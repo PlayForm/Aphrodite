@@ -14,9 +14,9 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
-OUT_DIR = REPO / ".hermes" / "tests"
+OUT_DIR = REPO / "reports"
 CACHE_FILE = OUT_DIR / "session_accumulator.json"
-OUT_FILE = OUT_DIR / "tune_results.json"
+OUT_FILE = OUT_DIR / "data.json"
 
 LIMIT = 40
 
@@ -285,7 +285,7 @@ def main():
     }.items():
         html = html.replace(key, val)
 
-    html_file = OUT_DIR / "tune_report.html"
+    html_file = OUT_DIR / "report.html"
     html_file.write_text(html)
     print(f"Report: {html_file}")
     __import__('webbrowser').open(f"file://{html_file}")

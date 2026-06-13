@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
+		<title>HermesCompress — Cumulative Compression</title>
+		<style>
+			:root {
+				--bg: #080808;
+				--s: #0f0f0f;
+				--b: #222;
+				--t: #888;
+				--tb: #ddd;
+				--a: #60a5fa;
+				--ad: #1e3a5f;
+				--g: #22c55e;
+				--gd: #14532d;
+				--y: #eab308;
+				--yd: #713f12;
+				--r: #f87171;
+				--re: #ef4444;
+				--rb: #7f1d1d;
+				--p: #c084fc;
+				--pd: #4c1d95;
+				--o: #fb923c;
+				--od: #7c2d12;
+				--c: #22d3ee;
+				--cd: #164e63;
+			}
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			body {
+				background: var(--bg);
+				color: var(--t);
+				font:
+					14px/1.65 -apple-system,
+					BlinkMacSystemFont,
+					"Segoe UI",
+					sans-serif;
+			}
+			.c {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 48px 28px;
+			}
+			header {
+				margin-bottom: 36px;
+				padding-bottom: 20px;
+				border-bottom: 1px solid var(--b);
+			}
+			.b {
+				display: inline-block;
+				padding: 3px 10px;
+				border-radius: 99px;
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+			}
+			.bv {
+				background: var(--ad);
+				color: var(--a);
+			}
+			.bm {
+				background: var(--gd);
+				color: var(--g);
+			}
+			.bw {
+				background: #333;
+				color: #aaa;
+			}
+			h1 {
+				font-size: 26px;
+				font-weight: 700;
+				color: var(--tb);
+				margin: 10px 0 6px;
+				letter-spacing: -0.02em;
+			}
+			h2 {
+				font-size: 18px;
+				font-weight: 600;
+				color: var(--tb);
+				margin: 44px 0 10px;
+				padding-bottom: 7px;
+				border-bottom: 1px solid var(--b);
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			}
+			h2 .d {
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+			}
+			.di {
+				background: var(--a);
+			}
+			.dp {
+				background: var(--g);
+			}
+			.ds {
+				background: var(--t);
+			}
+			.sub {
+				color: var(--t);
+				max-width: 780px;
+				line-height: 1.65;
+			}
+			.sub code {
+				color: #aaa;
+				background: #1a1a1a;
+				padding: 1px 5px;
+				border-radius: 3px;
+				font-size: 12px;
+			}
+			.sub em {
+				color: #ddd;
+				font-style: normal;
+			}
+			.me {
+				display: flex;
+				gap: 20px;
+				margin-top: 12px;
+				font: 11px monospace;
+				color: #555;
+				flex-wrap: wrap;
+			}
+			.me .kv {
+				color: #666;
+			}
+			.me .kv b {
+				color: #888;
+				font-weight: 500;
+			}
+			.help {
+				color: #555;
+				font-size: 12px;
+				line-height: 1.75;
+				margin: 8px 0 16px;
+				max-width: 780px;
+			}
+			.help em {
+				color: #666;
+				font-style: normal;
+			}
+			.help code {
+				background: #1a1a1a;
+				color: #999;
+				padding: 1px 4px;
+				border-radius: 2px;
+				font-size: 11px;
+			}
+			.help .hl {
+				color: var(--a);
+			}
+			.help .hg {
+				color: var(--g);
+			}
+			.help .hy {
+				color: var(--y);
+			}
+			.help .hr {
+				color: var(--r);
+			}
+
+			/* ── Tables ──────────────────────────────── */
+			.tw {
+				overflow-x: auto;
+				border: 1px solid var(--b);
+				border-radius: 6px;
+				background: var(--s);
+				margin-bottom: 22px;
+			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				font:
+					12px "SF Mono",
+					"Fira Code",
+					monospace;
+			}
+			th {
+				background: #0d0d0d;
+				color: #777;
+				font-weight: 500;
+				text-align: left;
+				padding: 9px 12px;
+				border-bottom: 1px solid var(--b);
+				font-size: 10px;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				white-space: nowrap;
+			}
+			td {
+				padding: 7px 12px;
+				border-bottom: 1px solid #1a1a1a;
+				white-space: nowrap;
+				vertical-align: top;
+			}
+			tr:last-child td {
+				border-bottom: none;
+			}
+			tr:hover {
+				background: #171717;
+			}
+			.n {
+				text-align: right;
+				font-variant-numeric: tabular-nums;
+			}
+			.cn {
+				color: var(--tb);
+				font-weight: 500;
+			}
+			.lbl {
+				color: #666;
+				font-size: 11px;
+			}
+			.tr {
+				color: var(--r);
+			}
+			.ty {
+				color: var(--y);
+			}
+			.tg {
+				color: var(--g);
+			}
+			.tb {
+				color: var(--tb);
+			}
+			.tool-tag {
+				display: inline-block;
+				padding: 1px 6px;
+				border-radius: 3px;
+				font-size: 10px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				margin-right: 4px;
+			}
+			.tt-te {
+				background: #1a2a1a;
+				color: var(--g);
+			}
+			.tt-rf {
+				background: #1a1a2a;
+				color: var(--a);
+			}
+			.tt-ws {
+				background: #2a1a1a;
+				color: var(--y);
+			}
+			.tt-ec {
+				background: #1a1a1a;
+				color: var(--o);
+			}
+			.tt-sf {
+				background: #1a2a2a;
+				color: var(--c);
+			}
+			.sb {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				min-width: 120px;
+			}
+			.br {
+				width: 76px;
+				height: 9px;
+				background: #1a1a1a;
+				border-radius: 5px;
+				overflow: hidden;
+			}
+			.bf {
+				height: 100%;
+				border-radius: 5px;
+			}
+			.gg {
+				background: var(--g);
+			}
+			.gy {
+				background: var(--y);
+			}
+			.gr {
+				background: var(--r);
+			}
+			.pct {
+				font-weight: 600;
+			}
+			.pg {
+				color: var(--g);
+			}
+			.py {
+				color: var(--y);
+			}
+			.pr {
+				color: var(--r);
+			}
+			.sr td {
+				border-top: 2px solid var(--b);
+				font-weight: 600;
+				color: var(--tb);
+				background: #0f0f0f;
+			}
+
+			/* ── Linear arrows ───────────────────────── */
+			.arrow-line {
+				position: relative;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.arrow-line::before {
+				content: "";
+				position: absolute;
+				top: 50%;
+				left: 6px;
+				right: 6px;
+				height: 2px;
+				background: linear-gradient(
+					90deg,
+					var(--re) 0%,
+					#661111 30%,
+					#333 50%,
+					#111166 70%,
+					var(--a) 100%
+				);
+			}
+			.arrow-line::after {
+				content: "";
+				position: absolute;
+				right: 4px;
+				top: 50%;
+				transform: translateY(-50%);
+				width: 0;
+				height: 0;
+				border-top: 5px solid transparent;
+				border-bottom: 5px solid transparent;
+				border-left: 8px solid var(--a);
+			}
+
+			/* ── Cards ───────────────────────────────── */
+			.ccard {
+				margin-bottom: 16px;
+				border: 1px solid var(--b);
+				border-radius: 8px;
+				overflow: hidden;
+				background: var(--s);
+			}
+			.ccard-head {
+				padding: 11px 16px;
+				background: #0c0c0c;
+				border-bottom: 1px solid var(--b);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				cursor: pointer;
+				user-select: none;
+			}
+			.ccard-head:hover {
+				background: #121212;
+			}
+			.ccard-head h3 {
+				font-size: 13px;
+				color: var(--tb);
+				font-weight: 600;
+			}
+			.ccard-head .st {
+				font: 10px monospace;
+				color: #666;
+			}
+			.ccard-body.collapsed {
+				display: none;
+			}
+			.diff-wrap {
+				display: flex;
+				gap: 0;
+				min-height: 80px;
+			}
+			.diff-wrap .arr {
+				position: relative;
+				width: 52px;
+				flex-shrink: 0;
+				background: #0c0c0c;
+				border-left: 1px solid var(--b);
+				border-right: 1px solid var(--b);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.diff-wrap .arr::before {
+				content: "";
+				position: absolute;
+				left: 10px;
+				right: 10px;
+				top: 50%;
+				height: 2px;
+				background: linear-gradient(
+					90deg,
+					var(--re),
+					#661111 25%,
+					#333 50%,
+					#111166 75%,
+					var(--a)
+				);
+			}
+			.diff-wrap .arr::after {
+				content: "";
+				position: absolute;
+				right: 9px;
+				top: 50%;
+				transform: translateY(-50%);
+				border-top: 5px solid transparent;
+				border-bottom: 5px solid transparent;
+				border-left: 8px solid var(--a);
+			}
+			.diff-col {
+				flex: 1;
+				padding: 12px 16px;
+				min-width: 0;
+			}
+			.diff-col.before {
+				background: linear-gradient(135deg, #0f0909, #0c0c0c);
+				border-right: 1px solid #1a0f0f;
+			}
+			.diff-col.before h4 {
+				color: #fca5a5;
+				font-size: 10px;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				margin-bottom: 8px;
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+			.diff-col.before .badge {
+				background: var(--rb);
+				color: var(--re);
+				padding: 2px 7px;
+				border-radius: 99px;
+				font-size: 9px;
+				font-weight: 700;
+			}
+			.diff-col.after {
+				background: linear-gradient(135deg, #09090f, #0c0c0c);
+			}
+			.diff-col.after h4 {
+				color: #93c5fd;
+				font-size: 10px;
+				text-transform: uppercase;
+				letter-spacing: 0.08em;
+				margin-bottom: 8px;
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+			.diff-col.after .badge {
+				background: var(--ad);
+				color: var(--a);
+				padding: 2px 7px;
+				border-radius: 99px;
+				font-size: 9px;
+				font-weight: 700;
+			}
+			.cbox {
+				font:
+					11px/1.5 "SF Mono",
+					"Fira Code",
+					monospace;
+				padding: 10px 12px;
+				border-radius: 5px;
+				white-space: pre-wrap;
+				word-break: break-all;
+				max-height: 200px;
+				overflow-y: auto;
+			}
+			.cbox.pre {
+				background: #0f0909;
+				border: 1px solid #2a1414;
+				color: #d4d4d4;
+			}
+			.cbox.post {
+				background: #09090f;
+				border: 1px solid #14142a;
+				color: #d4d4d4;
+			}
+
+			/* ── Stats bar ───────────────────────────── */
+			.stats-bar {
+				display: flex;
+				gap: 20px;
+				padding: 10px 16px;
+				background: #0c0c0c;
+				border-top: 1px solid var(--b);
+				font: 10px monospace;
+				color: #666;
+				flex-wrap: wrap;
+				align-items: center;
+			}
+			.stats-bar .kv {
+				display: inline-flex;
+				align-items: center;
+				gap: 4px;
+			}
+			.stats-bar .kv .k {
+				color: #555;
+				font-size: 9px;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+			}
+			.stats-bar .kv .v {
+				color: var(--tb);
+				font-weight: 500;
+			}
+			.stats-bar .saved {
+				color: var(--g);
+				font-weight: 700;
+				font-size: 11px;
+			}
+			.stats-bar .ms {
+				color: #777;
+			}
+			.stats-bar .xf {
+				color: #888;
+				font-size: 9px;
+			}
+
+			/* ── Summary cards ───────────────────────── */
+			.summary-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+				gap: 10px;
+				margin-bottom: 26px;
+			}
+			.summary-card {
+				background: var(--s);
+				border: 1px solid var(--b);
+				border-left: 3px solid var(--b);
+				border-radius: 7px;
+				padding: 12px 14px;
+			}
+			.summary-card.sc-g {
+				border-left-color: var(--g);
+			}
+			.summary-card.sc-a {
+				border-left-color: var(--a);
+			}
+			.summary-card.sc-y {
+				border-left-color: var(--y);
+			}
+			.summary-card.sc-r {
+				border-left-color: var(--r);
+			}
+			.summary-card .big {
+				font: 22px monospace;
+				color: var(--tb);
+				font-weight: 700;
+			}
+			.summary-card .lbl {
+				font-size: 10px;
+				color: #666;
+				margin-top: 2px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+			.note {
+				background: #111;
+				border: 1px solid var(--b);
+				border-radius: 6px;
+				padding: 12px 16px;
+				margin-bottom: 20px;
+				font-size: 12px;
+				color: #777;
+				line-height: 1.7;
+			}
+			.note strong {
+				color: var(--tb);
+			}
+			.note code {
+				background: #1a1a1a;
+				color: #999;
+				padding: 1px 5px;
+				border-radius: 3px;
+				font-size: 11px;
+			}
+			.note .path {
+				color: var(--c);
+			}
+			.note .cmd {
+				color: var(--y);
+			}
+			footer {
+				margin-top: 40px;
+				padding-top: 16px;
+				border-top: 1px solid var(--b);
+				font-size: 11px;
+				color: #555;
+			}
+			.ann {
+				background: var(--yd);
+				color: var(--y);
+				padding: 1px 5px;
+				border-radius: 3px;
+				font-size: 10px;
+				font-weight: 600;
+				margin-left: 5px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="c">
+			<header>
+				<div>
+					<span class="b bv">v0.7.6</span>
+					<span class="b bm">cache</span>
+					<span class="b bw">session: 18 msgs</span>
+				</div>
+				<h1>HermesCompress — Cumulative Compression</h1>
+				<p class="sub">
+					Randomized tool outputs accumulate in a shared session cache
+					across benchmark runs. Early calls see baseline compression;
+					later calls show how headroom scales as real-world context
+					builds up — the same pattern that occurs in long-running
+					Hermes sessions.
+				</p>
+				<div class="me">
+					<span class="kv">provider <b>deepseek</b></span>
+					<span class="kv">headroom <b>v0.25.0</b></span>
+					<span class="kv">threshold <b>500 tok</b></span>
+					<span class="kv">cache limit <b>40</b></span>
+					<span class="kv">2026-06-13 19:31 UTC</span>
+				</div>
+			</header>
+
+			<div class="summary-grid">
+				<div class="summary-card sc-g">
+					<div class="big">+60%</div>
+					<div class="lbl">Inline token savings</div>
+				</div>
+				<div class="summary-card sc-y">
+					<div class="big">25,135</div>
+					<div class="lbl">Tokens before compression</div>
+				</div>
+				<div class="summary-card sc-a">
+					<div class="big">10,191</div>
+					<div class="lbl">Tokens after compression</div>
+				</div>
+				<div class="summary-card sc-r">
+					<div class="big">5,069</div>
+					<div class="lbl">Proxy total billed tokens</div>
+				</div>
+				<div class="summary-card">
+					<div class="big">18</div>
+					<div class="lbl">Cache size (40 max)</div>
+				</div>
+			</div>
+
+			<div class="note">
+				<strong>How it works</strong> &mdash; each run appends
+				6 inline + 4 proxy test cases to
+				<code class="path">.hermes/tests/session_accumulator.json</code
+				>. The inline path uses <code>headroom.compress()</code> as a
+				Python library call (zero HTTP), wrapping each new tool output
+				in the accumulated session context. The proxy path sends HTTP
+				requests through a running <code>headroom proxy</code> on port
+				8787, which applies <span class="hl">SmartCrusher</span> &rarr;
+				<span class="hg">Kompress</span> &rarr; Cache before forwarding
+				to DeepSeek v4-flash. Cache entries older than 40 messages
+				are evicted. Use <code class="cmd">--reset</code> to clear.
+				</div>
+
+			<!-- ═══ INLINE ═══════════════════════════════════════════════════════ -->
+			<h2>
+				<span class="d di"></span>Inline — Python Library
+				<span class="ann">CCR</span>
+			</h2>
+			<p class="sub">
+				<code>headroom.compress()</code> called in-process on the
+				accumulated session cache plus a new randomized tool output. CCR
+				markers are LLM-native compressed references — the model
+				understands them without decompression. Zero HTTP, zero API
+				cost.
+			</p>
+			<p class="help">
+				<em>Pipeline:</em> ContentRouter &rarr;
+				<span class="hl">SmartCrusher</span> &rarr; CodeCompressor
+				&rarr; <span class="hg">Kompress</span> &rarr; CCR strip &rarr;
+				safety guard (reverts empty outputs only). Token counts come
+				from headroom internals via <code>CompressResult</code>. Chars
+				show the raw string length before and after — CCR markers are
+				typically &lt;100 chars regardless of input size.
+			</p>
+
+			<div class="tw">
+				<table>
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>Tool</th>
+							<th>Cache</th>
+							<th>Tokens In</th>
+							<th>Tokens Out</th>
+							<th>Saved</th>
+							<th>Rate</th>
+							<th>Chars</th>
+							<th>Time</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr onclick="toggle('i_0')" style="cursor:pointer"><td class="n">1</td><td class="cn"><span class="tool-tag tt-te">terminal</span></td><td class="lbl" style="font-size:10px">SmartCrusher</td><td class="n">0</td><td class="n">1,335</td><td class="n">49</td><td class="n tg">1,286</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:96.3%"></span></span><span class="pct pg">+96%</span></span></td><td class="lbl">2,714&rarr;27</td><td class="lbl">3348.9ms</td></tr>
+<tr onclick="toggle('i_1')" style="cursor:pointer"><td class="n">2</td><td class="cn"><span class="tool-tag tt-rf">read_file</span></td><td class="lbl" style="font-size:10px">CodeCompressor</td><td class="n">1</td><td class="n">3,223</td><td class="n">558</td><td class="n tg">2,665</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:82.7%"></span></span><span class="pct pg">+83%</span></span></td><td class="lbl">6,945&rarr;1,172</td><td class="lbl">1743.5ms</td></tr>
+<tr onclick="toggle('i_2')" style="cursor:pointer"><td class="n">3</td><td class="cn"><span class="tool-tag tt-ws">web_search</span></td><td class="lbl" style="font-size:10px">Kompress</td><td class="n">3</td><td class="n">3,611</td><td class="n">904</td><td class="n tg">2,707</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:75.0%"></span></span><span class="pct pg">+75%</span></span></td><td class="lbl">1,344&rarr;1,267</td><td class="lbl">17.4ms</td></tr>
+<tr onclick="toggle('i_3')" style="cursor:pointer"><td class="n">4</td><td class="cn"><span class="tool-tag tt-ec">execute_code</span></td><td class="lbl" style="font-size:10px">SmartCrusher+Compaction</td><td class="n">5</td><td class="n">4,715</td><td class="n">1,953</td><td class="n tg">2,762</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:58.6%"></span></span><span class="pct pg">+59%</span></span></td><td class="lbl">3,035&rarr;2,039</td><td class="lbl">21.2ms</td></tr>
+<tr onclick="toggle('i_4')" style="cursor:pointer"><td class="n">5</td><td class="cn"><span class="tool-tag tt-sf">search_files</span></td><td class="lbl" style="font-size:10px">ContentRouter</td><td class="n">7</td><td class="n">5,775</td><td class="n">3,013</td><td class="n ty">2,762</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:47.8%"></span></span><span class="pct py">+48%</span></span></td><td class="lbl">2,941&rarr;2,941</td><td class="lbl">18.7ms</td></tr>
+<tr onclick="toggle('i_5')" style="cursor:pointer"><td class="n">6</td><td class="cn"><span class="tool-tag tt-sf">cronjob</span></td><td class="lbl" style="font-size:10px">Full Pipeline</td><td class="n">8</td><td class="n">6,476</td><td class="n">3,714</td><td class="n ty">2,762</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:42.6%"></span></span><span class="pct py">+43%</span></span></td><td class="lbl">1,954&rarr;1,954</td><td class="lbl">20.2ms</td></tr>
+						<tr class="sr">
+							<td></td>
+							<td>TOTAL</td>
+							<td></td>
+							<td class="n">25,135</td>
+							<td class="n">10,191</td>
+							<td class="n tg">14,944</td>
+							<td>
+								<span class="sb"
+									><span class="br"
+										><span
+											class="bf gg"
+											style="
+												width: 59.5%;
+											"></span></span
+									><span class="pct pg"
+										>59.5%</span
+									></span
+								>
+							</td>
+							<td></td>
+							<td></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div class="ccard" id="i_0"><div class="ccard-head" onclick="toggle('i_0_b')"><h3>#1 terminal <span style="font-weight:400;color:#888;font-size:12px">[SmartCrusher] cache: 0 msgs</span></h3><span class="st">1,335t &rarr; 49t</span></div><div class="ccard-body collapsed" id="i_0_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 2,714 chars &nbsp; 1,335 tokens</h4><div class="cbox pre">{"output": "  file   18303  Apr 13 2026  .md\n  dir     1938  May 19 2024  .md\n  dir    90283  May 11 2026  .ts\n  link   75986  Mar 16 2026  .py\n  file   52655  Apr  6 2024  .md\n  link   59285  Feb  1 2024  .go\n  file   38624  Apr 10 2025  .py\n  dir    30424  Jun 17 2024  .ts\n  link   66625  Mar  4 2024  .ts\n  dir    61567  Feb  4 2026  .md\n  dir    85112  Jan  4 2026  .py\n  file    1459  Jan 22 2025  .ts\n  file   11351  Jan 28 2026  .go\n  file    2314  May  9 2026  .ts\n  link    36
+
+  ... [+2214 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 27 chars &nbsp; 49 tokens</h4><div class="cbox post">{"output":"","exit_code":1}</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">1,335 &rarr; 49</span></span><span class="saved">Saved 1,286t (96.3%)</span><span class="ms">&mid; 3348.9ms</span><span class="xf">Stage: SmartCrusher &middot; Transforms: router:protected:user_message, router:mixed:0.00</span></div></div></div>
+<div class="ccard" id="i_1"><div class="ccard-head" onclick="toggle('i_1_b')"><h3>#2 read_file <span style="font-weight:400;color:#888;font-size:12px">[CodeCompressor] cache: 1 msgs</span></h3><span class="st">3,223t &rarr; 558t</span></div><div class="ccard-body collapsed" id="i_1_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 6,945 chars &nbsp; 3,223 tokens</h4><div class="cbox pre">    def compute_0(self, a0, a1):
+        """Validate item 0."""
+        r = self._run(None)
+        return r
+
+    def handle_1(self, a0, a1):
+        """Process item 1."""
+        r = self._exec(a0)
+        return r
+
+    def validate_2(self, a0):
+        """Execute item 2."""
+        r = self._do(a0, a1)
+        return r
+
+    def resolve_3(self, ):
+        """Handle item 3."""
+        r = self._call(a0)
+        return r
+
+    def dispatch_4(self, a0, a1):
+        """Process item 4."""
+        r =
+
+  ... [+6445 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 1,172 chars &nbsp; 558 tokens</h4><div class="cbox post">compute_0(self, a1): handle_1(self, a1): 1.""" validate_2(self, 2.""" a1) resolve_3(self, 3.""" dispatch_4(self, 4.""" handle_5(self, 5.""" validate_6(self, 6.""" transform_7(self, 7.""" setup_8(self, a1): 8.""" compute_9(self, 9.""" execute_10(self, 10.""" transform_11(self, 11.""" setup_12(self, 12.""" self._exec(a0) dispatch_13(self, 13.""" compute_14(self, 14.""" transform_15(self, a2): 15.""" execute_16(self, 16.""" process_17(self, 17.""" transform_18(self, 18.""" transform_30(self, 30."""
+
+  ... [+672 more chars]</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">3,223 &rarr; 558</span></span><span class="saved">Saved 2,665t (82.7%)</span><span class="ms">&mid; 1743.5ms</span><span class="xf">Stage: CodeCompressor &middot; Transforms: router:mixed:0.00, router:protected:user_message, router:kompress:0.13</span></div></div></div>
+<div class="ccard" id="i_2"><div class="ccard-head" onclick="toggle('i_2_b')"><h3>#3 web_search <span style="font-weight:400;color:#888;font-size:12px">[Kompress] cache: 3 msgs</span></h3><span class="st">3,611t &rarr; 904t</span></div><div class="ccard-body collapsed" id="i_2_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 1,344 chars &nbsp; 3,611 tokens</h4><div class="cbox pre">{"results": [{"title": "Attention technique 0 \u2014 improving LLM context", "url": "https://example.com/article/8392", "snippet": "Learn how optimization can reduce token usage by 45% in production."}, {"title": "Optimization technique 1 \u2014 optimizing LLM context", "url": "https://example.com/article/2024", "snippet": "Learn how tokenization can improve token usage by 64% in production."}, {"title": "Caching technique 2 \u2014 improving LLM context", "url": "https://example.com/article/3250
+
+  ... [+844 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 1,267 chars &nbsp; 904 tokens</h4><div class="cbox post">{"results":[{"title":"Attention technique 0 — improving LLM context","url":"https://example.com/article/8392","snippet":"Learn how optimization can reduce token usage by 45% in production."},{"title":"Optimization technique 1 — optimizing LLM context","url":"https://example.com/article/2024","snippet":"Learn how tokenization can improve token usage by 64% in production."},{"title":"Caching technique 2 — improving LLM context","url":"https://example.com/article/3250","snippet":"Learn how compress
+
+  ... [+767 more chars]</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">3,611 &rarr; 904</span></span><span class="saved">Saved 2,707t (75.0%)</span><span class="ms">&mid; 17.4ms</span><span class="xf">Stage: Kompress &middot; Transforms: router:mixed:0.00, router:kompress:0.13, router:protected:user_message, router:protected:user_message, router:mixed:0.73</span></div></div></div>
+<div class="ccard" id="i_3"><div class="ccard-head" onclick="toggle('i_3_b')"><h3>#4 execute_code <span style="font-weight:400;color:#888;font-size:12px">[SmartCrusher+Compaction] cache: 5 msgs</span></h3><span class="st">4,715t &rarr; 1,953t</span></div><div class="ccard-body collapsed" id="i_3_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 3,035 chars &nbsp; 4,715 tokens</h4><div class="cbox pre">{"items": [{"id": 6811, "name": "item_0", "tags": ["tokenization", "caching"], "meta": {"created": "2026-07-09", "score": 49.6003, "active": true}}, {"id": 5035, "name": "item_1", "tags": ["compression", "transformer"], "meta": {"created": "2026-04-15", "score": 52.7375, "active": true}}, {"id": 3810, "name": "item_2", "tags": ["embedding", "optimization", "attention"], "meta": {"created": "2026-01-05", "score": 0.1117, "active": false}}, {"id": 8989, "name": "item_3", "tags": ["embedding", "tok
+
+  ... [+2535 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 2,039 chars &nbsp; 1,953 tokens</h4><div class="cbox post">{"items":"[20]{id:int,meta.created:string,meta.score:float,meta.active:bool,name:string,tags:json}\n6811,2026-07-09,49.6003,true,item_0,\"[\"\"tokenization\"\",\"\"caching\"\"]\"\n5035,2026-04-15,52.7375,true,item_1,\"[\"\"compression\"\",\"\"transformer\"\"]\"\n3810,2026-01-05,0.1117,false,item_2,\"[\"\"embedding\"\",\"\"optimization\"\",\"\"attention\"\"]\"\n8989,2026-05-02,32.4319,true,item_3,\"[\"\"embedding\"\",\"\"tokenization\"\",\"\"caching\"\"]\"\n7194,2026-08-25,57.2938,false,item_4,\"
+
+  ... [+1539 more chars]</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">4,715 &rarr; 1,953</span></span><span class="saved">Saved 2,762t (58.6%)</span><span class="ms">&mid; 21.2ms</span><span class="xf">Stage: SmartCrusher+Compaction &middot; Transforms: router:mixed:0.00, router:kompress:0.13, router:protected:user_message, router:mixed:0.73, router:protected:user_message, router:protected:user_message, router:smart_crusher:0.00</span></div></div></div>
+<div class="ccard" id="i_4"><div class="ccard-head" onclick="toggle('i_4_b')"><h3>#5 search_files <span style="font-weight:400;color:#888;font-size:12px">[ContentRouter] cache: 7 msgs</span></h3><span class="st">5,775t &rarr; 3,013t</span></div><div class="ccard-body collapsed" id="i_4_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 2,941 chars &nbsp; 5,775 tokens</h4><div class="cbox pre">INFO  [76409] response: tokenization embedding - latency=140ms status=283
+DEBUG [87141] cache: decoding attention - latency=68ms status=395
+ERROR [61443] response: tokenization - latency=102ms status=470
+DEBUG [71248] auth: caching tokenization attention - latency=377ms status=487
+WARN  [57182] db: transformer tokenization compression - latency=329ms status=317
+FATAL [62141] response: attention - latency=900ms status=221
+WARN  [28000] response: transformer tokenization - latency=89ms status=446
+
+
+  ... [+2441 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 2,941 chars &nbsp; 3,013 tokens</h4><div class="cbox post">INFO  [76409] response: tokenization embedding - latency=140ms status=283
+DEBUG [87141] cache: decoding attention - latency=68ms status=395
+ERROR [61443] response: tokenization - latency=102ms status=470
+DEBUG [71248] auth: caching tokenization attention - latency=377ms status=487
+WARN  [57182] db: transformer tokenization compression - latency=329ms status=317
+FATAL [62141] response: attention - latency=900ms status=221
+WARN  [28000] response: transformer tokenization - latency=89ms status=446
+
+
+  ... [+2441 more chars]</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">5,775 &rarr; 3,013</span></span><span class="saved">Saved 2,762t (47.8%)</span><span class="ms">&mid; 18.7ms</span><span class="xf">Stage: ContentRouter &middot; Transforms: router:mixed:0.00, router:kompress:0.13, router:protected:user_message, router:mixed:0.73, router:protected:user_message, router:smart_crusher:0.00, router:protected:user_message, router:protected:user_message, router:protected:error_output</span></div></div></div>
+<div class="ccard" id="i_5"><div class="ccard-head" onclick="toggle('i_5_b')"><h3>#6 cronjob <span style="font-weight:400;color:#888;font-size:12px">[Full Pipeline] cache: 8 msgs</span></h3><span class="st">6,476t &rarr; 3,714t</span></div><div class="ccard-body collapsed" id="i_5_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 1,954 chars &nbsp; 6,476 tokens</h4><div class="cbox pre">FATAL [12560] response: decoding - latency=155ms status=336
+ERROR [46986] auth: caching tokenization - latency=780ms status=355
+INFO  [27933] auth: compression - latency=932ms status=431
+ERROR [95187] auth: caching - latency=868ms status=218
+FATAL [30540] request: caching transformer - latency=270ms status=465
+DEBUG [28024] response: transformer attention - latency=979ms status=257
+WARN  [33107] net: decoding embedding compression - latency=964ms status=243
+DEBUG [26058] response: tokenization o
+
+  ... [+1454 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 1,954 chars &nbsp; 3,714 tokens</h4><div class="cbox post">FATAL [12560] response: decoding - latency=155ms status=336
+ERROR [46986] auth: caching tokenization - latency=780ms status=355
+INFO  [27933] auth: compression - latency=932ms status=431
+ERROR [95187] auth: caching - latency=868ms status=218
+FATAL [30540] request: caching transformer - latency=270ms status=465
+DEBUG [28024] response: transformer attention - latency=979ms status=257
+WARN  [33107] net: decoding embedding compression - latency=964ms status=243
+DEBUG [26058] response: tokenization o
+
+  ... [+1454 more chars]</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">6,476 &rarr; 3,714</span></span><span class="saved">Saved 2,762t (42.6%)</span><span class="ms">&mid; 20.2ms</span><span class="xf">Stage: Full Pipeline &middot; Transforms: router:mixed:0.00, router:kompress:0.13, router:protected:user_message, router:mixed:0.73, router:protected:user_message, router:smart_crusher:0.00, router:protected:user_message, router:protected:error_output, router:protected:user_message, router:protected:error_output</span></div></div></div>
+
+			<!-- ═══ PROXY ════════════════════════════════════════════════════════ -->
+			<h2>
+				<span class="d dp"></span>Proxy — headroom &rarr; DeepSeek
+				<span class="ann">billed</span>
+			</h2>
+			<p class="sub">
+				HTTP POST through <code>headroom proxy</code> (port 8787) with
+				accumulated session context. These are
+				<em>actual billed</em> prompt tokens as reported by the DeepSeek
+				API — the ground-truth cost metric.
+			</p>
+			<p class="help">
+				<em>Pipeline:</em> HTTP POST &rarr; CacheAligner &rarr;
+				ContentRouter &rarr; <span class="hl">SmartCrusher</span> &rarr;
+				<span class="hg">Kompress</span> &rarr; Cache &rarr; upstream
+				POST to DeepSeek. The proxy handles CCR markers, caching, and
+				rate limiting transparently. Tool messages from the cache are
+				filtered out (DeepSeek does not accept <code>role=tool</code>).
+				Completion tokens are capped at 50.
+			</p>
+
+			<div class="tw">
+				<table>
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>Tool</th>
+							<th>Cache</th>
+							<th>Prompt</th>
+							<th>Completion</th>
+							<th>Total</th>
+							<th>Chars In</th>
+							<th>LLM Response</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr onclick="toggle('p_0')" style="cursor:pointer"><td class="n">1</td><td class="cn"><span class="tool-tag tt-rf">read_file</span></td><td class="lbl" style="font-size:10px">CodeCompressor</td><td class="n">10</td><td class="n">1,855</td><td class="n">2</td><td class="n">1,857</td><td class="lbl">18,922</td><td class="lbl">3311</td></tr>
+<tr onclick="toggle('p_1')" style="cursor:pointer"><td class="n">2</td><td class="cn"><span class="tool-tag tt-sf">search_files</span></td><td class="lbl" style="font-size:10px">ContentRouter</td><td class="n">12</td><td class="n">1,386</td><td class="n">2</td><td class="n">1,388</td><td class="lbl">4,860</td><td class="lbl">10015</td></tr>
+<tr onclick="toggle('p_2')" style="cursor:pointer"><td class="n">3</td><td class="cn"><span class="tool-tag tt-ws">web_search</span></td><td class="lbl" style="font-size:10px">Kompress</td><td class="n">14</td><td class="n">854</td><td class="n">2</td><td class="n">856</td><td class="lbl">2,869</td><td class="lbl">18922</td></tr>
+<tr onclick="toggle('p_3')" style="cursor:pointer"><td class="n">4</td><td class="cn"><span class="tool-tag tt-ec">execute_code</span></td><td class="lbl" style="font-size:10px">SmartCrusher+Compaction</td><td class="n">16</td><td class="n">966</td><td class="n">2</td><td class="n">968</td><td class="lbl">2,273</td><td class="lbl">1134</td></tr>
+						<tr class="sr">
+							<td></td>
+							<td>TOTAL</td>
+							<td></td>
+							<td class="n">5,061</td>
+							<td class="n">8</td>
+							<td class="n">5,069</td>
+							<td></td>
+							<td></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<div class="ccard" id="p_0"><div class="ccard-head" onclick="toggle('p_0_b')"><h3>#1 read_file <span style="font-weight:400;color:#888;font-size:12px">[CodeCompressor] cache: 10 msgs</span></h3><span class="st">1,855 prompt tokens</span></div><div class="ccard-body collapsed" id="p_0_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">CONTENT SENT</span> 18,922 chars &nbsp; 1,855 prompt tokens</h4><div class="cbox pre">    def resolve_0(self, a0):
+        """Handle item 0."""
+        r = self._run(None)
+        return r
+
+    def transform_1(self, ):
+        """Validate item 1."""
+        r = self._exec(a0, a1)
+        return r
+
+    def setup_2(self, ):
+        """Process item 2."""
+        r = self._call(a0)
+        return r
+
+    def resolve_3(self, a0):
+        """Process item 3."""
+        r = self._call(None)
+        return r
+
+    def execute_4(self, a0, a1):
+        """Process item 4."""
+        r = self._
+
+  ... [+18422 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">LLM RESPONSE</span> 2 completion tokens</h4><div class="cbox post">3311</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Prompt</span> <span class="v">1,855t</span></span><span class="kv"><span class="k">Completion</span> <span class="v">2t</span></span><span class="kv"><span class="k">Total billed</span> <span class="v">1,857t</span></span></div></div></div>
+<div class="ccard" id="p_1"><div class="ccard-head" onclick="toggle('p_1_b')"><h3>#2 search_files <span style="font-weight:400;color:#888;font-size:12px">[ContentRouter] cache: 12 msgs</span></h3><span class="st">1,386 prompt tokens</span></div><div class="ccard-body collapsed" id="p_1_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">CONTENT SENT</span> 4,860 chars &nbsp; 1,386 prompt tokens</h4><div class="cbox pre">DEBUG [31317] net: transformer - latency=576ms status=270
+INFO  [55427] auth: compression tokenization - latency=131ms status=321
+INFO  [55574] cache: transformer caching attention - latency=608ms status=595
+WARN  [88374] request: compression caching attention - latency=878ms status=207
+FATAL [33614] request: tokenization caching transformer - latency=423ms status=335
+DEBUG [60157] net: tokenization transformer - latency=878ms status=296
+WARN  [98952] net: optimization - latency=42ms status=356
+
+
+  ... [+4360 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">LLM RESPONSE</span> 2 completion tokens</h4><div class="cbox post">10015</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Prompt</span> <span class="v">1,386t</span></span><span class="kv"><span class="k">Completion</span> <span class="v">2t</span></span><span class="kv"><span class="k">Total billed</span> <span class="v">1,388t</span></span></div></div></div>
+<div class="ccard" id="p_2"><div class="ccard-head" onclick="toggle('p_2_b')"><h3>#3 web_search <span style="font-weight:400;color:#888;font-size:12px">[Kompress] cache: 14 msgs</span></h3><span class="st">854 prompt tokens</span></div><div class="ccard-body collapsed" id="p_2_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">CONTENT SENT</span> 2,869 chars &nbsp; 854 prompt tokens</h4><div class="cbox pre">{"results": [{"title": "Compression technique 0 \u2014 improving LLM context", "url": "https://example.com/article/2124", "snippet": "Learn how caching can improve token usage by 68% in production."}, {"title": "Caching technique 1 \u2014 reducing LLM context", "url": "https://example.com/article/3027", "snippet": "Learn how transformer can improve token usage by 47% in production."}, {"title": "Tokenization technique 2 \u2014 improving LLM context", "url": "https://example.com/article/1102", "s
+
+  ... [+2369 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">LLM RESPONSE</span> 2 completion tokens</h4><div class="cbox post">18922</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Prompt</span> <span class="v">854t</span></span><span class="kv"><span class="k">Completion</span> <span class="v">2t</span></span><span class="kv"><span class="k">Total billed</span> <span class="v">856t</span></span></div></div></div>
+<div class="ccard" id="p_3"><div class="ccard-head" onclick="toggle('p_3_b')"><h3>#4 execute_code <span style="font-weight:400;color:#888;font-size:12px">[SmartCrusher+Compaction] cache: 16 msgs</span></h3><span class="st">966 prompt tokens</span></div><div class="ccard-body collapsed" id="p_3_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">CONTENT SENT</span> 2,273 chars &nbsp; 966 prompt tokens</h4><div class="cbox pre">{"items": [{"id": 4917, "name": "item_0", "tags": ["caching"], "meta": {"created": "2026-07-16", "score": 12.1294, "active": true}}, {"id": 8116, "name": "item_1", "tags": ["decoding", "compression", "tokenization"], "meta": {"created": "2026-11-15", "score": 84.4408, "active": true}}, {"id": 1968, "name": "item_2", "tags": ["tokenization", "decoding"], "meta": {"created": "2026-10-03", "score": 72.9058, "active": true}}, {"id": 3648, "name": "item_3", "tags": ["embedding"], "meta": {"created": 
+
+  ... [+1773 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">LLM RESPONSE</span> 2 completion tokens</h4><div class="cbox post">1134</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Prompt</span> <span class="v">966t</span></span><span class="kv"><span class="k">Completion</span> <span class="v">2t</span></span><span class="kv"><span class="k">Total billed</span> <span class="v">968t</span></span></div></div></div>
+
+			<footer>
+				HermesCompress v0.7.6 &nbsp;·&nbsp; headroom-ai v0.25.0
+				&nbsp;·&nbsp; deepseek-v4-flash &nbsp;·&nbsp; cache mode
+				&nbsp;·&nbsp; min_tokens_to_crush: 500 &nbsp;·&nbsp; cache:
+				18/40 &nbsp;·&nbsp; 2026-06-13 19:31 UTC
+			</footer>
+		</div>
+		<script>
+			function toggle(id) {
+				document.getElementById(id).classList.toggle("collapsed");
+			}
+		</script>
+	</body>
+</html>

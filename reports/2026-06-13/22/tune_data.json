@@ -1,0 +1,342 @@
+{
+  "default": {
+    "config": {
+      "label": "default",
+      "protect_recent": 1,
+      "min_tokens": 100,
+      "target_ratio": null
+    },
+    "rows": [
+      {
+        "tool": "terminal",
+        "tb": 8095,
+        "ta": 3868,
+        "ts": 4227,
+        "pct": 52.2,
+        "ms": 5082.2,
+        "cpre": 3088,
+        "cpost": 27,
+        "err": null
+      },
+      {
+        "tool": "read_file",
+        "tb": 11615,
+        "ta": 5119,
+        "ts": 6496,
+        "pct": 55.9,
+        "ms": 1318.7,
+        "cpre": 17937,
+        "cpost": 2843,
+        "err": null
+      },
+      {
+        "tool": "web_search",
+        "tb": 7168,
+        "ta": 4406,
+        "ts": 2762,
+        "pct": 38.5,
+        "ms": 29.2,
+        "cpre": 2104,
+        "cpost": 2014,
+        "err": null
+      },
+      {
+        "tool": "execute_code",
+        "tb": 7236,
+        "ta": 4474,
+        "ts": 2762,
+        "pct": 38.2,
+        "ms": 29.9,
+        "cpre": 1750,
+        "cpost": 1577,
+        "err": null
+      },
+      {
+        "tool": "search_files",
+        "tb": 8011,
+        "ta": 5249,
+        "ts": 2762,
+        "pct": 34.5,
+        "ms": 24.4,
+        "cpre": 3953,
+        "cpost": 3953,
+        "err": null
+      }
+    ],
+    "total_tb": 42125,
+    "total_ts": 19009,
+    "total_pct": 45.1
+  },
+  "aggressive": {
+    "config": {
+      "label": "aggressive",
+      "protect_recent": 0,
+      "min_tokens": 50,
+      "target_ratio": 0.05
+    },
+    "rows": [
+      {
+        "tool": "terminal",
+        "tb": 9037,
+        "ta": 3869,
+        "ts": 5168,
+        "pct": 57.2,
+        "ms": 28.8,
+        "cpre": 5026,
+        "cpost": 27,
+        "err": null
+      },
+      {
+        "tool": "read_file",
+        "tb": 11497,
+        "ta": 4180,
+        "ts": 7317,
+        "pct": 63.6,
+        "ms": 1252.9,
+        "cpre": 17307,
+        "cpost": 768,
+        "err": null
+      },
+      {
+        "tool": "web_search",
+        "tb": 6942,
+        "ta": 4180,
+        "ts": 2762,
+        "pct": 39.8,
+        "ms": 26.1,
+        "cpre": 1261,
+        "cpost": 1207,
+        "err": null
+      },
+      {
+        "tool": "execute_code",
+        "tb": 7569,
+        "ta": 4760,
+        "ts": 2809,
+        "pct": 37.1,
+        "ms": 28.8,
+        "cpre": 2721,
+        "cpost": 1831,
+        "err": null
+      },
+      {
+        "tool": "search_files",
+        "tb": 8202,
+        "ta": 5440,
+        "ts": 2762,
+        "pct": 33.7,
+        "ms": 24.1,
+        "cpre": 4310,
+        "cpost": 4310,
+        "err": null
+      }
+    ],
+    "total_tb": 43247,
+    "total_ts": 20818,
+    "total_pct": 48.1
+  },
+  "conservative": {
+    "config": {
+      "label": "conservative",
+      "protect_recent": 4,
+      "min_tokens": 500,
+      "target_ratio": null
+    },
+    "rows": [
+      {
+        "tool": "terminal",
+        "tb": 8725,
+        "ta": 3867,
+        "ts": 4858,
+        "pct": 55.7,
+        "ms": 27.6,
+        "cpre": 4380,
+        "cpost": 27,
+        "err": null
+      },
+      {
+        "tool": "read_file",
+        "tb": 9524,
+        "ta": 4556,
+        "ts": 4968,
+        "pct": 52.2,
+        "ms": 810.5,
+        "cpre": 10463,
+        "cpost": 1644,
+        "err": null
+      },
+      {
+        "tool": "web_search",
+        "tb": 7022,
+        "ta": 4260,
+        "ts": 2762,
+        "pct": 39.3,
+        "ms": 26.3,
+        "cpre": 1555,
+        "cpost": 1489,
+        "err": null
+      },
+      {
+        "tool": "execute_code",
+        "tb": 8589,
+        "ta": 5672,
+        "ts": 2917,
+        "pct": 34.0,
+        "ms": 30.8,
+        "cpre": 5417,
+        "cpost": 3440,
+        "err": null
+      },
+      {
+        "tool": "search_files",
+        "tb": 7575,
+        "ta": 4813,
+        "ts": 2762,
+        "pct": 36.5,
+        "ms": 22.7,
+        "cpre": 2656,
+        "cpost": 2656,
+        "err": null
+      }
+    ],
+    "total_tb": 41435,
+    "total_ts": 18267,
+    "total_pct": 44.1
+  },
+  "balanced+": {
+    "config": {
+      "label": "balanced+",
+      "protect_recent": 1,
+      "min_tokens": 150,
+      "target_ratio": 0.1
+    },
+    "rows": [
+      {
+        "tool": "terminal",
+        "tb": 8738,
+        "ta": 3869,
+        "ts": 4869,
+        "pct": 55.7,
+        "ms": 27.5,
+        "cpre": 4414,
+        "cpost": 27,
+        "err": null
+      },
+      {
+        "tool": "read_file",
+        "tb": 8889,
+        "ta": 4176,
+        "ts": 4713,
+        "pct": 53.0,
+        "ms": 676.7,
+        "cpre": 8346,
+        "cpost": 814,
+        "err": null
+      },
+      {
+        "tool": "web_search",
+        "tb": 7095,
+        "ta": 4333,
+        "ts": 2762,
+        "pct": 38.9,
+        "ms": 26.4,
+        "cpre": 1810,
+        "cpost": 1732,
+        "err": null
+      },
+      {
+        "tool": "execute_code",
+        "tb": 8245,
+        "ta": 5346,
+        "ts": 2899,
+        "pct": 35.2,
+        "ms": 31.1,
+        "cpre": 4454,
+        "cpost": 2780,
+        "err": null
+      },
+      {
+        "tool": "search_files",
+        "tb": 7705,
+        "ta": 4943,
+        "ts": 2762,
+        "pct": 35.8,
+        "ms": 24.4,
+        "cpre": 3087,
+        "cpost": 3087,
+        "err": null
+      }
+    ],
+    "total_tb": 40672,
+    "total_ts": 18005,
+    "total_pct": 44.3
+  },
+  "maximum": {
+    "config": {
+      "label": "maximum",
+      "protect_recent": 0,
+      "min_tokens": 25,
+      "target_ratio": 0.01
+    },
+    "rows": [
+      {
+        "tool": "terminal",
+        "tb": 8836,
+        "ta": 3870,
+        "ts": 4966,
+        "pct": 56.2,
+        "ms": 28.9,
+        "cpre": 4618,
+        "cpost": 27,
+        "err": null
+      },
+      {
+        "tool": "read_file",
+        "tb": 8426,
+        "ta": 3898,
+        "ts": 4528,
+        "pct": 53.7,
+        "ms": 537.2,
+        "cpre": 6526,
+        "cpost": 131,
+        "err": null
+      },
+      {
+        "tool": "web_search",
+        "tb": 6944,
+        "ta": 4182,
+        "ts": 2762,
+        "pct": 39.8,
+        "ms": 26.4,
+        "cpre": 1264,
+        "cpost": 1210,
+        "err": null
+      },
+      {
+        "tool": "execute_code",
+        "tb": 7237,
+        "ta": 4475,
+        "ts": 2762,
+        "pct": 38.2,
+        "ms": 27.8,
+        "cpre": 1745,
+        "cpost": 1572,
+        "err": null
+      },
+      {
+        "tool": "search_files",
+        "tb": 8452,
+        "ta": 5690,
+        "ts": 2762,
+        "pct": 32.7,
+        "ms": 24.6,
+        "cpre": 5235,
+        "cpost": 5235,
+        "err": null
+      }
+    ],
+    "total_tb": 39895,
+    "total_ts": 17780,
+    "total_pct": 44.6
+  }
+}
