@@ -74,7 +74,6 @@ TOOL_STRATEGIES: dict[str, str] = {
     "terminal": "balanced",
     "execute_code": "balanced",
     "read_terminal": "balanced",
-    "browser_console": "balanced",
     "process": "balanced",
     "cronjob": "balanced",
 

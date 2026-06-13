@@ -10,7 +10,7 @@ import json, os, subprocess, sys, time, urllib.request
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parent.parent
-HEADROOM_BIN = Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "headroom"
+HEADROOM_BIN = REPO_DIR / ".venv" / "bin" / "headroom"
 RESULTS_DIR = REPO_DIR / ".hermes" / "tests" / "proxy"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_FILE = REPO_DIR / ".hermes" / "cache" / "session.json"
