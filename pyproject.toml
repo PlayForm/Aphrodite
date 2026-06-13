@@ -1,6 +1,6 @@
 [project]
 name = "hermes-compress"
-version = "0.7.4"
+version = "0.7.5"
 description = "Headroom-powered context compression — slash LLM token usage by 25-60%"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -13,9 +13,6 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
-
-[project.scripts]
-hermes-compress = "hermes_compress._cli:main"
 
 [build-system]
 requires = ["hatchling"]
