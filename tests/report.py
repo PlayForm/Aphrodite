@@ -17,10 +17,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 VENV = REPO / ".venv"
-OUT_DIR = REPO / ".hermes" / "tests"
+OUT_DIR = REPO / "reports"
 TEMPLATE = REPO / "tests" / "report_template.html"
-OUT_HTML = OUT_DIR / "comparison_report.html"
-OUT_JSON = OUT_DIR / "comparison_data.json"
 CACHE = OUT_DIR / "session_accumulator.json"
 
 KEY = os.getenv("HEADROOM_DEEPSEEK_KEY", "")
@@ -405,7 +403,12 @@ def build_proxy_cards(rows):
 def main():
     run = "--no-run" not in sys.argv
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.strftime("%Y-%m-%d %H:%M UTC")
+    run_dir = OUT_DIR / now_dt.strftime("%Y-%m-%d") / now_dt.strftime("%H")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    out_html = run_dir / "report.html"
+    out_json = run_dir / "data.json"
 
     if run:
         cn_start = len(_load())
@@ -423,9 +426,9 @@ def main():
         print(f"\nCache: {cn_start} → {cn} messages")
 
         json.dump({"inline": inline, "proxy": proxy, "cache_n": cn, "limit": LIMIT},
-                  open(OUT_JSON, "w"), indent=2, default=str)
+                  open(out_json, "w"), indent=2, default=str)
     else:
-        d = json.load(open(OUT_JSON))
+        d = json.load(open(out_json))
         inline, proxy, cn = d["inline"], d["proxy"], d.get("cache_n", len(_load()))
         print(f"Loaded cached: {cn} messages")
 
@@ -458,7 +461,7 @@ def main():
         )
 
     replacements = {
-        "%VERSION%": "0.7.4",
+        "%VERSION%": "0.7.6",
         "%LIMIT%": str(LIMIT),
         "%TIMESTAMP%": now,
         "%CACHE_N%": str(cn),
@@ -485,11 +488,11 @@ def main():
     for key, val in replacements.items():
         template = template.replace(key, val)
 
-    OUT_HTML.write_text(template)
-    print(f"Report: {OUT_HTML} ({OUT_HTML.stat().st_size:,} bytes)")
+    out_html.write_text(template)
+    print(f"Report: {out_html} ({out_html.stat().st_size:,} bytes)")
 
     import webbrowser
-    webbrowser.open(f"file://{OUT_HTML}")
+    webbrowser.open(f"file://{out_html}")
     print("Opened.")
 
 
