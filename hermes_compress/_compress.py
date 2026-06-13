@@ -499,11 +499,11 @@ class Compress:
             pp_start = time.monotonic()
             messages = _strip_ccr_markers(result.messages)
 
-            # Phase 2a: Safety guard — revert tool outputs compressed to empty
-            # or over-compressed (>90% reduction). Headroom may over-compress
-            # tool outputs, stripping content aggressively. Revert both.
+            # Phase 2a: Safety guard — revert tool outputs compressed to empty.
+            # Headroom may produce empty strings when Kompress fails on specific
+            # content types. Revert only empty content — CCR markers are valid
+            # compressed output that the LLM understands natively.
             _empty_guard_count = 0
-            _overcompress_guard_count = 0
             for _i, _m in enumerate(messages):
                 if _m.get("role") != "tool":
                     continue
@@ -513,27 +513,12 @@ class Compress:
                 if not _orig:
                     continue
                 if isinstance(_content, str) and not _content.strip():
-                    # Headroom compressed to empty string — revert
                     messages[_i] = {**_m, "content": _orig}
                     _empty_guard_count += 1
-                elif isinstance(_content, str) and len(_content) < len(_orig) * 0.10:
-                    # >90% reduction — over-compressed, revert
-                    messages[_i] = {**_m, "content": _orig}
-                    _overcompress_guard_count += 1
-            if _empty_guard_count > 0 or _overcompress_guard_count > 0:
+            if _empty_guard_count > 0:
                 logger.warning(
-                    "hermes-compress: safety guard reverted %d tool output(s) "
-                    "(empty: %d, over-compressed >90%%: %d)",
-                    _empty_guard_count + _overcompress_guard_count,
+                    "hermes-compress: safety guard reverted %d empty tool output(s)",
                     _empty_guard_count,
-                    _overcompress_guard_count,
-                )
-                logger.warning(
-                    "hermes-compress: safety guard reverted %d tool output(s) "
-                    "(empty: %d, over-compressed >90%%: %d)",
-                    _empty_guard_count + _overcompress_guard_count,
-                    _empty_guard_count,
-                    _overcompress_guard_count,
                 )
 
             if flags.optimize_content:

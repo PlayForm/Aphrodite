@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 MODE="${1:-cache}"
 PORT="${2:-8787}"
-HEADROOM_BIN="$HOME/.hermes/hermes-agent/venv/bin/headroom"
+HEADROOM_BIN="$REPO_DIR/.venv/bin/headroom"
 DEEPSEEK_URL="https://api.deepseek.com"
 
 if [ -f "$REPO_DIR/.env" ]; then source "$REPO_DIR/.env"; fi

@@ -368,44 +368,45 @@ compression:
 ## Benchmarks 📈
 
 ## Benchmarks 📈
+
 ## Benchmarks 📈
 
 ### Production Session (DeepSeek v4-pro, max compression)
 
-| Metric | Value |
-|--------|-------|
-| **Calls** | 9 |
-| **Tokens saved** | 5,361 |
-| **Total latency** | 204 ms (23 ms/call) |
-| **Compression ratio** | ~60% per call |
+| Metric                | Value               |
+| --------------------- | ------------------- |
+| **Calls**             | 9                   |
+| **Tokens saved**      | 5,361               |
+| **Total latency**     | 204 ms (23 ms/call) |
+| **Compression ratio** | ~60% per call       |
 
 ### Dev Session (same model, dev bypass active)
 
-| Metric | Value |
-|--------|-------|
-| **Calls** | 7 |
-| **Tokens saved** | 4,817 |
+| Metric            | Value               |
+| ----------------- | ------------------- |
+| **Calls**         | 7                   |
+| **Tokens saved**  | 4,817               |
 | **Total latency** | 178 ms (25 ms/call) |
 
 ### Unit Benchmark (raw headroom, 18 configs × 4 content types)
 
-| Content | Configs | Latency (warm) | Token savings |
-|---------|---------|---------------|---------------|
-| JSON (34K chars) | 18 | 18 ms | 0% (structural only) |
-| Code (2.9K) | 18 | 1 ms | 0% |
-| Mixed (3.7K) | 18 | 2 ms | 0% |
-| Prose (4.6K) | 18 | 2 ms | 0% |
+| Content          | Configs | Latency (warm) | Token savings        |
+| ---------------- | ------- | -------------- | -------------------- |
+| JSON (34K chars) | 18      | 18 ms          | 0% (structural only) |
+| Code (2.9K)      | 18      | 1 ms           | 0%                   |
+| Mixed (3.7K)     | 18      | 2 ms           | 0%                   |
+| Prose (4.6K)     | 18      | 2 ms           | 0%                   |
 
-> Raw headroom reports 0% because SmartCrusher restructures content
-> without reducing token count. The full 8-phase pipeline (pre-process,
-> optimize, deduplicate, pre-compress) adds 43-60% real savings on top.
+> Raw headroom reports 0% because SmartCrusher restructures content without
+> reducing token count. The full 8-phase pipeline (pre-process, optimize,
+> deduplicate, pre-compress) adds 43-60% real savings on top.
 
 ### vs API Baseline
 
 Without compression, 863 messages cost ~2.3M tokens per call. With
-hermes-compress at `protect_recent=1`: **~77% reduction** in effective
-token usage through prompt caching + compression. For DeepSeek's 1M
-context window, this means ~3× longer conversations before summarization.
+hermes-compress at `protect_recent=1`: **~77% reduction** in effective token
+usage through prompt caching + compression. For DeepSeek's 1M context window,
+this means ~3× longer conversations before summarization.
 
 <br>
 
