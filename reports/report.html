@@ -1,0 +1,172 @@
+<!DOCTYPE html><html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>HermesCompress — Fine-Tuning Configs</title>
+<style>
+:root{--bg:#080808;--s:#0f0f0f;--b:#222;--t:#888;--tb:#ddd;--a:#60a5fa;--ad:#1e3a5f;
+--g:#22c55e;--gd:#14532d;--y:#eab308;--yd:#713f12;--r:#f87171;--re:#ef4444;--rb:#7f1d1d;
+--p:#c084fc;--pd:#4c1d95;--o:#fb923c;--od:#7c2d12;--c:#22d3ee;--cd:#164e63}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t);font:14px/1.65 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.c{max-width:1300px;margin:0 auto;padding:48px 28px}
+header{margin-bottom:36px;padding-bottom:20px;border-bottom:1px solid var(--b)}
+.b{display:inline-block;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.bv{background:var(--ad);color:var(--a)}.bm{background:var(--gd);color:var(--g)}.bw{background:#333;color:#aaa}
+h1{font-size:26px;font-weight:700;color:var(--tb);margin:10px 0 6px;letter-spacing:-.02em}
+h2{font-size:18px;font-weight:600;color:var(--tb);margin:44px 0 10px;padding-bottom:7px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px}
+h2 .d{width:8px;height:8px;border-radius:50%}
+h3{font-size:14px;color:var(--tb);margin:24px 0 10px;display:flex;align-items:center;gap:8px}
+.sub{color:var(--t);max-width:780px;line-height:1.65}.sub code{color:#aaa;background:#1a1a1a;padding:1px 5px;border-radius:3px;font-size:12px}
+.me{display:flex;gap:20px;margin-top:12px;font:11px monospace;color:#555;flex-wrap:wrap}
+.me .kv{color:#666}.me .kv b{color:#888;font-weight:500}
+.help{color:#555;font-size:12px;line-height:1.75;margin:8px 0 16px;max-width:780px}
+
+/* ── Tables ──────────────────────────────── */
+.tw{overflow-x:auto;border:1px solid var(--b);border-radius:6px;background:var(--s);margin-bottom:22px}
+table{width:100%;border-collapse:collapse;font:12px 'SF Mono','Fira Code',monospace}
+th{background:#0d0d0d;color:#777;font-weight:500;text-align:left;padding:9px 12px;border-bottom:1px solid var(--b);font-size:10px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+td{padding:7px 12px;border-bottom:1px solid #1a1a1a;white-space:nowrap;vertical-align:top}
+tr:last-child td{border-bottom:none}tr:hover{background:#171717}
+.n{text-align:right;font-variant-numeric:tabular-nums}.cn{color:var(--tb);font-weight:500}.lbl{color:#666;font-size:11px}
+.tg{color:var(--g)}.ty{color:var(--y)}.tr{color:var(--r)}.ta{color:var(--a)}.tp{color:var(--p)}
+.tool-tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-right:4px}
+.tt-te{background:#1a2a1a;color:var(--g)}.tt-rf{background:#1a1a2a;color:var(--a)}
+.tt-ws{background:#2a1a1a;color:var(--y)}.tt-ec{background:#1a1a1a;color:var(--o)}
+.tt-sf{background:#1a2a2a;color:var(--c)}
+.sb{display:inline-flex;align-items:center;gap:6px;min-width:120px}
+.br{width:76px;height:9px;background:#1a1a1a;border-radius:5px;overflow:hidden}
+.bf{height:100%;border-radius:5px}.gg{background:var(--g)}.gy{background:var(--y)}.gr{background:var(--r)}.ga{background:var(--a)}
+.pct{font-weight:600}.pg{color:var(--g)}.py{color:var(--y)}.pr{color:var(--r)}.pa{color:var(--a)}
+.sr td{border-top:2px solid var(--b);font-weight:600;color:var(--tb);background:#0f0f0f}
+.hl td{background:#111}
+
+/* ── Cards ───────────────────────────────── */
+.ccard{margin-bottom:14px;border:1px solid var(--b);border-radius:8px;overflow:hidden;background:var(--s)}
+.ccard-head{padding:10px 15px;background:#0c0c0c;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+.ccard-head:hover{background:#121212}
+.ccard-head h3{font-size:13px;color:var(--tb);font-weight:600;margin:0}
+.ccard-head .st{font:10px monospace;color:#666}
+.ccard-body.collapsed{display:none}
+
+/* ── Diff ────────────────────────────────── */
+.diff-wrap{display:flex;gap:0;min-height:80px}
+.diff-wrap .arr{position:relative;width:52px;flex-shrink:0;background:#0c0c0c;border-left:1px solid var(--b);border-right:1px solid var(--b);display:flex;align-items:center;justify-content:center}
+.diff-wrap .arr::before{content:'';position:absolute;left:10px;right:10px;top:50%;height:2px;background:linear-gradient(90deg,var(--re),#661111 25%,#333 50%,#111166 75%,var(--a))}
+.diff-wrap .arr::after{content:'';position:absolute;right:9px;top:50%;transform:translateY(-50%);border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:8px solid var(--a)}
+.diff-col{flex:1;padding:12px 16px;min-width:0}
+.diff-col.before{background:linear-gradient(135deg,#0f0909,#0c0c0c);border-right:1px solid #1a0f0f}
+.diff-col.before h4{color:#fca5a5;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.diff-col.before .badge{background:var(--rb);color:var(--re);padding:2px 7px;border-radius:99px;font-size:9px;font-weight:700}
+.diff-col.after{background:linear-gradient(135deg,#09090f,#0c0c0c)}
+.diff-col.after h4{color:#93c5fd;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.diff-col.after .badge{background:var(--ad);color:var(--a);padding:2px 7px;border-radius:99px;font-size:9px;font-weight:700}
+.cbox{font:11px/1.5 'SF Mono','Fira Code',monospace;padding:10px 12px;border-radius:5px;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto}
+.cbox.pre{background:#0f0909;border:1px solid #2a1414;color:#d4d4d4}
+.cbox.post{background:#09090f;border:1px solid #14142a;color:#d4d4d4}
+.stats-bar{display:flex;gap:20px;padding:10px 16px;background:#0c0c0c;border-top:1px solid var(--b);font:10px monospace;color:#666;flex-wrap:wrap;align-items:center}
+.stats-bar .kv{display:inline-flex;align-items:center;gap:4px}
+.stats-bar .kv .k{color:#555;font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+.stats-bar .kv .v{color:var(--tb);font-weight:500}
+.stats-bar .saved{color:var(--g);font-weight:700;font-size:11px}.stats-bar .ms{color:#777}
+
+/* ── Summary ─────────────────────────────── */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:26px}
+.summary-card{background:var(--s);border:1px solid var(--b);border-left:3px solid var(--b);border-radius:7px;padding:12px 14px}
+.summary-card.sc-g{border-left-color:var(--g)}.summary-card.sc-a{border-left-color:var(--a)}
+.summary-card.sc-y{border-left-color:var(--y)}.summary-card.sc-r{border-left-color:var(--r)}.summary-card.sc-p{border-left-color:var(--p)}
+.summary-card .big{font:22px monospace;color:var(--tb);font-weight:700}
+.summary-card .lbl{font-size:10px;color:#666;margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
+
+/* ── Toggle tabs ─────────────────────────── */
+.tabs{display:flex;gap:0;margin-bottom:16px;border:1px solid var(--b);border-radius:6px;overflow:hidden;background:var(--s)}
+.tab{padding:8px 16px;cursor:pointer;font-size:12px;color:#777;border-right:1px solid var(--b);transition:background .15s;user-select:none}
+.tab:last-child{border-right:none}
+.tab:hover{background:#1a1a1a;color:#aaa}
+.tab.active{background:#1a2a1a;color:var(--g);font-weight:600}
+.tab-content{display:none}.tab-content.active{display:block}
+
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--b);font-size:11px;color:#555}
+.ann{background:var(--yd);color:var(--y);padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;margin-left:5px}
+.badge-cfg{display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.03em;margin:0 2px}
+.bc-g{background:#1a2a1a;color:var(--g)}.bc-a{background:#1a1a2a;color:var(--a)}
+.bc-y{background:#2a1a1a;color:var(--y)}.bc-r{background:#2a1a1a;color:var(--r)}.bc-p{background:#1a1a2a;color:var(--p)}
+</style>
+</head>
+<body><div class="c">
+
+<header>
+<div><span class="b bv">v0.7.5</span> <span class="b bm">tuning</span> <span class="b bw">cache: 35 msgs</span></div>
+<h1>HermesCompress — Configuration Fine-Tuning</h1>
+<p class="sub">Five compression configs tested against the same growing session cache.
+Internal-only — Python library, zero proxy, zero HTTP. Each run adds to the cache
+so later configs have more accumulated context.</p>
+<div class="me">
+<span class="kv">model <b>deepseek-v4-pro</b></span>
+<span class="kv">headroom <b>v0.25.0</b></span>
+<span class="kv">payloads <b>5 per run</b></span>
+<span class="kv">2026-06-13 19:59 UTC</span>
+</div>
+</header>
+
+<div class="summary-grid">
+<div class="summary-card sc-g"><div class="big">balanced+</div><div class="lbl">Best config (56.7% savings)</div></div>
+<div class="summary-card sc-y"><div class="big">393,743</div><div class="lbl">Total tokens processed</div></div>
+<div class="summary-card sc-a"><div class="big">214,984</div><div class="lbl">Total tokens saved</div></div>
+<div class="summary-card sc-r"><div class="big">35</div><div class="lbl">Final cache size</div></div>
+<div class="summary-card sc-p"><div class="big">5</div><div class="lbl">Tool types tested</div></div>
+</div>
+
+<!-- ═══ CONFIG SUMMARY ════════════════════════════════════════════════ -->
+<h2><span class="d" style="background:var(--a)"></span>Config Comparison</h2>
+<p class="help">Each config processes the same 5 tool types through the accumulated cache.
+Settings flow: <span class="tg">more aggressive</span> → lower protect_recent, lower min_tokens,
+lower target_ratio. The safety guard prevents data loss by reverting over-compressed outputs
+(only empty content is reverted — CCR markers are valid).</p>
+
+<div class="tw"><table>
+<thead><tr>
+<th>Config</th><th>protect_recent</th><th>min_tokens</th><th>target_ratio</th>
+<th class="n">Tokens In</th><th class="n">Tokens Out</th><th class="n">Saved</th><th>Rate</th><th>Assessment</th>
+</tr></thead>
+<tbody>
+<tr><td class="cn">default</td><td class="n">1</td><td class="n">100</td><td class="n">—</td><td class="n">78,779</td><td class="n">36,626</td><td class="n ty">42,153</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:53.5%"></span></span><span class="pct py">54%</span></span></td><td class="lbl">~ moderate</td></tr>
+<tr><td class="cn">aggressive</td><td class="n">0</td><td class="n">50</td><td class="n">0.05</td><td class="n">78,654</td><td class="n">36,178</td><td class="n ty">42,476</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:54.0%"></span></span><span class="pct py">54%</span></span></td><td class="lbl">~ moderate</td></tr>
+<tr><td class="cn">conservative</td><td class="n">4</td><td class="n">500</td><td class="n">—</td><td class="n">76,041</td><td class="n">34,725</td><td class="n ty">41,316</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:54.3%"></span></span><span class="pct py">54%</span></span></td><td class="lbl">~ moderate</td></tr>
+<tr class="hl"><td class="cn">balanced+</td><td class="n">1</td><td class="n">150</td><td class="n">0.1</td><td class="n">82,103</td><td class="n">35,558</td><td class="n ty">46,545</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:56.7%"></span></span><span class="pct py">57%</span></span></td><td class="lbl">~ moderate</td></tr>
+<tr><td class="cn">maximum</td><td class="n">0</td><td class="n">25</td><td class="n">0.01</td><td class="n">78,166</td><td class="n">35,672</td><td class="n ty">42,494</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:54.4%"></span></span><span class="pct py">54%</span></span></td><td class="lbl">~ moderate</td></tr>
+</tbody></table></div>
+
+<!-- ═══ PER-CONFIG DETAIL ═════════════════════════════════════════════ -->
+<h2><span class="d" style="background:var(--g)"></span>Per-Config Breakdown</h2>
+<p class="help">Click a config to expand its full per-tool results. Each config processes
+the same 5 tool types through the session cache at the cache size shown.</p>
+
+<div class="tabs" id="tabs">
+<div class="tab active" data-tab="default" onclick="showTab('default')"><span class="badge-cfg bc-g">default</span> 54%</div>
+<div class="tab" data-tab="aggressive" onclick="showTab('aggressive')"><span class="badge-cfg bc-r">aggressive</span> 54%</div>
+<div class="tab" data-tab="conservative" onclick="showTab('conservative')"><span class="badge-cfg bc-a">conservative</span> 54%</div>
+<div class="tab" data-tab="balanced+" onclick="showTab('balanced+')"><span class="badge-cfg bc-y">balanced+</span> 57%</div>
+<div class="tab" data-tab="maximum" onclick="showTab('maximum')"><span class="badge-cfg bc-p">maximum</span> 54%</div>
+</div>
+
+<div class="tab-content active" id="tab-default"><div class="tw"><table><thead><tr><th>Tool</th><th>Tokens In</th><th>Tokens Out</th><th>Saved</th><th>Rate</th><th>Chars</th><th>Time</th></tr></thead><tbody><tr><td class="cn"><span class="tool-tag tt-te">terminal</span></td><td class="n">15,828</td><td class="n">6,454</td><td class="n tg">9,374</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:59.2%"></span></span><span class="pct pg">59%</span></span></td><td class="n">3,224→27</td><td class="lbl">6614.7ms</td></tr><tr><td class="cn"><span class="tool-tag tt-rf">read_file</span></td><td class="n">15,715</td><td class="n">6,645</td><td class="n tg">9,070</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:57.7%"></span></span><span class="pct pg">58%</span></span></td><td class="n">5,231→531</td><td class="lbl">521.6ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ws">web_search</span></td><td class="n">14,769</td><td class="n">6,919</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:53.2%"></span></span><span class="pct pg">53%</span></span></td><td class="n">1,819→1,741</td><td class="lbl">55.4ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ec">execute_code</span></td><td class="n">16,429</td><td class="n">8,420</td><td class="n tg">8,009</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:48.7%"></span></span><span class="pct py">49%</span></span></td><td class="n">5,955→3,839</td><td class="lbl">58.4ms</td></tr><tr><td class="cn"><span class="tool-tag tt-sf">search_files</span></td><td class="n">16,038</td><td class="n">8,188</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:48.9%"></span></span><span class="pct py">49%</span></span></td><td class="n">4,955→4,955</td><td class="lbl">50.3ms</td></tr></tbody></table></div></div>
+<div class="tab-content" id="tab-aggressive"><div class="tw"><table><thead><tr><th>Tool</th><th>Tokens In</th><th>Tokens Out</th><th>Saved</th><th>Rate</th><th>Chars</th><th>Time</th></tr></thead><tbody><tr><td class="cn"><span class="tool-tag tt-te">terminal</span></td><td class="n">15,892</td><td class="n">6,453</td><td class="n tg">9,439</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:59.4%"></span></span><span class="pct pg">59%</span></span></td><td class="n">3,360→27</td><td class="lbl">53.4ms</td></tr><tr><td class="cn"><span class="tool-tag tt-rf">read_file</span></td><td class="n">15,947</td><td class="n">6,565</td><td class="n tg">9,382</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:58.8%"></span></span><span class="pct pg">59%</span></span></td><td class="n">6,116→333</td><td class="lbl">519.2ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ws">web_search</span></td><td class="n">14,731</td><td class="n">6,881</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:53.3%"></span></span><span class="pct pg">53%</span></span></td><td class="n">1,667→1,595</td><td class="lbl">46.2ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ec">execute_code</span></td><td class="n">16,018</td><td class="n">8,063</td><td class="n tg">7,955</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:49.7%"></span></span><span class="pct py">50%</span></span></td><td class="n">4,840→3,203</td><td class="lbl">49.9ms</td></tr><tr><td class="cn"><span class="tool-tag tt-sf">search_files</span></td><td class="n">16,066</td><td class="n">8,216</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:48.9%"></span></span><span class="pct py">49%</span></span></td><td class="n">4,985→4,985</td><td class="lbl">43.3ms</td></tr></tbody></table></div></div>
+<div class="tab-content" id="tab-conservative"><div class="tw"><table><thead><tr><th>Tool</th><th>Tokens In</th><th>Tokens Out</th><th>Saved</th><th>Rate</th><th>Chars</th><th>Time</th></tr></thead><tbody><tr><td class="cn"><span class="tool-tag tt-te">terminal</span></td><td class="n">15,298</td><td class="n">6,452</td><td class="n tg">8,846</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:57.8%"></span></span><span class="pct pg">58%</span></span></td><td class="n">2,102→27</td><td class="lbl">45.5ms</td></tr><tr><td class="cn"><span class="tool-tag tt-rf">read_file</span></td><td class="n">15,533</td><td class="n">6,613</td><td class="n tg">8,920</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:57.4%"></span></span><span class="pct pg">57%</span></span></td><td class="n">4,537→441</td><td class="lbl">458.4ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ws">web_search</span></td><td class="n">14,502</td><td class="n">6,652</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:54.1%"></span></span><span class="pct pg">54%</span></span></td><td class="n">844→808</td><td class="lbl">48.2ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ec">execute_code</span></td><td class="n">15,028</td><td class="n">7,178</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:52.2%"></span></span><span class="pct pg">52%</span></span></td><td class="n">2,097→1,891</td><td class="lbl">51.9ms</td></tr><tr><td class="cn"><span class="tool-tag tt-sf">search_files</span></td><td class="n">15,680</td><td class="n">7,830</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:50.1%"></span></span><span class="pct pg">50%</span></span></td><td class="n">3,924→3,924</td><td class="lbl">44.0ms</td></tr></tbody></table></div></div>
+<div class="tab-content" id="tab-balanced+"><div class="tw"><table><thead><tr><th>Tool</th><th>Tokens In</th><th>Tokens Out</th><th>Saved</th><th>Rate</th><th>Chars</th><th>Time</th></tr></thead><tbody><tr><td class="cn"><span class="tool-tag tt-te">terminal</span></td><td class="n">16,693</td><td class="n">6,452</td><td class="n tg">10,241</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:61.3%"></span></span><span class="pct pg">61%</span></span></td><td class="n">4,992→27</td><td class="lbl">49.1ms</td></tr><tr><td class="cn"><span class="tool-tag tt-rf">read_file</span></td><td class="n">19,836</td><td class="n">7,143</td><td class="n tg">12,693</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:64.0%"></span></span><span class="pct pg">64%</span></span></td><td class="n">19,789→1,612</td><td class="lbl">1561.3ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ws">web_search</span></td><td class="n">14,730</td><td class="n">6,880</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:53.3%"></span></span><span class="pct pg">53%</span></span></td><td class="n">1,692→1,620</td><td class="lbl">53.0ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ec">execute_code</span></td><td class="n">15,175</td><td class="n">7,264</td><td class="n tg">7,911</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:52.1%"></span></span><span class="pct pg">52%</span></span></td><td class="n">2,451→1,569</td><td class="lbl">54.3ms</td></tr><tr><td class="cn"><span class="tool-tag tt-sf">search_files</span></td><td class="n">15,669</td><td class="n">7,819</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:50.1%"></span></span><span class="pct pg">50%</span></span></td><td class="n">3,911→3,911</td><td class="lbl">46.7ms</td></tr></tbody></table></div></div>
+<div class="tab-content" id="tab-maximum"><div class="tw"><table><thead><tr><th>Tool</th><th>Tokens In</th><th>Tokens Out</th><th>Saved</th><th>Rate</th><th>Chars</th><th>Time</th></tr></thead><tbody><tr><td class="cn"><span class="tool-tag tt-te">terminal</span></td><td class="n">15,019</td><td class="n">6,453</td><td class="n tg">8,566</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:57.0%"></span></span><span class="pct pg">57%</span></span></td><td class="n">1,558→27</td><td class="lbl">45.2ms</td></tr><tr><td class="cn"><span class="tool-tag tt-rf">read_file</span></td><td class="n">16,739</td><td class="n">6,488</td><td class="n tg">10,251</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:61.2%"></span></span><span class="pct pg">61%</span></span></td><td class="n">8,983→148</td><td class="lbl">779.5ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ws">web_search</span></td><td class="n">14,502</td><td class="n">6,652</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gg" style="width:54.1%"></span></span><span class="pct pg">54%</span></span></td><td class="n">837→801</td><td class="lbl">45.0ms</td></tr><tr><td class="cn"><span class="tool-tag tt-ec">execute_code</span></td><td class="n">16,002</td><td class="n">8,025</td><td class="n tg">7,977</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:49.9%"></span></span><span class="pct py">50%</span></span></td><td class="n">4,675→2,983</td><td class="lbl">50.2ms</td></tr><tr><td class="cn"><span class="tool-tag tt-sf">search_files</span></td><td class="n">15,904</td><td class="n">8,054</td><td class="n tg">7,850</td><td><span class="sb"><span class="br"><span class="bf gy" style="width:49.4%"></span></span><span class="pct py">49%</span></span></td><td class="n">4,606→4,606</td><td class="lbl">43.3ms</td></tr></tbody></table></div></div>
+
+<footer>HermesCompress v0.7.5 &nbsp;·&nbsp; headroom-ai v0.25.0 &nbsp;·&nbsp; deepseek-v4-pro &nbsp;·&nbsp;
+internal-only &nbsp;·&nbsp; cache: 35 msgs &nbsp;·&nbsp; 2026-06-13 19:59 UTC</footer>
+
+</div>
+<script>
+function showTab(name){
+ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+ document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+ var tab=document.querySelector('.tab[data-tab=\"'+name+'\"]');
+ if(tab)tab.classList.add('active');
+ var content=document.getElementById('tab-'+name);
+ if(content)content.classList.add('active');
+}
+function toggle(id){document.getElementById(id).classList.toggle('collapsed')}
+</script>
+</body></html>
