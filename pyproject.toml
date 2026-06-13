@@ -1,6 +1,6 @@
 [project]
 name = "hermes-compress"
-version = "0.7.8"
+version = "0.7.9"
 description = "Headroom-powered context compression — slash LLM token usage by 25-60%"
 readme = "README.md"
 license = { file = "LICENSE" }

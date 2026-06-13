@@ -108,7 +108,7 @@ def main():
     rounds = int(next((a.split("=",1)[1] for a in sys.argv if a.startswith("--rounds=")), "3"))
     modes = [mode_filter] if mode_filter else ["cache", "token"]
 
-    payload = {"model": "deepseek-v4-flash", "messages": MESSAGES, "max_tokens": 1000}
+    payload = {"model": "deepseek-v4-pro", "messages": MESSAGES, "max_tokens": 384000}
 
     for mode in modes:
         port = 8787 if mode == "cache" else 8788

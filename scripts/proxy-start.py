@@ -25,6 +25,11 @@ HEADROOM = VENV / "bin" / "headroom"
 DEEPSEEK_URL = "https://api.deepseek.com"
 DEFAULT_PORT = 8787
 
+# DeepSeek v4-pro: 1.6T params, 49B active, 1M ctx, 384K max output
+MODEL = "deepseek-v4-pro"
+MAX_CONTEXT = 1_000_000
+MAX_OUTPUT = 384_000
+
 
 def _load_env():
     env_file = REPO / ".env"
