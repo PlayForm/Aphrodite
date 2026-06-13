@@ -101,8 +101,10 @@ CONFIGS = [
 TOOLS = ["terminal", "read_file", "web_search", "execute_code", "search_files"]
 
 
-def run_config(label, protect_recent, min_tokens, target_ratio):
+def run_config(label, protect_recent, min_tokens, target_ratio, frozen_cache):
+    """Run ONE config against the FROZEN cache (no mutation)."""
     from hermes_compress._compress import Compress, CompressOption
+    import copy
     comp = Compress(option=CompressOption(
         Enabled=True, Mode="inline",
         ProtectRecent=protect_recent,
@@ -110,14 +112,12 @@ def run_config(label, protect_recent, min_tokens, target_ratio):
         TargetRatio=target_ratio,
     ), model="deepseek-v4-pro")
 
-    cache = _load()
     results = []
-
     for tool in TOOLS:
         content = _gen(tool)
         msg = {"role": "tool", "content": content,
                "tool_call_id": f"tc_{tool}_{random.randint(1000,9999)}", "name": tool}
-        session = cache[-30:] + [{"role": "user", "content": f"tune {len(cache)}"}, msg]
+        session = frozen_cache[-30:] + [{"role": "user", "content": f"tune {len(frozen_cache)}"}, msg]
 
         try:
             r = comp.compress(session)
@@ -137,9 +137,6 @@ def run_config(label, protect_recent, min_tokens, target_ratio):
         except Exception as e:
             results.append({"tool": tool, "err": str(e)})
 
-        cache.append(msg)
-
-    _save(cache)
     return results
 
 
@@ -148,6 +145,10 @@ def run_config(label, protect_recent, min_tokens, target_ratio):
 def main():
     print("HermesCompress — Fine-Tuning (5 Configs, Same Cache)")
     print("=" * 75)
+
+    # ── Freeze cache once — all configs test against same snapshot ──
+    frozen = _load()
+    print(f"Frozen cache: {len(frozen)} messages (all configs share this)\n")
 
     all_results = {}
 
@@ -159,7 +160,7 @@ def main():
         print(f"   {'Tool':<15} {'Tokens':>20} {'Saved':>8} {'Rate':>7} {'Chars':>14} {'Time'}")
         print(f"   {'-'*15} {'-'*20} {'-'*8} {'-'*7} {'-'*14} {'-'*6}")
 
-        rows = run_config(**cfg)
+        rows = run_config(**cfg, frozen_cache=frozen)
 
         all_results[label] = {
             "config": cfg,
@@ -209,6 +210,85 @@ def main():
 
     OUT_FILE.write_text(json.dumps(all_results, indent=2, default=str))
     print(f"\nResults: {OUT_FILE}")
+
+    # ── Render HTML ────────────────────────────────────────────────────
+    template = (REPO / "tests" / "tune_template.html").read_text()
+    now = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    cn = len(frozen)
+
+    # Config rows
+    config_rows = []
+    for label, data in all_results.items():
+        cfg = data["config"]
+        tb, ts, pct = data["total_tb"], data["total_ts"], data["total_pct"]
+        if pct > 80: col, cc, assess = "g", "tg", "✓ strong, safe"
+        elif pct > 60: col, cc, assess = "g", "tg", "✓ strong, safe"
+        elif pct > 30: col, cc, assess = "y", "ty", "~ moderate"
+        else: col, cc, assess = "r", "tr", "~ conservative"
+        hl = ' class="hl"' if label == best_label else ""
+        w = min(pct, 100)
+        config_rows.append(
+            f'<tr{hl}><td class="cn">{label}</td>'
+            f'<td class="n">{cfg["protect_recent"]}</td>'
+            f'<td class="n">{cfg["min_tokens"]}</td>'
+            f'<td class="n">{cfg["target_ratio"] or "—"}</td>'
+            f'<td class="n">{tb:,}</td><td class="n">{tb-ts:,}</td>'
+            f'<td class="n {cc}">{ts:,}</td>'
+            f'<td><span class="sb"><span class="br"><span class="bf g{col}" style="width:{w}%"></span></span>'
+            f'<span class="pct p{col}">{pct:.0f}%</span></span></td>'
+            f'<td class="lbl">{assess}</td></tr>')
+
+    # Tab headers + contents
+    tab_headers = []
+    tab_contents = []
+    TT = {"terminal":"tt-te","read_file":"tt-rf","web_search":"tt-ws",
+          "execute_code":"tt-ec","search_files":"tt-sf"}
+    CCOLORS = {"default":"g","aggressive":"r","conservative":"a",
+               "balanced+":"y","maximum":"p"}
+
+    for i, (label, data) in enumerate(all_results.items()):
+        active = ' active' if i == 0 else ''
+        cc = CCOLORS.get(label, "g")
+        tab_headers.append(
+            f'<div class="tab{active}" data-tab="{label}" onclick="showTab(\'{label}\')">'
+            f'<span class="badge-cfg bc-{cc}">{label}</span> '
+            f'{data["total_pct"]:.0f}%</div>')
+        rows_html = []
+        for r in data["rows"]:
+            tb, ta, ts = r.get("tb",0), r.get("ta",0), r.get("ts",0)
+            p = round(ts/tb*100,1) if tb else 0
+            col ="g" if p>=50 else ("y" if p>=20 else "r")
+            rows_html.append(
+                f'<tr><td class="cn"><span class="tool-tag {TT.get(r["tool"],"")}">{r["tool"]}</span></td>'
+                f'<td class="n">{tb:,}</td><td class="n">{ta:,}</td>'
+                f'<td class="n tg">{ts:,}</td>'
+                f'<td><span class="sb"><span class="br"><span class="bf g{col}" style="width:{min(p,100)}%"></span></span>'
+                f'<span class="pct p{col}">{p:.0f}%</span></span></td>'
+                f'<td class="n">{r.get("cpre",0):,}→{r.get("cpost",0):,}</td>'
+                f'<td class="lbl">{r.get("ms",0)}ms</td></tr>')
+        tab_contents.append(
+            f'<div class="tab-content{active}" id="tab-{label}">'
+            f'<div class="tw"><table>'
+            f'<thead><tr><th>Tool</th><th>Tokens In</th><th>Tokens Out</th><th>Saved</th><th>Rate</th><th>Chars</th><th>Time</th></tr></thead>'
+            f'<tbody>{"".join(rows_html)}</tbody></table></div></div>')
+
+    html = template
+    for key, val in {
+        "%TIMESTAMP%": now, "%CACHE_N%": str(cn),
+        "%BEST_LABEL%": best_label, "%BEST_PCT%": str(best_pct),
+        "%TOTAL_TOKENS%": f"{sum(d['total_tb'] for d in all_results.values()):,}",
+        "%TOTAL_SAVED%": f"{sum(d['total_ts'] for d in all_results.values()):,}",
+        "%TOTAL_TOOLS%": "5",
+        "%CONFIG_ROWS%": "\n".join(config_rows),
+        "%TAB_HEADERS%": "\n".join(tab_headers),
+        "%TAB_CONTENTS%": "\n".join(tab_contents),
+    }.items():
+        html = html.replace(key, val)
+
+    html_file = OUT_DIR / "tune_report.html"
+    html_file.write_text(html)
+    print(f"Report: {html_file}")
+    __import__('webbrowser').open(f"file://{html_file}")
 
 
 if __name__ == "__main__":
