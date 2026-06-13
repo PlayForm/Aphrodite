@@ -1,0 +1,13 @@
+# Headroom proxy configuration — local, self-contained
+
+backend: openai
+openai_api_url: https://api.deepseek.com
+
+optimize: true
+cache: true
+rate_limit: true
+disable_kompress: false
+
+# Default thresholds (recommended)
+min_tokens_to_crush: 500
+max_items_after_crush: 50

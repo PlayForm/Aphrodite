@@ -1,0 +1,29 @@
+# @playform/hermes-compress
+# Hermes Agent plugin — headroom-powered context compression
+#
+# Also installable standalone: pip install hermes-compress
+#   from hermes_compress import Compress, Proxy
+#   hermes-compress proxy --port 8787
+
+name: hermes-compress
+version: "0.7.1"
+description: >
+  Headroom-powered context compression for Hermes Agent and any Python app.
+  Inline mode (in-process, 8-10ms warm) or proxy mode (separate server).
+  Slashes LLM token usage by 43-60% per API call. 8-phase pipeline with
+  pre-processing, per-tool strategies, truncation, dedup, and auto-update.
+
+kind: standalone
+author: PlayForm
+homepage: https://github.com/PlayForm/HermesCompress
+
+provides_tools:
+  - headroom_stats
+  - headroom_compress
+  - headroom_proxy_start
+  - headroom_proxy_stop
+  - headroom_proxy_status
+
+provides_hooks:
+  - pre_llm_call
+  - transform_tool_result
