@@ -133,10 +133,28 @@ git clone https://GitHub.Com/PlayForm/HermesCompress.git \
 
 ## Modes ⚙️
 
-| Mode                 | How                     | Latency          | Savings                  | When                                |
-| -------------------- | ----------------------- | ---------------- | ------------------------ | ----------------------------------- |
-| **inline** (default) | Library call in‑process | 8‑10 ms warm     | Full pipeline (7 phases) | Default — fastest, best compression |
-| **proxy**            | Separate server, HTTP   | +5‑20 ms network | Headroom only            | Zero code changes, multi‑client     |
+| Mode                   | How                      | Latency          | Savings                  | When                                |
+| ---------------------- | ------------------------ | ---------------- | ------------------------ | ----------------------------------- |
+| **inline** (default)   | Library call in‑process  | 8‑10 ms warm     | Full pipeline (7 phases) | Default — fastest, best compression |
+| **proxy (cache)**      | Separate server, :8787   | +5‑20 ms network | Headroom only            | Zero code changes, prefix‑cache hits|
+| **proxy (token)**      | Separate server, :8788   | +5‑20 ms network | Headroom only            | Aggressive compression, rewrites    |
+| **dual**               | Both :8787 + :8788       | —                | —                        | Side‑by‑side comparison testing     |
+
+All modes target **DeepSeek v4‑pro** (1.6T params, 49B active, **1M context**,
+**384K max output**). The dual proxy launches both cache and token simultaneously
+for benchmark comparison — later shimmed into Hermes for A/B testing.
+
+```bash
+# Start both proxies
+python3 scripts/proxy-dual.py                # background
+python3 scripts/proxy-dual.py --foreground   # foreground
+python3 scripts/proxy-dual.py --status       # check both
+python3 scripts/proxy-dual.py --stop         # kill both
+
+# Or individually
+python3 scripts/proxy-start.py --mode cache --port 8787
+python3 scripts/proxy-start.py --mode token --port 8788
+```
 
 Both share the same headroom pipeline (CacheAligner → ContentRouter →
 SmartCrusher → Kompress). Inline mode adds 6 extra pre‑processing phases that
@@ -157,12 +175,18 @@ result = c.compress(messages)
 ```python
 from hermes_compress import Proxy
 
-proxy = Proxy(port = 8787)
+proxy = Proxy(port = 8787, mode = "token")
 proxy.start()
 # Point provider base_url → http://127.0.0.1:8787
 ```
 
-Or: `hermes-compress proxy --port 8787`
+Or via scripts:
+
+```bash
+python3 scripts/proxy-dual.py          # both cache (:8787) + token (:8788)
+python3 scripts/proxy-start.py --mode cache --port 8787
+python3 scripts/proxy-start.py --mode token --port 8788
+```
 
 <br>
 
