@@ -1,0 +1,13 @@
+name: hermes-proxy
+version: 0.1.0
+description: Headroom proxy manager — starts/stops/configures headroom proxy servers for transparent API compression
+author: "@playform"
+license: CC0
+entrypoint: hermes_proxy/__init__.py
+toolsets:
+  - compression
+provider_compatibility:
+  - deepseek
+  - anthropic
+  - openai
+  - google
