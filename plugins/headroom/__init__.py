@@ -402,6 +402,13 @@ _RESOLVED: dict[str, str] = {}
 def _resolve_one(hash_key):
     if hash_key in _RESOLVED:
         return _RESOLVED[hash_key]
+    # 1. Try SQLite internal store (proxyless)
+    if _PROXYLESS:
+        c = _retrieve_from_db(hash_key)
+        if c:
+            _RESOLVED[hash_key] = c
+            return c
+    # 2. Try proxy /v1/retrieve
     data = _proxy_post("/v1/retrieve", {"hash": hash_key})
     if data:
         c = data.get("original_content", "")
