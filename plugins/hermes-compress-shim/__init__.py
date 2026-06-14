@@ -7,14 +7,24 @@ No measurement. No filtering. No response handling.
 When a local headroom proxy is active (base_url → 127.0.0.1 / localhost),
 local compression is SKIPPED — the proxy handles it.  The headroom_retrieve
 tool always works, hitting the token-mode proxy on port 8788.
+
+Debug: set HERMES_COMPRESS_DEBUG=1 to enable verbose diagnostics.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
+import time
 import urllib.request
 import urllib.error
+
+DEBUG = os.environ.get("HERMES_COMPRESS_DEBUG", "") == "1"
+
+def _dbg(msg: str) -> None:
+    if DEBUG:
+        print(f"[hermes-compress-shim] {msg}", file=sys.stderr)
 
 MODEL = "deepseek-v4-pro"
 PROXY_RETRIEVE_URL = "http://127.0.0.1:8788"   # token-mode proxy for /v1/retrieve
@@ -93,13 +103,16 @@ def _handle_headroom_retrieve(args: dict) -> str:
 # ═══════════════════════════════════════════════════════════
 
 _ENGINE = None
+_ENGINE_ERROR = None
 
 
 def _engine():
-    global _ENGINE
+    global _ENGINE, _ENGINE_ERROR
     if _ENGINE is None:
+        _dbg("_engine: initialising Compress()...")
         try:
             from hermes_compress import Compress, CompressOption
+            _dbg(f"_engine: imports OK (Compress={Compress}, CompressOption={CompressOption})")
             opt = CompressOption()
             opt.Enabled = True
             opt.Mode = "inline"
@@ -109,19 +122,43 @@ def _engine():
             opt.PrecompressTools = COMPRESS_CONFIG["precompress"]
             opt.AggressiveKompress = COMPRESS_CONFIG["aggressive_kompress"]
             opt.DeduplicateResults = COMPRESS_CONFIG["deduplicate"]
+            _dbg(f"_engine: CompressOption built: enabled={opt.Enabled} mode={opt.Mode} "
+                 f"protect_recent={opt.ProtectRecent} min_tokens={opt.MinTokensToCompress} "
+                 f"target_ratio={opt.TargetRatio}")
             _ENGINE = Compress(model=MODEL, option=opt)
-        except Exception:
+            _dbg(f"_engine: Compress instance created OK (type={type(_ENGINE).__name__})")
+        except Exception as exc:
             _ENGINE = False
+            _ENGINE_ERROR = f"{type(exc).__name__}: {exc}"
+            print(f"[hermes-compress-shim] ERROR: engine init failed: {_ENGINE_ERROR}", file=sys.stderr)
+            if DEBUG:
+                import traceback
+                traceback.print_exc(file=sys.stderr)
     return _ENGINE if _ENGINE is not False else None
 
 
 def _compress(messages: list[dict]) -> list[dict]:
+    _dbg(f"_compress: called with {len(messages)} messages")
     c = _engine()
     if not c:
+        _dbg(f"_compress: engine NOT available (error: {_ENGINE_ERROR}) — returning unchanged")
         return messages
     try:
-        return c.compress(messages).messages
-    except Exception:
+        # Estimate tokens before
+        before_chars = sum(len(json.dumps(m, ensure_ascii=False)) for m in messages)
+        _dbg(f"_compress: compressing {len(messages)} msgs, ~{before_chars} chars...")
+        t0 = time.time()
+        result = c.compress(messages)
+        elapsed = time.time() - t0
+        after_chars = sum(len(json.dumps(m, ensure_ascii=False)) for m in result.messages)
+        savings = (1 - after_chars / before_chars) * 100 if before_chars > 0 else 0
+        _dbg(f"_compress: done in {elapsed*1000:.0f}ms — {before_chars}→{after_chars} chars ({savings:.1f}%)")
+        return result.messages
+    except Exception as exc:
+        _dbg(f"_compress: EXCEPTION {type(exc).__name__}: {exc}")
+        if DEBUG:
+            import traceback
+            traceback.print_exc(file=sys.stderr)
         return messages
 
 
@@ -132,19 +169,18 @@ def _compress(messages: list[dict]) -> list[dict]:
 def _is_proxy_active(agent) -> bool:
     """Return True if the agent's base_url points to a local headroom proxy."""
     base = ""
-    # Try model_config first (dict with base_url key)
     model_cfg = getattr(agent, "model_config", None)
     if isinstance(model_cfg, dict):
         base = str(model_cfg.get("base_url", ""))
-    # Fallback: direct base_url attr
     if not base:
         base = str(getattr(agent, "base_url", ""))
-    # Check other common paths
     if not base:
         cfg = getattr(agent, "config", None)
         if cfg:
             base = str(getattr(cfg, "base_url", ""))
-    return "127.0.0.1" in base or "localhost" in base
+    result = "127.0.0.1" in base or "localhost" in base
+    _dbg(f"_is_proxy_active: base_url='{base}' → {result}")
+    return result
 
 
 # ═══════════════════════════════════════════════════════════
@@ -152,6 +188,7 @@ def _is_proxy_active(agent) -> bool:
 # ═══════════════════════════════════════════════════════════
 
 def register(ctx) -> None:
+    _dbg("register() called — registering headroom_retrieve tool")
     ctx.register_tool(
         name="headroom_retrieve",
         toolset="headroom",
@@ -159,57 +196,79 @@ def register(ctx) -> None:
         handler=_handle_headroom_retrieve,
         emoji="🗜️",
     )
+    _dbg("register() → calling _patch_loop()")
     _patch_loop()
 
 
 def _patch_loop():
-    """Monkey-patch AIAgent._interruptible_api_call forwarders to compress messages.
-
-    When a local headroom proxy is active, we skip local compression —
-    the proxy handles it.  The headroom_retrieve tool still works either way.
-    """
+    """Monkey-patch AIAgent._interruptible_api_call forwarders to compress messages."""
+    _dbg("_patch_loop: importing agent.conversation_loop.run_conversation...")
     try:
         from agent.conversation_loop import run_conversation as _orig
-    except ImportError:
+        _dbg(f"_patch_loop: import OK — _orig={_orig}")
+    except ImportError as exc:
+        _dbg(f"_patch_loop: ImportError — {exc}")
         return
 
     import functools
 
     @functools.wraps(_orig)
     def _patched(*args, **kwargs):
-        agent = args[0]  # run_conversation(agent, user_message, system_message=..., ...)
+        agent = args[0]
+        _dbg(f"_patched: called — agent type={type(agent).__name__} args={len(args)} kwargs_keys={list(kwargs.keys())}")
+
         _api = getattr(agent, "_interruptible_api_call", None)
         _stream = getattr(agent, "_interruptible_streaming_api_call", None)
+        _dbg(f"_patched: _api={'FOUND' if _api else 'MISSING'} _stream={'FOUND' if _stream else 'MISSING'}")
 
         if not _api and not _stream:
             print("[hermes-compress-shim] WARNING: no intercept hook found", file=sys.stderr)
             return _orig(*args, **kwargs)
 
         using_proxy = _is_proxy_active(agent)
+        _dbg(f"_patched: using_proxy={using_proxy}")
 
         # ── Compression wrapper ───────────────────────────────────────
         def _make_wrapper(fn):
+            fn_name = getattr(fn, "__name__", str(fn))
             @functools.wraps(fn)
             def _compress_hook(*a, **kw):
-                # Forwarder sig: _interruptible_*_api_call(self, api_kwargs, ...)
-                # First positional arg after self is always api_kwargs dict.
+                _dbg(f"_compress_hook[{fn_name}]: called — positional_args={len(a)} "
+                     f"kw_keys={list(kw.keys())} "
+                     f"a[0]_type={type(a[0]).__name__ if a else 'N/A'} "
+                     f"using_proxy={using_proxy}")
                 if not using_proxy and a and isinstance(a[0], dict):
                     api_kwargs = a[0]
                     msgs = api_kwargs.get("messages")
+                    _dbg(f"_compress_hook[{fn_name}]: msgs={'PRESENT' if msgs else 'MISSING'} "
+                         f"type={type(msgs).__name__ if msgs else 'N/A'} "
+                         f"len={len(msgs) if isinstance(msgs, list) else 'N/A'}")
                     if msgs and isinstance(msgs, list) and len(msgs) > 1:
+                        _dbg(f"_compress_hook[{fn_name}]: compressing {len(msgs)} msgs...")
                         api_kwargs = {**api_kwargs, "messages": _compress(msgs)}
                         return fn(*(api_kwargs,) + a[1:], **kw)
+                    else:
+                        _dbg(f"_compress_hook[{fn_name}]: SKIP — msgs too small or not list")
+                else:
+                    _dbg(f"_compress_hook[{fn_name}]: SKIP — "
+                         f"using_proxy={using_proxy} has_args={bool(a)} "
+                         f"a0_is_dict={isinstance(a[0], dict) if a else False}")
                 return fn(*a, **kw)
             return _compress_hook
 
         if _api:
+            _dbg("_patched: wrapping _interruptible_api_call")
             setattr(agent, "_interruptible_api_call", _make_wrapper(_api))
         if _stream:
+            _dbg("_patched: wrapping _interruptible_streaming_api_call")
             setattr(agent, "_interruptible_streaming_api_call", _make_wrapper(_stream))
 
         tag = "proxy-active (no local compression)" if using_proxy else "direct compression"
-        print(f"[hermes-compress-shim] ✓ patched agent API hooks — {tag}", file=sys.stderr)
+        msg = f"[hermes-compress-shim] ✓ patched agent API hooks — {tag}"
+        print(msg, file=sys.stderr)
+        _dbg(f"_patched: {msg}")
         return _orig(*args, **kwargs)
 
     import agent.conversation_loop
     agent.conversation_loop.run_conversation = _patched
+    _dbg("_patch_loop: run_conversation monkey-patched successfully")
