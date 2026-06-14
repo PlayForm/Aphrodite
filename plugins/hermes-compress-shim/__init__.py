@@ -136,40 +136,49 @@ def register(ctx) -> None:
 
 
 def _patch_loop():
-    """Monkey-patch conversation loop to compress api_messages."""
+    """Monkey-patch AIAgent._interruptible_api_call forwarders to compress messages.
+
+    The agent's API call forwarders (run_agent.py:4012,4183) receive
+    ``api_kwargs`` as a dict with ``messages`` at ``api_kwargs["messages"]``.
+    We wrap them to compress those messages before they reach the provider.
+    """
     try:
         from agent.conversation_loop import run_conversation as _orig
     except ImportError:
         return
 
-    import functools
+    import functools, sys
 
     @functools.wraps(_orig)
     def _patched(agent, system_message, messages, conversation_history, turn_id, user_message, **kw):
-        call = getattr(agent, "_call_llm_with_retry", None) or getattr(agent, "_make_api_call", None)
-        if call is None:
+        _api = getattr(agent, "_interruptible_api_call", None)
+        _stream = getattr(agent, "_interruptible_streaming_api_call", None)
+
+        if not _api and not _stream:
+            print("[hermes-compress-shim] WARNING: no intercept hook found", file=sys.stderr)
             return _orig(agent, system_message, messages, conversation_history, turn_id, user_message, **kw)
 
-        @functools.wraps(call)
-        def _with_compress(*a, **kw):
-            msgs = kw.get("messages") or kw.get("api_messages")
-            if msgs is None and len(a) > 0 and isinstance(a[0], list):
-                msgs = a[0]
-            if msgs and isinstance(msgs, list) and len(msgs) > 1:
-                compressed = _compress(msgs)
-                if "messages" in kw:
-                    kw["messages"] = compressed
-                elif "api_messages" in kw:
-                    kw["api_messages"] = compressed
-                na = list(a)
-                for i, v in enumerate(na):
-                    if v is msgs:
-                        na[i] = compressed
-                        break
-                a = tuple(na)
-            return call(*a, **kw)
+        # ── Compression wrapper ───────────────────────────────────────
+        def _make_wrapper(fn):
+            @functools.wraps(fn)
+            def _compress_hook(*a, **kw):
+                # Forwarder sig: _interruptible_*_api_call(self, api_kwargs, ...)
+                # First positional arg after self is always api_kwargs dict.
+                if a and isinstance(a[0], dict):
+                    api_kwargs = a[0]
+                    msgs = api_kwargs.get("messages")
+                    if msgs and isinstance(msgs, list) and len(msgs) > 1:
+                        api_kwargs = {**api_kwargs, "messages": _compress(msgs)}
+                        return fn(*(api_kwargs,) + a[1:], **kw)
+                return fn(*a, **kw)
+            return _compress_hook
 
-        setattr(agent, call.__name__, _with_compress)
+        if _api:
+            setattr(agent, "_interruptible_api_call", _make_wrapper(_api))
+        if _stream:
+            setattr(agent, "_interruptible_streaming_api_call", _make_wrapper(_stream))
+
+        print("[hermes-compress-shim] ✓ patched agent API hooks", file=sys.stderr)
         return _orig(agent, system_message, messages, conversation_history, turn_id, user_message, **kw)
 
     import agent.conversation_loop
