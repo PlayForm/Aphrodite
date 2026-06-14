@@ -1,106 +1,62 @@
-"""
-headroom-retrieve v0.4.0 — Hermes plugin.
-Local disk read when path given; proxy fallback otherwise.
-"""
-from __future__ import annotations
-
+"""headroom-retrieve — Hermes plugin. Local read first, proxy fallback."""
 import json, os, urllib.request
 
 PROXY = "http://127.0.0.1:8788"
 
-
-def _hash(raw: str) -> str:
-    for sep in ("<<ccr:", "hash=", "hash:"):
-        if sep in raw:
-            return raw.split(sep, 1)[1].split(",")[0].split(">")[0].strip()
-    return raw.strip("<>").split(",")[0].strip()
-
-
-HEADROOM_RETRIEVE_SCHEMA = {
+SCHEMA = {
     "name": "headroom_retrieve",
-    "description": (
-        "Retrieve original content behind compression markers like "
-        "'<<ccr:abc,string,5KB>>' or '[N items compressed...]'. "
-        "Include `path` for instant local-file read. "
-        "Without path: tries proxy cache (may be expired)."
-    ),
+    "description": "Retrieve original content behind CCR markers like '<<ccr:abc,string,5KB>>'. Include `path` for instant local read; omit for proxy cache.",
     "parameters": {
         "type": "object",
         "properties": {
-            "hash": {"type": "string", "description": "CCR marker or raw hash"},
-            "path": {"type": "string", "description": "File path for local disk read"},
+            "hash": {"type": "string", "description": "CCR marker or hash"},
+            "path": {"type": "string", "description": "File path for local read"},
         },
         "required": ["hash"],
     },
 }
 
+def _hash(raw):
+    for s in ("<<ccr:", "hash="):
+        if s in raw:
+            return raw.split(s, 1)[1].split(",")[0].rstrip(">")
+    return raw.strip("<>").split(",")[0]
 
-def _read_file(path: str, limit: int = 0) -> str | None:
+def _file(path):
     if not path or not os.path.isfile(path):
         return None
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
-        total = len(lines)
-        if limit and total > limit:
-            lines = lines[:limit]
-        out = "".join(f"{i+1}|{line}" for i, line in enumerate(lines))
-        if limit and total > limit:
-            out += f"\n... [{total - limit} more lines]"
-        return out
+        return "".join(f"{i+1}|{l}" for i, l in enumerate(lines))
     except Exception:
         return None
 
-
-def _proxy(hash_key: str) -> str | None:
+def _proxy(h):
     try:
-        req = urllib.request.Request(
-            f"{PROXY}/v1/retrieve",
-            data=json.dumps({"hash": hash_key}).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        data = json.loads(urllib.request.urlopen(req, timeout=5).read())
-        content = data.get("original_content", "")
-        if not content:
-            return None
-        # Reject CCR re-compression
-        head = content.strip()[:200]
-        if head.startswith("<<ccr:") or ("compressed" in head and head.startswith("[")):
-            return None
-        return content
+        req = urllib.request.Request(f"{PROXY}/v1/retrieve",
+            data=json.dumps({"hash": h}).encode(),
+            headers={"Content-Type": "application/json"})
+        c = json.loads(urllib.request.urlopen(req, timeout=5).read()).get("original_content", "")
+        if c and not c.lstrip()[:6] == "<<ccr:":
+            return c
     except Exception:
-        return None
+        pass
+    return None
 
-
-def _handle_headroom_retrieve(args: dict, **kwargs) -> str:
+def _handle_headroom_retrieve(args, **kw):
     h = _hash(str(args.get("hash", "")))
     if not h:
-        return json.dumps({"error": "no hash found"})
+        return json.dumps({"error": "no hash"})
+    p = str(args.get("path", "")).strip()
 
-    path = str(args.get("path", "")).strip()
+    c = _file(p) if p else None
+    if c:
+        return json.dumps({"content": c, "source": "local"})
+    c = _proxy(h)
+    if c:
+        return json.dumps({"content": c, "source": "proxy"})
+    return json.dumps({"error": "expired" if p else "expired — re-run command"})
 
-    # Path → local read (always wins)
-    if path:
-        content = _read_file(path)
-        if content:
-            return json.dumps({"content": content, "source": "local"})
-        content = _proxy(h)
-        if content:
-            return json.dumps({"content": content, "source": "proxy"})
-        return json.dumps({"error": f"file not found: {path}"})
-
-    # No path → proxy only
-    content = _proxy(h)
-    if content:
-        return json.dumps({"content": content, "source": "proxy"})
-    return json.dumps({"error": "Content expired. Re-run original command."})
-
-
-def register(ctx) -> None:
-    ctx.register_tool(
-        name="headroom_retrieve",
-        toolset="headroom",
-        schema=HEADROOM_RETRIEVE_SCHEMA,
-        handler=_handle_headroom_retrieve,
-        emoji="🗜️",
-    )
+def register(ctx):
+    ctx.register_tool(name="headroom_retrieve", toolset="headroom", schema=SCHEMA, handler=_handle_headroom_retrieve, emoji="🗜️")
