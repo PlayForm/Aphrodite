@@ -1,3 +1,0 @@
-name: hermes-tool-fix
-version: 0.1.0
-description: "Monkey-patches terminal_tool and read_file_tool to fix empty output issues — captures stderr, recovers empty read_file content via direct file I/O."

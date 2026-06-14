@@ -1,5 +1,0 @@
-name: hermes-compress-shim
-version: 0.7.10
-description: "Headroom inline compression for Hermes Agent — compresses api_messages before LLM calls"
-provides_tools:
-  - headroom_retrieve
