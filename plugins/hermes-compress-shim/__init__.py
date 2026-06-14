@@ -75,27 +75,48 @@ def _handle_headroom_retrieve(args: dict) -> str:
     query = str(args.get("query") or "").strip()
     if query:
         payload["query"] = query
-    try:
+
+    def _try_httpx() -> str:
         import httpx
-        resp = httpx.post(f"{PROXY_RETRIEVE_URL}/v1/retrieve", json=payload, timeout=15)
+        try:
+            resp = httpx.post(f"{PROXY_RETRIEVE_URL}/v1/retrieve", json=payload, timeout=5)
+        except httpx.ConnectError:
+            return json.dumps({
+                "error": "Headroom proxy not running on port 8788. "
+                         "Content can only be retrieved when the token-mode proxy is active. "
+                         "Re-run the original command instead."
+            })
+        except httpx.TimeoutException:
+            return json.dumps({"error": "Proxy timed out. Re-run original command."})
         if resp.status_code == 404:
-            return json.dumps({"error": "Content expired. Re-run original command."})
+            return json.dumps({"error": "Content expired (CCR TTL elapsed). Re-run original command."})
         if resp.status_code != 200:
             return json.dumps({"error": f"Proxy HTTP {resp.status_code}"})
         data = resp.json()
         return json.dumps({"original_content": data.get("original_content", ""),
                            "original_tokens": data.get("original_tokens")})
-    except ImportError:
-        req = urllib.request.Request(f"{PROXY_RETRIEVE_URL}/v1/retrieve",
-            data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+
+    def _try_urllib() -> str:
         try:
-            data = json.loads(urllib.request.urlopen(req, timeout=15).read())
+            req = urllib.request.Request(f"{PROXY_RETRIEVE_URL}/v1/retrieve",
+                data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+            data = json.loads(urllib.request.urlopen(req, timeout=5).read())
             return json.dumps({"original_content": data.get("original_content", ""),
                                "original_tokens": data.get("original_tokens")})
         except urllib.error.HTTPError as e:
-            return json.dumps({"error": f"Content expired (HTTP {e.code}). Re-run command."})
-        except Exception as exc:
-            return json.dumps({"error": f"Proxy unreachable. Re-run command."})
+            return json.dumps({"error": f"Content expired (HTTP {e.code}). Re-run original command."})
+        except (urllib.error.URLError, ConnectionRefusedError, OSError):
+            return json.dumps({
+                "error": "Headroom proxy not running (port 8788). "
+                         "Re-run the original command instead."
+            })
+        except Exception:
+            return json.dumps({"error": "Proxy unreachable. Re-run original command."})
+
+    try:
+        return _try_httpx()
+    except ImportError:
+        return _try_urllib()
 
 
 # ═══════════════════════════════════════════════════════════
