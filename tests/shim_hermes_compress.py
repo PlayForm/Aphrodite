@@ -188,13 +188,14 @@ def patch() -> bool:
     import functools
 
     @functools.wraps(_orig)
-    def _patched(agent, system_message, messages, conversation_history, turn_id, user_message, **kw):
+    def _patched(*args, **kwargs):
+        agent = args[0]
         _api = getattr(agent, "_interruptible_api_call", None)
         _stream = getattr(agent, "_interruptible_streaming_api_call", None)
 
         if not _api and not _stream:
             print("[hermes-compress-shim] WARNING: no intercept hook found", file=sys.stderr)
-            return _orig(agent, system_message, messages, conversation_history, turn_id, user_message, **kw)
+            return _orig(*args, **kwargs)
 
         def _make_wrapper(fn):
             @functools.wraps(fn)
@@ -214,7 +215,7 @@ def patch() -> bool:
             setattr(agent, "_interruptible_streaming_api_call", _make_wrapper(_stream))
 
         print("[hermes-compress-shim] ✓ patched agent API hooks", file=sys.stderr)
-        return _orig(agent, system_message, messages, conversation_history, turn_id, user_message, **kw)
+        return _orig(*args, **kwargs)
 
     import agent.conversation_loop
     agent.conversation_loop.run_conversation = _patched
