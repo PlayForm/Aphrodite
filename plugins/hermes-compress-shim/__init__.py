@@ -45,16 +45,16 @@ COMPRESS_CONFIG = {
 HEADROOM_RETRIEVE_SCHEMA = {
     "name": "headroom_retrieve",
     "description": (
-        "Retrieve original content behind a headroom compression marker. "
-        "Markers look like '[N items compressed ... hash=abc123]' or "
-        "'<<ccr:abc,base64,4.5KB>>'. Extract just the hash. "
-        "Content expires — if not found, re-run the original command."
+        "Retrieve original content behind compression markers like "
+        "'<<ccr:abc,string,5KB>>' or '[N items compressed...]'. "
+        "Include `path` for instant local-file read. "
+        "Without path: tries proxy cache (may be expired)."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "hash": {"type": "string", "description": "Hash from marker (e.g. 'abc123')"},
-            "query": {"type": "string", "description": "Optional BM25 search query"},
+            "hash": {"type": "string", "description": "CCR marker or raw hash"},
+            "path": {"type": "string", "description": "File path for local disk read"},
         },
         "required": ["hash"],
     },
@@ -66,10 +66,31 @@ def _normalize_hash(raw: str) -> str:
     return h.split(",")[0].strip()
 
 
+def _read_file_local(path: str) -> str | None:
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+        return "".join(f"{i+1}|{l}" for i, l in enumerate(lines))
+    except Exception:
+        return None
+
+
 def _handle_headroom_retrieve(args: dict, **kwargs) -> str:
     hash_key = _normalize_hash(str(args.get("hash") or "").strip())
     if not hash_key:
         return json.dumps({"error": "hash required"})
+
+    path = str(args.get("path") or "").strip()
+
+    # Local file read first (works regardless of proxy)
+    if path:
+        content = _read_file_local(path)
+        if content:
+            return json.dumps({"original_content": content, "source": "local"})
+
+    # Proxy fallback
     payload: dict = {"hash": hash_key}
     query = str(args.get("query") or "").strip()
     if query:
@@ -80,15 +101,13 @@ def _handle_headroom_retrieve(args: dict, **kwargs) -> str:
         try:
             resp = httpx.post(f"{PROXY_RETRIEVE_URL}/v1/retrieve", json=payload, timeout=5)
         except httpx.ConnectError:
-            return json.dumps({
-                "error": "Headroom proxy not running on port 8788. "
-                         "Content can only be retrieved when the token-mode proxy is active. "
-                         "Re-run the original command instead."
-            })
-        except httpx.TimeoutException:
-            return json.dumps({"error": "Proxy timed out. Re-run original command."})
+            return json.dumps({"error": "Proxy not running. " + (
+                f"File not found at '{path}'." if path else "Re-run original command."
+            )})
         if resp.status_code == 404:
-            return json.dumps({"error": "Content expired (CCR TTL elapsed). Re-run original command."})
+            return json.dumps({"error": "Content expired. " + (
+                f"File not readable at '{path}'." if path else "Re-run original command."
+            )})
         if resp.status_code != 200:
             return json.dumps({"error": f"Proxy HTTP {resp.status_code}"})
         data = resp.json()
@@ -103,14 +122,13 @@ def _handle_headroom_retrieve(args: dict, **kwargs) -> str:
             return json.dumps({"original_content": data.get("original_content", ""),
                                "original_tokens": data.get("original_tokens")})
         except urllib.error.HTTPError as e:
-            return json.dumps({"error": f"Content expired (HTTP {e.code}). Re-run original command."})
+            return json.dumps({"error": f"Content expired (HTTP {e.code}). " + (
+                f"File not readable at '{path}'." if path else "Re-run original command."
+            )})
         except (urllib.error.URLError, ConnectionRefusedError, OSError):
-            return json.dumps({
-                "error": "Headroom proxy not running (port 8788). "
-                         "Re-run the original command instead."
-            })
-        except Exception:
-            return json.dumps({"error": "Proxy unreachable. Re-run original command."})
+            return json.dumps({"error": "Proxy not running. " + (
+                f"File not found at '{path}'." if path else "Re-run original command."
+            )})
 
     try:
         return _try_httpx()
