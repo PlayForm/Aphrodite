@@ -677,9 +677,8 @@ def register(ctx):
                       schema=PROXY_STOP_SCHEMA, handler=_handle_proxy_stop, emoji="⏹️")
     ctx.register_tool(name="headroom_proxy_status", toolset="compression",
                       schema=PROXY_STATUS_SCHEMA, handler=_handle_proxy_status, emoji="🩺")
-    # Native middleware: disabled when proxyless + no proxy (avoids CCR conflict).
-    # Allowed when cache proxy is active — proxy handles compression, native resolves CCR.
-    if _NATIVE:
+    # Native middleware: disabled when proxyless is active (fights with patches)
+    if _NATIVE and not _PROXYLESS:
         ctx.register_middleware("llm_request", _on_llm_request)
     if _PROXYLESS:
         _ensure_cache()
