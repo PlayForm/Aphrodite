@@ -7,11 +7,23 @@
 <p align="center"><strong>Native headroom integration for Hermes Agent.</strong><br>3 MCP tools + transparent middleware - no monkey-patching.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-purple?style=flat" alt="version">
-  <img src="https://img.shields.io/badge/savings-55--74%25-brightgreen?style=flat" alt="savings">
-  <img src="https://img.shields.io/badge/latency-50--500ms-blue?style=flat" alt="latency">
-  <img src="https://img.shields.io/badge/python-3.10+-orange?style=flat" alt="python">
-</p>
+  <img src="https://img.shields.io/badge/version-1.0.1-purple?style=flat" alt="version">
+  <img src="https://img.shields.io/badge/savings-55--84%25-brightgreen?style=flat" alt="savings">
+  <img src="https://img.shields.io/badge/latency-66--180ms-blue?style=flat" alt="latency">
+
+---
+
+## Recommended Architecture
+
+| Mode | Command | Compression | Stable |
+|------|---------|:-----------:|:------:|
+| **Default** | `hermes` | Cache proxy (prefix-freeze) | ✅ |
+| **Max savings** | `HERMES_HEADROOM_NATIVE=1 hermes --provider deepseek-direct` | Inline **81-84%** | ✅ |
+| **Token proxy** | `hermes --provider deepseek-proxy-token` | Proxy 46-70% | ⚠️ Re-compression |
+
+Token proxy compresses after the middleware, creating CCR loops. Cache proxy is the safe default. Direct + native gives the highest compression with no proxy dependency.
+
+---
 
 ---
 
