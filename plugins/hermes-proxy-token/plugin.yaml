@@ -1,0 +1,6 @@
+name: hermes-proxy-token
+version: 1.0.0
+description: "Auto-start headroom token proxy on Hermes startup (port :8788, full compression)"
+kind: plugin
+provides_hooks:
+  - session_start

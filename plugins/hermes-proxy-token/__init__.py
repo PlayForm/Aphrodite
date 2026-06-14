@@ -1,15 +1,15 @@
 """
-hermes-proxy-auto v1.1.0 — Auto-start headroom CACHE proxy on session start.
-Port :8787, --no-optimize (prefix-freeze only).
+hermes-proxy-token v1.0.0 — Auto-start headroom TOKEN proxy on session start.
+Port :8788, full compression (SmartCrusher + Kompress).
 
-Toggle: hermes plugins enable/disable hermes-proxy-auto
+Toggle: hermes plugins enable/disable hermes-proxy-token
 """
 import os, subprocess, urllib.request, json, logging
 
-PORT = 8787
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LAUNCHER = os.path.join(REPO, "scripts", "proxy-cache.sh")
-_log = logging.getLogger("hermes-proxy-auto")
+PORT = 8788
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+LAUNCHER = os.path.join(REPO, "scripts", "proxy-token.sh")
+_log = logging.getLogger("hermes-proxy-token")
 
 def _alive():
     try:
@@ -20,9 +20,8 @@ def _alive():
 
 def on_start(**kw):
     if _alive():
-        _log.info("cache proxy already running on :%s", PORT)
         return
-    _log.info("starting cache proxy on :%s", PORT)
+    _log.info("starting token proxy on :%s", PORT)
     try:
         subprocess.Popen(["bash", LAUNCHER], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     except Exception as e:
@@ -30,4 +29,4 @@ def on_start(**kw):
 
 def register(ctx):
     ctx.register_hook("session_start", on_start)
-    _log.info("cache proxy plugin registered")
+    _log.info("token proxy plugin registered")
