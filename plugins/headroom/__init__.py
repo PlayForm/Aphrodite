@@ -32,7 +32,7 @@ _CCR = re.compile(r"<<ccr:([a-f0-9]{1,64})[^>]*>>")
 _HASH = re.compile(r'hash[=:\s]*([a-f0-9]{1,64})', re.I)
 _NATIVE = os.environ.get("HERMES_HEADROOM_NATIVE", "1") != "0"
 _PROXYLESS = os.environ.get("HERMES_HEADROOM_PROXYLESS", "0") != "0"
-_PROXYLESS_MIN_LINES = int(os.environ.get("HERMES_PROXYLESS_MIN_LINES", "10"))
+_PROXYLESS_MIN_LINES = int(os.environ.get("HERMES_PROXYLESS_MIN_LINES", "20"))
 _PROXYLESS_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "headroom_cache")
 _PROXYLESS_DB = os.path.join(os.path.expanduser("~"), ".hermes", "headroom_cache.db")
 _PROXYLESS_COMPRESS = os.environ.get("HERMES_PROXYLESS_COMPRESS", "0") != "0"
@@ -532,7 +532,9 @@ def _patch_read_file():
                 recovered = True
 
             # PROXYLESS mode: store content → return CCR marker
-            if _PROXYLESS and content.strip() and total_lines >= _PROXYLESS_MIN_LINES:
+            # Skip files in our own cache dir (prevents infinite CCR loop)
+            if _PROXYLESS and content.strip() and total_lines >= _PROXYLESS_MIN_LINES \
+                    and _PROXYLESS_DIR not in os.path.abspath(path):
                 _ensure_cache()
                 # Read raw file content for cache (no line numbers — headroom_retrieve
                 # adds its own via _read_file).  OS page-cache makes this near-free.
@@ -609,7 +611,7 @@ def _patch_terminal():
             # PROXYLESS mode: store large outputs as CCR
             if _PROXYLESS and output.strip():
                 lines = output.count("\n") + 1
-                if lines >= _PROXYLESS_MIN_LINES and len(output) > 200:
+                if lines >= _PROXYLESS_MIN_LINES and len(output) > 500:
                     _ensure_cache()
                     stored = _compress_content(output) if _PROXYLESS_COMPRESS else output
                     h, p = _store_tool_content(stored, "terminal")
@@ -659,7 +661,7 @@ def _patch_execute_code():
             # PROXYLESS mode: store large outputs as CCR
             if _PROXYLESS and output.strip():
                 lines = output.count("\n") + 1
-                if lines >= _PROXYLESS_MIN_LINES and len(output) > 200:
+                if lines >= _PROXYLESS_MIN_LINES and len(output) > 500:
                     _ensure_cache()
                     stored = _compress_content(output) if _PROXYLESS_COMPRESS else output
                     h, p = _store_tool_content(stored, "execute_code")
