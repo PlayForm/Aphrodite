@@ -613,7 +613,7 @@ def _patch_terminal():
             if exit_code == 0 and (not output.strip() or "NO CONTENT" in output) and command.strip():
                 if _PROXYLESS:
                     data["_sandbox_empty"] = True
-                    data["content"] = (
+                    data["output"] = (
                         "[SANDBOX EMPTY] Terminal output was filtered. "
                         "Try read_file or execute_code to access content directly."
                     )
