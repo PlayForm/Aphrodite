@@ -161,7 +161,62 @@ def _handle_stats(args, **kw):
 
 
 # ═══════════════════════════════════════════════
-# Register all three
+# Native CCR resolution middleware (HERMES_HEADROOM_NATIVE=1)
+# Resolves CCR markers in messages BEFORE the proxy sees them.
+# ═══════════════════════════════════════════════
+
+import re as _re
+
+_CCR_PATTERN = _re.compile(r"<<ccr:([a-f0-9]{6,64})")
+_NATIVE = os.environ.get("HERMES_HEADROOM_NATIVE", "") == "1"
+
+def _resolve_ccr_in_messages(messages):
+    """Scan messages for CCR markers, resolve them in-place."""
+    if not messages or not isinstance(messages, list):
+        return
+    for i, msg in enumerate(messages):
+        content = msg.get("content", "")
+        if not isinstance(content, str) or not content.strip():
+            continue
+        # Find all CCR hashes in the content
+        hashes = _CCR_PATTERN.findall(content)
+        if not hashes:
+            # Also check [N items compressed...] format
+            if "items compressed" in content[:500]:
+                # Try to extract hash from [N items compressed ... hash=abc123]
+                import re as _re2
+                m = _re2.search(r'hash[=:\s]*([a-f0-9]{6,64})', content[:500], _re2.I)
+                if m:
+                    hashes = [m.group(1)]
+        if not hashes:
+            continue
+        # Resolve each hash — try local file path from context, then proxy
+        resolved = None
+        for h in hashes:
+            # Try proxy first (fastest for non-file content)
+            c = _proxy_retrieve(h)
+            if c:
+                resolved = c
+                break
+        if resolved:
+            messages[i] = {**msg, "content": resolved}
+    return messages
+
+
+def _on_llm_request(**kwargs):
+    """Middleware: resolve CCR markers before the API call goes through proxy."""
+    if not _NATIVE:
+        return None
+    request = dict(kwargs.get("request", {}))
+    msgs = request.get("messages")
+    if msgs:
+        _resolve_ccr_in_messages(msgs)
+        request["messages"] = msgs
+    return {"request": request, "source": "headroom-native"}
+
+
+# ═══════════════════════════════════════════════
+# Register all
 # ═══════════════════════════════════════════════
 
 def register(ctx):
@@ -171,3 +226,5 @@ def register(ctx):
                       schema=RETRIEVE_SCHEMA, handler=_handle_retrieve, emoji="🗜️")
     ctx.register_tool(name="headroom_stats",   toolset="headroom",
                       schema=STATS_SCHEMA,   handler=_handle_stats,   emoji="📊")
+    if _NATIVE:
+        ctx.register_middleware("llm_request", _on_llm_request)
