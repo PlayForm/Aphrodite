@@ -1,131 +1,63 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
   <defs>
-    <!-- Main gradient: deep navy → midnight -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1a1a2e"/>
-      <stop offset="50%" stop-color="#16213e"/>
-      <stop offset="100%" stop-color="#0f3460"/>
-    </linearGradient>
-    <!-- Accent gradient: violet → magenta -->
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="sole" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="50%" stop-color="#a855f7"/>
-      <stop offset="100%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#a855f7"/>
     </linearGradient>
-    <!-- Wing gradient: softer violet -->
-    <linearGradient id="wingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#6d28d9"/>
-      <stop offset="100%" stop-color="#a78bfa"/>
-    </linearGradient>
-    <!-- Subtle glow -->
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
 
-  <!-- Rounded hexagon background (manually computed with arc corners) -->
-  <path d="
-    M120 20 
-    L200 58 
-    Q204 60 204 64 
-    L204 176 
-    Q204 180 200 182 
-    L120 220 
-    Q116 222 112 220 
-    L40 182 
-    Q36 180 36 176 
-    L36 64 
-    Q36 60 40 58 
-    Z
-  " fill="url(#bgGrad)" stroke="url(#accentGrad)" stroke-width="3"/>
+  <!-- Winged sandal — flat comic/sticker style -->
+  <g transform="translate(120,125)">
 
-  <!-- Outer ring glow line -->
-  <path d="
-    M120 26 
-    L194 60 
-    Q196 62 196 66 
-    L196 174 
-    Q196 178 194 180 
-    L120 214 
-    L46 180 
-    Q44 178 44 174 
-    L44 66 
-    Q44 62 46 60 
-    Z
-  " fill="none" stroke="#7c3aed" stroke-width="1" opacity="0.3"/>
+    <!-- === LEFT WING === -->
+    <!-- Main feather sweep -->
+    <path d="M-18 -10 Q-60 -55 -80 -30 Q-52 -28 -40 -18 Q-72 -42 -75 -20 Q-50 -12 -36 -8"
+          fill="none" stroke="url(#sole)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Top feather -->
+    <path d="M-18 -14 Q-55 -65 -70 -45 Q-46 -42 -34 -22"
+          fill="none" stroke="url(#sole)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+    <!-- Bottom feather -->
+    <path d="M-18 -5 Q-50 -40 -55 -18 Q-38 -12 -28 -5"
+          fill="none" stroke="url(#sole)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
 
-  <!-- === CENTRAL MARK: Converging H / Compression diamond === -->
+    <!-- === SANDAL SOLE === -->
+    <!-- Sole body — flat elongated shape -->
+    <path d="M-45 10 Q-48 5 -42 -5 Q-30 -18 -5 -22 Q10 -23 20 -20 Q35 -15 45 -5 Q50 2 48 10 Q35 18 5 20 Q-25 20 -45 10 Z"
+          fill="url(#sole)" stroke="#5b21b6" stroke-width="3" stroke-linejoin="round"/>
 
-  <!-- Left vertical bar of H (with arrow tips) -->
-  <path d="M85 90 L85 150 L70 140" fill="none" stroke="url(#accentGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M85 90 L70 100" fill="none" stroke="url(#accentGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- H crossbars left -->
-  <line x1="78" y1="112" x2="92" y2="112" stroke="url(#accentGrad)" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>
-  <line x1="78" y1="128" x2="92" y2="128" stroke="url(#accentGrad)" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>
+    <!-- Sole highlight (flat comic shine) -->
+    <path d="M-30 4 Q-15 -8 10 -10 Q25 -10 35 -2"
+          fill="none" stroke="#c084fc" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
 
-  <!-- Right vertical bar of H (with arrow tips) -->
-  <path d="M155 90 L155 150 L170 140" fill="none" stroke="url(#accentGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M155 90 L170 100" fill="none" stroke="url(#accentGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- H crossbars right -->
-  <line x1="148" y1="112" x2="162" y2="112" stroke="url(#accentGrad)" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>
-  <line x1="148" y1="128" x2="162" y2="128" stroke="url(#accentGrad)" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>
+    <!-- === STRAPS === -->
+    <!-- Ankle strap -->
+    <path d="M-38 2 Q-25 -30 0 -28 Q20 -28 38 2"
+          fill="none" stroke="#7c3aed" stroke-width="4" stroke-linecap="round"/>
+    <!-- Toe strap -->
+    <path d="M35 -2 Q48 -15 55 -8 Q52 0 42 5"
+          fill="none" stroke="#7c3aed" stroke-width="3.5" stroke-linecap="round"/>
 
-  <!-- Center compression diamond (data funnel) -->
-  <path d="M100 100 L120 82 L140 100 L120 118 Z" fill="url(#accentGrad)" opacity="0.9" filter="url(#glow)"/>
-  
-  <!-- Inner center refined diamond (negative space) -->
-  <path d="M108 100 L120 92 L132 100 L120 108 Z" fill="#16213e" opacity="0.7"/>
+    <!-- === RIGHT WING === -->
+    <!-- Main feather sweep -->
+    <path d="M18 -10 Q60 -55 80 -30 Q52 -28 40 -18 Q72 -42 75 -20 Q50 -12 36 -8"
+          fill="none" stroke="url(#sole)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Top feather -->
+    <path d="M18 -14 Q55 -65 70 -45 Q46 -42 34 -22"
+          fill="none" stroke="url(#sole)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+    <!-- Bottom feather -->
+    <path d="M18 -5 Q50 -40 55 -18 Q38 -12 28 -5"
+          fill="none" stroke="url(#sole)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
 
-  <!-- Compression chevrons at edges -->
-  <path d="M95 95 L102 90 L109 95" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
-  <path d="M95 105 L102 110 L109 105" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
-  <path d="M131 95 L138 90 L145 95" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
-  <path d="M131 105 L138 110 L145 105" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
-
-  <!-- === HERMES WINGS === -->
-  <!-- Left wing -->
-  <path d="M82 82 Q55 55 38 72 Q50 78 60 85 Q48 68 32 82 Q44 90 56 92 Q40 80 28 92 Q42 98 58 94" 
-        fill="none" stroke="url(#wingGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)" opacity="0.85"/>
-
-  <!-- Right wing -->
-  <path d="M158 82 Q185 55 202 72 Q190 78 180 85 Q192 68 208 82 Q196 90 184 92 Q200 80 212 92 Q198 98 182 94" 
-        fill="none" stroke="url(#wingGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)" opacity="0.85"/>
-
-  <!-- === TOKEN NODES (flowing in/out) === -->
-  <!-- Input tokens (top) — 5 tokens flow in -->
-  <circle cx="88" cy="60" r="3.5" fill="#a855f7" opacity="0.6"/>
-  <circle cx="100" cy="54" r="3.5" fill="#7c3aed" opacity="0.8"/>
-  <circle cx="120" cy="50" r="4" fill="#c084fc" opacity="0.9"/>
-  <circle cx="140" cy="54" r="3.5" fill="#7c3aed" opacity="0.8"/>
-  <circle cx="152" cy="60" r="3.5" fill="#a855f7" opacity="0.6"/>
-
-  <!-- Output tokens (bottom) — 3 tokens out (compressed!) -->
-  <circle cx="100" cy="174" r="3.5" fill="#a855f7" opacity="0.7"/>
-  <circle cx="120" cy="178" r="4" fill="#c084fc" opacity="0.8"/>
-  <circle cx="140" cy="174" r="3.5" fill="#a855f7" opacity="0.7"/>
-
-  <!-- Data flow lines -->
-  <line x1="120" y1="54" x2="120" y2="82" stroke="#7c3aed" stroke-width="1" opacity="0.3" stroke-dasharray="3,3"/>
-  <line x1="88" y1="60" x2="100" y2="95" stroke="#7c3aed" stroke-width="0.7" opacity="0.25" stroke-dasharray="2,4"/>
-  <line x1="152" y1="60" x2="140" y2="95" stroke="#7c3aed" stroke-width="0.7" opacity="0.25" stroke-dasharray="2,4"/>
-  <line x1="120" y1="118" x2="120" y2="174" stroke="#7c3aed" stroke-width="1" opacity="0.3" stroke-dasharray="3,3"/>
-  <line x1="100" y1="112" x2="100" y2="170" stroke="#7c3aed" stroke-width="0.7" opacity="0.25" stroke-dasharray="2,4"/>
-  <line x1="140" y1="112" x2="140" y2="170" stroke="#7c3aed" stroke-width="0.7" opacity="0.25" stroke-dasharray="2,4"/>
+    <!-- === SPEED LINES (comic effect) === -->
+    <line x1="-55" y1="0" x2="-65" y2="2" stroke="#a855f7" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+    <line x1="-58" y1="6" x2="-68" y2="10" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>
+    <line x1="55" y1="0" x2="65" y2="2" stroke="#a855f7" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+    <line x1="58" y1="6" x2="68" y2="10" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>
+  </g>
 
   <!-- === TEXT === -->
-  <text x="120" y="202" text-anchor="middle" 
-        font-family="system-ui, -apple-system, sans-serif" 
-        font-size="11" font-weight="700" 
-        fill="url(#accentGrad)" letter-spacing="2.5">HERMESCOMPRESS</text>
+  <text x="120" y="26" text-anchor="middle"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-size="11" font-weight="700"
+        fill="#a855f7" letter-spacing="3">HERMESCOMPRESS</text>
 </svg>
