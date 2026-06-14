@@ -186,6 +186,23 @@ def _handle_proxy_stop(args, **kw):
     except Exception as e:
         return json.dumps({"error": f"proxy stop failed: {e}"})
 
+PROXY_STATUS_SCHEMA = {
+    "name": "headroom_proxy_status",
+    "description": "Check if headroom proxies are running and healthy.",
+    "parameters": {"type": "object", "properties": {}},
+}
+
+def _handle_proxy_status(args, **kw):
+    result = {}
+    for port in (8787, 8788):
+        try:
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/health")
+            data = json.loads(urllib.request.urlopen(req, timeout=3).read())
+            result[str(port)] = data.get("status", "unknown")
+        except Exception:
+            result[str(port)] = "offline"
+    return json.dumps(result)
+
 # ═══════════════════════════════════════
 # Native middleware (HERMES_HEADROOM_NATIVE=1)
 # ═══════════════════════════════════════
@@ -413,6 +430,8 @@ def register(ctx):
                       schema=PROXY_START_SCHEMA, handler=_handle_proxy_start, emoji="▶️")
     ctx.register_tool(name="headroom_proxy_stop", toolset="headroom",
                       schema=PROXY_STOP_SCHEMA, handler=_handle_proxy_stop, emoji="⏹️")
+    ctx.register_tool(name="headroom_proxy_status", toolset="headroom",
+                      schema=PROXY_STATUS_SCHEMA, handler=_handle_proxy_status, emoji="🩺")
     if _NATIVE:
         ctx.register_middleware("llm_request", _on_llm_request)
     _patch_read_file()
