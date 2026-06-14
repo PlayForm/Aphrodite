@@ -60,13 +60,15 @@ Inline compression via native middleware (direct API, 50-message session):
 | search_files | ContentRouter | **54.8%** |
 | cronjob | Full Pipeline | **51.0%** |
 
-Live session numbers (direct + native, 46 messages):
+Live session numbers (direct + native, scaling with context):
 
-| Metric | Value |
-|--------|-------|
-| Compression | **81-84%** |
-| Latency | 123-179ms |
-| Tokens saved | 31K-38K per turn |
+| Session size | Compression | Latency |
+|-------------|:-----------:|:-------:|
+| Small (20 msgs) | 40-52% | 57-72ms |
+| Medium (35 msgs) | 74-82% | 123-179ms |
+| Large (46 msgs) | **81-84%** | 179-409ms |
+
+> Note: Compression scales with context — more accumulated messages = more redundancy = higher savings. The middleware compresses inline on every API call. `HERMES_HEADROOM_NATIVE=1` and `deepseek-direct` are the default configuration. No proxy dependency.
 
 ---
 
