@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C5CE7"/>
+      <stop offset="100%" style="stop-color:#A29BFE"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2D2D4A"/>
+      <stop offset="100%" style="stop-color:#3D3D5C"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="120" cy="120" r="110" fill="url(#g2)" stroke="url(#g)" stroke-width="3"/>
+  <!-- Compression arrows -->
+  <path d="M60 120 L100 90 L100 110 L140 110 L140 90 L180 120 L140 150 L140 130 L100 130 L100 150 Z" 
+        fill="url(#g)" opacity="0.9"/>
+  <!-- Hermes wing left -->
+  <path d="M85 70 Q60 40 45 55 Q55 65 70 80" fill="none" stroke="#A29BFE" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M75 65 Q50 30 30 45 Q45 58 62 75" fill="none" stroke="#A29BFE" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <!-- Hermes wing right -->
+  <path d="M155 70 Q180 40 195 55 Q185 65 170 80" fill="none" stroke="#A29BFE" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M165 65 Q190 30 210 45 Q195 58 178 75" fill="none" stroke="#A29BFE" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <!-- Token nodes top -->
+  <circle cx="90" cy="55" r="4" fill="#6C5CE7" opacity="0.8"/>
+  <circle cx="110" cy="48" r="4" fill="#A29BFE" opacity="0.8"/>
+  <circle cx="130" cy="48" r="4" fill="#A29BFE" opacity="0.8"/>
+  <circle cx="150" cy="55" r="4" fill="#6C5CE7" opacity="0.8"/>
+  <!-- Token nodes bottom -->
+  <circle cx="80" cy="180" r="5" fill="#6C5CE7" opacity="0.7"/>
+  <circle cx="100" cy="188" r="5" fill="#A29BFE" opacity="0.7"/>
+  <circle cx="120" cy="192" r="5" fill="#A29BFE" opacity="0.7"/>
+  <circle cx="140" cy="188" r="5" fill="#A29BFE" opacity="0.7"/>
+  <circle cx="160" cy="180" r="5" fill="#6C5CE7" opacity="0.7"/>
+  <!-- Text -->
+  <text x="120" y="215" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="600" fill="#A29BFE" letter-spacing="2">COMPRESS</text>
+</svg>
