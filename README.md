@@ -135,25 +135,33 @@ git clone https://GitHub.Com/PlayForm/HermesCompress.git \
 
 | Mode                   | How                      | Latency          | Savings                  | When                                |
 | ---------------------- | ------------------------ | ---------------- | ------------------------ | ----------------------------------- |
-| **inline** (default)   | Library call in‑process  | 8‑10 ms warm     | Full pipeline (7 phases) | Default — fastest, best compression |
-| **proxy (cache)**      | Separate server, :8787   | +5‑20 ms network | Headroom only            | Zero code changes, prefix‑cache hits|
-| **proxy (token)**      | Separate server, :8788   | +5‑20 ms network | Headroom only            | Aggressive compression, rewrites    |
-| **dual**               | Both :8787 + :8788       | —                | —                        | Side‑by‑side comparison testing     |
+| **shim** (recommended) | Monkey-patch API loop    | 50‑80 ms warm    | Full pipeline (8 phases) | Production — proven 36‑72% savings  |
+| **inline** (default)   | Library call in‑process  | 8‑10 ms warm     | Full pipeline (7 phases) | Programmatic, non‑Hermes usage      |
+| **proxy (cache)**      | Separate server, `:8787` | +5‑20 ms network | Headroom only            | Zero code changes, prefix‑cache hits|
+| **proxy (token)**      | Separate server, `:8788` | +5‑20 ms network | Headroom only            | Aggressive rewriting, testing       |
+| **dual**               | Both `:8787` + `:8788`   | —                | —                        | Side‑by‑side comparison testing     |
 
 All modes target **DeepSeek v4‑pro** (1.6T params, 49B active, **1M context**,
-**384K max output**). The dual proxy launches both cache and token simultaneously
-for benchmark comparison — later shimmed into Hermes for A/B testing.
+**384K max output**).
+
+### Why the proxy doesn't compress Chat Completions
+
+Headroom proxy compresses **Anthropic Messages API** and **OpenAI Responses API**
+only. Hermes uses the **Chat Completions API** (with `role: tool` messages), which
+passes through uncompressed regardless of `--mode cache` or `--mode token`.
+Verified empirically: 14 side‑by‑side requests showed 0% compression on both modes.
+
+**The shim mode** solves this by using the inline `Compress.compress()` library
+directly — it intercepts ``api_messages`` right before the LLM API call at
+``agent/conversation_loop.py:674`` and runs the full 8‑phase pipeline.
 
 ```bash
-# Start both proxies
-python3 scripts/proxy-dual.py                # background
-python3 scripts/proxy-dual.py --foreground   # foreground
-python3 scripts/proxy-dual.py --status       # check both
-python3 scripts/proxy-dual.py --stop         # kill both
+# Install the shim (monkey-patches Hermes Agent)
+cd HermesCompress
+.venv/bin/python tests/shim_hermes_compress.py --patch
 
-# Or individually
-python3 scripts/proxy-start.py --mode cache --port 8787
-python3 scripts/proxy-start.py --mode token --port 8788
+# Test standalone (no Hermes needed)
+.venv/bin/python tests/shim_hermes_compress.py --test
 ```
 
 Both share the same headroom pipeline (CacheAligner → ContentRouter →
@@ -391,9 +399,16 @@ compression:
 
 ## Benchmarks 📈
 
-## Benchmarks 📈
+### Shim Mode (inline compress via monkey-patch)
 
-## Benchmarks 📈
+| Messages | Config | Tokens Before | Tokens After | Savings | Integrity |
+|----------|--------|:---:|:---:|:---:|:---:|
+| 22 | protect_recent=1, ratio=None | 20,159 | 12,899 | **36.0%** | ✓ all content preserved |
+| 8 | protect_recent=0, ratio=0.10 | 7,242 | 2,020 | 72.1% | ⚠️ code corrupted |
+| 8 | protect_recent=1, ratio=0.10 | 7,242 | 7,242 | 0% | ✓ all protected |
+
+**Recommended**: `protect_recent=1, target_ratio=None` — safe 36‑72% on
+accumulated sessions, zero content corruption.
 
 ### Production Session (DeepSeek v4-pro, max compression)
 
