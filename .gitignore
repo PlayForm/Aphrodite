@@ -16,3 +16,4 @@ build/
 .hermes/
 reports/session_accumulator.json
 ..bfg-report/
+target/
