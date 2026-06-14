@@ -99,12 +99,15 @@ def _call_proxy(hash_key: str) -> str | None:
             content = data.get("original_content", "")
         except Exception:
             pass
-
+    # Reject content that is or contains CCR markers
     if content:
         stripped = content.strip()
         if stripped.startswith("<<ccr:") or (
             stripped.startswith("[") and "compressed" in stripped[:200]
         ):
+            return None
+        # Also reject if CCR markers appear anywhere in the content
+        if "<<ccr:" in content[:5000] or "items compressed" in content[:5000]:
             return None
         _CACHE[hash_key] = content
 
