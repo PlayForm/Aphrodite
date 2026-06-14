@@ -5,7 +5,7 @@
 <h1 align="center">HermesCompress</h1>
 
 <p align="center"><strong>Native headroom integration for Hermes Agent.</strong><br>
-5 MCP tools + transparent middleware — zero monkey-patching.</p>
+5 MCP tools + transparent middleware - zero monkey-patching.</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.1-purple?style=flat">
@@ -43,7 +43,7 @@ HERMES_HEADROOM_NATIVE=1 hermes --provider deepseek-direct
 |-----------|------|
 | Middleware | Scans + resolves CCR markers, compresses inline |
 | `hermes_compress` | Python library: `Compress`, `CompressOption`, `Proxy` |
-| headroom ONNX | Kompress model — AST-aware, dedup-capable |
+| headroom ONNX | Kompress model - AST-aware, dedup-capable |
 
 ---
 
@@ -68,7 +68,7 @@ Live session numbers (direct + native, scaling with context):
 | Medium (35 msgs) | 74-82% | 123-179ms |
 | Large (46 msgs) | **81-84%** | 179-409ms |
 
-> Note: Compression scales with context — more accumulated messages = more redundancy = higher savings. The middleware compresses inline on every API call. `HERMES_HEADROOM_NATIVE=1` and `deepseek-direct` are the default configuration. No proxy dependency.
+> Note: Compression scales with context - more accumulated messages = more redundancy = higher savings. The middleware compresses inline on every API call. `HERMES_HEADROOM_NATIVE=1` and `deepseek-direct` are the default configuration. No proxy dependency.
 
 ---
 
@@ -86,7 +86,7 @@ hermes
 
 | Mode | Command | Compression | Use case |
 |------|---------|:-----------:|----------|
-| Direct + native | `hermes` | **81-84%** inline | Default — max savings |
+| Direct + native | `hermes` | **81-84%** inline | Default - max savings |
 | Cache proxy | `hermes --provider deepseek-proxy-cache` | Prefix-freeze | Stable, cost savings |
 | Token proxy | `hermes --provider deepseek-proxy-token` | 46-70% proxy | ⚠️ Re-compression |
 
@@ -94,7 +94,7 @@ hermes
 
 ## Tools
 
-The LLM has access to 5 tools — registered unconditionally:
+The LLM has access to 5 tools - registered unconditionally:
 
 | Tool | Purpose | Example |
 |------|---------|---------|
@@ -138,9 +138,9 @@ providers:
 ## Plugin Structure
 
 ```
-plugins/headroom/__init__.py   # 280 lines — single file
+plugins/headroom/__init__.py   # 280 lines - single file
 ├── 5 tool handlers            # compress, retrieve, stats, proxy_start, proxy_stop
-├── _resolve_ccr_in_messages   # re.sub callback — resolves ALL <<ccr:HASH>> markers
+├── _resolve_ccr_in_messages   # re.sub callback - resolves ALL <<ccr:HASH>> markers
 ├── _compress_inline           # hermes_compress.Compress singleton
 ├── _on_llm_request            # middleware entry point (proxy-aware)
 └── register()                 # registration surface
@@ -188,5 +188,5 @@ cd ~/.hermes/hermes-agent
 git apply /path/to/HermesCompress/patches/hermes-headroom-native.patch
 ```
 
-Adds `agent/headroom_native.py` — a standalone module with the same middleware logic,
+Adds `agent/headroom_native.py` - a standalone module with the same middleware logic,
 exposed as `register(ctx)` for integration into Hermes core.
