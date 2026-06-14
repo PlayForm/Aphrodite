@@ -20,7 +20,7 @@ import json, os, re, urllib.request
 PROXY = "http://127.0.0.1:8788"
 _CCR = re.compile(r"<<ccr:([a-f0-9]{1,64})[^>]*>>")
 _HASH = re.compile(r'hash[=:\s]*([a-f0-9]{1,64})', re.I)
-_NATIVE = os.environ.get("HERMES_HEADROOM_NATIVE") == "1"
+_NATIVE = os.environ.get("HERMES_HEADROOM_NATIVE", "1") != "0"
 _MODEL = os.environ.get("HERMES_MODEL", "deepseek-v4-pro")
 
 # ═══════════════════════════════════════
