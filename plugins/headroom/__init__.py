@@ -536,6 +536,8 @@ def _patch_read_file():
                     f"{i+1}|{line}" for i, line in enumerate(lines[start:end], start=start)
                 )
                 data["_fixed_by"] = "headroom"
+                # Invalidate Hermes internal cache by adding a unique key
+                data["_cache_bust"] = str(time.time())
                 # Also store raw to SQLite if proxyless is active
                 if _PROXYLESS and _PROXYLESS_DIR not in os.path.abspath(path):
                     try:
