@@ -288,6 +288,39 @@ def _on_llm_request(**kwargs):
     return {"request": request, "source": "headroom-native"}
 
 # ═══════════════════════════════════════
+# Tool fix middleware — recover empty read_file output (Hermes sandbox bug)
+# ═══════════════════════════════════════
+
+def _on_tool_execution(**kwargs):
+    """Wrap read_file — if result has empty content, re-read via Python."""
+    tool_name = kwargs.get("tool_name", "")
+    if tool_name != "read_file":
+        return kwargs["next_call"](kwargs["args"])
+
+    result = kwargs["next_call"](kwargs["args"])
+    try:
+        data = json.loads(result)
+        content = data.get("content", "")
+        total_lines = data.get("total_lines", 0)
+        if not content and total_lines and total_lines > 0:
+            path = kwargs["args"].get("path", "")
+            if path and os.path.isfile(path):
+                with open(path, encoding="utf-8", errors="replace") as f:
+                    lines = f.readlines()
+                offset = int(kwargs["args"].get("offset", 1))
+                limit = int(kwargs["args"].get("limit", 500))
+                start = max(0, offset - 1)
+                end = min(len(lines), start + limit)
+                data["content"] = "".join(
+                    f"{i+1}|{line}" for i, line in enumerate(lines[start:end], start=start)
+                )
+                data["_fixed_by"] = "headroom-tool-fix"
+                return json.dumps(data)
+    except Exception:
+        pass
+    return result
+
+# ═══════════════════════════════════════
 # Register
 # ═══════════════════════════════════════
 
@@ -304,3 +337,4 @@ def register(ctx):
                       schema=PROXY_STOP_SCHEMA, handler=_handle_proxy_stop, emoji="⏹️")
     if _NATIVE:
         ctx.register_middleware("llm_request", _on_llm_request)
+        ctx.register_middleware("tool_execution", _on_tool_execution)
