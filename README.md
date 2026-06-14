@@ -4,248 +4,155 @@
 
 <h1 align="center">HermesCompress</h1>
 
-<p align="center"><strong>Headroom-powered context compression for Hermes Agent.</strong><br>Inline compression shim - no proxy required.</p>
+<p align="center"><strong>Native headroom integration for Hermes Agent.</strong><br>3 MCP tools + transparent middleware — no monkey-patching.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.7.10-purple?style=flat" alt="version">
-  <img src="https://img.shields.io/badge/savings-50--67%25-brightgreen?style=flat" alt="savings">
-  <img src="https://img.shields.io/badge/latency-50--300ms-blue?style=flat" alt="latency">
-  <img src="https://img.shields.io/badge/python-3.11+-orange?style=flat" alt="python">
+  <img src="https://img.shields.io/badge/version-1.0.0-purple?style=flat" alt="version">
+  <img src="https://img.shields.io/badge/savings-55--74%25-brightgreen?style=flat" alt="savings">
+  <img src="https://img.shields.io/badge/latency-50--500ms-blue?style=flat" alt="latency">
+  <img src="https://img.shields.io/badge/python-3.10+-orange?style=flat" alt="python">
 </p>
-
----
-
-## Overview
-
-HermesCompress is a Hermes Agent plugin that monkey-patches the conversation loop to
-compress API messages before they reach the LLM provider. It uses
-[headroom-ai](https://github.com/NousResearch/headroom) (v0.25.0) with the
-Kompress ONNX model for AST-aware, dedup-capable compression.
-
-**Key numbers** (live benchmark, 85-message session):
-
-| Metric | Value |
-|--------|-------|
-| Token savings | **50-67%** (warm cache, 10+ messages) |
-| Latency overhead | **50-300ms** per API call (warm) |
-| Tool output integrity | **100% preserved** (0 empty/truncated results) |
-| CCR markers | **0** (inline mode, no markers) |
-| First-call overhead | **5-7s** (one-time Kompress ONNX model load) |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   Hermes Agent                          │
-│                                                         │
-│  ┌───────────────────────────────────────────────┐      │
-│  │        conversation_loop.run_conversation()    │      │
-│  │  ┌──────────────────────────────────────────┐ │      │
-│  │  │  hermes-compress-shim (monkey-patch)      │ │      │
-│  │  │                                          │ │      │
-│  │  │  1. _patched(*args, **kwargs)            │ │      │
-│  │  │     wraps run_conversation               │ │      │
-│  │  │  2. _compress_hook wraps forwarders:      │ │      │
-│  │  │     - _interruptible_api_call             │ │      │
-│  │  │     - _interruptible_streaming_api_call   │ │      │
-│  │  │  3. _compress(messages)                   │ │      │
-│  │  │     → Compress.compress() via headroom    │ │      │
-│  │  │  4. Proxy detection: skip if localhost    │ │      │
-│  │  └──────────────────────────────────────────┘ │      │
-│  └───────────────────────────────────────────────┘      │
-│                         ↓                               │
-│              DeepSeek API (v4-pro)                       │
-└─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                     Hermes Agent                           │
+│                                                            │
+│  ┌──────────────────────────────────────────────────┐     │
+│  │  llm_request middleware (HERMES_HEADROOM_NATIVE=1)│     │
+│  │                                                    │     │
+│  │  1. Scan messages for CCR markers                 │     │
+│  │  2. Resolve via proxy /v1/retrieve                │     │
+│  │  3. If direct API → compress inline via headroom  │     │
+│  │  4. If proxy → skip compression (proxy handles it)│     │
+│  └──────────────────────────────────────────────────┘     │
+│                         ↓                                  │
+│              DeepSeek API / Headroom Proxy                 │
+└────────────────────────────────────────────────────────────┘
 ```
 
-The shim intercepts at the **innermost layer** - the last code before the HTTP call to
-DeepSeek. All Hermes processing (sanitization, reasoning echo, middleware, tool JSON
-canonicalization) completes BEFORE compression. No downstream code can undo the result.
+**No monkey-patching.** Uses Hermes' native `ctx.register_middleware("llm_request", ...)` API. Runs before the proxy sees the request — breaking the re-compression loop.
 
----
+### Proxy-aware
 
-## Quick Start
+| Provider | Middleware behavior |
+|----------|-------------------|
+| `deepseek-proxy-cache` (:8787) | Resolve CCR only — proxy handles prefix-freeze |
+| `deepseek-proxy-token` (:8788) | Resolve CCR only — proxy handles compression |
+| `deepseek-direct` (api.deepseek.com) | **Resolve CCR + compress inline** (55-74%) |
 
-### 1. Install dependencies into Hermes agent venv
+### Three MCP Tools
 
-```bash
-~/.hermes/hermes-agent/venv/bin/pip install -e /path/to/HermesCompress
-~/.hermes/hermes-agent/venv/bin/pip install headroom-ai
-```
-
-**Critical**: `hermes_compress` MUST be importable from the Hermes process. The shim
-runs inside Hermes' Python process, not the project venv. Without this step, engine
-init silently fails (`ModuleNotFoundError`) with zero compression applied.
-
-### 2. Enable the plugin
-
-```bash
-hermes plugins enable hermes-compress-shim
-```
-
-**Note**: `hermes config set plugins.enabled ...` is IGNORED by Hermes. Use
-`hermes plugins enable` instead. Verify with `hermes plugins list --plain`.
-
-### 3. Restart Hermes
-
-On next session startup, you should see:
-
-```
-[hermes-compress-shim] ✓ patched agent API hooks - direct compression
-```
-
-The first API call will be slow (5-7s Kompress ONNX model download from HuggingFace).
-Set `HF_TOKEN` in `.env` to avoid rate limits. Subsequent calls: 50-300ms.
-
-### 4. Debug mode
-
-```bash
-HERMES_COMPRESS_DEBUG=1 hermes
-```
-
-Prints every step to stderr: patch detection, forwarder wrapping, engine init,
-compression result, savings %.
-
----
-
-## Configuration
-
-The shim reads its config from `COMPRESS_CONFIG` in the plugin source:
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `protect_recent` | `1` | Protect N most recent messages from compression |
-| `min_tokens` | `100` | Minimum tokens before compression triggers |
-| `target_ratio` | `None` | Target compression ratio (`None` = auto) |
-| `precompress` | `True` | Pre-compress tools before headroom |
-| `aggressive_kompress` | `True` | Aggressive mode for Kompress |
-| `deduplicate` | `True` | SmartCrusher deduplication |
-
-To override, edit `~/.hermes/plugins/hermes-compress-shim/__init__.py` (hardlinked to
-the repo copy at `plugins/hermes-compress-shim/__init__.py`).
-
----
-
-## Plugins
-
-| Plugin | What it does |
-|--------|-------------|
-| `hermes-compress-shim` | Monkey-patches API forwarders → 50-67% token savings |
-| `hermes-tool-fix` | Monitors terminal_tool for empty output, recovers read_file content |
-
-Enable both:
-
-```bash
-hermes plugins enable hermes-compress-shim
-hermes plugins enable hermes-tool-fix
-```
-
----
-
-## Proxy Mode (optional)
-
-Two headroom proxies are available for prefix-cache freezing:
-
-```bash
-./scripts/proxy-start.py --mode cache --port 8787   # cache mode
-./scripts/proxy-start.py --mode token --port 8788   # token mode
-```
-
-| Mode | Port | What it does |
-|------|------|-------------|
-| Cache | :8787 | Anthropic Messages API compression + CCR markers |
-| Token | :8788 | DeepSeek prefix-cache freezing (no Chat Completions compression) |
-
-**Important**: Neither proxy compresses OpenAI Chat Completions (what Hermes uses).
-The proxy only compresses Anthropic Messages API traffic. For Hermes, the inline
-shim is the ONLY compression path that actually reduces token count.
-
-The shim detects localhost base_url and skips local compression when a proxy is active
-(to avoid double-compression).
+| Tool | Purpose |
+|------|---------|
+| `headroom_compress` | Compress content on demand via proxy `/v1/compress` |
+| `headroom_retrieve` | Resolve CCR markers (local file + proxy + BM25) |
+| `headroom_stats` | Proxy compression statistics |
 
 ---
 
 ## Benchmarks
 
-### Live session (pane 6, 2026-06-14)
+Inline compression via native middleware (direct API, 50-message session):
 
-```
-10.7% -   2 msgs,  5,798ms  (cold: Kompress model load)
-15.3% -   5 msgs,     42ms
-56.1% -   6 msgs,     65ms
-58.6% -   9 msgs,     78ms
-61.4% -  12 msgs,    239ms
-61.9% -  14 msgs,     85ms
-62.3% -  16 msgs,     88ms
-61.8% -  18 msgs,     81ms
-```
+| Payload | Stage | Savings |
+|---------|-------|:-------:|
+| terminal | SmartCrusher | **97.9%** |
+| read_file | CodeCompressor | **83.0%** |
+| web_search | Kompress | **79.3%** |
+| execute_code | SmartCrusher+Compaction | **69.6%** |
+| search_files | ContentRouter | **64.6%** |
+| cronjob | Full Pipeline | **52.1%** |
 
-### Standalone (85 messages, all 5 tool types)
+Token proxy + tools (live session):
 
-```
-26.3% savings - 207,647 → 153,145 chars
-30 tool outputs, 0 CCR markers, 0 safety guard triggers
-Latency: 42s (85 msgs in one pass - per-call is 50-300ms on 5-20 msgs)
-```
-
-Full report: `reports/2026-06-14/live-benchmark.md`
+| Metric | Value |
+|--------|-------|
+| Compression rate | 45-70% (proxy-dependent) |
+| Tokens saved | 2.4M+ across sessions |
+| Retrieval method | Local file read first, proxy fallback |
 
 ---
 
-## Safety Guard
+## Quick Start
 
-The `_compress.py` safety guard reverts only truly empty tool outputs (zero-length
-strings). Across all benchmarks: **0 empty tool outputs detected**. The
-`protect_recent=1` setting prevents over-compression of recent content.
-
----
-
-## Verification
+### 1. Enable the plugin
 
 ```bash
-# Standalone compression test
-.venv/bin/python tests/shim_hermes_compress.py --test
+hermes plugins enable headroom
+```
 
-# Compare direct vs proxy
-.venv/bin/python tests/benchmark_compare.py
+### 2. Choose your mode
 
-# Tuning sweep
-.venv/bin/python tests/tune.py
+```bash
+# Cache proxy (stable default)
+hermes --provider deepseek-proxy-cache
 
-# Live session check (from another terminal)
-grep "hermes-compress: saved" ~/.hermes/logs/agent.log | tail -5
+# Token proxy + native middleware (no re-compression loop)
+HERMES_HEADROOM_NATIVE=1 hermes --provider deepseek-proxy-token
+
+# Direct API + inline compression (max savings, 55-74%)
+HERMES_HEADROOM_NATIVE=1 hermes --provider deepseek-direct
+```
+
+### 3. Use the tools
+
+The LLM can call `headroom_compress`, `headroom_retrieve`, and `headroom_stats` directly. No MCP configuration needed.
+
+---
+
+## Provider Configuration
+
+Three providers pre-configured in `~/.hermes/config.yaml`:
+
+```yaml
+model:
+  provider: deepseek-proxy-cache  # default
+  default: deepseek-v4-pro
+
+providers:
+  deepseek-proxy-cache:
+    base_url: http://127.0.0.1:8787/v1
+    api_key_env: DEEPSEEK_API_KEY
+    provider: deepseek
+
+  deepseek-proxy-token:
+    base_url: http://127.0.0.1:8788/v1
+    api_key_env: DEEPSEEK_API_KEY
+    provider: deepseek
+
+  deepseek-direct:
+    base_url: https://api.deepseek.com/v1
+    api_key_env: DEEPSEEK_API_KEY
+    provider: deepseek
 ```
 
 ---
 
-## Troubleshooting
+## Proxy Management
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| No compression, marker appears | `hermes_compress` not in agent venv | `pip install -e .` into agent venv |
-| Plugin `not enabled` in list | `plugins.enabled` config ignored | `hermes plugins enable hermes-compress-shim` |
-| `TypeError: run_conversation()` | Shim has wrong param signature | Update to latest (uses `*args/**kwargs`) |
-| `headroom_retrieve` loops | Proxy not running | Start proxy or ignore (tool fails fast now) |
-| Terminal commands return empty | Hermes sandbox bug (not our issue) | Enable `hermes-tool-fix` plugin |
+```bash
+# Start dual proxies (cache + token)
+.venv/bin/python scripts/proxy-dual.py
 
----
+# Check stats
+curl http://127.0.0.1:8787/stats   # cache mode
+curl http://127.0.0.1:8788/stats   # token mode
 
-## Commits (Current branch)
-
-```
-d1d9a01 feat: hermes-tool-fix plugin - patches terminal_tool + read_file_tool
-6f68475 fix: headroom_retrieve fails fast when proxy not running
-6092a5f fix: add debug logging + fix ModuleNotFoundError for hermes_compress
-4e2aab5 fix: *args/**kwargs passthrough to match actual run_conversation signature
-7b36b8a feat: proxy detection + correct port in shim plugin
-ae2ed63 docs: live benchmark report v2 - 85-msg payload, per-tool breakdown, 26.2% savings
-9f225f0 fix: correct monkey-patch targets + live benchmark report
+# Stop
+.venv/bin/python scripts/proxy-dual.py --stop
 ```
 
 ---
 
-## License
+## For Hermes Agent Developers
 
-HermesCompress is part of the [PlayForm](https://playform.cloud) ecosystem.
+A standalone patch is available at `patches/hermes-headroom-native.patch`. Apply it to `~/.hermes/hermes-agent/` to add the `agent/headroom_native.py` module. The plugin auto-detects this module and registers the middleware.
+
+```bash
+cd ~/.hermes/hermes-agent
+git apply /path/to/HermesCompress/patches/hermes-headroom-native.patch
+```
