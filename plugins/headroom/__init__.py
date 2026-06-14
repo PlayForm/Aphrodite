@@ -25,7 +25,7 @@ Proxyless mode (HERMES_HEADROOM_PROXYLESS=1):
   before caching (~60% savings on code files).
 """
 import hashlib as _hashlib
-import json, os, re, urllib.request
+import json, os, re, sqlite3, time, urllib.request
 
 PROXY = "http://127.0.0.1:8788"
 _CCR = re.compile(r"<<ccr:([a-f0-9]{1,64})[^>]*>>")
@@ -34,6 +34,7 @@ _NATIVE = os.environ.get("HERMES_HEADROOM_NATIVE", "1") != "0"
 _PROXYLESS = os.environ.get("HERMES_HEADROOM_PROXYLESS", "0") != "0"
 _PROXYLESS_MIN_LINES = int(os.environ.get("HERMES_PROXYLESS_MIN_LINES", "10"))
 _PROXYLESS_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "headroom_cache")
+_PROXYLESS_DB = os.path.join(os.path.expanduser("~"), ".hermes", "headroom_cache.db")
 _PROXYLESS_COMPRESS = os.environ.get("HERMES_PROXYLESS_COMPRESS", "0") != "0"
 _PROXYLESS_COMPRESS_MIN_TOKENS = int(os.environ.get("HERMES_PROXYLESS_COMPRESS_MIN_TOKENS", "50"))
 _MODEL = os.environ.get("HERMES_MODEL", "deepseek-v4-pro")
@@ -71,21 +72,99 @@ def _is_proxy(base_url):
 # Proxyless CCR cache (HERMES_HEADROOM_PROXYLESS=1)
 # ═══════════════════════════════════════
 
+def _init_db():
+    """Create SQLite tables for CCR storage and stats."""
+    if not _PROXYLESS:
+        return
+    try:
+        db = sqlite3.connect(_PROXYLESS_DB)
+        db.execute("""CREATE TABLE IF NOT EXISTS ccr_store (
+            hash       TEXT PRIMARY KEY,
+            content    TEXT NOT NULL,
+            tool       TEXT DEFAULT '',
+            size_before INTEGER DEFAULT 0,
+            size_after  INTEGER DEFAULT 0,
+            created_at REAL DEFAULT (strftime('%s','now'))
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS stats (
+            key    TEXT PRIMARY KEY,
+            value  TEXT DEFAULT '0'
+        )""")
+        # Initialize counters if missing
+        for k in ("requests", "stored", "retrieved", "bytes_before", "bytes_after", "compressions"):
+            db.execute("INSERT OR IGNORE INTO stats(key,value) VALUES(?, '0')", (k,))
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+def _db_row(key: str) -> str:
+    """Read a stats value from SQLite."""
+    try:
+        db = sqlite3.connect(_PROXYLESS_DB)
+        row = db.execute("SELECT value FROM stats WHERE key=?", (key,)).fetchone()
+        db.close()
+        return row[0] if row else "0"
+    except Exception:
+        return "0"
+
+def _db_inc(key: str, delta: int = 1):
+    """Increment a stats counter in SQLite."""
+    try:
+        db = sqlite3.connect(_PROXYLESS_DB)
+        db.execute("UPDATE stats SET value = CAST(value AS INTEGER) + ? WHERE key=?", (delta, key))
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
 def _ensure_cache():
-    """Create cache directory if missing."""
+    """Create cache directory and initialize SQLite DB."""
     if _PROXYLESS:
         os.makedirs(_PROXYLESS_DIR, exist_ok=True)
+        _init_db()
 
 def _store_tool_content(content: str, tool: str = "") -> tuple:
-    """Store tool output to local cache.  Returns (hash, path_or_None)."""
+    """Store tool output to SQLite + disk cache.  Returns (hash, path_or_None)."""
     h = _hashlib.sha256(content.encode()).hexdigest()[:24]
     p = os.path.join(_PROXYLESS_DIR, f"{h}.txt")
+
+    # Write to SQLite (primary store)
+    if _PROXYLESS:
+        try:
+            db = sqlite3.connect(_PROXYLESS_DB)
+            db.execute(
+                "INSERT OR REPLACE INTO ccr_store(hash,content,tool,size_before,size_after,created_at) VALUES(?,?,?,?,?,?)",
+                (h, content, tool, len(content), len(content), time.time())
+            )
+            db.commit()
+            db.close()
+            _db_inc("stored")
+            _db_inc("bytes_before", len(content))
+            _db_inc("requests")
+        except Exception:
+            pass
+
+    # Also write to disk (fast retrieval via _read_file)
     try:
         with open(p, "w", encoding="utf-8") as f:
             f.write(content)
     except Exception:
         return h, None
     return h, p
+
+def _retrieve_from_db(hash: str) -> str | None:
+    """Retrieve content from SQLite CCR store."""
+    try:
+        db = sqlite3.connect(_PROXYLESS_DB)
+        row = db.execute("SELECT content FROM ccr_store WHERE hash=?", (hash,)).fetchone()
+        db.close()
+        if row:
+            _db_inc("retrieved")
+            return row[0]
+    except Exception:
+        pass
+    return None
 
 def _ccr_result(hash: str, path: str, total_lines: int = 0, summary: str = "") -> str:
     """Build the CCR-wrapped JSON result string that replaces tool output."""
@@ -160,10 +239,18 @@ def _handle_retrieve(args, **kw):
     p = str(args.get("path", "")).strip()
     q = str(args.get("query", "")).strip()
 
+    # 1. Local file read (fastest)
     if p:
         c = _read_file(p)
         if c: return json.dumps({"original_content": c, "source": "local"})
 
+    # 2. SQLite internal store (proxyless)
+    if _PROXYLESS:
+        c = _retrieve_from_db(h)
+        if c:
+            return json.dumps({"original_content": c, "source": "sqlite"})
+
+    # 3. Proxy fallback
     data = _proxy_post("/v1/retrieve", {"hash": h, "query": q} if q else {"hash": h})
     if data:
         c = data.get("original_content", "")
@@ -183,6 +270,32 @@ STATS_SCHEMA = {
 }
 
 def _handle_stats(args, **kw):
+    # Internal stats from SQLite when proxyless mode is active
+    if _PROXYLESS:
+        try:
+            stored = int(_db_row("stored"))
+            retrieved = int(_db_row("retrieved"))
+            requests = int(_db_row("requests"))
+            bytes_before = int(_db_row("bytes_before"))
+            bytes_after = int(_db_row("bytes_after"))
+            compressions = int(_db_row("compressions"))
+            avg_savings = round((1 - bytes_after / max(1, bytes_before)) * 100, 1) if bytes_before else 0
+            return json.dumps({
+                "mode": "proxyless",
+                "requests": requests,
+                "stored": stored,
+                "retrieved": retrieved,
+                "bytes_before": bytes_before,
+                "bytes_after": bytes_after,
+                "compressions": compressions,
+                "avg_compression_pct": avg_savings,
+                "db_path": _PROXYLESS_DB,
+                "cache_dir": _PROXYLESS_DIR,
+            })
+        except Exception as e:
+            return json.dumps({"error": f"internal stats unavailable: {e}"})
+
+    # Proxy stats
     try:
         req = urllib.request.Request(f"{PROXY}/stats")
         s = json.loads(urllib.request.urlopen(req, timeout=5).read()).get("summary", {})
@@ -434,6 +547,8 @@ def _patch_read_file():
                     raw = content  # fallback if disk read fails
                 if _PROXYLESS_COMPRESS:
                     raw = _compress_content(raw)
+                    _db_inc("compressions")
+                    _db_inc("bytes_after", len(raw))
                 h, p = _store_tool_content(raw, "read_file")
                 if p:
                     summary = f"{'recovered ' if recovered else ''}{total_lines}L from {os.path.basename(path)}"
