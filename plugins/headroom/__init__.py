@@ -538,44 +538,24 @@ def _patch_read_file():
                 data["_fixed_by"] = "headroom"
                 recovered = True
 
-            # PROXYLESS mode: store content → return recovered content directly
+            # PROXYLESS mode: recover content + store to SQLite for stats
             # Skip files in our own cache dir (prevents infinite CCR loop)
             if _PROXYLESS and content.strip() \
                     and _PROXYLESS_DIR not in os.path.abspath(path):
-                _ensure_cache()
-                # Read raw file content for cache storage
+                # Store raw to SQLite + disk for stats tracking
                 raw = ""
                 try:
                     with open(path, encoding="utf-8", errors="replace") as f:
                         all_raw = f.readlines()
-                    s = max(0, offset - 1)
-                    e = min(len(all_raw), s + limit)
-                    raw = "".join(all_raw[s:e])
+                    start_i = max(0, offset - 1)
+                    end_i = min(len(all_raw), start_i + limit)
+                    raw = "".join(all_raw[start_i:end_i])
                 except Exception:
                     raw = content
-                # Store raw to SQLite + disk
-                if _PROXYLESS_COMPRESS:
-                    raw = _compress_content(raw)
-                    _db_inc("compressions")
-                    _db_inc("bytes_after", len(raw))
                 _store_tool_content(raw, "read_file")
-                # Only CCR-wrap very large files; otherwise return content directly
-                if total_lines >= 50:
-                    summary = f"{'recovered ' if recovered else ''}{total_lines}L from {os.path.basename(path)}"
-                    if _PROXYLESS_COMPRESS:
-                        summary = "compressed " + summary
-                    h, _ = _store_tool_content(raw, "read_file")
-                    p = os.path.join(_PROXYLESS_DIR, f"{h}.txt")
-                    data["content"] = _ccr_result(h, p, total_lines, summary)
-                    data["_ccr"] = True
-                    data["_hash"] = h
-                    data["_local_path"] = p
-                    if _PROXYLESS_COMPRESS:
-                        data["_compressed"] = True
-                else:
-                    # Return recovered content directly (no CCR wrapping)
-                    data["content"] = content
-                    data["_fixed_by"] = "headroom-proxyless"
+                # Return recovered content directly (never CCR-wrap read_file)
+                data["content"] = content
+                data["_fixed_by"] = "headroom-proxyless"
                 return json.dumps(data)
             elif recovered:
                 data["content"] = content
