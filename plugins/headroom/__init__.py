@@ -1,5 +1,5 @@
 """
-headroom v1.0.1 - Hermes plugin: MCP tools + transparent CCR middleware.
+headroom v1.0.2 - Hermes plugin: MCP tools + transparent CCR middleware + proxyless mode.
 
 Tools:
   headroom_compress     - compress content on demand via proxy /v1/compress
@@ -7,6 +7,7 @@ Tools:
   headroom_stats        - proxy compression statistics
   headroom_proxy_start  - start headroom proxy
   headroom_proxy_stop   - stop headroom proxy
+  headroom_proxy_status - check proxy health (:8787, :8788)
 
 Middleware (HERMES_HEADROOM_NATIVE=1):
   llm_request hook scans API messages for <<ccr:HASH>> markers,
@@ -14,13 +15,27 @@ Middleware (HERMES_HEADROOM_NATIVE=1):
   message list.  Proxy-aware: skips inline compression when routing
   through a local headroom proxy; applies inline compression on
   direct API using the hermes_compress.Compress engine.
+
+Proxyless mode (HERMES_HEADROOM_PROXYLESS=1):
+  Coexists with native middleware.  Tool outputs are stored to local
+  disk (~/.hermes/headroom_cache/) and replaced with CCR markers.
+  The model retrieves content on demand via headroom_retrieve using
+  local file reads — no network, no proxy, no sandbox filter issue.
+  With HERMES_PROXYLESS_COMPRESS=1, headroom AI-compresses content
+  before caching (~60% savings on code files).
 """
+import hashlib as _hashlib
 import json, os, re, urllib.request
 
 PROXY = "http://127.0.0.1:8788"
 _CCR = re.compile(r"<<ccr:([a-f0-9]{1,64})[^>]*>>")
 _HASH = re.compile(r'hash[=:\s]*([a-f0-9]{1,64})', re.I)
 _NATIVE = os.environ.get("HERMES_HEADROOM_NATIVE", "1") != "0"
+_PROXYLESS = os.environ.get("HERMES_HEADROOM_PROXYLESS", "0") != "0"
+_PROXYLESS_MIN_LINES = int(os.environ.get("HERMES_PROXYLESS_MIN_LINES", "10"))
+_PROXYLESS_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "headroom_cache")
+_PROXYLESS_COMPRESS = os.environ.get("HERMES_PROXYLESS_COMPRESS", "0") != "0"
+_PROXYLESS_COMPRESS_MIN_TOKENS = int(os.environ.get("HERMES_PROXYLESS_COMPRESS_MIN_TOKENS", "50"))
 _MODEL = os.environ.get("HERMES_MODEL", "deepseek-v4-pro")
 
 # ═══════════════════════════════════════
@@ -51,6 +66,48 @@ def _proxy_post(endpoint, payload, timeout=5):
 def _is_proxy(base_url):
     u = str(base_url)
     return any(h in u for h in ("127.0.0.1", "localhost", "0.0.0.0"))
+
+# ═══════════════════════════════════════
+# Proxyless CCR cache (HERMES_HEADROOM_PROXYLESS=1)
+# ═══════════════════════════════════════
+
+def _ensure_cache():
+    """Create cache directory if missing."""
+    if _PROXYLESS:
+        os.makedirs(_PROXYLESS_DIR, exist_ok=True)
+
+def _store_tool_content(content: str, tool: str = "") -> tuple:
+    """Store tool output to local cache.  Returns (hash, path_or_None)."""
+    h = _hashlib.sha256(content.encode()).hexdigest()[:24]
+    p = os.path.join(_PROXYLESS_DIR, f"{h}.txt")
+    try:
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception:
+        return h, None
+    return h, p
+
+def _ccr_result(hash: str, path: str, total_lines: int = 0, summary: str = "") -> str:
+    """Build the CCR-wrapped JSON result string that replaces tool output."""
+    marker = f"<<ccr:{hash},path={path}>>"
+    info = f" [{total_lines} lines]" if total_lines else ""
+    return (
+        f"[TOOL OUTPUT STORED{info}: {marker}"
+        f"{' — ' + summary if summary else ''}. "
+        f'Retrieve: headroom_retrieve(hash="{marker}", path="{path}")]'
+    )
+
+def _compress_content(content: str) -> str:
+    """Run headroom AI compression on a single content string.
+    Reuses the _compress_inline engine.  Returns compressed text
+    or original if compression unavailable."""
+    if len(content) < 200:
+        return content
+    msgs = [{"role": "tool", "content": content, "tool_call_id": "compression"}]
+    try:
+        return _compress_inline(msgs)[0]["content"]
+    except Exception:
+        return content
 
 # ═══════════════════════════════════════
 # headroom_compress
@@ -216,7 +273,8 @@ def _compress_inline(messages):
             from hermes_compress import Compress, CompressOption
             opt = CompressOption()
             opt.Enabled = True; opt.Mode = "inline"; opt.ProtectRecent = 1
-            opt.MinTokensToCompress = 100; opt.TargetRatio = None
+            opt.MinTokensToCompress = _PROXYLESS_COMPRESS_MIN_TOKENS if _PROXYLESS_COMPRESS else 100
+            opt.TargetRatio = None
             opt.PrecompressTools = True; opt.AggressiveKompress = True
             opt.DeduplicateResults = True
             _COMPRESS_ENGINE = Compress(model=_MODEL, option=opt)
@@ -326,11 +384,17 @@ def _on_llm_request(**kwargs):
 # ═══════════════════════════════════════
 
 def _patch_read_file():
-    """Monkey-patch read_file_tool to recover empty sandbox output."""
+    """Monkey-patch read_file_tool to recover empty sandbox output.
+    In PROXYLESS mode, stores recovered content locally and returns CCR markers."""
     try:
         import tools.file_tools as mod
         _orig = mod.read_file_tool
-    except Exception:
+    except Exception as e:
+        try:
+            import logging
+            logging.getLogger("headroom").warning("_patch_read_file: import failed: %s", e)
+        except Exception:
+            pass
         return
 
     import functools
@@ -341,15 +405,49 @@ def _patch_read_file():
             data = json.loads(result)
             content = data.get("content", "")
             total_lines = data.get("total_lines", 0)
+            recovered = False
             if (not content or "NO CONTENT" in content) and total_lines > 0 and os.path.isfile(path):
                 with open(path, encoding="utf-8", errors="replace") as f:
                     lines = f.readlines()
                 start = max(0, offset - 1)
                 end = min(len(lines), start + limit)
-                data["content"] = "".join(
+                content = "".join(
                     f"{i+1}|{line}" for i, line in enumerate(lines[start:end], start=start)
                 )
+                data["content"] = content
                 data["_fixed_by"] = "headroom"
+                recovered = True
+
+            # PROXYLESS mode: store content → return CCR marker
+            if _PROXYLESS and content.strip() and total_lines >= _PROXYLESS_MIN_LINES:
+                _ensure_cache()
+                # Read raw file content for cache (no line numbers — headroom_retrieve
+                # adds its own via _read_file).  OS page-cache makes this near-free.
+                raw = ""
+                try:
+                    with open(path, encoding="utf-8", errors="replace") as f:
+                        all_raw = f.readlines()
+                    s = max(0, offset - 1)
+                    e = min(len(all_raw), s + limit)
+                    raw = "".join(all_raw[s:e])
+                except Exception:
+                    raw = content  # fallback if disk read fails
+                if _PROXYLESS_COMPRESS:
+                    raw = _compress_content(raw)
+                h, p = _store_tool_content(raw, "read_file")
+                if p:
+                    summary = f"{'recovered ' if recovered else ''}{total_lines}L from {os.path.basename(path)}"
+                    if _PROXYLESS_COMPRESS:
+                        summary = "compressed " + summary
+                    data["content"] = _ccr_result(h, p, total_lines, summary)
+                    data["_ccr"] = True
+                    data["_hash"] = h
+                    data["_local_path"] = p
+                    if _PROXYLESS_COMPRESS:
+                        data["_compressed"] = True
+                return json.dumps(data)
+            elif recovered:
+                data["content"] = content
                 return json.dumps(data)
         except Exception:
             pass
@@ -359,7 +457,8 @@ def _patch_read_file():
 
 
 def _patch_terminal():
-    """Wrap terminal_tool to detect sandbox empty-output bug."""
+    """Wrap terminal_tool to detect sandbox empty-output bug.
+    In PROXYLESS mode, stores non-empty output locally and returns CCR markers."""
     try:
         import tools.terminal_tool as mod
         _orig = mod.terminal_tool
@@ -378,10 +477,32 @@ def _patch_terminal():
             data = json.loads(result)
             output = data.get("output", "")
             exit_code = data.get("exit_code", -1)
+
+            # Sandbox empty-output detection
             if exit_code == 0 and (not output.strip() or "NO CONTENT" in output) and command.strip():
+                if _PROXYLESS:
+                    data["_sandbox_empty"] = True
+                    data["content"] = (
+                        "[SANDBOX EMPTY] Terminal output was filtered. "
+                        "Try read_file or execute_code to access content directly."
+                    )
+                    return json.dumps(data)
                 data["_sandbox_empty"] = True
                 data["_hint"] = "Terminal returned exit 0 with empty output — likely sandbox bug. Try execute_code or read_file instead."
                 return json.dumps(data)
+
+            # PROXYLESS mode: store large outputs as CCR
+            if _PROXYLESS and output.strip():
+                lines = output.count("\n") + 1
+                if lines >= _PROXYLESS_MIN_LINES and len(output) > 200:
+                    _ensure_cache()
+                    stored = _compress_content(output) if _PROXYLESS_COMPRESS else output
+                    h, p = _store_tool_content(stored, "terminal")
+                    if p:
+                        data["content"] = _ccr_result(h, p, lines,
+                            f"terminal[{exit_code}] {command[:60]}")
+                        data["_ccr"] = True
+                        return json.dumps(data)
         except Exception:
             pass
         return result
@@ -390,7 +511,8 @@ def _patch_terminal():
 
 
 def _patch_execute_code():
-    """Wrap execute_code to detect sandbox empty-output bug."""
+    """Wrap execute_code to detect sandbox empty-output bug.
+    In PROXYLESS mode, stores non-empty output locally and returns CCR markers."""
     try:
         import tools.code_execution_tool as mod
         _orig = mod.execute_code
@@ -404,10 +526,33 @@ def _patch_execute_code():
         try:
             data = json.loads(result)
             output = data.get("output", "")
+            exit_code = data.get("exit_code", -1)
+
+            # Sandbox empty-output detection
             if (not output.strip() or "NO CONTENT" in output) and code.strip():
+                if _PROXYLESS:
+                    data["_sandbox_empty"] = True
+                    data["output"] = (
+                        "[SANDBOX EMPTY] execute_code output was filtered. "
+                        "Try read_file or terminal to access content directly."
+                    )
+                    return json.dumps(data)
                 data["_sandbox_empty"] = True
                 data["_hint"] = "execute_code returned empty — likely sandbox bug. Try read_file or terminal instead."
                 return json.dumps(data)
+
+            # PROXYLESS mode: store large outputs as CCR
+            if _PROXYLESS and output.strip():
+                lines = output.count("\n") + 1
+                if lines >= _PROXYLESS_MIN_LINES and len(output) > 200:
+                    _ensure_cache()
+                    stored = _compress_content(output) if _PROXYLESS_COMPRESS else output
+                    h, p = _store_tool_content(stored, "execute_code")
+                    if p:
+                        data["output"] = _ccr_result(h, p, lines,
+                            f"execute_code[{exit_code}] {code[:60]}")
+                        data["_ccr"] = True
+                        return json.dumps(data)
         except Exception:
             pass
         return result
@@ -420,20 +565,28 @@ def _patch_execute_code():
 # ═══════════════════════════════════════
 
 def register(ctx):
-    ctx.register_tool(name="headroom_compress", toolset="headroom",
+    ctx.register_tool(name="headroom_compress", toolset="compression",
                       schema=COMPRESS_SCHEMA, handler=_handle_compress, emoji="🗜️")
-    ctx.register_tool(name="headroom_retrieve", toolset="headroom",
+    ctx.register_tool(name="headroom_retrieve", toolset="compression",
                       schema=RETRIEVE_SCHEMA, handler=_handle_retrieve, emoji="🗜️")
-    ctx.register_tool(name="headroom_stats", toolset="headroom",
+    ctx.register_tool(name="headroom_stats", toolset="compression",
                       schema=STATS_SCHEMA, handler=_handle_stats, emoji="📊")
-    ctx.register_tool(name="headroom_proxy_start", toolset="headroom",
+    ctx.register_tool(name="headroom_proxy_start", toolset="compression",
                       schema=PROXY_START_SCHEMA, handler=_handle_proxy_start, emoji="▶️")
-    ctx.register_tool(name="headroom_proxy_stop", toolset="headroom",
+    ctx.register_tool(name="headroom_proxy_stop", toolset="compression",
                       schema=PROXY_STOP_SCHEMA, handler=_handle_proxy_stop, emoji="⏹️")
-    ctx.register_tool(name="headroom_proxy_status", toolset="headroom",
+    ctx.register_tool(name="headroom_proxy_status", toolset="compression",
                       schema=PROXY_STATUS_SCHEMA, handler=_handle_proxy_status, emoji="🩺")
+    # Native middleware: always-on when enabled (coexists with proxyless)
     if _NATIVE:
         ctx.register_middleware("llm_request", _on_llm_request)
+    if _PROXYLESS:
+        _ensure_cache()
+        try:
+            import logging
+            logging.getLogger("headroom").info("proxyless mode active — patching tools")
+        except Exception:
+            pass
     _patch_read_file()
     _patch_terminal()
     _patch_execute_code()
