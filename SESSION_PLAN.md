@@ -1,4 +1,4 @@
-# SESSION PLAN — HermesCompress (2026-06-14)
+# SESSION PLAN - HermesCompress (2026-06-14)
 
 ## Status: ✅ COMPLETED
 
@@ -8,7 +8,7 @@ All planned work has been completed and verified in live Hermes sessions.
 
 ### ✅ Bug 1: Monkey-patch targeted nonexistent methods (FIXED)
 - Shim now wraps correct forwarders: `_interruptible_api_call` + `_interruptible_streaming_api_call`
-- Verified: marker `[hermes-compress-shim] ✓ patched agent API hooks — direct compression` appears on startup
+- Verified: marker `[hermes-compress-shim] ✓ patched agent API hooks - direct compression` appears on startup
 - Commit: `9f225f0`
 
 ### ✅ Bug 2: headroom-ai not installed in agent venv (FIXED)
@@ -18,7 +18,7 @@ All planned work has been completed and verified in live Hermes sessions.
 
 ### ✅ Bug 3: Plugin disabled (FIXED)
 - Plugin shows `not enabled` despite `plugins.enabled` in config.yaml
-- Hermes ignores `plugins.enabled` config key — use `hermes plugins enable hermes-compress-shim`
+- Hermes ignores `plugins.enabled` config key - use `hermes plugins enable hermes-compress-shim`
 - Documented in skill pitfall
 
 ### ✅ Bug 4: Signature mismatch (FIXED)
@@ -27,7 +27,7 @@ All planned work has been completed and verified in live Hermes sessions.
 - Commit: `4e2aab5`
 
 ### ✅ Bug 5: Proxy detection (FIXED)
-- Added `_is_proxy_active(agent)` — checks model_config, config, base_url
+- Added `_is_proxy_active(agent)` - checks model_config, config, base_url
 - Skips local compression when proxy is detected (avoids double-compression)
 - Corrected proxy port: 8787 → 8788 (token mode)
 - Commit: `7b36b8a`
@@ -53,7 +53,7 @@ All planned work has been completed and verified in live Hermes sessions.
 
 ### ✅ Live verification
 - Compression confirmed working in 5+ Hermes sessions
-- Every API call compressed — no missed calls
+- Every API call compressed - no missed calls
 - 50-67% savings at steady state (10+ messages)
 - 10.7% first-call (cold Kompress load), 50-300ms warm
 

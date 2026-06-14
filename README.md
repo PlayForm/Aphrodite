@@ -4,7 +4,7 @@
 
 <h1 align="center">HermesCompress</h1>
 
-<p align="center"><strong>Headroom-powered context compression for Hermes Agent.</strong><br>Inline compression shim — no proxy required.</p>
+<p align="center"><strong>Headroom-powered context compression for Hermes Agent.</strong><br>Inline compression shim - no proxy required.</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.7.10-purple?style=flat" alt="version">
@@ -60,7 +60,7 @@ Kompress ONNX model for AST-aware, dedup-capable compression.
 └─────────────────────────────────────────────────────────┘
 ```
 
-The shim intercepts at the **innermost layer** — the last code before the HTTP call to
+The shim intercepts at the **innermost layer** - the last code before the HTTP call to
 DeepSeek. All Hermes processing (sanitization, reasoning echo, middleware, tool JSON
 canonicalization) completes BEFORE compression. No downstream code can undo the result.
 
@@ -93,7 +93,7 @@ hermes plugins enable hermes-compress-shim
 On next session startup, you should see:
 
 ```
-[hermes-compress-shim] ✓ patched agent API hooks — direct compression
+[hermes-compress-shim] ✓ patched agent API hooks - direct compression
 ```
 
 The first API call will be slow (5-7s Kompress ONNX model download from HuggingFace).
@@ -172,22 +172,22 @@ The shim detects localhost base_url and skips local compression when a proxy is 
 ### Live session (pane 6, 2026-06-14)
 
 ```
-10.7% —   2 msgs,  5,798ms  (cold: Kompress model load)
-15.3% —   5 msgs,     42ms
-56.1% —   6 msgs,     65ms
-58.6% —   9 msgs,     78ms
-61.4% —  12 msgs,    239ms
-61.9% —  14 msgs,     85ms
-62.3% —  16 msgs,     88ms
-61.8% —  18 msgs,     81ms
+10.7% -   2 msgs,  5,798ms  (cold: Kompress model load)
+15.3% -   5 msgs,     42ms
+56.1% -   6 msgs,     65ms
+58.6% -   9 msgs,     78ms
+61.4% -  12 msgs,    239ms
+61.9% -  14 msgs,     85ms
+62.3% -  16 msgs,     88ms
+61.8% -  18 msgs,     81ms
 ```
 
 ### Standalone (85 messages, all 5 tool types)
 
 ```
-26.3% savings — 207,647 → 153,145 chars
+26.3% savings - 207,647 → 153,145 chars
 30 tool outputs, 0 CCR markers, 0 safety guard triggers
-Latency: 42s (85 msgs in one pass — per-call is 50-300ms on 5-20 msgs)
+Latency: 42s (85 msgs in one pass - per-call is 50-300ms on 5-20 msgs)
 ```
 
 Full report: `reports/2026-06-14/live-benchmark.md`
@@ -235,12 +235,12 @@ grep "hermes-compress: saved" ~/.hermes/logs/agent.log | tail -5
 ## Commits (Current branch)
 
 ```
-d1d9a01 feat: hermes-tool-fix plugin — patches terminal_tool + read_file_tool
+d1d9a01 feat: hermes-tool-fix plugin - patches terminal_tool + read_file_tool
 6f68475 fix: headroom_retrieve fails fast when proxy not running
 6092a5f fix: add debug logging + fix ModuleNotFoundError for hermes_compress
 4e2aab5 fix: *args/**kwargs passthrough to match actual run_conversation signature
 7b36b8a feat: proxy detection + correct port in shim plugin
-ae2ed63 docs: live benchmark report v2 — 85-msg payload, per-tool breakdown, 26.2% savings
+ae2ed63 docs: live benchmark report v2 - 85-msg payload, per-tool breakdown, 26.2% savings
 9f225f0 fix: correct monkey-patch targets + live benchmark report
 ```
 

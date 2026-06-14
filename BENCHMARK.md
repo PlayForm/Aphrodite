@@ -1,4 +1,4 @@
-# BENCHMARK.md — HermesCompress
+# BENCHMARK.md - HermesCompress
 
 ## Quick Test (standalone)
 
@@ -22,19 +22,19 @@ grep "hermes-compress: saved" ~/.hermes/logs/agent.log | tail -5
 ### Results (2026-06-14, pane 6 session)
 
 ```
-10.7% —   2 msgs,  5,798ms  (cold: Kompress ONNX model download from HF)
-15.3% —   5 msgs,     42ms
-56.1% —   6 msgs,     65ms
-58.6% —   9 msgs,     78ms
-61.4% —  12 msgs,    239ms
-61.9% —  14 msgs,     85ms
-62.3% —  16 msgs,     88ms
-61.8% —  18 msgs,     81ms
+10.7% -   2 msgs,  5,798ms  (cold: Kompress ONNX model download from HF)
+15.3% -   5 msgs,     42ms
+56.1% -   6 msgs,     65ms
+58.6% -   9 msgs,     78ms
+61.4% -  12 msgs,    239ms
+61.9% -  14 msgs,     85ms
+62.3% -  16 msgs,     88ms
+61.8% -  18 msgs,     81ms
 ```
 
 **Steady state: ~62% savings at 10+ messages with ~80ms overhead.**
 
-Previous session (050301) hit 69.4% at 66 messages — 59,745 tokens saved.
+Previous session (050301) hit 69.4% at 66 messages - 59,745 tokens saved.
 
 ## Full Payload Benchmark (85 messages, 5 tool types)
 
@@ -77,7 +77,7 @@ Only the inline shim reduces actual token count.
 | Setup | `pip install -e .` | `./scripts/proxy-start.py` |
 
 The shim wins on token savings. The proxy wins on cache-hit pricing.
-They're complementary — use the shim for always-on compression, add the proxy
+They're complementary - use the shim for always-on compression, add the proxy
 when you want prefix-cache cost savings.
 
 ## Tuning Sweep
