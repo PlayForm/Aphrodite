@@ -7,24 +7,28 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 ## 1.0.2 — Proxyless CCR Mode, Combined Architecture, Compression
 
 - **Proxyless CCR mode** (`HERMES_HEADROOM_PROXYLESS=1`): tool outputs stored to
-  `~/.hermes/headroom_cache/` and replaced with `<<ccr:HASH,path=...>>` markers.
-  Model retrieves content on demand via `headroom_retrieve` using local file reads —
-  no proxy, no network. Sandbox-filtered content recovered via `open()`.
-  Achieves **97% tool output reduction** (58KB → 1.5KB of markers).
+  SQLite (`~/.hermes/headroom_cache.db`) + disk cache and replaced with
+  `<<ccr:HASH,path=...>>` markers. Model retrieves content on demand via
+  `headroom_retrieve` using local file reads → SQLite → proxy in priority order.
+  Achieves **97% tool output reduction** for large files (58KB → 1.5KB markers).
+- **Files <50 lines return directly** — no CCR wrapping. Only large files (≥50 lines)
+  get CCR-wrapped. Terminal/execute_code pass through raw below 50 lines/2KB.
+  Prevents CCR confusion during normal development.
+- **Cache-dir skip** — read_file won't CCR-wrap files in `~/.hermes/headroom_cache/`,
+  preventing infinite compression loops when agents read cache files directly.
+- **Auto-resolve via SQLite** — native `llm_request` middleware resolves `<<ccr:HASH>>`
+  markers from SQLite internal store before sending to DeepSeek. No manual
+  `headroom_retrieve` needed for standard reads.
 - **Headroom AI compression** (`HERMES_PROXYLESS_COMPRESS=1`): content compressed
   through headroom's Kompress ONNX model before caching (~60% code savings observed).
 - **Combined native + proxyless**: native middleware now coexists with proxyless patches.
-  Both layers run on the full message chain each turn — proxyless CCRs tool outputs,
-  native middleware compresses conversation (40-90%).
+  Both layers run on the full message chain each turn.
 - **Hermes v0.16.0 compatibility**: `toolset="compression"` required (was optional),
-  `toolsets: [compression]` in `plugin.yaml`, startup verification via logs.
-- **Renamed to `hermes-compress`**: plugin directory and metadata — avoids toolset
-  name collision warning in v0.16.0.
+  `toolsets: [compression]` in `plugin.yaml`.
+- **Renamed to `hermes-compress`**: plugin directory and metadata.
 - **Cache discipline**: `__pycache__` must be cleared after every build step.
-  Added to release workflow as mandatory step 1.
-- **`_PROXYLESS_COMPRESS_MIN_TOKENS=50`**: controls headroom activation threshold.
-- **Round-trip verified**: hash extraction → local file read → content with line numbers,
-  no double-numbering. Raw content stored to cache, `_read_file` adds line numbers on retrieval.
+- **SQLite stats**: requests, stored, retrieved, bytes_before/after, compressions.
+  `headroom_stats` returns internal stats when proxy is unavailable.
 
 ---
 
