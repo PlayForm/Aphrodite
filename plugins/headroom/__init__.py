@@ -538,13 +538,12 @@ def _patch_read_file():
                 data["_fixed_by"] = "headroom"
                 recovered = True
 
-            # PROXYLESS mode: store content → return CCR marker
+            # PROXYLESS mode: store content → return recovered content directly
             # Skip files in our own cache dir (prevents infinite CCR loop)
-            if _PROXYLESS and content.strip() and total_lines >= _PROXYLESS_MIN_LINES \
+            if _PROXYLESS and content.strip() \
                     and _PROXYLESS_DIR not in os.path.abspath(path):
                 _ensure_cache()
-                # Read raw file content for cache (no line numbers — headroom_retrieve
-                # adds its own via _read_file).  OS page-cache makes this near-free.
+                # Read raw file content for cache storage
                 raw = ""
                 try:
                     with open(path, encoding="utf-8", errors="replace") as f:
@@ -553,22 +552,30 @@ def _patch_read_file():
                     e = min(len(all_raw), s + limit)
                     raw = "".join(all_raw[s:e])
                 except Exception:
-                    raw = content  # fallback if disk read fails
+                    raw = content
+                # Store raw to SQLite + disk
                 if _PROXYLESS_COMPRESS:
                     raw = _compress_content(raw)
                     _db_inc("compressions")
                     _db_inc("bytes_after", len(raw))
-                h, p = _store_tool_content(raw, "read_file")
-                if p:
+                _store_tool_content(raw, "read_file")
+                # Only CCR-wrap very large files; otherwise return content directly
+                if total_lines >= 50:
                     summary = f"{'recovered ' if recovered else ''}{total_lines}L from {os.path.basename(path)}"
                     if _PROXYLESS_COMPRESS:
                         summary = "compressed " + summary
+                    h, _ = _store_tool_content(raw, "read_file")
+                    p = os.path.join(_PROXYLESS_DIR, f"{h}.txt")
                     data["content"] = _ccr_result(h, p, total_lines, summary)
                     data["_ccr"] = True
                     data["_hash"] = h
                     data["_local_path"] = p
                     if _PROXYLESS_COMPRESS:
                         data["_compressed"] = True
+                else:
+                    # Return recovered content directly (no CCR wrapping)
+                    data["content"] = content
+                    data["_fixed_by"] = "headroom-proxyless"
                 return json.dumps(data)
             elif recovered:
                 data["content"] = content
@@ -615,10 +622,10 @@ def _patch_terminal():
                 data["_hint"] = "Terminal returned exit 0 with empty output — likely sandbox bug. Try execute_code or read_file instead."
                 return json.dumps(data)
 
-            # PROXYLESS mode: store large outputs as CCR
+            # PROXYLESS mode: store large outputs as CCR; small ones pass through
             if _PROXYLESS and output.strip():
                 lines = output.count("\n") + 1
-                if lines >= _PROXYLESS_MIN_LINES and len(output) > 500:
+                if lines >= 50 and len(output) > 2000:
                     _ensure_cache()
                     stored = _compress_content(output) if _PROXYLESS_COMPRESS else output
                     h, p = _store_tool_content(stored, "terminal")
@@ -668,7 +675,7 @@ def _patch_execute_code():
             # PROXYLESS mode: store large outputs as CCR
             if _PROXYLESS and output.strip():
                 lines = output.count("\n") + 1
-                if lines >= _PROXYLESS_MIN_LINES and len(output) > 500:
+                if lines >= 50 and len(output) > 2000:
                     _ensure_cache()
                     stored = _compress_content(output) if _PROXYLESS_COMPRESS else output
                     h, p = _store_tool_content(stored, "execute_code")
