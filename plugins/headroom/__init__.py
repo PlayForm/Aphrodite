@@ -341,7 +341,7 @@ def _patch_read_file():
             data = json.loads(result)
             content = data.get("content", "")
             total_lines = data.get("total_lines", 0)
-            if not content and total_lines > 0 and os.path.isfile(path):
+            if (not content or "NO CONTENT" in content) and total_lines > 0 and os.path.isfile(path):
                 with open(path, encoding="utf-8", errors="replace") as f:
                     lines = f.readlines()
                 start = max(0, offset - 1)
@@ -378,7 +378,7 @@ def _patch_terminal():
             data = json.loads(result)
             output = data.get("output", "")
             exit_code = data.get("exit_code", -1)
-            if exit_code == 0 and not output.strip() and command.strip():
+            if exit_code == 0 and (not output.strip() or "NO CONTENT" in output) and command.strip():
                 data["_sandbox_empty"] = True
                 data["_hint"] = "Terminal returned exit 0 with empty output — likely sandbox bug. Try execute_code or read_file instead."
                 return json.dumps(data)
@@ -404,7 +404,7 @@ def _patch_execute_code():
         try:
             data = json.loads(result)
             output = data.get("output", "")
-            if not output.strip() and code.strip():
+            if (not output.strip() or "NO CONTENT" in output) and code.strip():
                 data["_sandbox_empty"] = True
                 data["_hint"] = "execute_code returned empty — likely sandbox bug. Try read_file or terminal instead."
                 return json.dumps(data)
