@@ -527,25 +527,27 @@ def _patch_read_file():
             content = data.get("content", "")
             total_lines = data.get("total_lines", 0)
             # Recover from sandbox filtering — always try this (safe: only fires on empty)
-            if (not content or "NO CONTENT" in content) and total_lines > 0 and os.path.isfile(path):
-                with open(path, encoding="utf-8", errors="replace") as f:
-                    lines = f.readlines()
-                start = max(0, offset - 1)
-                end = min(len(lines), start + limit)
-                data["content"] = "".join(
-                    f"{i+1}|{line}" for i, line in enumerate(lines[start:end], start=start)
-                )
-                data["_fixed_by"] = "headroom"
-                # Invalidate Hermes internal cache by adding a unique key
-                data["_cache_bust"] = str(time.time())
-                # Also store raw to SQLite if proxyless is active
-                if _PROXYLESS and _PROXYLESS_DIR not in os.path.abspath(path):
-                    try:
-                        raw = "".join(lines[start:end])
-                        _store_tool_content(raw, "read_file")
-                    except Exception:
-                        pass
-                return json.dumps(data)
+            if (not content or "NO CONTENT" in content) and os.path.isfile(path):
+                file_size = data.get("file_size", os.path.getsize(path))
+                if total_lines > 0 or file_size > 0:
+                    with open(path, encoding="utf-8", errors="replace") as f:
+                        lines = f.readlines()
+                    start = max(0, offset - 1)
+                    end = min(len(lines), start + limit)
+                    data["content"] = "".join(
+                        f"{i+1}|{line}" for i, line in enumerate(lines[start:end], start=start)
+                    )
+                    data["_fixed_by"] = "headroom"
+                    # Invalidate Hermes internal cache by adding a unique key
+                    data["_cache_bust"] = str(time.time())
+                    # Also store raw to SQLite if proxyless is active
+                    if _PROXYLESS and _PROXYLESS_DIR not in os.path.abspath(path):
+                        try:
+                            raw = "".join(lines[start:end])
+                            _store_tool_content(raw, "read_file")
+                        except Exception:
+                            pass
+                    return json.dumps(data)
         except Exception:
             pass
         return result
