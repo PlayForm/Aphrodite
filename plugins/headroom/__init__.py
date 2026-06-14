@@ -281,7 +281,7 @@ def _on_llm_request(**kwargs):
     fixed_indices = set()
     for i, msg in enumerate(msgs):
         content = str(msg.get("content", ""))
-        if "_fixed_by" in content[:200]:
+        if "_fixed_by" in content[:200] or "_sandbox_empty" in content[:200]:
             fixed_indices.add(i)
 
     # Resolve CCR markers (returns new list, no mutation)
@@ -372,6 +372,32 @@ def _patch_terminal():
     mod.terminal_tool = _fixed
 
 
+def _patch_execute_code():
+    """Wrap execute_code to detect sandbox empty-output bug."""
+    try:
+        import tools.code_execution_tool as mod
+        _orig = mod.execute_code
+    except Exception:
+        return
+
+    import functools
+    @functools.wraps(_orig)
+    def _fixed(code, task_id=None, enabled_tools=None):
+        result = _orig(code=code, task_id=task_id, enabled_tools=enabled_tools)
+        try:
+            data = json.loads(result)
+            output = data.get("output", "")
+            if not output.strip() and code.strip():
+                data["_sandbox_empty"] = True
+                data["_hint"] = "execute_code returned empty — likely sandbox bug. Try read_file or terminal instead."
+                return json.dumps(data)
+        except Exception:
+            pass
+        return result
+
+    mod.execute_code = _fixed
+
+
 # ═══════════════════════════════════════
 # Register
 # ═══════════════════════════════════════
@@ -391,3 +417,4 @@ def register(ctx):
         ctx.register_middleware("llm_request", _on_llm_request)
     _patch_read_file()
     _patch_terminal()
+    _patch_execute_code()
