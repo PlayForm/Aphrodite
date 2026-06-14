@@ -1,5 +1,7 @@
 name: headroom-retrieve
-version: 0.2.0
-description: "headroom_retrieve tool — proxy + local fallback with CCR-recompression detection. Path required for auto-fallback."
+version: 0.5.0
+description: "Full headroom MCP suite — compress, retrieve, stats. Works with token proxy or direct+shim."
 provides_tools:
+  - headroom_compress
   - headroom_retrieve
+  - headroom_stats
