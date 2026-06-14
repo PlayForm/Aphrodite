@@ -1,10 +1,10 @@
 """
-headroom-retrieve v0.3.0 — Hermes plugin.
-- Multi-hash batch retrieval (pass an array of hashes)
-- Auto-extract hash from raw CCR strings like '<<ccr:abc,string,5KB>>'
-- Local file read first when path provided
-- Self-caching (hash→content remembered within session)
+headroom-retrieve v0.3.1 — Hermes plugin.
+- Single or batch: pass one hash or comma-separated — DeepSeek chooses
+- Local disk read first when path provided (instant, bypasses all compression)
 - Proxy fallback for terminal/execute_code output
+- Self-caching per session
+- Rich metadata in responses (path, size, line count, source)
 """
 from __future__ import annotations
 
@@ -15,15 +15,11 @@ import urllib.request
 import urllib.error
 
 PROXY_URL = "http://127.0.0.1:8788"
-
-# Session-local cache — survives across calls within same Hermes session
 _CACHE: dict[str, str] = {}
-
 _CCR_EXTRACT = re.compile(r"(?:<<ccr:|hash[=:\s]*)([a-f0-9]{6,64})", re.I)
 
 
 def _extract_hash(raw: str) -> str:
-    """Extract hash from a raw CCR marker string like '<<ccr:abc123,string,5KB>>'."""
     m = _CCR_EXTRACT.search(raw)
     return m.group(1) if m else raw.strip("<>").split(",")[0].strip()
 
@@ -32,56 +28,57 @@ HEADROOM_RETRIEVE_SCHEMA = {
     "name": "headroom_retrieve",
     "description": (
         "Retrieve original content behind headroom compression markers. "
-        "Pass markers directly as `hash` — the tool extracts the hash automatically. "
-        "For files: include `path` for instant disk read. "
-        "For terminal/execute_code output: pass the hash and the tool "
-        "retrieves from the proxy cache. "
-        "Can batch multiple markers: pass comma-separated hashes."
+        "Pass markers directly — the tool auto-extracts hashes. "
+        "For FILES: include `path` for instant local disk read (fastest). "
+        "For TERMINAL/CODE output: omit `path` and the tool tries the proxy cache. "
+        "One hash or many (comma-separated) — your choice."
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "hash": {
                 "type": "string",
-                "description": (
-                    "One or more CCR markers or raw hashes. Can be a single marker "
-                    "like '<<ccr:abc,string,5KB>>' or comma-separated like "
-                    "'hash1,hash2,hash3'. The tool auto-extracts hashes."
-                ),
+                "description": "CCR marker(s) or hash(es). Single or comma-separated.",
             },
             "path": {
                 "type": "string",
-                "description": "File path for local disk read (fastest). Can be comma-separated for batches.",
+                "description": "File path(s) for local read. Comma-separated for batch.",
             },
-            "query": {"type": "string", "description": "Optional BM25 search query"},
         },
         "required": ["hash"],
     },
 }
 
 
-def _read_file_direct(path: str) -> str | None:
+def _read_file_direct(path: str, max_lines: int = 0) -> dict | None:
+    """Read file from disk. Returns {content, lines, size, path} or None."""
     if not path or not os.path.isfile(path):
         return None
     try:
+        size = os.path.getsize(path)
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
-        lines = content.split("\n")
-        return "\n".join(f"{i+1}|{line}" for i, line in enumerate(lines))
+        all_lines = content.split("\n")
+        total_lines = len(all_lines)
+        if max_lines and total_lines > max_lines:
+            shown = all_lines[:max_lines]
+            content = "\n".join(f"{i+1}|{line}" for i, line in enumerate(shown))
+            content += f"\n... [{total_lines - max_lines} more lines, {size} bytes total]"
+        else:
+            content = "\n".join(f"{i+1}|{line}" for i, line in enumerate(all_lines))
+        return {"content": content, "lines": total_lines, "size": size, "path": path}
     except Exception:
         return None
 
 
-def _call_proxy(hash_key: str, query: str = "") -> str | None:
-    """Try proxy retrieve for a single hash."""
+def _call_proxy(hash_key: str) -> str | None:
+    """Try proxy retrieve. Returns content string or None."""
     if hash_key in _CACHE:
         return _CACHE[hash_key]
 
-    payload: dict = {"hash": hash_key}
-    if query:
-        payload["query"] = query
-
+    payload = {"hash": hash_key}
     content = None
+
     try:
         import httpx
         resp = httpx.post(f"{PROXY_URL}/v1/retrieve", json=payload, timeout=5)
@@ -103,16 +100,14 @@ def _call_proxy(hash_key: str, query: str = "") -> str | None:
         except Exception:
             pass
 
-    # Reject content that is itself a CCR marker
     if content:
         stripped = content.strip()
         if stripped.startswith("<<ccr:") or (
             stripped.startswith("[") and "compressed" in stripped[:200]
         ):
-            content = None
-
-    if content:
+            return None
         _CACHE[hash_key] = content
+
     return content
 
 
@@ -121,73 +116,64 @@ def _handle_headroom_retrieve(args: dict, **kwargs) -> str:
     if not raw:
         return json.dumps({"error": "hash required"})
 
-    # Parse multiple hashes (comma-separated or raw CCR markers)
-    raw_hashes: list[str] = []
-    for part in raw.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        h = _extract_hash(part)
-        if h:
-            raw_hashes.append(h)
-
+    raw_hashes = [h for part in raw.split(",") if (h := _extract_hash(part.strip()))]
     if not raw_hashes:
-        return json.dumps({"error": "no valid hash found in input"})
+        return json.dumps({"error": "no valid hash found"})
 
-    # Parse paths (comma-separated)
     path_str = str(args.get("path") or "").strip()
-    paths: list[str] = [p.strip() for p in path_str.split(",") if p.strip()] if path_str else []
+    paths = [p.strip() for p in path_str.split(",") if p.strip()] if path_str else []
 
-    query = str(args.get("query") or "").strip()
-
-    results: list[dict] = []
-
+    results = []
     for i, h in enumerate(raw_hashes):
-        entry: dict = {"hash": h}
+        file_path = paths[i] if i < len(paths) else None
 
-        # 1. Cache hit?
+        # 1. Cache hit
         if h in _CACHE:
-            entry["original_content"] = _CACHE[h]
-            entry["source"] = "cache"
-            results.append(entry)
+            results.append({"hash": h, "content": _CACHE[h], "source": "cache"})
             continue
 
-        # 2. Local file read if path available
-        file_path = paths[i] if i < len(paths) else None
+        # 2. Local file read (fastest, most reliable)
         if file_path:
-            content = _read_file_direct(file_path)
-            if content:
-                _CACHE[h] = content
-                entry["original_content"] = content
-                entry["source"] = "local"
-                results.append(entry)
+            info = _read_file_direct(file_path)
+            if info:
+                _CACHE[h] = info["content"]
+                results.append({
+                    "hash": h,
+                    "content": info["content"],
+                    "source": "local",
+                    "path": info["path"],
+                    "lines": info["lines"],
+                    "bytes": info["size"],
+                })
                 continue
 
         # 3. Proxy
-        content = _call_proxy(h, query)
+        content = _call_proxy(h)
         if content:
-            entry["original_content"] = content
-            entry["source"] = "proxy"
-            results.append(entry)
+            results.append({"hash": h, "content": content, "source": "proxy"})
             continue
 
         # 4. Failed
-        hint = f" (path={file_path})" if file_path else ""
-        entry["error"] = f"CCR expired{hint}. Re-run original command."
-        results.append(entry)
+        hint = f' (path={file_path})' if file_path else ''
+        msg = (
+            f"Content not cached{hint}. "
+            + ("File not found on disk — check path." if file_path else
+               "Re-run the original terminal/execute_code command to get fresh output.")
+        )
+        results.append({"hash": h, "error": msg})
 
-    # Single hash → return flat (backward compat)
+    # Single result → return flat
     if len(results) == 1:
         r = results[0]
-        if "error" in r:
-            return json.dumps(r)
-        return json.dumps({
-            "original_content": r["original_content"],
-            "source": r.get("source", "unknown"),
-        })
+        return json.dumps(r)
 
-    # Multi-hash → return array
-    return json.dumps({"results": results})
+    # Batch → return array with summary
+    ok = sum(1 for r in results if "content" in r)
+    fail = len(results) - ok
+    return json.dumps({
+        "summary": f"{ok} retrieved, {fail} failed",
+        "results": results,
+    })
 
 
 def register(ctx) -> None:
