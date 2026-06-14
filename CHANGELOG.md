@@ -4,6 +4,25 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 
 ---
 
+## 0.7.13 - Inline Compression Always-On, Double-Wrap Fix, headroom_retrieve Fix
+
+- **Inline compression always active**: Removed proxy-detection bypass that
+  skipped local compression when a local headroom proxy was detected. The
+  cache-mode proxy is transparent for Chat Completions (Hermes' API format) —
+  only Anthropic Messages / OpenAI Responses get proxy compression. Inline
+  compression now runs alongside the proxy, providing 50-78% token savings
+  while the proxy provides prefix-freeze cost savings.
+- **Double-compression (N-layer wrapping) fixed**: `_patch_loop()` was
+  re-wrapping forwarders on every turn, creating N layers of wrappers after
+  N turns. Each layer called `headroom.compress()` on already-compressed
+  messages (0% savings, wasted CPU). Fixed by saving originals once and
+  wrapping one-time only via `_saved_origins` dict.
+- **headroom_retrieve TypeError fixed**: Handler signature `_handle_headroom_retrieve(args: dict)`
+  rejected Hermes' `task_id` kwarg. Changed to `**kwargs` passthrough.
+  Now returns proper "Content expired" messages instead of crashing.
+- **Startup message corrected**: No longer prints misleading "proxy-active
+  (no local compression)" — now says "inline compression active".
+
 ## 0.7.0 - Pipeline Reorder: Headroom-First
 
 - **Critical fix**: Reordered compression pipeline so headroom runs BEFORE

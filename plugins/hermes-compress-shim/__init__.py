@@ -222,7 +222,12 @@ def register(ctx) -> None:
 
 
 def _patch_loop():
-    """Monkey-patch AIAgent._interruptible_api_call forwarders to compress messages."""
+    """Monkey-patch AIAgent._interruptible_streaming_api_call to compress messages.
+
+    Wraps the forwarder ONCE by storing the original.  Subsequent turns
+    reuse the same wrapper — no nested wrapping (was causing double-compress
+    on every turn because _patched() re-read the already-wrapped attr).
+    """
     _dbg("_patch_loop: importing agent.conversation_loop.run_conversation...")
     try:
         from agent.conversation_loop import run_conversation as _orig
@@ -233,63 +238,78 @@ def _patch_loop():
 
     import functools
 
+    # Store original forwarders once — never re-wrap.
+    _saved_origins: dict = {}
+
     @functools.wraps(_orig)
     def _patched(*args, **kwargs):
         agent = args[0]
         _dbg(f"_patched: called — agent type={type(agent).__name__} args={len(args)} kwargs_keys={list(kwargs.keys())}")
 
-        _api = getattr(agent, "_interruptible_api_call", None)
-        _stream = getattr(agent, "_interruptible_streaming_api_call", None)
-        _dbg(f"_patched: _api={'FOUND' if _api else 'MISSING'} _stream={'FOUND' if _stream else 'MISSING'}")
+        # ── One-time wrap ────────────────────────────────────────────
+        if "_hc_wrapped" not in _saved_origins:
+            _stream = getattr(agent, "_interruptible_streaming_api_call", None)
+            _api = getattr(agent, "_interruptible_api_call", None)
+            _dbg(f"_patched: one-time wrap — _stream={'FOUND' if _stream else 'MISSING'} _api={'FOUND' if _api else 'MISSING'}")
 
-        if not _api and not _stream:
-            print("[hermes-compress-shim] WARNING: no intercept hook found", file=sys.stderr)
-            return _orig(*args, **kwargs)
+            if not _stream and not _api:
+                print("[hermes-compress-shim] WARNING: no intercept hook found", file=sys.stderr)
+                _saved_origins["_hc_wrapped"] = False
+                return _orig(*args, **kwargs)
 
-        using_proxy = _is_proxy_active(agent)
-        _dbg(f"_patched: using_proxy={using_proxy}")
+            # Wrap streaming (primary path) — inline compression always,
+            # proxy is transparent for Chat Completions.
+            if _stream:
+                _saved_origins["_stream"] = _stream
+                fn_name = getattr(_stream, "__name__", str(_stream))
 
-        # ── Compression wrapper ───────────────────────────────────────
-        # ALWAYS compress inline — the proxy (cache or token mode) is
-        # transparent for Chat Completions (Hermes' API format). Only
-        # Anthropic Messages / OpenAI Responses get proxy compression.
-        # Inline compression is always safe and gives real token savings.
-        def _make_wrapper(fn):
-            fn_name = getattr(fn, "__name__", str(fn))
-            @functools.wraps(fn)
-            def _compress_hook(*a, **kw):
-                _dbg(f"_compress_hook[{fn_name}]: called — positional_args={len(a)} "
-                     f"kw_keys={list(kw.keys())} "
-                     f"a[0]_type={type(a[0]).__name__ if a else 'N/A'}")
-                if a and isinstance(a[0], dict):
-                    api_kwargs = a[0]
-                    msgs = api_kwargs.get("messages")
-                    _dbg(f"_compress_hook[{fn_name}]: msgs={'PRESENT' if msgs else 'MISSING'} "
-                         f"type={type(msgs).__name__ if msgs else 'N/A'} "
-                         f"len={len(msgs) if isinstance(msgs, list) else 'N/A'}")
-                    if msgs and isinstance(msgs, list) and len(msgs) > 1:
-                        _dbg(f"_compress_hook[{fn_name}]: compressing {len(msgs)} msgs...")
-                        api_kwargs = {**api_kwargs, "messages": _compress(msgs)}
-                        return fn(*(api_kwargs,) + a[1:], **kw)
+                @functools.wraps(_stream)
+                def _compress_hook(*a, **kw):
+                    _dbg(f"_compress_hook[{fn_name}]: called — positional_args={len(a)} "
+                         f"kw_keys={list(kw.keys())} "
+                         f"a[0]_type={type(a[0]).__name__ if a else 'N/A'}")
+                    if a and isinstance(a[0], dict):
+                        api_kwargs = a[0]
+                        msgs = api_kwargs.get("messages")
+                        _dbg(f"_compress_hook[{fn_name}]: msgs={'PRESENT' if msgs else 'MISSING'} "
+                             f"type={type(msgs).__name__ if msgs else 'N/A'} "
+                             f"len={len(msgs) if isinstance(msgs, list) else 'N/A'}")
+                        if msgs and isinstance(msgs, list) and len(msgs) > 1:
+                            _dbg(f"_compress_hook[{fn_name}]: compressing {len(msgs)} msgs...")
+                            api_kwargs = {**api_kwargs, "messages": _compress(msgs)}
+                            return _saved_origins["_stream"](*(api_kwargs,) + a[1:], **kw)
+                        else:
+                            _dbg(f"_compress_hook[{fn_name}]: SKIP — msgs too small or not list")
                     else:
-                        _dbg(f"_compress_hook[{fn_name}]: SKIP — msgs too small or not list")
-                else:
-                    _dbg(f"_compress_hook[{fn_name}]: SKIP — "
-                         f"no args or a[0] not dict")
-                return fn(*a, **kw)
-            return _compress_hook
+                        _dbg(f"_compress_hook[{fn_name}]: SKIP — no args or a[0] not dict")
+                    return _saved_origins["_stream"](*a, **kw)
 
-        if _api:
-            _dbg("_patched: wrapping _interruptible_api_call")
-            setattr(agent, "_interruptible_api_call", _make_wrapper(_api))
-        if _stream:
-            _dbg("_patched: wrapping _interruptible_streaming_api_call")
-            setattr(agent, "_interruptible_streaming_api_call", _make_wrapper(_stream))
+                setattr(agent, "_interruptible_streaming_api_call", _compress_hook)
 
-        tag = "proxy-active (no local compression)" if using_proxy else "direct compression"
-        msg = f"[hermes-compress-shim] ✓ patched agent API hooks — {tag}"
-        print(msg, file=sys.stderr)
-        _dbg(f"_patched: {msg}")
+            # Also wrap non-streaming (fallback/retry path)
+            if _api:
+                _saved_origins["_api"] = _api
+                fn_name_api = getattr(_api, "__name__", str(_api))
+
+                @functools.wraps(_api)
+                def _compress_hook_api(*a, **kw):
+                    _dbg(f"_compress_hook[{fn_name_api}]: called")
+                    if a and isinstance(a[0], dict):
+                        api_kwargs = a[0]
+                        msgs = api_kwargs.get("messages")
+                        if msgs and isinstance(msgs, list) and len(msgs) > 1:
+                            _dbg(f"_compress_hook[{fn_name_api}]: compressing {len(msgs)} msgs...")
+                            api_kwargs = {**api_kwargs, "messages": _compress(msgs)}
+                            return _saved_origins["_api"](*(api_kwargs,) + a[1:], **kw)
+                    return _saved_origins["_api"](*a, **kw)
+
+                setattr(agent, "_interruptible_api_call", _compress_hook_api)
+
+            _saved_origins["_hc_wrapped"] = True
+            msg = "[hermes-compress-shim] ✓ patched agent API hooks — inline compression active"
+            print(msg, file=sys.stderr)
+            _dbg(f"_patched: {msg}")
+
         return _orig(*args, **kwargs)
 
     import agent.conversation_loop
