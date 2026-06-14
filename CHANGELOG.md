@@ -7,7 +7,7 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 ## 0.7.14 - headroom-retrieve v0.2.0 standalone plugin + CCR recompression detection
 
 - **headroom-retrieve v0.2.0**: New standalone plugin (`plugins/headroom-retrieve/`)
-  that registers ONLY the `headroom_retrieve` tool — no compression, no hooks,
+  that registers ONLY the `headroom_retrieve` tool - no compression, no hooks,
   no cross-session interference. Safe to leave enabled globally.
 - **CCR recompression detection**: `_looks_like_ccr()` detects when the token-mode
   proxy's `/v1/retrieve` endpoint returns another CCR marker instead of original
@@ -17,7 +17,7 @@ All notable changes to **@playform/hermes-compress** are documented in this file
   file path, enabling the fallback to work reliably.
 - **Three-provider config**: `deepseek-proxy-cache` (:8787, default),
   `deepseek-proxy-token` (:8788, `--provider` flag), `deepseek-direct` (fallback).
-  No more config swapping — just `hermes --provider deepseek-proxy-token`.
+  No more config swapping - just `hermes --provider deepseek-proxy-token`.
 
 ## 0.7.13 - Inline Compression Always-On, Double-Wrap Fix, headroom_retrieve Fix
   skipped local compression when a local headroom proxy was detected. The
