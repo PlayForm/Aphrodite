@@ -1,0 +1,7 @@
+name: headroom
+version: 1.0.0
+description: "Headroom MCP suite — compress, retrieve, stats + native middleware (HERMES_HEADROOM_NATIVE=1)"
+provides_tools:
+  - headroom_compress
+  - headroom_retrieve
+  - headroom_stats
