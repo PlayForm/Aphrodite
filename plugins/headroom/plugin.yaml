@@ -1,7 +1,11 @@
 name: headroom
-version: 1.0.0
-description: "Headroom MCP suite - compress, retrieve, stats + native middleware (HERMES_HEADROOM_NATIVE=1)"
+version: 1.0.1
+description: "Headroom suite: compress, retrieve, stats, proxy mgmt + native middleware + sandbox recovery"
 provides_tools:
   - headroom_compress
   - headroom_retrieve
   - headroom_stats
+  - headroom_proxy_start
+  - headroom_proxy_stop
+provides_hooks:
+  - llm_request
