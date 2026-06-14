@@ -686,3 +686,12 @@ def register(ctx):
     _patch_read_file()
     _patch_terminal()
     _patch_execute_code()
+    # Force-log plugin version on every load for debugging
+    try:
+        import logging
+        logging.getLogger("hermes-compress").info(
+            "v1.0.2 loaded — recovery always-on, %s %s",
+            "PROXYLESS" if _PROXYLESS else "passive",
+            "NATIVE" if _NATIVE else "no-native")
+    except Exception:
+        pass
