@@ -158,7 +158,7 @@ orig_tokens = est_tokens(json.dumps(msgs))
 print(f"  {len(msgs)} messages, {orig_chars:,} chars (~{orig_tokens:,} est tokens)")
 print()
 
-# Warm up headroom (first call is slow — Kompress model download)
+# Warm up headroom (first call is slow - Kompress model download)
 print("Warm-up (Kompress model load)...")
 warm = subprocess.run(
     [VENV_PYTHON, "-c", f"""
@@ -203,7 +203,7 @@ if "prompt_tokens" in proxy:
     print(f"  Proxy prompt tokens:  {proxy['prompt_tokens']:,}")
     print(f"  Proxy cache hit:      {cache_hit:,} tokens ({cache_pct:.1f}%)")
     print(f"  Proxy latency:        {proxy['latency_ms']}ms")
-    # Note: proxy doesn't compress Chat Completions — just provides cache freezing
+    # Note: proxy doesn't compress Chat Completions - just provides cache freezing
     print()
     print("  NOTE: Proxy token mode does NOT compress Chat Completions.")
     print("  It provides DeepSeek prefix-cache freezing for cost savings.")

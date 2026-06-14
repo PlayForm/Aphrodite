@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Full-spectrum headroom benchmark — 6 payload types, 3 compression modes,
+Full-spectrum headroom benchmark - 6 payload types, 3 compression modes,
 statistical aggregation, and proxy health monitoring.
 
 Tests every headroom pipeline stage: ContentRouter, SmartCrusher, Kompress, Cache.
@@ -30,7 +30,7 @@ if "--reset" in sys.argv and CACHE.exists():
     print("Cache cleared.")
 
 
-# ── Payload generators — 6 types covering all headroom stages ────────
+# ── Payload generators - 6 types covering all headroom stages ────────
 
 FUNCS = ["setup", "teardown", "validate", "transform", "execute",
          "process", "handle", "dispatch", "resolve", "compute"]
@@ -39,7 +39,7 @@ TOPICS = ["compression", "optimization", "caching", "tokenization",
 
 
 def _term():
-    """Terminal listing — tests SmartCrusher (structured text dedup)."""
+    """Terminal listing - tests SmartCrusher (structured text dedup)."""
     n = random.randint(30, 150)
     return json.dumps({
         "output": "\n".join(
@@ -54,7 +54,7 @@ def _term():
 
 
 def _code():
-    """Source code — tests CodeCompressor (AST-aware)."""
+    """Source code - tests CodeCompressor (AST-aware)."""
     n = random.randint(40, 200)
     return "\n".join(
         f"    def {random.choice(FUNCS)}_{i}(self, "
@@ -68,11 +68,11 @@ def _code():
 
 
 def _web():
-    """Search results — tests Kompress (semantic compression)."""
+    """Search results - tests Kompress (semantic compression)."""
     n = random.randint(3, 15)
     return json.dumps({
         "results": [{
-            "title": f"{random.choice(TOPICS).title()} technique {i} — "
+            "title": f"{random.choice(TOPICS).title()} technique {i} - "
                      f"{random.choice(['improving', 'reducing', 'optimizing'])} LLM context",
             "url": f"https://example.com/article/{random.randint(1000, 9999)}",
             "snippet": f"Learn how {random.choice(TOPICS)} can "
@@ -83,7 +83,7 @@ def _web():
 
 
 def _json():
-    """Dense JSON — tests SmartCrusher compaction."""
+    """Dense JSON - tests SmartCrusher compaction."""
     return json.dumps({
         "items": [{
             "id": random.randint(1000, 9999),
@@ -100,7 +100,7 @@ def _json():
 
 
 def _log():
-    """Log output — tests ContentRouter (pattern matching)."""
+    """Log output - tests ContentRouter (pattern matching)."""
     levels = ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"]
     n = random.randint(20, 80)
     return "\n".join(
@@ -112,7 +112,7 @@ def _log():
 
 
 def _mixed():
-    """Mixed content — tests full pipeline end-to-end."""
+    """Mixed content - tests full pipeline end-to-end."""
     sections = []
     if random.random() < 0.5:
         sections.append(f"# Build output\n\n{_log()}")
@@ -148,7 +148,7 @@ def _save(msgs):
     CACHE.write_text(json.dumps(msgs, indent=2))
 
 
-# ── Inline runner — tests all 6 payload types ────────────────────────
+# ── Inline runner - tests all 6 payload types ────────────────────────
 
 def run_inline():
     from hermes_compress._compress import Compress, CompressOption
@@ -200,7 +200,7 @@ def run_inline():
     return rows
 
 
-# ── Proxy runner — tests 4 random payloads ───────────────────────────
+# ── Proxy runner - tests 4 random payloads ───────────────────────────
 
 def _proxy_ok():
     try:

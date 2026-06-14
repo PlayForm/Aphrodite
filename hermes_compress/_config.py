@@ -1,4 +1,4 @@
-"""Configuration helpers for hermes-compress — hot-reload safe.
+"""Configuration helpers for hermes-compress - hot-reload safe.
 
 Reads compression.headroom.* from Hermes config on each call.
 Values are cached for _CACHE_TTL seconds to avoid filesystem
@@ -16,7 +16,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # ── Cache ───────────────────────────────────────────────────────────
-_CACHE_TTL = 5.0  # seconds — re-read config at most every 5s
+_CACHE_TTL = 5.0  # seconds - re-read config at most every 5s
 _cache: dict = {"ts": 0.0, "data": None}
 
 # ── Defaults ────────────────────────────────────────────────────────

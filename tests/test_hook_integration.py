@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Architecture test runner — validates the new hook-based integration.
+"""Architecture test runner - validates the new hook-based integration.
 
 Run: HERMES_COMPRESS_DEV=1 python3 test_hook_integration.py
 """
@@ -79,7 +79,7 @@ def test_transformer_hook():
             "content": json.dumps({
                 "results": [
                     {
-                        "title": f"Result {i} — How to compress LLM context with headroom",
+                        "title": f"Result {i} - How to compress LLM context with headroom",
                         "url": f"https://example.com/article/{i}",
                         "description": "Learn about the latest techniques in context compression using ONNX-based Kompress models. This approach reduces token usage by 40-60% while preserving semantic meaning.",
                     }
@@ -133,13 +133,13 @@ def test_transformer_hook():
                         print(f"  ✓ {tc['name']}: empty input → empty output (expected)")
                     # safety guard should preserve content on over-compression
                     elif orig_len > 0 and new_len == 0:
-                        print(f"  ✗ {tc['name']}: {orig_len}→0 chars — SAFETY GUARD FAILED")
+                        print(f"  ✗ {tc['name']}: {orig_len}→0 chars - SAFETY GUARD FAILED")
                     elif orig_len > 10 and new_len < orig_len * 0.10:
-                        print(f"  ✗ {tc['name']}: {orig_len}→{new_len} chars ({pct}% saved) — OVER-COMPRESSED, GUARD FAILED")
+                        print(f"  ✗ {tc['name']}: {orig_len}→{new_len} chars ({pct}% saved) - OVER-COMPRESSED, GUARD FAILED")
                     else:
                         print(f"  ✓ {tc['name']}: {orig_len}→{new_len} chars ({pct}% saved)")
         except Exception as e:
-            print(f"  ✗ {tc['name']}: ERROR — {e}")
+            print(f"  ✗ {tc['name']}: ERROR - {e}")
     
     return True
 

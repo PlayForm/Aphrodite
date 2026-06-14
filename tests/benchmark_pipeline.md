@@ -1,19 +1,19 @@
-# Compression Benchmark — Full Pipeline
+# Compression Benchmark - Full Pipeline
 
 Run these steps sequentially. After each step, report `headroom_stats`.
 
 ## Steps
 
-1. `headroom_stats` — record baseline: calls, saved, by_tool
+1. `headroom_stats` - record baseline: calls, saved, by_tool
 2. Search `hermes_compress/` for `def ` → triggers JSON compression
-3. `headroom_stats` — record delta
+3. `headroom_stats` - record delta
 4. Read `hermes_compress/_compress.py` (first 30 lines) → triggers code
    compression
-5. `headroom_stats` — record delta
+5. `headroom_stats` - record delta
 6. Run `wc -l hermes_compress/*.py` → triggers terminal compression
-7. `headroom_stats` — record delta
+7. `headroom_stats` - record delta
 8. Read `hermes_compress/__init__.py` (first 30 lines) → another code call
-9. `headroom_stats` — record delta
+9. `headroom_stats` - record delta
 
 ## Report
 

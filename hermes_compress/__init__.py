@@ -46,7 +46,7 @@ from hermes_compress._config import _get_integration_mode, get_headroom_config
 
 
 def register(ctx):
-    """Hermes plugin entry point — registers tools and hooks."""
+    """Hermes plugin entry point - registers tools and hooks."""
 
     ctx.register_tool(
         name="headroom_stats",
@@ -132,7 +132,7 @@ def _headroom_compress_handler(args=None, **kwargs) -> str:
 
 def _pre_llm_call_hook(messages=None, conversation_history=None, model=None, **kwargs):
     """Pre-LLM call hook. In dev mode, injects compression stats context.
-    In production, returns None — compression is silent."""
+    In production, returns None - compression is silent."""
     import logging
     logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def _transform_tool_result_hook(
     error_message="",
     **kwargs,
 ):
-    """Transform tool result — compress tool output at capture time.
+    """Transform tool result - compress tool output at capture time.
 
     Dev mode: forces read_file/terminal/execute_code/patch to minimal
     compression so the developer can always read tool output.
@@ -212,7 +212,7 @@ def _transform_tool_result_hook(
         if is_dev() and tool_name in ("read_file", "terminal", "execute_code", "patch", "read_terminal"):
             return result
 
-        # Minimum content threshold — per-tool strategy, not global
+        # Minimum content threshold - per-tool strategy, not global
         min_tokens = strategy.get("min_tokens_to_compress", 250)
         if len(result) < min_tokens:
             return result

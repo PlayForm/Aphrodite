@@ -52,7 +52,7 @@ def truncate_json(
     content: str,
     max_items: int = 100,
 ) -> str:
-    """Truncate JSON arrays/objects — keep first N items."""
+    """Truncate JSON arrays/objects - keep first N items."""
     import json
 
     if len(content) < 5000:
@@ -136,7 +136,7 @@ def deduplicate_message(
     # Check for exact duplicate
     for cached_key, cached_content in list(_DEDUP_CACHE.items()):
         if cached_content == content:
-            return f"[Duplicate of previous {tool_name} result — see above]"
+            return f"[Duplicate of previous {tool_name} result - see above]"
 
     # Store in cache
     if len(_DEDUP_CACHE) >= max_cache:
@@ -161,7 +161,7 @@ _HOT_RELOAD_MTIMES: dict[str, float] = {}
 def check_hot_reload(plugin_dir: str = "") -> bool:
     """Check if plugin files have changed since last check.
 
-    Returns True if any file was modified — caller should reload.
+    Returns True if any file was modified - caller should reload.
     """
     import os
     from pathlib import Path

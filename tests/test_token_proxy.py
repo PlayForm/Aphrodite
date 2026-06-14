@@ -88,10 +88,10 @@ def _retrieve(hash_key: str, query: str = "") -> dict | None:
         return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         body = e.read().decode()
-        print(f"    retrieve({hash_key}): {e.code} — {body[:200]}")
+        print(f"    retrieve({hash_key}): {e.code} - {body[:200]}")
         return None
     except Exception as e:
-        print(f"    retrieve({hash_key}): ERROR — {e}")
+        print(f"    retrieve({hash_key}): ERROR - {e}")
         return None
 
 

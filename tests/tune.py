@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Fine-tuning benchmark — 5 compression configs tested against the same cache.
+Fine-tuning benchmark - 5 compression configs tested against the same cache.
 
 Tests how protect_recent, min_tokens_to_compress, target_ratio affect savings.
-All runs share a single session cache — no proxy, internal-only (Compress library).
+All runs share a single session cache - no proxy, internal-only (Compress library).
 
 Usage:  python3 tests/tune.py
 """
@@ -143,10 +143,10 @@ def run_config(label, protect_recent, min_tokens, target_ratio, frozen_cache):
 # ═══════════════════════════════════════════════════════════════════════
 
 def main():
-    print("HermesCompress — Fine-Tuning (5 Configs, Same Cache)")
+    print("HermesCompress - Fine-Tuning (5 Configs, Same Cache)")
     print("=" * 75)
 
-    # ── Freeze cache once — all configs test against same snapshot ──
+    # ── Freeze cache once - all configs test against same snapshot ──
     frozen = _load()
     print(f"Frozen cache: {len(frozen)} messages (all configs share this)\n")
 
@@ -231,7 +231,7 @@ def main():
             f'<tr{hl}><td class="cn">{label}</td>'
             f'<td class="n">{cfg["protect_recent"]}</td>'
             f'<td class="n">{cfg["min_tokens"]}</td>'
-            f'<td class="n">{cfg["target_ratio"] or "—"}</td>'
+            f'<td class="n">{cfg["target_ratio"] or "-"}</td>'
             f'<td class="n">{tb:,}</td><td class="n">{tb-ts:,}</td>'
             f'<td class="n {cc}">{ts:,}</td>'
             f'<td><span class="sb"><span class="br"><span class="bf g{col}" style="width:{w}%"></span></span>'

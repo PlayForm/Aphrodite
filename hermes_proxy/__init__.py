@@ -1,10 +1,10 @@
 """
-@playform/hermes-proxy — Headroom proxy manager for Hermes Agent.
+@playform/hermes-proxy - Headroom proxy manager for Hermes Agent.
 
 Starts/stops/configures the headroom proxy server as a standalone
 process that intercepts API calls for transparent compression.
 
-No hooks, no per-tool compression — just proxy lifecycle management
+No hooks, no per-tool compression - just proxy lifecycle management
 and custom_providers configuration.
 
 Companion to @playform/hermes-compress (hook-based compression).
@@ -36,7 +36,7 @@ def _find_headroom_bin() -> str | None:
 
 
 def register(ctx):
-    """Hermes plugin entry point — registers proxy tools."""
+    """Hermes plugin entry point - registers proxy tools."""
 
     ctx.register_tool(
         name="headroom_proxy_start",

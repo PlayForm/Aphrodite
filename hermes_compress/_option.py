@@ -1,9 +1,9 @@
 """
-Compression options — mirrors the TypeScript Interface/Option.ts pattern.
+Compression options - mirrors the TypeScript Interface/Option.ts pattern.
 
 All fields use PascalCase (PlayForm convention). Modes:
-  "inline" — headroom runs in-process as a library (default, 50-80ms warm)
-  "proxy"  — headroom runs as a separate proxy server (port 8787, zero code changes)
+  "inline" - headroom runs in-process as a library (default, 50-80ms warm)
+  "proxy"  - headroom runs as a separate proxy server (port 8787, zero code changes)
 """
 
 from __future__ import annotations

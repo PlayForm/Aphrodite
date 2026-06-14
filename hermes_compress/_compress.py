@@ -454,7 +454,7 @@ class Compress:
         try:
             # Phase 1: Headroom compression (MUST be first)
             # Save original tool content for safety guard against over-compression.
-            # Key by tool_call_id (NOT index) — headroom may restructure the
+            # Key by tool_call_id (NOT index) - headroom may restructure the
             # message list, breaking index-based lookup.
             _orig_tool_content: dict[str, str] = {}
             for _m in messages:
@@ -495,13 +495,13 @@ class Compress:
             result = _headroom_compress(messages, model=self.model or "gpt-4o", **kwargs)
             compress_ms = (time.monotonic() - compress_start) * 1000
 
-            # Phase 2: Post-processing — strip CCR markers only
+            # Phase 2: Post-processing - strip CCR markers only
             pp_start = time.monotonic()
             messages = _strip_ccr_markers(result.messages)
 
-            # Phase 2a: Safety guard — revert tool outputs compressed to empty.
+            # Phase 2a: Safety guard - revert tool outputs compressed to empty.
             # Headroom may produce empty strings when Kompress fails on specific
-            # content types. Revert only empty content — CCR markers are valid
+            # content types. Revert only empty content - CCR markers are valid
             # compressed output that the LLM understands natively.
             _empty_guard_count = 0
             for _i, _m in enumerate(messages):

@@ -298,7 +298,7 @@ def _patch_file(
         if new in content:
             result.skipped.append(f"already patched: {target.name}")
             return
-        # Patch exists but is outdated — restore from backup, then re-patch
+        # Patch exists but is outdated - restore from backup, then re-patch
         backup = target.with_suffix(target.suffix + ".hermes-compress.bak")
         if backup.exists():
             content = backup.read_text()

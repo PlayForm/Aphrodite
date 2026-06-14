@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Headroom Proxy Dual-Mode Launcher — starts both cache + token proxies.
+Headroom Proxy Dual-Mode Launcher - starts both cache + token proxies.
 
 DeepSeek v4-pro: 1.6T params, 49B active, 1M context, 384K max output.
 
-    cache proxy  :8787   — freeze prior turns for prefix-cache hit rate
-    token proxy  :8788   — compress/rewrite prior turns for max savings
+    cache proxy  :8787   - freeze prior turns for prefix-cache hit rate
+    token proxy  :8788   - compress/rewrite prior turns for max savings
 
 Usage:
     python3 scripts/proxy-dual.py                    # start both in background
@@ -38,9 +38,9 @@ MAX_OUTPUT = 384_000
 
 SERVICES = {
     "cache": {"port": 8787, "mode": "cache",
-              "desc": "Freeze prior turns — maximise prefix-cache hit rate"},
+              "desc": "Freeze prior turns - maximise prefix-cache hit rate"},
     "token": {"port": 8788, "mode": "token",
-              "desc": "Compress/rewrite prior turns — maximise token savings"},
+              "desc": "Compress/rewrite prior turns - maximise token savings"},
 }
 
 
@@ -94,7 +94,7 @@ def start(key: str, foreground: bool = False) -> bool:
 
     if foreground:
         print(f"╔══════════════════════════════════════════════════╗")
-        print(f"║  HermesCompress Dual Proxy — {MODEL}          ║")
+        print(f"║  HermesCompress Dual Proxy - {MODEL}          ║")
         print(f"║  Context: 1M  |  Output: 384K                    ║")
         print(f"╚══════════════════════════════════════════════════╝")
         print()
@@ -110,7 +110,7 @@ def start(key: str, foreground: bool = False) -> bool:
         ]
 
         if foreground:
-            print(f"[{name}] Starting :{cfg['port']} — {cfg['desc']}")
+            print(f"[{name}] Starting :{cfg['port']} - {cfg['desc']}")
             proc = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             procs[name] = proc
         else:
@@ -126,7 +126,7 @@ def start(key: str, foreground: bool = False) -> bool:
                 unhealthy.discard(name)
                 if foreground:
                     port = SERVICES[name]["port"]
-                    print(f"   ✓ Healthy — curl http://127.0.0.1:{port}/stats")
+                    print(f"   ✓ Healthy - curl http://127.0.0.1:{port}/stats")
         if not unhealthy:
             break
 
@@ -147,7 +147,7 @@ def start(key: str, foreground: bool = False) -> bool:
                 proc.terminate()
     else:
         ports = ", ".join(f":{cfg['port']}" for cfg in SERVICES.values())
-        print(f"✓ Dual proxies started ({ports}) — {MODEL} (1M ctx / 384K out)")
+        print(f"✓ Dual proxies started ({ports}) - {MODEL} (1M ctx / 384K out)")
         print(f"  Cache:  curl http://127.0.0.1:8787/stats  (prefix-freeze)")
         print(f"  Token:  curl http://127.0.0.1:8788/stats  (compress)")
         print(f"  Stop:   python3 scripts/proxy-dual.py --stop")
@@ -174,7 +174,7 @@ def show_status():
     for name, cfg in SERVICES.items():
         port = cfg["port"]
         alive = "✓ HEALTHY" if _health(port) else "✗ DOWN"
-        print(f"  [{name}] :{port} — {alive}")
+        print(f"  [{name}] :{port} - {alive}")
         s = _stats(port)
         if s:
             summary = s.get("summary", {})
@@ -190,7 +190,7 @@ def show_status():
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(
-        description="HermesCompress Dual Proxy — cache + token mode",
+        description="HermesCompress Dual Proxy - cache + token mode",
         epilog=f"Model: {MODEL} (1.6T/49B active, 1M ctx, 384K output)"
     )
     p.add_argument("--foreground", action="store_true", help="Stay in foreground")

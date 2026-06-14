@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
-		<title>HermesCompress — Cumulative Compression</title>
+		<title>HermesCompress - Cumulative Compression</title>
 		<style>
 			:root {
 				--bg: #080808;
@@ -617,12 +617,12 @@
 					<span class="b bm">cache</span>
 					<span class="b bw">session: 35 msgs</span>
 				</div>
-				<h1>HermesCompress — Cumulative Compression</h1>
+				<h1>HermesCompress - Cumulative Compression</h1>
 				<p class="sub">
 					Randomized tool outputs accumulate in a shared session cache
 					across benchmark runs. Early calls see baseline compression;
 					later calls show how headroom scales as real-world context
-					builds up — the same pattern that occurs in long-running
+					builds up - the same pattern that occurs in long-running
 					Hermes sessions.
 				</p>
 				<div class="me">
@@ -673,13 +673,13 @@
 
 			<!-- ═══ INLINE ═══════════════════════════════════════════════════════ -->
 			<h2>
-				<span class="d di"></span>Inline — Python Library
+				<span class="d di"></span>Inline - Python Library
 				<span class="ann">CCR</span>
 			</h2>
 			<p class="sub">
 				<code>headroom.compress()</code> called in-process on the
 				accumulated session cache plus a new randomized tool output. CCR
-				markers are LLM-native compressed references — the model
+				markers are LLM-native compressed references - the model
 				understands them without decompression. Zero HTTP, zero API
 				cost.
 			</p>
@@ -689,7 +689,7 @@
 				&rarr; <span class="hg">Kompress</span> &rarr; CCR strip &rarr;
 				safety guard (reverts empty outputs only). Token counts come
 				from headroom internals via <code>CompressResult</code>. Chars
-				show the raw string length before and after — CCR markers are
+				show the raw string length before and after - CCR markers are
 				typically &lt;100 chars regardless of input size.
 			</p>
 
@@ -774,7 +774,7 @@
   ... [+1827 more chars]</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">13,054 &rarr; 4,916</span></span><span class="saved">Saved 8,138t (62.3%)</span><span class="ms">&mid; 1158.0ms</span><span class="xf">Stage: CodeCompressor &middot; Transforms: router:mixed:0.00, router:kompress:0.13, router:protected:user_message, router:mixed:0.73, router:protected:user_message, router:smart_crusher:0.00, router:protected:user_message, router:protected:error_output, router:protected:error_output, router:protected:user_message, router:protected:user_message, router:protected:user_message, router:protected:user_message, router:protected:user_message, router:mixed:0.00, router:protected:user_message, router:kompress:0.13</span></div></div></div>
 <div class="ccard" id="i_2"><div class="ccard-head" onclick="toggle('i_2_b')"><h3>#3 web_search <span style="font-weight:400;color:#888;font-size:12px">[Kompress] cache: 20 msgs</span></h3><span class="st">13,225t &rarr; 5,069t</span></div><div class="ccard-body collapsed" id="i_2_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 586 chars &nbsp; 13,225 tokens</h4><div class="cbox pre">{"results": [{"title": "Caching technique 0 \u2014 reducing LLM context", "url": "https://example.com/article/2758", "snippet": "Learn how tokenization can optimize token usage by 45% in production."}, {"title": "Compression technique 1 \u2014 reducing LLM context", "url": "https://example.com/article/3529", "snippet": "Learn how tokenization can reduce token usage by 70% in production."}, {"title": "Compression technique 2 \u2014 optimizing LLM context", "url": "https://example.com/article/3258
 
-  ... [+86 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 553 chars &nbsp; 5,069 tokens</h4><div class="cbox post">{"results":[{"title":"Caching technique 0 — reducing LLM context","url":"https://example.com/article/2758","snippet":"Learn how tokenization can optimize token usage by 45% in production."},{"title":"Compression technique 1 — reducing LLM context","url":"https://example.com/article/3529","snippet":"Learn how tokenization can reduce token usage by 70% in production."},{"title":"Compression technique 2 — optimizing LLM context","url":"https://example.com/article/3258","snippet":"Learn how compress
+  ... [+86 more chars]</div></div><div class="arr"><div class="arrow-line"></div></div><div class="diff-col after"><h4><span class="badge">AFTER</span> 553 chars &nbsp; 5,069 tokens</h4><div class="cbox post">{"results":[{"title":"Caching technique 0 - reducing LLM context","url":"https://example.com/article/2758","snippet":"Learn how tokenization can optimize token usage by 45% in production."},{"title":"Compression technique 1 - reducing LLM context","url":"https://example.com/article/3529","snippet":"Learn how tokenization can reduce token usage by 70% in production."},{"title":"Compression technique 2 - optimizing LLM context","url":"https://example.com/article/3258","snippet":"Learn how compress
 
   ... [+53 more chars]</div></div></div><div class="stats-bar"><span class="kv"><span class="k">Tokens</span> <span class="v">13,225 &rarr; 5,069</span></span><span class="saved">Saved 8,156t (61.7%)</span><span class="ms">&mid; 42.4ms</span><span class="xf">Stage: Kompress &middot; Transforms: router:mixed:0.00, router:kompress:0.13, router:protected:user_message, router:mixed:0.73, router:protected:user_message, router:smart_crusher:0.00, router:protected:user_message, router:protected:error_output, router:protected:error_output, router:protected:user_message, router:protected:user_message, router:protected:user_message, router:protected:user_message, router:protected:user_message, router:mixed:0.00, router:kompress:0.13, router:protected:user_message, router:mixed:0.73</span></div></div></div>
 <div class="ccard" id="i_3"><div class="ccard-head" onclick="toggle('i_3_b')"><h3>#4 execute_code <span style="font-weight:400;color:#888;font-size:12px">[SmartCrusher+Compaction] cache: 22 msgs</span></h3><span class="st">14,420t &rarr; 6,187t</span></div><div class="ccard-body collapsed" id="i_3_b"><div class="diff-wrap"><div class="diff-col before"><h4><span class="badge">BEFORE</span> 3,219 chars &nbsp; 14,420 tokens</h4><div class="cbox pre">{"items": [{"id": 7322, "name": "item_0", "tags": ["compression", "optimization", "transformer", "embedding"], "meta": {"created": "2026-05-01", "score": 24.5671, "active": true}}, {"id": 5374, "name": "item_1", "tags": ["tokenization", "compression", "attention", "caching"], "meta": {"created": "2026-06-19", "score": 96.6755, "active": true}}, {"id": 9287, "name": "item_2", "tags": ["embedding"], "meta": {"created": "2026-09-25", "score": 83.2363, "active": true}}, {"id": 1206, "name": "item_3"
@@ -812,14 +812,14 @@ FATAL [3904
 
 			<!-- ═══ PROXY ════════════════════════════════════════════════════════ -->
 			<h2>
-				<span class="d dp"></span>Proxy — headroom &rarr; DeepSeek
+				<span class="d dp"></span>Proxy - headroom &rarr; DeepSeek
 				<span class="ann">billed</span>
 			</h2>
 			<p class="sub">
 				HTTP POST through <code>headroom proxy</code> (port 8787) with
 				accumulated session context. These are
 				<em>actual billed</em> prompt tokens as reported by the DeepSeek
-				API — the ground-truth cost metric.
+				API - the ground-truth cost metric.
 			</p>
 			<p class="help">
 				<em>Pipeline:</em> HTTP POST &rarr; CacheAligner &rarr;

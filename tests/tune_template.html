@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>HermesCompress — Fine-Tuning Configs</title>
+<title>HermesCompress - Fine-Tuning Configs</title>
 <style>
 :root{--bg:#080808;--s:#0f0f0f;--b:#222;--t:#888;--tb:#ddd;--a:#60a5fa;--ad:#1e3a5f;
 --g:#22c55e;--gd:#14532d;--y:#eab308;--yd:#713f12;--r:#f87171;--re:#ef4444;--rb:#7f1d1d;
@@ -95,9 +95,9 @@ footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--b);font-size:
 
 <header>
 <div><span class="b bv">v0.7.5</span> <span class="b bm">tuning</span> <span class="b bw">cache: %CACHE_N% msgs</span></div>
-<h1>HermesCompress — Configuration Fine-Tuning</h1>
+<h1>HermesCompress - Configuration Fine-Tuning</h1>
 <p class="sub">Five compression configs tested against the same growing session cache.
-Internal-only — Python library, zero proxy, zero HTTP. Each run adds to the cache
+Internal-only - Python library, zero proxy, zero HTTP. Each run adds to the cache
 so later configs have more accumulated context.</p>
 <div class="me">
 <span class="kv">model <b>deepseek-v4-pro</b></span>
@@ -120,7 +120,7 @@ so later configs have more accumulated context.</p>
 <p class="help">Each config processes the same 5 tool types through the accumulated cache.
 Settings flow: <span class="tg">more aggressive</span> → lower protect_recent, lower min_tokens,
 lower target_ratio. The safety guard prevents data loss by reverting over-compressed outputs
-(only empty content is reverted — CCR markers are valid).</p>
+(only empty content is reverted - CCR markers are valid).</p>
 
 <div class="tw"><table>
 <thead><tr>
