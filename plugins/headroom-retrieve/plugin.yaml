@@ -1,0 +1,5 @@
+name: headroom-retrieve
+version: 0.2.0
+description: "headroom_retrieve tool — proxy + local fallback with CCR-recompression detection. Path required for auto-fallback."
+provides_tools:
+  - headroom_retrieve
