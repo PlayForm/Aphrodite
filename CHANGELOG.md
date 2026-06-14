@@ -4,6 +4,28 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 
 ---
 
+## 1.0.2 — Proxyless CCR Mode, Combined Architecture, Compression
+
+- **Proxyless CCR mode** (`HERMES_HEADROOM_PROXYLESS=1`): tool outputs stored to
+  `~/.hermes/headroom_cache/` and replaced with `<<ccr:HASH,path=...>>` markers.
+  Model retrieves content on demand via `headroom_retrieve` using local file reads —
+  no proxy, no network. Sandbox-filtered content recovered via `open()`.
+  Achieves **97% tool output reduction** (58KB → 1.5KB of markers).
+- **Headroom AI compression** (`HERMES_PROXYLESS_COMPRESS=1`): content compressed
+  through headroom's Kompress ONNX model before caching (~60% code savings observed).
+- **Combined native + proxyless**: native middleware now coexists with proxyless patches.
+  Both layers run on the full message chain each turn — proxyless CCRs tool outputs,
+  native middleware compresses conversation (40-90%).
+- **Hermes v0.16.0 compatibility**: `toolset="compression"` required (was optional),
+  `toolsets: [compression]` in `plugin.yaml`, startup verification via logs.
+- **Renamed to `hermes-compress`**: plugin directory and metadata — avoids toolset
+  name collision warning in v0.16.0.
+- **Cache discipline**: `__pycache__` must be cleared after every build step.
+  Added to release workflow as mandatory step 1.
+- **`_PROXYLESS_COMPRESS_MIN_TOKENS=50`**: controls headroom activation threshold.
+- **Round-trip verified**: hash extraction → local file read → content with line numbers,
+  no double-numbering. Raw content stored to cache, `_read_file` adds line numbers on retrieval.
+
 ---
 
 ## 1.0.1 - Native Middleware, Proxy Management, Full Test Suite

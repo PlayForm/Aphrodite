@@ -1,7 +1,7 @@
 [project]
 name = "hermes-compress"
-version = "1.0.1"
-description = "Headroom-powered context compression - slash LLM token usage by 25-60%"
+version = "1.0.2"
+description = "Headroom-powered context compression - slash LLM token usage by 25-60%. Proxyless CCR + native middleware."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
