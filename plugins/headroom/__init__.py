@@ -505,7 +505,8 @@ def _on_llm_request(**kwargs):
 
 def _patch_read_file():
     """Monkey-patch read_file_tool to recover empty sandbox output.
-    In PROXYLESS mode, stores recovered content locally and returns CCR markers."""
+    Stores recovered content to SQLite + disk for stats tracking.
+    Always returns recovered content directly (no CCR wrapping)."""
     try:
         import tools.file_tools as mod
         _orig = mod.read_file_tool
@@ -525,40 +526,23 @@ def _patch_read_file():
             data = json.loads(result)
             content = data.get("content", "")
             total_lines = data.get("total_lines", 0)
-            recovered = False
+            # Recover from sandbox filtering — always try this (safe: only fires on empty)
             if (not content or "NO CONTENT" in content) and total_lines > 0 and os.path.isfile(path):
                 with open(path, encoding="utf-8", errors="replace") as f:
                     lines = f.readlines()
                 start = max(0, offset - 1)
                 end = min(len(lines), start + limit)
-                content = "".join(
+                data["content"] = "".join(
                     f"{i+1}|{line}" for i, line in enumerate(lines[start:end], start=start)
                 )
-                data["content"] = content
                 data["_fixed_by"] = "headroom"
-                recovered = True
-
-            # PROXYLESS mode: recover content + store to SQLite for stats
-            # Skip files in our own cache dir (prevents infinite CCR loop)
-            if _PROXYLESS and content.strip() \
-                    and _PROXYLESS_DIR not in os.path.abspath(path):
-                # Store raw to SQLite + disk for stats tracking
-                raw = ""
-                try:
-                    with open(path, encoding="utf-8", errors="replace") as f:
-                        all_raw = f.readlines()
-                    start_i = max(0, offset - 1)
-                    end_i = min(len(all_raw), start_i + limit)
-                    raw = "".join(all_raw[start_i:end_i])
-                except Exception:
-                    raw = content
-                _store_tool_content(raw, "read_file")
-                # Return recovered content directly (never CCR-wrap read_file)
-                data["content"] = content
-                data["_fixed_by"] = "headroom-proxyless"
-                return json.dumps(data)
-            elif recovered:
-                data["content"] = content
+                # Also store raw to SQLite if proxyless is active
+                if _PROXYLESS and _PROXYLESS_DIR not in os.path.abspath(path):
+                    try:
+                        raw = "".join(lines[start:end])
+                        _store_tool_content(raw, "read_file")
+                    except Exception:
+                        pass
                 return json.dumps(data)
         except Exception:
             pass
@@ -695,11 +679,6 @@ def register(ctx):
         ctx.register_middleware("llm_request", _on_llm_request)
     if _PROXYLESS:
         _ensure_cache()
-        try:
-            import logging
-            logging.getLogger("headroom").info("proxyless mode active — patching tools")
-        except Exception:
-            pass
     _patch_read_file()
     _patch_terminal()
     _patch_execute_code()
