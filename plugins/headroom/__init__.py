@@ -277,12 +277,29 @@ def _on_llm_request(**kwargs):
 
     using_proxy = _is_proxy(kwargs.get("base_url", ""))
 
+    # Bridge: detect sandbox-fixed messages, skip their compression
+    fixed_indices = set()
+    for i, msg in enumerate(msgs):
+        content = str(msg.get("content", ""))
+        if "_fixed_by" in content[:200]:
+            fixed_indices.add(i)
+
     # Resolve CCR markers (returns new list, no mutation)
     msgs, _ = _resolve_ccr_in_messages(msgs)
 
-    # If direct API, compress inline
+    # If direct API, compress inline — but protect sandbox-fixed messages
     if not using_proxy and len(msgs) > 2:
+        # Temporarily mark fixed messages as user (protected from compression)
+        saved = {}
+        for i in fixed_indices:
+            if i < len(msgs):
+                saved[i] = msgs[i].get("role")
+                msgs[i] = {**msgs[i], "role": "user"}
         msgs = _compress_inline(msgs)
+        # Restore original roles
+        for i, role in saved.items():
+            if i < len(msgs):
+                msgs[i] = {**msgs[i], "role": role}
 
     request["messages"] = msgs
     return {"request": request, "source": "headroom-native"}
