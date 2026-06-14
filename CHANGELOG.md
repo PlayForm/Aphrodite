@@ -4,6 +4,24 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 
 ---
 
+---
+
+## 1.0.1 - Native Middleware, Proxy Management, Full Test Suite
+
+- **Native middleware fix**: `_resolve_ccr_in_messages` returns new list (no in-place mutation).
+  Resolves ALL `<<ccr:HASH>>` markers per message via `re.sub`, not just the first.
+  Format 2 (`[N items compressed...]`) handled separately. Cache of resolved hashes.
+- **5 feedback issues resolved**: stale root `plugin.yaml` fixed, hardcoded model→`HERMES_MODEL`
+  env var, `_is_proxy` detects `0.0.0.0`, multi-CCR resolution, no-mutation guarantee.
+- **Proxy management tools**: `headroom_proxy_start` / `headroom_proxy_stop` using
+  `hermes_compress.Proxy`. Hermes can start/stop proxies from within a conversation.
+- **13 unit tests**: multi-CCR (single message, across messages), cache reuse, `[N items]`
+  format, unresolved hash preservation, proxy detection (localhost/0.0.0.0/remote),
+  compress failure fallback, hash extraction (CCR/hash=/raw).
+- **Recommended architecture**: cache proxy (default, stable), direct + native (81-84%
+  max), token proxy (46-70% but re-compression loop). Documented in README.
+- **pyproject.toml bumped to 1.0.1**.
+
 ## 0.7.14 - headroom-retrieve v0.2.0 standalone plugin + CCR recompression detection
 
 - **headroom-retrieve v0.2.0**: New standalone plugin (`plugins/headroom-retrieve/`)
