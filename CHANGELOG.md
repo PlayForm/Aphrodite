@@ -22,6 +22,33 @@ All notable changes to **@playform/hermes-compress** are documented in this file
   max), token proxy (46-70% but re-compression loop). Documented in README.
 - **pyproject.toml bumped to 1.0.1**.
 
+---
+
+## 1.0.1 - Native Middleware, Proxy Management, Full Test Suite
+
+- **Sandbox recovery patches**: Monkey-patches on `read_file_tool` (recovers empty content
+  via Python `open()`), `terminal_tool` (tags `_sandbox_empty` + hint), and
+  `execute_code` (tags `_sandbox_empty` + hint). All three patches are surgical —
+  only fire when the Hermes sandbox returns empty output.
+- **Metadata bridge**: `llm_request` middleware detects `_fixed_by` and `_sandbox_empty`
+  tags, protecting recovered/detected messages from inline compression so they reach
+  the LLM intact.
+- **Native middleware fix**: `_resolve_ccr_in_messages` returns new list (no in-place mutation).
+  Resolves ALL `<<ccr:HASH>>` markers per message via `re.sub`, not just the first.
+  Format 2 (`[N items compressed...]`) handled separately. Cache of resolved hashes.
+- **5 feedback issues resolved**: stale root `plugin.yaml` fixed, hardcoded model->`HERMES_MODEL`
+  env var, `_is_proxy` detects `0.0.0.0`, multi-CCR resolution, no-mutation guarantee.
+- **Proxy management tools**: `headroom_proxy_start` / `headroom_proxy_stop` /
+  `headroom_proxy_status` using `hermes_compress.Proxy` and health checks.
+- **13 unit tests**: multi-CCR (single message, across messages), cache reuse, `[N items]`
+  format, unresolved hash preservation, proxy detection (localhost/0.0.0.0/remote),
+  compress failure fallback, hash extraction (CCR/hash=/raw).
+- **Recommended architecture**: cache proxy (default, stable), direct + native (81-84%
+  max), token proxy (46-70% but re-compression loop). Documented in README.
+- **Defaults**: `deepseek-direct` provider + native middleware always-on (opt-out
+  with `HERMES_HEADROOM_NATIVE=0`). No `.env` needed. Built-in compression off.
+- **pyproject.toml bumped to 1.0.1**.
+
 ## 0.7.14 - headroom-retrieve v0.2.0 standalone plugin + CCR recompression detection
 
 - **headroom-retrieve v0.2.0**: New standalone plugin (`plugins/headroom-retrieve/`)
