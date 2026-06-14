@@ -3,6 +3,10 @@ HermesCompress Shim Plugin — injects headroom compression into the conversatio
 
 Only two jobs: compress api_messages + provide headroom_retrieve tool.
 No measurement. No filtering. No response handling.
+
+When a local headroom proxy is active (base_url → 127.0.0.1 / localhost),
+local compression is SKIPPED — the proxy handles it.  The headroom_retrieve
+tool always works, hitting the token-mode proxy on port 8788.
 """
 
 from __future__ import annotations
@@ -13,7 +17,8 @@ import urllib.request
 import urllib.error
 
 MODEL = "deepseek-v4-pro"
-PROXY_URL = "http://127.0.0.1:8787"  # for /v1/retrieve (if proxy is running)
+PROXY_RETRIEVE_URL = "http://127.0.0.1:8788"   # token-mode proxy for /v1/retrieve
+PROXY_CHAT_URL = "http://127.0.0.1:8788/v1"     # token-mode proxy for chat completions
 
 COMPRESS_CONFIG = {
     "protect_recent": 1,
@@ -62,7 +67,7 @@ def _handle_headroom_retrieve(args: dict) -> str:
         payload["query"] = query
     try:
         import httpx
-        resp = httpx.post(f"{PROXY_URL}/v1/retrieve", json=payload, timeout=15)
+        resp = httpx.post(f"{PROXY_RETRIEVE_URL}/v1/retrieve", json=payload, timeout=15)
         if resp.status_code == 404:
             return json.dumps({"error": "Content expired. Re-run original command."})
         if resp.status_code != 200:
@@ -71,7 +76,7 @@ def _handle_headroom_retrieve(args: dict) -> str:
         return json.dumps({"original_content": data.get("original_content", ""),
                            "original_tokens": data.get("original_tokens")})
     except ImportError:
-        req = urllib.request.Request(f"{PROXY_URL}/v1/retrieve",
+        req = urllib.request.Request(f"{PROXY_RETRIEVE_URL}/v1/retrieve",
             data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
         try:
             data = json.loads(urllib.request.urlopen(req, timeout=15).read())
@@ -84,7 +89,7 @@ def _handle_headroom_retrieve(args: dict) -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-# Compression engine
+# Compression engine (local, used only when proxy is absent)
 # ═══════════════════════════════════════════════════════════
 
 _ENGINE = None
@@ -121,6 +126,28 @@ def _compress(messages: list[dict]) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════
+# Proxy detection
+# ═══════════════════════════════════════════════════════════
+
+def _is_proxy_active(agent) -> bool:
+    """Return True if the agent's base_url points to a local headroom proxy."""
+    base = ""
+    # Try model_config first (dict with base_url key)
+    model_cfg = getattr(agent, "model_config", None)
+    if isinstance(model_cfg, dict):
+        base = str(model_cfg.get("base_url", ""))
+    # Fallback: direct base_url attr
+    if not base:
+        base = str(getattr(agent, "base_url", ""))
+    # Check other common paths
+    if not base:
+        cfg = getattr(agent, "config", None)
+        if cfg:
+            base = str(getattr(cfg, "base_url", ""))
+    return "127.0.0.1" in base or "localhost" in base
+
+
+# ═══════════════════════════════════════════════════════════
 # Hermes plugin: register() + auto-patch
 # ═══════════════════════════════════════════════════════════
 
@@ -138,16 +165,15 @@ def register(ctx) -> None:
 def _patch_loop():
     """Monkey-patch AIAgent._interruptible_api_call forwarders to compress messages.
 
-    The agent's API call forwarders (run_agent.py:4012,4183) receive
-    ``api_kwargs`` as a dict with ``messages`` at ``api_kwargs["messages"]``.
-    We wrap them to compress those messages before they reach the provider.
+    When a local headroom proxy is active, we skip local compression —
+    the proxy handles it.  The headroom_retrieve tool still works either way.
     """
     try:
         from agent.conversation_loop import run_conversation as _orig
     except ImportError:
         return
 
-    import functools, sys
+    import functools
 
     @functools.wraps(_orig)
     def _patched(agent, system_message, messages, conversation_history, turn_id, user_message, **kw):
@@ -158,13 +184,15 @@ def _patch_loop():
             print("[hermes-compress-shim] WARNING: no intercept hook found", file=sys.stderr)
             return _orig(agent, system_message, messages, conversation_history, turn_id, user_message, **kw)
 
+        using_proxy = _is_proxy_active(agent)
+
         # ── Compression wrapper ───────────────────────────────────────
         def _make_wrapper(fn):
             @functools.wraps(fn)
             def _compress_hook(*a, **kw):
                 # Forwarder sig: _interruptible_*_api_call(self, api_kwargs, ...)
                 # First positional arg after self is always api_kwargs dict.
-                if a and isinstance(a[0], dict):
+                if not using_proxy and a and isinstance(a[0], dict):
                     api_kwargs = a[0]
                     msgs = api_kwargs.get("messages")
                     if msgs and isinstance(msgs, list) and len(msgs) > 1:
@@ -178,7 +206,8 @@ def _patch_loop():
         if _stream:
             setattr(agent, "_interruptible_streaming_api_call", _make_wrapper(_stream))
 
-        print("[hermes-compress-shim] ✓ patched agent API hooks", file=sys.stderr)
+        tag = "proxy-active (no local compression)" if using_proxy else "direct compression"
+        print(f"[hermes-compress-shim] ✓ patched agent API hooks — {tag}", file=sys.stderr)
         return _orig(agent, system_message, messages, conversation_history, turn_id, user_message, **kw)
 
     import agent.conversation_loop
