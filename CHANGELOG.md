@@ -4,19 +4,19 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 
 ---
 
-## 1.0.2 — Proxyless CCR Mode, Combined Architecture, Compression
+## 1.0.2 - Proxyless CCR Mode, Combined Architecture, Compression
 
 - **Proxyless CCR mode** (`HERMES_HEADROOM_PROXYLESS=1`): tool outputs stored to
   SQLite (`~/.hermes/headroom_cache.db`) + disk cache and replaced with
   `<<ccr:HASH,path=...>>` markers. Model retrieves content on demand via
   `headroom_retrieve` using local file reads → SQLite → proxy in priority order.
   Achieves **97% tool output reduction** for large files (58KB → 1.5KB markers).
-- **Files <50 lines return directly** — no CCR wrapping. Only large files (≥50 lines)
+- **Files <50 lines return directly** - no CCR wrapping. Only large files (≥50 lines)
   get CCR-wrapped. Terminal/execute_code pass through raw below 50 lines/2KB.
   Prevents CCR confusion during normal development.
-- **Cache-dir skip** — read_file won't CCR-wrap files in `~/.hermes/headroom_cache/`,
+- **Cache-dir skip** - read_file won't CCR-wrap files in `~/.hermes/headroom_cache/`,
   preventing infinite compression loops when agents read cache files directly.
-- **Auto-resolve via SQLite** — native `llm_request` middleware resolves `<<ccr:HASH>>`
+- **Auto-resolve via SQLite** - native `llm_request` middleware resolves `<<ccr:HASH>>`
   markers from SQLite internal store before sending to DeepSeek. No manual
   `headroom_retrieve` needed for standard reads.
 - **Headroom AI compression** (`HERMES_PROXYLESS_COMPRESS=1`): content compressed
@@ -54,7 +54,7 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 
 - **Sandbox recovery patches**: Monkey-patches on `read_file_tool` (recovers empty content
   via Python `open()`), `terminal_tool` (tags `_sandbox_empty` + hint), and
-  `execute_code` (tags `_sandbox_empty` + hint). All three patches are surgical —
+  `execute_code` (tags `_sandbox_empty` + hint). All three patches are surgical -
   only fire when the Hermes sandbox returns empty output.
 - **Metadata bridge**: `llm_request` middleware detects `_fixed_by` and `_sandbox_empty`
   tags, protecting recovered/detected messages from inline compression so they reach
