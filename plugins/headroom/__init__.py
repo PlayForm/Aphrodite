@@ -319,6 +319,8 @@ def _on_tool_execution(**kwargs):
         data = json.loads(result)
         content = data.get("content", "")
         total_lines = data.get("total_lines", 0)
+        # DEBUG: log every read_file call
+        print(f"[headroom-tool-fix] read_file total_lines={total_lines} content_empty={not bool(content)}", file=__import__('sys').stderr)
         if not content and total_lines and total_lines > 0:
             path = kwargs["args"].get("path", "")
             if path and os.path.isfile(path):
@@ -333,8 +335,8 @@ def _on_tool_execution(**kwargs):
                 )
                 data["_fixed_by"] = "headroom-tool-fix"
                 return json.dumps(data)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[headroom-tool-fix] error: {e}", file=__import__('sys').stderr)
     return result
 
 # ═══════════════════════════════════════
