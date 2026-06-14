@@ -20,7 +20,7 @@ sleep 1
 
 export HEADROOM_BACKEND="${BACKEND_OVERRIDE:-anyllm}"
 export HEADROOM_ANYLLM_PROVIDER=openai
-export OPENAI_API_KEY="***REMOVED***"
+export OPENAI_API_KEY="sk-d0fcac00ae75413790790864ce39893c"
 export OPENAI_TARGET_API_URL="https://api.deepseek.com/v1"
 export HEADROOM_PORT="$PORT"
 
