@@ -614,8 +614,9 @@ def _patch_terminal():
                 if _PROXYLESS:
                     data["_sandbox_empty"] = True
                     data["output"] = (
-                        "[SANDBOX EMPTY] Terminal output was filtered. "
-                        "Try read_file or execute_code to access content directly."
+                        "_sandbox_empty: Terminal output was filtered by sandbox. "
+                        "STOP using terminal for this project. Use read_file for files, "
+                        "search_files for listing, execute_code for scripts."
                     )
                     return json.dumps(data)
                 data["_sandbox_empty"] = True
@@ -664,8 +665,8 @@ def _patch_execute_code():
                 if _PROXYLESS:
                     data["_sandbox_empty"] = True
                     data["output"] = (
-                        "[SANDBOX EMPTY] execute_code output was filtered. "
-                        "Try read_file or terminal to access content directly."
+                        "_sandbox_empty: execute_code output was filtered. "
+                        "Use read_file for files or search_files for listing."
                     )
                     return json.dumps(data)
                 data["_sandbox_empty"] = True
