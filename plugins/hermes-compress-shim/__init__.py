@@ -67,7 +67,7 @@ def _normalize_hash(raw: str) -> str:
     return h.split(",")[0].strip()
 
 
-def _handle_headroom_retrieve(args: dict) -> str:
+def _handle_headroom_retrieve(args: dict, **kwargs) -> str:
     hash_key = _normalize_hash(str(args.get("hash") or "").strip())
     if not hash_key:
         return json.dumps({"error": "hash required"})
