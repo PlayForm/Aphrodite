@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test headroom proxy routing — deepseek-v4-pro (1M ctx, 384K output)
+# Test headroom proxy routing - deepseek-v4-pro (1M ctx, 384K output)
 # Usage: bash scripts/proxy-test.sh [port]
 #
 #   bash scripts/proxy-test.sh 8787   # test cache proxy

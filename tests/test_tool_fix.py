@@ -1,8 +1,8 @@
 """
 Unit + integration tests for hermes-tool-fix plugin.
 
-Patch 1: terminal_tool — monitors empty output on exit 0 (logs warning)
-Patch 2: read_file_tool — recovers empty content via direct file I/O
+Patch 1: terminal_tool - monitors empty output on exit 0 (logs warning)
+Patch 2: read_file_tool - recovers empty content via direct file I/O
 """
 
 from __future__ import annotations
@@ -196,7 +196,7 @@ class ReadFileToolUnitTests(unittest.TestCase):
             os.unlink(tmp_path)
 
     def test_content_present_no_recovery(self):
-        """Content present — no recovery needed, no _fixed_by."""
+        """Content present - no recovery needed, no _fixed_by."""
         self.mock_orig.return_value = json.dumps({
             "content": "1|hello\n",
             "total_lines": 1,

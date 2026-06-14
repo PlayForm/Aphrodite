@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Proxy compression benchmark — uses headroom's own /stats for ground truth.
+Proxy compression benchmark - uses headroom's own /stats for ground truth.
 
 Launch:  bash scripts/proxy-launch.sh [cache|token]
 Run:     python3 tests/bench_proxy.py [--mode cache] [--rounds 3]

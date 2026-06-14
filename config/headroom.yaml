@@ -1,4 +1,4 @@
-# Headroom proxy configuration — local, self-contained
+# Headroom proxy configuration - local, self-contained
 
 backend: openai
 openai_api_url: https://api.deepseek.com

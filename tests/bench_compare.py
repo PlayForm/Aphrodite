@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-HermesCompress vs HermesProxy — Comprehensive Comparison Benchmark
+HermesCompress vs HermesProxy - Comprehensive Comparison Benchmark
 
 Compares three compression approaches with identical prompts:
-  1. hook   — hermes-compress plugin (per-tool _transform_tool_result)
-  2. proxy-cache — hermes-proxy plugin (headroom --mode cache on :8787)
-  3. proxy-token — hermes-proxy plugin (headroom --mode token on :8788)
+  1. hook   - hermes-compress plugin (per-tool _transform_tool_result)
+  2. proxy-cache - hermes-proxy plugin (headroom --mode cache on :8787)
+  3. proxy-token - hermes-proxy plugin (headroom --mode token on :8788)
 
 Shared logging via `hermes_compress` logger for unified monitoring.
 
@@ -213,7 +213,7 @@ def main():
         for mode in modes:
             r = results.get(mode, {})
             if "error" in r:
-                print(f"  {mode:<15} {'—':>6} {'—':>10} {'—':>10} {'—':>7}")
+                print(f"  {mode:<15} {'-':>6} {'-':>10} {'-':>10} {'-':>7}")
             else:
                 print(f"  {mode:<15} {r.get('calls',0):>6} "
                       f"{r.get('tokens_saved',0):>10,} "

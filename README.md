@@ -4,7 +4,7 @@
 
 <h1 align="center">HermesCompress</h1>
 
-<p align="center"><strong>Native headroom integration for Hermes Agent.</strong><br>3 MCP tools + transparent middleware — no monkey-patching.</p>
+<p align="center"><strong>Native headroom integration for Hermes Agent.</strong><br>3 MCP tools + transparent middleware - no monkey-patching.</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-purple?style=flat" alt="version">
@@ -34,14 +34,14 @@
 └────────────────────────────────────────────────────────────┘
 ```
 
-**No monkey-patching.** Uses Hermes' native `ctx.register_middleware("llm_request", ...)` API. Runs before the proxy sees the request — breaking the re-compression loop.
+**No monkey-patching.** Uses Hermes' native `ctx.register_middleware("llm_request", ...)` API. Runs before the proxy sees the request - breaking the re-compression loop.
 
 ### Proxy-aware
 
 | Provider | Middleware behavior |
 |----------|-------------------|
-| `deepseek-proxy-cache` (:8787) | Resolve CCR only — proxy handles prefix-freeze |
-| `deepseek-proxy-token` (:8788) | Resolve CCR only — proxy handles compression |
+| `deepseek-proxy-cache` (:8787) | Resolve CCR only - proxy handles prefix-freeze |
+| `deepseek-proxy-token` (:8788) | Resolve CCR only - proxy handles compression |
 | `deepseek-direct` (api.deepseek.com) | **Resolve CCR + compress inline** (55-74%) |
 
 ### Three MCP Tools

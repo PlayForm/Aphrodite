@@ -3,7 +3,7 @@
 # Launches headroom in proxy mode with compression enabled.
 #
 # The proxy compresses Anthropic-format tool outputs (tool_result blocks).
-# OpenAI-format messages (role=tool) pass through uncompressed — use the
+# OpenAI-format messages (role=tool) pass through uncompressed - use the
 # inline Python library (Compress.compress()) for OpenAI-format compression.
 #
 # Usage:
@@ -12,9 +12,9 @@
 #   bash scripts/proxy-launch.sh cache 9090  # custom port
 #
 # Env vars needed (set in .env):
-#   HEADROOM_DEEPSEEK_KEY  — DeepSeek API key
-#   OPENAI_BASE_URL        — defaults to https://api.deepseek.com
-#   HEADROOM_CODE_AWARE_ENABLED — set to "true" for AST code compression
+#   HEADROOM_DEEPSEEK_KEY  - DeepSeek API key
+#   OPENAI_BASE_URL        - defaults to https://api.deepseek.com
+#   HEADROOM_CODE_AWARE_ENABLED - set to "true" for AST code compression
 # ──────────────────────────────────────────────────────────────────────
 
 set -e

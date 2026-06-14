@@ -3,7 +3,7 @@
 
 Four integration modes (set via compression.headroom.integration):
 
-hook Pure hook-based — no file patching needed. transform_tool_result hook
+hook Pure hook-based - no file patching needed. transform_tool_result hook
 compresses each tool output before it enters message history. Built-in
 compression has less to work with. Fast, clean, restart-free config changes.
 
@@ -30,7 +30,7 @@ result ▼ ┌──────────────────────
 make_tool_result_message() → appended to message history│
 └──────────────────────┬──────────────────────────────────┘ │ ▼
 ┌─────────────────────────────────────────────────────────┐ │ Built-in
-ContextCompressor (threshold-based summaries) │ │ Now has LESS work — tool
+ContextCompressor (threshold-based summaries) │ │ Now has LESS work - tool
 outputs already compressed │
 └──────────────────────┬──────────────────────────────────┘ │ ▼
 ┌─────────────────────────────────────────────────────────┐ │ pre_llm_call
@@ -42,5 +42,5 @@ Hot Reload: Config is read on each hook invocation (cached for 5s). Changing
 compression.headroom.\* takes effect within seconds without restart.
 
 DEV Mode (HERMES_COMPRESS_DEV=1): read_file, terminal, execute_code, patch
-downgrade to "minimal" strategy — prevents aggressive compression of dev tools
+downgrade to "minimal" strategy - prevents aggressive compression of dev tools
 during debugging. """

@@ -1,15 +1,15 @@
 """
-headroom — Hermes plugin: 3 MCP tools + transparent CCR resolution.
+headroom - Hermes plugin: 3 MCP tools + transparent CCR resolution.
 
 Tools:
-  headroom_compress  — compress content on demand via proxy /v1/compress
-  headroom_retrieve  — resolve CCR markers (local file + proxy + BM25)
-  headroom_stats     — proxy compression statistics
+  headroom_compress  - compress content on demand via proxy /v1/compress
+  headroom_retrieve  - resolve CCR markers (local file + proxy + BM25)
+  headroom_stats     - proxy compression statistics
 
 Middleware (HERMES_HEADROOM_NATIVE=1):
   Transparent CCR resolution via llm_request middleware.
   Scans API messages for CCR markers and resolves them BEFORE the proxy
-  sees them — breaking the token-proxy re-compression loop.
+  sees them - breaking the token-proxy re-compression loop.
   Proxy-aware: skips inline compression when routing through headroom proxy.
   Applies inline compression when on direct API.
 

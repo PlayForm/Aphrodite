@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Dual-proxy side-by-side comparison — tests cache vs token mode.
+Dual-proxy side-by-side comparison - tests cache vs token mode.
 
 Sends identical messages to both proxies simultaneously and compares
 token counts, compression, latency, and stats.
@@ -143,7 +143,7 @@ def _final_report():
     token_lat = sum(r["token"]["elapsed"] for r in RESULTS if r.get("token"))
 
     print("\n" + "=" * 70)
-    print(f"  FINAL COMPARISON — {MODEL}  |  1M ctx / {MAX_OUTPUT:,} out")
+    print(f"  FINAL COMPARISON - {MODEL}  |  1M ctx / {MAX_OUTPUT:,} out")
     print("=" * 70)
     print(f"  {'':25s} {'CACHE (prefix-freeze)':>20s}  {'TOKEN (compress)':>20s}")
     print(f"  {'─' * 25} {'─' * 20}  {'─' * 20}")
@@ -183,9 +183,9 @@ if not _key:
 print("╔══════════════════════════════════════════════════╗")
 print("║  Dual Proxy Side-by-Side Comparison              ║")
 print("╠══════════════════════════════════════════════════╣")
-print(f"║  Model:  {MODEL}  —  1M ctx / {MAX_OUTPUT:,} out")
-print(f"║  Cache:  :8787  —  {PROXIES['cache']['desc']}")
-print(f"║  Token:  :8788  —  {PROXIES['token']['desc']}")
+print(f"║  Model:  {MODEL}  -  1M ctx / {MAX_OUTPUT:,} out")
+print(f"║  Cache:  :8787  -  {PROXIES['cache']['desc']}")
+print(f"║  Token:  :8788  -  {PROXIES['token']['desc']}")
 print("╚══════════════════════════════════════════════════╝\n")
 
 # Load test files
@@ -243,7 +243,7 @@ LARGE_TEXT = (
 ) * 40
 
 for turn_i in range(3):
-    # Build fresh conversation for this turn (not accumulated — test each independently)
+    # Build fresh conversation for this turn (not accumulated - test each independently)
     # Actually, let's accumulate for cache vs token comparison
     pass
 

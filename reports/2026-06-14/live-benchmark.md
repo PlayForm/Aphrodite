@@ -1,4 +1,4 @@
-# HermesCompress — Live Benchmark Report v3
+# HermesCompress - Live Benchmark Report v3
 
 **Date**: 2026-06-14
 **Sessions**: 044944, 050301, 050631, 051102, 051905
@@ -36,20 +36,20 @@ Call  Messages  Tokens Saved  Savings  Latency
 ### Session 050301 (66 msg, 14 API calls)
 
 ```
-Peak: 69.4% at 66 messages — 59,745 tokens saved
+Peak: 69.4% at 66 messages - 59,745 tokens saved
 ```
 
 ### Session 051905 (latest)
 
 ```
-10.7% —   2 msgs,  5,798ms (cold HF download)
-15.3% —   5 msgs,     42ms
-56.1% —   6 msgs,     65ms
-58.6% —   9 msgs,     78ms
-61.4% —  12 msgs,    239ms
-61.9% —  14 msgs,     85ms
-62.3% —  16 msgs,     88ms
-61.8% —  18 msgs,     81ms
+10.7% -   2 msgs,  5,798ms (cold HF download)
+15.3% -   5 msgs,     42ms
+56.1% -   6 msgs,     65ms
+58.6% -   9 msgs,     78ms
+61.4% -  12 msgs,    239ms
+61.9% -  14 msgs,     85ms
+62.3% -  16 msgs,     88ms
+61.8% -  18 msgs,     81ms
 ```
 
 **Every API call across all sessions was compressed. 0 missed calls.**

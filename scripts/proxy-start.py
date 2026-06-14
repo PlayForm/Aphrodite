@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Headroom Proxy Starter — launches with compression enabled.
+Headroom Proxy Starter - launches with compression enabled.
 
 IMPORTANT: headroom proxy compresses Anthropic Messages API and OpenAI
 Responses API. It does NOT compress OpenAI Chat Completions API.

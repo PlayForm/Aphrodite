@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HermesCompress Test Suite — keyed, silent, sequential benchmarks.
+HermesCompress Test Suite - keyed, silent, sequential benchmarks.
 Uses Hermes CLI (-z) to run identical prompts under different configs.
 
 Each run produces a keyed JSON artifact for inspection.
@@ -168,7 +168,7 @@ def main():
         print(f"{'Key':<12} {'Exit':>5} {'Time':>6}s  Stats")
         print("-" * 40)
         for key, r in results.items():
-            stats = "✓ stats" if r.get("has_stats") else "—"
+            stats = "✓ stats" if r.get("has_stats") else "-"
             print(f"{key:<12} {r.get('exit_code',-1):>5} {r.get('duration_s',0):>6.1f}s  {stats}")
 
     print(f"\nResults: {RESULTS_DIR}")

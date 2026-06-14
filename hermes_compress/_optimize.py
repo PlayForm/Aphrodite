@@ -73,7 +73,7 @@ def compact_json_numbers(content: str, precision: int = 4) -> str:
     """Round floating-point numbers in JSON to reduce token count.
 
     High-precision floats like 3.141592653589793 become 3.1416.
-    Semantic meaning is preserved — 4 decimal places is enough
+    Semantic meaning is preserved - 4 decimal places is enough
     for all practical purposes in LLM context.
     """
     if not isinstance(content, str) or len(content) < 50:

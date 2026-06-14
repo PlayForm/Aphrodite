@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
-		<title>HermesCompress — Cumulative Compression</title>
+		<title>HermesCompress - Cumulative Compression</title>
 		<style>
 			:root {
 				--bg: #080808;
@@ -617,12 +617,12 @@
 					<span class="b bm">cache</span>
 					<span class="b bw">session: %CACHE_N% msgs</span>
 				</div>
-				<h1>HermesCompress — Cumulative Compression</h1>
+				<h1>HermesCompress - Cumulative Compression</h1>
 				<p class="sub">
 					Randomized tool outputs accumulate in a shared session cache
 					across benchmark runs. Early calls see baseline compression;
 					later calls show how headroom scales as real-world context
-					builds up — the same pattern that occurs in long-running
+					builds up - the same pattern that occurs in long-running
 					Hermes sessions.
 				</p>
 				<div class="me">
@@ -673,13 +673,13 @@
 
 			<!-- ═══ INLINE ═══════════════════════════════════════════════════════ -->
 			<h2>
-				<span class="d di"></span>Inline — Python Library
+				<span class="d di"></span>Inline - Python Library
 				<span class="ann">CCR</span>
 			</h2>
 			<p class="sub">
 				<code>headroom.compress()</code> called in-process on the
 				accumulated session cache plus a new randomized tool output. CCR
-				markers are LLM-native compressed references — the model
+				markers are LLM-native compressed references - the model
 				understands them without decompression. Zero HTTP, zero API
 				cost.
 			</p>
@@ -689,7 +689,7 @@
 				&rarr; <span class="hg">Kompress</span> &rarr; CCR strip &rarr;
 				safety guard (reverts empty outputs only). Token counts come
 				from headroom internals via <code>CompressResult</code>. Chars
-				show the raw string length before and after — CCR markers are
+				show the raw string length before and after - CCR markers are
 				typically &lt;100 chars regardless of input size.
 			</p>
 
@@ -741,14 +741,14 @@
 
 			<!-- ═══ PROXY ════════════════════════════════════════════════════════ -->
 			<h2>
-				<span class="d dp"></span>Proxy — headroom &rarr; DeepSeek
+				<span class="d dp"></span>Proxy - headroom &rarr; DeepSeek
 				<span class="ann">billed</span>
 			</h2>
 			<p class="sub">
 				HTTP POST through <code>headroom proxy</code> (port 8787) with
 				accumulated session context. These are
 				<em>actual billed</em> prompt tokens as reported by the DeepSeek
-				API — the ground-truth cost metric.
+				API - the ground-truth cost metric.
 			</p>
 			<p class="help">
 				<em>Pipeline:</em> HTTP POST &rarr; CacheAligner &rarr;

@@ -1,17 +1,17 @@
 """
-Per-tool compression strategies — custom headroom settings per Hermes tool.
+Per-tool compression strategies - custom headroom settings per Hermes tool.
 
 Different tool outputs benefit from different compression approaches.
 This module defines the optimal headroom kwargs for each tool type,
 based on real session benchmarks.
 
 Strategy tiers:
-  aggressive — max compression, JSON-heavy tools (search_files, web_search)
-  balanced  — moderate, mixed content (terminal, execute_code)
-  code      — AST-aware, preserve logic (read_file, patch)
-  prose     — ML-based, keep semantics (web_extract, skill_view)
-  minimal   — light touch, tiny outputs (memory, write_file)
-  skip      — never compress (vision, browser clicks)
+  aggressive - max compression, JSON-heavy tools (search_files, web_search)
+  balanced  - moderate, mixed content (terminal, execute_code)
+  code      - AST-aware, preserve logic (read_file, patch)
+  prose     - ML-based, keep semantics (web_extract, skill_view)
+  minimal   - light touch, tiny outputs (memory, write_file)
+  skip      - never compress (vision, browser clicks)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ STRATEGIES: dict[str, dict[str, Any]] = {
         "tier": "code",
         "protect_recent": 0,
         "min_tokens_to_compress": 100,
-        "target_ratio": 0.20,  # keep 20% — preserve imports/signatures
+        "target_ratio": 0.20,  # keep 20% - preserve imports/signatures
     },
     "prose": {
         "tier": "prose",
@@ -62,7 +62,7 @@ STRATEGIES: dict[str, dict[str, Any]] = {
 # ── Per-tool strategy mapping ─────────────────────────────────────────
 
 TOOL_STRATEGIES: dict[str, str] = {
-    # JSON-heavy — aggressive SmartCrusher
+    # JSON-heavy - aggressive SmartCrusher
     "search_files": "aggressive",
     "web_search": "aggressive",
     "session_search": "aggressive",
@@ -70,28 +70,28 @@ TOOL_STRATEGIES: dict[str, str] = {
     "skills_list": "aggressive",
     "skill_manage": "aggressive",
 
-    # Mixed content — balanced
+    # Mixed content - balanced
     "terminal": "balanced",
     "execute_code": "balanced",
     "read_terminal": "balanced",
     "process": "balanced",
     "cronjob": "balanced",
 
-    # Source code — code strategy
+    # Source code - code strategy
     "read_file": "code",
     "patch": "code",
 
-    # Prose / docs — Kompress
+    # Prose / docs - Kompress
     "web_extract": "prose",
     "delegate_task": "prose",
     "skill_view": "prose",
 
-    # HTML snapshots — skip (binary/image content, headroom can't compress)
+    # HTML snapshots - skip (binary/image content, headroom can't compress)
     "browser_navigate": "skip",
     "browser_snapshot": "skip",
     "browser_console": "skip",
 
-    # Tiny — minimal or skip
+    # Tiny - minimal or skip
     "todo": "minimal",
     "write_file": "skip",
     "memory": "skip",

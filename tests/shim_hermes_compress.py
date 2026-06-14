@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-HermesCompress Dynamic Shim — injects headroom compression into Hermes Agent.
+HermesCompress Dynamic Shim - injects headroom compression into Hermes Agent.
 
-Hooks into ``agent/conversation_loop.py:674`` — right after the system prompt
+Hooks into ``agent/conversation_loop.py:674`` - right after the system prompt
 is prepended to ``api_messages`` and immediately before the LLM API call.
 
 ONLY TWO JOBS:
@@ -52,7 +52,7 @@ HEADROOM_RETRIEVE_SCHEMA = {
         "Retrieve original uncompressed content behind a headroom compression "
         "marker. Markers look like '[N items compressed ... hash=abc123]' or "
         "'<<ccr:abc123>>' or '<<ccr:abc,base64,4.5KB>>'. Extract just the hash "
-        "and call this tool. Content expires after TTL — if expired, re-run "
+        "and call this tool. Content expires after TTL - if expired, re-run "
         "the original command instead."
     ),
     "parameters": {
@@ -253,7 +253,7 @@ def _test():
 
     print(f"Test: {len(msgs)} messages")
     result = _compress(msgs)
-    # Only report what changed — no measurement, just structural check
+    # Only report what changed - no measurement, just structural check
     tool_out = sum(1 for m in result if m.get("role") == "tool")
     print(f"  messages: {len(result)} (was {len(msgs)})")
     print(f"  tool outputs: {tool_out}")

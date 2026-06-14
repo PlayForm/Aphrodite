@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HermesCompress Shim structural test — validates compression pipeline only.
+HermesCompress Shim structural test - validates compression pipeline only.
 
 No measurement. No filtering. Just verifies:
   - Compression activates with enough context
@@ -47,7 +47,7 @@ def _build_conv(n_turns: int, files: dict[str, str]) -> list[dict]:
 
 
 def main():
-    print(f"Compression Pipeline Test — {MODEL}\n")
+    print(f"Compression Pipeline Test - {MODEL}\n")
 
     files = {
         "proxy-start.py": (REPO / "scripts" / "proxy-start.py").read_text(),
@@ -75,11 +75,11 @@ def main():
 
         ok = True
         if len(result.messages) > len(msgs):
-            print(f"  ✗ {label} ({len(msgs)} msg) — grew to {len(result.messages)}")
+            print(f"  ✗ {label} ({len(msgs)} msg) - grew to {len(result.messages)}")
             ok = False
         else:
             passed += 1
-            print(f"  ✓ {label} ({len(msgs)} msg) — {len(result.messages)} messages")
+            print(f"  ✓ {label} ({len(msgs)} msg) - {len(result.messages)} messages")
 
         # Tool output count preserved
         orig_tools = sum(1 for m in msgs if m.get("role") == "tool")
