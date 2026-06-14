@@ -1,119 +1,86 @@
-# HermesCompress — Session Handoff Plan (updated v0.7.10+)
+# SESSION PLAN — HermesCompress (2026-06-14)
 
-## Current State (branch Current, post-fix)
+## Status: ✅ COMPLETED
 
-### What was fixed this session
+All planned work has been completed and verified in live Hermes sessions.
 
-| Issue | Status | Detail |
-|-------|--------|--------|
-| Monkey-patch broken | ✅ Fixed | Targets `agent._interruptible_api_call` + `_streaming` (run_agent.py:4012,4183) instead of nonexistent `_call_llm_with_retry` |
-| headroom-ai missing | ✅ Installed | `pip install headroom-ai` in `~/.hermes/hermes-agent/venv` (v0.25.0) |
-| Plugin silent failure | ✅ Fixed | Now prints `[hermes-compress-shim] ✓ patched agent API hooks` on startup |
+## Completed Tasks
 
-### What's running
-| Component | Status | Detail |
-|-----------|--------|--------|
-| Cache proxy | :8787 | ✓ HEALTHY (348 req, 301 frozen) |
-| Token proxy | :8788 | ✓ HEALTHY (16 req, 4 frozen) |
-| Hermes session | Direct to DeepSeek | Plugin loaded but patch not active this session (needs restart) |
+### ✅ Bug 1: Monkey-patch targeted nonexistent methods (FIXED)
+- Shim now wraps correct forwarders: `_interruptible_api_call` + `_interruptible_streaming_api_call`
+- Verified: marker `[hermes-compress-shim] ✓ patched agent API hooks — direct compression` appears on startup
+- Commit: `9f225f0`
 
-### Verified working
-| Test | Result |
-|------|--------|
-| Structural test (3 sizes) | ✓ 6/6 passed |
-| Standalone compression (29 msgs) | ✓ 7% overall (-65% on dedup content) |
-| Cold start (Kompress ONNX) | ✓ Loads on first call (~10-15s) |
-| Tool output integrity | ✓ All tool outputs preserved |
+### ✅ Bug 2: headroom-ai not installed in agent venv (FIXED)
+- `headroom-ai` v0.25.0 installed in `~/.hermes/hermes-agent/venv`
+- Additional fix: `hermes_compress` also needs `pip install -e` into agent venv
+- Commit: `6092a5f`
 
-### Configuration
-```
-Plugin:        hermes-compress-shim (symlinked from repo)
-Config:        protect_recent=1, min_tokens=100, target_ratio=None
-headroom-ai:   0.25.0 (installed in hermes-agent venv)
-Proxy:         dual (cache :8787 + token :8788)
-```
+### ✅ Bug 3: Plugin disabled (FIXED)
+- Plugin shows `not enabled` despite `plugins.enabled` in config.yaml
+- Hermes ignores `plugins.enabled` config key — use `hermes plugins enable hermes-compress-shim`
+- Documented in skill pitfall
 
----
+### ✅ Bug 4: Signature mismatch (FIXED)
+- Shim's `_patched()` had wrong 6-param signature vs actual `run_conversation(agent, user_message, ...)` which has 7 params
+- Changed to `*args, **kwargs` passthrough
+- Commit: `4e2aab5`
 
-## New Session Checklist (UPDATED)
+### ✅ Bug 5: Proxy detection (FIXED)
+- Added `_is_proxy_active(agent)` — checks model_config, config, base_url
+- Skips local compression when proxy is detected (avoids double-compression)
+- Corrected proxy port: 8787 → 8788 (token mode)
+- Commit: `7b36b8a`
 
-### 1. Verify shim loaded with fix
-Start Hermes fresh. Check stderr for:
-```
-[hermes-compress-shim] ✓ patched agent API hooks
-```
-If you see `WARNING: no intercept hook found` — agent class changed, investigate.
+### ✅ Bug 6: headroom_retrieve loops (FIXED)
+- Agent retried endlessly when proxy not running
+- Now catches `httpx.ConnectError` and returns clear 'proxy not running' message
+- Timeout reduced from 15s → 5s
+- Commit: `6f68475`
 
-### 2. Test compression activates
-Build ~15+ messages with tool output. The first API call will be slow (10-15s, Kompress ONNX load). Subsequent calls fast (~50-80ms).
+### ✅ Bug 7: Terminal tool returns empty output (MITIGATED)
+- Created separate `hermes-tool-fix` plugin
+- Monitors terminal_tool for exit=0 + empty output
+- Recovers read_file content via direct file I/O fallback
+- Controlled via `HERMES_TOOL_FIX_DEBUG=1`
+- Commit: `d1d9a01`
 
-Compression activates progressively:
-- First 5-8 messages: 0% (ContentRouter protects small payloads)
-- 15+ messages with code: 7-15% (code is mostly unique)
-- 20+ messages with repeated patterns: 33-37% (dedup + code compression)
-- 35+ messages accumulated: 55-67% (skill benchmarks)
+### ✅ Documentation updated
+- README.md rewritten with full architecture, benchmarks, setup
+- BENCHMARK.md updated with live session data + proxy comparison
+- Created `assets/logo.svg`
+- reports/2026-06-14/live-benchmark.md updated (v2, v3)
 
-### 3. Test headroom_retrieve tool
-The `headroom_retrieve` tool is registered. It requires the cache proxy on :8787.
-CCR markers only appear in proxy mode — inline mode produces regular messages.
+### ✅ Live verification
+- Compression confirmed working in 5+ Hermes sessions
+- Every API call compressed — no missed calls
+- 50-67% savings at steady state (10+ messages)
+- 10.7% first-call (cold Kompress load), 50-300ms warm
 
-### 4. Known issues unchanged
-- v4-pro thinking overhead: needs `max_tokens >= 1200`
-- Compression needs accumulated context (12+ messages)
-- `protect_recent=0` + `target_ratio <= 0.10` can corrupt code
-- Proxy doesn't compress Chat Completions — inline shim is the only path
+## Remaining (nice-to-have)
 
----
+- [ ] Replace monkey-patch with proper `pre_api_request` mutation hook (when Hermes supports it)
+- [ ] Add `hermes-compress install` CLI command
+- [ ] Test with Anthropic Messages API via proxy (where proxy compression works)
+- [ ] Run 30+ turn session to verify savings scale to 69%+
 
-## Test Commands
+## Session History
+
+| Session | Date | Outcome |
+|---------|------|---------|
+| 032052 | Jun 14, 03:21 | Discovered Bug 1 + Bug 2 |
+| 033540 | Jun 14, 03:35 | Fixed Bug 1 + Bug 2, wrote live-benchmark v2 |
+| 041107 | Jun 14, 04:11 | Fixed Bug 5 (proxy detection) |
+| 044227 | Jun 14, 04:42 | Discovered Bug 3 (disabled) + Bug 4 (signature) |
+| 044944 | Jun 14, 04:49 | Bug 4 verified working |
+| 045442 | Jun 14, 04:54 | Bug 3 fixed, shim marker confirmed |
+| 050301 | Jun 14, 05:03 | Discovered Bug 6 (ModuleNotFoundError), debug env added |
+| 050631 | Jun 14, 05:06 | Compression confirmed: 50-59% live |
+| 051102 | Jun 14, 05:11 | 57-67% savings, discovered terminal sandbox issue |
+| 051905 | Jun 14, 05:19 | Both plugins active, terminal tool working |
+
+## Setup Command (required once)
 
 ```bash
-# Structural test
-.venv/bin/python tests/test_shim_compress.py
-
-# Standalone compression test
-.venv/bin/python tests/shim_hermes_compress.py --test
-
-# Dual proxy status
-.venv/bin/python scripts/proxy-dual.py --status
-
-# Full benchmark report
-HEADROOM_DEEPSEEK_KEY=<key> .venv/bin/python tests/report.py
-
-# Tune configs over frozen cache
-.venv/bin/python tests/tune.py
-
-# Verify headroom installed
-~/.hermes/hermes-agent/venv/bin/python -c "import headroom; print('OK')"
+~/.hermes/hermes-agent/venv/bin/pip install -e /Volumes/CORSAIR/Developer/macOS/Application/PlayForm/HermesCompress
 ```
-
----
-
-## Files modified this session
-
-| File | Change |
-|------|--------|
-| `plugins/hermes-compress-shim/__init__.py` | Fixed monkey-patch to target real API methods |
-| `tests/shim_hermes_compress.py` | Synced with plugin fix |
-| `BENCHMARK.md` | Created — live benchmark plan for dedicated session |
-| `~/.hermes/hermes-agent/venv` | Installed headroom-ai v0.25.0 |
-
----
-
-## Next Steps
-
-### Immediate (before restart)
-- [x] Monkey-patch targets correct methods
-- [x] headroom-ai installed in hermes-agent venv
-- [x] BENCHMARK.md ready for dedicated session
-
-### After restart
-- [ ] Verify `[hermes-compress-shim] ✓ patched agent API hooks` in logs
-- [ ] Run BENCHMARK.md in a dedicated session
-- [ ] Verify compression savings on real-world tool output
-
-### Development
-- [ ] Replace monkey-patch with proper `pre_api_request` hook
-- [ ] Add `pre_llm_call` hook support in Hermes core for message access
-- [ ] `hermes-compress install` command to symlink plugin + install deps
-- [ ] Report generation with live benchmark results

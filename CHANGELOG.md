@@ -4,12 +4,12 @@ All notable changes to **@playform/hermes-compress** are documented in this file
 
 ---
 
-## 0.7.0 — Pipeline Reorder: Headroom-First
+## 0.7.0 - Pipeline Reorder: Headroom-First
 
 - **Critical fix**: Reordered compression pipeline so headroom runs BEFORE
   pre-processing. Previously, pre-processing (ANSI strip, whitespace
   normalization, path optimization) ran first, which confused headroom's
-  ContentRouter — messages were incorrectly marked as `protected:user_message`
+  ContentRouter - messages were incorrectly marked as `protected:user_message`
   instead of being compressed. This cost 15-30% in lost savings.
 - **Benchmark-verified**: Full pipeline now matches or exceeds headroom-only
   compression on all tool types. Overall savings increased from 25.8% to
@@ -25,20 +25,20 @@ All notable changes to **@playform/hermes-compress** are documented in this file
   stripped from the compressed output. Full pre-processing is skipped on
   already-compressed content.
 
-## 0.6.0 — Auto-Update, Per-Tool Strategies, Smart Truncation, Dedup
+## 0.6.0 - Auto-Update, Per-Tool Strategies, Smart Truncation, Dedup
 
-- **Auto-update**: `_update.py` — checks GitHub releases on plugin load.
+- **Auto-update**: `_update.py` - checks GitHub releases on plugin load.
   `check_for_updates()` returns `UpdateResult` with version comparison.
   `install_update()` runs `pip install --upgrade` from the GitHub repo.
   Cached for 1 hour. Disable with `HERMES_COMPRESS_NO_UPDATE=1`.
-- **Per-tool compression strategies**: `_strategies.py` — six tiers
+- **Per-tool compression strategies**: `_strategies.py` - six tiers
   (aggressive, balanced, code, prose, minimal, skip) mapped to each Hermes
   tool based on content type. Aggressive for JSON tools (SmartCrusher, 40-60%
   savings), code tier for `read_file`/`patch` (CodeCompressor, 30-50%),
   balanced for mixed content, skip for tiny tools. Strategies merge with
   global config: more aggressive `protect_recent` and lower
   `min_tokens_to_compress` win.
-- **Smart truncation**: `_truncate.py` — three strategies for outputs over
+- **Smart truncation**: `_truncate.py` - three strategies for outputs over
   50K chars. Head-and-tail for code/content, JSON-aware for structured data
   (truncates arrays to first 100 items, preserves structure), line-based for
   logs/terminal output. All truncation is lossy but preserves the most
@@ -49,15 +49,15 @@ All notable changes to **@playform/hermes-compress** are documented in this file
   Saves 100% on duplicate results.
 - **Plugin hot-reload**: When `HERMES_COMPRESS_DEV=1`, the compressor checks
   file modification times before each call. If any `.py` file in the plugin
-  directory changed, it auto-reloads the affected modules — no restart needed.
-- **Zero-fidelity optimization pass**: `_optimize.py` — whitespace
+  directory changed, it auto-reloads the affected modules - no restart needed.
+- **Zero-fidelity optimization pass**: `_optimize.py` - whitespace
   normalization (tabs→spaces, trailing whitespace, blank line collapse), JSON
   number rounding (high-precision floats→4 decimal places), path normalization
   (home dir→`~`, backslash→forward slash), timestamp shortening
   (ISO→compact), boilerplate stripping (standard tool headers and footers).
-  All transforms preserve semantic meaning — only formatting changes.
+  All transforms preserve semantic meaning - only formatting changes.
 - **New CompressOption fields**: `PrecompressTools`, `AggressiveKompress`,
-  `DeduplicateResults`, `VerboseStats` — all configurable via `config.yaml`
+  `DeduplicateResults`, `VerboseStats` - all configurable via `config.yaml`
   or `CompressOption` constructor. Install patcher reads all fields from
   `compression.headroom` config.
 - **Smart re-patch**: Install patcher now detects outdated patches (marker
@@ -67,19 +67,19 @@ All notable changes to **@playform/hermes-compress** are documented in this file
   to pass `api_messages` through the compressor before every API call.
   `agent_init.py` reads all `compression.headroom.*` config keys. The
   `headroom_compression.py` wrapper delegates to the plugin's `Compress`
-  class — all logic lives in the plugin, not the patched core.
+  class - all logic lives in the plugin, not the patched core.
 - **HeadroomCompressor wrapper**: `_headroom_compression.py` now translates
   `agent_init` kwargs to `CompressOption`, accepts all advanced fields, and
   delegates via `__getattr__` to the underlying `Compress` instance. Zero
-  duplication — all compression logic is in the plugin.
+  duplication - all compression logic is in the plugin.
 
-## 0.5.0 — Pre-Processing Pipeline + Dev Mode
+## 0.5.0 - Pre-Processing Pipeline + Dev Mode
 
 - **Pre-processing pipeline**: Strips waste before headroom compression.
   ANSI escape codes (terminal output), repeated log lines (collapses N
   identical lines to 2 + count), debug-level noise (tracebacks, verbose npm,
   Docker layers), repeated pattern compression.
-- **Pre-compress tool outputs**: Double-pass compression — each large tool
+- **Pre-compress tool outputs**: Double-pass compression - each large tool
   result (>500 chars) is individually compressed before the full message
   list pass. Gives 5-15% extra savings on JSON and log-heavy sessions.
 - **Dev mode**: `HERMES_COMPRESS_DEV=1` enables per-message stats collection
@@ -90,18 +90,18 @@ All notable changes to **@playform/hermes-compress** are documented in this file
   79%. Combined with CCR marker stripping, average savings rose from 25.8%
   to 50.8%.
 
-## 0.4.0 — Post-Install Patcher
+## 0.4.0 - Post-Install Patcher
 
 - **`hermes-compress install`**: Patches `hermes-agent` core files
   (`conversation_loop.py`, `agent_init.py`, `agent_runtime_helpers.py`) to
   inject compression into the API call loop. Creates `.bak` backups for all
   patched files.
 - **`hermes-compress uninstall`**: Restores all patched files from `.bak`
-  backups. Fully reversible — no permanent changes.
+  backups. Fully reversible - no permanent changes.
 - **`hermes-compress status`**: Checks which files are currently patched and
   whether backups exist.
 
-## 0.3.0 — Standalone Package + CLI
+## 0.3.0 - Standalone Package + CLI
 
 - **Standalone pip package**: `pip install hermes-compress`. Works in any
   Python app without Hermes. `from hermes_compress import Compress`.
@@ -109,16 +109,16 @@ All notable changes to **@playform/hermes-compress** are documented in this file
   `hermes-compress install`, `hermes-compress uninstall`, `hermes-compress
   status`.
 - **Proxy mode**: `hermes-compress proxy --port 8787` starts a headroom
-  proxy server. Zero code changes needed — point provider `base_url` at it.
+  proxy server. Zero code changes needed - point provider `base_url` at it.
 
-## 0.2.0 — Proxy Mode + Generalization
+## 0.2.0 - Proxy Mode + Generalization
 
 - **Proxy class**: Start/stop/health-check the headroom proxy server from
   Python. `Proxy(port=8787).start()`.
 - **Mode switching**: `mode="inline"` (library) vs `mode="proxy"` (HTTP).
   Identical `compress(messages)` API for both.
 
-## 0.1.0 — Initial Release
+## 0.1.0 - Initial Release
 
 - **Headroom integration**: In-process library call via
   `headroom.compress()`.

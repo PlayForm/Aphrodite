@@ -1,5 +1,5 @@
 # @playform/hermes-compress
-# Hermes Agent plugin — headroom-powered context compression
+# Hermes Agent plugin - headroom-powered context compression
 #
 # Also installable standalone: pip install hermes-compress
 #   from hermes_compress import Compress, Proxy

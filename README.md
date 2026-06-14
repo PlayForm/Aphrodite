@@ -1,610 +1,251 @@
-<br>
 <p align="center">
-	<picture>
-		<source media="(prefers-color-scheme: dark)" srcset="https://PlayForm.Cloud/Dark/Image/GitHub/Hermes.svg">
-		<source media="(prefers-color-scheme: light)" srcset="https://PlayForm.Cloud/Image/GitHub/Hermes.svg">
-		<img width="28" alt="Hermes" src="https://PlayForm.Cloud/Image/GitHub/Hermes.svg">
-	</picture>
+  <img src="assets/logo.svg" alt="HermesCompress" width="180" height="180">
 </p>
 
-<br>
-<br>
+<h1 align="center">HermesCompress</h1>
 
-# [Hermes Compress] 🗜️
-
-**Headroom‑powered context compression for** **[`Hermes Agent`][Hermes]** **and
-any Python application.**
-
-Slash LLM token usage by 25‑60 % per API call. Works standalone, as a Hermes
-plugin, or anywhere you call an LLM.
-
-<br>
+<p align="center"><strong>Headroom-powered context compression for Hermes Agent.</strong><br>Inline compression shim — no proxy required.</p>
 
 <p align="center">
-	<a href="https://GitHub.Com/PlayForm/HermesCompress/actions/workflows/Node.yml" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/github/actions/workflow/status/PlayForm/HermesCompress/Node.yml?branch=Current&label=Build&logo=python&color=black&labelColor=black&logoColor=white&logoWidth=0">
-			<source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/github/actions/workflow/status/PlayForm/HermesCompress/Node.yml?branch=Current&label=Build&logo=python&color=white&labelColor=white&logoColor=black&logoWidth=0">
-			<img src="https://img.shields.io/github/actions/workflow/status/PlayForm/HermesCompress/Node.yml?branch=Current&label=Build&logo=python&color=black&labelColor=black&logoColor=white&logoWidth=0" alt="Build" title="Build">
-		</picture>
-	</a>
-	<br>
-	<a href="https://PyPI.Org/project/hermes-compress" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/pypi/v/hermes-compress?label=Version&logo=pypi&color=black&labelColor=black&logoColor=white&logoWidth=0">
-			<source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/pypi/v/hermes-compress?label=Version&logo=pypi&color=white&labelColor=white&logoColor=black&logoWidth=0">
-			<img src="https://img.shields.io/pypi/v/hermes-compress?label=Version&logo=pypi&color=black&labelColor=black&logoColor=white&logoWidth=0" alt="Version" title="Version">
-		</picture>
-	</a>
-	<br>
-	<a href="https://GitHub.Com/PlayForm/HermesCompress" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/github/stars/PlayForm/HermesCompress?style=flat&label=Star&logo=github&color=black&labelColor=black&logoColor=white&logoWidth=0">
-			<source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/github/stars/PlayForm/HermesCompress?style=flat&label=Star&logo=github&color=white&labelColor=white&logoColor=black&logoWidth=0">
-			<img src="https://img.shields.io/github/stars/PlayForm/HermesCompress?style=flat&label=Star&logo=github&color=black&labelColor=black&logoColor=white&logoWidth=0" alt="Star">
-		</picture>
-	</a>
-	<br>
-	<a href="https://GitHub.Com/PlayForm/HermesCompress/blob/Current/LICENSE" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/github/license/PlayForm/HermesCompress?label=License&color=black&labelColor=black&logoColor=white&logoWidth=0">
-			<source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/github/license/PlayForm/HermesCompress?label=License&color=white&labelColor=white&logoColor=black&logoWidth=0">
-			<img src="https://img.shields.io/github/license/PlayForm/HermesCompress?label=License&color=black&labelColor=black&logoColor=white&logoWidth=0" alt="License">
-		</picture>
-	</a>
+  <img src="https://img.shields.io/badge/version-0.7.10-purple?style=flat" alt="version">
+  <img src="https://img.shields.io/badge/savings-50--67%25-brightgreen?style=flat" alt="savings">
+  <img src="https://img.shields.io/badge/latency-50--300ms-blue?style=flat" alt="latency">
+  <img src="https://img.shields.io/badge/python-3.11+-orange?style=flat" alt="python">
 </p>
 
-<br>
+---
+
+## Overview
+
+HermesCompress is a Hermes Agent plugin that monkey-patches the conversation loop to
+compress API messages before they reach the LLM provider. It uses
+[headroom-ai](https://github.com/NousResearch/headroom) (v0.25.0) with the
+Kompress ONNX model for AST-aware, dedup-capable compression.
+
+**Key numbers** (live benchmark, 85-message session):
+
+| Metric | Value |
+|--------|-------|
+| Token savings | **50-67%** (warm cache, 10+ messages) |
+| Latency overhead | **50-300ms** per API call (warm) |
+| Tool output integrity | **100% preserved** (0 empty/truncated results) |
+| CCR markers | **0** (inline mode, no markers) |
+| First-call overhead | **5-7s** (one-time Kompress ONNX model load) |
 
 ---
 
-<br>
+## Architecture
 
-## Install 🚀
-
-```bash
-pip install hermes-compress
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Hermes Agent                          │
+│                                                         │
+│  ┌───────────────────────────────────────────────┐      │
+│  │        conversation_loop.run_conversation()    │      │
+│  │  ┌──────────────────────────────────────────┐ │      │
+│  │  │  hermes-compress-shim (monkey-patch)      │ │      │
+│  │  │                                          │ │      │
+│  │  │  1. _patched(*args, **kwargs)            │ │      │
+│  │  │     wraps run_conversation               │ │      │
+│  │  │  2. _compress_hook wraps forwarders:      │ │      │
+│  │  │     - _interruptible_api_call             │ │      │
+│  │  │     - _interruptible_streaming_api_call   │ │      │
+│  │  │  3. _compress(messages)                   │ │      │
+│  │  │     → Compress.compress() via headroom    │ │      │
+│  │  │  4. Proxy detection: skip if localhost    │ │      │
+│  │  └──────────────────────────────────────────┘ │      │
+│  └───────────────────────────────────────────────┘      │
+│                         ↓                               │
+│              DeepSeek API (v4-pro)                       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Hermes Agent integration (one command):
-
-```bash
-hermes-compress install   # patches hermes‑agent core
-hermes-compress uninstall # reverts all changes
-hermes-compress status    # check patch status
-```
-
-Enable in `~/.hermes/config.yaml`:
-
-```yaml
-compression:
- headroom:
-  enabled: true
-```
-
-Restart Hermes.
-
-<br>
-
-> **Note**
->
-> The first API call of any session may add **10‑15 seconds** while headroom
-> loads compression models (Kompress ONNX). Subsequent calls are fast
-> (~50‑80 ms).
-
-<br>
+The shim intercepts at the **innermost layer** — the last code before the HTTP call to
+DeepSeek. All Hermes processing (sanitization, reasoning echo, middleware, tool JSON
+canonicalization) completes BEFORE compression. No downstream code can undo the result.
 
 ---
 
-<br>
+## Quick Start
 
-## Usage 💡
-
-### Standalone (Any Python App)
-
-```python
-from hermes_compress import Compress
-
-c = Compress(model = "deepseek-v4-pro", enabled = True)
-result = c.compress(messages)
-messages = result.messages  # compressed, 25‑60 % smaller
-```
-
-### CLI
+### 1. Install dependencies into Hermes agent venv
 
 ```bash
-hermes-compress proxy --port 8787
-echo '{"items": [1,2,3]}' | hermes-compress compress --json
-hermes-compress compress "$(cat large-log.txt)"
+~/.hermes/hermes-agent/venv/bin/pip install -e /path/to/HermesCompress
+~/.hermes/hermes-agent/venv/bin/pip install headroom-ai
 ```
 
-### Hermes Plugin
+**Critical**: `hermes_compress` MUST be importable from the Hermes process. The shim
+runs inside Hermes' Python process, not the project venv. Without this step, engine
+init silently fails (`ModuleNotFoundError`) with zero compression applied.
+
+### 2. Enable the plugin
 
 ```bash
-git clone https://GitHub.Com/PlayForm/HermesCompress.git \
-	 ~/.hermes/plugins/hermes-compress
+hermes plugins enable hermes-compress-shim
 ```
 
-<br>
+**Note**: `hermes config set plugins.enabled ...` is IGNORED by Hermes. Use
+`hermes plugins enable` instead. Verify with `hermes plugins list --plain`.
+
+### 3. Restart Hermes
+
+On next session startup, you should see:
+
+```
+[hermes-compress-shim] ✓ patched agent API hooks — direct compression
+```
+
+The first API call will be slow (5-7s Kompress ONNX model download from HuggingFace).
+Set `HF_TOKEN` in `.env` to avoid rate limits. Subsequent calls: 50-300ms.
+
+### 4. Debug mode
+
+```bash
+HERMES_COMPRESS_DEBUG=1 hermes
+```
+
+Prints every step to stderr: patch detection, forwarder wrapping, engine init,
+compression result, savings %.
 
 ---
 
-<br>
+## Configuration
 
-## Modes ⚙️
+The shim reads its config from `COMPRESS_CONFIG` in the plugin source:
 
-| Mode                   | How                      | Latency          | Savings                  | When                                |
-| ---------------------- | ------------------------ | ---------------- | ------------------------ | ----------------------------------- |
-| **shim** (recommended) | Monkey-patch API loop    | 50‑80 ms warm    | Full pipeline (8 phases) | Production — proven 36‑72% savings  |
-| **inline** (default)   | Library call in‑process  | 8‑10 ms warm     | Full pipeline (7 phases) | Programmatic, non‑Hermes usage      |
-| **proxy (cache)**      | Separate server, `:8787` | +5‑20 ms network | Headroom only            | Zero code changes, prefix‑cache hits|
-| **proxy (token)**      | Separate server, `:8788` | +5‑20 ms network | Headroom only            | Aggressive rewriting, testing       |
-| **dual**               | Both `:8787` + `:8788`   | —                | —                        | Side‑by‑side comparison testing     |
+| Key | Default | Description |
+|-----|---------|-------------|
+| `protect_recent` | `1` | Protect N most recent messages from compression |
+| `min_tokens` | `100` | Minimum tokens before compression triggers |
+| `target_ratio` | `None` | Target compression ratio (`None` = auto) |
+| `precompress` | `True` | Pre-compress tools before headroom |
+| `aggressive_kompress` | `True` | Aggressive mode for Kompress |
+| `deduplicate` | `True` | SmartCrusher deduplication |
 
-All modes target **DeepSeek v4‑pro** (1.6T params, 49B active, **1M context**,
-**384K max output**).
+To override, edit `~/.hermes/plugins/hermes-compress-shim/__init__.py` (hardlinked to
+the repo copy at `plugins/hermes-compress-shim/__init__.py`).
 
-### Why the proxy doesn't compress Chat Completions
+---
 
-Headroom proxy compresses **Anthropic Messages API** and **OpenAI Responses API**
-only. Hermes uses the **Chat Completions API** (with `role: tool` messages), which
-passes through uncompressed regardless of `--mode cache` or `--mode token`.
-Verified empirically: 14 side‑by‑side requests showed 0% compression on both modes.
+## Plugins
 
-**The shim mode** solves this by using the inline `Compress.compress()` library
-directly — it intercepts ``api_messages`` right before the LLM API call at
-``agent/conversation_loop.py:674`` and runs the full 8‑phase pipeline.
+| Plugin | What it does |
+|--------|-------------|
+| `hermes-compress-shim` | Monkey-patches API forwarders → 50-67% token savings |
+| `hermes-tool-fix` | Monitors terminal_tool for empty output, recovers read_file content |
+
+Enable both:
 
 ```bash
-# Install the shim (monkey-patches Hermes Agent)
-cd HermesCompress
-.venv/bin/python tests/shim_hermes_compress.py --patch
+hermes plugins enable hermes-compress-shim
+hermes plugins enable hermes-tool-fix
+```
 
-# Test standalone (no Hermes needed)
+---
+
+## Proxy Mode (optional)
+
+Two headroom proxies are available for prefix-cache freezing:
+
+```bash
+./scripts/proxy-start.py --mode cache --port 8787   # cache mode
+./scripts/proxy-start.py --mode token --port 8788   # token mode
+```
+
+| Mode | Port | What it does |
+|------|------|-------------|
+| Cache | :8787 | Anthropic Messages API compression + CCR markers |
+| Token | :8788 | DeepSeek prefix-cache freezing (no Chat Completions compression) |
+
+**Important**: Neither proxy compresses OpenAI Chat Completions (what Hermes uses).
+The proxy only compresses Anthropic Messages API traffic. For Hermes, the inline
+shim is the ONLY compression path that actually reduces token count.
+
+The shim detects localhost base_url and skips local compression when a proxy is active
+(to avoid double-compression).
+
+---
+
+## Benchmarks
+
+### Live session (pane 6, 2026-06-14)
+
+```
+10.7% —   2 msgs,  5,798ms  (cold: Kompress model load)
+15.3% —   5 msgs,     42ms
+56.1% —   6 msgs,     65ms
+58.6% —   9 msgs,     78ms
+61.4% —  12 msgs,    239ms
+61.9% —  14 msgs,     85ms
+62.3% —  16 msgs,     88ms
+61.8% —  18 msgs,     81ms
+```
+
+### Standalone (85 messages, all 5 tool types)
+
+```
+26.3% savings — 207,647 → 153,145 chars
+30 tool outputs, 0 CCR markers, 0 safety guard triggers
+Latency: 42s (85 msgs in one pass — per-call is 50-300ms on 5-20 msgs)
+```
+
+Full report: `reports/2026-06-14/live-benchmark.md`
+
+---
+
+## Safety Guard
+
+The `_compress.py` safety guard reverts only truly empty tool outputs (zero-length
+strings). Across all benchmarks: **0 empty tool outputs detected**. The
+`protect_recent=1` setting prevents over-compression of recent content.
+
+---
+
+## Verification
+
+```bash
+# Standalone compression test
 .venv/bin/python tests/shim_hermes_compress.py --test
+
+# Compare direct vs proxy
+.venv/bin/python tests/benchmark_compare.py
+
+# Tuning sweep
+.venv/bin/python tests/tune.py
+
+# Live session check (from another terminal)
+grep "hermes-compress: saved" ~/.hermes/logs/agent.log | tail -5
 ```
-
-Both share the same headroom pipeline (CacheAligner → ContentRouter →
-SmartCrusher → Kompress). Inline mode adds 6 extra pre‑processing phases that
-the raw proxy does not have, giving **additional savings on top of headroom**.
-Use inline unless you cannot modify the codebase.
-
-### Inline
-
-```python
-from hermes_compress import Compress
-
-c = Compress(enabled = True, mode = "inline")
-result = c.compress(messages)
-```
-
-### Proxy
-
-```python
-from hermes_compress import Proxy
-
-proxy = Proxy(port = 8787, mode = "token")
-proxy.start()
-# Point provider base_url → http://127.0.0.1:8787
-```
-
-Or via scripts:
-
-```bash
-python3 scripts/proxy-dual.py          # both cache (:8787) + token (:8788)
-python3 scripts/proxy-start.py --mode cache --port 8787
-python3 scripts/proxy-start.py --mode token --port 8788
-```
-
-<br>
 
 ---
 
-<br>
+## Troubleshooting
 
-## Compression Pipeline 🔬
-
-Eight phases run before every LLM API call:
-
-1. **Pre‑process** 🧹 — Strip ANSI codes, collapse repeated log lines, remove
-   debug noise, compress repeated patterns
-2. **Optimize** ✨ — Whitespace normalization, JSON number rounding, path
-   normalization (~/), timestamp shortening, boilerplate stripping. Zero
-   fidelity loss — only formatting changes.
-3. **Strategies** 🎯 — Per‑tool compression tier selection
-   (aggressive / balanced / code / prose / minimal / skip)
-4. **Truncation** ✂️ — Smart head‑and‑tail, JSON‑aware, line‑based truncation
-   for outputs over 50 K chars
-5. **Deduplication** 🪞 — Skip identical tool results across turns
-6. **Pre‑compress** 🔄 — Double‑pass: compress each large tool output
-   individually before the full list
-7. **Headroom** 🧠 — CacheAligner → ContentRouter → SmartCrusher → Kompress
-8. **Stats** 📊 — Per‑call metrics, dry‑run mode, backpressure simulation
-
-### How the pipeline works
-
-When Hermes calls the LLM, the conversation loop injects compression just before
-the API request. The compressor receives `api_messages` — the complete message
-history that will be sent to the provider — and applies each phase in order.
-
-**Phase 1 (Pre‑process)** strips formatting waste that headroom cannot detect as
-cleanly. ANSI color codes from terminal output, repeated identical log lines
-from build runs, Python tracebacks beyond the first frame, and npm/Docker
-verbose output are all removed before they reach the compressor. This is pure
-win: the tokens removed carry no semantic value.
-
-**Phase 2 (Optimize)** handles the remaining formatting overhead. Whitespace is
-normalized without changing structure (tabs become spaces, multiple consecutive
-blank lines collapse to two). Floating‑point numbers in JSON are rounded to 4
-decimal places — semantically identical for all LLM purposes, but fewer tokens.
-Absolute file paths are shortened to `~/`‑relative form. ISO 8601 timestamps
-like `2026‑06‑13T07:28:20.609Z` become `20260613‑072820`. Standard tool output
-headers and session metadata footers are stripped.
-
-**Phase 3 (Strategies)** selects the optimal compression tier per tool type. The
-system ships with six tiers, each tuned to a content category. `search_files`
-and `web_search` get the aggressive tier (target ratio 0.10, protect recent 0)
-because JSON arrays compress extremely well under SmartCrusher. `read_file` and
-`patch` get the code tier (target ratio 0.20) to preserve function signatures
-and import blocks. `terminal` and `execute_code` get the balanced tier with
-default settings. Tiny tools like `write_file`, `memory`, and `clarify` are
-skipped entirely because their output is rarely worth the compression overhead.
-
-**Phase 4 (Truncation)** activates only for outputs over 50 K characters. For
-code content, it keeps the first 5 K and last 3 K characters. For terminal logs,
-it keeps the first 100 and last 50 lines. For JSON, it truncates arrays to the
-first 100 items and preserves the object structure. The truncation threshold is
-deliberately high — it only fires on genuinely oversized outputs that would slow
-down the compression pipeline.
-
-**Phase 5 (Deduplication)** maintains an LRU cache of the last 50 tool results.
-When a tool returns content identical to a previous call in the same session,
-the message is replaced with a short reference. This is common with `read_file`
-re‑reads, repeated `search_files` queries, and idempotent `patch` operations. A
-50‑entry cache is small enough to be nearly free but large enough to catch most
-duplicate patterns.
-
-**Phase 6 (Pre‑compress)** is the double‑pass strategy. Each large tool output
-(>500 characters) is individually compressed via headroom before the full
-message list is compressed. The individual pass uses `protect_recent=0` (no
-protection) and `min_tokens_to_compress=100` to aggressively shrink each output.
-The full pass then works on the partially‑compressed list, often finding
-additional savings because the ContentRouter can now detect patterns across the
-shrunken outputs.
-
-**Phase 7 (Headroom)** is the core compression engine. It runs four sub‑phases
-internally. CacheAligner stabilises message prefixes for KV‑cache hits (disabled
-for DeepSeek and OpenAI, which do not support this). ContentRouter detects the
-content type of each message and routes it to the appropriate compressor.
-SmartCrusher handles JSON arrays with pattern detection and structural
-compression. CodeCompressor is AST‑aware for Python, JavaScript, TypeScript,
-Rust, Go, and Java. Kompress uses a quantised ONNX model for ML‑based prose
-compression. Each compressor returns a ratio (fraction of original kept), and
-the ContentRouter records the transform chain.
-
-**Phase 8 (Stats)** runs only when dev mode is active or `verbose_stats` is
-enabled in config. It records per‑call token counts, latency breakdowns by
-phase, transform chains, and per‑tool savings rates. The `StatsCollector` can
-replay the last N calls as a formatted table and compute averages across the
-session.
-
-### Provider‑specific behaviour
-
-Different LLM providers support different compression features. Hermes Compress
-delegates model routing to headroom, which detects the provider and adjusts
-automatically.
-
-| Provider      | CacheAligner      | SmartCrusher | CodeCompressor | Kompress |
-| ------------- | ----------------- | ------------ | -------------- | -------- |
-| **DeepSeek**  | Disabled          | Active       | Active         | Active   |
-| **Anthropic** | Active (KV cache) | Active       | Active         | Active   |
-| **OpenAI**    | Disabled          | Active       | Active         | Active   |
-| **Google**    | Disabled          | Active       | Active         | Active   |
-
-**DeepSeek** is the primary target. The provider's 1 M token context window
-means conversations can grow very large before summarisation kicks in.
-Compression is therefore essential for cost control — 59‑64 % savings at 8‑10 ms
-per call translates to a 2.5× longer conversation in the same budget. DeepSeek
-does not support Anthropic‑style prompt caching, so CacheAligner is disabled.
-All three content compressors remain fully active.
-
-**Anthropic** (Claude) benefits from CacheAligner because the provider's prompt
-caching API (`cache_control` breakpoints) allows re‑using KV cache entries
-across turns. Hermes Compress stabilises message prefixes to maximise cache hit
-rates. With prompt caching enabled, the effective token cost of the compressed
-context can drop to near‑zero for cache hits — only the new, uncompressed
-messages are billed.
-
-**OpenAI** and **Google** work identically to DeepSeek: CacheAligner is skipped,
-and content compressors handle the full load. Both providers charge per input
-token, so compression savings translate directly to cost reduction.
-
-### Troubleshooting
-
-**Compression is not active.** Check that `compression.headroom.enabled` is
-`true` in `~/.hermes/config.yaml`. Run `hermes-compress status` to verify the
-install patcher applied all files. If you see `already patched` for all three
-files, compression is wired into the conversation loop. Restart Hermes for
-config changes to take effect.
-
-**First API call is slow (10‑15 seconds).** This is expected. Headroom loads the
-Kompress ONNX model on first use. A warning is logged:
-`hermes-compress: first call -- headroom is loading compression models (Kompress ONNX). This may add 10-15 seconds to this request. Subsequent calls will be fast (~50-80ms).`
-If the delay is unacceptable, disable Kompress by setting `mode: token` (forces
-SmartCrusher + CodeCompressor only, no ML model load).
-
-**Compression ratio is lower than expected.** Check `protect_recent` in config.
-The default of 1 protects only the most recent message. If you see low savings,
-the tool outputs may be genuinely unique content that headroom cannot compress
-without losing fidelity. JSON‑heavy sessions (web search, file search) compress
-best. Prose‑heavy sessions (web extraction, documentation) compress less.
-
-**Headroom is not installed.** Run `pip install hermes-compress` — headroom‑ai
-is a dependency. Compression is silently disabled if headroom is missing.
-Messages pass through unchanged.
-
-**The install patcher failed.** Run `hermes-compress uninstall` to restore from
-`.bak` backups, then re‑run `hermes-compress install`. If the backups are
-missing, run `git checkout` in the hermes‑agent directory to restore the
-original files, then re‑install.
-
-<br>
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| No compression, marker appears | `hermes_compress` not in agent venv | `pip install -e .` into agent venv |
+| Plugin `not enabled` in list | `plugins.enabled` config ignored | `hermes plugins enable hermes-compress-shim` |
+| `TypeError: run_conversation()` | Shim has wrong param signature | Update to latest (uses `*args/**kwargs`) |
+| `headroom_retrieve` loops | Proxy not running | Start proxy or ignore (tool fails fast now) |
+| Terminal commands return empty | Hermes sandbox bug (not our issue) | Enable `hermes-tool-fix` plugin |
 
 ---
 
-<br>
+## Commits (Current branch)
 
-## Configuration 🎛️
-
-### Python API
-
-```python
-from hermes_compress import CompressOption
-
-option = CompressOption(
- Enabled           = True,
- Mode              = "inline",
- ProtectRecent       = 1,
- TargetRatio         = None,   # most aggressive (~15 % kept)
- MinTokensToCompress = 250,
- PrecompressTools    = True,
- AggressiveKompress  = True,
- DeduplicateResults  = True,
- VerboseStats       = True,
-)
-c = Compress(model = "deepseek-v4-pro", option = option)
+```
+d1d9a01 feat: hermes-tool-fix plugin — patches terminal_tool + read_file_tool
+6f68475 fix: headroom_retrieve fails fast when proxy not running
+6092a5f fix: add debug logging + fix ModuleNotFoundError for hermes_compress
+4e2aab5 fix: *args/**kwargs passthrough to match actual run_conversation signature
+7b36b8a feat: proxy detection + correct port in shim plugin
+ae2ed63 docs: live benchmark report v2 — 85-msg payload, per-tool breakdown, 26.2% savings
+9f225f0 fix: correct monkey-patch targets + live benchmark report
 ```
 
-### Hermes `config.yaml`
-
-```yaml
-compression:
- headroom:
-  enabled: true
-  mode: inline
-  protect_recent: 1
-  target_ratio: null
-  min_tokens_to_compress: 250
-  precompress_tools: true
-  aggressive_kompress: true
-  deduplicate_results: true
-  verbose_stats: true
-```
-
-<br>
-
 ---
 
-<br>
+## License
 
-## Benchmarks 📈
-
-### Shim Mode (inline compress via monkey-patch)
-
-| Messages | Config | Tokens Before | Tokens After | Savings | Integrity |
-|----------|--------|:---:|:---:|:---:|:---:|
-| 22 | protect_recent=1, ratio=None | 20,159 | 12,899 | **36.0%** | ✓ all content preserved |
-| 8 | protect_recent=0, ratio=0.10 | 7,242 | 2,020 | 72.1% | ⚠️ code corrupted |
-| 8 | protect_recent=1, ratio=0.10 | 7,242 | 7,242 | 0% | ✓ all protected |
-
-**Recommended**: `protect_recent=1, target_ratio=None` — safe 36‑72% on
-accumulated sessions, zero content corruption.
-
-### Production Session (DeepSeek v4-pro, max compression)
-
-| Metric                | Value               |
-| --------------------- | ------------------- |
-| **Calls**             | 9                   |
-| **Tokens saved**      | 5,361               |
-| **Total latency**     | 204 ms (23 ms/call) |
-| **Compression ratio** | ~60% per call       |
-
-### Dev Session (same model, dev bypass active)
-
-| Metric            | Value               |
-| ----------------- | ------------------- |
-| **Calls**         | 7                   |
-| **Tokens saved**  | 4,817               |
-| **Total latency** | 178 ms (25 ms/call) |
-
-### Unit Benchmark (raw headroom, 18 configs × 4 content types)
-
-| Content          | Configs | Latency (warm) | Token savings        |
-| ---------------- | ------- | -------------- | -------------------- |
-| JSON (34K chars) | 18      | 18 ms          | 0% (structural only) |
-| Code (2.9K)      | 18      | 1 ms           | 0%                   |
-| Mixed (3.7K)     | 18      | 2 ms           | 0%                   |
-| Prose (4.6K)     | 18      | 2 ms           | 0%                   |
-
-> Raw headroom reports 0% because SmartCrusher restructures content without
-> reducing token count. The full 8-phase pipeline (pre-process, optimize,
-> deduplicate, pre-compress) adds 43-60% real savings on top.
-
-### vs API Baseline
-
-Without compression, 863 messages cost ~2.3M tokens per call. With
-hermes-compress at `protect_recent=1`: **~77% reduction** in effective token
-usage through prompt caching + compression. For DeepSeek's 1M context window,
-this means ~3× longer conversations before summarization.
-
-<br>
-
----
-
-<br>
-
-## Hermes Tools 🔧
-
-Five tools registered when loaded as a Hermes plugin:
-
-| Tool                    | Description                          |
-| ----------------------- | ------------------------------------ |
-| `headroom_stats`        | Session compression statistics       |
-| `headroom_compress`     | Manually compress text / JSON / code |
-| `headroom_proxy_start`  | Start the proxy server               |
-| `headroom_proxy_stop`   | Stop the proxy server                |
-| `headroom_proxy_status` | Check proxy health                   |
-
-<br>
-
----
-
-<br>
-
-## API Reference 📖
-
-### `Compress`
-
-```python
-class Compress(model: str = "", option: CompressOption = None):
-    def compress(messages) -> CompressResult
-    def update_model(model)
-    # Properties: enabled, mode, stats
-```
-
-### `Proxy`
-
-```python
-class Proxy(port: int = 8787, host: str = "127.0.0.1", mode: str = "token"):
-    def start() -> bool
-    def stop()
-    # Properties: running, healthy, base_url
-```
-
-### `CompressResult`
-
-```python
-@dataclass
-class CompressResult:
-    messages: list[dict]
-    tokens_before: int
-    tokens_after: int
-    tokens_saved: int
-    compression_ratio: float
-    duration_ms: float
-    transforms_applied: list[str]
-    error: str | None
-    compressed: bool  # True when tokens were saved
-```
-
-### `CompressOption`
-
-```python
-@dataclass
-class CompressOption:
-    Enabled: bool = False
-    Mode: str = "inline"
-    ProtectRecent: int = 1
-    TargetRatio: float | None = None
-    MinTokensToCompress: int = 250
-    PrecompressTools: bool = False
-    AggressiveKompress: bool = False
-    DeduplicateResults: bool = False
-    VerboseStats: bool = False
-    ProxyPort: int = 8787
-    ProxyHost: str = "127.0.0.1"
-    ProxyAutoStart: bool = False
-```
-
-<br>
-
----
-
-<br>
-
-## Dev Mode 🧪
-
-```bash
-HERMES_COMPRESS_DEV = 1 hermes ...
-
-# Feature flags
-HERMES_COMPRESS_FLAGS = dry_run = 1, verbose_stats = 1, precompress_tool_outputs = 1
-
-# Simulate backpressure
-HERMES_COMPRESS_FLAGS = simulate_backpressure = 1, backpressure_delay_ms = 50
-```
-
-Hot‑reload: edit any `.py` file in the plugin directory — changes are picked up
-on the next API call without restart.
-
-<br>
-
----
-
-<br>
-
-## FAQ ❓
-
-**Does this replace the built‑in context compression?** No. Hermes' context
-compressor handles conversation length (summarization). Hermes Compress handles
-message content — compressing tool outputs and prose before they enter context.
-They are complementary.
-
-**Does this need a separate server?** Not by default. Inline mode runs headroom
-as a library in‑process. Proxy mode is optional.
-
-**What if headroom‑ai is not installed?** Compression is silently disabled —
-messages pass through unchanged.
-
-**Does this modify conversation history?** No. Only `api_messages` are
-compressed — the per‑call copy sent to the LLM. Persistent history is preserved.
-
-<br>
-
----
-
-<br>
-
-## Changelog 📝
-
-See [`CHANGELOG.md`](CHANGELOG.md).
-
-<br>
-
----
-
-<br>
-
-## License ⚖️
-
-CC0 1.0 Universal — see [`LICENSE`](LICENSE).
-
-<br>
-
-<br>
-
-<p align="center">
-	<a href="https://PlayForm.Cloud" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://PlayForm.Cloud/Dark/Image/GitHub/PlayForm.svg">
-			<source media="(prefers-color-scheme: light)" srcset="https://PlayForm.Cloud/Image/GitHub/PlayForm.svg">
-			<img width="200" alt="PlayForm" src="https://PlayForm.Cloud/Image/GitHub/PlayForm.svg">
-		</picture>
-	</a>
-</p>
-
-[Hermes]: https://GitHub.Com/NousResearch/hermes-agent
-[Hermes Compress]: https://GitHub.Com/PlayForm/HermesCompress
-[SmartCrusher]: https://GitHub.Com/chopratejas/headroom
-[CodeCompressor]: https://GitHub.Com/chopratejas/headroom
-[Kompress]: https://HuggingFace.Com/chopratejas/kompress-v2-base
+HermesCompress is part of the [PlayForm](https://playform.cloud) ecosystem.
