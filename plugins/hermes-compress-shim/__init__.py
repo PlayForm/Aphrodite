@@ -250,15 +250,18 @@ def _patch_loop():
         _dbg(f"_patched: using_proxy={using_proxy}")
 
         # ── Compression wrapper ───────────────────────────────────────
+        # ALWAYS compress inline — the proxy (cache or token mode) is
+        # transparent for Chat Completions (Hermes' API format). Only
+        # Anthropic Messages / OpenAI Responses get proxy compression.
+        # Inline compression is always safe and gives real token savings.
         def _make_wrapper(fn):
             fn_name = getattr(fn, "__name__", str(fn))
             @functools.wraps(fn)
             def _compress_hook(*a, **kw):
                 _dbg(f"_compress_hook[{fn_name}]: called — positional_args={len(a)} "
                      f"kw_keys={list(kw.keys())} "
-                     f"a[0]_type={type(a[0]).__name__ if a else 'N/A'} "
-                     f"using_proxy={using_proxy}")
-                if not using_proxy and a and isinstance(a[0], dict):
+                     f"a[0]_type={type(a[0]).__name__ if a else 'N/A'}")
+                if a and isinstance(a[0], dict):
                     api_kwargs = a[0]
                     msgs = api_kwargs.get("messages")
                     _dbg(f"_compress_hook[{fn_name}]: msgs={'PRESENT' if msgs else 'MISSING'} "
@@ -272,8 +275,7 @@ def _patch_loop():
                         _dbg(f"_compress_hook[{fn_name}]: SKIP — msgs too small or not list")
                 else:
                     _dbg(f"_compress_hook[{fn_name}]: SKIP — "
-                         f"using_proxy={using_proxy} has_args={bool(a)} "
-                         f"a0_is_dict={isinstance(a[0], dict) if a else False}")
+                         f"no args or a[0] not dict")
                 return fn(*a, **kw)
             return _compress_hook
 
