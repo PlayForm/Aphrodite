@@ -1,13 +1,9 @@
 #!/bin/bash
-# headroom cache proxy launcher — DeepSeek backend, cache-only mode
-# API key: set HEADROOM_DEEPSEEK_KEY env var or export OPENAI_API_KEY
-# Usage: bash scripts/proxy-cache.sh
+# headroom cache proxy — source .env for keys, then launch
 # Port 8787 — prefix-freeze cache (no token compression)
-
+source ~/.hermes/.env 2>/dev/null
 export HEADROOM_BACKEND=anyllm
 export HEADROOM_ANYLLM_PROVIDER=openai
-export OPENAI_API_KEY="${HEADROOM_DEEPSEEK_KEY:-$OPENAI_API_KEY}"
 export OPENAI_TARGET_API_URL="https://api.deepseek.com/v1"
 export HEADROOM_PORT=8787
-
 exec headroom proxy --port "$HEADROOM_PORT" --no-optimize
