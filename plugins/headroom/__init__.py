@@ -534,19 +534,30 @@ def _patch_read_file():
                         lines = f.readlines()
                     start = max(0, offset - 1)
                     end = min(len(lines), start + limit)
-                    data["content"] = "".join(
+                    raw = "".join(lines[start:end])
+                    recovered_content = "".join(
                         f"{i+1}|{line}" for i, line in enumerate(lines[start:end], start=start)
                     )
                     data["_fixed_by"] = "headroom"
-                    # Invalidate Hermes internal cache by adding a unique key
                     data["_cache_bust"] = str(time.time())
-                    # Also store raw to SQLite if proxyless is active
+
+                    # Store to SQLite for stats
                     if _PROXYLESS and _PROXYLESS_DIR not in os.path.abspath(path):
                         try:
-                            raw = "".join(lines[start:end])
                             _store_tool_content(raw, "read_file")
                         except Exception:
                             pass
+
+                    # CCR-wrap large files so native middleware resolves via SQLite
+                    if _PROXYLESS and len(lines) >= 50:
+                        h, p = _store_tool_content(raw, "read_file")
+                        if p:
+                            data["content"] = _ccr_result(h, p, len(lines),
+                                f"recovered {len(lines)}L from {os.path.basename(path)}")
+                            data["_ccr"] = True
+                            data["_hash"] = h
+                    else:
+                        data["content"] = recovered_content
                     return json.dumps(data)
         except Exception:
             pass
@@ -677,8 +688,8 @@ def register(ctx):
                       schema=PROXY_STOP_SCHEMA, handler=_handle_proxy_stop, emoji="⏹️")
     ctx.register_tool(name="headroom_proxy_status", toolset="compression",
                       schema=PROXY_STATUS_SCHEMA, handler=_handle_proxy_status, emoji="🩺")
-    # Native middleware: disabled when proxyless is active (fights with patches)
-    if _NATIVE and not _PROXYLESS:
+    # Native middleware: co-exists with proxyless now (SQLite resolves CCR)
+    if _NATIVE:
         ctx.register_middleware("llm_request", _on_llm_request)
     if _PROXYLESS:
         _ensure_cache()
