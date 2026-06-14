@@ -341,6 +341,37 @@ def _patch_read_file():
     mod.read_file_tool = _fixed
 
 
+def _patch_terminal():
+    """Wrap terminal_tool to detect sandbox empty-output bug."""
+    try:
+        import tools.terminal_tool as mod
+        _orig = mod.terminal_tool
+    except Exception:
+        return
+
+    import functools
+    @functools.wraps(_orig)
+    def _fixed(command, background=False, timeout=None, task_id=None,
+               force=False, workdir=None, pty=False,
+               notify_on_complete=False, watch_patterns=None):
+        result = _orig(command=command, background=background, timeout=timeout,
+                       task_id=task_id, force=force, workdir=workdir, pty=pty,
+                       notify_on_complete=notify_on_complete, watch_patterns=watch_patterns)
+        try:
+            data = json.loads(result)
+            output = data.get("output", "")
+            exit_code = data.get("exit_code", -1)
+            if exit_code == 0 and not output.strip() and command.strip():
+                data["_sandbox_empty"] = True
+                data["_hint"] = "Terminal returned exit 0 with empty output — likely sandbox bug. Try execute_code or read_file instead."
+                return json.dumps(data)
+        except Exception:
+            pass
+        return result
+
+    mod.terminal_tool = _fixed
+
+
 # ═══════════════════════════════════════
 # Register
 # ═══════════════════════════════════════
@@ -359,3 +390,4 @@ def register(ctx):
     if _NATIVE:
         ctx.register_middleware("llm_request", _on_llm_request)
     _patch_read_file()
+    _patch_terminal()
