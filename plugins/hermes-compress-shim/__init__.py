@@ -1,12 +1,10 @@
 """
 HermesCompress Shim Plugin — injects headroom compression into the conversation loop.
 
-Only two jobs: compress api_messages + provide headroom_retrieve tool.
-No measurement. No filtering. No response handling.
-
-When a local headroom proxy is active (base_url → 127.0.0.1 / localhost),
-local compression is SKIPPED — the proxy handles it.  The headroom_retrieve
-tool always works, hitting the token-mode proxy on port 8788.
+Toggle via HERMES_COMPRESS_MODE env var:
+  inline   (default) — monkey-patch AIAgent + register headroom_retrieve
+  none     — only register headroom_retrieve tool, no compression
+  tool     — no compression, no tool (use separate headroom-retrieve plugin instead)
 
 Debug: set HERMES_COMPRESS_DEBUG=1 to enable verbose diagnostics.
 """
@@ -21,6 +19,7 @@ import urllib.request
 import urllib.error
 
 DEBUG = os.environ.get("HERMES_COMPRESS_DEBUG", "") == "1"
+MODE = os.environ.get("HERMES_COMPRESS_MODE", "inline")
 
 def _dbg(msg: str) -> None:
     if DEBUG:
@@ -209,16 +208,24 @@ def _is_proxy_active(agent) -> bool:
 # ═══════════════════════════════════════════════════════════
 
 def register(ctx) -> None:
-    _dbg("register() called — registering headroom_retrieve tool")
-    ctx.register_tool(
-        name="headroom_retrieve",
-        toolset="headroom",
-        schema=HEADROOM_RETRIEVE_SCHEMA,
-        handler=_handle_headroom_retrieve,
-        emoji="🗜️",
-    )
-    _dbg("register() → calling _patch_loop()")
-    _patch_loop()
+    _dbg(f"register() called — MODE={MODE}")
+
+    if MODE in ("inline", "none"):
+        ctx.register_tool(
+            name="headroom_retrieve",
+            toolset="headroom",
+            schema=HEADROOM_RETRIEVE_SCHEMA,
+            handler=_handle_headroom_retrieve,
+            emoji="🗜️",
+        )
+    else:
+        _dbg("register() → MODE=tool, skipping headroom_retrieve (use separate plugin)")
+
+    if MODE == "inline":
+        _dbg("register() → calling _patch_loop()")
+        _patch_loop()
+    else:
+        _dbg(f"register() → MODE={MODE}, skipping compression hooks")
 
 
 def _patch_loop():
