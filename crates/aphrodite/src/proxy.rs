@@ -12,7 +12,8 @@
 //! - Injects headroom_retrieve tool definition into tool_calls when aphrodite mode
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 
 use axum::{
     body::Body,
@@ -56,6 +57,14 @@ pub struct AppState {
     /// Dev mode — verbose logging.
     pub dev: bool,
 
+    // Structured debug
+    /// Latency histogram buckets (microseconds): 1ms, 10ms, 100ms, 1s, 10s
+    pub latency_buckets: [AtomicU64; 5],
+    /// Track last N errors for hot-path analysis
+    pub last_errors: std::sync::Mutex<Vec<String>>,
+    /// Compression decision counters by content type
+    pub compressions_by_type: std::sync::Mutex<std::collections::HashMap<String, u64>>,
+
     // Stats
     pub requests_total: AtomicU64,
     pub requests_compressed: AtomicU64,
@@ -87,6 +96,15 @@ impl AppState {
                 "created": self.ccr_created.load(Ordering::Relaxed),
             },
             "tool_relay_calls": self.tool_relay_calls.load(Ordering::Relaxed),
+            "latency_buckets_us": [
+                self.latency_buckets[0].load(Ordering::Relaxed),
+                self.latency_buckets[1].load(Ordering::Relaxed),
+                self.latency_buckets[2].load(Ordering::Relaxed),
+                self.latency_buckets[3].load(Ordering::Relaxed),
+                self.latency_buckets[4].load(Ordering::Relaxed),
+            ],
+            "compressions_by_type": self.compressions_by_type.lock().map(|m| m.clone()).unwrap_or_default(),
+            "last_errors": self.last_errors.lock().map(|v| v.iter().rev().take(5).cloned().collect::<Vec<_>>()).unwrap_or_default(),
         })
     }
 
@@ -94,6 +112,25 @@ impl AppState {
         match self.mode {
             ProxyMode::Cache => CACHE_COMPRESS_THRESHOLD,
             ProxyMode::Token => TOKEN_COMPRESS_THRESHOLD,
+        }
+    }
+
+    fn record_latency(&self, d: std::time::Duration) {
+        let us = d.as_micros() as u64;
+        let bucket = if us < 1_000 { 0 } else if us < 10_000 { 1 } else if us < 100_000 { 2 } else if us < 1_000_000 { 3 } else { 4 };
+        self.latency_buckets[bucket].fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_error(&self, msg: String) {
+        if let Ok(mut v) = self.last_errors.lock() {
+            v.push(msg);
+            if v.len() > 100 { v.remove(0); }
+        }
+    }
+
+    fn record_compression(&self, ct: &str) {
+        if let Ok(mut m) = self.compressions_by_type.lock() {
+            *m.entry(ct.to_string()).or_insert(0) += 1;
         }
     }
 }
@@ -178,6 +215,9 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         notify_url: cli.notify_url.clone(),
         notify_key: cli.notify_key.clone(),
         dev: cli.dev,
+        latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
+        last_errors: Mutex::new(Vec::new()),
+        compressions_by_type: Mutex::new(HashMap::new()),
         requests_total: AtomicU64::new(0),
         requests_compressed: AtomicU64::new(0),
         tokens_saved: AtomicU64::new(0),
@@ -200,13 +240,14 @@ pub async fn proxy_handler(
     body: Bytes,
 ) -> impl IntoResponse {
     state.requests_total.fetch_add(1, Ordering::Relaxed);
+    let t0 = std::time::Instant::now();
 
     if state.dev {
         tracing::info!(
             method = %method,
             path = %path.path(),
             body_len = body.len(),
-            "aphrodite dev: incoming request"
+            "req:start"
         );
     }
 
@@ -264,11 +305,13 @@ pub async fn proxy_handler(
                 .body(Body::from(resp_body))
                 .unwrap()
         }
-        Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({"error": format!("upstream error: {}", e)})),
-        )
-            .into_response(),
+        Err(e) => {
+            state.record_error(format!("upstream: {}", e));
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({"error": format!("upstream: {}", e)})),
+            ).into_response()
+        }
     }
 }
 
@@ -342,6 +385,7 @@ async fn compress_chat_completion(
                         };
                         *content_val = serde_json::Value::String(compressed);
                         did_compress = true;
+                        state.record_compression(ct);
                     }
                 }
             }
@@ -363,6 +407,7 @@ async fn compress_chat_completion(
                                             smart_marker(&hash, args_str, ct)
                                         );
                                         did_compress = true;
+                        state.record_compression(ct);
                                     }
                                 }
                             }
