@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["crates/headroom-hermes"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.80"
+license = "Apache-2.0"
+repository = "https://github.com/PlayForm/HermesCompress"
