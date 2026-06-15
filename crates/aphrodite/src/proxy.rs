@@ -83,6 +83,8 @@ pub struct AppState {
     // Structured debug
     /// Ring buffer of last 50 request summaries
     pub request_history: std::sync::Mutex<Vec<serde_json::Value>>,
+    /// Inline CCR for tiny entries — no round-trip needed (< INLINE_CCR_THRESHOLD bytes)
+    pub inline_ccr: std::sync::Mutex<std::collections::HashMap<String, String>>,
 
     // Stats
     /// Latency histogram buckets (microseconds): 1ms, 10ms, 100ms, 1s, 10s
@@ -297,6 +299,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         last_errors: Mutex::new(Vec::new()),
         compressions_by_type: Mutex::new(HashMap::new()),
         request_history: Mutex::new(Vec::new()),
+        inline_ccr: Mutex::new(std::collections::HashMap::new()),
         requests_total: AtomicU64::new(0),
         requests_compressed: AtomicU64::new(0),
         tokens_saved: AtomicU64::new(0),
@@ -847,6 +850,7 @@ mod tests {
             tool_relay_calls: AtomicU64::new(0),
         compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
             request_history: Mutex::new(Vec::new()),
+        inline_ccr: Mutex::new(std::collections::HashMap::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
             compressions_by_type: Mutex::new(HashMap::new()),
@@ -935,6 +939,7 @@ mod tests {
             tool_relay_calls: AtomicU64::new(0),
         compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
             request_history: Mutex::new(Vec::new()),
+        inline_ccr: Mutex::new(std::collections::HashMap::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
             compressions_by_type: Mutex::new(HashMap::new()),
