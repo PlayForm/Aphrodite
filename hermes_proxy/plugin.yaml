@@ -1,7 +1,0 @@
-name: hermes-proxy-auto
-version: 1.0.0
-description: "Auto-start headroom cache proxy on Hermes startup"
-kind: plugin
-provides_hooks:
-  - session_start
-  - session_end
