@@ -246,14 +246,29 @@ pub async fn proxy_handler(
     body: Bytes,
 ) -> impl IntoResponse {
     state.requests_total.fetch_add(1, Ordering::Relaxed);
-    let _t0 = std::time::Instant::now();
+    let t0 = std::time::Instant::now();
+    let req_id = uuid::Uuid::new_v4().to_string();
+    let req_id_short = &req_id[..8];
 
     if state.dev {
+        // Log incoming headers
+        let mut hdr_log = String::new();
+        for (k, v) in headers.iter() {
+            let val = v.to_str().unwrap_or("?");
+            if k.as_str().to_lowercase() != "authorization" {
+                hdr_log.push_str(&format!("  {}: {}", k.as_str(), if val.len() > 80 { &val[..80] } else { val }));
+            } else {
+                hdr_log.push_str("  authorization: [REDACTED]");
+            }
+            hdr_log.push('\n');
+        }
         tracing::info!(
+            id = %req_id_short,
             method = %method,
             path = %path.path(),
             body_len = body.len(),
-            "req:start"
+            headers = %hdr_log,
+            ">>> REQ"
         );
     }
 
@@ -293,11 +308,16 @@ pub async fn proxy_handler(
                 ).await {
                     state.requests_compressed.fetch_add(1, Ordering::Relaxed);
                     if state.dev {
+                        let elapsed = t0.elapsed();
+                        let comp_len = serde_json::to_vec(&compressed).map(|v| v.len()).unwrap_or(0);
                         tracing::info!(
+                            id = %req_id_short,
                             status = %status,
-                            resp_len = resp_body.len(),
-                            compressed_len = serde_json::to_vec(&compressed).map(|v| v.len()).unwrap_or(0),
-                            "aphrodite dev: compressed response"
+                            original_len = resp_body.len(),
+                            compressed_len = comp_len,
+                            ratio = format!("{:.1}x", resp_body.len() as f64 / comp_len.max(1) as f64),
+                            elapsed_ms = elapsed.as_millis(),
+                            "<<< COMPRESSED"
                         );
                     }
                     let body = serde_json::to_vec(&compressed).unwrap_or_else(|_| resp_body.to_vec());
@@ -309,6 +329,22 @@ pub async fn proxy_handler(
                 }
             }
 
+            if state.dev {
+                let elapsed = t0.elapsed();
+                let body_preview = if resp_body.len() > 500 {
+                    format!("{}... ({} total)", std::str::from_utf8(&resp_body[..200]).unwrap_or("?"), resp_body.len())
+                } else {
+                    std::str::from_utf8(&resp_body).unwrap_or("?").to_string()
+                };
+                tracing::info!(
+                    id = %req_id_short,
+                    status = %status,
+                    resp_len = resp_body.len(),
+                    elapsed_ms = elapsed.as_millis(),
+                    body = %body_preview,
+                    "<<< RES"
+                );
+            }
             Response::builder()
                 .status(status)
                 .body(Body::from(resp_body))
@@ -316,6 +352,14 @@ pub async fn proxy_handler(
         }
         Err(e) => {
             state.record_error(format!("upstream: {}", e));
+            if state.dev {
+                tracing::error!(
+                    id = %req_id_short,
+                    error = %e,
+                    elapsed_ms = t0.elapsed().as_millis(),
+                    "<<< ERR"
+                );
+            }
             (
                 StatusCode::BAD_GATEWAY,
                 Json(serde_json::json!({"error": format!("upstream: {}", e)})),
