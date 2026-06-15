@@ -1,7 +1,7 @@
 """
 hermes-proxy-aphrodite v1.0.0 — Auto-start aphrodite proxies on session start.
 - :9797 — aphrodite cache mode (in-memory CCR, >8KB threshold)
-- :9798 — aphrodite token mode (SQLite CCR, tool relay, >1KB threshold)
+- :9798 — aphrodite aphrodite mode (SQLite CCR, tool relay, >1KB threshold)
 
 Reads keys from ~/.hermes/.env.
 """

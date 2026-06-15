@@ -9,7 +9,7 @@
 //! Chat Completions API:
 //! - Forwards POST /v1/chat/completions to DeepSeek
 //! - Intercepts responses, compresses tool output via CCR
-//! - Injects headroom_retrieve tool definition into tool_calls when token mode
+//! - Injects headroom_retrieve tool definition into tool_calls when aphrodite mode
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -34,7 +34,7 @@ use crate::config::{Cli, ProxyMode};
 
 /// Content size threshold for cache mode compression (8KB).
 const CACHE_COMPRESS_THRESHOLD: usize = 8192;
-/// Content size threshold for token mode compression (1KB).
+/// Content size threshold for aphrodite mode compression (1KB).
 const TOKEN_COMPRESS_THRESHOLD: usize = 1024;
 /// Chat Completions API path.
 const CHAT_COMPLETIONS_PATH: &str = "/v1/chat/completions";
@@ -53,6 +53,8 @@ pub struct AppState {
     pub tool_relay: bool,
     pub notify_url: Option<String>,
     pub notify_key: Option<String>,
+    /// Dev mode — verbose logging.
+    pub dev: bool,
 
     // Stats
     pub requests_total: AtomicU64,
@@ -69,7 +71,7 @@ impl AppState {
         serde_json::json!({
             "mode": match self.mode {
                 ProxyMode::Cache => "cache",
-                ProxyMode::Token => "token",
+                ProxyMode::Aphrodite => "aphrodite",
             },
             "proxy": "aphrodite",
             "ccr_backend": if self.ccr.is_some() { "enabled" } else { "none" },
@@ -91,7 +93,7 @@ impl AppState {
     fn compress_threshold(&self) -> usize {
         match self.mode {
             ProxyMode::Cache => CACHE_COMPRESS_THRESHOLD,
-            ProxyMode::Token => TOKEN_COMPRESS_THRESHOLD,
+            ProxyMode::Aphrodite => TOKEN_COMPRESS_THRESHOLD,
         }
     }
 }
@@ -148,7 +150,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         .build()?;
 
     let ccr: Option<Arc<dyn CcrStore>> = match cli.mode {
-        ProxyMode::Token if !cli.no_ccr_marker => {
+        ProxyMode::Aphrodite if !cli.no_ccr_marker => {
             let store = SqliteCcrStore::open(&cli.ccr_db_path, cli.ccr_ttl_seconds)
                 .map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
             Some(Arc::new(store))
@@ -169,12 +171,13 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         model: cli.model.clone(),
         api_key: cli.deepseek_key.clone(),
         ccr,
-        inject_tool: !cli.no_ccr_inject_tool && matches!(cli.mode, ProxyMode::Token),
+        inject_tool: !cli.no_ccr_inject_tool && matches!(cli.mode, ProxyMode::Aphrodite),
         add_markers: !cli.no_ccr_marker,
         mode: cli.mode,
         tool_relay: cli.tool_relay,
         notify_url: cli.notify_url.clone(),
         notify_key: cli.notify_key.clone(),
+        dev: cli.dev,
         requests_total: AtomicU64::new(0),
         requests_compressed: AtomicU64::new(0),
         tokens_saved: AtomicU64::new(0),
@@ -197,6 +200,15 @@ pub async fn proxy_handler(
     body: Bytes,
 ) -> impl IntoResponse {
     state.requests_total.fetch_add(1, Ordering::Relaxed);
+
+    if state.dev {
+        tracing::info!(
+            method = %method,
+            path = %path.path(),
+            body_len = body.len(),
+            "aphrodite dev: incoming request"
+        );
+    }
 
     let deepseek_path = path.path().trim_start_matches('/');
     let url = format!("{}/{}", state.deepseek_url.trim_end_matches('/'), deepseek_path);
@@ -230,6 +242,14 @@ pub async fn proxy_handler(
                     &state, &resp_body,
                 ).await {
                     state.requests_compressed.fetch_add(1, Ordering::Relaxed);
+                    if state.dev {
+                        tracing::info!(
+                            status = %status,
+                            resp_len = resp_body.len(),
+                            compressed_len = serde_json::to_vec(&compressed).map(|v| v.len()).unwrap_or(0),
+                            "aphrodite dev: compressed response"
+                        );
+                    }
                     let body = serde_json::to_vec(&compressed).unwrap_or_else(|_| resp_body.to_vec());
                     return Response::builder()
                         .status(status)
@@ -287,14 +307,14 @@ async fn compress_chat_completion(
                         let hash = compute_key(content.as_bytes());
                         ccr.put(&hash, content);
 
-                        // Cache mode: keep a preview, token mode: marker only
+                        // Cache mode: keep a preview, aphrodite mode: marker only
                         let compressed = match state.mode {
                             ProxyMode::Cache => {
                                 // Lightweight: show preview + marker
                                 let preview = &content[..content.len().min(512)];
                                 format!("[{}] {}", marker_for(&hash), preview)
                             }
-                            ProxyMode::Token => {
+                            ProxyMode::Aphrodite => {
                                 // Aggressive: marker only
                                 if state.add_markers {
                                     marker_for(&hash)
@@ -332,7 +352,7 @@ async fn compress_chat_completion(
                     }
                 }
 
-                // Token mode: inject headroom_retrieve tool
+                // Aphrodite mode: inject headroom_retrieve tool
                 if state.inject_tool {
                     let retrieve_tool = serde_json::json!({
                         "type": "function",
@@ -460,13 +480,128 @@ pub async fn handle_ccr_list(
             "entries": ccr.len(),
             "backend": match state.mode {
                 ProxyMode::Cache => "in_memory",
-                ProxyMode::Token => "sqlite",
+                ProxyMode::Aphrodite => "sqlite",
             },
             "mode": match state.mode {
                 ProxyMode::Cache => "cache",
-                ProxyMode::Token => "token",
+                ProxyMode::Aphrodite => "aphrodite",
             },
         })),
         None => Json(serde_json::json!({"entries": 0, "message": "CCR not enabled"})),
+    }
+}
+
+
+// ── Tests ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compress_threshold_cache() {
+        let state = AppState {
+            client: HttpClient::new(),
+            deepseek_url: "https://api.deepseek.com".into(),
+            model: "test".into(),
+            api_key: "test".into(),
+            ccr: None,
+            inject_tool: false,
+            add_markers: false,
+            mode: ProxyMode::Cache,
+            tool_relay: false,
+            notify_url: None,
+            notify_key: None,
+            dev: false,
+            requests_total: AtomicU64::new(0),
+            requests_compressed: AtomicU64::new(0),
+            tokens_saved: AtomicU64::new(0),
+            ccr_hits: AtomicU64::new(0),
+            ccr_misses: AtomicU64::new(0),
+            ccr_created: AtomicU64::new(0),
+            tool_relay_calls: AtomicU64::new(0),
+        };
+        assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
+    }
+
+    #[test]
+    fn test_compress_threshold_aphrodite() {
+        let state = AppState {
+            mode: ProxyMode::Aphrodite,
+            ..test_state()
+        };
+        assert_eq!(state.compress_threshold(), TOKEN_COMPRESS_THRESHOLD);
+    }
+
+    #[test]
+    fn test_stats_json_modes() {
+        let cache = test_state();
+        let stats = cache.stats_json();
+        assert_eq!(stats["mode"], "cache");
+        assert_eq!(stats["proxy"], "aphrodite");
+
+        let mut aph = test_state();
+        aph.mode = ProxyMode::Aphrodite;
+        let stats = aph.stats_json();
+        assert_eq!(stats["mode"], "aphrodite");
+    }
+
+    #[test]
+    fn test_ccr_create_response() {
+        let resp = CcrCreateResponse {
+            hash: "abc123".into(),
+            compression_ratio: 2.5,
+            original_size: 100,
+            compressed_size: 40,
+        };
+        assert_eq!(resp.hash, "abc123");
+        assert!((resp.compression_ratio - 2.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_tool_relay_response_sync() {
+        let resp = ToolRelayResponse {
+            success: true,
+            result: Some(serde_json::json!({"found": true})),
+            error: None,
+            async_call: false,
+        };
+        assert!(resp.success);
+        assert!(!resp.async_call);
+    }
+
+    #[test]
+    fn test_tool_relay_response_async() {
+        let resp = ToolRelayResponse {
+            success: true,
+            result: None,
+            error: None,
+            async_call: true,
+        };
+        assert!(resp.async_call);
+    }
+
+    fn test_state() -> AppState {
+        AppState {
+            client: HttpClient::new(),
+            deepseek_url: "https://api.deepseek.com".into(),
+            model: "deepseek-v4-pro".into(),
+            api_key: "test".into(),
+            ccr: None,
+            inject_tool: false,
+            add_markers: false,
+            mode: ProxyMode::Cache,
+            tool_relay: false,
+            notify_url: None,
+            notify_key: None,
+            dev: false,
+            requests_total: AtomicU64::new(0),
+            requests_compressed: AtomicU64::new(0),
+            tokens_saved: AtomicU64::new(0),
+            ccr_hits: AtomicU64::new(0),
+            ccr_misses: AtomicU64::new(0),
+            ccr_created: AtomicU64::new(0),
+            tool_relay_calls: AtomicU64::new(0),
+        }
     }
 }
