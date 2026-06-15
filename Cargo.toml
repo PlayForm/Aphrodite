@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/headroom-hermes"]
-exclude = ["crates/headroom-token"]
+exclude = ["crates/aphrodite"]
 
 [workspace.package]
 edition = "2021"
