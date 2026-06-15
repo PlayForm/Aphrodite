@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
         "aphrodite starting"
     );
 
-    let mut app = Router::new()
+    let app = Router::new()
         .route("/health", get(|| async { "ok" }))
         .route("/stats", get({
             let s = state.clone();
