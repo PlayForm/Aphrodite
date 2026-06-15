@@ -115,10 +115,11 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
             move || async move {
                 let stats = s.stats_json();
                 let mut out = String::new();
+                let mode_str = stats["mode"].as_str().unwrap_or("unknown");
                 out.push_str(&format!("aphrodite_requests_total{{mode=\"{}\"}} {}\n",
-                    stats["mode"], stats["requests"]["total"]));
+                    mode_str, stats["requests"]["total"]));
                 out.push_str(&format!("aphrodite_requests_compressed{{mode=\"{}\"}} {}\n",
-                    stats["mode"], stats["requests"]["compressed"]));
+                    mode_str, stats["requests"]["compressed"]));
                 out.push_str(&format!("aphrodite_tokens_saved {}\n", stats["tokens_saved"]));
                 out.push_str(&format!("aphrodite_ccr_hits {}\n", stats["ccr"]["hits"]));
                 out.push_str(&format!("aphrodite_ccr_misses {}\n", stats["ccr"]["misses"]));
