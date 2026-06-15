@@ -1,5 +1,4 @@
 # aphrodite.toml — Multi-proxy configuration
-# Define any number of proxy listeners with per-listener settings.
 
 [defaults]
 api_url = "https://api.deepseek.com"
