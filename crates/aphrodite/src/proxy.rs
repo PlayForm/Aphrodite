@@ -223,7 +223,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
         last_errors: Mutex::new(Vec::new()),
         compressions_by_type: Mutex::new(HashMap::new()),
-        request_history: std::sync::Mutex::new(Vec::new()),
+        request_history: Mutex::new(Vec::new()),
         requests_total: AtomicU64::new(0),
         requests_compressed: AtomicU64::new(0),
         tokens_saved: AtomicU64::new(0),
@@ -601,6 +601,8 @@ mod tests {
 
     #[test]
     fn test_compress_threshold_cache() {
+        use std::sync::Mutex;
+        use std::collections::HashMap;
         let state = AppState {
             client: HttpClient::new(),
             api_url: "https://api.deepseek.com".into(),
@@ -614,14 +616,17 @@ mod tests {
             notify_url: None,
             notify_key: None,
             dev: false,
-            request_history: std::sync::Mutex::new(Vec::new()),
-        requests_total: AtomicU64::new(0),
+                    requests_total: AtomicU64::new(0),
             requests_compressed: AtomicU64::new(0),
             tokens_saved: AtomicU64::new(0),
             ccr_hits: AtomicU64::new(0),
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
+            request_history: Mutex::new(Vec::new()),
+            latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
+            last_errors: Mutex::new(Vec::new()),
+            compressions_by_type: Mutex::new(HashMap::new()),
         };
         assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
     }
@@ -684,6 +689,8 @@ mod tests {
     }
 
     fn test_state() -> AppState {
+        use std::sync::Mutex;
+        use std::collections::HashMap;
         AppState {
             client: HttpClient::new(),
             api_url: "https://api.deepseek.com".into(),
@@ -705,6 +712,9 @@ mod tests {
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
+            latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
+            last_errors: Mutex::new(Vec::new()),
+            compressions_by_type: Mutex::new(HashMap::new()),
         }
     }
 }
