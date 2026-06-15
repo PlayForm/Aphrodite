@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.8"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.17.0"        # plugin version
+BIN_VERSION = "v0.5.9"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.18.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
