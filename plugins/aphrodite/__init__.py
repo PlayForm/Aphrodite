@@ -1,10 +1,12 @@
 """
-aphrodite v1.8.0 — Auto-install + launch aphrodite proxies.
+aphrodite v1.8.1 - Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 - Recursive CCR resolution, session-scoped stores
 - Context engine (ContextEngine subclass), extensible hooks
-- 4 tools: headroom_retrieve/compress/stats + aphrodite_rebuild
+- 4 tools: aphrodite_retrieve/compress/stats + aphrodite_rebuild
+- Re-compression guard: skips content with existing CCR markers
+- Read-intent detection in pre_llm_hook
 - All thresholds configurable via env vars (see _cfg_int)
 
 On install: downloads pre-built binary from GitHub releases.
@@ -16,7 +18,7 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
 BIN_VERSION = "v0.2.0"          # binary download version
-PLUGIN_VERSION = "1.8.0"        # plugin version
+PLUGIN_VERSION = "1.8.1"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -41,7 +43,7 @@ DEBUG_LOGGING         = os.environ.get("APHRODITE_DEBUG", "") == "1"
 # Dev mode: skip all proxy routing
 _DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 if _DEV:
-    _log.warning("aphrodite DEV MODE — plugin disabled, use cargo watch for proxies")
+    _log.warning("aphrodite DEV MODE - plugin disabled, use cargo watch for proxies")
 if DEBUG_LOGGING:
     _log.setLevel(logging.DEBUG)
     _log.debug("aphrodite v%s debug logging enabled | engine_threshold=%s protect_first=%s protect_last=%s min_msgs=%s tool_token=%s tool_cache=%s term=%s inline=%s",
@@ -150,7 +152,7 @@ def _download_binary() -> bool:
         _log.info("aphrodite binary installed to %s", BINARY)
         return True
     except Exception as e:
-        _log.warning("download failed: %s — falling back to cargo build", e)
+        _log.warning("download failed: %s - falling back to cargo build", e)
         return False
 
 
@@ -173,7 +175,7 @@ def _ensure_binary() -> bool:
         _log.info("copied local binary to %s", BINARY)
         return True
     
-    _log.error("no binary found — install cargo or download manually from %s/releases", REPO)
+    _log.error("no binary found - install cargo or download manually from %s/releases", REPO)
     return False
 
 
@@ -208,7 +210,7 @@ def _start(name, env):
     port = PORTS[name]
     key = env.get("APHRODITE_API_KEY", "")
     if not key:
-        _log.warning("APHRODITE_API_KEY not set in env — proxy won't authenticate")
+        _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
         return
     
     args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key]
@@ -230,7 +232,7 @@ def _start(name, env):
 
 def on_start(**kw):
     if not _ensure_binary():
-        _log.error("cannot start — binary not available")
+        _log.error("cannot start - binary not available")
         return
     
     env = {**os.environ, **_load_env()}
@@ -320,7 +322,7 @@ def _compress_handler(args=None, **kwargs):
 
 
 COMPRESS_SCHEMA = {
-    "name": "headroom_compress",
+    "name": "aphrodite_compress",
     "description": "Compress content into CCR via aphrodite proxy for later retrieval.",
     "parameters": {
         "type": "object",
@@ -331,7 +333,7 @@ COMPRESS_SCHEMA = {
     }
 }
 RETRIEVE_SCHEMA = {
-    "name": "headroom_retrieve",
+    "name": "aphrodite_retrieve",
     "description": "Resolve CCR markers to original content via aphrodite proxy. Recursively resolves nested CCR markers up to 3 levels deep.",
     "parameters": {
         "type": "object",
@@ -354,7 +356,7 @@ def _transform_tool_result(
     """Compress tool outputs via CCR. Proxy first, inline fallback when proxy down.
     
     Dual-mode: proxy CCR (token >1KB, cache >8KB) with inline fallback (>4KB).
-    Works without proxy — no provider switch required.
+    Works without proxy - no provider switch required.
     """
     if not result or not isinstance(result, str) or not result.strip():
         return result
@@ -364,12 +366,16 @@ def _transform_tool_result(
     cache_alive = _alive(PORTS["cache"])
     proxy_available = token_alive or cache_alive
 
-    skip = {"read_file", "read_terminal", "headroom_retrieve", "headroom_stats"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo", "headroom_retrieve", "headroom_stats"}
+    skip = {"read_file", "read_terminal", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
     if tool_name in skip:
         return result
 
     threshold = 1024 if token_alive else 8192 if cache_alive else INLINE_THRESHOLD
     if len(result) < threshold:
+        return result
+
+    # Don't re-compress content that already has CCR markers (retrieved/compressed)
+    if _CCR_RE.search(result):
         return result
 
     preview = result[:120].replace('\\n', ' ').strip()
@@ -504,9 +510,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     ├─ Old turn summaries: compressed to CCR, cataloged here
     └─ Everything else: raw user/assistant text (Hermes keeps it)
 
-    STRATEGY: Provide catalog so LLM uses headroom_retrieve(hash)
+    STRATEGY: Provide catalog so LLM uses aphrodite_retrieve(hash)
     instead of scanning 300+ raw messages. Each CCR item below is
-    retrievable — the LLM should fetch only what's relevant.
+    retrievable - the LLM should fetch only what's relevant.
     """
     if _DEV: return
     if not conversation_history or not isinstance(conversation_history, list):
@@ -553,9 +559,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     kept = len(turns) - len(old_turns)
                     compress_hint = (
                         f"  [TURN ARCHIVE] CCR:{ccr['hash'][:12]} | "
-                        f"turns T{turns[0]['id']}–T{old_turns[-1]['id']} "
+                        f"turns T{turns[0]['id']}-T{old_turns[-1]['id']} "
                         f"({len(old_turns)} turns compressed, last {kept} raw)\n"
-                        f"  retrieve: headroom_retrieve({ccr['hash'][:12]})"
+                        f"  retrieve: aphrodite_retrieve({ccr['hash'][:12]})"
                     )
             except Exception:
                 pass
@@ -595,7 +601,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     preview = _extract_preview(m, conversation_history)
                     parts.append(f"      CCR:{m['hash'][:8]} | {_fmt_size(m['size'])} | {preview}")
                 if len(items) > visible:
-                    parts.append(f"      ... +{len(items)-visible} more (use headroom_retrieve)")
+                    parts.append(f"      ... +{len(items)-visible} more (use aphrodite_retrieve)")
         
         # Conversation memory
         if _conv_index:
@@ -605,9 +611,27 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         # Context hint
         if ctx_len > 20:
             if ctx_len > 100:
-                parts.append(f"  ⚠ context={ctx_len} msgs — prefer headroom_retrieve over scanning")
+                parts.append(f"  ⚠ context={ctx_len} msgs - prefer aphrodite_retrieve over scanning")
             else:
                 parts.append(f"  context={ctx_len} msgs")
+
+        # ── 4. Read-intent detection ──────────────────────────
+        READ_KEYWORDS = {"read", "show", "view", "get", "cat", "display",
+                         "retrieve", "fetch", "look", "see", "open",
+                         "inspect", "check", "print", "dump", "output"}
+        last_user = user_message or ""
+        if isinstance(conversation_history, list):
+            for msg in reversed(conversation_history):
+                if msg.get("role") == "user":
+                    last_user = str(msg.get("content", ""))[:200].lower()
+                    break
+        words = set(last_user.lower().split())
+        has_read_intent = bool(words & READ_KEYWORDS)
+        if has_read_intent and markers:
+            recent_markers = markers[-3:]
+            parts.append("  intent=read | recent CCRs available: " +
+                         " ".join(f"aphrodite_retrieve({m['hash'][:8]})"
+                                  for m in recent_markers))
 
     if parts:
         return "\n".join(parts)
@@ -660,6 +684,10 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     if len(output) < 2048:  # 2KB min for terminal compression
         return output
 
+    # Don't re-compress content that already has CCR markers (retrieved/compressed)
+    if _CCR_RE.search(output):
+        return output
+
     preview = output[:200].replace('\n', ' ').strip()
     
     # Try proxy compression first
@@ -668,13 +696,13 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         ccr = _compress_via_proxy(output, target)
         if ccr:
             h, _ = ccr
-            return f'[CCR:{h}|terminal|{len(output)}] {preview}…(use headroom_retrieve)'
+            return f'[CCR:{h}|terminal|{len(output)}] {preview}…(use aphrodite_retrieve)'
     
     # Fallback: inline compression
     if len(output) >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(output)
-            return f'[CCR:{h}|terminal|{len(output)}|inline] {preview}…(use headroom_retrieve)'
+            return f'[CCR:{h}|terminal|{len(output)}|inline] {preview}…(use aphrodite_retrieve)'
         except Exception:
             pass
     return output
@@ -740,7 +768,7 @@ def _stats_handler(args=None, **kwargs):
 
 
 STATS_SCHEMA = {
-    "name": "headroom_stats",
+    "name": "aphrodite_stats",
     "description": "Check aphrodite proxy health, CCR stats, engine compression status. Use when debugging compression or checking if proxy is alive.",
     "parameters": {"type": "object", "properties": {}}
 }
@@ -760,17 +788,17 @@ def register(ctx):
         handler=_rebuild_handler,
     )
     ctx.register_tool(
-        name="headroom_compress",
+        name="aphrodite_compress",
         schema=COMPRESS_SCHEMA,
         handler=_compress_handler,
     )
     ctx.register_tool(
-        name="headroom_retrieve",
+        name="aphrodite_retrieve",
         schema=RETRIEVE_SCHEMA,
         handler=_retrieve_handler,
     )
     ctx.register_tool(
-        name="headroom_stats",
+        name="aphrodite_stats",
         schema=STATS_SCHEMA,
         handler=_stats_handler,
     )
@@ -780,7 +808,7 @@ def register(ctx):
         _log.info("aphrodite context engine registered")
     except Exception as e:
         _log.debug("context engine registration skipped: %s", e)
-    _log.info("aphrodite v1.7.0 registered — %d tools + context engine + hooks", 4)
+    _log.info("aphrodite v1.8.1 registered - %d tools + context engine + hooks", 4)
 
 
 # ── Context Engine (plugs into Hermes compress() pipeline) ─────
@@ -817,8 +845,8 @@ class AphroditeContextEngine(ContextEngine):
     """CCR-based context compression engine for Hermes.
 
     Replaces built-in summarization compressor with CCR offloading.
-    Extensible via Hermes hooks — other plugins can listen to:
-      - ``aphrodite_engine_compressed`` — fired after each compression
+    Extensible via Hermes hooks - other plugins can listen to:
+      - ``aphrodite_engine_compressed`` - fired after each compression
 
     Set ``context.engine: aphrodite`` in config.yaml to activate.
     Works with proxy (token/cache) or inline fallback (zlib).
@@ -852,7 +880,7 @@ class AphroditeContextEngine(ContextEngine):
             self.threshold_tokens = 1  # always above threshold
 
     def should_compress(self, prompt_tokens=None):
-        return True  # always compress — emulate token proxy internally
+        return True  # always compress - emulate token proxy internally
 
     def compress(self, messages, current_tokens=None, focus_topic=None):
         """Offload middle messages to CCR, keep head+tail raw.
@@ -928,7 +956,7 @@ class AphroditeContextEngine(ContextEngine):
             f"[CONTEXT COMPRESSED: {len(middle)} messages → "
             f"CCR:{hash_val}|{size_str}]\n"
             f"These messages were offloaded to reduce context. "
-            f"Retrieve with: headroom_retrieve({hash_val}).\n"
+            f"Retrieve with: aphrodite_retrieve({hash_val}).\n"
             f"The {self.protect_last_n} messages below are your active context."
         )
 
@@ -982,7 +1010,7 @@ class AphroditeContextEngine(ContextEngine):
         global _conv_index, _turn_counter
         _conv_index.clear()
         _turn_counter = 0
-        _log.info("v1.7.0: session reset — inline store + memory cleared")
+        _log.info("v1.7.0: session reset - inline store + memory cleared")
 
     def on_session_start(self, session_id="", **kw):
         self.session_id = session_id
