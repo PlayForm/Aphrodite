@@ -107,6 +107,7 @@ def start(key: str, foreground: bool = False) -> bool:
             "--backend", "openai",
             "--openai-api-url", DEEPSEEK_URL,
             "--code-aware",
+            "--no-rate-limit",
         ]
 
         if foreground:

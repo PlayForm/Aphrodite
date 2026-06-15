@@ -482,8 +482,10 @@ def _on_llm_request(**kwargs):
     # Resolve CCR markers (returns new list, no mutation)
     msgs, _ = _resolve_ccr_in_messages(msgs)
 
-    # If direct API, compress inline — but protect sandbox-fixed messages
-    if not using_proxy and len(msgs) > 2:
+    # Compress inline — headroom proxy doesn't touch Chat Completions format,
+    # so there's no double-compression risk when routing through it.
+    # Still protect sandbox-fixed messages from compression.
+    if len(msgs) > 2:
         # Temporarily mark fixed messages as user (protected from compression)
         saved = {}
         for i in fixed_indices:

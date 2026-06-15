@@ -1,0 +1,48 @@
+[package]
+name = "headroom-token"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Headroom token-mode proxy — CCR-enabled, code-aware, DeepSeek forwarding. Standalone binary for Hermes agent use."
+
+[[bin]]
+name = "headroom-token"
+path = "src/main.rs"
+
+[dependencies]
+# Headroom core — CCR types, compression, SQLite store
+headroom-core = { path = "../../Documentation/Module/headroom/crates/headroom-core" }
+
+# HTTP server
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "io-util", "time"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "request-id", "cors"] }
+
+# HTTP client (forwarding to DeepSeek)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "fmt"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Utilities
+bytes = "1"
+futures = "0.3"
+futures-util = "0.3"
+url = "2"
+http = "1"
+http-body-util = "0.1"
+hyper = "1"
+uuid = { version = "1", features = ["v4"] }

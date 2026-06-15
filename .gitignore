@@ -15,4 +15,5 @@ build/
 .env
 .hermes/
 reports/session_accumulator.json
-..bfg-report/
+.bfg-report/
+.headroom
