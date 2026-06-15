@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.14"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.23.0"        # plugin version
+BIN_VERSION = "v0.5.15"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.24.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -346,6 +346,7 @@ def _compress_handler(args=None, **kwargs):
     """Compress content into CCR via aphrodite proxy."""
     args = args if isinstance(args, dict) else {}
     content = args.get("content", "")
+    type_hint = args.get("type", "text")
     if not content:
         return '{"error": "missing content parameter"}'
     try:
@@ -357,18 +358,24 @@ def _compress_handler(args=None, **kwargs):
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())
-        return json.dumps({"hash": result.get("hash"), "compression_ratio": result.get("compression_ratio")})
+        return json.dumps({
+            "hash": result.get("hash"),
+            "type": type_hint,
+            "size": len(content),
+            "compression_ratio": result.get("compression_ratio")
+        })
     except Exception as e:
         return f'{{"error": "compress failed: {str(e)}"}}'
 
 
 COMPRESS_SCHEMA = {
     "name": "aphrodite_compress",
-    "description": "Compress content into CCR via aphrodite proxy for later retrieval.",
+    "description": "Compress content into CCR via aphrodite proxy for later retrieval. Specify type for adaptive compression: code, log, diff, error, json, build_output.",
     "parameters": {
         "type": "object",
         "properties": {
-            "content": {"type": "string", "description": "Content to compress and store in CCR"}
+            "content": {"type": "string", "description": "Content to compress and store in CCR"},
+            "type": {"type": "string", "description": "Optional: content type hint — code, log, diff, error, json, build_output, text"}
         },
         "required": ["content"]
     }
