@@ -18,8 +18,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.47"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.56.0"        # plugin version
+BIN_VERSION = "v0.5.48"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.57.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1472,9 +1472,9 @@ class AphroditeContextEngine(ContextEngine):
         0 = never compress (disabled). 50 = compress at 50% fill."""
         if self.threshold_percent == 0:
             return False  # disabled
-        tokens = prompt_tokens or self.last_prompt_tokens
-        if not tokens or not self.context_length:
-            return False  # can't calculate — don't compress blindly
+        tokens = prompt_tokens or self.last_prompt_tokens or 1  # fallback: always had 1 token
+        if not self.context_length:
+            return False
         pct = (tokens / self.context_length) * 100
         return pct >= self.threshold_percent
 
