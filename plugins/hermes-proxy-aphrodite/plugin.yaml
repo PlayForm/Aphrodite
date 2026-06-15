@@ -1,0 +1,6 @@
+name: hermes-proxy-aphrodite
+version: 1.0.0
+description: "Auto-start aphrodite proxies on Hermes startup — cache (:9797) + token (:9798)"
+kind: plugin
+provides_hooks:
+  - session_start
