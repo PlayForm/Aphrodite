@@ -87,3 +87,68 @@ pub struct Cli {
     #[arg(long, default_value = "300")]
     pub timeout: u64,
 }
+
+
+/// Multi-proxy configuration loaded from aphrodite.toml.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct MultiConfig {
+    pub defaults: Option<Defaults>,
+    pub proxies: Vec<ProxyConfig>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct Defaults {
+    pub api_url: Option<String>,
+    pub model: Option<String>,
+    pub ccr_ttl_seconds: Option<u64>,
+    pub api_key: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ProxyConfig {
+    pub name: Option<String>,
+    pub listen: String,
+    pub mode: Option<String>,
+    pub api_key: Option<String>,
+    pub api_url: Option<String>,
+    pub model: Option<String>,
+    pub tool_relay: Option<bool>,
+    pub dev: Option<bool>,
+    pub ccr_ttl_seconds: Option<u64>,
+    pub ccr_db_path: Option<String>,
+}
+
+impl MultiConfig {
+    /// Load from aphrodite.toml in the current directory.
+    pub fn load() -> anyhow::Result<Self> {
+        let content = std::fs::read_to_string("aphrodite.toml")?;
+        Ok(toml::from_str(&content)?)
+    }
+
+    /// Resolve a ProxyConfig with defaults applied.
+    pub fn resolve(&self, cfg: &ProxyConfig) -> Cli {
+        let d = self.defaults.as_ref();
+        Cli {
+            mode: match cfg.mode.as_deref().unwrap_or("cache") {
+                "token" => ProxyMode::Token,
+                _ => ProxyMode::Cache,
+            },
+            listen: cfg.listen.parse().unwrap_or_else(|_| "127.0.0.1:8788".parse().unwrap()),
+            api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.deepseek.com".into()),
+            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).unwrap_or_default(),
+            model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "deepseek-v4-pro".into()),
+            max_context: 1_000_000,
+            max_output: 384_000,
+            ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| ".headroom/aphrodite-ccr.db".into()),
+            ccr_ttl_seconds: cfg.ccr_ttl_seconds.or_else(|| d.and_then(|d| d.ccr_ttl_seconds)).unwrap_or(3600),
+            no_ccr_inject_tool: false,
+            no_ccr_marker: false,
+            tool_relay: cfg.tool_relay.unwrap_or(false),
+            notify_url: None,
+            notify_key: None,
+            dev: cfg.dev.unwrap_or(false),
+            timeout: 300,
+        }
+    }
+}
+
