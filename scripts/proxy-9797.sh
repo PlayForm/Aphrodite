@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# headroom-proxy: launch the Rust token-mode proxy
+# headroom-proxy cache mode — launch on :9797
 #
 # Usage:
-#   ./scripts/proxy-token.sh              # start on :8788
-#   ./scripts/proxy-token.sh --stop       # stop the proxy
+#   ./scripts/proxy-9797.sh              # start
+#   ./scripts/proxy-9797.sh --stop       # stop
 #
 # Reads HEADROOM_DEEPSEEK_KEY from ~/.hermes/.env
 
@@ -11,9 +11,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
-PID_FILE="/tmp/headroom-proxy.pid"
-LOG_FILE="/tmp/headroom-proxy.log"
+BINARY="$PROJECT_DIR/crates/headroom-token/target/release/headroom-proxy"
+# Fall back to debug build
+if [ ! -x "$BINARY" ]; then
+    BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
+fi
+PID_FILE="/tmp/headroom-proxy-9797.pid"
+LOG_FILE="/tmp/headroom-proxy-9797.log"
+PORT=9797
 
 # Source env
 if [ -f "$HOME/.hermes/.env" ]; then
@@ -22,16 +27,15 @@ if [ -f "$HOME/.hermes/.env" ]; then
     set +a
 fi
 
-PORT="${HEADROOM_TOKEN_PORT:-8788}"
-DB="${HEADROOM_TOKEN_DB:-$PROJECT_DIR/.headroom/token-ccr.db}"
-TTL="${HEADROOM_TOKEN_CCR_TTL:-3600}"
+DB="${HEADROOM_PROXY_DB_9797:-$PROJECT_DIR/.headroom/proxy-cache-ccr.db}"
+TTL="${HEADROOM_PROXY_CCR_TTL:-3600}"
 
 case "${1:-}" in
     --stop)
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy stopped (pid=$PID)"
+                echo "✓ headroom-proxy cache (:9797) stopped (pid=$PID)"
             fi
             rm -f "$PID_FILE"
         else
@@ -43,28 +47,32 @@ case "${1:-}" in
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill -0 "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy running (pid=$PID, port=$PORT)"
+                echo "✓ headroom-proxy cache running (pid=$PID, port=$PORT)"
                 exit 0
             fi
         fi
-        echo "✗ headroom-proxy not running"
+        echo "✗ headroom-proxy cache not running"
         exit 1
         ;;
 esac
 
 # Build if binary doesn't exist
 if [ ! -x "$BINARY" ]; then
-    echo "Building headroom-proxy..."
+    echo "Building headroom-proxy (cache)..."
     source "$HOME/.cargo/env" 2>/dev/null || true
     cargo build --manifest-path "$PROJECT_DIR/crates/headroom-token/Cargo.toml"
+    if [ -x "$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy" ]; then
+        BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
+    fi
 fi
 
-echo "Starting headroom-proxy on :$PORT ..."
-echo "  DB:   $DB"
-echo "  TTL:  ${TTL}s"
-echo "  Log:  $LOG_FILE"
+echo "Starting headroom-proxy cache on :$PORT ..."
+echo "  Mode:  cache"
+echo "  DB:    $DB"
+echo "  Log:   $LOG_FILE"
 
 nohup "$BINARY" \
+    --mode cache \
     --listen "127.0.0.1:$PORT" \
     --ccr-db-path "$DB" \
     --ccr-ttl-seconds "$TTL" \
@@ -75,7 +83,8 @@ echo "$PID" > "$PID_FILE"
 sleep 1
 
 if kill -0 "$PID" 2>/dev/null; then
-    echo "✓ headroom-proxy started (pid=$PID, port=$PORT)"
+    echo "✓ headroom-proxy cache started (pid=$PID, port=$PORT)"
+    echo "  Health: curl http://127.0.0.1:$PORT/health"
     echo "  Stats:  curl http://127.0.0.1:$PORT/stats"
     echo "  Stop:   $0 --stop"
 else
