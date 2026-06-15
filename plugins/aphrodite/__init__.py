@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.29"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.38.0"        # plugin version
+BIN_VERSION = "v0.5.30"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.39.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1129,6 +1129,60 @@ def _test_handler(args=None, **kwargs):
                     "compresses_never": pct >= 100,
                 }
         report["settings_matrix"] = settings
+    
+    # ── Pipeline mode: full + matrix + feature toggles ─────
+    if mode == "pipeline":
+        # Feature toggle: test with/without debug, with/without compression
+        toggles = {
+            "debug_on": {"APHRODITE_DEBUG": "1"},
+            "debug_off": {"APHRODITE_DEBUG": "0"},
+            "engine_on": {"APHRODITE_CONTEXT_ENGINE": "1"},
+            "engine_off": {"APHRODITE_CONTEXT_ENGINE": "0"},
+        }
+        feature_results = {}
+        for name, env_overrides in toggles.items():
+            saved = {k: os.environ.get(k, "") for k in env_overrides}
+            for k, v in env_overrides.items():
+                os.environ[k] = v
+            feature_results[name] = {
+                "env": env_overrides,
+                "proxy_alive": _alive(9798),
+                "cache_alive": _alive(9797),
+                "thresholds": {
+                    "terminal": TERMINAL_THRESHOLD,
+                    "inline": INLINE_THRESHOLD,
+                    "tool_token": TOOL_THRESHOLD_TOKEN,
+                    "tool_cache": TOOL_THRESHOLD_CACHE,
+                },
+                "engine_threshold": ENGINE_THRESHOLD_PCT,
+            }
+            for k, orig in saved.items():
+                if orig:
+                    os.environ[k] = orig
+                else:
+                    os.environ.pop(k, None)
+        report["feature_toggles"] = feature_results
+    
+    # ── Save results for regression comparison ─────────────
+    try:
+        results_path = os.path.join(os.path.dirname(__file__), ".test-results.json")
+        prev = {}
+        if os.path.exists(results_path):
+            with open(results_path) as f:
+                prev = json.load(f)
+        with open(results_path, "w") as f:
+            json.dump(report, f, indent=2)
+        if prev:
+            prev_passed = prev.get("summary", {}).get("passed", 0)
+            curr_passed = report["summary"]["passed"]
+            report["regression"] = {
+                "previous_passed": prev_passed,
+                "current_passed": curr_passed,
+                "delta": curr_passed - prev_passed,
+                "status": "DEGRADED" if curr_passed < prev_passed else "OK"
+            }
+    except Exception:
+        pass
     
     report["summary"] = {
         "total": len(report["tests"]),
