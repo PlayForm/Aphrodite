@@ -343,7 +343,7 @@ def _transform_tool_result(
     cache_alive = _alive(PORTS["cache"])
     proxy_available = token_alive or cache_alive
 
-    skip = {"read_file", "read_terminal"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo"}
+    skip = {"read_file", "read_terminal", "headroom_retrieve", "headroom_stats"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo", "headroom_retrieve", "headroom_stats"}
     if tool_name in skip:
         return result
 
