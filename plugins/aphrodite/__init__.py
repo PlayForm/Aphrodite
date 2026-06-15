@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.11"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.20.0"        # plugin version
+BIN_VERSION = "v0.5.12"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.21.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -676,6 +676,20 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             recent = sorted(_conv_index.items(), reverse=True)[:3]
             parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in recent))
         
+        # File tree: inject when many files referenced
+        if len(_referenced_files) > 5:
+            by_dir = {}
+            for path in sorted(_referenced_files):
+                d = os.path.dirname(path) or "."
+                by_dir.setdefault(d, []).append(os.path.basename(path))
+            parts.append(f"  files: {len(_referenced_files)} referenced:")
+            for d, files in sorted(by_dir.items())[:8]:
+                parts.append(f"    {d}/ {', '.join(files[:6])}")
+                if len(files) > 6:
+                    parts.append(f"      ... +{len(files)-6} more")
+            if len(by_dir) > 8:
+                parts.append(f"    ... +{len(by_dir)-8} more dirs")
+        
         # Context hint
         if ctx_len > 20:
             if ctx_len > 100:
@@ -939,6 +953,22 @@ FILES_SCHEMA = {
     "parameters": {"type": "object", "properties": {}}
 }
 
+def _diff_handler(args=None, **kwargs):
+    """Show conversation turn diffs — what was discussed in recent turns."""
+    if not _conv_index:
+        return json.dumps({"turns": 0, "hint": "No turn history yet"})
+    turns = []
+    for tnum in sorted(_conv_index.keys(), reverse=True)[:10]:
+        h, summary, size = _conv_index[tnum]
+        turns.append({"turn": tnum, "hash": h, "summary": summary, "size": size})
+    return json.dumps({"turns": len(_conv_index), "recent": turns})
+
+DIFF_SCHEMA = {
+    "name": "aphrodite_diff",
+    "description": "Show conversation turn history — what was discussed, compressed, and stored across turns. Use to understand context evolution.",
+    "parameters": {"type": "object", "properties": {}}
+}
+
 
 def register(ctx):
     # Install binary on registration
@@ -976,6 +1006,12 @@ def register(ctx):
         name="aphrodite_files",
         schema=FILES_SCHEMA,
         handler=_files_handler,
+        toolset="aphrodite",
+    )
+    ctx.register_tool(
+        name="aphrodite_diff",
+        schema=DIFF_SCHEMA,
+        handler=_diff_handler,
         toolset="aphrodite",
     )
     # Register context engine (plugs into Hermes' compress() pipeline)
