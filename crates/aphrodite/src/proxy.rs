@@ -606,6 +606,18 @@ async fn execute_tool_relay(
                 Err("CCR not enabled".into())
             }
         }
+        "aphrodite_list" => {
+            match &state.ccr {
+                Some(ccr) => Ok(serde_json::json!({
+                    "entries": ccr.len(),
+                    "backend": match state.mode {
+                        ProxyMode::Cache => "in_memory",
+                        ProxyMode::Token => "sqlite",
+                    },
+                })),
+                None => Ok(serde_json::json!({"entries": 0, "message": "CCR not enabled"})),
+            }
+        }
         _ => Err(format!("Unknown tool: {}", tool)),
     }
 }
