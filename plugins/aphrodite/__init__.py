@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.18"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.27.0"        # plugin version
+BIN_VERSION = "v0.5.19"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.28.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -408,6 +408,7 @@ def _transform_tool_result(
     Dual-mode: proxy CCR (token >1KB, cache >8KB) with inline fallback (>4KB).
     Works without proxy - no provider switch required.
     """
+    _t0 = time.time()
     if not result or not isinstance(result, str) or not result.strip():
         return result
 
@@ -421,20 +422,20 @@ def _transform_tool_result(
     skip = {"read_file", "read_terminal", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
     if tool_name in skip:
         if DEBUG_LOGGING:
-            _log.debug("transform_tool_result: SKIP %s (in skip list)", tool_name[:40])
+            _log.debug("transform_tool_result: SKIP %s %.1fms (in skip list)", tool_name[:40], (time.time()-_t0)*1000)
         return result
 
     threshold = 1024 if token_alive else 8192 if cache_alive else INLINE_THRESHOLD
     result_len = len(result)
     if result_len < threshold:
         if DEBUG_LOGGING:
-            _log.debug("transform_tool_result: BELOW %s size=%s < threshold=%s", tool_name[:40], result_len, threshold)
+            _log.debug("transform_tool_result: BELOW %s size=%s < threshold=%s %.1fms", tool_name[:40], result_len, threshold, (time.time()-_t0)*1000)
         return result
 
     # Don't re-compress content that already has CCR markers (retrieved/compressed)
     if _CCR_RE.search(result):
         if DEBUG_LOGGING:
-            _log.debug("transform_tool_result: GUARD %s has existing CCR marker", tool_name[:40])
+            _log.debug("transform_tool_result: GUARD %s has existing CCR marker %.1fms", tool_name[:40], (time.time()-_t0)*1000)
         return result
 
     preview = result[:120].replace('\\n', ' ').strip()
@@ -448,7 +449,7 @@ def _transform_tool_result(
             label = "token" if token_alive else "cache"
             if DEBUG_LOGGING:
                 ratio = result_len / max(len(h), 1)
-                _log.debug("transform_tool_result: CCR %s %s:%s size=%s ratio=%.1fx", tool_name[:40], label, h, result_len, ratio)
+                _log.debug("transform_tool_result: CCR %s %s:%s size=%s ratio=%.1fx %.1fms", tool_name[:40], label, h, result_len, ratio, (time.time()-_t0)*1000)
             return _ccr_marker(h, "tool", result_len, label, preview)
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s — proxy returned no hash", tool_name[:40])
@@ -458,14 +459,14 @@ def _transform_tool_result(
         try:
             h, _ = _inline_compress(result)
             if DEBUG_LOGGING:
-                _log.debug("transform_tool_result: INLINE %s hash=%s size=%s", tool_name[:40], h, result_len)
+                _log.debug("transform_tool_result: INLINE %s hash=%s size=%s %.1fms", tool_name[:40], h, result_len, (time.time()-_t0)*1000)
             return _ccr_marker(h, "tool", result_len, "inline", preview)
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("transform_tool_result: INLINE FAIL %s", tool_name[:40])
             pass
     if DEBUG_LOGGING:
-        _log.debug("transform_tool_result: PASSTHROUGH %s size=%s", tool_name[:40], result_len)
+        _log.debug("transform_tool_result: PASSTHROUGH %s size=%s %.1fms", tool_name[:40], result_len, (time.time()-_t0)*1000)
     return result  # soft-fail
 
 
@@ -766,6 +767,7 @@ def _extract_preview(marker, conversation_history):
 def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     """Compress terminal output via CCR on-the-fly. Proxy first, inline fallback.
     Build output gets smart summarization — repeated patterns collapsed."""
+    _t0 = time.time()
     if _DEV: return output  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
@@ -774,13 +776,13 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     out_len = len(output)
     if out_len < TERMINAL_THRESHOLD:  # use configured threshold
         if DEBUG_LOGGING:
-            _log.debug("terminal_hook: BELOW size=%s < threshold=%s (cmd: %s)", out_len, TERMINAL_THRESHOLD, command[:60])
+            _log.debug("terminal_hook: BELOW size=%s < threshold=%s %.1fms (cmd: %s)", out_len, TERMINAL_THRESHOLD, (time.time()-_t0)*1000, command[:60])
         return output
 
     # Don't re-compress content that already has CCR markers (retrieved/compressed)
     if _CCR_RE.search(output):
         if DEBUG_LOGGING:
-            _log.debug("terminal_hook: GUARD has existing CCR marker (cmd: %s)", command[:60])
+            _log.debug("terminal_hook: GUARD has existing CCR marker %.1fms (cmd: %s)", (time.time()-_t0)*1000, command[:60])
         return output
 
     # ── Build output detection: collapse repeated lines ──────────────
@@ -856,7 +858,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                 _log.debug("terminal_hook: INLINE FAIL (cmd: %s)", command[:60])
             pass
     if DEBUG_LOGGING:
-        _log.debug("terminal_hook: PASSTHROUGH size=%s", out_len)
+        _log.debug("terminal_hook: PASSTHROUGH size=%s %.1fms", out_len, (time.time()-_t0)*1000)
     return output
 
 
