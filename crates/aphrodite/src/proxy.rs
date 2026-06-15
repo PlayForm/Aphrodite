@@ -744,8 +744,9 @@ async fn execute_tool_relay(
             let content = params.get("content").and_then(|v| v.as_str()).ok_or("missing content")?;
             if let Some(ccr) = &state.ccr {
                 let hash = compute_key(content.as_bytes());
+                let size = content.len();
                 ccr.put(&hash, content);
-                Ok(serde_json::json!({"compressed": format!("<<<CCR:{}|compress|0>>>", hash), "hash": hash}))
+                Ok(serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}))
             } else {
                 Err("CCR not enabled".into())
             }

@@ -109,7 +109,7 @@ fn filter_content(content: &str, query: Option<&str>) -> String {
                 .filter(|line| line.to_lowercase().contains(&q.to_lowercase()))
                 .collect();
             if filtered.is_empty() {
-                content.to_string()  // fallback to full content — don't silently return empty
+                format!("[no lines matching {:?} in {} lines]", q, content.lines().count())
             } else {
                 filtered.join("\n")
             }
