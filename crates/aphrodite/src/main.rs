@@ -46,6 +46,10 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
+        .route("/history", get({
+            let s = state.clone();
+            move || async move { Json(s.request_history.lock().map(|v| v.clone()).unwrap_or_default()) }
+        }))
         .route("/stats", get({
             let s = state.clone();
             move || async move { Json(s.stats_json()) }

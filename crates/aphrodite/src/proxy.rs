@@ -58,6 +58,10 @@ pub struct AppState {
     pub dev: bool,
 
     // Structured debug
+    /// Ring buffer of last 50 request summaries
+    pub request_history: std::sync::Mutex<Vec<serde_json::Value>>,
+
+    // Stats
     /// Latency histogram buckets (microseconds): 1ms, 10ms, 100ms, 1s, 10s
     pub latency_buckets: [AtomicU64; 5],
     /// Track last N errors for hot-path analysis
@@ -105,6 +109,7 @@ impl AppState {
             ],
             "compressions_by_type": self.compressions_by_type.lock().map(|m| m.clone()).unwrap_or_default(),
             "last_errors": self.last_errors.lock().map(|v| v.iter().rev().take(5).cloned().collect::<Vec<_>>()).unwrap_or_default(),
+            "request_history": self.request_history.lock().map(|v| v.clone()).unwrap_or_default(),
         })
     }
 
@@ -218,6 +223,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
         last_errors: Mutex::new(Vec::new()),
         compressions_by_type: Mutex::new(HashMap::new()),
+        request_history: std::sync::Mutex::new(Vec::new()),
         requests_total: AtomicU64::new(0),
         requests_compressed: AtomicU64::new(0),
         tokens_saved: AtomicU64::new(0),
@@ -605,7 +611,8 @@ mod tests {
             notify_url: None,
             notify_key: None,
             dev: false,
-            requests_total: AtomicU64::new(0),
+            request_history: std::sync::Mutex::new(Vec::new()),
+        requests_total: AtomicU64::new(0),
             requests_compressed: AtomicU64::new(0),
             tokens_saved: AtomicU64::new(0),
             ccr_hits: AtomicU64::new(0),
@@ -687,7 +694,8 @@ mod tests {
             notify_url: None,
             notify_key: None,
             dev: false,
-            requests_total: AtomicU64::new(0),
+            request_history: std::sync::Mutex::new(Vec::new()),
+        requests_total: AtomicU64::new(0),
             requests_compressed: AtomicU64::new(0),
             tokens_saved: AtomicU64::new(0),
             ccr_hits: AtomicU64::new(0),
