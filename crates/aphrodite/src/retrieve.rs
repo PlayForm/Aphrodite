@@ -16,6 +16,10 @@ pub struct RetrieveRequest {
     pub hash: Option<String>,
     pub query: Option<String>,
     pub path: Option<String>,
+    #[serde(default)]
+    pub offset: usize,
+    #[serde(default)]
+    pub limit: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -30,17 +34,9 @@ pub async fn handle_retrieve(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RetrieveRequest>,
 ) -> impl IntoResponse {
-    // Path-based file read
-    if let Some(path) = &req.path {
+    let mut content = if let Some(path) = &req.path {
         match std::fs::read_to_string(path) {
-            Ok(content) => {
-                return Json(RetrieveResponse {
-                    found: true,
-                    content: Some(filter_content(&content, req.query.as_deref())),
-                    source: format!("file:{}", path),
-                    error: None,
-                }).into_response();
-            }
+            Ok(c) => c,
             Err(e) => {
                 return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
                     found: false, content: None,
@@ -49,46 +45,64 @@ pub async fn handle_retrieve(
                 })).into_response();
             }
         }
-    }
+    } else {
+        let hash = match &req.hash {
+            Some(h) => h.clone(),
+            None => {
+                return (StatusCode::BAD_REQUEST, Json(RetrieveResponse {
+                    found: false, content: None, source: "none".into(),
+                    error: Some("`hash` or `path` required".into()),
+                })).into_response();
+            }
+        };
 
-    let hash = match &req.hash {
-        Some(h) => h.clone(),
-        None => {
-            return (StatusCode::BAD_REQUEST, Json(RetrieveResponse {
-                found: false, content: None, source: "none".into(),
-                error: Some("`hash` or `path` required".into()),
-            })).into_response();
-        }
-    };
-
-    if let Some(ccr) = &state.ccr {
-        match ccr.get(&hash) {
-            Some(content) => {
-                state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                return Json(RetrieveResponse {
-                    found: true,
-                    content: Some(filter_content(&content, req.query.as_deref())),
-                    source: "ccr".into(),
-                    error: None,
-                }).into_response();
+        match &state.ccr {
+            Some(ccr) => {
+                match ccr.get(&hash) {
+                    Some(c) => {
+                        state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        c
+                    }
+                    None => {
+                        state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
+                            found: false, content: None, source: "none".into(),
+                            error: Some(format!("CCR entry not found: {}", hash)),
+                        })).into_response();
+                    }
+                }
             }
             None => {
                 state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
+                    found: false, content: None, source: "none".into(),
+                    error: Some(format!("CCR entry not found: {}", hash)),
+                })).into_response();
             }
         }
-    } else {
-        state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    };
+
+    // Apply query filter, then pagination
+    content = filter_content(&content, req.query.as_deref());
+    if req.limit > 0 {
+        let lines: Vec<&str> = content.lines().collect();
+        let total = lines.len();
+        let start = req.offset.min(total);
+        let end = (start + req.limit).min(total);
+        content = lines[start..end].join("\n");
+        if start > 0 || end < total {
+            // Prepend range info when paginated
+            content = format!("[lines {}-{}/{}]\n{}", start + 1, end, total, content);
+        }
     }
 
-    // Remove: old unconditional miss increment (was double-counting)
-    (
-        StatusCode::NOT_FOUND,
-        Json(RetrieveResponse {
-            found: false, content: None, source: "none".into(),
-            error: Some(format!("CCR entry not found: {}", hash)),
-        }),
-    )
-        .into_response()
+    let source = if req.path.is_some() { format!("file:{}", req.path.as_ref().unwrap()) } else { "ccr".into() };
+    Json(RetrieveResponse {
+        found: true,
+        content: Some(content),
+        source,
+        error: None,
+    }).into_response()
 }
 
 fn filter_content(content: &str, query: Option<&str>) -> String {
