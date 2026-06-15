@@ -217,8 +217,13 @@ def _transform_tool_result(
     if not result or not isinstance(result, str) or not result.strip():
         return result
 
-    # Only compress outputs > 512 chars
-    if len(result) < 512:
+    # Never compress debug/read tools — keep output visible
+    skip_tools = {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo"}
+    if tool_name in skip_tools:
+        return result
+
+    # Only compress outputs > 8KB
+    if len(result) < 8192:
         return result
 
     try:
