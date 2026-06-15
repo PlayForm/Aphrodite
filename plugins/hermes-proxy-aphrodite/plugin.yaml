@@ -1,6 +1,10 @@
 name: hermes-proxy-aphrodite
-version: 1.0.0
-description: "Auto-start aphrodite proxies on Hermes startup — cache (:9797) + token (:9798)"
+version: 1.1.0
+description: "Auto-install + launch aphrodite Chat Completions proxy — cache (:9797) + token (:9798) with CCR + tool relay"
 kind: plugin
 provides_hooks:
   - session_start
+install_message: |
+  aphrodite v0.2.0 will be downloaded from GitHub releases.
+  Requires DEEPSEEK_API_KEY in ~/.hermes/.env.
+  No cargo/Rust required — pre-built binary included.
