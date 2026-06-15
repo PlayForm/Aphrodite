@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.16"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.25.0"        # plugin version
+BIN_VERSION = "v0.5.17"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.26.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1021,13 +1021,17 @@ def register(ctx):
         handler=_diff_handler,
         toolset="aphrodite",
     )
-    # Register context engine (plugs into Hermes' compress() pipeline)
-    try:
-        ctx.register_context_engine(AphroditeContextEngine())
-        _log.info("aphrodite context engine registered")
-    except Exception as e:
-        _log.debug("context engine registration skipped: %s", e)
-    _log.info("aphrodite v1.8.1 registered - %d tools + context engine + hooks", 4)
+    # Only register context engine when explicitly configured
+    engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
+    if engine_configured:
+        try:
+            ctx.register_context_engine(AphroditeContextEngine())
+            _log.info("aphrodite context engine registered")
+        except Exception as e:
+            _log.debug("context engine registration skipped: %s", e)
+    else:
+        _log.info("context engine not registered — set APHRODITE_CONTEXT_ENGINE=1 to enable")
+    _log.info("aphrodite v%s registered — %d tools + hooks", PLUGIN_VERSION, 6)
 
 
 # ── Context Engine (plugs into Hermes compress() pipeline) ─────
