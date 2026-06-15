@@ -18,8 +18,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.50"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.59.0"        # plugin version
+BIN_VERSION = "v0.5.51"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.60.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -435,7 +435,8 @@ def _transform_tool_result(
     # Track file references for aphrodite_files tool
     _track_file_refs(tool_name, args)
     token_alive = _alive(9798)
-    proxy_available = token_alive
+    cache_alive = _alive(9797)
+    proxy_available = token_alive or cache_alive
 
     # Essential tools: never compress - agent needs immediate access to skills, memory, session history
     _ESSENTIAL_TOOLS = {"skill_view", "skills_list", "skill_manage", "memory", "session_search", "read_file", "read_terminal"}
@@ -445,7 +446,7 @@ def _transform_tool_result(
             _log.debug("transform_tool_result: SKIP %s %.1fms (in skip list)", tool_name[:40], (time.time()-_t0)*1000)
         return result
 
-    threshold = 1024 if token_alive else 8192 if cache_alive else INLINE_THRESHOLD
+    threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cache_alive else INLINE_THRESHOLD
     result_len = len(result)
     if result_len < threshold:
         if DEBUG_LOGGING:
@@ -668,7 +669,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             for m in _parse_ccr_markers(content):
                 total_bytes += m['size']
                 markers.append(m)
-    _recent_markers = markers  # cache for aphrodite_search
+    global _recent_markers
+    _recent_markers.clear()
+    _recent_markers.extend(markers)  # cache for aphrodite_search
     if DEBUG_LOGGING and markers:
         _log.debug("pre_llm_hook: scanned %d CCR markers across %d msgs, %s total compressed",
                    len(markers), ctx_len, _fmt_size(total_bytes))
