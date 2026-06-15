@@ -18,3 +18,4 @@ reports/session_accumulator.json
 .bfg-report/
 .headroom
 target/
+target/**/*
