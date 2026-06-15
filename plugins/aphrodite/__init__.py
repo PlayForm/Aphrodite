@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.15"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.24.0"        # plugin version
+BIN_VERSION = "v0.5.16"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.25.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -29,10 +29,10 @@ def _cfg_int(name, default):
     try: return int(os.environ.get(name, str(default)))
     except: return default
 
-ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 0)  # 0=always compress
+ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 50)  # compress at 50% fill
 ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 2)
 ENGINE_PROTECT_LAST  = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 5)
-ENGINE_MIN_MSGS      = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 0)
+ENGINE_MIN_MSGS      = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 30)  # don't compress short conversations
 TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 1024)
 TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 8192)
 TERMINAL_THRESHOLD    = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 2048)
@@ -1099,11 +1099,12 @@ class AphroditeContextEngine(ContextEngine):
             self.threshold_tokens = 1  # always above threshold
 
     def should_compress(self, prompt_tokens=None):
-        """Compress only when context fill exceeds threshold percentage."""
+        """Compress only when context fill exceeds threshold percentage.
+        0 = never compress (disabled). 50 = compress at 50% fill."""
         if self.threshold_percent == 0:
-            return True
+            return False  # disabled
         if not prompt_tokens or not self.context_length:
-            return True
+            return False  # can't calculate — don't compress blindly
         pct = (prompt_tokens / self.context_length) * 100
         return pct >= self.threshold_percent
 
