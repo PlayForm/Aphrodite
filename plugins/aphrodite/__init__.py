@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.10"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.19.0"        # plugin version
+BIN_VERSION = "v0.5.11"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.20.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -405,6 +405,8 @@ def _transform_tool_result(
         return result
 
     if _DEV: return result  # dev mode: passthrough
+    # Track file references for aphrodite_files tool
+    _track_file_refs(tool_name, args)
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
     proxy_available = token_alive or cache_alive
@@ -741,7 +743,8 @@ def _extract_preview(marker, conversation_history):
 
 
 def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
-    """Compress terminal output via CCR on-the-fly. Proxy first, inline fallback."""
+    """Compress terminal output via CCR on-the-fly. Proxy first, inline fallback.
+    Build output gets smart summarization — repeated patterns collapsed."""
     if _DEV: return output  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
@@ -758,6 +761,52 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         if DEBUG_LOGGING:
             _log.debug("terminal_hook: GUARD has existing CCR marker (cmd: %s)", command[:60])
         return output
+
+    # ── Build output detection: collapse repeated lines ──────────────
+    first_line = output.split('\n', 1)[0].strip() if output else ""
+    is_build = any(first_line.startswith(p) for p in (
+        "Compiling ", "   Compiling ", "Finished ", "error:",
+        "warning:", "Running ", "PASSED", "FAILED", "test result:",
+    ))
+    if is_build and output.count('\n') > 20:
+        lines = output.splitlines()
+        # Count unique patterns, deduplicate consecutive repeats
+        unique = []
+        counts = {}
+        prev = None
+        for line in lines:
+            stripped = line.strip()
+            if stripped == prev:
+                counts[stripped] = counts.get(stripped, 1) + 1
+            else:
+                if stripped not in counts:
+                    unique.append(stripped)
+                counts[stripped] = counts.get(stripped, 0) + 1
+                prev = stripped
+        
+        # Build summary: unique error/warning lines + total
+        errors = [l for l in unique if 'error' in l.lower() and l not in ('error:', 'error')]
+        warnings = [l for l in unique if 'warning' in l.lower() and 'warning:' not in l]
+        summary = f"[build: {len(lines)} lines, {len(unique)} unique patterns]"
+        if errors:
+            summary += f" | errors: {'; '.join(errors[:5])}"
+        if warnings:
+            summary += f" | warnings: {'; '.join(warnings[:3])}"
+        out_len = len(summary)
+        if DEBUG_LOGGING:
+            _log.debug("terminal_hook: BUILD collapse %d→%d lines (cmd: %s)", len(lines), len(summary.split('\n')), command[:60])
+        # Store full output in CCR, return summary
+        if proxy_available:
+            target = PORTS["token"] if token_alive else PORTS["cache"]
+            ccr = _compress_via_proxy(output, target)
+            if ccr:
+                h, _ = ccr
+                if DEBUG_LOGGING:
+                    _log.debug("terminal_hook: BUILD-CCR %s:%s", "token" if token_alive else "cache", h)
+                return f'<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)'
+        # Inline fallback
+        h, _ = _inline_compress(output)
+        return f'<<<CCR:{h}|build|{len(output)}|inline>>> {summary}…(use aphrodite_retrieve)'
 
     preview = output[:200].replace('\n', ' ').strip()
     
@@ -854,6 +903,42 @@ STATS_SCHEMA = {
     "parameters": {"type": "object", "properties": {}}
 }
 
+# ── File tracking (for aphrodite_files tool) ──────────────────
+_referenced_files = {}  # {filepath: last_tool_name}
+
+_FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
+
+def _track_file_refs(tool_name, args):
+    """Track file paths referenced by tool calls."""
+    if tool_name not in _FILE_TOOLS:
+        return
+    args = args if isinstance(args, dict) else {}
+    path = args.get("path", args.get("file", ""))
+    if path and isinstance(path, str) and len(path) < 500:
+        _referenced_files[path] = tool_name
+        if len(_referenced_files) > 200:
+            oldest = next(iter(_referenced_files))
+            del _referenced_files[oldest]
+
+def _files_handler(args=None, **kwargs):
+    """List all files referenced in the current session."""
+    if not _referenced_files:
+        return json.dumps({"files": [], "count": 0, "hint": "No file operations yet"})
+    by_tool = {}
+    for path, tool in sorted(_referenced_files.items()):
+        by_tool.setdefault(tool, []).append(path)
+    return json.dumps({
+        "count": len(_referenced_files),
+        "by_tool": {t: sorted(paths) for t, paths in sorted(by_tool.items())},
+        "all": sorted(_referenced_files.keys()),
+    })
+
+FILES_SCHEMA = {
+    "name": "aphrodite_files",
+    "description": "List all file paths referenced in the current session. Grouped by tool type. Use to see what files have been touched before making decisions.",
+    "parameters": {"type": "object", "properties": {}}
+}
+
 
 def register(ctx):
     # Install binary on registration
@@ -885,6 +970,12 @@ def register(ctx):
         name="aphrodite_stats",
         schema=STATS_SCHEMA,
         handler=_stats_handler,
+        toolset="aphrodite",
+    )
+    ctx.register_tool(
+        name="aphrodite_files",
+        schema=FILES_SCHEMA,
+        handler=_files_handler,
         toolset="aphrodite",
     )
     # Register context engine (plugs into Hermes' compress() pipeline)
@@ -1098,9 +1189,10 @@ class AphroditeContextEngine(ContextEngine):
         self.compression_count = 0
         self.last_compression = {}
         _inline_clear()
-        global _conv_index, _turn_counter
+        global _conv_index, _turn_counter, _referenced_files
         _conv_index.clear()
         _turn_counter = 0
+        _referenced_files.clear()
         _log.info("aphrodite v%s: session reset - inline store + memory cleared", PLUGIN_VERSION)
 
     def on_session_start(self, session_id="", **kw):
