@@ -1299,7 +1299,26 @@ def register(ctx):
             _log.debug("context engine registration skipped: %s", e)
     else:
         _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
-    _log.info("aphrodite v%s registered - %d tools + hooks", PLUGIN_VERSION, 6)
+    _log.info("aphrodite v%s registered — %d tools + hooks", PLUGIN_VERSION, 8)
+    
+    # ── Debug banner: print configuration on startup ──────────
+    if DEBUG_LOGGING:
+        _log.info("=" * 60)
+        _log.info("APHRODITE v%s — DEBUG MODE", PLUGIN_VERSION)
+        _log.info("  Mode: %s | Engine: %s | Dev: %s",
+            "proxy+hooks" if not engine_configured else "proxy+hooks+engine",
+            "enabled" if engine_configured else "disabled (APHRODITE_CONTEXT_ENGINE=0)",
+            "on" if _DEV else "off"
+        )
+        _log.info("  Thresholds: terminal=%s inline=%s tool_token=%s tool_cache=%s",
+            TERMINAL_THRESHOLD, INLINE_THRESHOLD, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE)
+        _log.info("  Engine: threshold=%s%% protect=%s/%s min_msgs=%s",
+            ENGINE_THRESHOLD_PCT, ENGINE_PROTECT_FIRST, ENGINE_PROTECT_LAST, ENGINE_MIN_MSGS)
+        _log.info("  CCR: regex=%s depth=%s", _CCR_RE.pattern, RECURSIVE_DEPTH)
+        _log.info("  Tools: retrieve, compress, stats, rebuild, files, diff, search, test")
+        _log.info("  Proxies: cache=:9797 token=:9798 | %s",
+            "waiting for session_start..." )
+        _log.info("=" * 60)
 
 
 # ── Context Engine (plugs into Hermes compress() pipeline) ─────
