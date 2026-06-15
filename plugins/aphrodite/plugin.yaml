@@ -5,6 +5,8 @@ kind: plugin
 provides_hooks:
   - session_start
   - transform_tool_result
+  - pre_llm_call
+  - transform_terminal_output
 provides_tools:
   - headroom_retrieve
   - headroom_compress
