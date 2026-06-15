@@ -1,4 +1,4 @@
-# Aphrodite Plugin — Comprehensive Handoff
+# Aphrodite Plugin - Comprehensive Handoff
 
 ## Current State: v1.8.0 (16 commits)
 
@@ -28,10 +28,10 @@
 - aphrodite.toml needs api_key for cargo watch (not committed, .gitignored)
 
 ### Key Files
-- plugins/aphrodite/__init__.py (970 lines) — all logic
-- plugins/aphrodite/plugin.yaml — manifest
-- aphrodite.toml — proxy config (gitignored, contains api_key)
-- crates/aphrodite/src/ — Rust proxy binary
+- plugins/aphrodite/__init__.py (970 lines) - all logic
+- plugins/aphrodite/plugin.yaml - manifest
+- aphrodite.toml - proxy config (gitignored, contains api_key)
+- crates/aphrodite/src/ - Rust proxy binary
 
 ### Config
 ```yaml
