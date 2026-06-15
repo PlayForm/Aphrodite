@@ -507,6 +507,16 @@ fn detect_content_type(content: &str) -> &'static str {
         return "build_output";
     }
     
+    // Linter output patterns
+    if first_line.starts_with("error[E") || first_line.starts_with("error: ")
+        || first_line.starts_with("warning[") || first_line.starts_with("warning: ")
+        || first_line.contains("|") && (first_line.contains("error") || first_line.contains("warning"))
+        || first_line.contains("mypy") || first_line.contains("clippy") 
+        || first_line.contains("eslint") || first_line.contains("tsc ")
+    {
+        return "linter";
+    }
+    
     // Diff output
     if first_line.starts_with("diff --git ") || first_line.starts_with("@@ -")
         || first_line.starts_with("+++ ") || first_line.starts_with("--- ")
