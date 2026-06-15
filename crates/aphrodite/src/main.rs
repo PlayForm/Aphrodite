@@ -54,6 +54,35 @@ async fn main() -> anyhow::Result<()> {
         .route("/tool/relay", post(handle_tool_relay))
         .route("/ccr/create", post(handle_ccr_create))
         .route("/ccr/list", get(handle_ccr_list))
+        .route("/debug", get({
+            let s = state.clone();
+            move || async move {
+                let stats = s.stats_json();
+                let lat = &stats["latency_buckets_us"];
+                let comp = &stats["compressions_by_type"];
+                let errs = &stats["last_errors"];
+                Json(serde_json::json!({
+                    "proxy": "aphrodite",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "mode": stats["mode"],
+                    "health": {
+                        "requests_total": stats["requests"]["total"],
+                        "requests_compressed": stats["requests"]["compressed"],
+                        "ccr_hits": stats["ccr"]["hits"],
+                        "ccr_created": stats["ccr"]["created"],
+                    },
+                    "latency": {
+                        "lt_1ms": lat[0],
+                        "lt_10ms": lat[1], 
+                        "lt_100ms": lat[2],
+                        "lt_1s": lat[3],
+                        "gt_1s": lat[4],
+                    },
+                    "compression_by_type": comp,
+                    "recent_errors": errs,
+                }))
+            }
+        }))
         .route("/*path", any(proxy::proxy_handler))
         .layer(CorsLayer::permissive())
         .with_state(state);
