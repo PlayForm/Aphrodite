@@ -705,10 +705,10 @@ class AphroditeContextEngine:
     Works with proxy (token/cache) or inline fallback (zlib).
     """
     name = "aphrodite"
-    threshold_percent = 0.05   # trigger at 5% context (aggressive: ~50K tokens of 1M)
-    protect_first_n = 2        # keep first 2
-    protect_last_n = 5         # keep last 5
-    min_messages_to_compress = 10  # compress when >10 msgs total
+    threshold_percent = 0.0    # always trigger (emulate token proxy internally)
+    protect_first_n = 2
+    protect_last_n = 5
+    min_messages_to_compress = 0  # always compress when possible
 
     def __init__(self):
         self.last_prompt_tokens = 0
@@ -723,13 +723,10 @@ class AphroditeContextEngine:
         self.last_completion_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
         self.last_total_tokens = usage.get("total_tokens", 0)
         if self.context_length:
-            self.threshold_tokens = int(self.context_length * self.threshold_percent)
+            self.threshold_tokens = 1  # always above threshold
 
     def should_compress(self, prompt_tokens=None):
-        tokens = prompt_tokens if prompt_tokens is not None else self.last_prompt_tokens
-        if self.threshold_tokens and tokens > self.threshold_tokens:
-            return True
-        return False
+        return True  # always compress — emulate token proxy internally
 
     def compress(self, messages, current_tokens=None, focus_topic=None):
         """Offload middle messages to CCR, keep head+tail raw.
