@@ -236,6 +236,31 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
 // ── Main proxy handler ──────────────────────────────────────────────
 
+
+/// Retry an async operation with exponential backoff.
+async fn retry_with_backoff<F, Fut, T, E>(mut f: F, max_retries: u32, label: &str) -> Result<T, E>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
+    E: std::fmt::Display,
+{
+    let mut last_err = None;
+    for attempt in 1..=max_retries {
+        match f().await {
+            Ok(val) => return Ok(val),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < max_retries {
+                    let ms = 100 * 2u64.pow(attempt - 1);
+                    tracing::warn!(attempt, backoff_ms = ms, label, "retrying after error");
+                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap())
+}
+
 /// Catch-all proxy handler — forwards any request to DeepSeek.
 /// Specifically handles Chat Completions API at /v1/chat/completions.
 pub async fn proxy_handler(
