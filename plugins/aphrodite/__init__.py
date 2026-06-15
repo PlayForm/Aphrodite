@@ -1,5 +1,5 @@
 """
-aphrodite v1.13.0 - Auto-install + launch aphrodite proxies.
+aphrodite v1.14.0 - Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 - Recursive CCR resolution, session-scoped stores
@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.4"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.13.0"        # plugin version
+BIN_VERSION = "v0.5.5"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.14.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -74,16 +74,23 @@ def _inline_retrieve(hash_val):
     return _inline_store.get(hash_val)
 
 
-def _resolve_one(hash_val, timeout=4):
-    """Resolve a single CCR hash. Checks inline store first, then tries both proxies."""
+def _resolve_one(hash_val, timeout=4, query=""):
+    """Resolve a single CCR hash. Checks inline store first, then tries both proxies.
+    If query is provided, it's passed to the proxy for line-level filtering."""
     # Check inline store first
     content = _inline_retrieve(hash_val)
     if content is not None:
+        if query:
+            lines = [l for l in content.splitlines() if query.lower() in l.lower()]
+            return "\n".join(lines) if lines else content
         return content
-    # Try token proxy first, then cache proxy
+    # Try both proxy ports
+    payload = {"hash": hash_val}
+    if query:
+        payload["query"] = query
     for port in (9797, 9798):
         try:
-            data = json.dumps({"hash": hash_val}).encode()
+            data = json.dumps(payload).encode()
             req = urllib.request.Request(
                 f"http://127.0.0.1:{port}/retrieve",
                 data=data,
@@ -318,11 +325,17 @@ def _retrieve_handler(args=None, **kwargs):
     """Resolve CCR markers with recursive depth. Scans for nested markers."""
     args = args if isinstance(args, dict) else {}
     hash_val = args.get("hash", "")
+    query = args.get("query", "")
     if not hash_val:
         return '{"error": "missing hash parameter"}'
     try:
         content = _resolve_recursive(hash_val)
         if content and not content.startswith("<<<CCR:"):
+            if query:
+                lines = [l for l in content.splitlines() if query.lower() in l.lower()]
+                if lines:
+                    return "\n".join(lines)
+                return content  # no matches, return full content
             return content
         return f'{{"error": "CCR entry not found: {hash_val}"}}'
     except Exception as e:
@@ -362,11 +375,12 @@ COMPRESS_SCHEMA = {
 }
 RETRIEVE_SCHEMA = {
     "name": "aphrodite_retrieve",
-    "description": "Resolve CCR markers to original content via aphrodite proxy. Recursively resolves nested CCR markers up to 3 levels deep.",
+    "description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query (lines containing the query string). Recursively resolves nested CCR markers up to 3 levels deep.",
     "parameters": {
         "type": "object",
         "properties": {
-            "hash": {"type": "string", "description": "CCR marker hash to retrieve"}
+            "hash": {"type": "string", "description": "CCR marker hash to retrieve"},
+            "query": {"type": "string", "description": "Optional: filter retrieved content to lines containing this query string"}
         },
         "required": ["hash"]
     }
