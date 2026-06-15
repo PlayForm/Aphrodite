@@ -1,13 +1,14 @@
 """
-aphrodite v1.15.0 - Auto-install + launch aphrodite proxies.
-- Cache (:9797): in-memory CCR, >8KB threshold
-- Token (:9798): SQLite CCR, tool relay, >1KB threshold
-- Recursive CCR resolution, session-scoped stores
-- Context engine (ContextEngine subclass), extensible hooks
-- 4 tools: aphrodite_retrieve/compress/stats + aphrodite_rebuild
-- Re-compression guard: skips content with existing CCR markers
-- Read-intent detection in pre_llm_hook
-- All thresholds configurable via env vars (see _cfg_int)
+aphrodite v1.55.0 - Auto-install + launch aphrodite proxies.
+|- Cache (:9797): in-memory CCR, >8KB threshold
+|- Token (:9798): SQLite CCR, tool relay, >1KB threshold
+|- Recursive CCR resolution, session-scoped stores
+|- Context engine (ContextEngine subclass), extensible hooks
+|- 9 tools: aphrodite_retrieve/compress/stats/rebuild/files/diff/search/test/catalog
+|- Re-compression guard: skips content with existing CCR markers
+|- Read-intent detection in pre_llm_hook
+|- Catalog mode toggle (APHRODITE_CATALOG): full | compact (default) | tool
+|- All thresholds configurable via env vars (see _cfg_int)
 
 On install: downloads pre-built binary from GitHub releases.
 On session_start: launches aphrodite proxies not already running.
@@ -17,8 +18,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.45"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.54.0"        # plugin version
+BIN_VERSION = "v0.5.46"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.55.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -39,6 +40,7 @@ TERMINAL_THRESHOLD    = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 2048)
 INLINE_THRESHOLD      = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
 RECURSIVE_DEPTH       = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
 DEBUG_LOGGING         = os.environ.get("APHRODITE_DEBUG", "") == "1"
+CATALOG_MODE         = os.environ.get("APHRODITE_CATALOG", "compact")  # full | compact | tool
 
 # Dev mode: skip all proxy routing
 _DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
@@ -435,7 +437,7 @@ def _transform_tool_result(
     token_alive = _alive(9798)
     proxy_available = token_alive
 
-    # Essential tools: never compress — agent needs immediate access to skills, memory, session history
+    # Essential tools: never compress - agent needs immediate access to skills, memory, session history
     _ESSENTIAL_TOOLS = {"skill_view", "skills_list", "skill_manage", "memory", "session_search", "read_file", "read_terminal"}
     skip = _ESSENTIAL_TOOLS | {"aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"} if token_alive else _ESSENTIAL_TOOLS | {"execute_code", "patch", "write_file", "search_files", "todo", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
     if tool_name in skip:
@@ -708,29 +710,42 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 except Exception:
                     pass
 
-    # ── 3. Build the catalog ──────────────────────────────────
+    # ── 3. Build the catalog (mode-aware) ─────────────────────
     parts = []
     if markers or _conv_index or compress_hint or len(_referenced_files) > 5 or DEBUG_LOGGING:
         parts.append("[APHRODITE]")
         
-        # Debug banner injected into conversation (when APHRODITE_DEBUG=1)
-        if DEBUG_LOGGING:
+        # Debug banner (only in DEBUG mode or full catalog)
+        if DEBUG_LOGGING or CATALOG_MODE == "full":
             parts.append(f"  ⚙ v{PLUGIN_VERSION} | mode={'proxy+hooks' if not os.environ.get('APHRODITE_CONTEXT_ENGINE') else 'proxy+hooks+engine'} | engine={'enabled' if os.environ.get('APHRODITE_CONTEXT_ENGINE')=='1' else 'off'} | dev={'on' if _DEV else 'off'}")
             parts.append(f"  ⚙ thresholds: term={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_tok={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE} engine_pct={ENGINE_THRESHOLD_PCT}% prot={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min={ENGINE_MIN_MSGS}")
         
-        # Git diff summary (cached 30s)
+        # Git diff summary
         git_info = _git_summary()
         if git_info:
             parts.append(f"  git: {git_info}")
         
-        # Compression wrapping summary
+        # Compression wrapping summary (compact by type in compact/tool mode)
         if proxy_available:
             mode = "token" if token_alive else "cache"
-            parts.append(f"  mode={mode} | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
-        else:
+            if CATALOG_MODE == "tool":
+                parts.append(f"  {len(markers)} items compressed")
+            elif CATALOG_MODE == "compact":
+                # Group by type for compact display
+                by_type = {}
+                for m in markers:
+                    by_type.setdefault(m['type'], []).append(m)
+                if by_type:
+                    type_parts = " ".join(f"{len(items)} [{ctype}]" for ctype, items in sorted(by_type.items()))
+                    parts.append(f"  {len(markers)} items ({_fmt_size(total_bytes)} saved) - {type_parts}")
+                else:
+                    parts.append(f"  {len(markers)} items ({_fmt_size(total_bytes)} saved)")
+            else:  # full
+                parts.append(f"  mode={mode} | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
+        elif CATALOG_MODE != "tool":
             parts.append(f"  mode=inline | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
         
-        # Engine stats (from ContextEngine, if active)
+        # Engine stats
         engine = get_engine()
         if engine and engine.compression_count > 0:
             parts.append(f"  engine: {engine.compression_count} compressions | last: {engine.last_compression.get('messages_compressed', '?')} msgs → CCR:{engine.last_compression.get('hash', '?')[:8]}")
@@ -739,12 +754,22 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         if compress_hint:
             parts.append(compress_hint)
         
-        # CCR catalog: grouped by type — filtered to live/retrievable entries only
-        if markers:
+        # Full CCR catalog: grouped by type with previews (full mode only)
+        if CATALOG_MODE == "full" and markers:
             live = [m for m in markers if m['hash'] in _inline_store or _inline_retrieve(m['hash'])]
             if not live and markers:
-                # Fallback: if all filtered, show all (don't hide real content)
                 live = markers
+            
+            # Auto-expand: resolve small cached items inline — LLM never sees aphrodite_retrieve
+            expanded = []
+            for m in live:
+                if m['size'] < 10240 and m['hash'] in _inline_store:
+                    content = _inline_store[m['hash']]
+                    m['preview'] = content[:200].replace('\n', ' ').strip()
+                    m['auto_expanded'] = True
+                expanded.append(m)
+            live = expanded
+            
             by_type = {}
             for m in live:
                 by_type.setdefault(m['type'], []).append(m)
@@ -762,49 +787,53 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 if len(items) > visible:
                     parts.append(f"      ... +{len(items)-visible} more (use aphrodite_retrieve)")
         
-        # Conversation memory
-        if _conv_index:
+        # Conversation memory (full mode only - already in system prompt)
+        if CATALOG_MODE == "full" and _conv_index:
             recent = sorted(_conv_index.items(), reverse=True)[:3]
             parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in recent))
         
-        # File tree: inject when many files referenced
+        # File tree: compact in non-full modes
         if len(_referenced_files) > 5:
-            by_dir = {}
-            for path in sorted(_referenced_files):
-                d = os.path.dirname(path) or "."
-                by_dir.setdefault(d, []).append(os.path.basename(path))
-            parts.append(f"  files: {len(_referenced_files)} referenced:")
-            for d, files in sorted(by_dir.items())[:8]:
-                parts.append(f"    {d}/ {', '.join(files[:6])}")
-                if len(files) > 6:
-                    parts.append(f"      ... +{len(files)-6} more")
-            if len(by_dir) > 8:
-                parts.append(f"    ... +{len(by_dir)-8} more dirs")
+            if CATALOG_MODE == "full":
+                by_dir = {}
+                for path in sorted(_referenced_files):
+                    d = os.path.dirname(path) or "."
+                    by_dir.setdefault(d, []).append(os.path.basename(path))
+                parts.append(f"  files: {len(_referenced_files)} referenced:")
+                for d, files in sorted(by_dir.items())[:8]:
+                    parts.append(f"    {d}/ {', '.join(files[:6])}")
+                    if len(files) > 6:
+                        parts.append(f"      ... +{len(files)-6} more")
+                if len(by_dir) > 8:
+                    parts.append(f"    ... +{len(by_dir)-8} more dirs")
+            else:
+                parts.append(f"  files: {len(_referenced_files)} referenced")
         
-        # Context hint
-        if ctx_len > 20:
+        # Context hint (skip in tool mode)
+        if CATALOG_MODE != "tool" and ctx_len > 20:
             if ctx_len > 100:
                 parts.append(f"  ⚠ context={ctx_len} msgs - prefer aphrodite_retrieve over scanning")
             else:
                 parts.append(f"  context={ctx_len} msgs")
-
-        # ── 4. Read-intent detection ──────────────────────────
-        READ_KEYWORDS = {"read", "show", "view", "get", "cat", "display",
-                         "retrieve", "fetch", "look", "see", "open",
-                         "inspect", "check", "print", "dump", "output"}
-        last_user = user_message or ""
-        if isinstance(conversation_history, list):
-            for msg in reversed(conversation_history):
-                if msg.get("role") == "user":
-                    last_user = str(msg.get("content", ""))[:200].lower()
-                    break
-        words = set(last_user.lower().split())
-        has_read_intent = bool(words & READ_KEYWORDS)
-        if has_read_intent and markers:
-            recent_markers = markers[-3:]
-            parts.append("  intent=read | recent CCRs available: " +
-                         " ".join(f"aphrodite_retrieve({m['hash']})"
-                                  for m in recent_markers))
+        
+        # Read-intent detection (skip in tool mode)
+        if CATALOG_MODE != "tool":
+            READ_KEYWORDS = {"read", "show", "view", "get", "cat", "display",
+                             "retrieve", "fetch", "look", "see", "open",
+                             "inspect", "check", "print", "dump", "output"}
+            last_user = user_message or ""
+            if isinstance(conversation_history, list):
+                for msg in reversed(conversation_history):
+                    if msg.get("role") == "user":
+                        last_user = str(msg.get("content", ""))[:200].lower()
+                        break
+            words = set(last_user.lower().split())
+            has_read_intent = bool(words & READ_KEYWORDS)
+            if has_read_intent and markers:
+                recent_markers = markers[-3:]
+                parts.append("  intent=read | recent CCRs available: " +
+                             " ".join(f"aphrodite_retrieve({m['hash']})"
+                                      for m in recent_markers))
 
     if parts:
         catalog = "\n".join(parts)
@@ -1068,6 +1097,36 @@ DIFF_SCHEMA = {
     "parameters": {"type": "object", "properties": {}}
 }
 
+def _catalog_handler(args=None, **kwargs):
+    """Return full compression catalog: all items with hashes, sizes, types, previews.
+    Use when catalog mode is 'tool' and you need detailed CCR information."""
+    items = []
+    for m in _recent_markers:
+        items.append({
+            "hash": m["hash"],
+            "type": m["type"],
+            "size": m["size"],
+            "preview": m.get("preview", "")[:120]
+        })
+    by_type = {}
+    for item in items:
+        by_type.setdefault(item["type"], []).append(item["hash"])
+    result = {
+        "total_items": len(items),
+        "total_saved": sum(m["size"] for m in _recent_markers),
+        "by_type": {t: {"count": len(hashes), "hashes": hashes[:10]} for t, hashes in sorted(by_type.items())},
+        "items": items,
+        "conv_turns": len(_conv_index),
+        "referenced_files": len(_referenced_files),
+    }
+    return json.dumps(result, indent=2)
+
+CATALOG_SCHEMA = {
+    "name": "aphrodite_catalog",
+    "description": "Return full compression catalog - all CCR items with hashes, sizes, types, and previews. Use when you need detailed information about what has been compressed.",
+    "parameters": {"type": "object", "properties": {}}
+}
+
 def _search_handler(args=None, **kwargs):
     """Search across compressed items by type or content pattern."""
     args = args if isinstance(args, dict) else {}
@@ -1108,7 +1167,7 @@ def _search_handler(args=None, **kwargs):
 
 
 def _test_handler(args=None, **kwargs):
-    """Full smoke test suite — exercises all tools, hooks, compression, search, retrieve."""
+    """Full smoke test suite - exercises all tools, hooks, compression, search, retrieve."""
     args = args if isinstance(args, dict) else {}
     mode = args.get("mode", "quick")  # quick, full, matrix
     report = {"suite": "aphrodite_smoke", "version": PLUGIN_VERSION, "mode": mode, "tests": []}
@@ -1224,7 +1283,7 @@ def _test_handler(args=None, **kwargs):
 
 TEST_SCHEMA = {
     "name": "aphrodite_test",
-    "description": "Run full smoke test suite — compress, retrieve, search, stats, files, diff, proxy health. Modes: quick, full, matrix, pipeline.",
+    "description": "Run full smoke test suite - compress, retrieve, search, stats, files, diff, proxy health. Modes: quick, full, matrix, pipeline.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -1303,6 +1362,12 @@ def register(ctx):
         handler=_test_handler,
         toolset="aphrodite",
     )
+    ctx.register_tool(
+        name="aphrodite_catalog",
+        schema=CATALOG_SCHEMA,
+        handler=_catalog_handler,
+        toolset="aphrodite",
+    )
     # Only register context engine when explicitly configured
     engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
     if engine_configured:
@@ -1313,18 +1378,19 @@ def register(ctx):
             _log.debug("context engine registration skipped: %s", e)
     else:
         _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
-    _log.info("aphrodite v%s registered — %d tools + hooks", PLUGIN_VERSION, 8)
+    _log.info("aphrodite v%s registered - %d tools + hooks", PLUGIN_VERSION, 9)
     
     # ── Debug banner: print configuration on startup ──────────
     if DEBUG_LOGGING:
         lines = [
             "=" * 60,
-            f"APHRODITE v{PLUGIN_VERSION} — DEBUG MODE",
+            f"APHRODITE v{PLUGIN_VERSION} - DEBUG MODE",
             f"  Mode: {'proxy+hooks' if not engine_configured else 'proxy+hooks+engine'} | Engine: {'enabled' if engine_configured else 'disabled'} | Dev: {'on' if _DEV else 'off'}",
             f"  Thresholds: terminal={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_token={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE}",
             f"  Engine: threshold={ENGINE_THRESHOLD_PCT}% protect={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min_msgs={ENGINE_MIN_MSGS}",
             f"  CCR: regex={_CCR_RE.pattern} depth={RECURSIVE_DEPTH}",
-            f"  Tools: retrieve, compress, stats, rebuild, files, diff, search, test",
+            f"  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog",
+            f"  Catalog mode: {CATALOG_MODE} (APHRODITE_CATALOG=full|compact|tool)",
             f"  Proxies: cache=:9797 token=:9798 | waiting for session_start...",
             "=" * 60,
         ]
