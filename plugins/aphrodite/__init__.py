@@ -469,11 +469,17 @@ def _parse_ccr_markers(text):
 
 
 def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
-    """Before LLM call: inject content map + memory index as context string.
+    """Before LLM call: compress old turns, inject knowledge map + retrieval catalog.
 
-    Hermes injects the returned string into the user message (not system prompt),
-    preserving prompt-cache prefix. Mutations to conversation_history are lost
-    (Hermes passes a copy), so we return a context string instead.
+    Hermes injects the returned string into the user message. We CANNOT mutate
+    conversation_history (Hermes passes a copy). Instead we:
+
+    1. Group messages into turns (user→assistant→tools chains)
+    2. Compress old turns (>6 back) to CCR for later retrieval
+    3. Return a rich catalog so the LLM navigates context efficiently
+
+    The LLM should prefer headroom_retrieve for old content rather than
+    scanning hundreds of raw messages.
     """
     if _DEV: return  # dev mode: skip
     if not conversation_history or not isinstance(conversation_history, list):
@@ -481,8 +487,10 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
+    proxy_available = token_alive or cache_alive
+    target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
 
-    # ── Build markers with previews + memory index ─────────
+    # ── 1. Build CCR marker catalog ──────────────────────────
     markers = []
     total_bytes = 0
     for msg in conversation_history:
@@ -492,41 +500,107 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 total_bytes += m['size']
                 markers.append(m)
 
+    # ── 2. Compress old turns to CCR ─────────────────────────
+    ctx_len = len(conversation_history)
+    compress_hint = ""
+    if proxy_available and target and ctx_len > 30:
+        # Group into turns: each user message starts a new turn
+        turns = _group_into_turns(conversation_history)
+        if len(turns) > 6:
+            old_turns = turns[:-6]
+            try:
+                # Build a structured summary of old turns
+                turn_summaries = []
+                for t in old_turns:
+                    user_msg = t.get("user", "")[:300]
+                    asst_msg = t.get("assistant", "")[:300]
+                    turn_summaries.append({
+                        "id": t["id"],
+                        "user": user_msg,
+                        "assistant": asst_msg if asst_msg else "(tool calls)",
+                    })
+                
+                packed = json.dumps(turn_summaries)
+                if len(packed) > 500:
+                    data = json.dumps({"content": packed}).encode()
+                    req = urllib.request.Request(
+                        f"http://127.0.0.1:{target}/ccr/create",
+                        data=data,
+                        headers={"Content-Type": "application/json"}
+                    )
+                    with urllib.request.urlopen(req, timeout=3) as r:
+                        ccr = json.loads(r.read())
+                    
+                    compress_hint = (
+                        f"  compressed: {len(old_turns)} old turns → CCR:{ccr['hash'][:12]} "
+                        f"({_fmt_size(len(packed))}) | retrieve: headroom_retrieve({ccr['hash'][:12]})\n"
+                        f"  turn range compressed: T{turns[0]['id']}–T{old_turns[-1]['id']} "
+                        f"({len(old_turns)} turns, last {len(turns)-len(old_turns)} kept in context)"
+                    )
+            except Exception:
+                pass
+
+    # ── 3. Build the catalog ─────────────────────────────────
     map_parts = []
-    if markers or _conv_index:
+    if markers or _conv_index or compress_hint:
         map_parts.append("[APHRODITE]")
         if markers:
             mode_tag = "token" if token_alive else "cache" if cache_alive else "off"
-            # Dynamic cutoff: show first 8 markers with previews, summarize rest
             visible = min(len(markers), 8)
             map_parts.append(f"  proxy={mode_tag} | {len(markers)} items @ {_fmt_size(total_bytes)} | retrieval: headroom_retrieve")
             if visible > 0:
                 map_parts.append(f"  catalog ({visible}/{len(markers)}):")
                 for i, m in enumerate(markers[:visible]):
-                    # Extract a short preview from the marker context
-                    # The preview is the text after the [CCR:...] marker in the original message
-                    preview = ""
-                    for msg in conversation_history:
-                        c = msg.get("content", "")
-                        if isinstance(c, str) and m['hash'] in c:
-                            idx = c.find(m['hash'])
-                            after = c[idx + len(m['hash']):].strip()
-                            if after.startswith('|'):
-                                after = after.split(']', 1)[-1] if ']' in after else after
-                            preview = after[:80].strip()
-                            break
+                    preview = _extract_preview(m, conversation_history)
                     map_parts.append(f"    [{i}] CCR:{m['hash'][:8]} | {m['type']} | {_fmt_size(m['size'])} | {preview}")
+        if compress_hint:
+            map_parts.append(compress_hint)
         if _conv_index:
             turns = sorted(_conv_index.items(), reverse=True)[:5]
             map_parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in turns))
-        ctx_len = len(conversation_history)
-        if ctx_len > 20:
-            # Dynamic cutoff hint
-            hint = "auto-compress active" if ctx_len > 50 else "consider compressing older turns"
+        if ctx_len > 30:
+            hint = "use headroom_retrieve for old content" if ctx_len > 50 else "consider compressing older turns"
             map_parts.append(f"  context: {ctx_len} msgs ({hint})")
 
     if map_parts:
         return "\n".join(map_parts)
+
+
+def _group_into_turns(conversation_history):
+    """Group messages into turns (user → assistant → tools)."""
+    turns = []
+    current = None
+    turn_num = 0
+    for msg in conversation_history:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role == "user":
+            if current:
+                turns.append(current)
+            turn_num += 1
+            current = {"id": turn_num, "user": str(content)[:1000]}
+        elif role == "assistant" and current:
+            current["assistant"] = str(content)[:1000]
+        elif role == "tool" and current:
+            # Tool results accumulate under the current turn
+            pass
+    if current:
+        turns.append(current)
+    return turns
+
+
+def _extract_preview(marker, conversation_history):
+    """Extract a short preview for a CCR marker from conversation history."""
+    h = marker['hash']
+    for msg in conversation_history:
+        c = msg.get("content", "")
+        if isinstance(c, str) and h in c:
+            idx = c.find(h)
+            after = c[idx + len(h):].strip()
+            if after.startswith('|'):
+                after = after.split(']', 1)[-1] if ']' in after else after
+            return after[:80].strip()
+    return ""
 
 
 def _api_request_hook(api_messages=None, api_request_id=None, **kwargs):
