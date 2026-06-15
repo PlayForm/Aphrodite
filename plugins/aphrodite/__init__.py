@@ -18,8 +18,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.48"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.57.0"        # plugin version
+BIN_VERSION = "v0.5.49"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.58.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -31,9 +31,9 @@ def _cfg_int(name, default):
     except: return default
 
 ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 50)  # compress at 50% fill
-ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 2)
-ENGINE_PROTECT_LAST  = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 5)
-ENGINE_MIN_MSGS      = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 30)  # don't compress short conversations
+ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 1)
+ENGINE_PROTECT_LAST  = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 1)
+ENGINE_MIN_MSGS      = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 4)   # compress early for testing
 TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 1024)
 TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 8192)
 TERMINAL_THRESHOLD    = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 2048)
@@ -760,7 +760,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             if not live and markers:
                 live = markers
             
-            # Auto-expand: resolve small cached items inline — LLM never sees aphrodite_retrieve
+            # Auto-expand: resolve small cached items inline - LLM never sees aphrodite_retrieve
             expanded = []
             for m in live:
                 if m['size'] < 10240 and m['hash'] in _inline_store:
@@ -1472,7 +1472,7 @@ class AphroditeContextEngine(ContextEngine):
         0 = never compress (disabled). 50 = compress at 50% fill."""
         if self.threshold_percent == 0:
             return False  # disabled
-        tokens = prompt_tokens or self.last_prompt_tokens or 1  # fallback: always had 1 token
+        tokens = prompt_tokens or self.last_prompt_tokens or (self.context_length or 1000000)
         if not self.context_length:
             return False
         pct = (tokens / self.context_length) * 100
