@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.31"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.40.0"        # plugin version
+BIN_VERSION = "v0.5.34"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.43.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -246,11 +246,7 @@ def _start(name, env):
         _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
         return
     
-    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key]
-    if name == "token":
-        args += ["--mode", "token", "--tool-relay"]
-    else:
-        args += ["--mode", "cache"]
+    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key, "--mode", "token", "--tool-relay"]
     
     _log.info("starting aphrodite %s on :%s", name, port)
     try:
@@ -269,14 +265,13 @@ def on_start(**kw):
         return
     
     env = {**os.environ, **_load_env()}
-    for name in ("cache", "token"):
+    for name in ("token",):
         if not _alive(PORTS[name]):
             _start(name, env)
     
-    # Retry loop for proxy readiness (was fixed 0.5s sleep)
-    cache_ok = _wait_alive(9797, retries=10, delay=0.3)
+    # Retry loop for proxy readiness
     token_ok = _wait_alive(9798, retries=10, delay=0.3)
-    _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
+    _log.info("aphrodite: token=%s", "UP" if token_ok else "DOWN")
 
 
 def _wait_alive(port, retries=10, delay=0.3):
@@ -437,9 +432,8 @@ def _transform_tool_result(
     if _DEV: return result  # dev mode: passthrough
     # Track file references for aphrodite_files tool
     _track_file_refs(tool_name, args)
-    token_alive = _alive(PORTS["token"])
-    cache_alive = _alive(PORTS["cache"])
-    proxy_available = token_alive or cache_alive
+    token_alive = _alive(9798)
+    proxy_available = token_alive
 
     skip = {"read_file", "read_terminal", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
     if tool_name in skip:
@@ -556,6 +550,15 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
             break
 
     summary = f"T{tnum}: {last_user}… → {str(assistant_response)[:200]}"
+    # Tag by file type for better retrieval
+    if _referenced_files:
+        exts = {}
+        for path in list(_referenced_files)[-10:]:  # recent files
+            ext = os.path.splitext(path)[1] or "noext"
+            exts[ext] = exts.get(ext, 0) + 1
+        top_exts = sorted(exts.items(), key=lambda x: x[1], reverse=True)[:3]
+        file_tag = " ".join(f"{ext}({n})" for ext, n in top_exts)
+        summary += f" [{file_tag}]"
 
     try:
         data = json.dumps({"content": json.dumps({
