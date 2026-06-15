@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.37"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.46.0"        # plugin version
+BIN_VERSION = "v0.5.38"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.47.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -824,8 +824,8 @@ def _extract_preview(marker, conversation_history):
         if isinstance(c, str) and h in c:
             idx = c.find(h)
             after = c[idx + len(h):].strip()
-            if after.startswith('|'):
-                after = after.split(']', 1)[-1] if ']' in after else after
+            if '>>>' in after:
+                after = after.split('>>>', 1)[-1].strip()
             return after[:80].strip()
     return ""
 
