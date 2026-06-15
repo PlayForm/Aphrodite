@@ -272,26 +272,47 @@ pub async fn proxy_handler(
     }
 }
 
-/// Compress a Chat Completions API response.
-///
-/// The response format is:
-/// ```json
-/// {
-///   "choices": [{
-///     "message": {
-///       "role": "assistant",
-///       "content": "...",
-///       "tool_calls": [...]
-///     }
-///   }]
-/// }
-/// ```
+/// Detect content type for adaptive compression strategy.
+
+fn format_size(bytes: usize) -> String {
+    if bytes >= 1_000_000 { format!("{:.1}MB", bytes as f64 / 1_000_000.0) }
+    else if bytes >= 1000 { format!("{:.1}KB", bytes as f64 / 1000.0) }
+    else { format!("{}B", bytes) }
+}
+
+fn detect_content_type(content: &str) -> &'static str {
+    if content.starts_with('{') || content.starts_with('[') {
+        if content.contains("exit_code") {
+            return "tool_output";
+        }
+        return "json";
+    }
+    if content.contains("error") || content.contains("Error") || content.contains("ERROR") {
+        return "error";
+    }
+    if content.contains('\n') && content.lines().count() > 5 {
+        if content.contains("fn ") || content.contains("def ") || content.contains("class ") {
+            return "code";
+        }
+        return "log";
+    }
+    "text"
+}
+
+/// Create a smart CCR marker with metadata the LLM can use to decide retrieval.
+fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
+    let size = content.len();
+    let preview = &content[..content.len().min(120)];
+    let oneliner = preview.lines().next().unwrap_or(preview).trim();
+    format!("⫷CCR:{}|{}|{}⫸ {}", hash, ct, size, oneliner)
+}
+
+/// Compress a Chat Completions API response with smart markers.
 async fn compress_chat_completion(
     state: &AppState,
     resp_body: &[u8],
 ) -> Option<serde_json::Value> {
     let mut response: serde_json::Value = serde_json::from_slice(resp_body).ok()?;
-
     let choices = response.get_mut("choices")?.as_array_mut()?;
     let threshold = state.compress_threshold();
     let mut did_compress = false;
@@ -299,28 +320,24 @@ async fn compress_chat_completion(
     for choice in choices {
         let message = choice.get_mut("message")?;
 
-        // Compress text content
+        // Compress text content with smart markers
         if let Some(content_val) = message.get_mut("content") {
             if let Some(content) = content_val.as_str() {
                 if content.len() > threshold {
                     if let Some(ccr) = &state.ccr {
                         let hash = compute_key(content.as_bytes());
                         ccr.put(&hash, content);
+                        let ct = detect_content_type(content);
 
-                        // Cache mode: keep a preview, aphrodite mode: marker only
                         let compressed = match state.mode {
                             ProxyMode::Cache => {
-                                // Lightweight: show preview + marker
+                                // Keep first 512 chars + marker
                                 let preview = &content[..content.len().min(512)];
-                                format!("[{}] {}", marker_for(&hash), preview)
+                                format!("⫷CCR:{}|{}|{}⫸\n{}", hash, ct, content.len(), preview)
                             }
                             ProxyMode::Token => {
-                                // Aggressive: marker only
-                                if state.add_markers {
-                                    marker_for(&hash)
-                                } else {
-                                    hash
-                                }
+                                // Marker with one-line preview so LLM knows whether to retrieve
+                                smart_marker(&hash, content, ct)
                             }
                         };
                         *content_val = serde_json::Value::String(compressed);
@@ -330,7 +347,7 @@ async fn compress_chat_completion(
             }
         }
 
-        // Compress tool call outputs (function results)
+        // Compress tool call outputs
         if let Some(tool_calls_val) = message.get_mut("tool_calls") {
             if let Some(arr) = tool_calls_val.as_array_mut() {
                 for tc in arr.iter_mut() {
@@ -341,8 +358,9 @@ async fn compress_chat_completion(
                                     if let Some(ccr) = &state.ccr {
                                         let hash = compute_key(args_str.as_bytes());
                                         ccr.put(&hash, args_str);
+                                        let ct = detect_content_type(args_str);
                                         *args = serde_json::Value::String(
-                                            marker_for(&hash)
+                                            smart_marker(&hash, args_str, ct)
                                         );
                                         did_compress = true;
                                     }
@@ -352,19 +370,24 @@ async fn compress_chat_completion(
                     }
                 }
 
-                // Token mode: inject headroom_retrieve tool
+                // Inject optimized headroom_retrieve tool
                 if state.inject_tool {
                     let retrieve_tool = serde_json::json!({
                         "type": "function",
                         "function": {
                             "name": "headroom_retrieve",
-                            "description": "Resolve CCR markers to original content.",
+                            "description": "Retrieve original content behind a CCR marker. Call this when you see a ⭷CCR:hash marker and need the full content to answer accurately. Provide the hash from the marker. Optionally filter with query.",
                             "parameters": {
                                 "type": "object",
                                 "properties": {
-                                    "hash": {"type": "string", "description": "CCR marker or hash to retrieve"},
-                                    "query": {"type": "string", "description": "Filter retrieved content by query"},
-                                    "path": {"type": "string", "description": "File path for direct disk read"}
+                                    "hash": {
+                                        "type": "string",
+                                        "description": "The hash from the CCR marker (e.g. ⭷CCR:abc123|json|2048⭸)"
+                                    },
+                                    "query": {
+                                        "type": "string",
+                                        "description": "Filter returned content to lines matching this query (optional)"
+                                    }
                                 },
                                 "required": ["hash"]
                             }
