@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.23"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.32.0"        # plugin version
+BIN_VERSION = "v0.5.24"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.33.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -559,11 +559,15 @@ def _parse_ccr_markers(text):
         if len(parts) >= 3:
             try:
                 sz = int(parts[2])
+                # Extract preview text after the marker
+                marker_end = m.rfind('>>>') + 3 if '>>>' in m else len(m)
+                preview = text[text.find(m) + marker_end:].strip()[:200] if marker_end > 3 else ''
                 markers.append({
                     'hash': parts[0],
                     'type': parts[1],
                     'size': sz,
-                    'mode': parts[3] if len(parts) > 3 else '?'
+                    'mode': parts[3] if len(parts) > 3 else '?',
+                    'preview': preview,
                 })
             except ValueError:
                 pass
@@ -623,6 +627,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             for m in _parse_ccr_markers(content):
                 total_bytes += m['size']
                 markers.append(m)
+    _recent_markers = markers  # cache for aphrodite_search
 
     # ── 2. Compress old turns to CCR (skip already-compressed) ──
     compress_hint = ""
@@ -952,6 +957,7 @@ STATS_SCHEMA = {
 
 # ── File tracking (for aphrodite_files tool) ──────────────────
 _referenced_files = {}  # {filepath: last_tool_name}
+_recent_markers = []     # list of {hash, type, size, preview} from catalog
 
 _FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
 
@@ -1022,8 +1028,15 @@ def _search_handler(args=None, **kwargs):
         preview = content[:200].replace('\n', ' ').strip()
         results.append({"source": "inline", "hash": h, "preview": preview, "size": len(content)})
     
+    # Search recent marker catalog (from pre_llm_hook)
+    for m in _recent_markers:
+        if query and query not in m.get('preview', '').lower():
+            continue
+        results.append({"source": "marker", "hash": m['hash'], "type": m.get('type', '?'), 
+                        "size": m.get('size', 0), "preview": m.get('preview', '')[:200]})
+    
     if ccr_type:
-        results = [r for r in results if ccr_type in r.get("summary", "") + r.get("preview", "")]
+        results = [r for r in results if ccr_type in r.get("type", "") or ccr_type in r.get("summary", "") + r.get("preview", "")]
     
     return json.dumps({
         "query": query,
@@ -1327,10 +1340,11 @@ class AphroditeContextEngine(ContextEngine):
         self.compression_count = 0
         self.last_compression = {}
         _inline_clear()
-        global _conv_index, _turn_counter, _referenced_files
+        global _conv_index, _turn_counter, _referenced_files, _recent_markers
         _conv_index.clear()
         _turn_counter = 0
         _referenced_files.clear()
+        _recent_markers.clear()
         _log.info("aphrodite v%s: session reset - inline store + memory cleared", PLUGIN_VERSION)
 
     def on_session_start(self, session_id="", **kw):
