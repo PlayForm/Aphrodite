@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.40"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.49.0"        # plugin version
+BIN_VERSION = "v0.5.41"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.50.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1305,22 +1305,20 @@ def register(ctx):
     
     # ── Debug banner: print configuration on startup ──────────
     if DEBUG_LOGGING:
-        _log.info("=" * 60)
-        _log.info("APHRODITE v%s — DEBUG MODE", PLUGIN_VERSION)
-        _log.info("  Mode: %s | Engine: %s | Dev: %s",
-            "proxy+hooks" if not engine_configured else "proxy+hooks+engine",
-            "enabled" if engine_configured else "disabled (APHRODITE_CONTEXT_ENGINE=0)",
-            "on" if _DEV else "off"
-        )
-        _log.info("  Thresholds: terminal=%s inline=%s tool_token=%s tool_cache=%s",
-            TERMINAL_THRESHOLD, INLINE_THRESHOLD, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE)
-        _log.info("  Engine: threshold=%s%% protect=%s/%s min_msgs=%s",
-            ENGINE_THRESHOLD_PCT, ENGINE_PROTECT_FIRST, ENGINE_PROTECT_LAST, ENGINE_MIN_MSGS)
-        _log.info("  CCR: regex=%s depth=%s", _CCR_RE.pattern, RECURSIVE_DEPTH)
-        _log.info("  Tools: retrieve, compress, stats, rebuild, files, diff, search, test")
-        _log.info("  Proxies: cache=:9797 token=:9798 | %s",
-            "waiting for session_start..." )
-        _log.info("=" * 60)
+        lines = [
+            "=" * 60,
+            f"APHRODITE v{PLUGIN_VERSION} — DEBUG MODE",
+            f"  Mode: {'proxy+hooks' if not engine_configured else 'proxy+hooks+engine'} | Engine: {'enabled' if engine_configured else 'disabled'} | Dev: {'on' if _DEV else 'off'}",
+            f"  Thresholds: terminal={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_token={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE}",
+            f"  Engine: threshold={ENGINE_THRESHOLD_PCT}% protect={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min_msgs={ENGINE_MIN_MSGS}",
+            f"  CCR: regex={_CCR_RE.pattern} depth={RECURSIVE_DEPTH}",
+            f"  Tools: retrieve, compress, stats, rebuild, files, diff, search, test",
+            f"  Proxies: cache=:9797 token=:9798 | waiting for session_start...",
+            "=" * 60,
+        ]
+        for line in lines:
+            print(line)
+            _log.info(line)
 
 
 # ── Context Engine (plugs into Hermes compress() pipeline) ─────
