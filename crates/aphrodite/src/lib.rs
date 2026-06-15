@@ -1,49 +1,87 @@
-//! # aphrodite — Chat Completions proxy wrapping headroom-core
+//! # aphrodite — LLM proxy with CCR + tool relay
 //!
-//! Aphrodite is a Rust proxy that sits between Hermes and DeepSeek's API,
-//! providing CCR (Compress-Cache-Retrieve) for tool outputs in chat completions.
-//!
-//! ## Modes
-//!
-//! - **Cache** (default, :9797): In-memory CCR store, >8KB compression threshold,
-//!   preserves a 512-char content preview. Lightweight, no tool injection.
-//! - **Aphrodite** (:9798): SQLite-backed persistent CCR, >1KB threshold,
-//!   aggressive compression with marker-only output, tool injection for
-//!   `headroom_retrieve`, bidirectional tool relay endpoint.
-//!
-//! ## Endpoints
-//!
-//! | Method | Path | Description |
-//! |--------|------|-------------|
-//! | GET | `/health` | Health check → `ok` |
-//! | GET | `/stats` | Live proxy statistics |
-//! | POST | `/retrieve` | Resolve CCR markers → original content |
-//! | POST | `/tool/relay` | Execute tool calls through proxy |
-//! | POST | `/ccr/create` | Programmatic CCR entry creation |
-//! | GET | `/ccr/list` | List CCR entries |
-//! | ANY | `/*path` | Proxy passthrough → DeepSeek |
+//! Generic proxy for any OpenAI-compatible API. Two modes:
+//! - **Cache** (:9797): in-memory CCR, >8KB threshold, preview preserved
+//! - **Token** (:9798): SQLite CCR, >1KB threshold, tool injection + relay
 //!
 //! ## Quick Start
 //!
 //! ```bash
-//! # Cache mode (default)
-//! aphrodite --mode cache --listen 127.0.0.1:9797 --deepseek-key $KEY
+//! # Multi-proxy from config
+//! aphrodite  # reads aphrodite.toml → starts :9797 + :9798
 //!
-//! # Token mode (full CCR + tool relay)
-//! aphrodite --mode aphrodite --listen 127.0.0.1:9798 --deepseek-key $KEY --tool-relay
+//! # Single mode
+//! aphrodite --mode cache --listen :9797 --api-key $APHRODITE_API_KEY
+//! aphrodite --mode token --listen :9798 --api-key $APHRODITE_API_KEY --tool-relay
 //!
-//! # Dev mode (verbose logging)
-//! aphrodite --mode aphrodite --listen 127.0.0.1:9798 --deepseek-key $KEY --dev
+//! # Dev mode with verbose logging
+//! APHRODITE_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
 //! ```
 //!
 //! ## Architecture
 //!
 //! ```text
-//! Hermes → aphrodite (:9797/:9798) → DeepSeek API
-//!              ↓ CCR store
-//!         InMemoryCcrStore (cache) / SqliteCcrStore (aphrodite)
-//!              ↓ Tool relay
-//!         POST /tool/relay ← Hermes can call this
+//! Hermes → aphrodite (:9797/:9798) → any LLM API
+//!              ↓ CCR store (in-memory / SQLite)
+//!              ↓ Tool relay (bidirectional)
+//!         POST /tool/relay ← headroom_retrieve / headroom_compress
+//! ```
+//!
+//! ## Endpoints
+//!
+//! | Method | Path | Description |
+//! |--------|------|-------------|
+//! | GET | `/health` | Upstream probe + version |
+//! | GET | `/stats` | Latency histogram, CCR stats |
+//! | GET | `/history` | Ring buffer of last 50 requests |
+//! | POST | `/retrieve` | Resolve CCR markers |
+//! | POST | `/tool/relay` | headroom_retrieve/headroom_compress |
+//! | POST | `/ccr/create` | Programmatic CCR entry |
+//! | GET | `/ccr/list` | Entry count + backend info |
+//! | ANY | `/*path` | LLM API pass-through |
+//!
+//! ## Benchmarks
+//!
+//! | File | Size | Compressed | Ratio | Latency |
+//! |------|------|------------|-------|---------|
+//! | LICENSE | 7.0KB | 24B | 290x | 40ms |
+//! | README | 2.5KB | 24B | 103x | 64ms |
+//! | 20KB text | 20KB | 24B | 833x | — |
+//! | **Retrieve** | 20KB | — | — | **27ms avg** |
+//!
+//! ## Config (aphrodite.toml)
+//!
+//! ```toml
+//! [defaults]
+//! api_url = "https://api.deepseek.com"
+//! model = "deepseek-v4-pro"
+//!
+//! [[proxies]]
+//! name = "cache"
+//! listen = "127.0.0.1:9797"
+//! mode = "cache"
+//!
+//! [[proxies]]
+//! name = "token"
+//! listen = "127.0.0.1:9798"
+//! mode = "token"
+//! tool_relay = true
+//! ```
+//!
+//! ## Hermes Integration
+//!
+//! ```yaml
+//! providers:
+//!   aphrodite-cache:
+//!     api_key_env: APHRODITE_API_KEY
+//!     provider: deepseek
+//!     base_url: http://127.0.0.1:9797
+//!   aphrodite-token:
+//!     api_key_env: APHRODITE_API_KEY
+//!     provider: deepseek
+//!     base_url: http://127.0.0.1:9798
+//! fallback_providers:
+//!   - deepseek-direct
 //! ```
 
 pub mod config;
