@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.39"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.48.0"        # plugin version
+BIN_VERSION = "v0.5.40"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.49.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -435,7 +435,9 @@ def _transform_tool_result(
     token_alive = _alive(9798)
     proxy_available = token_alive
 
-    skip = {"read_file", "read_terminal", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
+    # Essential tools: never compress — agent needs immediate access to skills, memory, session history
+    _ESSENTIAL_TOOLS = {"skill_view", "skills_list", "skill_manage", "memory", "session_search", "read_file", "read_terminal"}
+    skip = _ESSENTIAL_TOOLS | {"aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"} if token_alive else _ESSENTIAL_TOOLS | {"execute_code", "patch", "write_file", "search_files", "todo", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
     if tool_name in skip:
         if DEBUG_LOGGING:
             _log.debug("transform_tool_result: SKIP %s %.1fms (in skip list)", tool_name[:40], (time.time()-_t0)*1000)
