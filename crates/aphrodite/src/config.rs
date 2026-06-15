@@ -32,15 +32,15 @@ pub struct Cli {
     pub listen: SocketAddr,
 
     /// Upstream API base URL
-    #[arg(long, default_value = "https://upstream-api.example.com", env = "APHRODITE_API_URL")]
+    #[arg(long, default_value = "https://api.openai.com", env = "APHRODITE_API_URL")]
     pub api_url: String,
 
     /// Upstream API key
-    #[arg(long, env = "APHRODITE_UPSTREAM_API_KEY")]
+    #[arg(long, env = "APHRODITE_API_KEY")]
     pub api_key: String,
 
-    /// Model name to forward
-    #[arg(long, default_value = "default-model",  # set via APHRODITE_MODEL env or --model env = "APHRODITE_MODEL")]
+    /// Model name to forward (set via APHRODITE_MODEL env or --model)
+    #[arg(long, default_value = "default-model", env = "APHRODITE_MODEL")]
     pub model: String,
 
     /// Max context tokens
@@ -134,8 +134,8 @@ impl MultiConfig {
                 _ => ProxyMode::Cache,
             },
             listen: cfg.listen.parse().unwrap_or_else(|_| "127.0.0.1:8788".parse().unwrap()),
-            api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://upstream-api.example.com".into()),
-            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_UPSTREAM_API_KEY").ok()).or_else(|| std::env::var("UPSTREAM_API_KEY").ok()).unwrap_or_default(),
+            api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
+            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).unwrap_or_default(),
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
             max_context: 1_000_000,
             max_output: 384_000,
