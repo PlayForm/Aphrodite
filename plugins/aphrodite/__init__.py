@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.26"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.35.0"        # plugin version
+BIN_VERSION = "v0.5.27"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.36.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -343,12 +343,20 @@ def _retrieve_handler(args=None, **kwargs):
 
 
 def _compress_handler(args=None, **kwargs):
-    """Compress content into CCR via aphrodite proxy."""
+    """Compress content into CCR via aphrodite proxy. Content-addressable:
+    checks local cache first, only hits proxy on miss."""
     args = args if isinstance(args, dict) else {}
     content = args.get("content", "")
     type_hint = args.get("type", "text")
     if not content:
         return '{"error": "missing content parameter"}'
+    
+    # Pop the API: check local cache first (content-addressable store)
+    h = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
+    if h in _inline_store:
+        return json.dumps({"hash": h, "type": type_hint, "size": len(content), 
+                           "source": "cache", "compression_ratio": 0})
+    
     try:
         data = json.dumps({"content": content}).encode()
         req = urllib.request.Request(
@@ -358,7 +366,7 @@ def _compress_handler(args=None, **kwargs):
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())
-        h = result.get("hash")
+        h = result.get("hash", h)
         if h:
             _inline_store[h] = content  # mirror in inline store for aphrodite_search
         return json.dumps({
@@ -368,7 +376,10 @@ def _compress_handler(args=None, **kwargs):
             "compression_ratio": result.get("compression_ratio")
         })
     except Exception as e:
-        return f'{{"error": "compress failed: {str(e)}"}}'
+        # Fallback: store inline anyway
+        _inline_store[h] = content
+        return json.dumps({"hash": h, "type": type_hint, "size": len(content), 
+                           "source": "inline_fallback", "compression_ratio": 0})
 
 
 COMPRESS_SCHEMA = {
