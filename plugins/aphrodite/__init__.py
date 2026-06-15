@@ -837,13 +837,29 @@ class AphroditeContextEngine(ContextEngine):
         """Offload middle messages to CCR, keep head+tail raw.
 
         Dual-mode: proxy CCR preferred, inline zlib fallback.
+        Tool-chain safe: won't split assistant tool_call from its tool_result.
         """
         if len(messages) <= self.min_messages_to_compress:
             return messages
 
-        head = messages[:self.protect_first_n]
-        middle = messages[self.protect_first_n:-self.protect_last_n]
-        tail = messages[-self.protect_last_n:]
+        head_n = self.protect_first_n
+        tail_n = self.protect_last_n
+
+        # ── Tool-chain safety: extend tail to include full chains ──
+        # If the tail boundary splits a tool_call→tool_result pair,
+        # extend tail backwards to include the orphan tool_result.
+        if len(messages) > tail_n:
+            boundary = len(messages) - tail_n
+            # Check if we'd split a tool chain: if messages[boundary] is a
+            # tool result, backtrack through preceding tool_call messages
+            while boundary < len(messages) and messages[boundary].get("role") == "tool":
+                boundary += 1
+                tail_n += 1
+            tail_n = min(tail_n, len(messages) - head_n)
+
+        head = messages[:head_n]
+        middle = messages[head_n:-tail_n] if tail_n > 0 else messages[head_n:]
+        tail = messages[-tail_n:] if tail_n > 0 else []
 
         if len(middle) < 3:
             return messages  # too few to compress
