@@ -28,7 +28,7 @@ pub struct Cli {
     pub mode: ProxyMode,
 
     /// Listen address
-    #[arg(long, default_value = "127.0.0.1:8788", env = "APHRODITE_LISTEN")]
+    #[arg(long, default_value = "127.0.0.1:9797", env = "APHRODITE_LISTEN")]
     pub listen: SocketAddr,
 
     /// Upstream API base URL
@@ -52,7 +52,7 @@ pub struct Cli {
     pub max_output: usize,
 
     /// SQLite database path for CCR storage
-    #[arg(long, default_value = ".headroom/aphrodite-ccr.db", env = "APHRODITE_DB")]
+    #[arg(long, env = "APHRODITE_DB", default_value = "")]
     pub ccr_db_path: PathBuf,
 
     /// CCR TTL in seconds (default: 3600 = 1 hour)
@@ -134,7 +134,7 @@ impl MultiConfig {
                 "token" => ProxyMode::Token,
                 _ => ProxyMode::Cache,
             },
-            listen: cfg.listen.parse().unwrap_or_else(|_| "127.0.0.1:8788".parse().unwrap()),
+            listen: cfg.listen.parse().unwrap_or_else(|_| "127.0.0.1:9797".parse().unwrap()),
             api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
             api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).unwrap_or_default(),
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
