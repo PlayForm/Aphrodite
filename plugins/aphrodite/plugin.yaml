@@ -1,5 +1,5 @@
 name: aphrodite
-version: 0.3.0
+version: 0.4.0
 description: "Auto-install + launch aphrodite Chat Completions proxy — cache (:9797) + token (:9798) with CCR + tool relay"
 kind: plugin
 provides_hooks:
