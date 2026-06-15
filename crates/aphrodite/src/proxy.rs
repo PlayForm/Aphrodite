@@ -43,7 +43,7 @@ const CHAT_COMPLETIONS_PATH: &str = "/v1/chat/completions";
 
 pub struct AppState {
     pub client: HttpClient,
-    pub deepseek_url: String,
+    pub api_url: String,
     pub model: String,
     pub api_key: String,
     pub ccr: Option<Arc<dyn CcrStore>>,
@@ -167,9 +167,9 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
     Ok(AppState {
         client,
-        deepseek_url: cli.deepseek_url.clone(),
+        api_url: cli.api_url.clone(),
         model: cli.model.clone(),
-        api_key: cli.deepseek_key.clone(),
+        api_key: cli.api_key.clone(),
         ccr,
         inject_tool: !cli.no_ccr_inject_tool && matches!(cli.mode, ProxyMode::Token),
         add_markers: !cli.no_ccr_marker,
@@ -211,7 +211,7 @@ pub async fn proxy_handler(
     }
 
     let deepseek_path = path.path().trim_start_matches('/');
-    let url = format!("{}/{}", state.deepseek_url.trim_end_matches('/'), deepseek_path);
+    let url = format!("{}/{}", state.api_url.trim_end_matches('/'), deepseek_path);
 
     let is_chat_completion = deepseek_path == CHAT_COMPLETIONS_PATH.trim_start_matches('/');
 
@@ -502,7 +502,7 @@ mod tests {
     fn test_compress_threshold_cache() {
         let state = AppState {
             client: HttpClient::new(),
-            deepseek_url: "https://api.deepseek.com".into(),
+            api_url: "https://api.deepseek.com".into(),
             model: "test".into(),
             api_key: "test".into(),
             ccr: None,
@@ -584,7 +584,7 @@ mod tests {
     fn test_state() -> AppState {
         AppState {
             client: HttpClient::new(),
-            deepseek_url: "https://api.deepseek.com".into(),
+            api_url: "https://api.deepseek.com".into(),
             model: "deepseek-v4-pro".into(),
             api_key: "test".into(),
             ccr: None,
