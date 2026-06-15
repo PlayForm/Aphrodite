@@ -5,7 +5,7 @@
 #   ./scripts/proxy-9798.sh              # start
 #   ./scripts/proxy-9798.sh --stop       # stop
 #
-# Reads HEADROOM_DEEPSEEK_KEY from ~/.hermes/.env
+# Reads APHRODITE_API_KEY from ~/.hermes/.env
 
 set -euo pipefail
 

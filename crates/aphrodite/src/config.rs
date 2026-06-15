@@ -1,7 +1,7 @@
 //! CLI configuration for aphrodite.
 //!
-//! Supports cache (:9797) and token (:9798) proxy modes with
-//! Chat Completions API forwarding, tool relay, and programmatic CCR.
+//! Generic LLM proxy — works with any OpenAI-compatible API.
+//! Cache and Token modes with CCR, tool relay, programmatic CCR.
 
 use clap::{Parser, ValueEnum};
 use std::net::SocketAddr;
@@ -18,7 +18,8 @@ pub enum ProxyMode {
     Token,
 }
 
-/// aphrodite — Chat Completions proxy with CCR, tool relay, and programmatic CCR.
+/// aphrodite — generic LLM proxy with CCR, tool relay, and programmatic CCR.
+/// Works with any OpenAI-compatible API (DeepSeek, OpenAI, Anthropic via proxy, etc.)
 #[derive(Parser, Debug, Clone)]
 #[command(name = "aphrodite", version, about)]
 pub struct Cli {
@@ -26,17 +27,17 @@ pub struct Cli {
     #[arg(long, default_value = "token", env = "APHRODITE_MODE")]
     pub mode: ProxyMode,
 
-    /// Listen address (default: 127.0.0.1:8788 for token, :9797 for cache)
+    /// Listen address
     #[arg(long, default_value = "127.0.0.1:8788", env = "APHRODITE_LISTEN")]
     pub listen: SocketAddr,
 
-    /// DeepSeek API base URL
-    #[arg(long, default_value = "https://api.deepseek.com", env = "DEEPSEEK_URL")]
-    pub deepseek_url: String,
+    /// Upstream API base URL
+    #[arg(long, default_value = "https://api.deepseek.com", env = "APHRODITE_API_URL")]
+    pub api_url: String,
 
-    /// DeepSeek API key
-    #[arg(long, env = "HEADROOM_DEEPSEEK_KEY")]
-    pub deepseek_key: String,
+    /// Upstream API key
+    #[arg(long, env = "APHRODITE_API_KEY")]
+    pub api_key: String,
 
     /// Model name to forward
     #[arg(long, default_value = "deepseek-v4-pro", env = "APHRODITE_MODEL")]
@@ -58,7 +59,7 @@ pub struct Cli {
     #[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
     pub ccr_ttl_seconds: u64,
 
-    /// Disable CCR tool injection (aphrodite mode only)
+    /// Disable CCR tool injection (token mode only)
     #[arg(long)]
     pub no_ccr_inject_tool: bool,
 
@@ -78,7 +79,7 @@ pub struct Cli {
     #[arg(long, env = "APHRODITE_NOTIFY_KEY")]
     pub notify_key: Option<String>,
 
-    /// Enable dev mode — verbose request/response logging to stderr + /tmp/aphrodite-dev.log
+    /// Enable dev mode — verbose request/response logging
     #[arg(long)]
     pub dev: bool,
 }

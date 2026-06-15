@@ -99,9 +99,9 @@ def _alive(port):
 
 def _start(name, env):
     port = PORTS[name]
-    key = env.get("DEEPSEEK_API_KEY", "")
+    key = env.get("APHRODITE_API_KEY", "")
     if not key:
-        _log.warning("DEEPSEEK_API_KEY not set in env — proxy won't authenticate")
+        _log.warning("APHRODITE_API_KEY not set in env — proxy won't authenticate")
         return
     
     args = [BINARY, "--listen", f"127.0.0.1:{port}", "--deepseek-key", key]
