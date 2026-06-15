@@ -11,10 +11,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/crates/headroom-token/target/release/aphrodite"
+BINARY="$PROJECT_DIR/crates/aphrodite/target/release/aphrodite"
 # Fall back to debug build
 if [ ! -x "$BINARY" ]; then
-    BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite"
+    BINARY="$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite"
 fi
 PID_FILE="/tmp/aphrodite-9797.pid"
 LOG_FILE="/tmp/aphrodite-9797.log"
@@ -60,9 +60,9 @@ esac
 if [ ! -x "$BINARY" ]; then
     echo "Building aphrodite (cache)..."
     source "$HOME/.cargo/env" 2>/dev/null || true
-    cargo build --manifest-path "$PROJECT_DIR/crates/headroom-token/Cargo.toml"
-    if [ -x "$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite" ]; then
-        BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite"
+    cargo build --manifest-path "$PROJECT_DIR/crates/aphrodite/Cargo.toml"
+    if [ -x "$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite" ]; then
+        BINARY="$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite"
     fi
 fi
 
