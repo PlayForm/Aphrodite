@@ -1,9 +1,9 @@
 name: aphrodite
 version: 0.4.0
-description: "Auto-install + launch aphrodite Chat Completions proxy — cache (:9797) + token (:9798) with CCR + tool relay"
+description: "Auto-install + launch aphrodite Chat Completions proxy - cache (:9797) + token (:9798) with CCR + tool relay"
 kind: plugin
 provides_hooks:
-  - session_start
+  - on_session_start
   - transform_tool_result
   - pre_llm_call
   - transform_terminal_output
@@ -15,4 +15,4 @@ provides_tools:
 install_message: |
   aphrodite v0.2.0 will be downloaded from GitHub releases.
   Requires DEEPSEEK_API_KEY in ~/.hermes/.env.
-  No cargo/Rust required — pre-built binary included.
+  No cargo/Rust required - pre-built binary included.

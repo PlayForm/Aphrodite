@@ -1,5 +1,5 @@
 """
-aphrodite v1.1.0 — Auto-install + launch aphrodite proxies.
+aphrodite v1.1.0 - Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 
@@ -15,11 +15,11 @@ BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
 _log = logging.getLogger("aphrodite")
-# Dev mode: skip all proxy routing — use cargo watch instead
+# Dev mode: skip all proxy routing - use cargo watch instead
 _DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 if _DEV:
     _log_placeholder = _log
-    _log_placeholder.warning("aphrodite DEV MODE — plugin disabled, use cargo watch for proxies")
+    _log_placeholder.warning("aphrodite DEV MODE - plugin disabled, use cargo watch for proxies")
 
 
 
@@ -50,7 +50,7 @@ def _download_binary() -> bool:
         _log.info("aphrodite binary installed to %s", BINARY)
         return True
     except Exception as e:
-        _log.warning("download failed: %s — falling back to cargo build", e)
+        _log.warning("download failed: %s - falling back to cargo build", e)
         return False
 
 
@@ -73,7 +73,7 @@ def _ensure_binary() -> bool:
         _log.info("copied local binary to %s", BINARY)
         return True
     
-    _log.error("no binary found — install cargo or download manually from %s/releases", REPO)
+    _log.error("no binary found - install cargo or download manually from %s/releases", REPO)
     return False
 
 
@@ -108,7 +108,7 @@ def _start(name, env):
     port = PORTS[name]
     key = env.get("APHRODITE_API_KEY", "")
     if not key:
-        _log.warning("APHRODITE_API_KEY not set in env — proxy won't authenticate")
+        _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
         return
     
     args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key]
@@ -130,7 +130,7 @@ def _start(name, env):
 
 def on_start(**kw):
     if not _ensure_binary():
-        _log.error("cannot start — binary not available")
+        _log.error("cannot start - binary not available")
         return
     
     env = {**os.environ, **_load_env()}
@@ -287,12 +287,12 @@ REBUILD_SCHEMA = {
 
 _conv_index = {}  # {turn_number: (hash, summary, size)}
 
-def _store_conversation_turn(api_messages=None, response=None, turn_number=0, **kwargs):
+def _store_conversation_turn(conversation_history=None, assistant_response=None, turn_id=0, **kwargs):
     """Post-LLM-call: store the current exchange in CCR for later retrieval."""
-    if not api_messages or response is None:
+    if not conversation_history or assistant_response is None:
         return
 
-    if _DEV: return result  # dev mode: passthrough
+    if _DEV: return  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
     if not token_alive and not cache_alive:
@@ -302,19 +302,19 @@ def _store_conversation_turn(api_messages=None, response=None, turn_number=0, **
 
     # Capture the last exchange (last user msg + assistant response)
     last_user = ""
-    for msg in reversed(api_messages):
+    for msg in reversed(conversation_history):
         if msg.get("role") == "user":
             last_user = msg.get("content", "")[:200]
             break
 
-    summary = f"Turn {turn_number}: {last_user} → {str(response)[:200]}"
+    summary = f"Turn {turn_id}: {last_user} → {str(assistant_response)[:200]}"
 
     try:
         import urllib.request, json
         data = json.dumps({"content": json.dumps({
-            "turn": turn_number,
+            "turn": turn_id,
             "user": last_user,
-            "assistant": str(response)[:5000],
+            "assistant": str(assistant_response)[:5000],
         })}).encode()
         req = urllib.request.Request(
             f"http://127.0.0.1:{target}/ccr/create",
@@ -323,33 +323,32 @@ def _store_conversation_turn(api_messages=None, response=None, turn_number=0, **
         with urllib.request.urlopen(req, timeout=2) as r:
             ccr = json.loads(r.read())
 
-        _conv_index[turn_number] = (ccr["hash"], summary, len(str(response)))
+        _conv_index[turn_id] = (ccr["hash"], summary, len(str(assistant_response)))
         if len(_conv_index) > 100:
             oldest = min(_conv_index.keys())
             del _conv_index[oldest]
 
-        _log.debug("conv-cache: stored turn %d → %s (%d total)", turn_number, ccr["hash"][:8], len(_conv_index))
+        _log.debug("conv-cache: stored turn %s → %s (%d total)", turn_id, ccr["hash"][:8], len(_conv_index))
     except Exception:
-        pass  # soft-fail — conversation memory is best-effort
+        pass  # soft-fail - conversation memory is best-effort
 
 
-def _pre_llm_hook(api_messages=None, response=None, **kwargs):
+def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     """Before LLM call: compress old messages, inject content map + memory index."""
     if _DEV: return  # dev mode: skip
-    if not api_messages or not isinstance(api_messages, list):
+    if not conversation_history or not isinstance(conversation_history, list):
         return
 
     # ── 1. Offload old messages to CCR ──────────────────────────
-    if _DEV: return result  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
     target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
 
     # Keep last 6 messages in context, offload older ones to CCR
-    if target and len(api_messages) > 8:
+    if target and len(conversation_history) > 8:
         try:
             import urllib.request, json
-            old_msgs = api_messages[:-6]  # everything except last 6
+            old_msgs = conversation_history[:-6]  # everything except last 6
             packed = json.dumps([{"role": m.get("role",""), "content": str(m.get("content",""))[:1000]} for m in old_msgs])
             if len(packed) > 200:  # only if worth compressing
                 data = json.dumps({"content": packed}).encode()
@@ -359,8 +358,8 @@ def _pre_llm_hook(api_messages=None, response=None, **kwargs):
                 # Replace old messages with a single marker
                 summary = f"[Context compressed: {len(old_msgs)} messages → CCR:{ccr['hash']}|{ccr['compression_ratio']:.0f}x]"
                 for _ in old_msgs:
-                    api_messages.pop(0)
-                api_messages.insert(0, {"role": "system", "content": summary})
+                    conversation_history.pop(0)
+                conversation_history.insert(0, {"role": "system", "content": summary})
                 _log.debug("pre_llm: offloaded %d old msgs → %s", len(old_msgs), ccr['hash'][:8])
         except Exception:
             pass  # soft-fail
@@ -369,7 +368,7 @@ def _pre_llm_hook(api_messages=None, response=None, **kwargs):
     markers = []
     total_bytes = 0
     import re
-    for msg in api_messages:
+    for msg in conversation_history:
         content = msg.get("content", "")
         if isinstance(content, str):
             found = re.findall(r'\[CCR:([^\]]+)\]', content)
@@ -391,14 +390,14 @@ def _pre_llm_hook(api_messages=None, response=None, **kwargs):
         if _conv_index:
             turns = sorted(_conv_index.items(), reverse=True)[:5]
             map_parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in turns))
-        if len(api_messages) > 20:
-            map_parts.append(f"  context: {len(api_messages)} msgs (auto-compress active)")
+        if len(conversation_history) > 20:
+            map_parts.append(f"  context: {len(conversation_history)} msgs (auto-compress active)")
 
     if map_parts:
         msg = "\n".join(map_parts)
-        for i in range(len(api_messages)-1, -1, -1):
-            if api_messages[i].get("role") == "user":
-                api_messages.insert(i, {"role": "system", "content": msg, "ephemeral": True})
+        for i in range(len(conversation_history)-1, -1, -1):
+            if conversation_history[i].get("role") == "user":
+                conversation_history.insert(i, {"role": "system", "content": msg, "ephemeral": True})
                 break
 def _fmt_size(b):
     if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
@@ -407,23 +406,19 @@ def _fmt_size(b):
 
 
 
-def _transform_terminal_hook(command="", stdout="", stderr="", exit_code=0, **kwargs):
+def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     """Compress terminal output via CCR on-the-fly."""
-    if _DEV: return stdout  # dev mode: passthrough
+    if _DEV: return output  # dev mode: passthrough
     if not _alive(PORTS["token"]) and not _alive(PORTS["cache"]):
-        return stdout  # no proxy, pass through
+        return output  # no proxy, pass through
 
-    combined = stdout
-    if stderr:
-        combined += "\n[stderr]\n" + stderr
-
-    if len(combined) < 2048:  # 2KB min for terminal compression
-        return stdout
+    if len(output) < 2048:  # 2KB min for terminal compression
+        return output
 
     target = PORTS["token"] if _alive(PORTS["token"]) else PORTS["cache"]
     try:
         import urllib.request, json
-        data = json.dumps({"content": combined}).encode()
+        data = json.dumps({"content": output}).encode()
         req = urllib.request.Request(
             f"http://127.0.0.1:{target}/ccr/create",
             data=data,
@@ -432,16 +427,16 @@ def _transform_terminal_hook(command="", stdout="", stderr="", exit_code=0, **kw
         with urllib.request.urlopen(req, timeout=3) as r:
             ccr = json.loads(r.read())
         hash_val = ccr["hash"]
-        preview = combined[:200].replace('\n', ' ').strip()
-        return f'[CCR:{hash_val}|terminal|{len(combined)}] {preview}...(use headroom_retrieve)'
+        preview = output[:200].replace('\n', ' ').strip()
+        return f'[CCR:{hash_val}|terminal|{len(output)}] {preview}...(use headroom_retrieve)'
     except Exception as e:
         _log.debug("terminal compress skipped: %s", e)
-        return stdout
+        return output
 
 def register(ctx):
     # Install binary on registration
     _ensure_binary()
-    ctx.register_hook("session_start", on_start)
+    ctx.register_hook("on_session_start", on_start)
     ctx.register_hook("pre_llm_call", _pre_llm_hook)
     ctx.register_hook("transform_terminal_output", _transform_terminal_hook)
     ctx.register_hook("post_llm_call", _store_conversation_turn)
@@ -464,4 +459,4 @@ def register(ctx):
         schema=RETRIEVE_SCHEMA,
         handler=_retrieve_handler,
     )
-    _log.info("aphrodite v%s registered — proxy + headroom_retrieve tool", VERSION)
+    _log.info("aphrodite v%s registered - proxy + headroom_retrieve tool", VERSION)
