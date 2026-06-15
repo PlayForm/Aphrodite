@@ -1,12 +1,14 @@
 """
-aphrodite v1.1.0 - Auto-install + launch aphrodite proxies.
+aphrodite v1.2.0 — Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
+- Recursive CCR resolution for nested markers
+- Dynamic knowledge map with previews and cutoff
 
 On install: downloads pre-built binary from GitHub releases.
 On session_start: launches aphrodite proxies not already running.
 """
-import os, subprocess, urllib.request, time, logging, platform, stat
+import os, subprocess, urllib.request, time, logging, platform, stat, re, json
 
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
@@ -15,11 +17,14 @@ BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
 _log = logging.getLogger("aphrodite")
-# Dev mode: skip all proxy routing - use cargo watch instead
+# Dev mode: skip all proxy routing — use cargo watch instead
 _DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 if _DEV:
-    _log_placeholder = _log
-    _log_placeholder.warning("aphrodite DEV MODE - plugin disabled, use cargo watch for proxies")
+    _log.warning("aphrodite DEV MODE — plugin disabled, use cargo watch for proxies")
+
+# ── CCR regex (shared) ───────────────────────────────────────
+_CCR_RE = re.compile(r'\[CCR:([^\]]+)\]')
+_RECURSIVE_DEPTH = 3  # max nesting depth for recursive resolution
 
 
 
@@ -50,7 +55,7 @@ def _download_binary() -> bool:
         _log.info("aphrodite binary installed to %s", BINARY)
         return True
     except Exception as e:
-        _log.warning("download failed: %s - falling back to cargo build", e)
+        _log.warning("download failed: %s — falling back to cargo build", e)
         return False
 
 
@@ -73,7 +78,7 @@ def _ensure_binary() -> bool:
         _log.info("copied local binary to %s", BINARY)
         return True
     
-    _log.error("no binary found - install cargo or download manually from %s/releases", REPO)
+    _log.error("no binary found — install cargo or download manually from %s/releases", REPO)
     return False
 
 
@@ -108,7 +113,7 @@ def _start(name, env):
     port = PORTS[name]
     key = env.get("APHRODITE_API_KEY", "")
     if not key:
-        _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
+        _log.warning("APHRODITE_API_KEY not set in env — proxy won't authenticate")
         return
     
     args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key]
@@ -130,7 +135,7 @@ def _start(name, env):
 
 def on_start(**kw):
     if not _ensure_binary():
-        _log.error("cannot start - binary not available")
+        _log.error("cannot start — binary not available")
         return
     
     env = {**os.environ, **_load_env()}
@@ -143,29 +148,78 @@ def on_start(**kw):
     _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
 
 
+# ── Tools ─────────────────────────────────────────────────────
 
-def _retrieve_handler(args=None, **kwargs):
-    """Resolve CCR markers to original content via aphrodite proxy."""
-    args = args if isinstance(args, dict) else {}
-    hash_val = args.get("hash", "")
-    if not hash_val:
-        return '{"error": "missing hash parameter"}'
+def _resolve_one(hash_val, timeout=4):
+    """Resolve a single CCR hash. Returns content string or None."""
     try:
-        import urllib.request, json
         data = json.dumps({"hash": hash_val}).encode()
         req = urllib.request.Request(
             "http://127.0.0.1:9798/retrieve",
             data=data,
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=5) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             result = json.loads(r.read())
         if result.get("found"):
             return result["content"]
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_recursive(hash_val, depth=0, resolved=None):
+    """Recursively resolve CCR markers in content, up to max depth.
+    
+    After retrieving content, scans for nested [CCR:...] markers
+    and resolves them in parallel, replacing markers with resolved content.
+    """
+    if resolved is None:
+        resolved = {}
+    
+    if depth >= _RECURSIVE_DEPTH or hash_val in resolved:
+        return resolved.get(hash_val, "")
+    
+    content = _resolve_one(hash_val)
+    if content is None:
+        return f'[CCR:{hash_val}|unresolved]'
+    
+    resolved[hash_val] = content
+    
+    # Find nested CCR markers
+    nested = _CCR_RE.findall(content)
+    if not nested:
+        return content
+    
+    # Resolve nested markers in parallel (sequential for simplicity)
+    replacements = {}
+    for marker in nested:
+        parts = marker.split('|')
+        if len(parts) >= 1 and parts[0] not in resolved:
+            nested_hash = parts[0]
+            nested_content = _resolve_recursive(nested_hash, depth + 1, resolved)
+            replacements[f'[CCR:{marker}]'] = nested_content
+    
+    # Replace markers with resolved content
+    for marker_str, replacement in replacements.items():
+        content = content.replace(marker_str, replacement)
+    
+    return content
+
+
+def _retrieve_handler(args=None, **kwargs):
+    """Resolve CCR markers with recursive depth. Scans for nested markers."""
+    args = args if isinstance(args, dict) else {}
+    hash_val = args.get("hash", "")
+    if not hash_val:
+        return '{"error": "missing hash parameter"}'
+    try:
+        content = _resolve_recursive(hash_val)
+        if content and not content.startswith("[CCR:"):
+            return content
         return f'{{"error": "CCR entry not found: {hash_val}"}}'
     except Exception as e:
         return f'{{"error": "retrieve failed: {str(e)}"}}'
-
 
 
 def _compress_handler(args=None, **kwargs):
@@ -175,7 +229,6 @@ def _compress_handler(args=None, **kwargs):
     if not content:
         return '{"error": "missing content parameter"}'
     try:
-        import urllib.request, json
         data = json.dumps({"content": content}).encode()
         req = urllib.request.Request(
             "http://127.0.0.1:9798/ccr/create",
@@ -202,7 +255,7 @@ COMPRESS_SCHEMA = {
 }
 RETRIEVE_SCHEMA = {
     "name": "headroom_retrieve",
-    "description": "Resolve CCR markers to original content via aphrodite proxy.",
+    "description": "Resolve CCR markers to original content via aphrodite proxy. Recursively resolves nested CCR markers up to 3 levels deep.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -213,6 +266,7 @@ RETRIEVE_SCHEMA = {
 }
 
 
+# ── Hooks ─────────────────────────────────────────────────────
 
 def _transform_tool_result(
     tool_name="", args=None, result="", tool_call_id="",
@@ -240,7 +294,6 @@ def _transform_tool_result(
 
     target = PORTS["token"] if token_alive else PORTS["cache"]
     try:
-        import urllib.request, json
         data = json.dumps({"content": result}).encode()
         req = urllib.request.Request(f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=3) as r:
@@ -255,7 +308,6 @@ def _transform_tool_result(
 
 def _rebuild_handler(args=None, **kwargs):
     """Rebuild aphrodite crate and copy binary to ~/.hermes/aphrodite/."""
-    import subprocess, shutil, os
     repo = "/Users/nikola/Developer/Application/PlayForm/HermesCompress"
     result = subprocess.run(
         ["cargo", "build", "--release", "-p", "aphrodite"],
@@ -267,6 +319,7 @@ def _rebuild_handler(args=None, **kwargs):
     
     src = os.path.join(repo, "target/release/aphrodite")
     if os.path.exists(src):
+        import shutil
         shutil.copy2(src, BINARY)
         os.chmod(BINARY, 0o755)
         return f'{{"ok": true, "size": {os.path.getsize(BINARY)}, "path": "{BINARY}"}}'
@@ -280,12 +333,10 @@ REBUILD_SCHEMA = {
 }
 
 
-
-
-
 # ── Conversation Memory via CCR ─────────────────────────────────────
 
-_conv_index = {}  # {turn_number: (hash, summary, size)}
+_conv_index = {}  # {turn_id: (hash, summary, size)}
+
 
 def _store_conversation_turn(conversation_history=None, assistant_response=None, turn_id=0, **kwargs):
     """Post-LLM-call: store the current exchange in CCR for later retrieval."""
@@ -307,10 +358,9 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
             last_user = msg.get("content", "")[:200]
             break
 
-    summary = f"Turn {turn_id}: {last_user} → {str(assistant_response)[:200]}"
+    summary = f"Turn {turn_id}: {last_user}… → {str(assistant_response)[:200]}"
 
     try:
-        import urllib.request, json
         data = json.dumps({"content": json.dumps({
             "turn": turn_id,
             "user": last_user,
@@ -330,7 +380,26 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
 
         _log.debug("conv-cache: stored turn %s → %s (%d total)", turn_id, ccr["hash"][:8], len(_conv_index))
     except Exception:
-        pass  # soft-fail - conversation memory is best-effort
+        pass  # soft-fail — conversation memory is best-effort
+
+
+def _parse_ccr_markers(text):
+    """Parse [CCR:hash|type|size|mode] markers from text. Returns list of dicts."""
+    markers = []
+    for m in _CCR_RE.findall(text):
+        parts = m.split('|')
+        if len(parts) >= 3:
+            try:
+                sz = int(parts[2])
+                markers.append({
+                    'hash': parts[0],
+                    'type': parts[1],
+                    'size': sz,
+                    'mode': parts[3] if len(parts) > 3 else '?'
+                })
+            except ValueError:
+                pass
+    return markers
 
 
 def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
@@ -347,42 +416,98 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
 
-    # ── Build markers + memory index ─────────────────────────
+    # ── Build markers with previews + memory index ─────────
     markers = []
     total_bytes = 0
-    import re
     for msg in conversation_history:
         content = msg.get("content", "")
         if isinstance(content, str):
-            found = re.findall(r'\[CCR:([^\]]+)\]', content)
-            for m in found:
-                parts = m.split('|')
-                if len(parts) >= 3:
-                    try:
-                        sz = int(parts[2])
-                        total_bytes += sz
-                        markers.append({'hash': parts[0], 'type': parts[1], 'size': sz, 'mode': parts[3] if len(parts) > 3 else '?'})
-                    except ValueError: pass
+            for m in _parse_ccr_markers(content):
+                total_bytes += m['size']
+                markers.append(m)
 
     map_parts = []
     if markers or _conv_index:
         map_parts.append("[APHRODITE]")
         if markers:
             mode_tag = "token" if token_alive else "cache" if cache_alive else "off"
+            # Dynamic cutoff: show first 8 markers with previews, summarize rest
+            visible = min(len(markers), 8)
             map_parts.append(f"  proxy={mode_tag} | {len(markers)} items @ {_fmt_size(total_bytes)} | retrieval: headroom_retrieve")
+            if visible > 0:
+                map_parts.append(f"  catalog ({visible}/{len(markers)}):")
+                for i, m in enumerate(markers[:visible]):
+                    # Extract a short preview from the marker context
+                    # The preview is the text after the [CCR:...] marker in the original message
+                    preview = ""
+                    for msg in conversation_history:
+                        c = msg.get("content", "")
+                        if isinstance(c, str) and m['hash'] in c:
+                            idx = c.find(m['hash'])
+                            after = c[idx + len(m['hash']):].strip()
+                            if after.startswith('|'):
+                                after = after.split(']', 1)[-1] if ']' in after else after
+                            preview = after[:80].strip()
+                            break
+                    map_parts.append(f"    [{i}] CCR:{m['hash'][:8]} | {m['type']} | {_fmt_size(m['size'])} | {preview}")
         if _conv_index:
             turns = sorted(_conv_index.items(), reverse=True)[:5]
             map_parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in turns))
-        if len(conversation_history) > 20:
-            map_parts.append(f"  context: {len(conversation_history)} msgs (auto-compress active)")
+        ctx_len = len(conversation_history)
+        if ctx_len > 20:
+            # Dynamic cutoff hint
+            hint = "auto-compress active" if ctx_len > 50 else "consider compressing older turns"
+            map_parts.append(f"  context: {ctx_len} msgs ({hint})")
 
     if map_parts:
         return "\n".join(map_parts)
-def _fmt_size(b):
-    if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
-    if b >= 1000: return f"{b/1000:.1f}KB"
-    return f"{b}B"
 
+
+def _api_request_hook(api_messages=None, api_request_id=None, **kwargs):
+    """pre_api_request: compress old messages before API call.
+    
+    Hermes passes the actual API payload (messages list) which CAN be mutated.
+    We offload messages older than the last 6 to CCR.
+    """
+    if _DEV: return  # dev mode: skip
+    if not api_messages or not isinstance(api_messages, list):
+        return
+
+    token_alive = _alive(PORTS["token"])
+    cache_alive = _alive(PORTS["cache"])
+    target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
+    
+    if not target or len(api_messages) <= 8:
+        return
+
+    # Keep last 6 messages, offload older ones to CCR
+    try:
+        old_msgs = api_messages[:-6]
+        packed = json.dumps([{
+            "role": m.get("role", ""),
+            "content": str(m.get("content", ""))[:2000]
+        } for m in old_msgs])
+        
+        if len(packed) < 500:  # not worth compressing
+            return
+            
+        data = json.dumps({"content": packed}).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{target}/ccr/create",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=3) as r:
+            ccr = json.loads(r.read())
+        
+        # Replace old messages with a single compressed marker
+        summary = f"[CCR:{ccr['hash']}|context|{len(packed)}|{len(old_msgs)}msgs] Context compressed: {len(old_msgs)} messages. Retrieve with headroom_retrieve."
+        del api_messages[:-6]  # remove all but last 6
+        api_messages.insert(0, {"role": "system", "content": summary})
+        
+        _log.debug("api_request: offloaded %d msgs → %s", len(old_msgs), ccr['hash'][:8])
+    except Exception:
+        pass  # soft-fail
 
 
 def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
@@ -396,7 +521,6 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
 
     target = PORTS["token"] if _alive(PORTS["token"]) else PORTS["cache"]
     try:
-        import urllib.request, json
         data = json.dumps({"content": output}).encode()
         req = urllib.request.Request(
             f"http://127.0.0.1:{target}/ccr/create",
@@ -407,35 +531,40 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             ccr = json.loads(r.read())
         hash_val = ccr["hash"]
         preview = output[:200].replace('\n', ' ').strip()
-        return f'[CCR:{hash_val}|terminal|{len(output)}] {preview}...(use headroom_retrieve)'
+        return f'[CCR:{hash_val}|terminal|{len(output)}] {preview}…(use headroom_retrieve)'
     except Exception as e:
         _log.debug("terminal compress skipped: %s", e)
         return output
+
+
+def _fmt_size(b):
+    if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
+    if b >= 1000: return f"{b/1000:.1f}KB"
+    return f"{b}B"
+
 
 def register(ctx):
     # Install binary on registration
     _ensure_binary()
     ctx.register_hook("on_session_start", on_start)
     ctx.register_hook("pre_llm_call", _pre_llm_hook)
+    ctx.register_hook("pre_api_request", _api_request_hook)
     ctx.register_hook("transform_terminal_output", _transform_terminal_hook)
     ctx.register_hook("post_llm_call", _store_conversation_turn)
     ctx.register_hook("transform_tool_result", _transform_tool_result)
     ctx.register_tool(
         name="aphrodite_rebuild",
-        toolset="aphrodite",
         schema=REBUILD_SCHEMA,
         handler=_rebuild_handler,
     )
     ctx.register_tool(
         name="headroom_compress",
-        toolset="aphrodite",
         schema=COMPRESS_SCHEMA,
         handler=_compress_handler,
     )
     ctx.register_tool(
         name="headroom_retrieve",
-        toolset="aphrodite",
         schema=RETRIEVE_SCHEMA,
         handler=_retrieve_handler,
     )
-    _log.info("aphrodite v%s registered - proxy + headroom_retrieve tool", VERSION)
+    _log.info("aphrodite v1.2.0 registered — recursive CCR + knowledge map + api_request compression")
