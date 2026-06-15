@@ -29,6 +29,30 @@ use headroom_core::ccr::backends::in_memory::InMemoryCcrStore;
 use headroom_core::ccr::backends::sqlite::SqliteCcrStore;
 use headroom_core::ccr::{compute_key, CcrStore};
 
+/// API key wrapper with safe Debug — never leaks to logs.
+#[derive(Clone)]
+pub struct Secret(pub(crate) String);
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[REDACTED]")
+    }
+}
+
+impl std::fmt::Display for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for Secret {
+    fn from(s: &str) -> Self { Secret(s.to_string()) }
+}
+
+impl From<String> for Secret {
+    fn from(s: String) -> Self { Secret(s) }
+}
+
 use crate::config::{Cli, ProxyMode};
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -46,7 +70,7 @@ pub struct AppState {
     pub client: HttpClient,
     pub api_url: String,
     pub model: String,
-    pub api_key: String,
+    pub api_key: Secret,
     pub ccr: Option<Arc<dyn CcrStore>>,
     pub add_markers: bool,
     pub mode: ProxyMode,
@@ -224,7 +248,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         client,
         api_url: cli.api_url.clone(),
         model: cli.model.clone(),
-        api_key: cli.api_key.clone(),
+        api_key: cli.api_key.clone().into(),
         ccr,
         add_markers: !cli.no_ccr_marker,
         mode: cli.mode,
@@ -314,9 +338,6 @@ pub async fn proxy_handler(
         for (key, val) in headers.iter() {
             let k = key.as_str().to_lowercase();
             if k != "host" && k != "authorization" && k != "content-length" {
-                if k.starts_with("x-headroom-") && k != "x-headroom-workspace" {
-                    continue;
-                }
                 req = req.header(key, val);
             }
         }
