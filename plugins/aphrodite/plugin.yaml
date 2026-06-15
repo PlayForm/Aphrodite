@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.54.0
-description: "CCR compression plugin - smoke test suite, feature toggles, regression tracking, 8 tools."
+version: 1.55.0
+description: "CCR compression plugin - smoke test suite, feature toggles, regression tracking, 9 tools, catalog mode toggle."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -17,9 +17,11 @@ provides_tools:
   - aphrodite_diff
   - aphrodite_search
   - aphrodite_test
+  - aphrodite_catalog
 provides_context_engine: true
 install_message: |
-  aphrodite v1.39.0 - smoke test suite, feature toggles, regression tracking, 8 tools.
+  aphrodite v1.55.0 - smoke test suite, feature toggles, regression tracking, 9 tools.
   Activate: hermes config set context.engine aphrodite
   Debug: APHRODITE_DEBUG=1 hermes ...
-  Tools: aphrodite_retrieve, aphrodite_compress, aphrodite_stats, aphrodite_rebuild
+  Catalog: APHRODITE_CATALOG=full|compact|tool (default: compact)
+  Tools: aphrodite_retrieve, aphrodite_compress, aphrodite_stats, aphrodite_rebuild, aphrodite_catalog
