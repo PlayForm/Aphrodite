@@ -1,6 +1,0 @@
-name: hermes-proxy-auto
-version: 2.0.0
-description: "Auto-start all 4 headroom proxies on Hermes startup — :8787 :8788 :9797 :9798"
-kind: plugin
-provides_hooks:
-  - session_start

@@ -1,5 +1,5 @@
 """
-hermes-proxy-aphrodite v1.1.0 — Auto-install + launch aphrodite proxies.
+aphrodite v1.1.0 — Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 
@@ -14,7 +14,7 @@ VERSION = "v0.2.0"
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
-_log = logging.getLogger("hermes-proxy-aphrodite")
+_log = logging.getLogger("aphrodite")
 
 
 def _detect_platform() -> str:
@@ -140,4 +140,4 @@ def register(ctx):
     # Install binary on registration
     _ensure_binary()
     ctx.register_hook("session_start", on_start)
-    _log.info("hermes-proxy-aphrodite v%s registered", VERSION)
+    _log.info("aphrodite v%s registered", VERSION)

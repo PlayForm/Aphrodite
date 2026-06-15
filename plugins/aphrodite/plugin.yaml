@@ -1,4 +1,4 @@
-name: hermes-proxy-aphrodite
+name: aphrodite
 version: 1.1.0
 description: "Auto-install + launch aphrodite Chat Completions proxy — cache (:9797) + token (:9798) with CCR + tool relay"
 kind: plugin
