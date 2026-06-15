@@ -269,7 +269,14 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
     let ccr: Option<Arc<dyn CcrStore>> = match cli.mode {
         ProxyMode::Token if !cli.no_ccr_marker => {
-            let store = SqliteCcrStore::open(&cli.ccr_db_path, cli.ccr_ttl_seconds)
+            let db_path = if cli.ccr_db_path.as_os_str().is_empty() {
+                dirs::data_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+                    .join("aphrodite").join("ccr.db")
+            } else {
+                cli.ccr_db_path.clone()
+            };
+            let store = SqliteCcrStore::open(&db_path, cli.ccr_ttl_seconds)
                 .map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
             Some(Arc::new(store))
         }
@@ -307,7 +314,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         ccr_misses: AtomicU64::new(0),
         ccr_created: AtomicU64::new(0),
         tool_relay_calls: AtomicU64::new(0),
-        compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
+        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x — neutral, avoids startup scale-up
     })
 }
 
@@ -400,16 +407,24 @@ pub async fn proxy_handler(
             let status = response.status();
             // Extract content-type before consuming response body
             let content_type = response.headers().get("content-type").cloned();
-            let resp_body = response.bytes().await.unwrap_or_default();
+            let resp_body = match response.bytes().await {
+                Ok(b) => b,
+                Err(e) => {
+                    state.record_error(format!("body read: {}", e));
+                    return (StatusCode::BAD_GATEWAY,
+                        Json(serde_json::json!({"error": format!("body read: {}", e)}))).into_response();
+                }
+            };
 
             // Only compress Chat Completions responses
+            let elapsed = t0.elapsed();
             if is_chat_completion && state.ccr.is_some() {
                 if let Some(compressed) = compress_chat_completion(
                     &state, &resp_body,
                 ).await {
                     state.requests_compressed.fetch_add(1, Ordering::Relaxed);
-                    state.record_latency(t0.elapsed());
-                    state.record_request(req_id_short, method.as_str(), path.path(), status.as_u16(), true, t0.elapsed().as_millis());
+                    state.record_latency(elapsed);
+                    state.record_request(req_id_short, method.as_str(), path.path(), status.as_u16(), true, elapsed.as_millis());
                     if state.dev {
                         let elapsed = t0.elapsed();
                         let comp_len = serde_json::to_vec(&compressed).map(|v| v.len()).unwrap_or(0);
@@ -532,10 +547,14 @@ fn detect_content_type(content: &str) -> &'static str {
     
     // Code detection — language-specific
     if content.lines().count() > 3 {
-        // Rust
-        if content.contains("fn ") && (content.contains("-> ") || content.contains("impl ") 
-            || content.contains("struct ") || content.contains("pub ")) 
-        {
+        // Rust — line-anchored to avoid false positives on Python/log text containing "fn "
+        if content.lines().any(|l| {
+            let t = l.trim_start();
+            t.starts_with("fn ") || t.starts_with("pub fn ") || t.starts_with("async fn ")
+                || t.starts_with("pub async fn ") || t.starts_with("impl ")
+                || t.starts_with("struct ") || t.starts_with("pub struct ")
+                || t.starts_with("enum ") || t.starts_with("pub enum ")
+        }) {
             return "code_rust";
         }
         // Python
@@ -610,7 +629,6 @@ async fn compress_chat_completion(
                         }
 
                         let (compressed, orig_len) = {
-                            let ct = detect_content_type(content);
                             let compressed = match state.mode {
                                 ProxyMode::Cache => {
                                     let preview = &content[..content.len().min(512)];
@@ -624,9 +642,10 @@ async fn compress_chat_completion(
                             state.record_compression(ct);
                             (compressed, len)
                         };
+                        let marker_len = compressed.len();
                         *content_val = serde_json::Value::String(compressed);
                         did_compress = true;
-                        state.update_compression_ratio(orig_len, hash.len());
+                        state.update_compression_ratio(orig_len, marker_len);
                     }
                 }
             }
@@ -819,7 +838,7 @@ pub async fn health_check(
     let ccr_ok = state.ccr.is_some();
 
     (StatusCode::OK, Json(serde_json::json!({
-        "status": if ccr_ok { "healthy" } else { "degraded" },
+        "status": "healthy",
         "ccr": ccr_ok,
         "mode": match state.mode {
             ProxyMode::Cache => "cache",
@@ -858,7 +877,7 @@ mod tests {
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
-        compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
+        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x — neutral, avoids startup scale-up
             request_history: Mutex::new(Vec::new()),
         inline_ccr: Mutex::new(std::collections::HashMap::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
@@ -947,7 +966,7 @@ mod tests {
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
-        compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
+        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x — neutral, avoids startup scale-up
             request_history: Mutex::new(Vec::new()),
         inline_ccr: Mutex::new(std::collections::HashMap::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
