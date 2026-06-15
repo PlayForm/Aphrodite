@@ -135,7 +135,7 @@ impl MultiConfig {
             },
             listen: cfg.listen.parse().unwrap_or_else(|_| "127.0.0.1:8788".parse().unwrap()),
             api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.deepseek.com".into()),
-            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).unwrap_or_default(),
+            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).unwrap_or_default(),
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "deepseek-v4-pro".into()),
             max_context: 1_000_000,
             max_output: 384_000,
