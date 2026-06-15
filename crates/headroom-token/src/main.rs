@@ -9,7 +9,7 @@
 //! 6. Exposes /ccr/create + /ccr/list for programmatic CCR
 //!
 //! Cache mode (:9797): in-memory, >8KB threshold, preview kept.
-//! Token mode (:9798): SQLite, >1KB threshold, tool injection.
+//! Aphrodite mode (:9798): SQLite, >1KB threshold, tool injection.
 
 use std::sync::Arc;
 
@@ -37,6 +37,20 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
+    // Dev mode: also write to /tmp/aphrodite-dev.log
+    if cli.dev {
+        let dev_log = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/aphrodite-dev.log")?;
+        let (writer, _guard) = tracing_appender::non_blocking(dev_log);
+        tracing_subscriber::fmt()
+            .with_writer(writer)
+            .with_env_filter("aphrodite=debug")
+            .try_init()
+            .ok();
+    }
+
     if let Some(parent) = cli.ccr_db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -45,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mode_str = match cli.mode {
         ProxyMode::Cache => "cache",
-        ProxyMode::Token => "token",
+        ProxyMode::Aphrodite => "aphrodite",
     };
 
     tracing::info!(

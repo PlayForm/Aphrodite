@@ -13,7 +13,7 @@ pub enum ProxyMode {
     /// Cache mode — in-memory CCR, lightweight compression (>8KB threshold),
     /// preview preserved, no tool injection.
     Cache,
-    /// Token mode — SQLite CCR, aggressive compression (>1KB threshold),
+    /// Aphrodite mode — SQLite CCR, aggressive compression (>1KB threshold),
     /// tool injection, tool relay.
     Token,
 }
@@ -23,7 +23,7 @@ pub enum ProxyMode {
 #[command(name = "aphrodite", version, about)]
 pub struct Cli {
     /// Proxy mode: cache or token
-    #[arg(long, default_value = "token", env = "APHRODITE_MODE")]
+    #[arg(long, default_value = "aphrodite", env = "APHRODITE_MODE")]
     pub mode: ProxyMode,
 
     /// Listen address (default: 127.0.0.1:8788 for token, :9797 for cache)
@@ -58,7 +58,7 @@ pub struct Cli {
     #[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
     pub ccr_ttl_seconds: u64,
 
-    /// Disable CCR tool injection (token mode only)
+    /// Disable CCR tool injection (aphrodite mode only)
     #[arg(long)]
     pub no_ccr_inject_tool: bool,
 
@@ -77,4 +77,8 @@ pub struct Cli {
     /// Hermes API key for callback auth
     #[arg(long, env = "APHRODITE_NOTIFY_KEY")]
     pub notify_key: Option<String>,
+
+    /// Enable dev mode — verbose request/response logging to stderr + /tmp/aphrodite-dev.log
+    #[arg(long)]
+    pub dev: bool,
 }

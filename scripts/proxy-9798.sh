@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# aphrodite token mode — launch on :9798
+# aphrodite aphrodite mode — launch on :9798
 #
 # Usage:
 #   ./scripts/proxy-9798.sh              # start
@@ -76,7 +76,7 @@ echo "  Notify URL:   ${NOTIFY_URL:-none}"
 echo "  Log:          $LOG_FILE"
 
 CMD=("$BINARY"
-    --mode token
+    --mode aphrodite
     --listen "127.0.0.1:$PORT"
     --ccr-db-path "$DB"
     --ccr-ttl-seconds "$TTL"
