@@ -5,6 +5,10 @@ kind: plugin
 provides_hooks:
   - session_start
   - transform_tool_result
+provides_tools:
+  - headroom_retrieve
+  - headroom_compress
+  - aphrodite_rebuild
 install_message: |
   aphrodite v0.2.0 will be downloaded from GitHub releases.
   Requires DEEPSEEK_API_KEY in ~/.hermes/.env.
