@@ -694,7 +694,10 @@ def register(ctx):
 
 # ── Context Engine (plugs into Hermes compress() pipeline) ─────
 
-class AphroditeContextEngine:
+from agent.context_engine import ContextEngine
+
+
+class AphroditeContextEngine(ContextEngine):
     """CCR-based context compression engine for Hermes.
 
     Replaces built-in summarization compressor with CCR offloading.
@@ -704,7 +707,10 @@ class AphroditeContextEngine:
     Set ``context.engine: aphrodite`` in config.yaml to activate.
     Works with proxy (token/cache) or inline fallback (zlib).
     """
-    name = "aphrodite"
+
+    @property
+    def name(self) -> str:
+        return "aphrodite"
     threshold_percent = 0.0    # always trigger (emulate token proxy internally)
     protect_first_n = 2
     protect_last_n = 5
@@ -810,10 +816,10 @@ class AphroditeContextEngine:
             "compression_count": self.compression_count,
         }
 
-    def update_model(self, model="", context_length=0, **kw):
+    def update_model(self, model="", context_length=0, base_url="", api_key="", provider="", api_mode="", **kw):
         if context_length:
             self.context_length = context_length
-            self.threshold_tokens = int(context_length * self.threshold_percent)
+            self.threshold_tokens = 1  # always above threshold
 
     def on_session_reset(self):
         self.last_prompt_tokens = 0
