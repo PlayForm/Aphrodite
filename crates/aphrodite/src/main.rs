@@ -65,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(
         listen = %cli.listen,
         mode = %mode_str,
-        deepseek = %cli.deepseek_url,
+        api_url = %cli.api_url,
         model = %cli.model,
         tool_relay = cli.tool_relay,
         "aphrodite starting"
