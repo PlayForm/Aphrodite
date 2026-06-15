@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# headroom-proxy: launch the Rust token-mode proxy
+# aphrodite: launch the Rust token-mode proxy
 #
 # Usage:
 #   ./scripts/proxy-token.sh              # start on :8788
@@ -11,9 +11,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
-PID_FILE="/tmp/headroom-proxy.pid"
-LOG_FILE="/tmp/headroom-proxy.log"
+BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite"
+PID_FILE="/tmp/aphrodite.pid"
+LOG_FILE="/tmp/aphrodite.log"
 
 # Source env
 if [ -f "$HOME/.hermes/.env" ]; then
@@ -31,7 +31,7 @@ case "${1:-}" in
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy stopped (pid=$PID)"
+                echo "✓ aphrodite stopped (pid=$PID)"
             fi
             rm -f "$PID_FILE"
         else
@@ -43,23 +43,23 @@ case "${1:-}" in
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill -0 "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy running (pid=$PID, port=$PORT)"
+                echo "✓ aphrodite running (pid=$PID, port=$PORT)"
                 exit 0
             fi
         fi
-        echo "✗ headroom-proxy not running"
+        echo "✗ aphrodite not running"
         exit 1
         ;;
 esac
 
 # Build if binary doesn't exist
 if [ ! -x "$BINARY" ]; then
-    echo "Building headroom-proxy..."
+    echo "Building aphrodite..."
     source "$HOME/.cargo/env" 2>/dev/null || true
     cargo build --manifest-path "$PROJECT_DIR/crates/headroom-token/Cargo.toml"
 fi
 
-echo "Starting headroom-proxy on :$PORT ..."
+echo "Starting aphrodite on :$PORT ..."
 echo "  DB:   $DB"
 echo "  TTL:  ${TTL}s"
 echo "  Log:  $LOG_FILE"
@@ -75,7 +75,7 @@ echo "$PID" > "$PID_FILE"
 sleep 1
 
 if kill -0 "$PID" 2>/dev/null; then
-    echo "✓ headroom-proxy started (pid=$PID, port=$PORT)"
+    echo "✓ aphrodite started (pid=$PID, port=$PORT)"
     echo "  Stats:  curl http://127.0.0.1:$PORT/stats"
     echo "  Stop:   $0 --stop"
 else

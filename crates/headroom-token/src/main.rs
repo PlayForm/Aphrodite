@@ -1,20 +1,19 @@
-//! headroom-proxy — Cache+Token proxy binary with tool relay.
+//! aphrodite — Cache+Token Chat Completions proxy.
 //!
 //! Standalone HTTP proxy that:
-//! 1. Listens for OpenAI-compatible requests
+//! 1. Listens for Chat Completions API requests (POST /v1/chat/completions)
 //! 2. Forwards to DeepSeek
-//! 3. Compresses large tool outputs with CCR (SQLite-backed) in token mode
-//! 4. Exposes /retrieve to resolve CCR markers
+//! 3. Compresses large tool outputs with CCR
+//! 4. Exposes /retrieve for CCR lookup
 //! 5. Exposes /tool/relay for bidirectional Hermes communication
-//! 6. Exposes /ccr/create for programmatic CCR entry creation
-//! 7. Injects headroom_retrieve tool into compressed responses (token mode)
+//! 6. Exposes /ccr/create + /ccr/list for programmatic CCR
 //!
-//! Default ports: :9797 (cache mode), :9798 (token mode).
+//! Cache mode (:9797): in-memory, >8KB threshold, preview kept.
+//! Token mode (:9798): SQLite, >1KB threshold, tool injection.
 
 use std::sync::Arc;
 
 use axum::{
-    extract::State,
     routing::{any, get, post},
     Json, Router,
 };
@@ -23,9 +22,9 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use headroom_proxy::config::{Cli, ProxyMode};
-use headroom_proxy::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list};
-use headroom_proxy::retrieve;
+use aphrodite::config::{Cli, ProxyMode};
+use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list};
+use aphrodite::retrieve;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -55,25 +54,19 @@ async fn main() -> anyhow::Result<()> {
         deepseek = %cli.deepseek_url,
         model = %cli.model,
         tool_relay = cli.tool_relay,
-        notify_url = ?cli.notify_url,
-        "headroom-proxy starting"
+        "aphrodite starting"
     );
 
-    // Build router with all endpoints
-    let state2 = state.clone();
     let mut app = Router::new()
-        // Core endpoints
         .route("/health", get(|| async { "ok" }))
-        .route("/stats", get(move || async move {
-            Json(state2.stats_json())
+        .route("/stats", get({
+            let s = state.clone();
+            move || async move { Json(s.stats_json()) }
         }))
         .route("/retrieve", post(retrieve::handle_retrieve))
-        // Tool relay (enabled by --tool-relay flag)
         .route("/tool/relay", post(handle_tool_relay))
-        // Programmatic CCR management
         .route("/ccr/create", post(handle_ccr_create))
         .route("/ccr/list", get(handle_ccr_list))
-        // Catch-all proxy
         .route("/*path", any(proxy::proxy_handler))
         .with_state(state);
 
@@ -88,23 +81,15 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn shutdown_signal() {
-    let ctrl_c = async {
-        let _ = tokio::signal::ctrl_c().await;
-    };
+    let ctrl_c = async { let _ = tokio::signal::ctrl_c().await; };
     #[cfg(unix)]
     let terminate = async {
-        if let Ok(mut s) =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-        {
+        if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
             s.recv().await;
         }
     };
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
-    tracing::info!("shutdown signal received");
+    tokio::select! { _ = ctrl_c => {}, _ = terminate => {} }
+    tracing::info!("shutdown");
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# headroom-proxy cache mode — launch on :9797
+# aphrodite cache mode — launch on :9797
 #
 # Usage:
 #   ./scripts/proxy-9797.sh              # start
@@ -11,13 +11,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/crates/headroom-token/target/release/headroom-proxy"
+BINARY="$PROJECT_DIR/crates/headroom-token/target/release/aphrodite"
 # Fall back to debug build
 if [ ! -x "$BINARY" ]; then
-    BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
+    BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite"
 fi
-PID_FILE="/tmp/headroom-proxy-9797.pid"
-LOG_FILE="/tmp/headroom-proxy-9797.log"
+PID_FILE="/tmp/aphrodite-9797.pid"
+LOG_FILE="/tmp/aphrodite-9797.log"
 PORT=9797
 
 # Source env
@@ -35,7 +35,7 @@ case "${1:-}" in
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy cache (:9797) stopped (pid=$PID)"
+                echo "✓ aphrodite cache (:9797) stopped (pid=$PID)"
             fi
             rm -f "$PID_FILE"
         else
@@ -47,26 +47,26 @@ case "${1:-}" in
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill -0 "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy cache running (pid=$PID, port=$PORT)"
+                echo "✓ aphrodite cache running (pid=$PID, port=$PORT)"
                 exit 0
             fi
         fi
-        echo "✗ headroom-proxy cache not running"
+        echo "✗ aphrodite cache not running"
         exit 1
         ;;
 esac
 
 # Build if binary doesn't exist
 if [ ! -x "$BINARY" ]; then
-    echo "Building headroom-proxy (cache)..."
+    echo "Building aphrodite (cache)..."
     source "$HOME/.cargo/env" 2>/dev/null || true
     cargo build --manifest-path "$PROJECT_DIR/crates/headroom-token/Cargo.toml"
-    if [ -x "$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy" ]; then
-        BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
+    if [ -x "$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite" ]; then
+        BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite"
     fi
 fi
 
-echo "Starting headroom-proxy cache on :$PORT ..."
+echo "Starting aphrodite cache on :$PORT ..."
 echo "  Mode:  cache"
 echo "  DB:    $DB"
 echo "  Log:   $LOG_FILE"
@@ -83,7 +83,7 @@ echo "$PID" > "$PID_FILE"
 sleep 1
 
 if kill -0 "$PID" 2>/dev/null; then
-    echo "✓ headroom-proxy cache started (pid=$PID, port=$PORT)"
+    echo "✓ aphrodite cache started (pid=$PID, port=$PORT)"
     echo "  Health: curl http://127.0.0.1:$PORT/health"
     echo "  Stats:  curl http://127.0.0.1:$PORT/stats"
     echo "  Stop:   $0 --stop"

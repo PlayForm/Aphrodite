@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# headroom-proxy token mode — launch on :9798
+# aphrodite token mode — launch on :9798
 #
 # Usage:
 #   ./scripts/proxy-9798.sh              # start
@@ -11,12 +11,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/crates/headroom-token/target/release/headroom-proxy"
+BINARY="$PROJECT_DIR/crates/headroom-token/target/release/aphrodite"
 if [ ! -x "$BINARY" ]; then
-    BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
+    BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite"
 fi
-PID_FILE="/tmp/headroom-proxy-9798.pid"
-LOG_FILE="/tmp/headroom-proxy-9798.log"
+PID_FILE="/tmp/aphrodite-9798.pid"
+LOG_FILE="/tmp/aphrodite-9798.log"
 PORT=9798
 
 # Source env
@@ -36,7 +36,7 @@ case "${1:-}" in
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy token (:9798) stopped (pid=$PID)"
+                echo "✓ aphrodite token (:9798) stopped (pid=$PID)"
             fi
             rm -f "$PID_FILE"
         else
@@ -48,26 +48,26 @@ case "${1:-}" in
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
             if kill -0 "$PID" 2>/dev/null; then
-                echo "✓ headroom-proxy token running (pid=$PID, port=$PORT)"
+                echo "✓ aphrodite token running (pid=$PID, port=$PORT)"
                 exit 0
             fi
         fi
-        echo "✗ headroom-proxy token not running"
+        echo "✗ aphrodite token not running"
         exit 1
         ;;
 esac
 
 # Build if binary doesn't exist
 if [ ! -x "$BINARY" ]; then
-    echo "Building headroom-proxy (token)..."
+    echo "Building aphrodite (token)..."
     source "$HOME/.cargo/env" 2>/dev/null || true
     cargo build --manifest-path "$PROJECT_DIR/crates/headroom-token/Cargo.toml"
-    if [ -x "$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy" ]; then
-        BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/headroom-proxy"
+    if [ -x "$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite" ]; then
+        BINARY="$PROJECT_DIR/crates/headroom-token/target/debug/aphrodite"
     fi
 fi
 
-echo "Starting headroom-proxy token on :$PORT ..."
+echo "Starting aphrodite token on :$PORT ..."
 echo "  Mode:         token"
 echo "  Tool relay:   enabled"
 echo "  DB:           $DB"
@@ -97,7 +97,7 @@ echo "$PID" > "$PID_FILE"
 sleep 1
 
 if kill -0 "$PID" 2>/dev/null; then
-    echo "✓ headroom-proxy token started (pid=$PID, port=$PORT)"
+    echo "✓ aphrodite token started (pid=$PID, port=$PORT)"
     echo "  Health:    curl http://127.0.0.1:$PORT/health"
     echo "  Stats:     curl http://127.0.0.1:$PORT/stats"
     echo "  Retrieve:  curl -X POST http://127.0.0.1:$PORT/retrieve -d '{"hash":"..."}'"
