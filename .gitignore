@@ -19,3 +19,5 @@ reports/session_accumulator.json
 .headroom
 target/
 target/**/*
+
+hermes-archive.tar.gz
