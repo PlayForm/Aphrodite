@@ -15,8 +15,8 @@ class Aphrodite < Formula
     unless File.exist?(etc/"aphrodite/aphrodite.toml")
       (etc/"aphrodite/aphrodite.toml").write <<~EOS
         [defaults]
-        api_url = "https://api.deepseek.com"
-        model = "deepseek-v4-pro"
+        api_url = "https://api.example.com"
+        model = "gpt-4o"
 
         [[proxies]]
         name = "cache"

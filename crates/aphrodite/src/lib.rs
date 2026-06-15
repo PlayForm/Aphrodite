@@ -53,8 +53,8 @@
 //!
 //! ```toml
 //! [defaults]
-//! api_url = "https://api.deepseek.com"
-//! model = "deepseek-v4-pro"
+//! api_url = "https://api.example.com"
+//! model = "gpt-4o"
 //!
 //! [[proxies]]
 //! name = "cache"
