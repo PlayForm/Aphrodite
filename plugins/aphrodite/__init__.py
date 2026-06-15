@@ -18,8 +18,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.49"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.58.0"        # plugin version
+BIN_VERSION = "v0.5.50"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.59.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -770,6 +770,15 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 expanded.append(m)
             live = expanded
             
+            # Deduplicate by hash — keep first occurrence only
+            seen = set()
+            deduped = []
+            for m in live:
+                if m['hash'] not in seen:
+                    seen.add(m['hash'])
+                    deduped.append(m)
+            live = deduped
+            
             by_type = {}
             for m in live:
                 by_type.setdefault(m['type'], []).append(m)
@@ -1469,11 +1478,12 @@ class AphroditeContextEngine(ContextEngine):
 
     def should_compress(self, prompt_tokens=None):
         """Compress only when context fill exceeds threshold percentage.
-        0 = never compress (disabled). 50 = compress at 50% fill."""
+        0 = never compress (disabled). 50 = compress at 50% fill.
+        NOTE: Falls back to context_length when Hermes doesn't call update_from_response."""
         if self.threshold_percent == 0:
             return False  # disabled
-        tokens = prompt_tokens or self.last_prompt_tokens
-        if not tokens or not self.context_length:
+        tokens = prompt_tokens or self.last_prompt_tokens or (self.context_length or 1000000)
+        if not self.context_length:
             return False
         pct = (tokens / self.context_length) * 100
         return pct >= self.threshold_percent
