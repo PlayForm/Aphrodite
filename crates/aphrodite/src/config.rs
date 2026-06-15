@@ -116,6 +116,11 @@ pub struct ProxyConfig {
     pub dev: Option<bool>,
     pub ccr_ttl_seconds: Option<u64>,
     pub ccr_db_path: Option<String>,
+    pub notify_url: Option<String>,
+    pub notify_key: Option<String>,
+    pub timeout: Option<u64>,
+    pub max_context: Option<usize>,
+    pub max_output: Option<usize>,
 }
 
 impl MultiConfig {
@@ -137,17 +142,17 @@ impl MultiConfig {
             api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
             api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).unwrap_or_default(),
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
-            max_context: 1_000_000,
-            max_output: 384_000,
+            max_context: cfg.max_context.unwrap_or(1_000_000),
+            max_output: cfg.max_output.unwrap_or(384_000),
             ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| ".headroom/aphrodite-ccr.db".into()),
             ccr_ttl_seconds: cfg.ccr_ttl_seconds.or_else(|| d.and_then(|d| d.ccr_ttl_seconds)).unwrap_or(3600),
             no_ccr_inject_tool: false,
             no_ccr_marker: false,
             tool_relay: cfg.tool_relay.unwrap_or(false),
-            notify_url: None,
-            notify_key: None,
+            notify_url: cfg.notify_url.clone(),
+            notify_key: cfg.notify_key.clone(),
             dev: cfg.dev.unwrap_or(false),
-            timeout: 300,
+            timeout: cfg.timeout.unwrap_or(300),
         }
     }
 }

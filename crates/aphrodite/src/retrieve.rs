@@ -76,9 +76,11 @@ pub async fn handle_retrieve(
                 state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
         }
+    } else {
+        state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // Remove: old unconditional miss increment (was double-counting)
     (
         StatusCode::NOT_FOUND,
         Json(RetrieveResponse {
@@ -92,10 +94,14 @@ pub async fn handle_retrieve(
 fn filter_content(content: &str, query: Option<&str>) -> String {
     match query {
         Some(q) if !q.is_empty() => {
-            content.lines()
+            let filtered: Vec<&str> = content.lines()
                 .filter(|line| line.to_lowercase().contains(&q.to_lowercase()))
-                .collect::<Vec<_>>()
-                .join("\n")
+                .collect();
+            if filtered.is_empty() {
+                content.to_string()  // fallback to full content — don't silently return empty
+            } else {
+                filtered.join("\n")
+            }
         }
         _ => content.to_string(),
     }
