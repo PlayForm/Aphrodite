@@ -334,37 +334,20 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
 
 
 def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
-    """Before LLM call: compress old messages, inject content map + memory index."""
+    """Before LLM call: inject content map + memory index as context string.
+
+    Hermes injects the returned string into the user message (not system prompt),
+    preserving prompt-cache prefix. Mutations to conversation_history are lost
+    (Hermes passes a copy), so we return a context string instead.
+    """
     if _DEV: return  # dev mode: skip
     if not conversation_history or not isinstance(conversation_history, list):
         return
 
-    # ── 1. Offload old messages to CCR ──────────────────────────
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
-    target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
 
-    # Keep last 6 messages in context, offload older ones to CCR
-    if target and len(conversation_history) > 8:
-        try:
-            import urllib.request, json
-            old_msgs = conversation_history[:-6]  # everything except last 6
-            packed = json.dumps([{"role": m.get("role",""), "content": str(m.get("content",""))[:1000]} for m in old_msgs])
-            if len(packed) > 200:  # only if worth compressing
-                data = json.dumps({"content": packed}).encode()
-                req = urllib.request.Request(f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=2) as r:
-                    ccr = json.loads(r.read())
-                # Replace old messages with a single marker
-                summary = f"[Context compressed: {len(old_msgs)} messages → CCR:{ccr['hash']}|{ccr['compression_ratio']:.0f}x]"
-                for _ in old_msgs:
-                    conversation_history.pop(0)
-                conversation_history.insert(0, {"role": "system", "content": summary})
-                _log.debug("pre_llm: offloaded %d old msgs → %s", len(old_msgs), ccr['hash'][:8])
-        except Exception:
-            pass  # soft-fail
-
-    # ── 2. Build markers + memory index ─────────────────────────
+    # ── Build markers + memory index ─────────────────────────
     markers = []
     total_bytes = 0
     import re
@@ -385,7 +368,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     if markers or _conv_index:
         map_parts.append("[APHRODITE]")
         if markers:
-            mode_tag = f"token" if token_alive else f"cache" if cache_alive else "off"
+            mode_tag = "token" if token_alive else "cache" if cache_alive else "off"
             map_parts.append(f"  proxy={mode_tag} | {len(markers)} items @ {_fmt_size(total_bytes)} | retrieval: headroom_retrieve")
         if _conv_index:
             turns = sorted(_conv_index.items(), reverse=True)[:5]
@@ -394,11 +377,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             map_parts.append(f"  context: {len(conversation_history)} msgs (auto-compress active)")
 
     if map_parts:
-        msg = "\n".join(map_parts)
-        for i in range(len(conversation_history)-1, -1, -1):
-            if conversation_history[i].get("role") == "user":
-                conversation_history.insert(i, {"role": "system", "content": msg, "ephemeral": True})
-                break
+        return "\n".join(map_parts)
 def _fmt_size(b):
     if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
     if b >= 1000: return f"{b/1000:.1f}KB"
