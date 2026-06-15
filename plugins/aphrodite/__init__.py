@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.38"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.47.0"        # plugin version
+BIN_VERSION = "v0.5.39"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.48.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -662,6 +662,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 total_bytes += m['size']
                 markers.append(m)
     _recent_markers = markers  # cache for aphrodite_search
+    if DEBUG_LOGGING and markers:
+        _log.debug("pre_llm_hook: scanned %d CCR markers across %d msgs, %s total compressed",
+                   len(markers), ctx_len, _fmt_size(total_bytes))
 
     # ── 2. Compress old turns to CCR (skip already-compressed) ──
     compress_hint = ""
@@ -738,8 +741,8 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 parts.append(f"    [{ctype}] {len(items)} items:")
                 for i, m in enumerate(items[:visible]):
                     preview = _extract_preview(m, conversation_history)
-                    h = str(m.get('hash', '?'))
-                    if not h or h in ('{}', '?', 'None'):
+                    h = str(m.get('hash', '')).strip()
+                    if len(h) < 4 or h in ('{}', '?', 'None', 'null', 'undefined'):
                         continue
                     parts.append(f"      CCR:{h} | {_fmt_size(m['size'])} | {preview}")
                 if len(items) > visible:
@@ -790,7 +793,13 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                                   for m in recent_markers))
 
     if parts:
-        return "\n".join(parts)
+        catalog = "\n".join(parts)
+        if DEBUG_LOGGING:
+            _log.debug("pre_llm_hook: catalog (%d lines, %d markers, %d files)", 
+                       len(parts), len(markers), len(_referenced_files))
+            _log.debug("pre_llm_hook: %d markers parsed, %d skipped (empty/bad hash)", 
+                       len(markers), sum(1 for m in markers if len(str(m.get('hash',''))) < 4))
+        return catalog
 
 
 def _group_into_turns(conversation_history):
