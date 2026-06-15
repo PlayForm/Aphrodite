@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.9"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.18.0"        # plugin version
+BIN_VERSION = "v0.5.10"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.19.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -375,14 +375,15 @@ COMPRESS_SCHEMA = {
 }
 RETRIEVE_SCHEMA = {
     "name": "aphrodite_retrieve",
-    "description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query (lines containing the query string). Recursively resolves nested CCR markers up to 3 levels deep.",
+    "description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query. Supports file path reads. Recursively resolves nested CCR markers up to 3 levels deep.",
     "parameters": {
         "type": "object",
         "properties": {
             "hash": {"type": "string", "description": "CCR marker hash to retrieve"},
-            "query": {"type": "string", "description": "Optional: filter retrieved content to lines containing this query string"}
+            "query": {"type": "string", "description": "Optional: filter retrieved content to lines containing this query string"},
+            "path": {"type": "string", "description": "Optional: file path to read directly (bypasses CCR)"}
         },
-        "required": ["hash"]
+        "required": []
     }
 }
 
@@ -817,7 +818,12 @@ def _stats_handler(args=None, **kwargs):
                 "alive": True,
                 "ccr_created": ccr.get("created", 0),
                 "ccr_hits": ccr.get("hits", 0),
+                "ccr_misses": ccr.get("misses", 0),
                 "ccr_entries": ccr.get("entries", "?"),
+                "tokens_saved": data.get("tokens_saved", 0),
+                "requests_total": data.get("requests", {}).get("total", 0),
+                "requests_compressed": data.get("requests", {}).get("compressed", 0),
+                "compressions_by_type": data.get("compressions_by_type", {}),
             }
         except Exception:
             result["proxy"][name] = {"alive": False}
