@@ -600,13 +600,8 @@ pub async fn handle_ccr_create(
         ccr.put(&hash, &req.content);
         state.ccr_created.fetch_add(1, Ordering::Relaxed);
 
-        // Background: generate a summary of the content
-        if req.content.len() > 1024 {
-            let summary = generate_summary(&req.content);
-            let summary_hash = format!("{}_summary", hash);
-            ccr.put(&summary_hash, &summary);
-            tracing::info!(hash=%hash, summary_hash=%summary_hash, "background summary generated");
-        }
+        // Background summary disabled — burns process + extra CCR entries
+        // if req.content.len() > 1024 { ... }
     }
 
     if let Some(notify_url) = &state.notify_url {
