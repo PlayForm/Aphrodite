@@ -100,6 +100,7 @@ pub struct AppState {
     pub ccr_misses: AtomicU64,
     pub ccr_created: AtomicU64,
     pub tool_relay_calls: AtomicU64,
+    pub compression_ratio_ema: AtomicU64,  // ×100 for EMA of compression ratio
 }
 
 impl AppState {
@@ -131,6 +132,7 @@ impl AppState {
                 self.latency_buckets[4].load(Ordering::Relaxed),
             ],
             "compressions_by_type": self.compressions_by_type.lock().map(|m| m.clone()).unwrap_or_default(),
+            "compression_ratio_ema": self.compression_ratio_ema.load(Ordering::Relaxed) as f64 / 100.0,
             "last_errors": self.last_errors.lock().map(|v| v.iter().rev().take(5).cloned().collect::<Vec<_>>()).unwrap_or_default(),
             "request_history": self.request_history.lock().map(|v| v.clone()).unwrap_or_default(),
         })
@@ -146,15 +148,36 @@ impl AppState {
     /// Per-type threshold — code stays in context longer, logs compressed aggressively.
     fn threshold_for(&self, ct: &str) -> usize {
         let base = self.compress_threshold();
+        // Auto-tune: adjust thresholds based on historical compression ratios
+        let ratio = self.compression_ratio_ema.load(Ordering::Relaxed) as f64 / 100.0;
+        let tune = if ratio > 20.0 {
+            // Very aggressive — raise thresholds to preserve more content
+            2.0
+        } else if ratio < 3.0 && ratio > 0.0 {
+            // Very conservative — lower thresholds to compress more
+            0.5
+        } else {
+            1.0
+        };
+        let base = (base as f64 * tune) as usize;
         match ct {
-            "error" => base * 8,           // errors always visible
-            "code_rust" | "code_python" | "code_go" | "code_js" | "code" => base * 4,  // code preserved
-            "diff" | "git" => base * 2,     // diffs moderately compressed
-            "tool_output" => base,           // default
-            "build_output" | "log" => base / 2,  // logs aggressive
+            "error" => base * 8,
+            "code_rust" | "code_python" | "code_go" | "code_js" | "code" => base * 4,
+            "diff" | "git" => base * 2,
+            "tool_output" => base,
+            "build_output" | "log" => base / 2,
             "json" => base,
             _ => base,
         }
+    }
+
+    fn update_compression_ratio(&self, original_len: usize, compressed_len: usize) {
+        if original_len == 0 || compressed_len == 0 { return; }
+        let ratio = (original_len as f64 / compressed_len as f64 * 100.0) as u64;
+        // Exponential moving average: new = 0.2 * ratio + 0.8 * old
+        let old = self.compression_ratio_ema.load(Ordering::Relaxed);
+        let new = ((ratio as f64 * 0.2) + (old as f64 * 0.8)) as u64;
+        self.compression_ratio_ema.store(new, Ordering::Relaxed);
     }
 
     fn record_latency(&self, d: std::time::Duration) {
@@ -281,6 +304,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         ccr_misses: AtomicU64::new(0),
         ccr_created: AtomicU64::new(0),
         tool_relay_calls: AtomicU64::new(0),
+        compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
     })
 }
 
@@ -572,20 +596,24 @@ async fn compress_chat_completion(
                             state.tokens_saved.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
                         }
 
-                        let compressed = match state.mode {
-                            ProxyMode::Cache => {
-                                // Keep first 512 chars + marker
-                                let preview = &content[..content.len().min(512)];
-                                format!("<<<CCR:{}|{}|{}>>>\n{}", hash, ct, content.len(), preview)
-                            }
-                            ProxyMode::Token => {
-                                // Marker with one-line preview so LLM knows whether to retrieve
-                                smart_marker(&hash, content, ct)
-                            }
+                        let (compressed, orig_len) = {
+                            let ct = detect_content_type(content);
+                            let compressed = match state.mode {
+                                ProxyMode::Cache => {
+                                    let preview = &content[..content.len().min(512)];
+                                    format!("<<<CCR:{}|{}|{}>>>\n{}", hash, ct, content.len(), preview)
+                                }
+                                ProxyMode::Token => {
+                                    smart_marker(&hash, content, ct)
+                                }
+                            };
+                            let len = content.len();
+                            state.record_compression(ct);
+                            (compressed, len)
                         };
                         *content_val = serde_json::Value::String(compressed);
                         did_compress = true;
-                        state.record_compression(ct);
+                        state.update_compression_ratio(orig_len, hash.len());
                     }
                 }
             }
@@ -598,25 +626,30 @@ async fn compress_chat_completion(
                     if let Some(func) = tc.get_mut("function") {
                         if let Some(args) = func.get_mut("arguments") {
                             if let Some(args_str) = args.as_str() {
-                                let ct = detect_content_type(args_str);
+                                let args_owned = args_str.to_string();  // drop borrow before mutation
+                                let ct = detect_content_type(&args_owned);
                                 let threshold = state.threshold_for(ct).max(base_threshold);
-                                if args_str.len() > threshold {
+                                if args_owned.len() > threshold {
                                     if let Some(ccr) = &state.ccr {
-                                        let hash = compute_key(args_str.as_bytes());
+                                        let hash = compute_key(args_owned.as_bytes());
                                         if ccr.get(&hash).is_some() {
                                             state.ccr_hits.fetch_add(1, Ordering::Relaxed);
                                         } else {
                                             state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-                                            ccr.put(&hash, args_str);
+                                            ccr.put(&hash, &args_owned);
                                             state.ccr_created.fetch_add(1, Ordering::Relaxed);
-                                            state.tokens_saved.fetch_add((args_str.len() - hash.len()) as u64, Ordering::Relaxed);
+                                            state.tokens_saved.fetch_add((args_owned.len() - hash.len()) as u64, Ordering::Relaxed);
                                         }
-                                        let ct = detect_content_type(args_str);
-                                        *args = serde_json::Value::String(
-                                            smart_marker(&hash, args_str, ct)
-                                        );
+                                        let (compressed, orig_len) = {
+                                            let ct2 = detect_content_type(&args_owned);
+                                            let compressed = smart_marker(&hash, &args_owned, ct2);
+                                            let len = args_owned.len();
+                                            state.record_compression(ct2);
+                                            (compressed, len)
+                                        };
+                                        *args = serde_json::Value::String(compressed);
                                         did_compress = true;
-                        state.record_compression(ct);
+                        state.update_compression_ratio(orig_len, hash.len());
                                     }
                                 }
                             }
@@ -812,6 +845,7 @@ mod tests {
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
+        compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
             request_history: Mutex::new(Vec::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
@@ -899,6 +933,7 @@ mod tests {
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
+        compression_ratio_ema: AtomicU64::new(10000),  // initial: 100.0x ratio = neutral
             request_history: Mutex::new(Vec::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
