@@ -13,13 +13,24 @@ aphrodite v1.55.0 - Auto-install + launch aphrodite proxies.
 On install: downloads pre-built binary from GitHub releases.
 On session_start: launches aphrodite proxies not already running.
 """
-import os, subprocess, urllib.request, time, logging, platform, stat, re, json, hashlib, base64, zlib
+import os
+import subprocess
+import urllib.request
+import time
+import logging
+import platform
+import stat
+import re
+import json
+import hashlib
+import base64
+import zlib
 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.51"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.60.0"        # plugin version
+BIN_VERSION = "v0.5.52"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.61.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1477,7 +1488,7 @@ class AphroditeContextEngine(ContextEngine):
         self.last_completion_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
         self.last_total_tokens = usage.get("total_tokens", 0)
         if self.context_length:
-            self.threshold_tokens = 1  # always above threshold
+            self.threshold_tokens = int(self.context_length * self.threshold_percent / 100)
 
     def should_compress(self, prompt_tokens=None):
         """Compress only when context fill exceeds threshold percentage.
@@ -1485,7 +1496,9 @@ class AphroditeContextEngine(ContextEngine):
         NOTE: Falls back to context_length when Hermes doesn't call update_from_response."""
         if self.threshold_percent == 0:
             return False  # disabled
-        tokens = prompt_tokens or self.last_prompt_tokens or (self.context_length or 1000000)
+        tokens = prompt_tokens or self.last_prompt_tokens
+        if not tokens:          # no real token data yet — skip first turn
+            return False
         if not self.context_length:
             return False
         pct = (tokens / self.context_length) * 100
