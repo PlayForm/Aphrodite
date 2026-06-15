@@ -48,7 +48,6 @@ pub struct AppState {
     pub model: String,
     pub api_key: String,
     pub ccr: Option<Arc<dyn CcrStore>>,
-    pub inject_tool: bool,
     pub add_markers: bool,
     pub mode: ProxyMode,
     pub tool_relay: bool,
@@ -227,7 +226,6 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         model: cli.model.clone(),
         api_key: cli.api_key.clone(),
         ccr,
-        inject_tool: !cli.no_ccr_inject_tool && matches!(cli.mode, ProxyMode::Token),
         add_markers: !cli.no_ccr_marker,
         mode: cli.mode,
         tool_relay: cli.tool_relay,
@@ -250,31 +248,6 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
 // ── Main proxy handler ──────────────────────────────────────────────
 
-
-/// Retry an async operation with exponential backoff.
-#[allow(dead_code)]
-async fn retry_with_backoff<F, Fut, T, E>(mut f: F, max_retries: u32, label: &str) -> Result<T, E>
-where
-    F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = Result<T, E>>,
-    E: std::fmt::Display,
-{
-    let mut last_err = None;
-    for attempt in 1..=max_retries {
-        match f().await {
-            Ok(val) => return Ok(val),
-            Err(e) => {
-                last_err = Some(e);
-                if attempt < max_retries {
-                    let ms = 100 * 2u64.pow(attempt - 1);
-                    tracing::warn!(attempt, backoff_ms = ms, label, "retrying after error");
-                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
-                }
-            }
-        }
-    }
-    Err(last_err.unwrap())
-}
 
 
 /// Generate a simple summary — first 3 lines or first 200 chars.
@@ -551,31 +524,8 @@ async fn compress_chat_completion(
                     }
                 }
 
-                // Inject optimized aphrodite_retrieve tool
-                if state.inject_tool {
-                    let retrieve_tool = serde_json::json!({
-                        "type": "function",
-                        "function": {
-                            "name": "aphrodite_retrieve",
-                            "description": "Retrieve original content behind a CCR marker. Call this when you see a <<<CCR:hash|type|size>>> marker and need the full content to answer accurately. Provide the hash from the marker. Optionally filter with query.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "hash": {
-                                        "type": "string",
-                                        "description": "The hash from the CCR marker (e.g. <<<CCR:abc123|json|2048>>>)"
-                                    },
-                                    "query": {
-                                        "type": "string",
-                                        "description": "Filter returned content to lines matching this query (optional)"
-                                    }
-                                },
-                                "required": ["hash"]
-                            }
-                        }
-                    });
-                    arr.push(retrieve_tool);
-                }
+                // Tool injection removed — aphrodite_retrieve is registered by the Python plugin.
+                // Injecting into the response tool_calls array was incorrect (Bug 18).
             }
         }
     }
@@ -737,14 +687,13 @@ mod tests {
             model: "test".into(),
             api_key: "test".into(),
             ccr: None,
-            inject_tool: false,
             add_markers: false,
             mode: ProxyMode::Cache,
             tool_relay: false,
             notify_url: None,
             notify_key: None,
             dev: false,
-                    requests_total: AtomicU64::new(0),
+            requests_total: AtomicU64::new(0),
             requests_compressed: AtomicU64::new(0),
             tokens_saved: AtomicU64::new(0),
             ccr_hits: AtomicU64::new(0),
@@ -825,21 +774,20 @@ mod tests {
             model: "default-model".into(),
             api_key: "test".into(),
             ccr: None,
-            inject_tool: false,
             add_markers: false,
             mode: ProxyMode::Cache,
             tool_relay: false,
             notify_url: None,
             notify_key: None,
             dev: false,
-            request_history: std::sync::Mutex::new(Vec::new()),
-        requests_total: AtomicU64::new(0),
+            requests_total: AtomicU64::new(0),
             requests_compressed: AtomicU64::new(0),
             tokens_saved: AtomicU64::new(0),
             ccr_hits: AtomicU64::new(0),
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
+            request_history: Mutex::new(Vec::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
             compressions_by_type: Mutex::new(HashMap::new()),
