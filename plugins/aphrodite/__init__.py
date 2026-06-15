@@ -36,7 +36,7 @@ ENGINE_MIN_MSGS      = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 0)
 TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 1024)
 TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 8192)
 TERMINAL_THRESHOLD    = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 2048)
-INLINE_THRESHOLD      = _cfg_int("APHRODITEINLINE_THRESHOLD", 4096)
+INLINE_THRESHOLD      = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
 RECURSIVE_DEPTH       = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
 DEBUG_LOGGING         = os.environ.get("APHRODITE_DEBUG", "") == "1"
 
@@ -706,12 +706,6 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         except Exception:
             pass
     return output
-
-
-# ── Inline compression store (session-scoped, fallback when proxy down) ────
-# Maps hash → original content. Cleared on session reset.
-_inline_store = {}
-INLINE_THRESHOLD = 4096
 
 
 def _inline_clear():
