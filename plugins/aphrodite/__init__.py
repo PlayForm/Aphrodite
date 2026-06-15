@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.41"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.50.0"        # plugin version
+BIN_VERSION = "v0.5.42"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.51.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -707,8 +707,13 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     # ── 3. Build the catalog ──────────────────────────────────
     parts = []
-    if markers or _conv_index or compress_hint or len(_referenced_files) > 5:
+    if markers or _conv_index or compress_hint or len(_referenced_files) > 5 or DEBUG_LOGGING:
         parts.append("[APHRODITE]")
+        
+        # Debug banner injected into conversation (when APHRODITE_DEBUG=1)
+        if DEBUG_LOGGING:
+            parts.append(f"  ⚙ v{PLUGIN_VERSION} | mode={'proxy+hooks' if not os.environ.get('APHRODITE_CONTEXT_ENGINE') else 'proxy+hooks+engine'} | engine={'enabled' if os.environ.get('APHRODITE_CONTEXT_ENGINE')=='1' else 'off'} | dev={'on' if _DEV else 'off'}")
+            parts.append(f"  ⚙ thresholds: term={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_tok={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE} engine_pct={ENGINE_THRESHOLD_PCT}% prot={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min={ENGINE_MIN_MSGS}")
         
         # Git diff summary (cached 30s)
         git_info = _git_summary()
