@@ -1,5 +1,5 @@
 name: aphrodite
-version: 1.20.0
+version: 1.21.0
 description: "CCR compression plugin - ccr hits/misses tracking, health 200, request history, compressed header."
 kind: plugin
 provides_hooks:
@@ -14,6 +14,7 @@ provides_tools:
   - aphrodite_stats
   - aphrodite_rebuild
   - aphrodite_files
+  - aphrodite_diff
 provides_context_engine: true
 install_message: |
   aphrodite v1.15.0 - ccr hits/misses, health 200, request history, compressed header.
