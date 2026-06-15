@@ -9,7 +9,7 @@
 //! Chat Completions API:
 //! - Forwards POST /v1/chat/completions to DeepSeek
 //! - Intercepts responses, compresses tool output via CCR
-//! - Injects headroom_retrieve tool definition into tool_calls when aphrodite mode
+//! - Injects aphrodite_retrieve tool definition into tool_calls when aphrodite mode
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -499,12 +499,12 @@ async fn compress_chat_completion(
                     }
                 }
 
-                // Inject optimized headroom_retrieve tool
+                // Inject optimized aphrodite_retrieve tool
                 if state.inject_tool {
                     let retrieve_tool = serde_json::json!({
                         "type": "function",
                         "function": {
-                            "name": "headroom_retrieve",
+                            "name": "aphrodite_retrieve",
                             "description": "Retrieve original content behind a CCR marker. Call this when you see a ⭷CCR:hash marker and need the full content to answer accurately. Provide the hash from the marker. Optionally filter with query.",
                             "parameters": {
                                 "type": "object",
@@ -562,7 +562,7 @@ async fn execute_tool_relay(
     state: &AppState, tool: &str, params: &serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     match tool {
-        "headroom_retrieve" => {
+        "aphrodite_retrieve" => {
             let hash = params.get("hash").and_then(|v| v.as_str()).ok_or("missing hash")?;
             if let Some(ccr) = &state.ccr {
                 match ccr.get(hash) {
@@ -573,7 +573,7 @@ async fn execute_tool_relay(
                 Err("CCR not enabled".into())
             }
         }
-        "headroom_compress" => {
+        "aphrodite_compress" => {
             let content = params.get("content").and_then(|v| v.as_str()).ok_or("missing content")?;
             if let Some(ccr) = &state.ccr {
                 let hash = compute_key(content.as_bytes());

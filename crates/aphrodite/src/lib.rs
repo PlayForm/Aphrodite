@@ -24,7 +24,7 @@
 //! Hermes → aphrodite (:9797/:9798) → any LLM API
 //!              ↓ CCR store (in-memory / SQLite)
 //!              ↓ Tool relay (bidirectional)
-//!         POST /tool/relay ← headroom_retrieve / headroom_compress
+//!         POST /tool/relay ← aphrodite_retrieve / aphrodite_compress
 //! ```
 //!
 //! ## Endpoints
@@ -35,7 +35,7 @@
 //! | GET | `/stats` | Latency histogram, CCR stats |
 //! | GET | `/history` | Ring buffer of last 50 requests |
 //! | POST | `/retrieve` | Resolve CCR markers |
-//! | POST | `/tool/relay` | headroom_retrieve/headroom_compress |
+//! | POST | `/tool/relay` | aphrodite_retrieve/aphrodite_compress |
 //! | POST | `/ccr/create` | Programmatic CCR entry |
 //! | GET | `/ccr/list` | Entry count + backend info |
 //! | ANY | `/*path` | LLM API pass-through |
