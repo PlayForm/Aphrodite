@@ -1,36 +1,58 @@
 """
-aphrodite v1.7.0 — Auto-install + launch aphrodite proxies.
+aphrodite v1.8.0 — Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 - Recursive CCR resolution, session-scoped stores
 - Context engine (ContextEngine subclass), extensible hooks
-- headroom_retrieve + headroom_compress + headroom_stats + aphrodite_rebuild
+- 4 tools: headroom_retrieve/compress/stats + aphrodite_rebuild
+- All thresholds configurable via env vars (see _cfg_int)
 
 On install: downloads pre-built binary from GitHub releases.
 On session_start: launches aphrodite proxies not already running.
 """
 import os, subprocess, urllib.request, time, logging, platform, stat, re, json, hashlib, base64, zlib
 
+# ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-VERSION = "v0.2.0"
+BIN_VERSION = "v0.2.0"          # binary download version
+PLUGIN_VERSION = "1.8.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
 _log = logging.getLogger("aphrodite")
-# Dev mode: skip all proxy routing — use cargo watch instead
+
+# ── Configurable thresholds (env vars) ────────────────────────
+def _cfg_int(name, default):
+    try: return int(os.environ.get(name, str(default)))
+    except: return default
+
+ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 0)  # 0=always compress
+ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 2)
+ENGINE_PROTECT_LAST  = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 5)
+ENGINE_MIN_MSGS      = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 0)
+TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 1024)
+TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 8192)
+TERMINAL_THRESHOLD    = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 2048)
+INLINE_THRESHOLD      = _cfg_int("APHRODITEINLINE_THRESHOLD", 4096)
+RECURSIVE_DEPTH       = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
+DEBUG_LOGGING         = os.environ.get("APHRODITE_DEBUG", "") == "1"
+
+# Dev mode: skip all proxy routing
 _DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 if _DEV:
     _log.warning("aphrodite DEV MODE — plugin disabled, use cargo watch for proxies")
+if DEBUG_LOGGING:
+    _log.setLevel(logging.DEBUG)
+    _log.debug("aphrodite v%s debug logging enabled | engine_threshold=%s protect_first=%s protect_last=%s min_msgs=%s tool_token=%s tool_cache=%s term=%s inline=%s",
+        PLUGIN_VERSION, ENGINE_THRESHOLD_PCT, ENGINE_PROTECT_FIRST, ENGINE_PROTECT_LAST,
+        ENGINE_MIN_MSGS, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE, TERMINAL_THRESHOLD, INLINE_THRESHOLD)
 
 # ── CCR regex (shared) ───────────────────────────────────────
 _CCR_RE = re.compile(r'\[CCR:([^\]]+)\]')
-_RECURSIVE_DEPTH = 3  # max nesting depth for recursive resolution
 
-# ── Inline compression store (fallback when proxy is down) ────
-# Maps hash → original content. Session-scoped, survives proxy restarts.
+# ── Inline compression store (session-scoped) ─────────────────
 _inline_store = {}
-_INLINE_THRESHOLD = 4096  # only inline-compress outputs >4KB (lighter than proxy thresholds)
 
 
 def _inline_compress(content):
@@ -117,10 +139,10 @@ def _download_binary() -> bool:
     os.makedirs(BINARY_DIR, exist_ok=True)
     
     download_url = (
-        f"https://github.com/{REPO}/releases/download/{VERSION}/aphrodite"
+        f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite"
     )
     
-    _log.info("downloading aphrodite %s from %s", VERSION, download_url)
+    _log.info("downloading aphrodite %s from %s", BIN_VERSION, download_url)
     
     try:
         urllib.request.urlretrieve(download_url, BINARY)
@@ -232,7 +254,7 @@ def _resolve_recursive(hash_val, depth=0, resolved=None):
     if resolved is None:
         resolved = {}
     
-    if depth >= _RECURSIVE_DEPTH or hash_val in resolved:
+    if depth >= RECURSIVE_DEPTH or hash_val in resolved:
         return resolved.get(hash_val, "")
     
     content = _resolve_one(hash_val)
@@ -346,7 +368,7 @@ def _transform_tool_result(
     if tool_name in skip:
         return result
 
-    threshold = 1024 if token_alive else 8192 if cache_alive else _INLINE_THRESHOLD
+    threshold = 1024 if token_alive else 8192 if cache_alive else INLINE_THRESHOLD
     if len(result) < threshold:
         return result
 
@@ -362,7 +384,7 @@ def _transform_tool_result(
             return _ccr_marker(h, "tool", len(result), label, preview)
     
     # Fallback: inline compression (works without proxy)
-    if len(result) >= _INLINE_THRESHOLD:
+    if len(result) >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(result)
             return _ccr_marker(h, "tool", len(result), "inline", preview)
@@ -649,7 +671,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             return f'[CCR:{h}|terminal|{len(output)}] {preview}…(use headroom_retrieve)'
     
     # Fallback: inline compression
-    if len(output) >= _INLINE_THRESHOLD:
+    if len(output) >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(output)
             return f'[CCR:{h}|terminal|{len(output)}|inline] {preview}…(use headroom_retrieve)'
@@ -661,7 +683,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
 # ── Inline compression store (session-scoped, fallback when proxy down) ────
 # Maps hash → original content. Cleared on session reset.
 _inline_store = {}
-_INLINE_THRESHOLD = 4096
+INLINE_THRESHOLD = 4096
 
 
 def _inline_clear():
@@ -805,10 +827,10 @@ class AphroditeContextEngine(ContextEngine):
     @property
     def name(self) -> str:
         return "aphrodite"
-    threshold_percent = 0.0
-    protect_first_n = 2
-    protect_last_n = 5
-    min_messages_to_compress = 0
+    threshold_percent = ENGINE_THRESHOLD_PCT
+    protect_first_n = ENGINE_PROTECT_FIRST
+    protect_last_n = ENGINE_PROTECT_LAST
+    min_messages_to_compress = ENGINE_MIN_MSGS
 
     def __init__(self):
         self.last_prompt_tokens = 0

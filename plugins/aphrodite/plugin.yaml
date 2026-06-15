@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.7.0
-description: "CCR compression plugin — context engine, recursive retrieve, inline fallback, session-scoped stores, extensible hooks, 4 tools."
+version: 1.8.0
+description: "CCR compression plugin — all thresholds configurable via env vars, debug logging, 4 tools, context engine."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -15,5 +15,7 @@ provides_tools:
   - aphrodite_rebuild
 provides_context_engine: true
 install_message: |
-  aphrodite v1.7.0 — session-scoped, extensible hooks, 4 tools.
+  aphrodite v1.8.0 — env-configurable thresholds, debug logging.
   Activate: hermes config set context.engine aphrodite
+  Debug: APHRODITE_DEBUG=1 hermes ...
+  Config: APHRODITE_ENGINE_THRESHOLD_PCT=50 APHRODITE_TERMINAL_THRESHOLD=1024 ...
