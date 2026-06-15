@@ -205,10 +205,44 @@ RETRIEVE_SCHEMA = {
     }
 }
 
+
+
+def _transform_tool_result(
+    tool_name="", args=None, result="", tool_call_id="",
+    task_id="", session_id="", turn_id="", api_request_id="",
+    duration_ms=0, status="", error_type="", error_message="",
+    **kwargs,
+):
+    """Compress large tool outputs at capture time via CCR."""
+    if not result or not isinstance(result, str) or not result.strip():
+        return result
+
+    # Only compress outputs > 512 chars
+    if len(result) < 512:
+        return result
+
+    try:
+        import urllib.request, json
+        data = json.dumps({"content": result}).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:9798/ccr/create",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=3) as r:
+            ccr_result = json.loads(r.read())
+        hash_val = ccr_result["hash"]
+        # Return a marker the LLM can retrieve
+        return f'[CCR:{hash_val}] Tool output compressed ({len(result)} chars). Use headroom_retrieve with hash={hash_val} to get full content.'
+    except Exception as e:
+        _log.debug("transform_tool_result compression skipped: %s", e)
+        return result
+
 def register(ctx):
     # Install binary on registration
     _ensure_binary()
     ctx.register_hook("session_start", on_start)
+    ctx.register_hook("transform_tool_result", _transform_tool_result)
     ctx.register_tool(
         name="headroom_compress",
         schema=COMPRESS_SCHEMA,

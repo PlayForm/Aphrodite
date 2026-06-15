@@ -4,6 +4,7 @@ description: "Auto-install + launch aphrodite Chat Completions proxy — cache (
 kind: plugin
 provides_hooks:
   - session_start
+  - transform_tool_result
 install_message: |
   aphrodite v0.2.0 will be downloaded from GitHub releases.
   Requires DEEPSEEK_API_KEY in ~/.hermes/.env.
