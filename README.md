@@ -2,7 +2,7 @@
 
 <p align="center"><img src="assets/aphrodite.svg" width="80"></p>
 
-> Generic LLM proxy with CCR + tool relay — any OpenAI-compatible API.
+> Generic LLM proxy with CCR + tool relay - any OpenAI-compatible API.
 
 [![release](https://img.shields.io/badge/release-v0.4.0-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
@@ -14,8 +14,8 @@
 |------|------|------------|-------|---------|
 | LICENSE | 7.0KB | 24B | 290x | 40ms |
 | README | 2.5KB | 24B | 103x | 64ms |
-| 20KB text | 20KB | 24B | 833x | — |
-| **Retrieve** | 20KB | — | — | **27ms avg** |
+| 20KB text | 20KB | 24B | 833x | - |
+| **Retrieve** | 20KB | - | - | **27ms avg** |
 
 ## Quick Start
 
