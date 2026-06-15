@@ -1,17 +1,21 @@
-//! headroom-token — Token-mode proxy binary.
+//! headroom-proxy — Cache+Token proxy binary with tool relay.
 //!
 //! Standalone HTTP proxy that:
 //! 1. Listens for OpenAI-compatible requests
-//! 2. Forwards them to DeepSeek
-//! 3. Compresses large tool outputs with CCR (SQLite-backed)
-//! 4. Exposes `/retrieve` to resolve CCR markers
-//! 5. Injects `headroom_retrieve` tool into compressed responses
+//! 2. Forwards to DeepSeek
+//! 3. Compresses large tool outputs with CCR (SQLite-backed) in token mode
+//! 4. Exposes /retrieve to resolve CCR markers
+//! 5. Exposes /tool/relay for bidirectional Hermes communication
+//! 6. Exposes /ccr/create for programmatic CCR entry creation
+//! 7. Injects headroom_retrieve tool into compressed responses (token mode)
+//!
+//! Default ports: :9797 (cache mode), :9798 (token mode).
 
 use std::sync::Arc;
 
 use axum::{
     extract::State,
-    routing::{any, post},
+    routing::{any, get, post},
     Json, Router,
 };
 use clap::Parser;
@@ -19,9 +23,9 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-use headroom_token::config::Cli;
-use headroom_token::proxy::{self};
-use headroom_token::retrieve;
+use headroom_proxy::config::{Cli, ProxyMode};
+use headroom_proxy::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list};
+use headroom_proxy::retrieve;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -40,27 +44,36 @@ async fn main() -> anyhow::Result<()> {
 
     let state = Arc::new(proxy::build_state(&cli).await?);
 
+    let mode_str = match cli.mode {
+        ProxyMode::Cache => "cache",
+        ProxyMode::Token => "token",
+    };
+
     tracing::info!(
         listen = %cli.listen,
+        mode = %mode_str,
         deepseek = %cli.deepseek_url,
         model = %cli.model,
-        ccr_db = %cli.ccr_db_path.display(),
-        ccr_ttl_s = cli.ccr_ttl_seconds,
-        inject_tool = !cli.no_ccr_inject_tool,
-        add_markers = !cli.no_ccr_marker,
-        "headroom-token starting"
+        tool_relay = cli.tool_relay,
+        notify_url = ?cli.notify_url,
+        "headroom-proxy starting"
     );
 
+    // Build router with all endpoints
     let state2 = state.clone();
-    let app = Router::new()
+    let mut app = Router::new()
+        // Core endpoints
+        .route("/health", get(|| async { "ok" }))
+        .route("/stats", get(move || async move {
+            Json(state2.stats_json())
+        }))
         .route("/retrieve", post(retrieve::handle_retrieve))
-        .route(
-            "/stats",
-            axum::routing::get(move || async move {
-                Json(state2.stats_json())
-            }),
-        )
-        .route("/health", axum::routing::get(|| async { "ok" }))
+        // Tool relay (enabled by --tool-relay flag)
+        .route("/tool/relay", post(handle_tool_relay))
+        // Programmatic CCR management
+        .route("/ccr/create", post(handle_ccr_create))
+        .route("/ccr/list", get(handle_ccr_list))
+        // Catch-all proxy
         .route("/*path", any(proxy::proxy_handler))
         .with_state(state);
 

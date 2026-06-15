@@ -1,12 +1,12 @@
 [package]
-name = "headroom-token"
-version = "0.1.0"
+name = "headroom-proxy"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.80"
-description = "Headroom token-mode proxy — CCR-enabled, code-aware, DeepSeek forwarding. Standalone binary for Hermes agent use."
+description = "Headroom proxy — cache + token modes with CCR, tool relay, and programmatic CCR for Hermes agent integration."
 
 [[bin]]
-name = "headroom-token"
+name = "headroom-proxy"
 path = "src/main.rs"
 
 [dependencies]
