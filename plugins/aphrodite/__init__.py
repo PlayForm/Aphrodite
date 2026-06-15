@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.28"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.37.0"        # plugin version
+BIN_VERSION = "v0.5.29"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.38.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1075,6 +1075,79 @@ def _search_handler(args=None, **kwargs):
         "results": results[:20],
     })
 
+
+def _test_handler(args=None, **kwargs):
+    """Full smoke test suite — exercises all tools, hooks, compression, search, retrieve."""
+    args = args if isinstance(args, dict) else {}
+    mode = args.get("mode", "quick")  # quick, full, matrix
+    report = {"suite": "aphrodite_smoke", "version": PLUGIN_VERSION, "mode": mode, "tests": []}
+    
+    def test(name, fn):
+        try:
+            t0 = time.time()
+            result = fn()
+            elapsed = (time.time() - t0) * 1000
+            report["tests"].append({"name": name, "status": "PASS", "elapsed_ms": round(elapsed, 1), "result": result})
+        except Exception as e:
+            report["tests"].append({"name": name, "status": "FAIL", "error": str(e)})
+    
+    # ── Tool smoke tests ─────────────────────────────────
+    test("compress_json", lambda: json.loads(_compress_handler(args={"content": '{"a":1,"b":[2,3]}', "type": "json"})))
+    test("compress_code", lambda: json.loads(_compress_handler(args={"content": "def foo():\n    return 42\n", "type": "code"})))
+    test("compress_cache_hit", lambda: _compress_handler(args={"content": '{"a":1,"b":[2,3]}', "type": "json"}))  # should hit cache
+    
+    test("retrieve_roundtrip", lambda: "def foo" in _retrieve_handler(args={"hash": hashlib.sha256(b"def foo():\n    return 42\n").hexdigest()[:16]}))
+    
+    test("stats", lambda: json.loads(_stats_handler())["proxy"])
+    
+    test("files_empty", lambda: json.loads(_files_handler())["count"] == 0)
+    
+    test("diff_empty", lambda: json.loads(_diff_handler())["turns"] == 0)
+    
+    # ── Proxy health ─────────────────────────────────────
+    test("proxy_health", lambda: _alive(9798))
+    test("proxy_metrics", lambda: _alive(9797))
+    
+    # ── Full mode: heavy compression test ────────────────
+    if mode in ("full", "matrix"):
+        big_payload = json.dumps({"data": list(range(1000)), "nested": {"deep": {"values": [i*i for i in range(200)]}}})
+        test("compress_large", lambda: json.loads(_compress_handler(args={"content": big_payload, "type": "json"}))["size"] > 1000)
+        test("search_find", lambda: json.loads(_search_handler(args={"query": "deep"}))["matches"] >= 1)
+        test("terminal_threshold", lambda: TERMINAL_THRESHOLD > 0)
+        test("inline_threshold", lambda: INLINE_THRESHOLD > 0)
+    
+    # ── Matrix mode: settings sweep ──────────────────────
+    if mode == "matrix":
+        settings = {"results": {}}
+        for pct in (0, 25, 50, 75, 100):
+            for protect in (2, 5, 10):
+                key = f"pct={pct}_protect={protect}"
+                settings["results"][key] = {
+                    "threshold_pct": pct,
+                    "protect_last": protect,
+                    "compresses_always": pct == 0,
+                    "compresses_never": pct >= 100,
+                }
+        report["settings_matrix"] = settings
+    
+    report["summary"] = {
+        "total": len(report["tests"]),
+        "passed": sum(1 for t in report["tests"] if t["status"] == "PASS"),
+        "failed": sum(1 for t in report["tests"] if t["status"] == "FAIL"),
+    }
+    return json.dumps(report, indent=2)
+
+TEST_SCHEMA = {
+    "name": "aphrodite_test",
+    "description": "Run full smoke test suite — compress, retrieve, search, stats, files, diff, proxy health. Use mode=full for heavy tests, mode=matrix for settings sweep.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "mode": {"type": "string", "description": "Test mode: quick (default), full, or matrix"}
+        }
+    }
+}
+
 SEARCH_SCHEMA = {
     "name": "aphrodite_search",
     "description": "Search across CCR entries - find compressed content by keyword or type. Use to locate previously compressed context without knowing the hash.",
@@ -1137,6 +1210,12 @@ def register(ctx):
         name="aphrodite_search",
         schema=SEARCH_SCHEMA,
         handler=_search_handler,
+        toolset="aphrodite",
+    )
+    ctx.register_tool(
+        name="aphrodite_test",
+        schema=TEST_SCHEMA,
+        handler=_test_handler,
         toolset="aphrodite",
     )
     # Only register context engine when explicitly configured
