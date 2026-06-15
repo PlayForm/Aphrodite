@@ -143,6 +143,20 @@ impl AppState {
         }
     }
 
+    /// Per-type threshold — code stays in context longer, logs compressed aggressively.
+    fn threshold_for(&self, ct: &str) -> usize {
+        let base = self.compress_threshold();
+        match ct {
+            "error" => base * 8,           // errors always visible
+            "code_rust" | "code_python" | "code_go" | "code_js" | "code" => base * 4,  // code preserved
+            "diff" | "git" => base * 2,     // diffs moderately compressed
+            "tool_output" => base,           // default
+            "build_output" | "log" => base / 2,  // logs aggressive
+            "json" => base,
+            _ => base,
+        }
+    }
+
     fn record_latency(&self, d: std::time::Duration) {
         let us = d.as_micros() as u64;
         let bucket = if us < 1_000 { 0 } else if us < 10_000 { 1 } else if us < 100_000 { 2 } else if us < 1_000_000 { 3 } else { 4 };
@@ -440,19 +454,81 @@ pub async fn proxy_handler(
 /// Detect content type for adaptive compression strategy.
 
 fn detect_content_type(content: &str) -> &'static str {
+    let first_line = content.lines().next().unwrap_or("");
+    
+    // Structured output detection
     if content.starts_with('{') || content.starts_with('[') {
-        if content.contains("exit_code") {
+        if content.contains("exit_code") || content.contains("\"status\"") {
             return "tool_output";
         }
         return "json";
     }
-    if content.contains("error") || content.contains("Error") || content.contains("ERROR") {
+    
+    // Error output — always keep visible
+    if first_line.contains("error") || first_line.contains("Error") || first_line.contains("ERROR")
+        || first_line.contains("Traceback") || first_line.contains("panic")
+        || first_line.starts_with("thread '") 
+    {
         return "error";
     }
-    if content.contains('\n') && content.lines().count() > 5 {
-        if content.contains("fn ") || content.contains("def ") || content.contains("class ") {
+    
+    // Build/test output patterns
+    if first_line.starts_with("Compiling ") || first_line.starts_with("   Compiling ")
+        || first_line.contains("Finished") || first_line.starts_with("running ")
+        || first_line.starts_with("test ") 
+    {
+        return "build_output";
+    }
+    
+    // Diff output
+    if first_line.starts_with("diff --git ") || first_line.starts_with("@@ -")
+        || first_line.starts_with("+++ ") || first_line.starts_with("--- ")
+    {
+        return "diff";
+    }
+    
+    // Git output
+    if first_line.starts_with("commit ") || first_line.starts_with("On branch ")
+    {
+        return "git";
+    }
+    
+    // Code detection — language-specific
+    if content.lines().count() > 3 {
+        // Rust
+        if content.contains("fn ") && (content.contains("-> ") || content.contains("impl ") 
+            || content.contains("struct ") || content.contains("pub ")) 
+        {
+            return "code_rust";
+        }
+        // Python
+        if content.contains("def ") && (content.contains("import ") || content.contains("class ")
+            || content.contains("from ") || content.contains("self."))
+        {
+            return "code_python";
+        }
+        // Go
+        if (content.contains("func ") || content.contains("package ")) 
+            && content.contains("import (") 
+        {
+            return "code_go";
+        }
+        // JS/TS
+        if (content.contains("function ") || content.contains("const ") || content.contains("=> "))
+            && (content.contains("import ") || content.contains("export "))
+        {
+            return "code_js";
+        }
+        // Generic code
+        if content.contains("fn ") || content.contains("def ") || content.contains("class ")
+            || content.contains("import ") || content.contains("pub fn")
+        {
             return "code";
         }
+    }
+    
+    // Terminal output
+    if content.lines().count() > 5 {
         return "log";
     }
     "text"
@@ -473,7 +549,7 @@ async fn compress_chat_completion(
 ) -> Option<serde_json::Value> {
     let mut response: serde_json::Value = serde_json::from_slice(resp_body).ok()?;
     let choices = response.get_mut("choices")?.as_array_mut()?;
-    let threshold = state.compress_threshold();
+    let base_threshold = state.compress_threshold();  // floor threshold for all types
     let mut did_compress = false;
 
     for choice in choices {
@@ -482,6 +558,8 @@ async fn compress_chat_completion(
         // Compress text content with smart markers
         if let Some(content_val) = message.get_mut("content") {
             if let Some(content) = content_val.as_str() {
+                let ct = detect_content_type(content);
+                let threshold = state.threshold_for(ct).max(base_threshold);
                 if content.len() > threshold {
                     if let Some(ccr) = &state.ccr {
                         let hash = compute_key(content.as_bytes());
@@ -493,7 +571,6 @@ async fn compress_chat_completion(
                             state.ccr_created.fetch_add(1, Ordering::Relaxed);
                             state.tokens_saved.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
                         }
-                        let ct = detect_content_type(content);
 
                         let compressed = match state.mode {
                             ProxyMode::Cache => {
@@ -521,6 +598,8 @@ async fn compress_chat_completion(
                     if let Some(func) = tc.get_mut("function") {
                         if let Some(args) = func.get_mut("arguments") {
                             if let Some(args_str) = args.as_str() {
+                                let ct = detect_content_type(args_str);
+                                let threshold = state.threshold_for(ct).max(base_threshold);
                                 if args_str.len() > threshold {
                                     if let Some(ccr) = &state.ccr {
                                         let hash = compute_key(args_str.as_bytes());
