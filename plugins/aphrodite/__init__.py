@@ -551,6 +551,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         else:
             parts.append(f"  mode=inline | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
         
+        # Engine stats (from ContextEngine, if active)
+        engine = get_engine()
+        if engine and engine.compression_count > 0:
+            parts.append(f"  engine: {engine.compression_count} compressions | last: {engine.last_compression.get('messages_compressed', '?')} msgs → CCR:{engine.last_compression.get('hash', '?')[:8]}")
+        
         # Turn archive
         if compress_hint:
             parts.append(compress_hint)
@@ -696,13 +701,38 @@ def register(ctx):
 
 from agent.context_engine import ContextEngine
 
+# Global reference so hooks + other plugins can access the engine
+_engine = None
+
+
+def _set_engine(eng):
+    global _engine
+    _engine = eng
+
+
+def get_engine():
+    """Return the aphrodite context engine instance, or None.
+    
+    Other plugins can call this to access the engine and its stats.
+    """
+    return _engine
+
+
+def _fire_hook(name, **kwargs):
+    """Fire a Hermes hook so other plugins can listen to engine events."""
+    try:
+        from hermes_cli.plugins import invoke_hook
+        invoke_hook(name, **kwargs)
+    except Exception:
+        pass
+
 
 class AphroditeContextEngine(ContextEngine):
     """CCR-based context compression engine for Hermes.
 
     Replaces built-in summarization compressor with CCR offloading.
-    When context exceeds threshold, middle messages are compressed to CCR
-    and replaced with a retrieval marker. Head + tail kept raw.
+    Extensible via Hermes hooks — other plugins can listen to:
+      - ``aphrodite_engine_compressed`` — fired after each compression
 
     Set ``context.engine: aphrodite`` in config.yaml to activate.
     Works with proxy (token/cache) or inline fallback (zlib).
@@ -711,10 +741,10 @@ class AphroditeContextEngine(ContextEngine):
     @property
     def name(self) -> str:
         return "aphrodite"
-    threshold_percent = 0.0    # always trigger (emulate token proxy internally)
+    threshold_percent = 0.0
     protect_first_n = 2
     protect_last_n = 5
-    min_messages_to_compress = 0  # always compress when possible
+    min_messages_to_compress = 0
 
     def __init__(self):
         self.last_prompt_tokens = 0
@@ -723,6 +753,10 @@ class AphroditeContextEngine(ContextEngine):
         self.threshold_tokens = 0
         self.context_length = 1000000
         self.compression_count = 0
+        self.last_compression = {}  # stats from most recent compression
+        self.session_id = ""
+        # Store reference globally so other plugins + hooks can access
+        _set_engine(self)
 
     def update_from_response(self, usage):
         self.last_prompt_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
@@ -801,8 +835,23 @@ class AphroditeContextEngine(ContextEngine):
             "context_engine: compressed %d msgs → CCR:%s (%s)",
             len(middle), hash_val[:8], size_str
         )
+        self._notify_compressed(len(packed), len(middle), hash_val)
 
         return head + [{"role": "system", "content": marker}] + tail
+
+    def _notify_compressed(self, packed_len, middle_len, hash_val):
+        """Fire hook so other plugins can react to compression."""
+        self.last_compression = {
+            "messages_compressed": middle_len,
+            "packed_size": packed_len,
+            "hash": hash_val,
+            "count": self.compression_count,
+        }
+        _fire_hook(
+            "aphrodite_engine_compressed",
+            engine=self,
+            stats=self.last_compression,
+        )
 
     def get_status(self):
         return {
