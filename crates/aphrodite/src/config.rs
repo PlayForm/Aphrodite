@@ -15,7 +15,7 @@ pub enum ProxyMode {
     Cache,
     /// Aphrodite mode — SQLite CCR, aggressive compression (>1KB threshold),
     /// tool injection, tool relay.
-    Token,
+    Aphrodite,
 }
 
 /// aphrodite — Chat Completions proxy with CCR, tool relay, and programmatic CCR.
