@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.38.0
-description: "CCR compression plugin - ccr hits/misses tracking, health 200, request history, compressed header."
+version: 1.39.0
+description: "CCR compression plugin - smoke test suite, feature toggles, regression tracking, 8 tools."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -19,7 +19,7 @@ provides_tools:
   - aphrodite_test
 provides_context_engine: true
 install_message: |
-  aphrodite v1.15.0 - ccr hits/misses, health 200, request history, compressed header.
+  aphrodite v1.39.0 - smoke test suite, feature toggles, regression tracking, 8 tools.
   Activate: hermes config set context.engine aphrodite
   Debug: APHRODITE_DEBUG=1 hermes ...
   Tools: aphrodite_retrieve, aphrodite_compress, aphrodite_stats, aphrodite_rebuild
