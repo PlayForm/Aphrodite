@@ -238,11 +238,43 @@ def _transform_tool_result(
         _log.debug("transform_tool_result compression skipped: %s", e)
         return result
 
+
+def _rebuild_handler(args=None, **kwargs):
+    """Rebuild aphrodite crate and copy binary to ~/.hermes/aphrodite/."""
+    import subprocess, shutil, os
+    repo = "REPLACED/Developer/Application/PlayForm/HermesCompress"
+    result = subprocess.run(
+        ["cargo", "build", "--release", "-p", "aphrodite"],
+        cwd=repo, capture_output=True, text=True, timeout=300,
+        env={**os.environ, "PATH": f"{os.path.expanduser('~/.cargo/bin')}:{os.environ.get('PATH', '')}"}
+    )
+    if result.returncode != 0:
+        return f'{{"error": "build failed: {result.stderr[-200:]}"}}'
+    
+    src = os.path.join(repo, "target/release/aphrodite")
+    if os.path.exists(src):
+        shutil.copy2(src, BINARY)
+        os.chmod(BINARY, 0o755)
+        return f'{{"ok": true, "size": {os.path.getsize(BINARY)}, "path": "{BINARY}"}}'
+    return '{"error": "binary not found after build"}'
+
+
+REBUILD_SCHEMA = {
+    "name": "aphrodite_rebuild",
+    "description": "Rebuild aphrodite crate from source and install binary. Use after code changes.",
+    "parameters": {"type": "object", "properties": {}}
+}
+
 def register(ctx):
     # Install binary on registration
     _ensure_binary()
     ctx.register_hook("session_start", on_start)
     ctx.register_hook("transform_tool_result", _transform_tool_result)
+    ctx.register_tool(
+        name="aphrodite_rebuild",
+        schema=REBUILD_SCHEMA,
+        handler=_rebuild_handler,
+    )
     ctx.register_tool(
         name="headroom_compress",
         schema=COMPRESS_SCHEMA,
