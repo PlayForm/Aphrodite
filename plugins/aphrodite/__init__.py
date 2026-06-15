@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.34"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.43.0"        # plugin version
+BIN_VERSION = "v0.5.35"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.44.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -603,7 +603,8 @@ def _parse_ccr_markers(text):
                 })
             except ValueError:
                 pass
-    return markers
+    # Filter out entries with missing/empty hashes
+    return [m for m in markers if m['hash'] and len(m['hash']) >= 4]
 
 
 _git_cache = {}  # {summary: timestamp}
