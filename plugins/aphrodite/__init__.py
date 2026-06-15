@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.30"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.39.0"        # plugin version
+BIN_VERSION = "v0.5.31"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.40.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1163,6 +1163,12 @@ def _test_handler(args=None, **kwargs):
                     os.environ.pop(k, None)
         report["feature_toggles"] = feature_results
     
+    report["summary"] = {
+        "total": len(report["tests"]),
+        "passed": sum(1 for t in report["tests"] if t["status"] == "PASS"),
+        "failed": sum(1 for t in report["tests"] if t["status"] == "FAIL"),
+    }
+    
     # ── Save results for regression comparison ─────────────
     try:
         results_path = os.path.join(os.path.dirname(__file__), ".test-results.json")
@@ -1183,17 +1189,11 @@ def _test_handler(args=None, **kwargs):
             }
     except Exception:
         pass
-    
-    report["summary"] = {
-        "total": len(report["tests"]),
-        "passed": sum(1 for t in report["tests"] if t["status"] == "PASS"),
-        "failed": sum(1 for t in report["tests"] if t["status"] == "FAIL"),
-    }
     return json.dumps(report, indent=2)
 
 TEST_SCHEMA = {
     "name": "aphrodite_test",
-    "description": "Run full smoke test suite — compress, retrieve, search, stats, files, diff, proxy health. Use mode=full for heavy tests, mode=matrix for settings sweep.",
+    "description": "Run full smoke test suite — compress, retrieve, search, stats, files, diff, proxy health. Modes: quick, full, matrix, pipeline.",
     "parameters": {
         "type": "object",
         "properties": {
