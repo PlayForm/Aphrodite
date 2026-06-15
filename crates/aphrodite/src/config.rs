@@ -103,7 +103,8 @@ pub struct Defaults {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ProxyConfig {
     pub name: Option<String>,
-    pub listen: String,
+    #[serde(default)]
+    pub listen: Option<String>,
     pub mode: Option<String>,
     pub api_key: Option<String>,
     pub api_url: Option<String>,
@@ -130,11 +131,17 @@ impl MultiConfig {
     pub fn resolve(&self, cfg: &ProxyConfig) -> Cli {
         let d = self.defaults.as_ref();
         Cli {
-            mode: match cfg.mode.as_deref().unwrap_or("cache") {
-                "token" => ProxyMode::Token,
-                _ => ProxyMode::Cache,
+            mode: match cfg.mode.as_deref() {
+                Some("token") => ProxyMode::Token,
+                Some("cache") | None => ProxyMode::Cache,
+                Some(other) => {
+                    tracing::warn!("unknown mode {:?}, defaulting to cache", other);
+                    ProxyMode::Cache
+                }
             },
-            listen: cfg.listen.parse().unwrap_or_else(|_| "127.0.0.1:9797".parse().unwrap()),
+            listen: cfg.listen.as_deref()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or_else(|| "127.0.0.1:9797".parse().unwrap()),
             api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
             api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).unwrap_or_default(),
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
