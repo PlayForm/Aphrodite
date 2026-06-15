@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.20"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.29.0"        # plugin version
+BIN_VERSION = "v0.5.21"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.30.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -570,6 +570,25 @@ def _parse_ccr_markers(text):
     return markers
 
 
+_git_cache = {}  # {summary: timestamp}
+
+def _git_summary():
+    """Get cached git diff --stat summary. Returns string or None."""
+    now = time.time()
+    if _git_cache.get("ts", 0) > now - 30:
+        return _git_cache.get("summary")
+    try:
+        import subprocess
+        r = subprocess.run(["git", "diff", "--stat"], capture_output=True, text=True, timeout=3)
+        if r.returncode == 0 and r.stdout.strip():
+            summary = r.stdout.strip().split('\n')[-1] if r.stdout.strip() else None
+            _git_cache["ts"] = now
+            _git_cache["summary"] = summary
+            return summary
+    except Exception:
+        pass
+    return None
+
 def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     """Before LLM call: build navigable compression catalog.
 
@@ -644,8 +663,13 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     # ── 3. Build the catalog ──────────────────────────────────
     parts = []
-    if markers or _conv_index or compress_hint:
+    if markers or _conv_index or compress_hint or len(_referenced_files) > 5:
         parts.append("[APHRODITE]")
+        
+        # Git diff summary (cached 30s)
+        git_info = _git_summary()
+        if git_info:
+            parts.append(f"  git: {git_info}")
         
         # Compression wrapping summary
         if proxy_available:
