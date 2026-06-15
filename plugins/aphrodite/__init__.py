@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.12"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.21.0"        # plugin version
+BIN_VERSION = "v0.5.13"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.22.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -1105,6 +1105,7 @@ class AphroditeContextEngine(ContextEngine):
 
         Dual-mode: proxy CCR preferred, inline zlib fallback.
         Tool-chain safe: won't split assistant tool_call from its tool_result.
+        Editing-aware: active editing sessions preserve more recent context.
         """
         if len(messages) <= self.min_messages_to_compress:
             return messages
@@ -1112,16 +1113,30 @@ class AphroditeContextEngine(ContextEngine):
         head_n = self.protect_first_n
         tail_n = self.protect_last_n
 
+        # ── Editing session detection: preserve more context ──
+        is_editing = False
+        for msg in messages[-10:]:
+            content = str(msg.get("content", ""))
+            if (msg.get("role") == "tool" and 
+                any(kw in content.lower() for kw in ("wrote", "patched", "modified", "created", "deleted", "successfully", "written"))):
+                is_editing = True
+                break
+        if is_editing:
+            tail_n = max(tail_n, 8)  # keep more context during edits
+
         # ── Tool-chain safety: extend tail to include full chains ──
-        # If the tail boundary splits a tool_call→tool_result pair,
-        # extend tail backwards to include the orphan tool_result.
         if len(messages) > tail_n:
             boundary = len(messages) - tail_n
-            # Check if we'd split a tool chain: if messages[boundary] is a
-            # tool result, backtrack through preceding tool_call messages
+            # Backtrack to include orphan tool_results
             while boundary < len(messages) and messages[boundary].get("role") == "tool":
                 boundary += 1
                 tail_n += 1
+            # Also backtrack to include the assistant tool_call that owns the tool_result
+            if boundary > 0 and messages[boundary - 1].get("role") == "assistant":
+                tool_calls = messages[boundary - 1].get("tool_calls", [])
+                if tool_calls:
+                    boundary -= 1
+                    tail_n += 1
             tail_n = min(tail_n, len(messages) - head_n)
 
         head = messages[:head_n]
