@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.24"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.33.0"        # plugin version
+BIN_VERSION = "v0.5.25"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.34.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -450,6 +450,9 @@ def _transform_tool_result(
             if DEBUG_LOGGING:
                 ratio = result_len / max(len(h), 1)
                 _log.debug("transform_tool_result: CCR %s %s:%s size=%s ratio=%.1fx %.1fms", tool_name[:40], label, h, result_len, ratio, (time.time()-_t0)*1000)
+            _recent_markers.append({'hash': h, 'type': 'tool', 'size': result_len, 'preview': preview})
+            if len(_recent_markers) > 200:
+                _recent_markers.pop(0)
             return _ccr_marker(h, "tool", result_len, label, preview)
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s — proxy returned no hash", tool_name[:40])
@@ -460,6 +463,9 @@ def _transform_tool_result(
             h, _ = _inline_compress(result)
             if DEBUG_LOGGING:
                 _log.debug("transform_tool_result: INLINE %s hash=%s size=%s %.1fms", tool_name[:40], h, result_len, (time.time()-_t0)*1000)
+            _recent_markers.append({'hash': h, 'type': 'tool', 'size': result_len, 'preview': preview})
+            if len(_recent_markers) > 200:
+                _recent_markers.pop(0)
             return _ccr_marker(h, "tool", result_len, "inline", preview)
         except Exception:
             if DEBUG_LOGGING:
