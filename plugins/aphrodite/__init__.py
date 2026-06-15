@@ -595,10 +595,10 @@ def _parse_ccr_markers(text):
                 marker_end = m.rfind('>>>') + 3 if '>>>' in m else len(m)
                 preview = text[text.find(m) + marker_end:].strip()[:200] if marker_end > 3 else ''
                 markers.append({
-                    'hash': parts[0],
-                    'type': parts[1],
+                    'hash': str(parts[0]) if parts[0] else '',
+                    'type': str(parts[1]),
                     'size': sz,
-                    'mode': parts[3] if len(parts) > 3 else '?',
+                    'mode': str(parts[3]) if len(parts) > 3 else '?',
                     'preview': preview,
                 })
             except ValueError:
@@ -737,7 +737,10 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 parts.append(f"    [{ctype}] {len(items)} items:")
                 for i, m in enumerate(items[:visible]):
                     preview = _extract_preview(m, conversation_history)
-                    parts.append(f"      CCR:{m['hash']} | {_fmt_size(m['size'])} | {preview}")
+                    h = str(m.get('hash', '?'))
+                    if not h or h in ('{}', '?', 'None'):
+                        continue
+                    parts.append(f"      CCR:{h} | {_fmt_size(m['size'])} | {preview}")
                 if len(items) > visible:
                     parts.append(f"      ... +{len(items)-visible} more (use aphrodite_retrieve)")
         
