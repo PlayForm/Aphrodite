@@ -238,6 +238,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
 
 /// Retry an async operation with exponential backoff.
+#[allow(dead_code)]
 async fn retry_with_backoff<F, Fut, T, E>(mut f: F, max_retries: u32, label: &str) -> Result<T, E>
 where
     F: FnMut() -> Fut,
@@ -263,6 +264,7 @@ where
 
 
 /// Generate a simple summary — first 3 lines or first 200 chars.
+#[allow(dead_code)]
 fn generate_summary(content: &str) -> String {
     let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).take(3).collect();
     if lines.len() >= 2 {
@@ -324,10 +326,13 @@ pub async fn proxy_handler(
     // Client (Hermes) connects without auth, proxy handles upstream auth
     req = req.header("Authorization", format!("Bearer {}", state.api_key));
 
-    // Forward select headers
+    // Forward select headers (preserve X-Headroom-Workspace for CCR scoping)
     for (key, val) in headers.iter() {
         let k = key.as_str().to_lowercase();
         if k != "host" && k != "authorization" && k != "content-length" {
+            if k.starts_with("x-headroom-") && k != "x-headroom-workspace" {
+                continue;  // strip headroom headers except workspace key
+            }
             req = req.header(key, val);
         }
     }
@@ -336,6 +341,8 @@ pub async fn proxy_handler(
     match req.body(body_vec.clone()).send().await {
         Ok(response) => {
             let status = response.status();
+            // Extract content-type before consuming response body
+            let content_type = response.headers().get("content-type").cloned();
             let resp_body = response.bytes().await.unwrap_or_default();
 
             // Only compress Chat Completions responses
@@ -382,10 +389,12 @@ pub async fn proxy_handler(
                     "<<< RES"
                 );
             }
-            Response::builder()
-                .status(status)
-                .body(Body::from(resp_body))
-                .unwrap()
+            // Use already-extracted content_type (fetched before response.bytes())
+            let mut builder = Response::builder().status(status);
+            if let Some(ct) = content_type {
+                builder = builder.header("Content-Type", ct);
+            }
+            builder.body(Body::from(resp_body)).unwrap()
         }
         Err(e) => {
             state.record_error(format!("upstream: {}", e));
@@ -426,12 +435,12 @@ fn detect_content_type(content: &str) -> &'static str {
     "text"
 }
 
-/// Create a smart CCR marker with metadata the LLM can use to decide retrieval.
+/// Create a standard CCR marker the LLM can parse to decide retrieval.
 fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
     let size = content.len();
     let preview = &content[..content.len().min(120)];
     let oneliner = preview.lines().next().unwrap_or(preview).trim();
-    format!("⫷CCR:{}|{}|{}⫸ {}", hash, ct, size, oneliner)
+    format!("<<<CCR:{}|{}|{}>>> {}", hash, ct, size, oneliner)
 }
 
 /// Compress a Chat Completions API response with smart markers.
@@ -454,13 +463,15 @@ async fn compress_chat_completion(
                     if let Some(ccr) = &state.ccr {
                         let hash = compute_key(content.as_bytes());
                         ccr.put(&hash, content);
+                        state.ccr_created.fetch_add(1, Ordering::Relaxed);
+                        state.tokens_saved.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
                         let ct = detect_content_type(content);
 
                         let compressed = match state.mode {
                             ProxyMode::Cache => {
                                 // Keep first 512 chars + marker
                                 let preview = &content[..content.len().min(512)];
-                                format!("⫷CCR:{}|{}|{}⫸\n{}", hash, ct, content.len(), preview)
+                                format!("<<<CCR:{}|{}|{}>>>\n{}", hash, ct, content.len(), preview)
                             }
                             ProxyMode::Token => {
                                 // Marker with one-line preview so LLM knows whether to retrieve
@@ -505,13 +516,13 @@ async fn compress_chat_completion(
                         "type": "function",
                         "function": {
                             "name": "aphrodite_retrieve",
-                            "description": "Retrieve original content behind a CCR marker. Call this when you see a ⭷CCR:hash marker and need the full content to answer accurately. Provide the hash from the marker. Optionally filter with query.",
+                            "description": "Retrieve original content behind a CCR marker. Call this when you see a <<<CCR:hash|type|size>>> marker and need the full content to answer accurately. Provide the hash from the marker. Optionally filter with query.",
                             "parameters": {
                                 "type": "object",
                                 "properties": {
                                     "hash": {
                                         "type": "string",
-                                        "description": "The hash from the CCR marker (e.g. ⭷CCR:abc123|json|2048⭸)"
+                                        "description": "The hash from the CCR marker (e.g. <<<CCR:abc123|json|2048>>>)"
                                     },
                                     "query": {
                                         "type": "string",
@@ -653,22 +664,13 @@ pub async fn handle_ccr_list(
 pub async fn health_check(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    let upstream_ok = state
-        .client
-        .get(format!("{}/models", state.api_url.trim_end_matches('/')))
-        .header("Authorization", format!("Bearer {}", state.api_key))
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-        .map(|r| r.status().is_success())
-        .unwrap_or(false);
-
-    let status_code = if upstream_ok { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    // Local-only health — no upstream API call (done separately via /health/upstream)
+    let ccr_ok = state.ccr.is_some();
+    let status_code = if ccr_ok { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
 
     (status_code, Json(serde_json::json!({
-        "status": if upstream_ok { "healthy" } else { "degraded" },
-        "upstream": upstream_ok,
-        "ccr": state.ccr.is_some(),
+        "status": if ccr_ok { "healthy" } else { "degraded" },
+        "ccr": ccr_ok,
         "mode": match state.mode {
             ProxyMode::Cache => "cache",
             ProxyMode::Token => "token",

@@ -84,6 +84,20 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health_check))
+        .route("/health/upstream", get({
+            let s = state.clone();
+            move || async move {
+                let ok = s.client
+                    .get(format!("{}/models", s.api_url.trim_end_matches('/')))
+                    .header("Authorization", format!("Bearer {}", s.api_key))
+                    .timeout(std::time::Duration::from_secs(5))
+                    .send()
+                    .await
+                    .map(|r| r.status().is_success())
+                    .unwrap_or(false);
+                Json(serde_json::json!({"upstream": ok}))
+            }
+        }))
         .route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
         .route("/stats", get({
             let s = state.clone();

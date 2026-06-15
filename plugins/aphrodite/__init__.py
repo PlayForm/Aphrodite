@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.2.0"          # binary download version
-PLUGIN_VERSION = "1.8.1"        # plugin version
+BIN_VERSION = "v0.4.0"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.9.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -51,7 +51,7 @@ if DEBUG_LOGGING:
         ENGINE_MIN_MSGS, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE, TERMINAL_THRESHOLD, INLINE_THRESHOLD)
 
 # ── CCR regex (shared) ───────────────────────────────────────
-_CCR_RE = re.compile(r'\[CCR:([^\]]+)\]')
+_CCR_RE = re.compile(r'<<<CCR:([^>]+)>>>')
 
 # ── Inline compression store (session-scoped) ─────────────────
 _inline_store = {}
@@ -75,25 +75,26 @@ def _inline_retrieve(hash_val):
 
 
 def _resolve_one(hash_val, timeout=4):
-    """Resolve a single CCR hash. Checks inline store first, then proxy."""
+    """Resolve a single CCR hash. Checks inline store first, then tries both proxies."""
     # Check inline store first
     content = _inline_retrieve(hash_val)
     if content is not None:
         return content
-    # Fall through to proxy
-    try:
-        data = json.dumps({"hash": hash_val}).encode()
-        req = urllib.request.Request(
-            "http://127.0.0.1:9798/retrieve",
-            data=data,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            result = json.loads(r.read())
-        if result.get("found"):
-            return result["content"]
-    except Exception:
-        pass
+    # Try token proxy first, then cache proxy
+    for port in (9797, 9798):
+        try:
+            data = json.dumps({"hash": hash_val}).encode()
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/retrieve",
+                data=data,
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                result = json.loads(r.read())
+            if result.get("found"):
+                return result["content"]
+        except Exception:
+            continue
     return None
 
 
@@ -115,10 +116,10 @@ def _compress_via_proxy(content, target_port):
 
 def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
     """Build a standard CCR marker string."""
-    base = f"[CCR:{hash_val}|{ccr_type}|{size}"
+    base = f"<<<CCR:{hash_val}|{ccr_type}|{size}"
     if mode:
         base += f"|{mode}"
-    base += "]"
+    base += ">>>"
     if preview:
         base += f" {preview}"
     return base
@@ -140,8 +141,9 @@ def _download_binary() -> bool:
     """Download aphrodite binary from GitHub releases."""
     os.makedirs(BINARY_DIR, exist_ok=True)
     
+    plat = _detect_platform()
     download_url = (
-        f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite"
+        f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite-{plat}"
     )
     
     _log.info("downloading aphrodite %s from %s", BIN_VERSION, download_url)
@@ -197,13 +199,29 @@ def _load_env():
     return env
 
 
+# ── Alive cache (5-second TTL) ──────────────────────────────
+_alive_cache = {}  # {port: (result, timestamp)}
+
+
 def _alive(port, timeout=3):
+    """Check proxy health with 5-second caching to avoid socket overhead."""
+    now = time.time()
+    if port in _alive_cache:
+        result, ts = _alive_cache[port]
+        if now - ts < 5:
+            return result
     try:
         r = urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=timeout)
         body = r.read().decode().strip()
-        return body == "ok" or '"status":"healthy"' in body
+        try:
+            data = json.loads(body)
+            result = data.get("status") in ("healthy", "ok", "degraded")
+        except Exception:
+            result = body.strip() == "ok"
     except Exception:
-        return False
+        result = False
+    _alive_cache[port] = (result, now)
+    return result
 
 
 def _start(name, env):
@@ -239,10 +257,20 @@ def on_start(**kw):
     for name in ("cache", "token"):
         if not _alive(PORTS[name]):
             _start(name, env)
-    time.sleep(0.5)
-    cache_ok = _alive(9797)
-    token_ok = _alive(9798)
+    
+    # Retry loop for proxy readiness (was fixed 0.5s sleep)
+    cache_ok = _wait_alive(9797, retries=10, delay=0.3)
+    token_ok = _wait_alive(9798, retries=10, delay=0.3)
     _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
+
+
+def _wait_alive(port, retries=10, delay=0.3):
+    """Wait for proxy port to become alive, with retries."""
+    for _ in range(retries):
+        if _alive(port):
+            return True
+        time.sleep(delay)
+    return False
 
 
 # ── Tools ─────────────────────────────────────────────────────
@@ -250,7 +278,7 @@ def on_start(**kw):
 def _resolve_recursive(hash_val, depth=0, resolved=None):
     """Recursively resolve CCR markers in content, up to max depth.
     
-    After retrieving content, scans for nested [CCR:...] markers
+    After retrieving content, scans for nested <<<CCR:...>>> markers
     and resolves them in parallel, replacing markers with resolved content.
     """
     if resolved is None:
@@ -261,7 +289,7 @@ def _resolve_recursive(hash_val, depth=0, resolved=None):
     
     content = _resolve_one(hash_val)
     if content is None:
-        return f'[CCR:{hash_val}|unresolved]'
+            return f'<<<CCR:{hash_val}|unresolved>>>'
     
     resolved[hash_val] = content
     
@@ -277,7 +305,7 @@ def _resolve_recursive(hash_val, depth=0, resolved=None):
         if len(parts) >= 1 and parts[0] not in resolved:
             nested_hash = parts[0]
             nested_content = _resolve_recursive(nested_hash, depth + 1, resolved)
-            replacements[f'[CCR:{marker}]'] = nested_content
+            replacements[f'<<<CCR:{marker}>>>'] = nested_content
     
     # Replace markers with resolved content
     for marker_str, replacement in replacements.items():
@@ -294,7 +322,7 @@ def _retrieve_handler(args=None, **kwargs):
         return '{"error": "missing hash parameter"}'
     try:
         content = _resolve_recursive(hash_val)
-        if content and not content.startswith("[CCR:"):
+        if content and not content.startswith("<<<CCR:"):
             return content
         return f'{{"error": "CCR entry not found: {hash_val}"}}'
     except Exception as e:
@@ -401,7 +429,7 @@ def _transform_tool_result(
 
 def _rebuild_handler(args=None, **kwargs):
     """Rebuild aphrodite crate and copy binary to ~/.hermes/aphrodite/."""
-    repo = "REPLACED/Developer/Application/PlayForm/HermesCompress"
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     result = subprocess.run(
         ["cargo", "build", "--release", "-p", "aphrodite"],
         cwd=repo, capture_output=True, text=True, timeout=300,
@@ -481,7 +509,7 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
 
 
 def _parse_ccr_markers(text):
-    """Parse [CCR:hash|type|size|mode] markers from text. Returns list of dicts."""
+    """Parse <<<CCR:hash|type|size|mode>>> markers from text. Returns list of dicts."""
     markers = []
     for m in _CCR_RE.findall(text):
         parts = m.split('|')
@@ -506,7 +534,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     WRAPPING PATTERN visible to LLM:
     ┌─ Last ~10 messages: raw, fully in context
-    ├─ Tool/terminal outputs >1KB: [CCR:hash|type|size] markers inline
+    ├─ Tool/terminal outputs >1KB: <<<CCR:hash|type|size>>> markers inline
     ├─ Old turn summaries: compressed to CCR, cataloged here
     └─ Everything else: raw user/assistant text (Hermes keeps it)
 
@@ -534,37 +562,42 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 total_bytes += m['size']
                 markers.append(m)
 
-    # ── 2. Compress old turns to CCR (structured summaries) ───
+    # ── 2. Compress old turns to CCR (skip already-compressed) ──
     compress_hint = ""
     if proxy_available and target and ctx_len > 30:
         turns = _group_into_turns(conversation_history)
         if len(turns) > 6:
             old_turns = turns[:-6]
-            try:
-                summaries = []
-                for t in old_turns:
-                    summaries.append({
-                        "turn": t["id"],
-                        "user": t.get("user", "")[:300],
-                        "assistant": t.get("assistant", "(tool calls)")[:300],
-                    })
-                packed = json.dumps(summaries)
-                if len(packed) > 500:
-                    data = json.dumps({"content": packed}).encode()
-                    req = urllib.request.Request(
-                        f"http://127.0.0.1:{target}/ccr/create",
-                        data=data, headers={"Content-Type": "application/json"})
-                    with urllib.request.urlopen(req, timeout=3) as r:
-                        ccr = json.loads(r.read())
-                    kept = len(turns) - len(old_turns)
-                    compress_hint = (
-                        f"  [TURN ARCHIVE] CCR:{ccr['hash'][:12]} | "
-                        f"turns T{turns[0]['id']}-T{old_turns[-1]['id']} "
-                        f"({len(old_turns)} turns compressed, last {kept} raw)\n"
-                        f"  retrieve: aphrodite_retrieve({ccr['hash'][:12]})"
-                    )
-            except Exception:
-                pass
+            # Filter out turns already in _conv_index (prevents re-compression)
+            old_turns = [t for t in old_turns if t["id"] not in _conv_index]
+            if not old_turns:
+                compress_hint = ""  # already compressed, skip
+            else:
+                try:
+                    summaries = []
+                    for t in old_turns:
+                        summaries.append({
+                            "turn": t["id"],
+                            "user": t.get("user", "")[:300],
+                            "assistant": t.get("assistant", "(tool calls)")[:300],
+                        })
+                    packed = json.dumps(summaries)
+                    if len(packed) > 500:
+                        data = json.dumps({"content": packed}).encode()
+                        req = urllib.request.Request(
+                            f"http://127.0.0.1:{target}/ccr/create",
+                            data=data, headers={"Content-Type": "application/json"})
+                        with urllib.request.urlopen(req, timeout=3) as r:
+                            ccr = json.loads(r.read())
+                        kept = len(turns) - len(old_turns)
+                        compress_hint = (
+                            f"  [TURN ARCHIVE] CCR:{ccr['hash'][:12]} | "
+                            f"turns T{turns[0]['id']}-T{old_turns[-1]['id']} "
+                            f"({len(old_turns)} turns compressed, last {kept} raw)\n"
+                            f"  retrieve: aphrodite_retrieve({ccr['hash'][:12]})"
+                        )
+                except Exception:
+                    pass
 
     # ── 3. Build the catalog ──────────────────────────────────
     parts = []
@@ -681,7 +714,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     cache_alive = _alive(PORTS["cache"])
     proxy_available = token_alive or cache_alive
 
-    if len(output) < 2048:  # 2KB min for terminal compression
+    if len(output) < TERMINAL_THRESHOLD:  # use configured threshold
         return output
 
     # Don't re-compress content that already has CCR markers (retrieved/compressed)
@@ -696,13 +729,13 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         ccr = _compress_via_proxy(output, target)
         if ccr:
             h, _ = ccr
-            return f'[CCR:{h}|terminal|{len(output)}] {preview}…(use aphrodite_retrieve)'
+            return f'<<<CCR:{h}|terminal|{len(output)}>>> {preview}…(use aphrodite_retrieve)'
     
     # Fallback: inline compression
     if len(output) >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(output)
-            return f'[CCR:{h}|terminal|{len(output)}|inline] {preview}…(use aphrodite_retrieve)'
+            return f'<<<CCR:{h}|terminal|{len(output)}|inline>>> {preview}…(use aphrodite_retrieve)'
         except Exception:
             pass
     return output
@@ -878,7 +911,13 @@ class AphroditeContextEngine(ContextEngine):
             self.threshold_tokens = 1  # always above threshold
 
     def should_compress(self, prompt_tokens=None):
-        return True  # always compress - emulate token proxy internally
+        """Compress only when context fill exceeds threshold percentage."""
+        if self.threshold_percent == 0:
+            return True
+        if not prompt_tokens or not self.context_length:
+            return True
+        pct = (prompt_tokens / self.context_length) * 100
+        return pct >= self.threshold_percent
 
     def compress(self, messages, current_tokens=None, focus_topic=None):
         """Offload middle messages to CCR, keep head+tail raw.
@@ -911,10 +950,10 @@ class AphroditeContextEngine(ContextEngine):
         if len(middle) < 3:
             return messages  # too few to compress
 
-        # Pack middle messages
+        # Pack middle messages (no truncation — content already CCR-marked by hooks)
         packed = json.dumps([{
             "role": m.get("role", ""),
-            "content": str(m.get("content", ""))[:2000],
+            "content": str(m.get("content", "")),  # full content, not [:2000]
             "tool_call_id": m.get("tool_call_id", ""),
         } for m in middle])
 
@@ -1008,7 +1047,7 @@ class AphroditeContextEngine(ContextEngine):
         global _conv_index, _turn_counter
         _conv_index.clear()
         _turn_counter = 0
-        _log.info("v1.7.0: session reset - inline store + memory cleared")
+        _log.info("aphrodite v%s: session reset - inline store + memory cleared", PLUGIN_VERSION)
 
     def on_session_start(self, session_id="", **kw):
         self.session_id = session_id
