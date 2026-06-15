@@ -674,7 +674,7 @@ mod tests {
         use std::collections::HashMap;
         let state = AppState {
             client: HttpClient::new(),
-            api_url: "https://upstream-api.example.com".into(),
+            api_url: "https://upstream-openai.com".into(),
             model: "test".into(),
             api_key: "test".into(),
             ccr: None,
@@ -762,7 +762,7 @@ mod tests {
         use std::collections::HashMap;
         AppState {
             client: HttpClient::new(),
-            api_url: "https://upstream-api.example.com".into(),
+            api_url: "https://upstream-openai.com".into(),
             model: "default-model".into(),
             api_key: "test".into(),
             ccr: None,
