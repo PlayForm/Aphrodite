@@ -11,11 +11,11 @@
 //! aphrodite  # reads aphrodite.toml → starts :9797 + :9798
 //!
 //! # Single mode
-//! aphrodite --mode cache --listen :9797 --api-key $APHRODITE_API_KEY
-//! aphrodite --mode token --listen :9798 --api-key $APHRODITE_API_KEY --tool-relay
+//! aphrodite --mode cache --listen :9797 --api-key $APHRODITE_UPSTREAM_API_KEY
+//! aphrodite --mode token --listen :9798 --api-key $APHRODITE_UPSTREAM_API_KEY --tool-relay
 //!
 //! # Dev mode with verbose logging
-//! APHRODITE_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
+//! APHRODITE_UPSTREAM_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
 //! ```
 //!
 //! ## Architecture
@@ -53,8 +53,8 @@
 //!
 //! ```toml
 //! [defaults]
-//! api_url = "https://api.example.com"
-//! model = "gpt-4o"
+//! api_url = "https://upstream-api.example.com"
+//! model = "default-model"
 //!
 //! [[proxies]]
 //! name = "cache"
@@ -73,11 +73,11 @@
 //! ```yaml
 //! providers:
 //!   aphrodite-cache:
-//!     api_key_env: APHRODITE_API_KEY
+//!     api_key_env: APHRODITE_UPSTREAM_API_KEY
 //!     provider: deepseek
 //!     base_url: http://127.0.0.1:9797
 //!   aphrodite-token:
-//!     api_key_env: APHRODITE_API_KEY
+//!     api_key_env: APHRODITE_UPSTREAM_API_KEY
 //!     provider: deepseek
 //!     base_url: http://127.0.0.1:9798
 //! fallback_providers:

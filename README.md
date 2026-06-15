@@ -24,13 +24,13 @@
 aphrodite  # reads aphrodite.toml → starts :9797 + :9798
 
 # Cache mode only
-aphrodite --mode cache --listen :9797 --api-key $APHRODITE_API_KEY
+aphrodite --mode cache --listen :9797 --api-key $APHRODITE_UPSTREAM_API_KEY
 
 # Token mode with tool relay
-aphrodite --mode token --listen :9798 --api-key $APHRODITE_API_KEY --tool-relay
+aphrodite --mode token --listen :9798 --api-key $APHRODITE_UPSTREAM_API_KEY --tool-relay
 
 # Dev: single cargo watch, auto-rebuild
-APHRODITE_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
+APHRODITE_UPSTREAM_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
 ```
 
 ## Endpoints
@@ -52,11 +52,11 @@ APHRODITE_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
 ```yaml
 providers:
   aphrodite-cache:
-    api_key_env: APHRODITE_API_KEY
+    api_key_env: APHRODITE_UPSTREAM_API_KEY
     provider: deepseek
     base_url: http://127.0.0.1:9797
   aphrodite-token:
-    api_key_env: APHRODITE_API_KEY
+    api_key_env: APHRODITE_UPSTREAM_API_KEY
     provider: deepseek
     base_url: http://127.0.0.1:9798
 fallback_providers:
