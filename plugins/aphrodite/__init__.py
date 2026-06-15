@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.35"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.44.0"        # plugin version
+BIN_VERSION = "v0.5.37"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.46.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -586,14 +586,15 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
 def _parse_ccr_markers(text):
     """Parse <<<CCR:hash|type|size|mode>>> markers from text. Returns list of dicts."""
     markers = []
-    for m in _CCR_RE.findall(text):
+    for match in _CCR_RE.finditer(text):
+        m = match.group(1)
         parts = m.split('|')
         if len(parts) >= 3:
             try:
                 sz = int(parts[2])
-                # Extract preview text after the marker
-                marker_end = m.rfind('>>>') + 3 if '>>>' in m else len(m)
-                preview = text[text.find(m) + marker_end:].strip()[:200] if marker_end > 3 else ''
+                # Extract preview text after the >>> terminator
+                marker_end = match.end()  # position right after >>>
+                preview = text[marker_end:].strip()[:200] if marker_end < len(text) else ''
                 markers.append({
                     'hash': str(parts[0]) if parts[0] else '',
                     'type': str(parts[1]),
