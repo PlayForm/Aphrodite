@@ -1,14 +1,16 @@
 """
-aphrodite v1.2.0 — Auto-install + launch aphrodite proxies.
+aphrodite v1.3.0 — Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 - Recursive CCR resolution for nested markers
 - Dynamic knowledge map with previews and cutoff
+- Inline compression fallback (zlib) when proxy is down — no provider switch needed
+- Dual-mode: proxy CCR preferred, local fallback for resilience
 
 On install: downloads pre-built binary from GitHub releases.
 On session_start: launches aphrodite proxies not already running.
 """
-import os, subprocess, urllib.request, time, logging, platform, stat, re, json
+import os, subprocess, urllib.request, time, logging, platform, stat, re, json, hashlib, base64, zlib
 
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
@@ -25,6 +27,78 @@ if _DEV:
 # ── CCR regex (shared) ───────────────────────────────────────
 _CCR_RE = re.compile(r'\[CCR:([^\]]+)\]')
 _RECURSIVE_DEPTH = 3  # max nesting depth for recursive resolution
+
+# ── Inline compression store (fallback when proxy is down) ────
+# Maps hash → original content. Session-scoped, survives proxy restarts.
+_inline_store = {}
+_INLINE_THRESHOLD = 4096  # only inline-compress outputs >4KB (lighter than proxy thresholds)
+
+
+def _inline_compress(content):
+    """Compress content locally using zlib, store in session dict. Returns hash."""
+    compressed = base64.urlsafe_b64encode(zlib.compress(content.encode('utf-8'), 9)).decode('ascii')
+    h = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
+    _inline_store[h] = content
+    # Keep store bounded
+    if len(_inline_store) > 500:
+        oldest = next(iter(_inline_store))
+        del _inline_store[oldest]
+    return h, len(compressed)
+
+
+def _inline_retrieve(hash_val):
+    """Retrieve content from inline store. Returns content or None."""
+    return _inline_store.get(hash_val)
+
+
+def _resolve_one(hash_val, timeout=4):
+    """Resolve a single CCR hash. Checks inline store first, then proxy."""
+    # Check inline store first
+    content = _inline_retrieve(hash_val)
+    if content is not None:
+        return content
+    # Fall through to proxy
+    try:
+        data = json.dumps({"hash": hash_val}).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:9798/retrieve",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            result = json.loads(r.read())
+        if result.get("found"):
+            return result["content"]
+    except Exception:
+        pass
+    return None
+
+
+def _compress_via_proxy(content, target_port):
+    """Compress content through proxy CCR. Returns (hash, compressed_size) or None."""
+    try:
+        data = json.dumps({"content": content}).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{target_port}/ccr/create",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=3) as r:
+            ccr = json.loads(r.read())
+        return ccr["hash"], len(content)
+    except Exception:
+        return None
+
+
+def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
+    """Build a standard CCR marker string."""
+    base = f"[CCR:{hash_val}|{ccr_type}|{size}"
+    if mode:
+        base += f"|{mode}"
+    base += "]"
+    if preview:
+        base += f" {preview}"
+    return base
 
 
 
@@ -150,24 +224,6 @@ def on_start(**kw):
 
 # ── Tools ─────────────────────────────────────────────────────
 
-def _resolve_one(hash_val, timeout=4):
-    """Resolve a single CCR hash. Returns content string or None."""
-    try:
-        data = json.dumps({"hash": hash_val}).encode()
-        req = urllib.request.Request(
-            "http://127.0.0.1:9798/retrieve",
-            data=data,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            result = json.loads(r.read())
-        if result.get("found"):
-            return result["content"]
-    except Exception:
-        pass
-    return None
-
-
 def _resolve_recursive(hash_val, depth=0, resolved=None):
     """Recursively resolve CCR markers in content, up to max depth.
     
@@ -274,36 +330,46 @@ def _transform_tool_result(
     duration_ms=0, status="", error_type="", error_message="",
     **kwargs,
 ):
-    """Compress tool outputs at capture time via CCR. Token: >1KB, Cache: >8KB."""
+    """Compress tool outputs via CCR. Proxy first, inline fallback when proxy down.
+    
+    Dual-mode: proxy CCR (token >1KB, cache >8KB) with inline fallback (>4KB).
+    Works without proxy — no provider switch required.
+    """
     if not result or not isinstance(result, str) or not result.strip():
         return result
 
     if _DEV: return result  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
-    if not token_alive and not cache_alive:
-        return result
+    proxy_available = token_alive or cache_alive
 
     skip = {"read_file", "read_terminal"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo"}
     if tool_name in skip:
         return result
 
-    threshold = 1024 if token_alive else 8192
+    threshold = 1024 if token_alive else 8192 if cache_alive else _INLINE_THRESHOLD
     if len(result) < threshold:
         return result
 
-    target = PORTS["token"] if token_alive else PORTS["cache"]
-    try:
-        data = json.dumps({"content": result}).encode()
-        req = urllib.request.Request(f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=3) as r:
-            ccr = json.loads(r.read())
-        h = ccr["hash"]
-        p = result[:120].replace('\\n', ' ').strip()
-        label = "token" if token_alive else "cache"
-        return f'[CCR:{h}|tool|{len(result)}|{label}] {p}'
-    except Exception as e:
-        return result  # soft-fail
+    preview = result[:120].replace('\\n', ' ').strip()
+    
+    # Try proxy compression first
+    if proxy_available:
+        target = PORTS["token"] if token_alive else PORTS["cache"]
+        ccr = _compress_via_proxy(result, target)
+        if ccr:
+            h, sz = ccr
+            label = "token" if token_alive else "cache"
+            return _ccr_marker(h, "tool", len(result), label, preview)
+    
+    # Fallback: inline compression (works without proxy)
+    if len(result) >= _INLINE_THRESHOLD:
+        try:
+            h, _ = _inline_compress(result)
+            return _ccr_marker(h, "tool", len(result), "inline", preview)
+        except Exception:
+            pass
+    return result  # soft-fail
 
 
 def _rebuild_handler(args=None, **kwargs):
@@ -511,30 +577,33 @@ def _api_request_hook(api_messages=None, api_request_id=None, **kwargs):
 
 
 def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
-    """Compress terminal output via CCR on-the-fly."""
+    """Compress terminal output via CCR on-the-fly. Proxy first, inline fallback."""
     if _DEV: return output  # dev mode: passthrough
-    if not _alive(PORTS["token"]) and not _alive(PORTS["cache"]):
-        return output  # no proxy, pass through
+    token_alive = _alive(PORTS["token"])
+    cache_alive = _alive(PORTS["cache"])
+    proxy_available = token_alive or cache_alive
 
     if len(output) < 2048:  # 2KB min for terminal compression
         return output
 
-    target = PORTS["token"] if _alive(PORTS["token"]) else PORTS["cache"]
-    try:
-        data = json.dumps({"content": output}).encode()
-        req = urllib.request.Request(
-            f"http://127.0.0.1:{target}/ccr/create",
-            data=data,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=3) as r:
-            ccr = json.loads(r.read())
-        hash_val = ccr["hash"]
-        preview = output[:200].replace('\n', ' ').strip()
-        return f'[CCR:{hash_val}|terminal|{len(output)}] {preview}…(use headroom_retrieve)'
-    except Exception as e:
-        _log.debug("terminal compress skipped: %s", e)
-        return output
+    preview = output[:200].replace('\n', ' ').strip()
+    
+    # Try proxy compression first
+    if proxy_available:
+        target = PORTS["token"] if token_alive else PORTS["cache"]
+        ccr = _compress_via_proxy(output, target)
+        if ccr:
+            h, _ = ccr
+            return f'[CCR:{h}|terminal|{len(output)}] {preview}…(use headroom_retrieve)'
+    
+    # Fallback: inline compression
+    if len(output) >= _INLINE_THRESHOLD:
+        try:
+            h, _ = _inline_compress(output)
+            return f'[CCR:{h}|terminal|{len(output)}|inline] {preview}…(use headroom_retrieve)'
+        except Exception:
+            pass
+    return output
 
 
 def _fmt_size(b):
