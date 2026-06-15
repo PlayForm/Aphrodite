@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.9.0
-description: "CCR compression plugin - aphrodite tools, re-compression guard, read-intent detection."
+version: 1.10.0
+description: "CCR compression plugin - aphrodite tools, latency tracking, re-compression guard, read-intent detection."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -15,7 +15,7 @@ provides_tools:
   - aphrodite_rebuild
 provides_context_engine: true
 install_message: |
-  aphrodite v1.9.0 - re-compression guard, read-intent detection, aphrodite_* tools.
+  aphrodite v1.10.0 - latency tracking, re-compression guard, read-intent detection, aphrodite_* tools.
   Activate: hermes config set context.engine aphrodite
   Debug: APHRODITE_DEBUG=1 hermes ...
   Tools: aphrodite_retrieve, aphrodite_compress, aphrodite_stats, aphrodite_rebuild
