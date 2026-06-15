@@ -1,7 +1,7 @@
-//! CLI configuration for headroom-proxy.
+//! CLI configuration for aphrodite.
 //!
-//! Supports both cache (:9797) and token (:9798) proxy modes,
-//! with tool relay and programmatic CCR endpoints.
+//! Supports cache (:9797) and token (:9798) proxy modes with
+//! Chat Completions API forwarding, tool relay, and programmatic CCR.
 
 use clap::{Parser, ValueEnum};
 use std::net::SocketAddr;
@@ -10,23 +10,24 @@ use std::path::PathBuf;
 /// Proxy operation mode.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ProxyMode {
-    /// Cache mode — standard compression, no tool injection.
+    /// Cache mode — in-memory CCR, lightweight compression (>8KB threshold),
+    /// preview preserved, no tool injection.
     Cache,
-    /// Token mode — aggressive compression, CCR, tool injection, tool relay.
+    /// Token mode — SQLite CCR, aggressive compression (>1KB threshold),
+    /// tool injection, tool relay.
     Token,
 }
 
-/// Headroom proxy — CCR-enabled, code-aware DeepSeek forwarder.
-/// Supports tool relay and programmatic CCR for Hermes integration.
+/// aphrodite — Chat Completions proxy with CCR, tool relay, and programmatic CCR.
 #[derive(Parser, Debug, Clone)]
-#[command(name = "headroom-proxy", version, about)]
+#[command(name = "aphrodite", version, about)]
 pub struct Cli {
     /// Proxy mode: cache or token
-    #[arg(long, default_value = "token", env = "HEADROOM_PROXY_MODE")]
+    #[arg(long, default_value = "token", env = "APHRODITE_MODE")]
     pub mode: ProxyMode,
 
     /// Listen address (default: 127.0.0.1:8788 for token, :9797 for cache)
-    #[arg(long, default_value = "127.0.0.1:8788", env = "HEADROOM_PROXY_LISTEN")]
+    #[arg(long, default_value = "127.0.0.1:8788", env = "APHRODITE_LISTEN")]
     pub listen: SocketAddr,
 
     /// DeepSeek API base URL
@@ -38,10 +39,10 @@ pub struct Cli {
     pub deepseek_key: String,
 
     /// Model name to forward
-    #[arg(long, default_value = "deepseek-v4-pro", env = "HEADROOM_PROXY_MODEL")]
+    #[arg(long, default_value = "deepseek-v4-pro", env = "APHRODITE_MODEL")]
     pub model: String,
 
-    /// Max context tokens (for token counting)
+    /// Max context tokens
     #[arg(long, default_value = "1000000")]
     pub max_context: usize,
 
@@ -50,11 +51,11 @@ pub struct Cli {
     pub max_output: usize,
 
     /// SQLite database path for CCR storage
-    #[arg(long, default_value = ".headroom/proxy-ccr.db", env = "HEADROOM_PROXY_DB")]
+    #[arg(long, default_value = ".headroom/aphrodite-ccr.db", env = "APHRODITE_DB")]
     pub ccr_db_path: PathBuf,
 
     /// CCR TTL in seconds (default: 3600 = 1 hour)
-    #[arg(long, default_value = "3600", env = "HEADROOM_PROXY_CCR_TTL")]
+    #[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
     pub ccr_ttl_seconds: u64,
 
     /// Disable CCR tool injection (token mode only)
@@ -70,10 +71,10 @@ pub struct Cli {
     pub tool_relay: bool,
 
     /// Hermes callback URL for CCR notifications
-    #[arg(long, env = "HEADROOM_NOTIFY_URL")]
+    #[arg(long, env = "APHRODITE_NOTIFY_URL")]
     pub notify_url: Option<String>,
 
     /// Hermes API key for callback auth
-    #[arg(long, env = "HEADROOM_NOTIFY_KEY")]
+    #[arg(long, env = "APHRODITE_NOTIFY_KEY")]
     pub notify_key: Option<String>,
 }

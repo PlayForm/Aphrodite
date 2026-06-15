@@ -1,12 +1,12 @@
 [package]
-name = "headroom-proxy"
+name = "aphrodite"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.80"
 description = "Headroom proxy — cache + token modes with CCR, tool relay, and programmatic CCR for Hermes agent integration."
 
 [[bin]]
-name = "headroom-proxy"
+name = "aphrodite"
 path = "src/main.rs"
 
 [dependencies]

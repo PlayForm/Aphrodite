@@ -1,8 +1,15 @@
-//! Reverse proxy — forwards to DeepSeek, compresses with CCR.
+//! aphrodite — Reverse proxy with Chat Completions API support.
 //!
-//! Uses headroom_core::ccr::CcrStore for compression/caching.
-//! Supports cache and token modes. Token mode adds tool relay and
-//! programmatic CCR endpoints.
+//! Two modes:
+//! - **Cache** (:9797): In-memory CCR, lightweight compression, no tool injection.
+//!   Passes most content through, only compresses very large outputs (>8KB).
+//! - **Token** (:9798): SQLite CCR, aggressive compression, tool injection,
+//!   tool relay for bidirectional Hermes communication.
+//!
+//! Chat Completions API:
+//! - Forwards POST /v1/chat/completions to DeepSeek
+//! - Intercepts responses, compresses tool output via CCR
+//! - Injects headroom_retrieve tool definition into tool_calls when token mode
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -23,6 +30,15 @@ use headroom_core::ccr::{compute_key, marker_for, CcrStore};
 
 use crate::config::{Cli, ProxyMode};
 
+// ── Constants ───────────────────────────────────────────────────────
+
+/// Content size threshold for cache mode compression (8KB).
+const CACHE_COMPRESS_THRESHOLD: usize = 8192;
+/// Content size threshold for token mode compression (1KB).
+const TOKEN_COMPRESS_THRESHOLD: usize = 1024;
+/// Chat Completions API path.
+const CHAT_COMPLETIONS_PATH: &str = "/v1/chat/completions";
+
 // ── State ──────────────────────────────────────────────────────────
 
 pub struct AppState {
@@ -30,7 +46,6 @@ pub struct AppState {
     pub deepseek_url: String,
     pub model: String,
     pub api_key: String,
-    /// CCR store — in-memory (cache mode) or SQLite (token mode).
     pub ccr: Option<Arc<dyn CcrStore>>,
     pub inject_tool: bool,
     pub add_markers: bool,
@@ -56,7 +71,7 @@ impl AppState {
                 ProxyMode::Cache => "cache",
                 ProxyMode::Token => "token",
             },
-            "proxy": "headroom-proxy",
+            "proxy": "aphrodite",
             "ccr_backend": if self.ccr.is_some() { "enabled" } else { "none" },
             "tool_relay": self.tool_relay,
             "requests": {
@@ -71,6 +86,13 @@ impl AppState {
             },
             "tool_relay_calls": self.tool_relay_calls.load(Ordering::Relaxed),
         })
+    }
+
+    fn compress_threshold(&self) -> usize {
+        match self.mode {
+            ProxyMode::Cache => CACHE_COMPRESS_THRESHOLD,
+            ProxyMode::Token => TOKEN_COMPRESS_THRESHOLD,
+        }
     }
 }
 
@@ -127,13 +149,11 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
     let ccr: Option<Arc<dyn CcrStore>> = match cli.mode {
         ProxyMode::Token if !cli.no_ccr_marker => {
-            // Use SQLite backend for persistent CCR
             let store = SqliteCcrStore::open(&cli.ccr_db_path, cli.ccr_ttl_seconds)
                 .map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
             Some(Arc::new(store))
         }
         ProxyMode::Cache => {
-            // Use in-memory backend for cache mode
             let store = InMemoryCcrStore::with_capacity_and_ttl(
                 10_000,
                 std::time::Duration::from_secs(cli.ccr_ttl_seconds),
@@ -167,6 +187,8 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
 // ── Main proxy handler ──────────────────────────────────────────────
 
+/// Catch-all proxy handler — forwards any request to DeepSeek.
+/// Specifically handles Chat Completions API at /v1/chat/completions.
 pub async fn proxy_handler(
     State(state): State<Arc<AppState>>,
     method: Method,
@@ -179,15 +201,19 @@ pub async fn proxy_handler(
     let deepseek_path = path.path().trim_start_matches('/');
     let url = format!("{}/{}", state.deepseek_url.trim_end_matches('/'), deepseek_path);
 
+    let is_chat_completion = deepseek_path == CHAT_COMPLETIONS_PATH.trim_start_matches('/');
+
     let mut req = state
         .client
         .request(method.clone(), &url)
         .header("Authorization", format!("Bearer {}", state.api_key))
-        .header("Content-Type", "application/json");
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json");
 
+    // Forward select headers
     for (key, val) in headers.iter() {
         let k = key.as_str().to_lowercase();
-        if k != "host" && k != "authorization" {
+        if k != "host" && k != "authorization" && k != "content-length" {
             req = req.header(key, val);
         }
     }
@@ -198,15 +224,16 @@ pub async fn proxy_handler(
             let status = response.status();
             let resp_body = response.bytes().await.unwrap_or_default();
 
-            // Attempt CCR compression on response
-            if let Some(ccr) = &state.ccr {
-                if let Some(compressed) =
-                    try_compress_response(ccr, &resp_body, &body_vec, state.add_markers, state.inject_tool).await
-                {
+            // Only compress Chat Completions responses
+            if is_chat_completion && state.ccr.is_some() {
+                if let Some(compressed) = compress_chat_completion(
+                    &state, &resp_body,
+                ).await {
                     state.requests_compressed.fetch_add(1, Ordering::Relaxed);
                     let body = serde_json::to_vec(&compressed).unwrap_or_else(|_| resp_body.to_vec());
                     return Response::builder()
                         .status(status)
+                        .header("Content-Type", "application/json")
                         .body(Body::from(body))
                         .unwrap();
                 }
@@ -219,71 +246,117 @@ pub async fn proxy_handler(
         }
         Err(e) => (
             StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({"error": format!("{}", e)})),
+            Json(serde_json::json!({"error": format!("upstream error: {}", e)})),
         )
             .into_response(),
     }
 }
 
-async fn try_compress_response(
-    ccr: &Arc<dyn CcrStore>,
+/// Compress a Chat Completions API response.
+///
+/// The response format is:
+/// ```json
+/// {
+///   "choices": [{
+///     "message": {
+///       "role": "assistant",
+///       "content": "...",
+///       "tool_calls": [...]
+///     }
+///   }]
+/// }
+/// ```
+async fn compress_chat_completion(
+    state: &AppState,
     resp_body: &[u8],
-    _req_body: &[u8],
-    add_markers: bool,
-    inject_tool: bool,
 ) -> Option<serde_json::Value> {
-    let response: serde_json::Value = serde_json::from_slice(resp_body).ok()?;
-    let choices = response.get("choices")?.as_array()?;
-    let mut modified = response.clone();
+    let mut response: serde_json::Value = serde_json::from_slice(resp_body).ok()?;
+
+    let choices = response.get_mut("choices")?.as_array_mut()?;
+    let threshold = state.compress_threshold();
     let mut did_compress = false;
 
-    if let Some(choices_arr) = modified.get_mut("choices")?.as_array_mut() {
-        for choice in choices_arr {
-            if let Some(message) = choice.get_mut("message") {
-                if let Some(content) = message.get("content").and_then(|v| v.as_str()) {
-                    // Compress large content
-                    if content.len() > 1024 {
+    for choice in choices {
+        let message = choice.get_mut("message")?;
+
+        // Compress text content
+        if let Some(content_val) = message.get_mut("content") {
+            if let Some(content) = content_val.as_str() {
+                if content.len() > threshold {
+                    if let Some(ccr) = &state.ccr {
                         let hash = compute_key(content.as_bytes());
                         ccr.put(&hash, content);
-                        let compressed = if add_markers {
-                            format!("{} {}", marker_for(&hash), &content[..content.len().min(200)])
-                        } else {
-                            marker_for(&hash)
+
+                        // Cache mode: keep a preview, token mode: marker only
+                        let compressed = match state.mode {
+                            ProxyMode::Cache => {
+                                // Lightweight: show preview + marker
+                                let preview = &content[..content.len().min(512)];
+                                format!("[{}] {}", marker_for(&hash), preview)
+                            }
+                            ProxyMode::Token => {
+                                // Aggressive: marker only
+                                if state.add_markers {
+                                    marker_for(&hash)
+                                } else {
+                                    hash
+                                }
+                            }
                         };
-                        message["content"] = serde_json::Value::String(compressed);
+                        *content_val = serde_json::Value::String(compressed);
                         did_compress = true;
                     }
                 }
+            }
+        }
 
-                // Inject headroom_retrieve tool
-                if inject_tool {
-                    if let Some(tools) = message.get_mut("tool_calls") {
-                        let retrieve_tool = serde_json::json!({
-                            "type": "function",
-                            "function": {
-                                "name": "headroom_retrieve",
-                                "description": "Resolve CCR markers to original content.",
-                                "parameters": {
-                                    "type": "object",
-                                    "properties": {
-                                        "hash": {"type": "string"},
-                                        "query": {"type": "string"},
-                                        "path": {"type": "string"}
-                                    },
-                                    "required": ["hash"]
+        // Compress tool call outputs (function results)
+        if let Some(tool_calls_val) = message.get_mut("tool_calls") {
+            if let Some(arr) = tool_calls_val.as_array_mut() {
+                for tc in arr.iter_mut() {
+                    if let Some(func) = tc.get_mut("function") {
+                        if let Some(args) = func.get_mut("arguments") {
+                            if let Some(args_str) = args.as_str() {
+                                if args_str.len() > threshold {
+                                    if let Some(ccr) = &state.ccr {
+                                        let hash = compute_key(args_str.as_bytes());
+                                        ccr.put(&hash, args_str);
+                                        *args = serde_json::Value::String(
+                                            marker_for(&hash)
+                                        );
+                                        did_compress = true;
+                                    }
                                 }
                             }
-                        });
-                        if let Some(arr) = tools.as_array_mut() {
-                            arr.push(retrieve_tool);
                         }
                     }
+                }
+
+                // Token mode: inject headroom_retrieve tool
+                if state.inject_tool {
+                    let retrieve_tool = serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": "headroom_retrieve",
+                            "description": "Resolve CCR markers to original content.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "hash": {"type": "string", "description": "CCR marker or hash to retrieve"},
+                                    "query": {"type": "string", "description": "Filter retrieved content by query"},
+                                    "path": {"type": "string", "description": "File path for direct disk read"}
+                                },
+                                "required": ["hash"]
+                            }
+                        }
+                    });
+                    arr.push(retrieve_tool);
                 }
             }
         }
     }
 
-    if did_compress { Some(modified) } else { None }
+    if did_compress { Some(response) } else { None }
 }
 
 // ── Tool relay handler ───────────────────────────────────────────────
@@ -304,9 +377,7 @@ pub async fn handle_tool_relay(
             let result = execute_tool_relay(&state, &tool, &params).await;
             let _ = state.client.post(&cb).json(&result).send().await;
         });
-        return Json(ToolRelayResponse {
-            success: true, result: None, error: None, async_call: true,
-        });
+        return Json(ToolRelayResponse { success: true, result: None, error: None, async_call: true });
     }
 
     match execute_tool_relay(&state, &req.tool, &req.params).await {
@@ -358,7 +429,6 @@ pub async fn handle_ccr_create(
         state.ccr_created.fetch_add(1, Ordering::Relaxed);
     }
 
-    // Notify Hermes
     if let Some(notify_url) = &state.notify_url {
         let notification = CcrNotification {
             event: "ccr_created".into(),
@@ -388,7 +458,14 @@ pub async fn handle_ccr_list(
     match &state.ccr {
         Some(ccr) => Json(serde_json::json!({
             "entries": ccr.len(),
-            "message": "CCR enabled"
+            "backend": match state.mode {
+                ProxyMode::Cache => "in_memory",
+                ProxyMode::Token => "sqlite",
+            },
+            "mode": match state.mode {
+                ProxyMode::Cache => "cache",
+                ProxyMode::Token => "token",
+            },
         })),
         None => Json(serde_json::json!({"entries": 0, "message": "CCR not enabled"})),
     }
