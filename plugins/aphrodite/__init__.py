@@ -705,10 +705,10 @@ class AphroditeContextEngine:
     Works with proxy (token/cache) or inline fallback (zlib).
     """
     name = "aphrodite"
-    threshold_percent = 0.20  # trigger at 20% context (very aggressive)
-    protect_first_n = 3
-    protect_last_n = 10
-    min_messages_to_compress = 30  # only compress when >30 msgs
+    threshold_percent = 0.05   # trigger at 5% context (aggressive: ~50K tokens of 1M)
+    protect_first_n = 2        # keep first 2
+    protect_last_n = 5         # keep last 5
+    min_messages_to_compress = 10  # compress when >10 msgs total
 
     def __init__(self):
         self.last_prompt_tokens = 0
@@ -743,7 +743,7 @@ class AphroditeContextEngine:
         middle = messages[self.protect_first_n:-self.protect_last_n]
         tail = messages[-self.protect_last_n:]
 
-        if len(middle) < 10:
+        if len(middle) < 3:
             return messages  # too few to compress
 
         # Pack middle messages
@@ -753,7 +753,7 @@ class AphroditeContextEngine:
             "tool_call_id": m.get("tool_call_id", ""),
         } for m in middle])
 
-        if len(packed) < 1000:
+        if len(packed) < 200:
             return messages
 
         hash_val = None
