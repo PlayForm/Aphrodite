@@ -275,18 +275,69 @@ REBUILD_SCHEMA = {
 
 
 
+
+
+# ── Conversation Memory via CCR ─────────────────────────────────────
+
+_conv_index = {}  # {turn_number: (hash, summary, size)}
+
+def _store_conversation_turn(api_messages=None, response=None, turn_number=0, **kwargs):
+    """Post-LLM-call: store the current exchange in CCR for later retrieval."""
+    if not api_messages or response is None:
+        return
+
+    token_alive = _alive(PORTS["token"])
+    cache_alive = _alive(PORTS["cache"])
+    if not token_alive and not cache_alive:
+        return
+
+    target = PORTS["token"] if token_alive else PORTS["cache"]
+
+    # Capture the last exchange (last user msg + assistant response)
+    last_user = ""
+    for msg in reversed(api_messages):
+        if msg.get("role") == "user":
+            last_user = msg.get("content", "")[:200]
+            break
+
+    summary = f"Turn {turn_number}: {last_user} → {str(response)[:200]}"
+
+    try:
+        import urllib.request, json
+        data = json.dumps({"content": json.dumps({
+            "turn": turn_number,
+            "user": last_user,
+            "assistant": str(response)[:5000],
+        })}).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{target}/ccr/create",
+            data=data, headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=2) as r:
+            ccr = json.loads(r.read())
+
+        _conv_index[turn_number] = (ccr["hash"], summary, len(str(response)))
+        if len(_conv_index) > 100:
+            oldest = min(_conv_index.keys())
+            del _conv_index[oldest]
+
+        _log.debug("conv-cache: stored turn %d → %s (%d total)", turn_number, ccr["hash"][:8], len(_conv_index))
+    except Exception:
+        pass  # soft-fail — conversation memory is best-effort
+
+
 def _pre_llm_hook(api_messages=None, **kwargs):
-    """Before LLM call: scan for CCR markers and inject a content map."""
+    """Before LLM call: inject content map + conversation memory index."""
+    # First: scan for CCR markers in messages
     if not api_messages or not isinstance(api_messages, list):
         return
 
     markers = []
     total_bytes = 0
+    import re
     for msg in api_messages:
         content = msg.get("content", "")
         if isinstance(content, str):
-            # Find CCR marker patterns: [CCR:hash|type|size] or [CCR:hash|type|size|mode]
-            import re
             found = re.findall(r'\[CCR:([^\]]+)\]', content)
             for m in found:
                 parts = m.split('|')
@@ -294,35 +345,38 @@ def _pre_llm_hook(api_messages=None, **kwargs):
                     try:
                         size = int(parts[2])
                         total_bytes += size
-                        markers.append({
-                            'hash': parts[0],
-                            'type': parts[1],
-                            'size': size,
-                            'mode': parts[3] if len(parts) > 3 else 'unknown'
-                        })
+                        markers.append({'hash': parts[0], 'type': parts[1], 'size': size, 'mode': parts[3] if len(parts) > 3 else 'unknown'})
                     except ValueError:
                         pass
 
-    if not markers:
+    # Build content map
+    map_parts = []
+    if markers:
+        map_parts.append("[APHRODITE: content map]")
+        map_parts.append(f"  {len(markers)} compressed item(s), {_fmt_size(total_bytes)} total")
+        for i, m in enumerate(markers[:20], 1):
+            map_parts.append(f"  {i}. [{m['type']}] {_fmt_size(m['size'])} — hash={m['hash']}")
+        if len(markers) > 20:
+            map_parts.append(f"  ... and {len(markers) - 20} more")
+
+    # Add conversation memory index
+    if _conv_index:
+        map_parts.append("")
+        map_parts.append("[APHRODITE: conversation memory]")
+        turns_sorted = sorted(_conv_index.items(), reverse=True)[:10]
+        for turn, (h, s, sz) in turns_sorted:
+            map_parts.append(f"  Turn {turn}: {s} — {_fmt_size(sz)} (hash={h})")
+        map_parts.append(f"  (use headroom_retrieve to recall any turn)")
+
+    if not map_parts:
         return
 
-    # Build content map
-    map_lines = ["[APHRODITE CONTENT MAP]", f"  {len(markers)} compressed item(s), {_fmt_size(total_bytes)} total", ""]
-    for i, m in enumerate(markers[:20], 1):
-        map_lines.append(f"  {i}. [{m['type']}] {_fmt_size(m['size'])} — hash={m['hash']} — use headroom_retrieve")
-    if len(markers) > 20:
-        map_lines.append(f"  ... and {len(markers) - 20} more")
-
-    map_msg = "\n".join(map_lines)
-
-    # Inject as ephemeral system message before the last user message
-    # Find the last user message and prepend the map
+    map_msg = "\n".join(map_parts)
     for i in range(len(api_messages) - 1, -1, -1):
         if api_messages[i].get("role") == "user":
             api_messages.insert(i, {"role": "system", "content": map_msg, "ephemeral": True})
-            _log.debug("pre_llm: injected content map for %d markers (%s)", len(markers), _fmt_size(total_bytes))
+            _log.debug("pre_llm: injected map (%d markers + %d conv turns)", len(markers), len(_conv_index))
             break
-
 
 def _fmt_size(b):
     if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
@@ -367,6 +421,7 @@ def register(ctx):
     ctx.register_hook("session_start", on_start)
     ctx.register_hook("pre_llm_call", _pre_llm_hook)
     ctx.register_hook("transform_terminal_output", _transform_terminal_hook)
+    ctx.register_hook("post_llm_call", _store_conversation_turn)
     ctx.register_hook("transform_tool_result", _transform_tool_result)
     ctx.register_tool(
         name="aphrodite_rebuild",
