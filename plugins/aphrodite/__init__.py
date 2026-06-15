@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.27"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.36.0"        # plugin version
+BIN_VERSION = "v0.5.28"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.37.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -80,6 +80,9 @@ def _resolve_one(hash_val, timeout=4, query=""):
     # Check inline store first
     content = _inline_retrieve(hash_val)
     if content is not None:
+        _recent_markers.append({'hash': hash_val, 'type': 'retrieved', 'size': len(content), 'preview': content[:200]})
+        if len(_recent_markers) > 200:
+            _recent_markers.pop(0)
         if query:
             lines = [l for l in content.splitlines() if query.lower() in l.lower()]
             return "\n".join(lines) if lines else content
@@ -99,7 +102,12 @@ def _resolve_one(hash_val, timeout=4, query=""):
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 result = json.loads(r.read())
             if result.get("found"):
-                return result["content"]
+                content = result["content"]
+                _inline_store[hash_val] = content  # cache for search + future retrieves
+                _recent_markers.append({'hash': hash_val, 'type': 'retrieved', 'size': len(content), 'preview': content[:200]})
+                if len(_recent_markers) > 200:
+                    _recent_markers.pop(0)
+                return content
         except Exception:
             continue
     return None
@@ -1063,6 +1071,7 @@ def _search_handler(args=None, **kwargs):
         "query": query,
         "type_filter": ccr_type,
         "matches": len(results),
+        "hint": "Use aphrodite_retrieve(hash) on any result hash to get full content.",
         "results": results[:20],
     })
 
