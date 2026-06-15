@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.43"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.52.0"        # plugin version
+BIN_VERSION = "v0.5.44"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.53.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -739,10 +739,14 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         if compress_hint:
             parts.append(compress_hint)
         
-        # CCR catalog: grouped by type
+        # CCR catalog: grouped by type — filtered to live/retrievable entries only
         if markers:
+            live = [m for m in markers if m['hash'] in _inline_store or _inline_retrieve(m['hash'])]
+            if not live and markers:
+                # Fallback: if all filtered, show all (don't hide real content)
+                live = markers
             by_type = {}
-            for m in markers:
+            for m in live:
                 by_type.setdefault(m['type'], []).append(m)
             
             parts.append(f"  catalog ({len(markers)} items):")
