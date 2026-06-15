@@ -7,6 +7,7 @@ provides_hooks:
   - transform_tool_result
   - pre_llm_call
   - transform_terminal_output
+  - post_llm_call
 provides_tools:
   - headroom_retrieve
   - headroom_compress
