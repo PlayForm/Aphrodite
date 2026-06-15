@@ -73,7 +73,7 @@ impl AppState {
                 ProxyMode::Cache => "cache",
                 ProxyMode::Token => "token",
             },
-            "proxy": "token",
+            "proxy": "aphrodite",
             "ccr_backend": if self.ccr.is_some() { "enabled" } else { "none" },
             "tool_relay": self.tool_relay,
             "requests": {
@@ -538,7 +538,7 @@ mod tests {
         let cache = test_state();
         let stats = cache.stats_json();
         assert_eq!(stats["mode"], "cache");
-        assert_eq!(stats["proxy"], "token");
+        assert_eq!(stats["proxy"], "aphrodite");
 
         let mut aph = test_state();
         aph.mode = ProxyMode::Token;
