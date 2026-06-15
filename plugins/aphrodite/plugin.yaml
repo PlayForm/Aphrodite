@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.3.0
-description: "Complete CCR compression plugin: proxy (cache+token) + inline fallback, recursive resolution, knowledge map, pre_api_request compression. Replaces hermes-compress-shim."
+version: 1.4.0
+description: "Complete CCR compression plugin with context engine, recursive resolution, inline fallback. Replaces built-in compressor."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -13,8 +13,8 @@ provides_tools:
   - headroom_retrieve
   - headroom_compress
   - aphrodite_rebuild
+provides_context_engine: true
 install_message: |
-  aphrodite v1.3.0 — complete CCR compression plugin.
+  aphrodite v1.4.0 — CCR context engine + hooks + tools.
+  Set context.engine: aphrodite in config.yaml to activate.
   Requires APHRODITE_API_KEY in ~/.hermes/.env.
-  Proxy auto-installed + auto-launched on session start.
-  Inline fallback works without proxy — no provider switch needed.
