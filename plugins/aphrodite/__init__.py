@@ -1,5 +1,5 @@
 """
-aphrodite v1.12.0 - Auto-install + launch aphrodite proxies.
+aphrodite v1.13.0 - Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 - Recursive CCR resolution, session-scoped stores
@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.3"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.12.0"        # plugin version
+BIN_VERSION = "v0.5.4"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.13.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -396,14 +396,21 @@ def _transform_tool_result(
 
     skip = {"read_file", "read_terminal", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo", "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
     if tool_name in skip:
+        if DEBUG_LOGGING:
+            _log.debug("transform_tool_result: SKIP %s (in skip list)", tool_name[:40])
         return result
 
     threshold = 1024 if token_alive else 8192 if cache_alive else INLINE_THRESHOLD
-    if len(result) < threshold:
+    result_len = len(result)
+    if result_len < threshold:
+        if DEBUG_LOGGING:
+            _log.debug("transform_tool_result: BELOW %s size=%s < threshold=%s", tool_name[:40], result_len, threshold)
         return result
 
     # Don't re-compress content that already has CCR markers (retrieved/compressed)
     if _CCR_RE.search(result):
+        if DEBUG_LOGGING:
+            _log.debug("transform_tool_result: GUARD %s has existing CCR marker", tool_name[:40])
         return result
 
     preview = result[:120].replace('\\n', ' ').strip()
@@ -415,15 +422,26 @@ def _transform_tool_result(
         if ccr:
             h, sz = ccr
             label = "token" if token_alive else "cache"
-            return _ccr_marker(h, "tool", len(result), label, preview)
+            if DEBUG_LOGGING:
+                ratio = result_len / max(len(h), 1)
+                _log.debug("transform_tool_result: CCR %s %s:%s size=%s ratio=%.1fx", tool_name[:40], label, h, result_len, ratio)
+            return _ccr_marker(h, "tool", result_len, label, preview)
+        elif DEBUG_LOGGING:
+            _log.debug("transform_tool_result: PROXY FAIL %s — proxy returned no hash", tool_name[:40])
     
     # Fallback: inline compression (works without proxy)
-    if len(result) >= INLINE_THRESHOLD:
+    if result_len >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(result)
-            return _ccr_marker(h, "tool", len(result), "inline", preview)
+            if DEBUG_LOGGING:
+                _log.debug("transform_tool_result: INLINE %s hash=%s size=%s", tool_name[:40], h, result_len)
+            return _ccr_marker(h, "tool", result_len, "inline", preview)
         except Exception:
+            if DEBUG_LOGGING:
+                _log.debug("transform_tool_result: INLINE FAIL %s", tool_name[:40])
             pass
+    if DEBUG_LOGGING:
+        _log.debug("transform_tool_result: PASSTHROUGH %s size=%s", tool_name[:40], result_len)
     return result  # soft-fail
 
 
@@ -714,11 +732,16 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     cache_alive = _alive(PORTS["cache"])
     proxy_available = token_alive or cache_alive
 
-    if len(output) < TERMINAL_THRESHOLD:  # use configured threshold
+    out_len = len(output)
+    if out_len < TERMINAL_THRESHOLD:  # use configured threshold
+        if DEBUG_LOGGING:
+            _log.debug("terminal_hook: BELOW size=%s < threshold=%s (cmd: %s)", out_len, TERMINAL_THRESHOLD, command[:60])
         return output
 
     # Don't re-compress content that already has CCR markers (retrieved/compressed)
     if _CCR_RE.search(output):
+        if DEBUG_LOGGING:
+            _log.debug("terminal_hook: GUARD has existing CCR marker (cmd: %s)", command[:60])
         return output
 
     preview = output[:200].replace('\n', ' ').strip()
@@ -729,15 +752,26 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         ccr = _compress_via_proxy(output, target)
         if ccr:
             h, _ = ccr
-            return f'<<<CCR:{h}|terminal|{len(output)}>>> {preview}…(use aphrodite_retrieve)'
+            if DEBUG_LOGGING:
+                ratio = out_len / max(len(h), 1)
+                _log.debug("terminal_hook: CCR %s:%s size=%s ratio=%.1fx", "token" if token_alive else "cache", h, out_len, ratio)
+            return f'<<<CCR:{h}|terminal|{out_len}>>> {preview}…(use aphrodite_retrieve)'
+        elif DEBUG_LOGGING:
+            _log.debug("terminal_hook: PROXY FAIL — returned no hash (cmd: %s)", command[:60])
     
     # Fallback: inline compression
-    if len(output) >= INLINE_THRESHOLD:
+    if out_len >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(output)
-            return f'<<<CCR:{h}|terminal|{len(output)}|inline>>> {preview}…(use aphrodite_retrieve)'
+            if DEBUG_LOGGING:
+                _log.debug("terminal_hook: INLINE hash=%s size=%s", h, out_len)
+            return f'<<<CCR:{h}|terminal|{out_len}|inline>>> {preview}…(use aphrodite_retrieve)'
         except Exception:
+            if DEBUG_LOGGING:
+                _log.debug("terminal_hook: INLINE FAIL (cmd: %s)", command[:60])
             pass
+    if DEBUG_LOGGING:
+        _log.debug("terminal_hook: PASSTHROUGH size=%s", out_len)
     return output
 
 
