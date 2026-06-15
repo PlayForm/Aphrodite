@@ -111,7 +111,7 @@ def _start(name, env):
         _log.warning("APHRODITE_API_KEY not set in env — proxy won't authenticate")
         return
     
-    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--deepseek-key", key]
+    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key]
     if name == "token":
         args += ["--mode", "token", "--tool-relay"]
     else:

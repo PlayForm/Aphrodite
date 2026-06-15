@@ -32,7 +32,7 @@ pub struct Cli {
     pub listen: SocketAddr,
 
     /// Upstream API base URL
-    #[arg(long, default_value = "https://api.deepseek.com", env = "APHRODITE_API_URL")]
+    #[arg(long, default_value = "https://api.example.com", env = "APHRODITE_API_URL")]
     pub api_url: String,
 
     /// Upstream API key
@@ -40,7 +40,7 @@ pub struct Cli {
     pub api_key: String,
 
     /// Model name to forward
-    #[arg(long, default_value = "deepseek-v4-pro", env = "APHRODITE_MODEL")]
+    #[arg(long, default_value = "gpt-4o", env = "APHRODITE_MODEL")]
     pub model: String,
 
     /// Max context tokens
@@ -134,9 +134,9 @@ impl MultiConfig {
                 _ => ProxyMode::Cache,
             },
             listen: cfg.listen.parse().unwrap_or_else(|_| "127.0.0.1:8788".parse().unwrap()),
-            api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.deepseek.com".into()),
-            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).unwrap_or_default(),
-            model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "deepseek-v4-pro".into()),
+            api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.example.com".into()),
+            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("API_KEY").ok()).unwrap_or_default(),
+            model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "gpt-4o".into()),
             max_context: 1_000_000,
             max_output: 384_000,
             ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| ".headroom/aphrodite-ccr.db".into()),
