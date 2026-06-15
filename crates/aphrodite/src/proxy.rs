@@ -146,7 +146,7 @@ pub struct CcrNotification {
 
 pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
     let client = HttpClient::builder()
-        .timeout(std::time::Duration::from_secs(300))
+        .timeout(std::time::Duration::from_secs(cli.timeout))
         .build()?;
 
     let ccr: Option<Arc<dyn CcrStore>> = match cli.mode {
@@ -491,6 +491,36 @@ pub async fn handle_ccr_list(
     }
 }
 
+
+
+// ── Health check ────────────────────────────────────────────────────
+
+pub async fn health_check(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let upstream_ok = state
+        .client
+        .get(format!("{}/models", state.api_url.trim_end_matches('/')))
+        .header("Authorization", format!("Bearer {}", state.api_key))
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false);
+
+    let status_code = if upstream_ok { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+
+    (status_code, Json(serde_json::json!({
+        "status": if upstream_ok { "healthy" } else { "degraded" },
+        "upstream": upstream_ok,
+        "ccr": state.ccr.is_some(),
+        "mode": match state.mode {
+            ProxyMode::Cache => "cache",
+            ProxyMode::Token => "token",
+        },
+        "version": env!("CARGO_PKG_VERSION"),
+    }))).into_response()
+}
 
 // ── Tests ────────────────────────────────────────────────────────────
 

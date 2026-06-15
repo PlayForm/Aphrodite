@@ -9,7 +9,7 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use aphrodite::config::{Cli, ProxyMode};
-use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list};
+use aphrodite::proxy::{self, health_check, handle_tool_relay, handle_ccr_create, handle_ccr_list};
 use aphrodite::retrieve;
 
 #[tokio::main]
@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let app = Router::new()
-        .route("/health", get(|| async { "ok" }))
+        .route("/health", get(health_check))
         .route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
         .route("/stats", get({
             let s = state.clone();
