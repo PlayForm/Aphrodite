@@ -316,29 +316,37 @@ pub async fn proxy_handler(
 
     let is_chat_completion = deepseek_path == CHAT_COMPLETIONS_PATH.trim_start_matches('/');
 
-    let mut req = state
-        .client
-        .request(method.clone(), &url)
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json");
-
-    // Proxy always uses its own key for upstream — like anyllm backend
-    // Client (Hermes) connects without auth, proxy handles upstream auth
-    req = req.header("Authorization", format!("Bearer {}", state.api_key));
-
-    // Forward select headers (preserve X-Headroom-Workspace for CCR scoping)
-    for (key, val) in headers.iter() {
-        let k = key.as_str().to_lowercase();
-        if k != "host" && k != "authorization" && k != "content-length" {
-            if k.starts_with("x-headroom-") && k != "x-headroom-workspace" {
-                continue;  // strip headroom headers except workspace key
+    let body_vec = body.to_vec();
+    let mut upstream_result = Err("unreachable".to_string());
+    for attempt in 1..=3u32 {
+        let req = state.client.request(method.clone(), &url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("Authorization", format!("Bearer {}", state.api_key));
+        let mut req = req;
+        for (key, val) in headers.iter() {
+            let k = key.as_str().to_lowercase();
+            if k != "host" && k != "authorization" && k != "content-length" {
+                if k.starts_with("x-headroom-") && k != "x-headroom-workspace" {
+                    continue;
+                }
+                req = req.header(key, val);
             }
-            req = req.header(key, val);
+        }
+        match req.body(body_vec.clone()).send().await {
+            Ok(r) => { upstream_result = Ok(r); break; }
+            Err(e) => {
+                if attempt < 3 {
+                    let ms = 100 * 2u64.pow(attempt - 1);
+                    tracing::warn!(attempt, backoff_ms = ms, "upstream retry after error: {}", e);
+                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                } else {
+                    upstream_result = Err(format!("{}", e));
+                }
+            }
         }
     }
-
-    let body_vec = body.to_vec();
-    match req.body(body_vec.clone()).send().await {
+    match upstream_result {
         Ok(response) => {
             let status = response.status();
             // Extract content-type before consuming response body
