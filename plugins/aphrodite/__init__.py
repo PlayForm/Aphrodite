@@ -1,11 +1,10 @@
 """
-aphrodite v1.3.0 — Auto-install + launch aphrodite proxies.
+aphrodite v1.7.0 — Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
-- Recursive CCR resolution for nested markers
-- Dynamic knowledge map with previews and cutoff
-- Inline compression fallback (zlib) when proxy is down — no provider switch needed
-- Dual-mode: proxy CCR preferred, local fallback for resilience
+- Recursive CCR resolution, session-scoped stores
+- Context engine (ContextEngine subclass), extensible hooks
+- headroom_retrieve + headroom_compress + headroom_stats + aphrodite_rebuild
 
 On install: downloads pre-built binary from GitHub releases.
 On session_start: launches aphrodite proxies not already running.
@@ -759,7 +758,7 @@ def register(ctx):
         _log.info("aphrodite context engine registered")
     except Exception as e:
         _log.debug("context engine registration skipped: %s", e)
-    _log.info("aphrodite v1.4.0 registered — CCR context engine + hooks + tools")
+    _log.info("aphrodite v1.7.0 registered — %d tools + context engine + hooks", 4)
 
 
 # ── Context Engine (plugs into Hermes compress() pipeline) ─────
@@ -957,8 +956,11 @@ class AphroditeContextEngine(ContextEngine):
         self.last_total_tokens = 0
         self.compression_count = 0
         self.last_compression = {}
-        _inline_clear()  # session-scoped: clear inline store
-        _log.info("context_engine: session reset — inline store cleared, %d compressions total", self.compression_count)
+        _inline_clear()
+        global _conv_index, _turn_counter
+        _conv_index.clear()
+        _turn_counter = 0
+        _log.info("v1.7.0: session reset — inline store + memory cleared")
 
     def on_session_start(self, session_id="", **kw):
         self.session_id = session_id
