@@ -261,6 +261,18 @@ where
     Err(last_err.unwrap())
 }
 
+
+/// Generate a simple summary — first 3 lines or first 200 chars.
+fn generate_summary(content: &str) -> String {
+    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).take(3).collect();
+    if lines.len() >= 2 {
+        format!("[summary] {} lines, {}B: {}", content.lines().count(), content.len(), lines.join(" | "))
+    } else {
+        let preview = &content[..content.len().min(200)];
+        format!("[summary] {}B: {}", content.len(), preview)
+    }
+}
+
 /// Catch-all proxy handler — forwards any request to DeepSeek.
 /// Specifically handles Chat Completions API at /v1/chat/completions.
 pub async fn proxy_handler(
@@ -587,6 +599,14 @@ pub async fn handle_ccr_create(
     if let Some(ccr) = &state.ccr {
         ccr.put(&hash, &req.content);
         state.ccr_created.fetch_add(1, Ordering::Relaxed);
+
+        // Background: generate a summary of the content
+        if req.content.len() > 1024 {
+            let summary = generate_summary(&req.content);
+            let summary_hash = format!("{}_summary", hash);
+            ccr.put(&summary_hash, &summary);
+            tracing::info!(hash=%hash, summary_hash=%summary_hash, "background summary generated");
+        }
     }
 
     if let Some(notify_url) = &state.notify_url {
