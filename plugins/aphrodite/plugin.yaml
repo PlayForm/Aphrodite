@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.5.0
-description: "CCR compression plugin with context engine, recursive resolution, inline fallback. Replaces built-in compressor."
+version: 1.6.0
+description: "CCR compression plugin with context engine, extensible hooks, session-scoped stores, stats tool."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -11,8 +11,10 @@ provides_hooks:
 provides_tools:
   - headroom_retrieve
   - headroom_compress
+  - headroom_stats
   - aphrodite_rebuild
 provides_context_engine: true
 install_message: |
-  aphrodite v1.5.0 — CCR context engine (20% threshold), sequential memory.
+  aphrodite v1.6.0 — extensible context engine, session-scoped, stats tool.
   Activate: hermes config set context.engine aphrodite
+  Other plugins: ctx.register_hook("aphrodite_engine_compressed", cb)
