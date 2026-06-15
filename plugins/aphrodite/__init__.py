@@ -786,21 +786,25 @@ def register(ctx):
         name="aphrodite_rebuild",
         schema=REBUILD_SCHEMA,
         handler=_rebuild_handler,
+        toolset="aphrodite",
     )
     ctx.register_tool(
         name="aphrodite_compress",
         schema=COMPRESS_SCHEMA,
         handler=_compress_handler,
+        toolset="aphrodite",
     )
     ctx.register_tool(
         name="aphrodite_retrieve",
         schema=RETRIEVE_SCHEMA,
         handler=_retrieve_handler,
+        toolset="aphrodite",
     )
     ctx.register_tool(
         name="aphrodite_stats",
         schema=STATS_SCHEMA,
         handler=_stats_handler,
+        toolset="aphrodite",
     )
     # Register context engine (plugs into Hermes' compress() pipeline)
     try:
