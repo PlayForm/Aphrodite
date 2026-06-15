@@ -280,16 +280,19 @@ def register(ctx):
     ctx.register_hook("transform_tool_result", _transform_tool_result)
     ctx.register_tool(
         name="aphrodite_rebuild",
+        toolset="aphrodite",
         schema=REBUILD_SCHEMA,
         handler=_rebuild_handler,
     )
     ctx.register_tool(
         name="headroom_compress",
+        toolset="aphrodite",
         schema=COMPRESS_SCHEMA,
         handler=_compress_handler,
     )
     ctx.register_tool(
         name="headroom_retrieve",
+        toolset="aphrodite",
         schema=RETRIEVE_SCHEMA,
         handler=_retrieve_handler,
     )
