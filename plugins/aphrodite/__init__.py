@@ -401,34 +401,38 @@ REBUILD_SCHEMA = {
 
 # ── Conversation Memory via CCR ─────────────────────────────────────
 
-_conv_index = {}  # {turn_id: (hash, summary, size)}
+_conv_index = {}  # {sequential_number: (hash, summary, size)}
+_turn_counter = 0  # sequential counter (Hermes turn_id is a UUID string)
 
 
 def _store_conversation_turn(conversation_history=None, assistant_response=None, turn_id=0, **kwargs):
     """Post-LLM-call: store the current exchange in CCR for later retrieval."""
+    global _turn_counter
     if not conversation_history or assistant_response is None:
         return
 
-    if _DEV: return  # dev mode: passthrough
+    if _DEV: return
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
     if not token_alive and not cache_alive:
         return
 
     target = PORTS["token"] if token_alive else PORTS["cache"]
+    _turn_counter += 1
+    tnum = _turn_counter
 
-    # Capture the last exchange (last user msg + assistant response)
+    # Capture the last user message from conversation history
     last_user = ""
     for msg in reversed(conversation_history):
         if msg.get("role") == "user":
             last_user = msg.get("content", "")[:200]
             break
 
-    summary = f"Turn {turn_id}: {last_user}… → {str(assistant_response)[:200]}"
+    summary = f"T{tnum}: {last_user}… → {str(assistant_response)[:200]}"
 
     try:
         data = json.dumps({"content": json.dumps({
-            "turn": turn_id,
+            "turn": tnum,
             "user": last_user,
             "assistant": str(assistant_response)[:5000],
         })}).encode()
@@ -439,14 +443,14 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
         with urllib.request.urlopen(req, timeout=2) as r:
             ccr = json.loads(r.read())
 
-        _conv_index[turn_id] = (ccr["hash"], summary, len(str(assistant_response)))
+        _conv_index[tnum] = (ccr["hash"], summary, len(str(assistant_response)))
         if len(_conv_index) > 100:
             oldest = min(_conv_index.keys())
             del _conv_index[oldest]
 
-        _log.debug("conv-cache: stored turn %s → %s (%d total)", turn_id, ccr["hash"][:8], len(_conv_index))
+        _log.debug("conv-cache: stored T%d → %s (%d total)", tnum, ccr["hash"][:8], len(_conv_index))
     except Exception:
-        pass  # soft-fail — conversation memory is best-effort
+        pass
 
 
 def _parse_ccr_markers(text):
@@ -620,53 +624,6 @@ def _extract_preview(marker, conversation_history):
     return ""
 
 
-def _api_request_hook(api_messages=None, api_request_id=None, **kwargs):
-    """pre_api_request: compress old messages before API call.
-    
-    Hermes passes the actual API payload (messages list) which CAN be mutated.
-    We offload messages older than the last 6 to CCR.
-    """
-    if _DEV: return  # dev mode: skip
-    if not api_messages or not isinstance(api_messages, list):
-        return
-
-    token_alive = _alive(PORTS["token"])
-    cache_alive = _alive(PORTS["cache"])
-    target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
-    
-    if not target or len(api_messages) <= 8:
-        return
-
-    # Keep last 6 messages, offload older ones to CCR
-    try:
-        old_msgs = api_messages[:-6]
-        packed = json.dumps([{
-            "role": m.get("role", ""),
-            "content": str(m.get("content", ""))[:2000]
-        } for m in old_msgs])
-        
-        if len(packed) < 500:  # not worth compressing
-            return
-            
-        data = json.dumps({"content": packed}).encode()
-        req = urllib.request.Request(
-            f"http://127.0.0.1:{target}/ccr/create",
-            data=data,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=3) as r:
-            ccr = json.loads(r.read())
-        
-        # Replace old messages with a single compressed marker
-        summary = f"[CCR:{ccr['hash']}|context|{len(packed)}|{len(old_msgs)}msgs] Context compressed: {len(old_msgs)} messages. Retrieve with headroom_retrieve."
-        del api_messages[:-6]  # remove all but last 6
-        api_messages.insert(0, {"role": "system", "content": summary})
-        
-        _log.debug("api_request: offloaded %d msgs → %s", len(old_msgs), ccr['hash'][:8])
-    except Exception:
-        pass  # soft-fail
-
-
 def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     """Compress terminal output via CCR on-the-fly. Proxy first, inline fallback."""
     if _DEV: return output  # dev mode: passthrough
@@ -708,7 +665,6 @@ def register(ctx):
     _ensure_binary()
     ctx.register_hook("on_session_start", on_start)
     ctx.register_hook("pre_llm_call", _pre_llm_hook)
-    ctx.register_hook("pre_api_request", _api_request_hook)
     ctx.register_hook("transform_terminal_output", _transform_terminal_hook)
     ctx.register_hook("post_llm_call", _store_conversation_turn)
     ctx.register_hook("transform_tool_result", _transform_tool_result)
@@ -741,27 +697,28 @@ def register(ctx):
 class AphroditeContextEngine:
     """CCR-based context compression engine for Hermes.
 
-    Replaces Hermes' built-in summarization compressor with CCR offloading.
-    When context exceeds threshold, old messages are compressed to CCR
-    and replaced with a retrieval marker in the message list.
+    Replaces built-in summarization compressor with CCR offloading.
+    When context exceeds threshold, middle messages are compressed to CCR
+    and replaced with a retrieval marker. Head + tail kept raw.
 
     Set ``context.engine: aphrodite`` in config.yaml to activate.
+    Works with proxy (token/cache) or inline fallback (zlib).
     """
     name = "aphrodite"
-    threshold_percent = 0.3  # trigger at 30% context (aggressive)
+    threshold_percent = 0.20  # trigger at 20% context (very aggressive)
     protect_first_n = 3
     protect_last_n = 10
+    min_messages_to_compress = 30  # only compress when >30 msgs
 
     def __init__(self):
         self.last_prompt_tokens = 0
         self.last_completion_tokens = 0
         self.last_total_tokens = 0
         self.threshold_tokens = 0
-        self.context_length = 1000000  # token limit
+        self.context_length = 1000000
         self.compression_count = 0
 
     def update_from_response(self, usage):
-        """Track token usage from API response."""
         self.last_prompt_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
         self.last_completion_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
         self.last_total_tokens = usage.get("total_tokens", 0)
@@ -769,34 +726,27 @@ class AphroditeContextEngine:
             self.threshold_tokens = int(self.context_length * self.threshold_percent)
 
     def should_compress(self, prompt_tokens=None):
-        """Compress when context exceeds 30% of token limit or >50 messages."""
         tokens = prompt_tokens if prompt_tokens is not None else self.last_prompt_tokens
         if self.threshold_tokens and tokens > self.threshold_tokens:
             return True
         return False
 
     def compress(self, messages, current_tokens=None, focus_topic=None):
-        """Compress old messages to CCR, replace with retrieval marker.
+        """Offload middle messages to CCR, keep head+tail raw.
 
-        Keeps first protect_first_n and last protect_last_n messages raw.
-        Middle messages are packed to JSON, stored in proxy CCR, and replaced
-        with a system message containing the retrieval hash.
+        Dual-mode: proxy CCR preferred, inline zlib fallback.
         """
-        if len(messages) <= self.protect_first_n + self.protect_last_n + 5:
-            return messages  # nothing to compress
-
-        token_alive = _alive(PORTS["token"])
-        cache_alive = _alive(PORTS["cache"])
-        if not token_alive and not cache_alive:
-            return messages  # proxy down, can't compress
-
-        target = PORTS["token"] if token_alive else PORTS["cache"]
+        if len(messages) <= self.min_messages_to_compress:
+            return messages
 
         head = messages[:self.protect_first_n]
         middle = messages[self.protect_first_n:-self.protect_last_n]
         tail = messages[-self.protect_last_n:]
 
-        # Pack middle messages with truncated content
+        if len(middle) < 10:
+            return messages  # too few to compress
+
+        # Pack middle messages
         packed = json.dumps([{
             "role": m.get("role", ""),
             "content": str(m.get("content", ""))[:2000],
@@ -804,38 +754,52 @@ class AphroditeContextEngine:
         } for m in middle])
 
         if len(packed) < 1000:
-            return messages  # not worth compressing
-
-        try:
-            data = json.dumps({"content": packed}).encode()
-            req = urllib.request.Request(
-                f"http://127.0.0.1:{target}/ccr/create",
-                data=data,
-                headers={"Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=5) as r:
-                ccr = json.loads(r.read())
-
-            marker = (
-                f"[CONTEXT COMPRESSED: {len(middle)} messages → "
-                f"CCR:{ccr['hash']}|{_fmt_size(len(packed))}]\n"
-                f"These messages were offloaded. Retrieve full context with: "
-                f"headroom_retrieve({ccr['hash']})\n"
-                f"The messages below are the most recent {self.protect_last_n} "
-                f"messages — these are your active context."
-            )
-
-            self.compression_count += 1
-            _log.info(
-                "context_engine: compressed %d msgs → CCR:%s (%s)",
-                len(middle), ccr['hash'][:8], _fmt_size(len(packed))
-            )
-
-            return head + [{"role": "system", "content": marker}] + tail
-
-        except Exception as e:
-            _log.debug("context_engine compress skipped: %s", e)
             return messages
+
+        hash_val = None
+        size_str = _fmt_size(len(packed))
+
+        # Try proxy CCR first
+        token_alive = _alive(PORTS["token"])
+        cache_alive = _alive(PORTS["cache"])
+        if token_alive or cache_alive:
+            target = PORTS["token"] if token_alive else PORTS["cache"]
+            try:
+                data = json.dumps({"content": packed}).encode()
+                req = urllib.request.Request(
+                    f"http://127.0.0.1:{target}/ccr/create",
+                    data=data,
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    ccr = json.loads(r.read())
+                hash_val = ccr["hash"]
+            except Exception:
+                pass
+
+        # Inline fallback
+        if not hash_val:
+            try:
+                hash_val, _ = _inline_compress(packed)
+                size_str = _fmt_size(len(packed))
+            except Exception:
+                return messages
+
+        marker = (
+            f"[CONTEXT COMPRESSED: {len(middle)} messages → "
+            f"CCR:{hash_val}|{size_str}]\n"
+            f"These messages were offloaded to reduce context. "
+            f"Retrieve with: headroom_retrieve({hash_val}).\n"
+            f"The {self.protect_last_n} messages below are your active context."
+        )
+
+        self.compression_count += 1
+        _log.info(
+            "context_engine: compressed %d msgs → CCR:%s (%s)",
+            len(middle), hash_val[:8], size_str
+        )
+
+        return head + [{"role": "system", "content": marker}] + tail
 
     def get_status(self):
         return {
