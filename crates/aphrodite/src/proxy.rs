@@ -359,6 +359,7 @@ pub async fn proxy_handler(
                     &state, &resp_body,
                 ).await {
                     state.requests_compressed.fetch_add(1, Ordering::Relaxed);
+                    state.record_latency(t0.elapsed());
                     if state.dev {
                         let elapsed = t0.elapsed();
                         let comp_len = serde_json::to_vec(&compressed).map(|v| v.len()).unwrap_or(0);
@@ -398,6 +399,7 @@ pub async fn proxy_handler(
                 );
             }
             // Use already-extracted content_type (fetched before response.bytes())
+            state.record_latency(t0.elapsed());
             let mut builder = Response::builder().status(status);
             if let Some(ct) = content_type {
                 builder = builder.header("Content-Type", ct);
@@ -405,6 +407,7 @@ pub async fn proxy_handler(
             builder.body(Body::from(resp_body)).unwrap()
         }
         Err(e) => {
+            state.record_latency(t0.elapsed());
             state.record_error(format!("upstream: {}", e));
             if state.dev {
                 tracing::error!(
