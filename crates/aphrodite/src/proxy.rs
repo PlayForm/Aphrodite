@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use headroom_core::ccr::backends::in_memory::InMemoryCcrStore;
 use headroom_core::ccr::backends::sqlite::SqliteCcrStore;
-use headroom_core::ccr::{compute_key, marker_for, CcrStore};
+use headroom_core::ccr::{compute_key, CcrStore};
 
 use crate::config::{Cli, ProxyMode};
 
@@ -136,6 +136,20 @@ impl AppState {
     fn record_compression(&self, ct: &str) {
         if let Ok(mut m) = self.compressions_by_type.lock() {
             *m.entry(ct.to_string()).or_insert(0) += 1;
+        }
+    }
+
+    fn record_request(&self, id: &str, method: &str, path: &str, status: u16, compressed: bool, elapsed_ms: u128) {
+        if let Ok(mut hist) = self.request_history.lock() {
+            hist.push(serde_json::json!({
+                "id": id,
+                "method": method,
+                "path": path,
+                "status": status,
+                "compressed": compressed,
+                "elapsed_ms": elapsed_ms,
+            }));
+            if hist.len() > 50 { hist.remove(0); }
         }
     }
 }
@@ -360,6 +374,7 @@ pub async fn proxy_handler(
                 ).await {
                     state.requests_compressed.fetch_add(1, Ordering::Relaxed);
                     state.record_latency(t0.elapsed());
+                    state.record_request(req_id_short, method.as_str(), path.path(), status.as_u16(), true, t0.elapsed().as_millis());
                     if state.dev {
                         let elapsed = t0.elapsed();
                         let comp_len = serde_json::to_vec(&compressed).map(|v| v.len()).unwrap_or(0);
@@ -377,6 +392,7 @@ pub async fn proxy_handler(
                     return Response::builder()
                         .status(status)
                         .header("Content-Type", "application/json")
+                        .header("X-Aphrodite-Compressed", "true")
                         .body(Body::from(body))
                         .unwrap();
                 }
@@ -400,6 +416,7 @@ pub async fn proxy_handler(
             }
             // Use already-extracted content_type (fetched before response.bytes())
             state.record_latency(t0.elapsed());
+            state.record_request(req_id_short, method.as_str(), path.path(), status.as_u16(), false, t0.elapsed().as_millis());
             let mut builder = Response::builder().status(status);
             if let Some(ct) = content_type {
                 builder = builder.header("Content-Type", ct);
@@ -408,6 +425,7 @@ pub async fn proxy_handler(
         }
         Err(e) => {
             state.record_latency(t0.elapsed());
+            state.record_request(req_id_short, method.as_str(), path.path(), 502, false, t0.elapsed().as_millis());
             state.record_error(format!("upstream: {}", e));
             if state.dev {
                 tracing::error!(
@@ -473,9 +491,14 @@ async fn compress_chat_completion(
                 if content.len() > threshold {
                     if let Some(ccr) = &state.ccr {
                         let hash = compute_key(content.as_bytes());
-                        ccr.put(&hash, content);
-                        state.ccr_created.fetch_add(1, Ordering::Relaxed);
-                        state.tokens_saved.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
+                        if ccr.get(&hash).is_some() {
+                            state.ccr_hits.fetch_add(1, Ordering::Relaxed);
+                        } else {
+                            state.ccr_misses.fetch_add(1, Ordering::Relaxed);
+                            ccr.put(&hash, content);
+                            state.ccr_created.fetch_add(1, Ordering::Relaxed);
+                            state.tokens_saved.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
+                        }
                         let ct = detect_content_type(content);
 
                         let compressed = match state.mode {
@@ -507,7 +530,14 @@ async fn compress_chat_completion(
                                 if args_str.len() > threshold {
                                     if let Some(ccr) = &state.ccr {
                                         let hash = compute_key(args_str.as_bytes());
-                                        ccr.put(&hash, args_str);
+                                        if ccr.get(&hash).is_some() {
+                                            state.ccr_hits.fetch_add(1, Ordering::Relaxed);
+                                        } else {
+                                            state.ccr_misses.fetch_add(1, Ordering::Relaxed);
+                                            ccr.put(&hash, args_str);
+                                            state.ccr_created.fetch_add(1, Ordering::Relaxed);
+                                            state.tokens_saved.fetch_add((args_str.len() - hash.len()) as u64, Ordering::Relaxed);
+                                        }
                                         let ct = detect_content_type(args_str);
                                         *args = serde_json::Value::String(
                                             smart_marker(&hash, args_str, ct)
@@ -600,7 +630,7 @@ async fn execute_tool_relay(
             if let Some(ccr) = &state.ccr {
                 let hash = compute_key(content.as_bytes());
                 ccr.put(&hash, content);
-                Ok(serde_json::json!({"compressed": marker_for(&hash), "hash": hash}))
+                Ok(serde_json::json!({"compressed": format!("<<<CCR:{}|compress|0>>>", hash), "hash": hash}))
             } else {
                 Err("CCR not enabled".into())
             }
@@ -677,10 +707,10 @@ pub async fn health_check(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     // Local-only health — no upstream API call (done separately via /health/upstream)
+    // Always 200 — capability state conveyed via JSON body (CCR is optional/opt-in)
     let ccr_ok = state.ccr.is_some();
-    let status_code = if ccr_ok { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
 
-    (status_code, Json(serde_json::json!({
+    (StatusCode::OK, Json(serde_json::json!({
         "status": if ccr_ok { "healthy" } else { "degraded" },
         "ccr": ccr_ok,
         "mode": match state.mode {
