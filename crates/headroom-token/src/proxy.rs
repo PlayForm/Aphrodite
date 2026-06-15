@@ -1,256 +1,281 @@
-//! Reverse proxy — forwards to DeepSeek, injects CCR compression.
+//! Reverse proxy — forwards to DeepSeek, compresses with CCR.
 //!
-//! Intercepts chat completions responses, compresses large tool outputs
-//! with headroom-core CCR (SQLite-backed), and injects the `headroom_retrieve`
-//! tool definition so the LLM can decompress on demand.
+//! Uses headroom_core::ccr::CcrStore for compression/caching.
+//! Supports cache and token modes. Token mode adds tool relay and
+//! programmatic CCR endpoints.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use axum::{
     body::Body,
     extract::State,
-    http::{Request, StatusCode},
-    response::{IntoResponse, Response},
-    Json,
+    http::{Method, StatusCode},
+    response::{IntoResponse, Json, Response},
 };
-use http_body_util::BodyExt;
-use serde_json::Value;
+use bytes::Bytes;
+use reqwest::Client as HttpClient;
+use serde::{Deserialize, Serialize};
 
-use headroom_core::ccr::{self, CcrStore};
+use headroom_core::ccr::backends::in_memory::InMemoryCcrStore;
+use headroom_core::ccr::backends::sqlite::SqliteCcrStore;
+use headroom_core::ccr::{compute_key, marker_for, CcrStore};
 
-use crate::config::Cli;
+use crate::config::{Cli, ProxyMode};
 
-/// Shared application state.
+// ── State ──────────────────────────────────────────────────────────
+
 pub struct AppState {
-    /// DeepSeek API base URL
+    pub client: HttpClient,
     pub deepseek_url: String,
-    /// DeepSeek API key
-    pub deepseek_key: String,
-    /// Model name
     pub model: String,
-    /// HTTP client
-    pub client: reqwest::Client,
-    /// CCR store (SQLite-backed)
-    pub ccr_store: Box<dyn CcrStore>,
-    /// Inject CCR retrieval tool into responses
+    pub api_key: String,
+    /// CCR store — in-memory (cache mode) or SQLite (token mode).
+    pub ccr: Option<Arc<dyn CcrStore>>,
     pub inject_tool: bool,
-    /// Add CCR markers to compressed content
     pub add_markers: bool,
+    pub mode: ProxyMode,
+    pub tool_relay: bool,
+    pub notify_url: Option<String>,
+    pub notify_key: Option<String>,
 
-    // Stats counters
-    pub total_requests: AtomicU64,
-    pub compressed_requests: AtomicU64,
-    pub total_tokens_saved: AtomicU64,
-    pub ccr_stored: AtomicU64,
+    // Stats
+    pub requests_total: AtomicU64,
+    pub requests_compressed: AtomicU64,
+    pub tokens_saved: AtomicU64,
     pub ccr_hits: AtomicU64,
     pub ccr_misses: AtomicU64,
+    pub ccr_created: AtomicU64,
+    pub tool_relay_calls: AtomicU64,
 }
 
 impl AppState {
     pub fn stats_json(&self) -> serde_json::Value {
         serde_json::json!({
-            "mode": "token",
-            "proxy": "headroom-token",
-            "ccr_backend": "sqlite",
-            "requests": {
-                "total": self.total_requests.load(Ordering::Relaxed),
-                "compressed": self.compressed_requests.load(Ordering::Relaxed),
+            "mode": match self.mode {
+                ProxyMode::Cache => "cache",
+                ProxyMode::Token => "token",
             },
-            "tokens_saved": self.total_tokens_saved.load(Ordering::Relaxed),
+            "proxy": "headroom-proxy",
+            "ccr_backend": if self.ccr.is_some() { "enabled" } else { "none" },
+            "tool_relay": self.tool_relay,
+            "requests": {
+                "total": self.requests_total.load(Ordering::Relaxed),
+                "compressed": self.requests_compressed.load(Ordering::Relaxed),
+            },
+            "tokens_saved": self.tokens_saved.load(Ordering::Relaxed),
             "ccr": {
-                "stored": self.ccr_stored.load(Ordering::Relaxed),
                 "hits": self.ccr_hits.load(Ordering::Relaxed),
                 "misses": self.ccr_misses.load(Ordering::Relaxed),
-                "entries": self.ccr_store.len(),
-            }
+                "created": self.ccr_created.load(Ordering::Relaxed),
+            },
+            "tool_relay_calls": self.tool_relay_calls.load(Ordering::Relaxed),
         })
     }
 }
 
+// ── Tool relay types ────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct ToolRelayRequest {
+    pub tool: String,
+    pub params: serde_json::Value,
+    pub callback_url: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ToolRelayResponse {
+    pub success: bool,
+    pub result: Option<serde_json::Value>,
+    pub error: Option<String>,
+    pub async_call: bool,
+}
+
+// ── CCR management types ────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct CcrCreateRequest {
+    pub content: String,
+    pub key: Option<String>,
+    pub ttl_seconds: Option<u64>,
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CcrCreateResponse {
+    pub hash: String,
+    pub compression_ratio: f64,
+    pub original_size: usize,
+    pub compressed_size: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CcrNotification {
+    pub event: String,
+    pub hash: String,
+    pub created_at: u64,
+    pub ttl: u64,
+    pub tags: Vec<String>,
+}
+
+// ── Build state ─────────────────────────────────────────────────────
+
 pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
-    let client = reqwest::Client::builder()
+    let client = HttpClient::builder()
         .timeout(std::time::Duration::from_secs(300))
-        .connect_timeout(std::time::Duration::from_secs(30))
         .build()?;
 
-    let ccr_config = headroom_core::ccr::backends::CcrBackendConfig::Sqlite {
-        path: cli.ccr_db_path.clone(),
-        ttl_seconds: cli.ccr_ttl_seconds,
+    let ccr: Option<Arc<dyn CcrStore>> = match cli.mode {
+        ProxyMode::Token if !cli.no_ccr_marker => {
+            // Use SQLite backend for persistent CCR
+            let store = SqliteCcrStore::open(&cli.ccr_db_path, cli.ccr_ttl_seconds)
+                .map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
+            Some(Arc::new(store))
+        }
+        ProxyMode::Cache => {
+            // Use in-memory backend for cache mode
+            let store = InMemoryCcrStore::with_capacity_and_ttl(
+                10_000,
+                std::time::Duration::from_secs(cli.ccr_ttl_seconds),
+            );
+            Some(Arc::new(store))
+        }
+        _ => None,
     };
-    let ccr_store = headroom_core::ccr::backends::from_config(&ccr_config)?;
-
-    tracing::info!(
-        db = %cli.ccr_db_path.display(),
-        ttl_s = cli.ccr_ttl_seconds,
-        "CCR SQLite store initialised"
-    );
 
     Ok(AppState {
-        deepseek_url: cli.deepseek_url.trim_end_matches('/').to_string(),
-        deepseek_key: cli.deepseek_key.clone(),
-        model: cli.model.clone(),
         client,
-        ccr_store,
-        inject_tool: !cli.no_ccr_inject_tool,
+        deepseek_url: cli.deepseek_url.clone(),
+        model: cli.model.clone(),
+        api_key: cli.deepseek_key.clone(),
+        ccr,
+        inject_tool: !cli.no_ccr_inject_tool && matches!(cli.mode, ProxyMode::Token),
         add_markers: !cli.no_ccr_marker,
-        total_requests: AtomicU64::new(0),
-        compressed_requests: AtomicU64::new(0),
-        total_tokens_saved: AtomicU64::new(0),
-        ccr_stored: AtomicU64::new(0),
+        mode: cli.mode,
+        tool_relay: cli.tool_relay,
+        notify_url: cli.notify_url.clone(),
+        notify_key: cli.notify_key.clone(),
+        requests_total: AtomicU64::new(0),
+        requests_compressed: AtomicU64::new(0),
+        tokens_saved: AtomicU64::new(0),
         ccr_hits: AtomicU64::new(0),
         ccr_misses: AtomicU64::new(0),
+        ccr_created: AtomicU64::new(0),
+        tool_relay_calls: AtomicU64::new(0),
     })
 }
 
-/// CCR retrieve tool definition — injected into chat completions responses.
-const RETRIEVE_TOOL: &str = r#"{
-  "type": "function",
-  "function": {
-    "name": "headroom_retrieve",
-    "description": "Resolve CCR markers. Include `path` for local file read. Include `query` for BM25 search.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "hash": {
-          "type": "string",
-          "description": "The CCR marker hash (e.g. 'abc123')"
-        },
-        "path": {
-          "type": "string",
-          "description": "Optional: local file path to read directly"
-        },
-        "query": {
-          "type": "string",
-          "description": "Optional: BM25 search query to filter content"
-        }
-      },
-      "required": ["hash"]
-    }
-  }
-}"#;
+// ── Main proxy handler ──────────────────────────────────────────────
 
-/// Main proxy handler — forwards all requests to DeepSeek.
 pub async fn proxy_handler(
     State(state): State<Arc<AppState>>,
-    req: Request<Body>,
+    method: Method,
+    path: axum::extract::OriginalUri,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
 ) -> impl IntoResponse {
-    state.total_requests.fetch_add(1, Ordering::Relaxed);
+    state.requests_total.fetch_add(1, Ordering::Relaxed);
 
-    let path = req.uri().path().to_string();
-    let method = req.method().clone();
-    let upstream_url = format!("{}{}", state.deepseek_url, path);
+    let deepseek_path = path.path().trim_start_matches('/');
+    let url = format!("{}/{}", state.deepseek_url.trim_end_matches('/'), deepseek_path);
 
-    let (parts, body) = req.into_parts();
-    let body_bytes = match body.collect().await {
-        Ok(collected) => collected.to_bytes(),
-        Err(e) => {
-            tracing::error!(error = %e, "failed to read request body");
-            return (StatusCode::BAD_REQUEST, "failed to read body").into_response();
-        }
-    };
-
-    let mut upstream_req = state
+    let mut req = state
         .client
-        .request(method.clone(), &upstream_url)
-        .body(body_bytes.clone());
+        .request(method.clone(), &url)
+        .header("Authorization", format!("Bearer {}", state.api_key))
+        .header("Content-Type", "application/json");
 
-    for (name, value) in &parts.headers {
-        let name_str = name.as_str().to_lowercase();
-        if name_str == "authorization" {
-            upstream_req = upstream_req.header(
-                "Authorization",
-                format!("Bearer {}", state.deepseek_key),
-            );
-        } else if name_str != "host" && name_str != "content-length" {
-            upstream_req = upstream_req.header(name.as_str(), value.as_bytes());
+    for (key, val) in headers.iter() {
+        let k = key.as_str().to_lowercase();
+        if k != "host" && k != "authorization" {
+            req = req.header(key, val);
         }
     }
-    upstream_req = upstream_req.header(
-        "Authorization",
-        format!("Bearer {}", state.deepseek_key),
-    );
 
-    let upstream_resp = match upstream_req.send().await {
-        Ok(resp) => resp,
-        Err(e) => {
-            tracing::error!(error = %e, "upstream request failed");
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(serde_json::json!({
-                    "error": {
-                        "message": format!("upstream request failed: {}", e),
-                        "type": "proxy_error",
-                    }
-                })),
-            )
-                .into_response();
-        }
-    };
+    let body_vec = body.to_vec();
+    match req.body(body_vec.clone()).send().await {
+        Ok(response) => {
+            let status = response.status();
+            let resp_body = response.bytes().await.unwrap_or_default();
 
-    let status = upstream_resp.status();
-    let upstream_headers = upstream_resp.headers().clone();
-    let resp_body = match upstream_resp.bytes().await {
-        Ok(b) => b,
-        Err(e) => {
-            tracing::error!(error = %e, "failed to read upstream response");
-            return (StatusCode::BAD_GATEWAY, "failed to read upstream body").into_response();
-        }
-    };
-
-    let is_chat = path.contains("/chat/completions");
-    let is_stream = path.contains("stream");
-
-    let final_body = if is_chat && status.is_success() && !is_stream {
-        match compress_response(&state, &resp_body) {
-            Ok(compressed) => compressed,
-            Err(e) => {
-                tracing::warn!(error = %e, "compression failed, passing through");
-                resp_body.to_vec()
+            // Attempt CCR compression on response
+            if let Some(ccr) = &state.ccr {
+                if let Some(compressed) =
+                    try_compress_response(ccr, &resp_body, &body_vec, state.add_markers, state.inject_tool).await
+                {
+                    state.requests_compressed.fetch_add(1, Ordering::Relaxed);
+                    let body = serde_json::to_vec(&compressed).unwrap_or_else(|_| resp_body.to_vec());
+                    return Response::builder()
+                        .status(status)
+                        .body(Body::from(body))
+                        .unwrap();
+                }
             }
-        }
-    } else {
-        resp_body.to_vec()
-    };
 
-    let mut response = Response::builder().status(status);
-    for (name, value) in &upstream_headers {
-        if let (Ok(n), Ok(v)) = (
-            http::HeaderName::from_bytes(name.as_str().as_bytes()),
-            http::HeaderValue::from_bytes(value.as_bytes()),
-        ) {
-            if n.as_str().to_lowercase() != "content-length" {
-                response = response.header(n, v);
-            }
+            Response::builder()
+                .status(status)
+                .body(Body::from(resp_body))
+                .unwrap()
         }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": format!("{}", e)})),
+        )
+            .into_response(),
     }
-    response.body(Body::from(final_body)).unwrap().into_response()
 }
 
-/// Compress tool output in a chat completions response.
-fn compress_response(state: &AppState, body: &[u8]) -> anyhow::Result<Vec<u8>> {
-    let body_str = std::str::from_utf8(body)?;
-    let mut json: Value = serde_json::from_str(body_str)?;
-
+async fn try_compress_response(
+    ccr: &Arc<dyn CcrStore>,
+    resp_body: &[u8],
+    _req_body: &[u8],
+    add_markers: bool,
+    inject_tool: bool,
+) -> Option<serde_json::Value> {
+    let response: serde_json::Value = serde_json::from_slice(resp_body).ok()?;
+    let choices = response.get("choices")?.as_array()?;
+    let mut modified = response.clone();
     let mut did_compress = false;
 
-    if let Some(choices) = json.get_mut("choices").and_then(|c| c.as_array_mut()) {
-        for choice in choices {
+    if let Some(choices_arr) = modified.get_mut("choices")?.as_array_mut() {
+        for choice in choices_arr {
             if let Some(message) = choice.get_mut("message") {
-                if let Some(content) = message.get_mut("content") {
-                    if let Some(text) = content.as_str() {
-                        if let Some(compressed) = maybe_compress(state, text) {
-                            *content = Value::String(compressed);
-                            did_compress = true;
-                        }
-                    } else if let Some(parts) = content.as_array_mut() {
-                        for part in parts {
-                            if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
-                                if let Some(compressed) = maybe_compress(state, text) {
-                                    part["text"] = Value::String(compressed);
-                                    did_compress = true;
+                if let Some(content) = message.get("content").and_then(|v| v.as_str()) {
+                    // Compress large content
+                    if content.len() > 1024 {
+                        let hash = compute_key(content.as_bytes());
+                        ccr.put(&hash, content);
+                        let compressed = if add_markers {
+                            format!("{} {}", marker_for(&hash), &content[..content.len().min(200)])
+                        } else {
+                            marker_for(&hash)
+                        };
+                        message["content"] = serde_json::Value::String(compressed);
+                        did_compress = true;
+                    }
+                }
+
+                // Inject headroom_retrieve tool
+                if inject_tool {
+                    if let Some(tools) = message.get_mut("tool_calls") {
+                        let retrieve_tool = serde_json::json!({
+                            "type": "function",
+                            "function": {
+                                "name": "headroom_retrieve",
+                                "description": "Resolve CCR markers to original content.",
+                                "parameters": {
+                                    "type": "object",
+                                    "properties": {
+                                        "hash": {"type": "string"},
+                                        "query": {"type": "string"},
+                                        "path": {"type": "string"}
+                                    },
+                                    "required": ["hash"]
                                 }
                             }
+                        });
+                        if let Some(arr) = tools.as_array_mut() {
+                            arr.push(retrieve_tool);
                         }
                     }
                 }
@@ -258,70 +283,113 @@ fn compress_response(state: &AppState, body: &[u8]) -> anyhow::Result<Vec<u8>> {
         }
     }
 
-    // Inject CCR retrieve tool if we compressed something
-    if did_compress && state.inject_tool {
-        if let Ok(retrieve_tool) = serde_json::from_str::<Value>(RETRIEVE_TOOL) {
-            if let Some(tools) = json.get_mut("tools") {
-                if let Some(arr) = tools.as_array_mut() {
-                    // Only add if not already present
-                    let already_has = arr.iter().any(|t| {
-                        t.get("function")
-                            .and_then(|f| f.get("name"))
-                            .and_then(|n| n.as_str())
-                            == Some("headroom_retrieve")
-                    });
-                    if !already_has {
-                        arr.push(retrieve_tool);
-                    }
-                }
-            }
-        }
-    }
-
-    if did_compress {
-        state.compressed_requests.fetch_add(1, Ordering::Relaxed);
-    }
-
-    Ok(serde_json::to_vec(&json)?)
+    if did_compress { Some(modified) } else { None }
 }
 
-/// Try to compress a text content block. Returns Some(compressed) if compressed.
-fn maybe_compress(state: &AppState, content: &str) -> Option<String> {
-    const MIN_CHARS: usize = 400;
-    const CHUNK_SIZE: usize = 1500;
+// ── Tool relay handler ───────────────────────────────────────────────
 
-    if content.len() < MIN_CHARS {
-        return None;
+pub async fn handle_tool_relay(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ToolRelayRequest>,
+) -> impl IntoResponse {
+    state.tool_relay_calls.fetch_add(1, Ordering::Relaxed);
+    tracing::info!(tool = %req.tool, "tool_relay");
+
+    if let Some(cb) = &req.callback_url {
+        let state = state.clone();
+        let tool = req.tool.clone();
+        let params = req.params.clone();
+        let cb = cb.clone();
+        tokio::spawn(async move {
+            let result = execute_tool_relay(&state, &tool, &params).await;
+            let _ = state.client.post(&cb).json(&result).send().await;
+        });
+        return Json(ToolRelayResponse {
+            success: true, result: None, error: None, async_call: true,
+        });
     }
 
-    let token_estimate = content.len() / 3; // rough: ~3 chars per token
-    let mut result = String::with_capacity(content.len());
-    let mut offset = 0;
-    let mut saved = 0usize;
+    match execute_tool_relay(&state, &req.tool, &req.params).await {
+        Ok(val) => Json(ToolRelayResponse { success: true, result: Some(val), error: None, async_call: false }),
+        Err(e) => Json(ToolRelayResponse { success: false, result: None, error: Some(e), async_call: false }),
+    }
+}
 
-    while offset < content.len() {
-        let end = std::cmp::min(offset + CHUNK_SIZE, content.len());
-        let chunk = &content[offset..end];
-
-        if chunk.len() < MIN_CHARS {
-            result.push_str(chunk);
-        } else {
-            let hash = ccr::compute_key(chunk.as_bytes());
-            state.ccr_store.put(&hash, chunk);
-            state.ccr_stored.fetch_add(1, Ordering::Relaxed);
-
-            if state.add_markers {
-                result.push_str(&ccr::marker_for(&hash));
+async fn execute_tool_relay(
+    state: &AppState, tool: &str, params: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    match tool {
+        "headroom_retrieve" => {
+            let hash = params.get("hash").and_then(|v| v.as_str()).ok_or("missing hash")?;
+            if let Some(ccr) = &state.ccr {
+                match ccr.get(hash) {
+                    Some(content) => Ok(serde_json::json!({"found": true, "content": content})),
+                    None => Ok(serde_json::json!({"found": false})),
+                }
+            } else {
+                Err("CCR not enabled".into())
             }
-            saved += chunk.len();
         }
-        offset = end;
+        "headroom_compress" => {
+            let content = params.get("content").and_then(|v| v.as_str()).ok_or("missing content")?;
+            if let Some(ccr) = &state.ccr {
+                let hash = compute_key(content.as_bytes());
+                ccr.put(&hash, content);
+                Ok(serde_json::json!({"compressed": marker_for(&hash), "hash": hash}))
+            } else {
+                Err("CCR not enabled".into())
+            }
+        }
+        _ => Err(format!("Unknown tool: {}", tool)),
+    }
+}
+
+// ── Programmatic CCR handlers ────────────────────────────────────────
+
+pub async fn handle_ccr_create(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CcrCreateRequest>,
+) -> impl IntoResponse {
+    let original_size = req.content.len();
+    let hash = req.key.unwrap_or_else(|| compute_key(req.content.as_bytes()));
+
+    if let Some(ccr) = &state.ccr {
+        ccr.put(&hash, &req.content);
+        state.ccr_created.fetch_add(1, Ordering::Relaxed);
     }
 
-    if saved > 0 {
-        state.total_tokens_saved.fetch_add((saved / 3) as u64, Ordering::Relaxed);
-        Some(result)
-    } else {
-        None
+    // Notify Hermes
+    if let Some(notify_url) = &state.notify_url {
+        let notification = CcrNotification {
+            event: "ccr_created".into(),
+            hash: hash.clone(),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+            ttl: req.ttl_seconds.unwrap_or(3600),
+            tags: req.tags.unwrap_or_default(),
+        };
+        let client = state.client.clone();
+        let url = notify_url.clone();
+        tokio::spawn(async move { let _ = client.post(&url).json(&notification).send().await; });
+    }
+
+    let compressed_size = hash.len();
+    Json(CcrCreateResponse {
+        hash,
+        compression_ratio: if original_size > 0 { original_size as f64 / compressed_size.max(1) as f64 } else { 1.0 },
+        original_size,
+        compressed_size,
+    })
+}
+
+pub async fn handle_ccr_list(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    match &state.ccr {
+        Some(ccr) => Json(serde_json::json!({
+            "entries": ccr.len(),
+            "message": "CCR enabled"
+        })),
+        None => Json(serde_json::json!({"entries": 0, "message": "CCR not enabled"})),
     }
 }
