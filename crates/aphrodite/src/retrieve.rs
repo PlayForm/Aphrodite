@@ -16,6 +16,7 @@ pub struct RetrieveRequest {
     pub hash: Option<String>,
     pub query: Option<String>,
     pub path: Option<String>,
+    /// DEPRECATED — path-based file reads disabled for security. Use hash or query instead.
     #[serde(default)]
     pub offset: usize,
     #[serde(default)]
@@ -34,17 +35,13 @@ pub async fn handle_retrieve(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RetrieveRequest>,
 ) -> impl IntoResponse {
-    let mut content = if let Some(path) = &req.path {
-        match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(e) => {
-                return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
-                    found: false, content: None,
-                    source: format!("file:{}", path),
-                    error: Some(format!("{}", e)),
-                })).into_response();
-            }
-        }
+    let mut content = if let Some(_path) = &req.path {
+        // Path-based file reads disabled for security
+        return (StatusCode::FORBIDDEN, Json(RetrieveResponse {
+            found: false, content: None,
+            source: "path_reads_disabled".into(),
+            error: Some("path-based file reads are disabled for security".into()),
+        })).into_response();
     } else {
         let hash = match &req.hash {
             Some(h) => h.clone(),
