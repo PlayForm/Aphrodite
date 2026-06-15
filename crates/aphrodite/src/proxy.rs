@@ -268,14 +268,9 @@ pub async fn proxy_handler(
         .header("Content-Type", "application/json")
         .header("Accept", "application/json");
 
-    // Use proxy's own key, fall back to forwarding client's key
-    if !state.api_key.is_empty() {
-        req = req.header("Authorization", format!("Bearer {}", state.api_key));
-    } else if let Some(auth) = headers.get("authorization") {
-        req = req.header("Authorization", auth);
-    } else if let Some(auth) = headers.get("x-api-key") {
-        req = req.header("Authorization", auth);
-    }
+    // Proxy always uses its own key for upstream — like anyllm backend
+    // Client (Hermes) connects without auth, proxy handles upstream auth
+    req = req.header("Authorization", format!("Bearer {}", state.api_key));
 
     // Forward select headers
     for (key, val) in headers.iter() {
