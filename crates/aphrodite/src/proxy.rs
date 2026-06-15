@@ -240,7 +240,7 @@ pub async fn proxy_handler(
     body: Bytes,
 ) -> impl IntoResponse {
     state.requests_total.fetch_add(1, Ordering::Relaxed);
-    let t0 = std::time::Instant::now();
+    let _t0 = std::time::Instant::now();
 
     if state.dev {
         tracing::info!(
@@ -316,12 +316,6 @@ pub async fn proxy_handler(
 }
 
 /// Detect content type for adaptive compression strategy.
-
-fn format_size(bytes: usize) -> String {
-    if bytes >= 1_000_000 { format!("{:.1}MB", bytes as f64 / 1_000_000.0) }
-    else if bytes >= 1000 { format!("{:.1}KB", bytes as f64 / 1000.0) }
-    else { format!("{}B", bytes) }
-}
 
 fn detect_content_type(content: &str) -> &'static str {
     if content.starts_with('{') || content.starts_with('[') {
