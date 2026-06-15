@@ -59,10 +59,6 @@ pub struct Cli {
     #[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
     pub ccr_ttl_seconds: u64,
 
-    /// Disable CCR tool injection (token mode only)
-    #[arg(long)]
-    pub no_ccr_inject_tool: bool,
-
     /// Disable CCR markers in compressed output
     #[arg(long)]
     pub no_ccr_marker: bool,
@@ -144,9 +140,13 @@ impl MultiConfig {
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
             max_context: cfg.max_context.unwrap_or(1_000_000),
             max_output: cfg.max_output.unwrap_or(384_000),
-            ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| ".headroom/aphrodite-ccr.db".into()),
+            ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| {
+                let default = dirs::data_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+                    .join("aphrodite").join("ccr.db");
+                default.into()
+            }),
             ccr_ttl_seconds: cfg.ccr_ttl_seconds.or_else(|| d.and_then(|d| d.ccr_ttl_seconds)).unwrap_or(3600),
-            no_ccr_inject_tool: false,
             no_ccr_marker: false,
             tool_relay: cfg.tool_relay.unwrap_or(false),
             notify_url: cfg.notify_url.clone(),

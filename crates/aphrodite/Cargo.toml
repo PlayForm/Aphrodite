@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite"
-version = "0.5.6"
+version = "0.5.7"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -34,6 +34,7 @@ http = "1"
 http-body-util = "0.1"
 hyper = "1"
 uuid = { version = "1", features = ["v4"] }
+dirs = "5"
 
 chrono = { version = "0.4", features = ["serde"] }
 
