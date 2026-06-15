@@ -238,7 +238,10 @@ def _transform_tool_result(
             ccr_result = json.loads(r.read())
         hash_val = ccr_result["hash"]
         # Return a marker the LLM can retrieve
-        return f'[CCR:{hash_val}] Tool output compressed ({len(result)} chars). Use headroom_retrieve with hash={hash_val} to get full content.'
+        preview = result[:120].splitlines()[0].strip() if result else ''
+        ct = 'tool_output'
+        size = len(result)
+        return f'<<CCR:{hash_val}|{ct}|{size}>> {preview}'
     except Exception as e:
         _log.debug("transform_tool_result compression skipped: %s", e)
         return result
