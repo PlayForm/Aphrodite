@@ -727,4 +727,135 @@ def register(ctx):
         schema=RETRIEVE_SCHEMA,
         handler=_retrieve_handler,
     )
-    _log.info("aphrodite v1.2.0 registered — recursive CCR + knowledge map + api_request compression")
+    # Register context engine (plugs into Hermes' compress() pipeline)
+    try:
+        ctx.register_context_engine(AphroditeContextEngine())
+        _log.info("aphrodite context engine registered")
+    except Exception as e:
+        _log.debug("context engine registration skipped: %s", e)
+    _log.info("aphrodite v1.4.0 registered — CCR context engine + hooks + tools")
+
+
+# ── Context Engine (plugs into Hermes compress() pipeline) ─────
+
+class AphroditeContextEngine:
+    """CCR-based context compression engine for Hermes.
+
+    Replaces Hermes' built-in summarization compressor with CCR offloading.
+    When context exceeds threshold, old messages are compressed to CCR
+    and replaced with a retrieval marker in the message list.
+
+    Set ``context.engine: aphrodite`` in config.yaml to activate.
+    """
+    name = "aphrodite"
+    threshold_percent = 0.3  # trigger at 30% context (aggressive)
+    protect_first_n = 3
+    protect_last_n = 10
+
+    def __init__(self):
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+        self.last_total_tokens = 0
+        self.threshold_tokens = 0
+        self.context_length = 1000000  # token limit
+        self.compression_count = 0
+
+    def update_from_response(self, usage):
+        """Track token usage from API response."""
+        self.last_prompt_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
+        self.last_completion_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
+        self.last_total_tokens = usage.get("total_tokens", 0)
+        if self.context_length:
+            self.threshold_tokens = int(self.context_length * self.threshold_percent)
+
+    def should_compress(self, prompt_tokens=None):
+        """Compress when context exceeds 30% of token limit or >50 messages."""
+        tokens = prompt_tokens if prompt_tokens is not None else self.last_prompt_tokens
+        if self.threshold_tokens and tokens > self.threshold_tokens:
+            return True
+        return False
+
+    def compress(self, messages, current_tokens=None, focus_topic=None):
+        """Compress old messages to CCR, replace with retrieval marker.
+
+        Keeps first protect_first_n and last protect_last_n messages raw.
+        Middle messages are packed to JSON, stored in proxy CCR, and replaced
+        with a system message containing the retrieval hash.
+        """
+        if len(messages) <= self.protect_first_n + self.protect_last_n + 5:
+            return messages  # nothing to compress
+
+        token_alive = _alive(PORTS["token"])
+        cache_alive = _alive(PORTS["cache"])
+        if not token_alive and not cache_alive:
+            return messages  # proxy down, can't compress
+
+        target = PORTS["token"] if token_alive else PORTS["cache"]
+
+        head = messages[:self.protect_first_n]
+        middle = messages[self.protect_first_n:-self.protect_last_n]
+        tail = messages[-self.protect_last_n:]
+
+        # Pack middle messages with truncated content
+        packed = json.dumps([{
+            "role": m.get("role", ""),
+            "content": str(m.get("content", ""))[:2000],
+            "tool_call_id": m.get("tool_call_id", ""),
+        } for m in middle])
+
+        if len(packed) < 1000:
+            return messages  # not worth compressing
+
+        try:
+            data = json.dumps({"content": packed}).encode()
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{target}/ccr/create",
+                data=data,
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as r:
+                ccr = json.loads(r.read())
+
+            marker = (
+                f"[CONTEXT COMPRESSED: {len(middle)} messages → "
+                f"CCR:{ccr['hash']}|{_fmt_size(len(packed))}]\n"
+                f"These messages were offloaded. Retrieve full context with: "
+                f"headroom_retrieve({ccr['hash']})\n"
+                f"The messages below are the most recent {self.protect_last_n} "
+                f"messages — these are your active context."
+            )
+
+            self.compression_count += 1
+            _log.info(
+                "context_engine: compressed %d msgs → CCR:%s (%s)",
+                len(middle), ccr['hash'][:8], _fmt_size(len(packed))
+            )
+
+            return head + [{"role": "system", "content": marker}] + tail
+
+        except Exception as e:
+            _log.debug("context_engine compress skipped: %s", e)
+            return messages
+
+    def get_status(self):
+        return {
+            "last_prompt_tokens": self.last_prompt_tokens,
+            "threshold_tokens": self.threshold_tokens,
+            "context_length": self.context_length,
+            "usage_percent": (
+                min(100, self.last_prompt_tokens / self.context_length * 100)
+                if self.context_length else 0
+            ),
+            "compression_count": self.compression_count,
+        }
+
+    def update_model(self, model="", context_length=0, **kw):
+        if context_length:
+            self.context_length = context_length
+            self.threshold_tokens = int(context_length * self.threshold_percent)
+
+    def on_session_reset(self):
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+        self.last_total_tokens = 0
+        self.compression_count = 0
