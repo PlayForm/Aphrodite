@@ -1,10 +1,16 @@
 [workspace]
 resolver = "2"
-members = ["crates/headroom-hermes"]
-exclude = ["crates/aphrodite"]
+members = ["crates/headroom-hermes", "crates/aphrodite"]
 
 [workspace.package]
 edition = "2021"
 rust-version = "1.80"
 license = "Apache-2.0"
 repository = "https://github.com/PlayForm/HermesCompress"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+thiserror = "1"
+tracing = "0.1"
