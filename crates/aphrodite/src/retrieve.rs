@@ -9,7 +9,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use headroom_core::ccr::CcrStore;
 use crate::proxy::AppState;
 
 #[derive(Debug, Deserialize)]
