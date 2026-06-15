@@ -659,10 +659,70 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     return output
 
 
+# ── Inline compression store (session-scoped, fallback when proxy down) ────
+# Maps hash → original content. Cleared on session reset.
+_inline_store = {}
+_INLINE_THRESHOLD = 4096
+
+
+def _inline_clear():
+    """Clear the inline store (called on session reset)."""
+    _inline_store.clear()
+
+
 def _fmt_size(b):
     if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
     if b >= 1000: return f"{b/1000:.1f}KB"
     return f"{b}B"
+
+
+def _stats_handler(args=None, **kwargs):
+    """Return proxy health, CCR stats, engine status, inline store size."""
+    result = {"proxy": {}, "engine": {}, "inline_store": {
+        "entries": len(_inline_store),
+        "total_bytes": sum(len(v) for v in _inline_store.values()),
+    }}
+    
+    # Proxy health
+    for name, port in PORTS.items():
+        try:
+            r = urllib.request.urlopen(f"http://127.0.0.1:{port}/stats", timeout=2)
+            data = json.loads(r.read())
+            ccr = data.get("ccr", {})
+            result["proxy"][name] = {
+                "alive": True,
+                "ccr_created": ccr.get("created", 0),
+                "ccr_hits": ccr.get("hits", 0),
+                "ccr_entries": ccr.get("entries", "?"),
+            }
+        except Exception:
+            result["proxy"][name] = {"alive": False}
+    
+    # Engine status
+    eng = get_engine()
+    if eng:
+        result["engine"] = {
+            "active": True,
+            "compressions": eng.compression_count,
+            "threshold_tokens": eng.threshold_tokens,
+            "last_prompt_tokens": eng.last_prompt_tokens,
+            "context_length": eng.context_length,
+            "protect_first_n": eng.protect_first_n,
+            "protect_last_n": eng.protect_last_n,
+            "last_compression": eng.last_compression,
+            "session_id": eng.session_id,
+        }
+    else:
+        result["engine"] = {"active": False}
+    
+    return json.dumps(result)
+
+
+STATS_SCHEMA = {
+    "name": "headroom_stats",
+    "description": "Check aphrodite proxy health, CCR stats, engine compression status. Use when debugging compression or checking if proxy is alive.",
+    "parameters": {"type": "object", "properties": {}}
+}
 
 
 def register(ctx):
@@ -687,6 +747,11 @@ def register(ctx):
         name="headroom_retrieve",
         schema=RETRIEVE_SCHEMA,
         handler=_retrieve_handler,
+    )
+    ctx.register_tool(
+        name="headroom_stats",
+        schema=STATS_SCHEMA,
+        handler=_stats_handler,
     )
     # Register context engine (plugs into Hermes' compress() pipeline)
     try:
@@ -875,3 +940,10 @@ class AphroditeContextEngine(ContextEngine):
         self.last_completion_tokens = 0
         self.last_total_tokens = 0
         self.compression_count = 0
+        self.last_compression = {}
+        _inline_clear()  # session-scoped: clear inline store
+        _log.info("context_engine: session reset — inline store cleared, %d compressions total", self.compression_count)
+
+    def on_session_start(self, session_id="", **kw):
+        self.session_id = session_id
+        _log.info("context_engine: session %s started", session_id[:16] if session_id else "?")
