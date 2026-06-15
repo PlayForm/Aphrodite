@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.2.0
-description: "Auto-install + launch aphrodite Chat Completions proxy — cache (:9797) + token (:9798) with CCR + tool relay. Recursive CCR resolution, dynamic knowledge map, pre_api_request compression."
+version: 1.3.0
+description: "Complete CCR compression plugin: proxy (cache+token) + inline fallback, recursive resolution, knowledge map, pre_api_request compression. Replaces hermes-compress-shim."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -14,6 +14,7 @@ provides_tools:
   - headroom_compress
   - aphrodite_rebuild
 install_message: |
-  aphrodite v1.2.0 — recursive CCR resolution + knowledge map.
+  aphrodite v1.3.0 — complete CCR compression plugin.
   Requires APHRODITE_API_KEY in ~/.hermes/.env.
-  No cargo/Rust required — pre-built binary included.
+  Proxy auto-installed + auto-launched on session start.
+  Inline fallback works without proxy — no provider switch needed.
