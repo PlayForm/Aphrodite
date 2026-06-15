@@ -89,10 +89,11 @@ def _load_env():
     return env
 
 
-def _alive(port):
+def _alive(port, timeout=3):
     try:
-        r = urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2)
-        return r.read().decode().strip() == "ok"
+        r = urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=timeout)
+        body = r.read().decode().strip()
+        return body == "ok" or '"status":"healthy"' in body
     except Exception:
         return False
 
@@ -213,38 +214,36 @@ def _transform_tool_result(
     duration_ms=0, status="", error_type="", error_message="",
     **kwargs,
 ):
-    """Compress large tool outputs at capture time via CCR."""
+    """Compress tool outputs at capture time via CCR. Token: >1KB, Cache: >8KB."""
     if not result or not isinstance(result, str) or not result.strip():
         return result
 
-    # Never compress debug/read tools — keep output visible
-    skip_tools = {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo"}
-    if tool_name in skip_tools:
+    token_alive = _alive(PORTS["token"])
+    cache_alive = _alive(PORTS["cache"])
+    if not token_alive and not cache_alive:
         return result
 
-    # Only compress outputs > 8KB
-    if len(result) < 8192:
+    skip = {"read_file", "read_terminal"} if token_alive else {"read_file", "read_terminal", "execute_code", "memory", "patch", "write_file", "search_files", "todo"}
+    if tool_name in skip:
         return result
 
+    threshold = 1024 if token_alive else 8192
+    if len(result) < threshold:
+        return result
+
+    target = PORTS["token"] if token_alive else PORTS["cache"]
     try:
         import urllib.request, json
         data = json.dumps({"content": result}).encode()
-        req = urllib.request.Request(
-            "http://127.0.0.1:9798/ccr/create",
-            data=data,
-            headers={"Content-Type": "application/json"}
-        )
+        req = urllib.request.Request(f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=3) as r:
-            ccr_result = json.loads(r.read())
-        hash_val = ccr_result["hash"]
-        # Return a marker the LLM can retrieve
-        preview = result[:120].splitlines()[0].strip() if result else ''
-        ct = 'tool_output'
-        size = len(result)
-        return f'<<CCR:{hash_val}|{ct}|{size}>> {preview}'
+            ccr = json.loads(r.read())
+        h = ccr["hash"]
+        p = result[:120].replace('\\n', ' ').strip()
+        label = "token" if token_alive else "cache"
+        return f'[CCR:{h}|tool|{len(result)}|{label}] {p}'
     except Exception as e:
-        _log.debug("transform_tool_result compression skipped: %s", e)
-        return result
+        return result  # soft-fail
 
 
 def _rebuild_handler(args=None, **kwargs):
