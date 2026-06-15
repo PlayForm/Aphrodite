@@ -469,19 +469,21 @@ def _parse_ccr_markers(text):
 
 
 def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
-    """Before LLM call: compress old turns, inject knowledge map + retrieval catalog.
+    """Before LLM call: build navigable compression catalog.
 
-    Hermes injects the returned string into the user message. We CANNOT mutate
-    conversation_history (Hermes passes a copy). Instead we:
+    CANNOT mutate conversation_history (Hermes passes a copy). Instead:
 
-    1. Group messages into turns (user→assistant→tools chains)
-    2. Compress old turns (>6 back) to CCR for later retrieval
-    3. Return a rich catalog so the LLM navigates context efficiently
+    WRAPPING PATTERN visible to LLM:
+    ┌─ Last ~10 messages: raw, fully in context
+    ├─ Tool/terminal outputs >1KB: [CCR:hash|type|size] markers inline
+    ├─ Old turn summaries: compressed to CCR, cataloged here
+    └─ Everything else: raw user/assistant text (Hermes keeps it)
 
-    The LLM should prefer headroom_retrieve for old content rather than
-    scanning hundreds of raw messages.
+    STRATEGY: Provide catalog so LLM uses headroom_retrieve(hash)
+    instead of scanning 300+ raw messages. Each CCR item below is
+    retrievable — the LLM should fetch only what's relevant.
     """
-    if _DEV: return  # dev mode: skip
+    if _DEV: return
     if not conversation_history or not isinstance(conversation_history, list):
         return
 
@@ -489,8 +491,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     cache_alive = _alive(PORTS["cache"])
     proxy_available = token_alive or cache_alive
     target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
+    ctx_len = len(conversation_history)
 
-    # ── 1. Build CCR marker catalog ──────────────────────────
+    # ── 1. Scan for CCR markers (injected by transform hooks) ──
     markers = []
     total_bytes = 0
     for msg in conversation_history:
@@ -500,70 +503,84 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 total_bytes += m['size']
                 markers.append(m)
 
-    # ── 2. Compress old turns to CCR ─────────────────────────
-    ctx_len = len(conversation_history)
+    # ── 2. Compress old turns to CCR (structured summaries) ───
     compress_hint = ""
     if proxy_available and target and ctx_len > 30:
-        # Group into turns: each user message starts a new turn
         turns = _group_into_turns(conversation_history)
         if len(turns) > 6:
             old_turns = turns[:-6]
             try:
-                # Build a structured summary of old turns
-                turn_summaries = []
+                summaries = []
                 for t in old_turns:
-                    user_msg = t.get("user", "")[:300]
-                    asst_msg = t.get("assistant", "")[:300]
-                    turn_summaries.append({
-                        "id": t["id"],
-                        "user": user_msg,
-                        "assistant": asst_msg if asst_msg else "(tool calls)",
+                    summaries.append({
+                        "turn": t["id"],
+                        "user": t.get("user", "")[:300],
+                        "assistant": t.get("assistant", "(tool calls)")[:300],
                     })
-                
-                packed = json.dumps(turn_summaries)
+                packed = json.dumps(summaries)
                 if len(packed) > 500:
                     data = json.dumps({"content": packed}).encode()
                     req = urllib.request.Request(
                         f"http://127.0.0.1:{target}/ccr/create",
-                        data=data,
-                        headers={"Content-Type": "application/json"}
-                    )
+                        data=data, headers={"Content-Type": "application/json"})
                     with urllib.request.urlopen(req, timeout=3) as r:
                         ccr = json.loads(r.read())
-                    
+                    kept = len(turns) - len(old_turns)
                     compress_hint = (
-                        f"  compressed: {len(old_turns)} old turns → CCR:{ccr['hash'][:12]} "
-                        f"({_fmt_size(len(packed))}) | retrieve: headroom_retrieve({ccr['hash'][:12]})\n"
-                        f"  turn range compressed: T{turns[0]['id']}–T{old_turns[-1]['id']} "
-                        f"({len(old_turns)} turns, last {len(turns)-len(old_turns)} kept in context)"
+                        f"  [TURN ARCHIVE] CCR:{ccr['hash'][:12]} | "
+                        f"turns T{turns[0]['id']}–T{old_turns[-1]['id']} "
+                        f"({len(old_turns)} turns compressed, last {kept} raw)\n"
+                        f"  retrieve: headroom_retrieve({ccr['hash'][:12]})"
                     )
             except Exception:
                 pass
 
-    # ── 3. Build the catalog ─────────────────────────────────
-    map_parts = []
+    # ── 3. Build the catalog ──────────────────────────────────
+    parts = []
     if markers or _conv_index or compress_hint:
-        map_parts.append("[APHRODITE]")
-        if markers:
-            mode_tag = "token" if token_alive else "cache" if cache_alive else "off"
-            visible = min(len(markers), 8)
-            map_parts.append(f"  proxy={mode_tag} | {len(markers)} items @ {_fmt_size(total_bytes)} | retrieval: headroom_retrieve")
-            if visible > 0:
-                map_parts.append(f"  catalog ({visible}/{len(markers)}):")
-                for i, m in enumerate(markers[:visible]):
-                    preview = _extract_preview(m, conversation_history)
-                    map_parts.append(f"    [{i}] CCR:{m['hash'][:8]} | {m['type']} | {_fmt_size(m['size'])} | {preview}")
+        parts.append("[APHRODITE]")
+        
+        # Compression wrapping summary
+        if proxy_available:
+            mode = "token" if token_alive else "cache"
+            parts.append(f"  mode={mode} | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
+        else:
+            parts.append(f"  mode=inline | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
+        
+        # Turn archive
         if compress_hint:
-            map_parts.append(compress_hint)
+            parts.append(compress_hint)
+        
+        # CCR catalog: grouped by type
+        if markers:
+            by_type = {}
+            for m in markers:
+                by_type.setdefault(m['type'], []).append(m)
+            
+            parts.append(f"  catalog ({len(markers)} items):")
+            for ctype, items in sorted(by_type.items()):
+                visible = min(len(items), 3)
+                parts.append(f"    [{ctype}] {len(items)} items:")
+                for i, m in enumerate(items[:visible]):
+                    preview = _extract_preview(m, conversation_history)
+                    parts.append(f"      CCR:{m['hash'][:8]} | {_fmt_size(m['size'])} | {preview}")
+                if len(items) > visible:
+                    parts.append(f"      ... +{len(items)-visible} more (use headroom_retrieve)")
+        
+        # Conversation memory
         if _conv_index:
-            turns = sorted(_conv_index.items(), reverse=True)[:5]
-            map_parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in turns))
-        if ctx_len > 30:
-            hint = "use headroom_retrieve for old content" if ctx_len > 50 else "consider compressing older turns"
-            map_parts.append(f"  context: {ctx_len} msgs ({hint})")
+            recent = sorted(_conv_index.items(), reverse=True)[:3]
+            parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in recent))
+        
+        # Context hint
+        if ctx_len > 20:
+            if ctx_len > 100:
+                parts.append(f"  ⚠ context={ctx_len} msgs — prefer headroom_retrieve over scanning")
+            else:
+                parts.append(f"  context={ctx_len} msgs")
 
-    if map_parts:
-        return "\n".join(map_parts)
+    if parts:
+        return "\n".join(parts)
 
 
 def _group_into_turns(conversation_history):
