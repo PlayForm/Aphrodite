@@ -268,11 +268,13 @@ pub async fn proxy_handler(
         .header("Content-Type", "application/json")
         .header("Accept", "application/json");
 
-    // Forward the original Authorization header from the client, or use our own
-    if let Some(auth) = headers.get("authorization") {
-        req = req.header("Authorization", auth);
-    } else if !state.api_key.is_empty() {
+    // Use proxy's own key, fall back to forwarding client's key
+    if !state.api_key.is_empty() {
         req = req.header("Authorization", format!("Bearer {}", state.api_key));
+    } else if let Some(auth) = headers.get("authorization") {
+        req = req.header("Authorization", auth);
+    } else if let Some(auth) = headers.get("x-api-key") {
+        req = req.header("Authorization", auth);
     }
 
     // Forward select headers
