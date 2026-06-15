@@ -1,5 +1,7 @@
 # aphrodite
 
+<p align="center"><img src="assets/aphrodite.svg" width="80" alt="aphrodite"></p>
+
 > Chat Completions proxy wrapping headroom-core with CCR + tool relay
 
 [![release](https://img.shields.io/badge/release-v0.3.0-blue)](https://github.com/PlayForm/Aphrodite/releases)
