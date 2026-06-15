@@ -1,5 +1,5 @@
 """
-aphrodite v1.14.0 - Auto-install + launch aphrodite proxies.
+aphrodite v1.15.0 - Auto-install + launch aphrodite proxies.
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 - Recursive CCR resolution, session-scoped stores
@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.5"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.14.0"        # plugin version
+BIN_VERSION = "v0.5.6"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.15.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
