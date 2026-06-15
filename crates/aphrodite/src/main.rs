@@ -5,7 +5,7 @@
 //! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
 use std::sync::Arc;
-use axum::{routing::{any, get, post}, Json, Router};
+use axum::{routing::{any, get, post}, http::StatusCode, Json, Router};
 use clap::Parser;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -18,10 +18,17 @@ use aphrodite::retrieve;
 async fn main() -> anyhow::Result<()> {
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_subscriber::fmt::layer())
-        .try_init()?;
+    let compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
+    let subscriber = tracing_subscriber::registry().with(filter);
+    if compact {
+        subscriber
+            .with(tracing_subscriber::fmt::layer().compact().with_target(false).without_time())
+            .try_init()?;
+    } else {
+        subscriber
+            .with(tracing_subscriber::fmt::layer())
+            .try_init()?;
+    }
 
     // Try multi-proxy config first, fall back to CLI
     let proxies: Vec<(String, Cli)> = if std::path::Path::new("aphrodite.toml").exists() {
@@ -102,6 +109,33 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
         .route("/stats", get({
             let s = state.clone();
             move || async move { Json(s.stats_json()) }
+        }))
+        .route("/metrics", get({
+            let s = state.clone();
+            move || async move {
+                let stats = s.stats_json();
+                let mut out = String::new();
+                out.push_str(&format!("aphrodite_requests_total{{mode=\"{}\"}} {}\n",
+                    stats["mode"], stats["requests"]["total"]));
+                out.push_str(&format!("aphrodite_requests_compressed{{mode=\"{}\"}} {}\n",
+                    stats["mode"], stats["requests"]["compressed"]));
+                out.push_str(&format!("aphrodite_tokens_saved {}\n", stats["tokens_saved"]));
+                out.push_str(&format!("aphrodite_ccr_hits {}\n", stats["ccr"]["hits"]));
+                out.push_str(&format!("aphrodite_ccr_misses {}\n", stats["ccr"]["misses"]));
+                out.push_str(&format!("aphrodite_ccr_created {}\n", stats["ccr"]["created"]));
+                out.push_str(&format!("aphrodite_tool_relay_calls {}\n", stats["tool_relay_calls"]));
+                // Latency buckets
+                if let Some(buckets) = stats["latency_buckets_us"].as_array() {
+                    for (i, v) in buckets.iter().enumerate() {
+                        let le = match i { 0=>"0.001", 1=>"0.01", 2=>"0.1", 3=>"1.0", 4=>"10.0", _=>"+Inf"};
+                        out.push_str(&format!("aphrodite_latency_seconds_bucket{{le=\"{}\"}} {}\n", le, v));
+                    }
+                }
+                if let Some(ratio) = stats["compression_ratio_ema"].as_f64() {
+                    out.push_str(&format!("aphrodite_compression_ratio_ema {:.2}\n", ratio));
+                }
+                (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")], out)
+            }
         }))
         .route("/history", get({
             let s = state.clone();
