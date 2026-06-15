@@ -1472,8 +1472,8 @@ class AphroditeContextEngine(ContextEngine):
         0 = never compress (disabled). 50 = compress at 50% fill."""
         if self.threshold_percent == 0:
             return False  # disabled
-        tokens = prompt_tokens or self.last_prompt_tokens or (self.context_length or 1000000)
-        if not self.context_length:
+        tokens = prompt_tokens or self.last_prompt_tokens
+        if not tokens or not self.context_length:
             return False
         pct = (tokens / self.context_length) * 100
         return pct >= self.threshold_percent
