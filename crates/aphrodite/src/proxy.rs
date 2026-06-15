@@ -265,9 +265,15 @@ pub async fn proxy_handler(
     let mut req = state
         .client
         .request(method.clone(), &url)
-        .header("Authorization", format!("Bearer {}", state.api_key))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json");
+
+    // Forward the original Authorization header from the client, or use our own
+    if let Some(auth) = headers.get("authorization") {
+        req = req.header("Authorization", auth);
+    } else if !state.api_key.is_empty() {
+        req = req.header("Authorization", format!("Bearer {}", state.api_key));
+    }
 
     // Forward select headers
     for (key, val) in headers.iter() {
