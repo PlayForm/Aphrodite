@@ -71,9 +71,9 @@ impl AppState {
         serde_json::json!({
             "mode": match self.mode {
                 ProxyMode::Cache => "cache",
-                ProxyMode::Aphrodite => "aphrodite",
+                ProxyMode::Token => "token",
             },
-            "proxy": "aphrodite",
+            "proxy": "token",
             "ccr_backend": if self.ccr.is_some() { "enabled" } else { "none" },
             "tool_relay": self.tool_relay,
             "requests": {
@@ -93,7 +93,7 @@ impl AppState {
     fn compress_threshold(&self) -> usize {
         match self.mode {
             ProxyMode::Cache => CACHE_COMPRESS_THRESHOLD,
-            ProxyMode::Aphrodite => TOKEN_COMPRESS_THRESHOLD,
+            ProxyMode::Token => TOKEN_COMPRESS_THRESHOLD,
         }
     }
 }
@@ -150,7 +150,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         .build()?;
 
     let ccr: Option<Arc<dyn CcrStore>> = match cli.mode {
-        ProxyMode::Aphrodite if !cli.no_ccr_marker => {
+        ProxyMode::Token if !cli.no_ccr_marker => {
             let store = SqliteCcrStore::open(&cli.ccr_db_path, cli.ccr_ttl_seconds)
                 .map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
             Some(Arc::new(store))
@@ -171,7 +171,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         model: cli.model.clone(),
         api_key: cli.deepseek_key.clone(),
         ccr,
-        inject_tool: !cli.no_ccr_inject_tool && matches!(cli.mode, ProxyMode::Aphrodite),
+        inject_tool: !cli.no_ccr_inject_tool && matches!(cli.mode, ProxyMode::Token),
         add_markers: !cli.no_ccr_marker,
         mode: cli.mode,
         tool_relay: cli.tool_relay,
@@ -314,7 +314,7 @@ async fn compress_chat_completion(
                                 let preview = &content[..content.len().min(512)];
                                 format!("[{}] {}", marker_for(&hash), preview)
                             }
-                            ProxyMode::Aphrodite => {
+                            ProxyMode::Token => {
                                 // Aggressive: marker only
                                 if state.add_markers {
                                     marker_for(&hash)
@@ -352,7 +352,7 @@ async fn compress_chat_completion(
                     }
                 }
 
-                // Aphrodite mode: inject headroom_retrieve tool
+                // Token mode: inject headroom_retrieve tool
                 if state.inject_tool {
                     let retrieve_tool = serde_json::json!({
                         "type": "function",
@@ -480,11 +480,11 @@ pub async fn handle_ccr_list(
             "entries": ccr.len(),
             "backend": match state.mode {
                 ProxyMode::Cache => "in_memory",
-                ProxyMode::Aphrodite => "sqlite",
+                ProxyMode::Token => "sqlite",
             },
             "mode": match state.mode {
                 ProxyMode::Cache => "cache",
-                ProxyMode::Aphrodite => "aphrodite",
+                ProxyMode::Token => "token",
             },
         })),
         None => Json(serde_json::json!({"entries": 0, "message": "CCR not enabled"})),
@@ -527,7 +527,7 @@ mod tests {
     #[test]
     fn test_compress_threshold_aphrodite() {
         let state = AppState {
-            mode: ProxyMode::Aphrodite,
+            mode: ProxyMode::Token,
             ..test_state()
         };
         assert_eq!(state.compress_threshold(), TOKEN_COMPRESS_THRESHOLD);
@@ -538,12 +538,12 @@ mod tests {
         let cache = test_state();
         let stats = cache.stats_json();
         assert_eq!(stats["mode"], "cache");
-        assert_eq!(stats["proxy"], "aphrodite");
+        assert_eq!(stats["proxy"], "token");
 
         let mut aph = test_state();
-        aph.mode = ProxyMode::Aphrodite;
+        aph.mode = ProxyMode::Token;
         let stats = aph.stats_json();
-        assert_eq!(stats["mode"], "aphrodite");
+        assert_eq!(stats["mode"], "token");
     }
 
     #[test]

@@ -76,7 +76,7 @@ echo "  Notify URL:   ${NOTIFY_URL:-none}"
 echo "  Log:          $LOG_FILE"
 
 CMD=("$BINARY"
-    --mode aphrodite
+    --mode token
     --listen "127.0.0.1:$PORT"
     --ccr-db-path "$DB"
     --ccr-ttl-seconds "$TTL"

@@ -29,7 +29,7 @@
 //! # Cache mode (default)
 //! aphrodite --mode cache --listen 127.0.0.1:9797 --deepseek-key $KEY
 //!
-//! # Aphrodite mode (full CCR + tool relay)
+//! # Token mode (full CCR + tool relay)
 //! aphrodite --mode aphrodite --listen 127.0.0.1:9798 --deepseek-key $KEY --tool-relay
 //!
 //! # Dev mode (verbose logging)
