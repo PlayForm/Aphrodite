@@ -82,4 +82,8 @@ pub struct Cli {
     /// Enable dev mode — verbose request/response logging
     #[arg(long)]
     pub dev: bool,
+
+    /// Upstream request timeout in seconds (default: 300)
+    #[arg(long, default_value = "300")]
+    pub timeout: u64,
 }
