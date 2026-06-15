@@ -618,6 +618,7 @@ pub async fn handle_ccr_create(
     if let Some(ccr) = &state.ccr {
         ccr.put(&hash, &req.content);
         state.ccr_created.fetch_add(1, Ordering::Relaxed);
+        state.tokens_saved.fetch_add((original_size - hash.len()) as u64, Ordering::Relaxed);
 
         // Background summary disabled — burns process + extra CCR entries
         // if req.content.len() > 1024 { ... }
