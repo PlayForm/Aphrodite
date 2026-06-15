@@ -1,26 +1,12 @@
-//! aphrodite — Cache+Token Chat Completions proxy.
+//! aphrodite — Generic LLM proxy with CCR + tool relay.
 //!
-//! Standalone HTTP proxy that:
-//! 1. Listens for Chat Completions API requests (POST /v1/chat/completions)
-//! 2. Forwards to DeepSeek
-//! 3. Compresses large tool outputs with CCR
-//! 4. Exposes /retrieve for CCR lookup
-//! 5. Exposes /tool/relay for bidirectional Hermes communication
-//! 6. Exposes /ccr/create + /ccr/list for programmatic CCR
-//!
-//! Cache mode (:9797): in-memory, >8KB threshold, preview kept.
-//! Token mode (:9798): SQLite, >1KB threshold, tool injection.
+//! Works with any OpenAI-compatible API.
 
 use std::sync::Arc;
-
-use axum::{
-    routing::{any, get, post},
-    Json, Router,
-};
+use axum::{routing::{any, get, post}, Json, Router};
 use clap::Parser;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
+use tower_http::cors::CorsLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use aphrodite::config::{Cli, ProxyMode};
 use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list};
@@ -28,28 +14,14 @@ use aphrodite::retrieve;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::registry()
         .with(filter)
         .with(tracing_subscriber::fmt::layer())
         .try_init()?;
 
     let cli = Cli::parse();
-
-    // Dev mode: also write to /tmp/aphrodite-dev.log
-    if cli.dev {
-        let dev_log = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("/tmp/aphrodite-dev.log")?;
-        let (writer, _guard) = tracing_appender::non_blocking(dev_log);
-        tracing_subscriber::fmt()
-            .with_writer(writer)
-            .with_env_filter("aphrodite=debug")
-            .try_init()
-            .ok();
-    }
 
     if let Some(parent) = cli.ccr_db_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -82,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/ccr/create", post(handle_ccr_create))
         .route("/ccr/list", get(handle_ccr_list))
         .route("/*path", any(proxy::proxy_handler))
+        .layer(CorsLayer::permissive())
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(cli.listen).await?;
