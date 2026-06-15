@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.17"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.26.0"        # plugin version
+BIN_VERSION = "v0.5.18"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.27.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -976,6 +976,49 @@ DIFF_SCHEMA = {
     "parameters": {"type": "object", "properties": {}}
 }
 
+def _search_handler(args=None, **kwargs):
+    """Search across compressed items by type or content pattern."""
+    args = args if isinstance(args, dict) else {}
+    query = args.get("query", "").lower()
+    ccr_type = args.get("type", "")
+    
+    results = []
+    # Search conversation turn index
+    for tnum, (h, summary, size) in sorted(_conv_index.items(), reverse=True):
+        if query and query not in summary.lower():
+            continue
+        results.append({"source": "turn", "turn": tnum, "hash": h, "summary": summary, "size": size})
+    
+    # Search inline store
+    for h, content in _inline_store.items():
+        if query and query not in content.lower():
+            continue
+        preview = content[:200].replace('\n', ' ').strip()
+        results.append({"source": "inline", "hash": h, "preview": preview, "size": len(content)})
+    
+    if ccr_type:
+        results = [r for r in results if ccr_type in r.get("summary", "") + r.get("preview", "")]
+    
+    return json.dumps({
+        "query": query,
+        "type_filter": ccr_type,
+        "matches": len(results),
+        "results": results[:20],
+    })
+
+SEARCH_SCHEMA = {
+    "name": "aphrodite_search",
+    "description": "Search across CCR entries — find compressed content by keyword or type. Use to locate previously compressed context without knowing the hash.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "Search keyword or phrase to find in compressed content"},
+            "type": {"type": "string", "description": "Optional: filter by CCR type (tool, terminal, code, error, etc.)"}
+        },
+        "required": ["query"]
+    }
+}
+
 
 def register(ctx):
     # Install binary on registration
@@ -1019,6 +1062,12 @@ def register(ctx):
         name="aphrodite_diff",
         schema=DIFF_SCHEMA,
         handler=_diff_handler,
+        toolset="aphrodite",
+    )
+    ctx.register_tool(
+        name="aphrodite_search",
+        schema=SEARCH_SCHEMA,
+        handler=_search_handler,
         toolset="aphrodite",
     )
     # Only register context engine when explicitly configured
