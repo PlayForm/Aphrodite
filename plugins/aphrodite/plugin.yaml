@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.13.0
-description: "CCR compression plugin - debug decision logging, deque LRU perf, stripped integrations."
+version: 1.14.0
+description: "CCR compression plugin - query-filtered retrieve, debug logging, deque LRU."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -15,7 +15,7 @@ provides_tools:
   - aphrodite_rebuild
 provides_context_engine: true
 install_message: |
-  aphrodite v1.13.0 - debug decision logging, deque LRU perf.
+  aphrodite v1.14.0 - query-filtered retrieve, debug logging, deque LRU.
   Activate: hermes config set context.engine aphrodite
   Debug: APHRODITE_DEBUG=1 hermes ...
   Tools: aphrodite_retrieve, aphrodite_compress, aphrodite_stats, aphrodite_rebuild
