@@ -503,7 +503,7 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
             oldest = min(_conv_index.keys())
             del _conv_index[oldest]
 
-        _log.debug("conv-cache: stored T%d → %s (%d total)", tnum, ccr["hash"][:8], len(_conv_index))
+        _log.debug("conv-cache: stored T%d → %s (%d total)", tnum, ccr["hash"], len(_conv_index))
     except Exception:
         pass
 
@@ -591,10 +591,10 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                             ccr = json.loads(r.read())
                         kept = len(turns) - len(old_turns)
                         compress_hint = (
-                            f"  [TURN ARCHIVE] CCR:{ccr['hash'][:12]} | "
+                            f"  [TURN ARCHIVE] CCR:{ccr['hash']} | "
                             f"turns T{turns[0]['id']}-T{old_turns[-1]['id']} "
                             f"({len(old_turns)} turns compressed, last {kept} raw)\n"
-                            f"  retrieve: aphrodite_retrieve({ccr['hash'][:12]})"
+                            f"  retrieve: aphrodite_retrieve({ccr['hash']})"
                         )
                 except Exception:
                     pass
@@ -632,7 +632,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 parts.append(f"    [{ctype}] {len(items)} items:")
                 for i, m in enumerate(items[:visible]):
                     preview = _extract_preview(m, conversation_history)
-                    parts.append(f"      CCR:{m['hash'][:8]} | {_fmt_size(m['size'])} | {preview}")
+                    parts.append(f"      CCR:{m['hash']} | {_fmt_size(m['size'])} | {preview}")
                 if len(items) > visible:
                     parts.append(f"      ... +{len(items)-visible} more (use aphrodite_retrieve)")
         
@@ -663,7 +663,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         if has_read_intent and markers:
             recent_markers = markers[-3:]
             parts.append("  intent=read | recent CCRs available: " +
-                         " ".join(f"aphrodite_retrieve({m['hash'][:8]})"
+                         " ".join(f"aphrodite_retrieve({m['hash']})"
                                   for m in recent_markers))
 
     if parts:
@@ -1000,7 +1000,7 @@ class AphroditeContextEngine(ContextEngine):
         self.compression_count += 1
         _log.info(
             "context_engine: compressed %d msgs → CCR:%s (%s)",
-            len(middle), hash_val[:8], size_str
+            len(middle), hash_val, size_str
         )
         self._notify_compressed(len(packed), len(middle), hash_val)
 
