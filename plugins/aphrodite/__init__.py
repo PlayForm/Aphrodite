@@ -273,10 +273,100 @@ REBUILD_SCHEMA = {
     "parameters": {"type": "object", "properties": {}}
 }
 
+
+
+def _pre_llm_hook(api_messages=None, **kwargs):
+    """Before LLM call: scan for CCR markers and inject a content map."""
+    if not api_messages or not isinstance(api_messages, list):
+        return
+
+    markers = []
+    total_bytes = 0
+    for msg in api_messages:
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            # Find CCR marker patterns: [CCR:hash|type|size] or [CCR:hash|type|size|mode]
+            import re
+            found = re.findall(r'\[CCR:([^\]]+)\]', content)
+            for m in found:
+                parts = m.split('|')
+                if len(parts) >= 3:
+                    try:
+                        size = int(parts[2])
+                        total_bytes += size
+                        markers.append({
+                            'hash': parts[0],
+                            'type': parts[1],
+                            'size': size,
+                            'mode': parts[3] if len(parts) > 3 else 'unknown'
+                        })
+                    except ValueError:
+                        pass
+
+    if not markers:
+        return
+
+    # Build content map
+    map_lines = ["[APHRODITE CONTENT MAP]", f"  {len(markers)} compressed item(s), {_fmt_size(total_bytes)} total", ""]
+    for i, m in enumerate(markers[:20], 1):
+        map_lines.append(f"  {i}. [{m['type']}] {_fmt_size(m['size'])} — hash={m['hash']} — use headroom_retrieve")
+    if len(markers) > 20:
+        map_lines.append(f"  ... and {len(markers) - 20} more")
+
+    map_msg = "\n".join(map_lines)
+
+    # Inject as ephemeral system message before the last user message
+    # Find the last user message and prepend the map
+    for i in range(len(api_messages) - 1, -1, -1):
+        if api_messages[i].get("role") == "user":
+            api_messages.insert(i, {"role": "system", "content": map_msg, "ephemeral": True})
+            _log.debug("pre_llm: injected content map for %d markers (%s)", len(markers), _fmt_size(total_bytes))
+            break
+
+
+def _fmt_size(b):
+    if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
+    if b >= 1000: return f"{b/1000:.1f}KB"
+    return f"{b}B"
+
+
+
+def _transform_terminal_hook(command="", stdout="", stderr="", exit_code=0, **kwargs):
+    """Compress terminal output via CCR on-the-fly."""
+    if not _alive(PORTS["token"]) and not _alive(PORTS["cache"]):
+        return stdout  # no proxy, pass through
+
+    combined = stdout
+    if stderr:
+        combined += "\n[stderr]\n" + stderr
+
+    if len(combined) < 2048:  # 2KB min for terminal compression
+        return stdout
+
+    target = PORTS["token"] if _alive(PORTS["token"]) else PORTS["cache"]
+    try:
+        import urllib.request, json
+        data = json.dumps({"content": combined}).encode()
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{target}/ccr/create",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=3) as r:
+            ccr = json.loads(r.read())
+        hash_val = ccr["hash"]
+        preview = combined[:200].replace('\n', ' ').strip()
+        return f'[CCR:{hash_val}|terminal|{len(combined)}] {preview}...(use headroom_retrieve)'
+    except Exception as e:
+        _log.debug("terminal compress skipped: %s", e)
+        return stdout
+
 def register(ctx):
     # Install binary on registration
     _ensure_binary()
     ctx.register_hook("session_start", on_start)
+    ctx.register_hook("pre_llm_call", _pre_llm_hook)
+    ctx.register_hook("transform_terminal_output", _transform_terminal_hook)
     ctx.register_hook("transform_tool_result", _transform_tool_result)
     ctx.register_tool(
         name="aphrodite_rebuild",
