@@ -13,9 +13,9 @@ pub enum ProxyMode {
     /// Cache mode — in-memory CCR, lightweight compression (>8KB threshold),
     /// preview preserved, no tool injection.
     Cache,
-    /// Aphrodite mode — SQLite CCR, aggressive compression (>1KB threshold),
+    /// Token mode — SQLite CCR, aggressive compression (>1KB threshold),
     /// tool injection, tool relay.
-    Aphrodite,
+    Token,
 }
 
 /// aphrodite — Chat Completions proxy with CCR, tool relay, and programmatic CCR.
@@ -23,7 +23,7 @@ pub enum ProxyMode {
 #[command(name = "aphrodite", version, about)]
 pub struct Cli {
     /// Proxy mode: cache or token
-    #[arg(long, default_value = "aphrodite", env = "APHRODITE_MODE")]
+    #[arg(long, default_value = "token", env = "APHRODITE_MODE")]
     pub mode: ProxyMode,
 
     /// Listen address (default: 127.0.0.1:8788 for token, :9797 for cache)

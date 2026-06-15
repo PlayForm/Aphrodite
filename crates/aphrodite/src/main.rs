@@ -9,7 +9,7 @@
 //! 6. Exposes /ccr/create + /ccr/list for programmatic CCR
 //!
 //! Cache mode (:9797): in-memory, >8KB threshold, preview kept.
-//! Aphrodite mode (:9798): SQLite, >1KB threshold, tool injection.
+//! Token mode (:9798): SQLite, >1KB threshold, tool injection.
 
 use std::sync::Arc;
 
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mode_str = match cli.mode {
         ProxyMode::Cache => "cache",
-        ProxyMode::Aphrodite => "aphrodite",
+        ProxyMode::Token => "token",
     };
 
     tracing::info!(
