@@ -34,3 +34,5 @@ http = "1"
 http-body-util = "0.1"
 hyper = "1"
 uuid = { version = "1", features = ["v4"] }
+
+chrono = { version = "0.4", features = ["serde"] }
