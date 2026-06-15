@@ -136,8 +136,87 @@ def on_start(**kw):
     _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
 
 
+
+def _retrieve_handler(args=None, **kwargs):
+    """Resolve CCR markers to original content via aphrodite proxy."""
+    args = args if isinstance(args, dict) else {}
+    hash_val = args.get("hash", "")
+    if not hash_val:
+        return '{"error": "missing hash parameter"}'
+    try:
+        import urllib.request, json
+        data = json.dumps({"hash": hash_val}).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:9798/retrieve",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            result = json.loads(r.read())
+        if result.get("found"):
+            return result["content"]
+        return f'{{"error": "CCR entry not found: {hash_val}"}}'
+    except Exception as e:
+        return f'{{"error": "retrieve failed: {str(e)}"}}'
+
+
+
+def _compress_handler(args=None, **kwargs):
+    """Compress content into CCR via aphrodite proxy."""
+    args = args if isinstance(args, dict) else {}
+    content = args.get("content", "")
+    if not content:
+        return '{"error": "missing content parameter"}'
+    try:
+        import urllib.request, json
+        data = json.dumps({"content": content}).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:9798/ccr/create",
+            data=data,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            result = json.loads(r.read())
+        return json.dumps({"hash": result.get("hash"), "compression_ratio": result.get("compression_ratio")})
+    except Exception as e:
+        return f'{{"error": "compress failed: {str(e)}"}}'
+
+
+COMPRESS_SCHEMA = {
+    "name": "headroom_compress",
+    "description": "Compress content into CCR via aphrodite proxy for later retrieval.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "content": {"type": "string", "description": "Content to compress and store in CCR"}
+        },
+        "required": ["content"]
+    }
+}
+RETRIEVE_SCHEMA = {
+    "name": "headroom_retrieve",
+    "description": "Resolve CCR markers to original content via aphrodite proxy.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "hash": {"type": "string", "description": "CCR marker hash to retrieve"}
+        },
+        "required": ["hash"]
+    }
+}
+
 def register(ctx):
     # Install binary on registration
     _ensure_binary()
     ctx.register_hook("session_start", on_start)
-    _log.info("aphrodite v%s registered", VERSION)
+    ctx.register_tool(
+        name="headroom_compress",
+        schema=COMPRESS_SCHEMA,
+        handler=_compress_handler,
+    )
+    ctx.register_tool(
+        name="headroom_retrieve",
+        schema=RETRIEVE_SCHEMA,
+        handler=_retrieve_handler,
+    )
+    _log.info("aphrodite v%s registered — proxy + headroom_retrieve tool", VERSION)
