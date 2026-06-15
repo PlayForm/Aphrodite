@@ -148,6 +148,9 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
         .route("/tool/relay", post(handle_tool_relay))
         .route("/ccr/create", post(handle_ccr_create))
         .route("/ccr/list", get(handle_ccr_list))
+        .route("/favicon.ico", get(|| async { StatusCode::NOT_FOUND }))
+        .route("/robots.txt", get(|| async { "User-agent: *\nDisallow: /\n" }))
+        .route("/", get(|| async { Json(serde_json::json!({"proxy": "aphrodite", "version": env!("CARGO_PKG_VERSION")})) }))
         .route("/*path", any(proxy::proxy_handler))
         .layer(CorsLayer::permissive())
         .with_state(state);
