@@ -1,6 +1,8 @@
-//! aphrodite — Generic LLM proxy with CCR + tool relay.
+//! aphrodite — Multi-proxy LLM proxy with CCR + tool relay.
 //!
-//! Works with any OpenAI-compatible API.
+//! Two modes:
+//! 1. Single proxy: `aphrodite --mode cache --listen :9797 --api-key KEY`
+//! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
 use std::sync::Arc;
 use axum::{routing::{any, get, post}, Json, Router};
@@ -8,8 +10,8 @@ use clap::Parser;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use aphrodite::config::{Cli, ProxyMode};
-use aphrodite::proxy::{self, health_check, handle_tool_relay, handle_ccr_create, handle_ccr_list};
+use aphrodite::config::{Cli, MultiConfig, ProxyMode};
+use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, health_check};
 use aphrodite::retrieve;
 
 #[tokio::main]
@@ -21,8 +23,44 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .try_init()?;
 
-    let cli = Cli::parse();
+    // Try multi-proxy config first, fall back to CLI
+    let proxies: Vec<(String, Cli)> = if std::path::Path::new("aphrodite.toml").exists() {
+        let config = MultiConfig::load()?;
+        config.proxies.iter().map(|p| {
+            let cli = config.resolve(p);
+            let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
+            (name, cli)
+        }).collect()
+    } else {
+        let cli = Cli::parse();
+        let name = format!("{}", cli.listen);
+        vec![(name, cli)]
+    };
 
+    tracing::info!("starting {} proxy listener(s)", proxies.len());
+
+    let mut handles = Vec::new();
+    for (name, cli) in proxies {
+        let handle = tokio::spawn(async move {
+            if let Err(e) = run_single(name, cli).await {
+                tracing::error!(%e, "proxy listener failed");
+            }
+        });
+        handles.push(handle);
+    }
+
+    // Wait for shutdown signal
+    shutdown_signal().await;
+    tracing::info!("shutdown signal received, stopping all listeners");
+
+    for h in handles {
+        h.abort();
+    }
+
+    Ok(())
+}
+
+async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
     if let Some(parent) = cli.ccr_db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -35,58 +73,32 @@ async fn main() -> anyhow::Result<()> {
     };
 
     tracing::info!(
+        name = %name,
         listen = %cli.listen,
         mode = %mode_str,
         api_url = %cli.api_url,
         model = %cli.model,
         tool_relay = cli.tool_relay,
-        "aphrodite starting"
+        "proxy starting"
     );
 
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
-        .route("/history", get({
-            let s = state.clone();
-            move || async move { Json(s.request_history.lock().map(|v| v.clone()).unwrap_or_default()) }
-        }))
         .route("/stats", get({
             let s = state.clone();
             move || async move { Json(s.stats_json()) }
+        }))
+        .route("/history", get({
+            let s = state.clone();
+            move || async move {
+                Json(s.request_history.lock().map(|v| v.clone()).unwrap_or_default())
+            }
         }))
         .route("/retrieve", post(retrieve::handle_retrieve))
         .route("/tool/relay", post(handle_tool_relay))
         .route("/ccr/create", post(handle_ccr_create))
         .route("/ccr/list", get(handle_ccr_list))
-        .route("/debug", get({
-            let s = state.clone();
-            move || async move {
-                let stats = s.stats_json();
-                let lat = &stats["latency_buckets_us"];
-                let comp = &stats["compressions_by_type"];
-                let errs = &stats["last_errors"];
-                Json(serde_json::json!({
-                    "proxy": "aphrodite",
-                    "version": env!("CARGO_PKG_VERSION"),
-                    "mode": stats["mode"],
-                    "health": {
-                        "requests_total": stats["requests"]["total"],
-                        "requests_compressed": stats["requests"]["compressed"],
-                        "ccr_hits": stats["ccr"]["hits"],
-                        "ccr_created": stats["ccr"]["created"],
-                    },
-                    "latency": {
-                        "lt_1ms": lat[0],
-                        "lt_10ms": lat[1], 
-                        "lt_100ms": lat[2],
-                        "lt_1s": lat[3],
-                        "gt_1s": lat[4],
-                    },
-                    "compression_by_type": comp,
-                    "recent_errors": errs,
-                }))
-            }
-        }))
         .route("/*path", any(proxy::proxy_handler))
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -95,7 +107,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(addr = %listener.local_addr()?, "listening");
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(async {
+            tokio::signal::ctrl_c().await.ok();
+        })
         .await?;
 
     Ok(())
@@ -112,5 +126,4 @@ async fn shutdown_signal() {
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
     tokio::select! { _ = ctrl_c => {}, _ = terminate => {} }
-    tracing::info!("shutdown");
 }
