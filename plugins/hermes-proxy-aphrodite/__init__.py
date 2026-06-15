@@ -80,10 +80,10 @@ def _load_env():
                 if line.startswith("export "):
                     kv = line[7:].split("=", 1)
                     if len(kv) == 2:
-                        env[kv[0]] = kv[1].strip('"\').strip("'\"")
+                        env[kv[0]] = kv[1].strip('"').strip("'")
                 elif "=" in line and not line.startswith("#"):
                     kv = line.split("=", 1)
-                    env[kv[0]] = kv[1].strip('"\').strip("'\"")
+                    env[kv[0]] = kv[1].strip('"').strip("'")
     except Exception:
         pass
     return env
