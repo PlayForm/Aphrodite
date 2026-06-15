@@ -1,45 +1,32 @@
 [package]
 name = "aphrodite"
-version = "0.2.0"
-edition = "2021"
-rust-version = "1.80"
-description = "Headroom proxy — cache + token modes with CCR, tool relay, and programmatic CCR for Hermes agent integration."
+version = "0.3.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "aphrodite: Chat Completions proxy with CCR, tool relay, and programmatic CCR for Hermes agent integration."
 
 [[bin]]
 name = "aphrodite"
 path = "src/main.rs"
 
 [dependencies]
-# Headroom core — CCR types, compression, SQLite store
-headroom-core = { path = "/Volumes/CORSAIR/Developer/macOS/Application/PlayForm/HermesCompress/Documentation/Module/headroom/crates/headroom-core" }
-
-# HTTP server
+headroom-core = { path = "../../vendor/headroom/crates/headroom-core" }
 axum = { version = "0.7", features = ["macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "io-util", "time"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "request-id", "cors"] }
-
-# HTTP client (forwarding to DeepSeek)
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
-
-# CLI
 clap = { version = "4", features = ["derive", "env"] }
-
-# Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-# Logging
-tracing = "0.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "fmt"] }
 tracing-appender = "0.2"
-
-# Error handling
 anyhow = "1"
-thiserror = "1"
-
-# Utilities
-bytes = "1"
+thiserror = { workspace = true }
+bytes = { workspace = true }
 futures = "0.3"
 futures-util = "0.3"
 url = "2"
