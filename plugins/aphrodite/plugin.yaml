@@ -1,6 +1,6 @@
 name: aphrodite
-version: 1.11.0
-description: "CCR compression plugin - aphrodite tools, stripped non-coding integrations, latency tracking."
+version: 1.12.0
+description: "CCR compression plugin - deque LRU perf, stripped non-coding integrations, latency tracking."
 kind: plugin
 provides_hooks:
   - on_session_start
@@ -15,7 +15,7 @@ provides_tools:
   - aphrodite_rebuild
 provides_context_engine: true
 install_message: |
-  aphrodite v1.11.0 - stripped non-coding integrations, latency tracking, aphrodite_* tools.
+  aphrodite v1.12.0 - deque LRU perf, stripped non-coding integrations, latency tracking.
   Activate: hermes config set context.engine aphrodite
   Debug: APHRODITE_DEBUG=1 hermes ...
   Tools: aphrodite_retrieve, aphrodite_compress, aphrodite_stats, aphrodite_rebuild
