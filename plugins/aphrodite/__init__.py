@@ -15,6 +15,12 @@ BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
 _log = logging.getLogger("aphrodite")
+# Dev mode: skip all proxy routing — use cargo watch instead
+_DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
+if _DEV:
+    _log_placeholder = _log
+    _log_placeholder.warning("aphrodite DEV MODE — plugin disabled, use cargo watch for proxies")
+
 
 
 def _detect_platform() -> str:
@@ -218,6 +224,7 @@ def _transform_tool_result(
     if not result or not isinstance(result, str) or not result.strip():
         return result
 
+    if _DEV: return result  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
     if not token_alive and not cache_alive:
@@ -285,6 +292,7 @@ def _store_conversation_turn(api_messages=None, response=None, turn_number=0, **
     if not api_messages or response is None:
         return
 
+    if _DEV: return result  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
     if not token_alive and not cache_alive:
@@ -327,10 +335,12 @@ def _store_conversation_turn(api_messages=None, response=None, turn_number=0, **
 
 def _pre_llm_hook(api_messages=None, response=None, **kwargs):
     """Before LLM call: compress old messages, inject content map + memory index."""
+    if _DEV: return  # dev mode: skip
     if not api_messages or not isinstance(api_messages, list):
         return
 
     # ── 1. Offload old messages to CCR ──────────────────────────
+    if _DEV: return result  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
     cache_alive = _alive(PORTS["cache"])
     target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
@@ -399,6 +409,7 @@ def _fmt_size(b):
 
 def _transform_terminal_hook(command="", stdout="", stderr="", exit_code=0, **kwargs):
     """Compress terminal output via CCR on-the-fly."""
+    if _DEV: return stdout  # dev mode: passthrough
     if not _alive(PORTS["token"]) and not _alive(PORTS["cache"]):
         return stdout  # no proxy, pass through
 
