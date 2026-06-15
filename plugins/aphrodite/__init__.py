@@ -17,8 +17,8 @@ import os, subprocess, urllib.request, time, logging, platform, stat, re, json, 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.25"          # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.34.0"        # plugin version
+BIN_VERSION = "v0.5.26"          # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.35.0"        # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -358,8 +358,11 @@ def _compress_handler(args=None, **kwargs):
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())
+        h = result.get("hash")
+        if h:
+            _inline_store[h] = content  # mirror in inline store for aphrodite_search
         return json.dumps({
-            "hash": result.get("hash"),
+            "hash": h,
             "type": type_hint,
             "size": len(content),
             "compression_ratio": result.get("compression_ratio")
@@ -375,7 +378,7 @@ COMPRESS_SCHEMA = {
         "type": "object",
         "properties": {
             "content": {"type": "string", "description": "Content to compress and store in CCR"},
-            "type": {"type": "string", "description": "Optional: content type hint — code, log, diff, error, json, build_output, text"}
+            "type": {"type": "string", "description": "Optional: content type hint - code, log, diff, error, json, build_output, text"}
         },
         "required": ["content"]
     }
@@ -453,9 +456,10 @@ def _transform_tool_result(
             _recent_markers.append({'hash': h, 'type': 'tool', 'size': result_len, 'preview': preview})
             if len(_recent_markers) > 200:
                 _recent_markers.pop(0)
+            _inline_store[h] = result  # mirror for aphrodite_search
             return _ccr_marker(h, "tool", result_len, label, preview)
         elif DEBUG_LOGGING:
-            _log.debug("transform_tool_result: PROXY FAIL %s — proxy returned no hash", tool_name[:40])
+            _log.debug("transform_tool_result: PROXY FAIL %s - proxy returned no hash", tool_name[:40])
     
     # Fallback: inline compression (works without proxy)
     if result_len >= INLINE_THRESHOLD:
@@ -801,7 +805,7 @@ def _extract_preview(marker, conversation_history):
 
 def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     """Compress terminal output via CCR on-the-fly. Proxy first, inline fallback.
-    Build output gets smart summarization — repeated patterns collapsed."""
+    Build output gets smart summarization - repeated patterns collapsed."""
     _t0 = time.time()
     if _DEV: return output  # dev mode: passthrough
     token_alive = _alive(PORTS["token"])
@@ -879,7 +883,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                 _log.debug("terminal_hook: CCR %s:%s size=%s ratio=%.1fx", "token" if token_alive else "cache", h, out_len, ratio)
             return f'<<<CCR:{h}|terminal|{out_len}>>> {preview}…(use aphrodite_retrieve)'
         elif DEBUG_LOGGING:
-            _log.debug("terminal_hook: PROXY FAIL — returned no hash (cmd: %s)", command[:60])
+            _log.debug("terminal_hook: PROXY FAIL - returned no hash (cmd: %s)", command[:60])
     
     # Fallback: inline compression
     if out_len >= INLINE_THRESHOLD:
@@ -999,7 +1003,7 @@ FILES_SCHEMA = {
 }
 
 def _diff_handler(args=None, **kwargs):
-    """Show conversation turn diffs — what was discussed in recent turns."""
+    """Show conversation turn diffs - what was discussed in recent turns."""
     if not _conv_index:
         return json.dumps({"turns": 0, "hint": "No turn history yet"})
     turns = []
@@ -1010,7 +1014,7 @@ def _diff_handler(args=None, **kwargs):
 
 DIFF_SCHEMA = {
     "name": "aphrodite_diff",
-    "description": "Show conversation turn history — what was discussed, compressed, and stored across turns. Use to understand context evolution.",
+    "description": "Show conversation turn history - what was discussed, compressed, and stored across turns. Use to understand context evolution.",
     "parameters": {"type": "object", "properties": {}}
 }
 
@@ -1053,7 +1057,7 @@ def _search_handler(args=None, **kwargs):
 
 SEARCH_SCHEMA = {
     "name": "aphrodite_search",
-    "description": "Search across CCR entries — find compressed content by keyword or type. Use to locate previously compressed context without knowing the hash.",
+    "description": "Search across CCR entries - find compressed content by keyword or type. Use to locate previously compressed context without knowing the hash.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -1124,8 +1128,8 @@ def register(ctx):
         except Exception as e:
             _log.debug("context engine registration skipped: %s", e)
     else:
-        _log.info("context engine not registered — set APHRODITE_CONTEXT_ENGINE=1 to enable")
-    _log.info("aphrodite v%s registered — %d tools + hooks", PLUGIN_VERSION, 6)
+        _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
+    _log.info("aphrodite v%s registered - %d tools + hooks", PLUGIN_VERSION, 6)
 
 
 # ── Context Engine (plugs into Hermes compress() pipeline) ─────
@@ -1202,7 +1206,7 @@ class AphroditeContextEngine(ContextEngine):
         if self.threshold_percent == 0:
             return False  # disabled
         if not prompt_tokens or not self.context_length:
-            return False  # can't calculate — don't compress blindly
+            return False  # can't calculate - don't compress blindly
         pct = (prompt_tokens / self.context_length) * 100
         return pct >= self.threshold_percent
 
@@ -1252,7 +1256,7 @@ class AphroditeContextEngine(ContextEngine):
         if len(middle) < 3:
             return messages  # too few to compress
 
-        # Pack middle messages (no truncation — content already CCR-marked by hooks)
+        # Pack middle messages (no truncation - content already CCR-marked by hooks)
         packed = json.dumps([{
             "role": m.get("role", ""),
             "content": str(m.get("content", "")),  # full content, not [:2000]
