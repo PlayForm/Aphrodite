@@ -46,7 +46,7 @@ from ._core import (
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
-from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers, _parse_errors
+from ._marker import _ccr_marker, _classify_content, _compress_via_proxy, _parse_ccr_markers, _parse_errors
 from ._proxy import (
     _alive,
     _alive_cache,
@@ -76,8 +76,9 @@ __all__ = [
     "_pre_llm_hook", "_store_conversation_turn",
     "_rebuild_handler", "_stats_handler", "_files_handler",
     "_diff_handler", "_search_handler", "_test_handler", "_catalog_handler",
+    "_aphrodite_reclassify_handler",
     "REBUILD_SCHEMA", "STATS_SCHEMA", "FILES_SCHEMA", "DIFF_SCHEMA",
-    "SEARCH_SCHEMA", "TEST_SCHEMA", "CATALOG_SCHEMA",
+    "SEARCH_SCHEMA", "TEST_SCHEMA", "CATALOG_SCHEMA", "RECLASSIFY_SCHEMA",
 ]
 
 # ── Module-level frozenset constants ───────────────────────────
@@ -599,6 +600,36 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             len(markers),
             ctx_len,
             _fmt_size(total_bytes),
+        )
+
+    # ── 1.4 Auto-classify new entries lacking metadata ──────────
+    # For any marker without a non-empty ``meta`` field, attempt to
+    # classify its content retroactively. This enriches old entries
+    # that were created before structured metadata was introduced.
+    # Only processes markers accessible via inline store (fast path);
+    # proxy-resolved classification is opt-in via aphrodite_reclassify.
+    classified_this_turn = 0
+    for m in _recent_markers:
+        if m.get("meta") and m["meta"] != {}:
+            continue
+        h = m.get("hash", "")
+        if not h:
+            continue
+        h_bare = h[2:] if h.startswith("i:") else h
+        content = _inline_store.get(h_bare)
+        if content is None:
+            continue
+        try:
+            klass = _classify_content(content)
+            m["meta"] = klass
+            classified_this_turn += 1
+        except Exception:
+            if DEBUG_LOGGING:
+                _log.debug("pre_llm_hook: auto-classify failed for %s", h[:12])
+    if classified_this_turn and DEBUG_LOGGING:
+        _log.debug(
+            "pre_llm_hook: auto-classified %d entries lacking metadata",
+            classified_this_turn,
         )
 
     # ── 1.5 Auto-expand small tool CCR markers ──────────────────
@@ -1548,6 +1579,108 @@ SEARCH_SCHEMA = {
         "required": ["query"],
     },
 }
+
+RECLASSIFY_SCHEMA = {
+    "name": "aphrodite_reclassify",
+    "description": "Retroactively classify/metadata-enrich all CCR entries lacking structured metadata. Scans _recent_markers, retrieves content, runs _classify_content, writes meta field. Safe, non-destructive, never modifies original content.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "hash": {"type": "string", "description": "Optional: reclassify a single CCR entry by hash. If omitted (or action='all'), reclassifies all entries lacking meta."},
+            "action": {"type": "string", "description": "Set to 'all' to reclassify all entries lacking meta. Ignored if hash is provided.", "default": "all"},
+        },
+        "required": [],
+    },
+}
+
+
+def _aphrodite_reclassify_handler(args=None, **kwargs):
+    """Retroactively enrich all CCR entries with structured metadata.
+
+    For each entry in _recent_markers that lacks a non-empty ``meta`` dict,
+    retrieve the original content and run ``_classify_content`` on it, then
+    write the result to the entry's ``meta`` field.
+
+    Non-destructive: only adds the ``meta`` field, never removes or alters
+    existing fields. Skips entries where content cannot be retrieved.
+
+    Returns JSON with classification stats.
+    """
+    import time
+
+    args = args if isinstance(args, dict) else {}
+    from ._marker import _classify_content
+    from ._resolve import _resolve_one
+    target_hash = args.get("hash", "").strip()
+    action = args.get("action", "all")
+
+    # Build candidates: either a single hash or all entries lacking meta
+    if target_hash:
+        candidates = [m for m in _recent_markers if m.get("hash") == target_hash]
+        if not candidates:
+            return json.dumps({"error": f"hash not found: {target_hash}", "reclassified": 0})
+    elif action == "all":
+        candidates = [m for m in _recent_markers if not m.get("meta") or m["meta"] == {}]
+    else:
+        return json.dumps({"error": f"unknown action: {action}", "reclassified": 0})
+
+    if not candidates:
+        return json.dumps({"reclassified": 0, "type_distribution": {}, "note": "all entries already have metadata"})
+
+    type_counts = {}
+    reclassified = 0
+    skipped_no_content = 0
+    errors = 0
+    t0 = time.time()
+
+    for m in candidates:
+        h = m.get("hash", "")
+        if not h:
+            continue
+        if m.get("meta") and m["meta"] != {}:
+            continue
+
+        # Retrieve content - inline store first, then proxy
+        content = None
+        h_bare = h[2:] if h.startswith("i:") else h
+        if h_bare in _inline_store:
+            content = _inline_store[h_bare]
+        else:
+            with contextlib.suppress(Exception):
+                content = _resolve_one(h, timeout=2)
+
+        if content is None:
+            skipped_no_content += 1
+            continue
+
+        try:
+            klass = _classify_content(content)
+            if not m.get("meta") or m["meta"] == {}:
+                m["meta"] = klass
+            ctype = klass.get("type", "text")
+            type_counts[ctype] = type_counts.get(ctype, 0) + 1
+            reclassified += 1
+        except Exception:
+            errors += 1
+            continue
+
+    elapsed = time.time() - t0
+    total_with_meta = sum(1 for m in _recent_markers if m.get("meta") and m["meta"] != {})
+
+    return json.dumps(
+        {
+            "reclassified": reclassified,
+            "skipped_no_content": skipped_no_content,
+            "errors": errors,
+            "elapsed_ms": round(elapsed * 1000, 1),
+            "total_with_meta": total_with_meta,
+            "total_entries": len(_recent_markers),
+            "type_distribution": dict(sorted(type_counts.items())),
+            "note": f"{reclassified} entries enriched with retroactive metadata",
+        },
+        indent=2,
+    )
+
 
 
 

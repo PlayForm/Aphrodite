@@ -76,9 +76,11 @@ from ._hooks import (
     DIFF_SCHEMA,
     FILES_SCHEMA,
     REBUILD_SCHEMA,
+    RECLASSIFY_SCHEMA,
     SEARCH_SCHEMA,
     STATS_SCHEMA,
     TEST_SCHEMA,
+    _aphrodite_reclassify_handler,
     _catalog_handler,
     _diff_handler,
     _extract_preview,
@@ -133,6 +135,7 @@ def register(ctx):
     ctx.register_tool(name="aphrodite_search", schema=SEARCH_SCHEMA, handler=_search_handler, toolset="aphrodite")
     ctx.register_tool(name="aphrodite_test", schema=TEST_SCHEMA, handler=_test_handler, toolset="aphrodite")
     ctx.register_tool(name="aphrodite_catalog", schema=CATALOG_SCHEMA, handler=_catalog_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_reclassify", schema=RECLASSIFY_SCHEMA, handler=_aphrodite_reclassify_handler, toolset="aphrodite")
 
     engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
     if engine_configured:
@@ -159,7 +162,7 @@ def register(ctx):
     for _name, _desc in _skills:
         ctx.register_skill(_name, _skills_dir / _name / "SKILL.md", _desc)
 
-    _log.info("aphrodite v%s registered - 9 tools + 3 skills + hooks", PLUGIN_VERSION)
+    _log.info("aphrodite v%s registered - 10 tools + 3 skills + hooks", PLUGIN_VERSION)
 
     if DEBUG_LOGGING:
         lines = [
@@ -169,7 +172,7 @@ def register(ctx):
             f"  Thresholds: terminal={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_token={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE}",
             f"  Engine: threshold={ENGINE_THRESHOLD_PCT}% protect={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min_msgs={ENGINE_MIN_MSGS}",
             f"  CCR: regex={_CCR_RE.pattern} depth={RECURSIVE_DEPTH}",
-            "  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog",
+            "  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog, reclassify",
             f"  Catalog mode: {CATALOG_MODE} (APHRODITE_CATALOG=full|compact|tool)",
             "  Proxies: cache=:9797 token=:9798 | waiting for session_start...",
             "=" * 60,

@@ -50,6 +50,133 @@ def _put_conn(port: int) -> None:
             del _tls.conn_ts[port]
 
 
+def _classify_content(content: str) -> dict:
+    """Classify content into structured metadata dict.
+
+    Detects content type from content structure and extracts relevant metadata,
+    mirroring the logic in _extract_tool_metadata but working from raw content
+    alone (no tool name/args context). Safe, best-effort, never throws.
+
+    Returns dict with at minimum {"type": "<detected_type>"} plus type-specific
+    keys. Returns {"type": "text", "ln": N} for unrecognised content.
+    """
+    try:
+        if not content or not isinstance(content, str):
+            return {"type": "text", "ln": 0}
+        lines = content.splitlines()
+        ln = len(lines)
+        trimmed = content[:5000]  # only analyse first 5KB for classification
+
+        # ── diff content ──────────────────────────────────────────
+        if trimmed.startswith("diff --git") or trimmed.startswith("---"):
+            meta = {"type": "diff", "ln": str(ln)}
+            for line in lines[:10]:
+                m = re.match(r"^\+\+\+ b/(.+)$", line)
+                if m:
+                    meta["fn"] = m.group(1)
+                    break
+            return meta
+
+        # ── Rust build errors ──────────────────────────────────────
+        if "error[E" in trimmed:
+            meta = {"type": "build_error", "ln": str(ln)}
+            for line in lines[:20]:
+                m = re.match(r"error\[(E\d+)\]", line)
+                if m:
+                    meta["code"] = m.group(1)
+                    break
+                m = re.match(r" --> (.+:\d+:\d+)", line)
+                if m and "loc" not in meta:
+                    meta["loc"] = m.group(1)
+            return meta
+
+        # ── JSON content ──────────────────────────────────────────
+        stripped = trimmed.strip()
+        if stripped.startswith("{") or stripped.startswith("["):
+            try:
+                data = json.loads(stripped)
+                if isinstance(data, dict):
+                    # search_results pattern
+                    if "total_count" in data:
+                        meta = {"type": "search_results"}
+                        if "query" in data:
+                            meta["q"] = str(data["query"])[:40]
+                        meta["total"] = str(data["total_count"])
+                        return meta
+                    # process_output (session-based)
+                    if "session_id" in data:
+                        meta = {"type": "process_output"}
+                        meta["pid"] = str(data.get("pid", data.get("process_id", "?")))
+                        if "uptime" in data:
+                            meta["uptime"] = str(data["uptime"])
+                        return meta
+                    # terminal-like output with exit_code
+                    if "exit_code" in data or "output" in data:
+                        meta = {"type": "terminal"}
+                        if "exit_code" in data:
+                            meta["exit"] = str(data["exit_code"])
+                        if "output" in data and isinstance(data["output"], str):
+                            last = data["output"].splitlines()
+                            if last:
+                                meta["last"] = last[-1][:60]
+                        return meta
+                    # search_files (matches key)
+                    if "matches" in data:
+                        meta = {"type": "search_files"}
+                        meta["files"] = str(len(data["matches"])) if isinstance(data["matches"], (list, tuple)) else str(data["matches"])
+                        if "query" in data:
+                            meta["q"] = str(data["query"])[:40]
+                        return meta
+                    # Fallback JSON: extract top-level keys
+                    keys = list(data.keys())[:8]
+                    meta = {"type": "json", "ln": str(ln)}
+                    if keys:
+                        meta["keys"] = ",".join(keys)
+                    return meta
+                elif isinstance(data, list):
+                    return {"type": "json_list", "ln": str(ln), "len": str(len(data))}
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # ── Terminal output (exit code pattern) ──
+        for line in lines[-5:]:
+            m = re.match(r"exit code[\s:]+(\d+)", line.strip(), re.IGNORECASE)
+            if m:
+                last_line = ""
+                for l2 in lines:
+                    s = l2.strip()
+                    if s:
+                        last_line = s
+                meta = {"type": "terminal", "exit": m.group(1)}
+                if last_line:
+                    meta["last"] = last_line[:60]
+                for l2 in lines[:3]:
+                    if l2.strip().startswith("$") or l2.strip().startswith(">"):
+                        meta["cmd"] = l2.strip()[:40]
+                        break
+                return meta
+
+        # ── Search output (file:line: text pattern) ───────────────
+        file_line_count = 0
+        for line in lines[:200]:
+            if re.match(r"^[^\s]+:\d+:", line):
+                file_line_count += 1
+        if file_line_count > 3 and file_line_count > ln * 0.3:
+            return {"type": "search_files", "files": str(file_line_count), "ln": str(ln)}
+
+        # ── Tabular/structured output ─────────────────────────────
+        pipe_count = sum(1 for line in lines[:50] if "|" in line)
+        if pipe_count >= 3 and pipe_count > ln * 0.2:
+            return {"type": "tabular", "rows": str(pipe_count), "ln": str(ln)}
+
+        # ── Fallback: text ────────────────────────────────────────
+        return {"type": "text", "ln": str(ln)}
+    except Exception:
+        if logging.getLogger("aphrodite").isEnabledFor(logging.DEBUG):
+            logging.getLogger("aphrodite").debug("_classify_content: failed for %d-char content", len(content) if isinstance(content, str) else 0)
+        return {"type": "text", "ln": str(len(content.splitlines())) if isinstance(content, str) else 0}
+
+
 def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None, meta=None):
     """Build a standard CCR marker string.
 
