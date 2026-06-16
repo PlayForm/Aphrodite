@@ -36,7 +36,7 @@ def _compress_via_proxy(content, target_port):
 
 
 def _parse_ccr_markers(text):
-    """Parse <<<CCR:hash|type|size|mode>>> markers from text. Returns list of dicts."""
+    """Parse <<<CCR:hash|type|size|mode>>> markers from text. Returns list of dicts with preview."""
     markers = []
     for match in _CCR_RE.finditer(text):
         m = match.group(1)
@@ -44,11 +44,23 @@ def _parse_ccr_markers(text):
         if len(parts) >= 3:
             try:
                 sz = int(parts[2])
-                marker = {"hash": parts[0], "type": parts[1], "size": sz}
-                if len(parts) >= 4:
-                    marker["mode"] = parts[3]
-                markers.append(marker)
-            except (ValueError, IndexError):
-                marker_text = match.group(0)[:100]
-                _log.warning("Malformed CCR marker ignored: %r", marker_text)
-    return markers
+                # Extract preview text after the >>> terminator
+                marker_end = match.end()  # position right after >>>
+                preview = text[marker_end:].strip()[:200] if marker_end < len(text) else ""
+                markers.append(
+                    {
+                        "hash": str(parts[0]) if parts[0] else "",
+                        "type": str(parts[1]),
+                        "size": sz,
+                        "mode": str(parts[3]) if len(parts) > 3 else "?",
+                        "preview": preview,
+                    }
+                )
+            except ValueError:
+                _log.debug("_parse_ccr_markers: malformed marker skipped in %d-char text", len(text) if isinstance(text, str) else 0)
+    # Filter: real CCR hashes are hex (0-9,a-f), >=8 chars
+    return [
+        m
+        for m in markers
+        if m["hash"] and len(m["hash"]) >= 8 and all(c in "0123456789abcdef" for c in m["hash"].lower())
+    ]

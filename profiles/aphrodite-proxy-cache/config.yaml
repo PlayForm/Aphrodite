@@ -25,7 +25,14 @@ compression:
   threshold: 0.0
 toolsets: '["hermes-cli", "aphrodite"]'
 agent:
+  show_tool_calls: true
   default_skills:
   - plan-then-delegate
   - execution-blocks
   - aphrodite-dev-workflow
+display:
+  compact: false
+  streaming: true
+  show_reasoning: true
+logging:
+  level: DEBUG

@@ -862,6 +862,36 @@ pub async fn handle_ccr_delete(
 
 // ── Health check ────────────────────────────────────────────────────
 
+pub async fn handle_stats_db(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let mode = match state.mode {
+        ProxyMode::Cache => "cache",
+        ProxyMode::Token => "token",
+    };
+    match &state.ccr {
+        Some(ccr) => {
+            match ccr.stats_db() {
+                Some(stats) => Json(stats).into_response(),
+                None => (
+                    StatusCode::OK,
+                    Json(serde_json::json!({
+                        "error": "stats_db not available for this backend",
+                        "mode": mode,
+                    }))
+                ).into_response(),
+            }
+        }
+        None => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "error": "CCR not enabled",
+                "mode": mode,
+            }))
+        ).into_response(),
+    }
+}
+
 pub async fn health_check(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
