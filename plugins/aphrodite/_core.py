@@ -8,8 +8,8 @@ from collections import OrderedDict
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.60"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.6"  # plugin version
+BIN_VERSION = "v0.5.61"  # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.62.7"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -32,9 +32,16 @@ TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 1024)
 TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 8192)
 TERMINAL_THRESHOLD = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 2048)
 INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
+# HEADROOM_SSE_BUFFER_MAX_BYTES check: if set, bump INLINE_THRESHOLD to 1MB
+# so headroom's SSE buffer isn't overwhelmed by small inline compressions
+if os.environ.get("HEADROOM_SSE_BUFFER_MAX_BYTES"):
+    INLINE_THRESHOLD = 1_048_576
 RECURSIVE_DEPTH = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
 DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
 CATALOG_MODE = os.environ.get("APHRODITE_CATALOG", "compact")
+
+# Big-payload guard: skip compression entirely for payloads exceeding this
+MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)  # 100MB default
 
 _DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 
@@ -57,7 +64,7 @@ if DEBUG_LOGGING:
     )
 
 # ── CCR regex (shared) ───────────────────────────────────────
-_CCR_RE = re.compile(r"<<<CCR:([^>]{1,100})>>>")
+_CCR_RE = re.compile(r'(?:\[|<<<)CCR:([^|\]>]+)(?:[^\]>]*)?(?:\]|>>>)')
 
 # ── Inline compression store (session-scoped) ─────────────────
 _inline_store = OrderedDict()

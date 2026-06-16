@@ -10,14 +10,26 @@ from ._core import _CCR_RE
 _log = logging.getLogger("aphrodite")
 
 
-def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
-    """Build a standard CCR marker string."""
+def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headers=None):
+    """Build a standard CCR marker string.
+
+    Args:
+        hash_val: CCR hash string.
+        ccr_type: Type label (tool, terminal, etc.).
+        size: Original size in bytes.
+        mode: Proxy mode (token, cache, inline, etc.).
+        preview: Optional text preview (base64-encoded).
+        headers: Optional dict of extra key=value pairs embedded in the marker.
+    """
     parts = [hash_val, ccr_type, str(size)]
     if mode:
         parts.append(mode)
     if preview:
         preview_b64 = base64.urlsafe_b64encode(preview.encode()).decode()
         parts.append(f"preview={preview_b64}")
+    if headers:
+        for k, v in headers.items():
+            parts.append(f"{k}={v}")
     return f"<<<CCR:{'|'.join(parts)}>>>"
 
 
