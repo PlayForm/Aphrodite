@@ -17,6 +17,7 @@ Modules:
 
 On session_start: downloads binary, launches token proxy on :9798.
 """
+
 import hashlib
 import json
 import logging
@@ -29,6 +30,7 @@ from ._binary import _detect_platform, _download_binary, _ensure_binary
 from ._core import (
     _CCR_RE,
     _DEV,
+    _FILE_TOOLS,
     BIN_VERSION,
     BINARY,
     BINARY_DIR,
@@ -48,8 +50,15 @@ from ._core import (
     TOOL_THRESHOLD_CACHE,
     TOOL_THRESHOLD_TOKEN,
     _cfg_int,
+    _conv_index,
+    _fmt_size,
+    _git_cache,
+    _inline_clear,
     _inline_store,
     _log,
+    _recent_markers,
+    _referenced_files,
+    _turn_counter,
 )
 
 # ── Engine ────────────────────────────────────────────────────────
@@ -63,7 +72,6 @@ from ._engine import (
 
 # ── Hooks (contains some tools + all hook handlers) ────────────────
 from ._hooks import (
-    _FILE_TOOLS,
     CATALOG_SCHEMA,
     DIFF_SCHEMA,
     FILES_SCHEMA,
@@ -72,20 +80,14 @@ from ._hooks import (
     STATS_SCHEMA,
     TEST_SCHEMA,
     _catalog_handler,
-    _conv_index,
     _diff_handler,
     _extract_preview,
     _files_handler,
-    _fmt_size,
-    _git_cache,
     _git_summary,
     _group_into_turns,
-    _inline_clear,
     _parse_ccr_markers,
     _pre_llm_hook,
     _rebuild_handler,
-    _recent_markers,
-    _referenced_files,
     _search_handler,
     _stats_handler,
     _store_conversation_turn,
@@ -93,7 +95,6 @@ from ._hooks import (
     _track_file_refs,
     _transform_terminal_hook,
     _transform_tool_result,
-    _turn_counter,
 )
 from ._inline import _inline_compress, _inline_retrieve
 from ._marker import _ccr_marker, _compress_via_proxy
