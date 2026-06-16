@@ -118,7 +118,7 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
     Returns the fully resolved content string, or None if the hash was not
     resolved (e.g. max depth exceeded with no cached result). When a hash
     cannot be resolved from any source, the unresolved marker is preserved
-    as-is: ``<<<CCR:hash|unresolved>>>``.
+    as-is: ``[CCR_UNRESOLVED:hash]``.
 
     Use _resolve_one when you only need the raw content for a single hash and
     do NOT need to unpack nested markers."""
@@ -128,7 +128,7 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
         _visited = set()
     if hash_val in _visited:
         return resolved.get(hash_val)
-    # _visited is per-call (not persistent across invocations) — added here
+    # _visited is per-call (not persistent across invocations) - added here
     # for cycle detection only; it is NOT removed on early returns because cycles
     # are detected by the `if hash_val in _visited` guard above.
     _visited.add(hash_val)

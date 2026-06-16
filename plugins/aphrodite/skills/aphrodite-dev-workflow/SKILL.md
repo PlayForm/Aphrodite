@@ -31,6 +31,59 @@ Plugin registers 5 hooks + 7 tools. Rust proxy runs two listeners:
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 
+## Observability: Build & Compression Logging
+
+All build/compression operations write structured logs to `~/.hermes/aphrodite/build-<ts>.md`:
+
+**Format:**
+```markdown
+# Build <unix-ts>
+Started: <ISO timestamp>
+Type: release|debug|smoke-test
+Status: running|completed|failed
+
+## Operations
+- cargo build --release -p aphrodite → exit 0 (12.4s)
+- cp target/release/aphrodite ~/.hermes/aphrodite/aphrodite
+- aphrodite_rebuild() → success
+
+## Compression Stats
+- CCR entries created: 14
+- Bytes saved: 284,732
+- Health: cache=UP token=UP
+
+## Errors
+(none)
+```
+
+**Implementation in code:**
+```python
+import os, json, time
+
+def _write_build_log(ts, status, operations, errors=None):
+    log_path = os.path.expanduser(f"~/.hermes/aphrodite/build-{ts}.md")
+    lines = [
+        f"# Build {ts}",
+        f"Started: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts))}",
+        f"Status: {status}",
+        "",
+        "## Operations",
+    ]
+    for op in (operations or []):
+        lines.append(f"- {op}")
+    if errors:
+        lines.extend(["", "## Errors"])
+        for err in errors:
+            lines.append(f"- {err}")
+    with open(log_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return log_path
+```
+
+**Quiet mode:** When `QUIET=1` env var is set, skip build log writes entirely (except on failure - errors are always logged).
+
+These logs are gitignored (`~/.hermes/.gitignore` covers `aphrodite/*.md` and `aphrodite/*.log`).
+
 ## Dev Environment Setup
 
 ### Plugin Reload - NO HOT RELOAD
