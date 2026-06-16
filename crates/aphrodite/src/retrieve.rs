@@ -1,6 +1,5 @@
 //! `/retrieve` endpoint - resolve CCR markers to original content.
 
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use axum::{
@@ -122,48 +121,48 @@ pub async fn handle_retrieve(
 	}
 
 	// Apply query filter, then pagination
-	content = filter_content(&content, req.query.as_deref()).into_owned();
-	if req.limit > 0 {
-		let lines: Vec<&str> = content.lines().collect();
-		let total = lines.len();
-		if req.offset >= total {
-			return (
-				StatusCode::BAD_REQUEST,
-				Json(RetrieveResponse {
-					found: false,
-					content: Some(format!("[offset {} out of range; document has {} lines]", req.offset, total)),
-					source: "ccr".into(),
-					error: None,
-				}),
-			)
-				.into_response();
-		}
-		let start = req.offset.min(total);
-		let end = (start + req.limit).min(total);
-		content = lines[start..end].join("\n");
-		if start > 0 || end < total {
-			// Prepend range info when paginated
-			content = format!("[lines {}-{}/{}]\n{}", start + 1, end, total, content);
-		}
+	content = filter_content(&content, req.query.as_deref());
+	// Clamp limit: 0 = unlimited, max 10_000 lines for safety
+	let limit = if req.limit == 0 { 10_000 } else { req.limit.min(10_000) };
+	let lines: Vec<&str> = content.lines().collect();
+	let total = lines.len();
+	if req.offset >= total {
+		return (
+			StatusCode::BAD_REQUEST,
+			Json(RetrieveResponse {
+				found: false,
+				content: Some(format!("[offset {} out of range; document has {} lines]", req.offset, total)),
+				source: "ccr".into(),
+				error: None,
+			}),
+		)
+			.into_response();
+	}
+	let start = req.offset.min(total);
+	let end = (start + limit).min(total);
+	content = lines[start..end].join("\n");
+	if start > 0 || end < total {
+		content = format!("[lines {}-{}/{}]\n{}", start + 1, end, total, content);
 	}
 
 	Json(RetrieveResponse { found: true, content: Some(content), source: "ccr".into(), error: None }).into_response()
 }
 
-fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
+fn filter_content(content: &str, query: Option<&str>) -> String {
 	match query {
 		Some(q) if !q.is_empty() => {
+			let q_lower = q.to_ascii_lowercase();
 			let q = if q.len() > 512 { &q[..512] } else { q };
 			let filtered: Vec<&str> = content
 				.lines()
-				.filter(|line| line.to_lowercase().contains(&q.to_lowercase()))
+				.filter(|line| line.to_ascii_lowercase().contains(&q_lower))
 				.collect();
 			if filtered.is_empty() {
-				Cow::Owned(format!("[no lines matching {:?} in {} lines]", q, content.lines().count()))
+				format!("[no lines matching {:?} in {} lines]", q, content.lines().count())
 			} else {
-				Cow::Owned(filtered.join("\n"))
+				filtered.join("\n")
 			}
 		},
-		_ => Cow::Borrowed(content),
+		_ => content.to_string(),
 	}
 }
