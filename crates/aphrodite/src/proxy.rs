@@ -1422,10 +1422,41 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 		.to_string()
 }
 
-/// Create a standard CCR marker the LLM can parse to decide retrieval.
+// ── CCR output template (editable) ────────────────────────────────
+///
+/// Edit this function to change the layout the LLM sees when content
+/// is compressed. Three-line format by default: preview, structure, marker.
+fn format_ccr_output(preview: &str, ct: &str, metadata: &str, hash: &str, size: usize) -> String {
+	format!("{preview}\n[{ct}: {metadata}]\n<<<CCR:{hash}|{ct}|{size}>>>")
+}
+
+/// Create a CCR marker with preview and structure for the LLM.
+///
+/// Uses [`format_ccr_output`] for the output layout. The LLM reads the
+/// preview + structure first, then decides whether to call
+/// aphrodite_retrieve for the full content.
 fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
 	let size = content.len();
-	format!("<<<CCR:{}|{}|{}|{}>>>", hash, ct, size, generate_metadata(content, ct))
+	let metadata = generate_metadata(content, ct);
+
+	// Preview: first line of content, ~250 chars
+	let preview: String = content
+		.lines()
+		.next()
+		.unwrap_or("")
+		.chars()
+		.take(250)
+		.collect();
+
+	format_ccr_output(&preview, ct, &metadata, hash, size)
+}
+
+/// Cache-mode CCR output — preview + marker, same template.
+fn cache_marker(hash: &str, content: &str, ct: &str) -> String {
+	let size = content.len();
+	// Cache mode: show first ~512 chars as preview (more generous — cache has no persistence)
+	let preview: String = content.chars().take(512).collect();
+	format_ccr_output(&preview, ct, "", hash, size)
 }
 
 /// Compress a Chat Completions API response with smart markers.
@@ -1481,14 +1512,7 @@ async fn compress_chat_completion(
 						let (compressed, orig_len) = {
 							let compressed = match state.mode {
 								ProxyMode::Cache => {
-									let boundary = content
-										.char_indices()
-										.take_while(|(i, _)| *i < 512)
-										.last()
-										.map(|(i, c)| i + c.len_utf8())
-										.unwrap_or(0);
-									let preview = &content[..boundary];
-									format!("<<<CCR:{}|{}|{}>>>\n{}", hash, ct, content.len(), preview)
+									cache_marker(&hash, content, ct)
 								},
 								ProxyMode::Token => smart_marker(&hash, content, ct),
 							};

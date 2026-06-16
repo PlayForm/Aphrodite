@@ -178,23 +178,22 @@ def _classify_content(content: str) -> dict:
 
 
 def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None, meta=None):
-    """Build a standard CCR marker string.
+    """Build a CCR output block: preview, structure, marker — each on its own line.
+
+    Matches the Rust ``format_ccr_output`` layout. The LLM reads the
+    preview + structure first, then decides whether to retrieve.
 
     Args:
         hash_val: CCR hash string.
-        ccr_type: Type label (tool, terminal, etc.).
+        ccr_type: Type label (tool, terminal, code_rust, etc.).
         size: Original size in bytes.
-        mode: Proxy mode (token, cache, inline, etc.).
-        preview: Optional text preview (pipe-safe, control-char-stripped).
-        headroom_budget: If set (int or str), lower values truncate preview
-            earlier so the marker itself takes fewer tokens under tight
-            budget.  Ignored when preview is empty.
-        meta: Optional dict of structured metadata (e.g. lang, fns).
-            Serialized as JSON in a meta= segment within the marker.
+        mode: Proxy mode (token, cache, inline).
+        preview: Text preview (pipe-safe, control-char-stripped).
+        headroom_budget: If set, truncates preview under tight budget.
+        meta: Dict of structured metadata (lang, fns, structs, etc.).
     """
-    parts = [hash_val, ccr_type, str(size)]
-    if mode:
-        parts.append(mode)
+    # Line 1: preview
+    lines = []
     if preview:
         safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
         safe = "".join(c if c >= " " else " " for c in safe)
@@ -208,21 +207,28 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=N
                 elif budget < 75:
                     safe = safe[:100]
             except (ValueError, TypeError):
-                pass  # non-numeric budget, keep full preview
-        parts.append(f"preview={safe}")
+                pass
+        lines.append(safe)
+
+    # Line 2: structure summary [type: key=val; key=val]
+    meta_parts = []
     if meta:
-        # Flat pipe-delimited key=value pairs (matching Rust format)
-        meta_parts = []
         for k, v in meta.items():
             safe_v = str(v).replace("|", "/").replace("\n", " ").strip()
             if safe_v:
                 meta_parts.append(f"{k}={safe_v}")
-        meta_str = "|".join(meta_parts)
-        if len(meta_str) > 200:
-            meta_str = meta_str[:197] + "..."
-        if meta_str:
-            parts.append(meta_str)
-    return f"<<<CCR:{'|'.join(parts)}>>>"
+    meta_str = ";".join(meta_parts)
+    if len(meta_str) > 300:
+        meta_str = meta_str[:297] + "..."
+    lines.append(f"[{ccr_type}: {meta_str}]" if meta_str else f"[{ccr_type}]")
+
+    # Line 3: CCR marker
+    parts = [hash_val, ccr_type, str(size)]
+    if mode:
+        parts.append(mode)
+    lines.append(f"<<<CCR:{'|'.join(parts)}>>>")
+
+    return "\n".join(lines)
 
 
 def _compress_via_proxy(content, target_port, headers=None):
