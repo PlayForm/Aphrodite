@@ -83,12 +83,13 @@ def on_start(**kw):
         _log.error("cannot start - binary not available")
         return
     env = {**os.environ, **_load_env()}
-    for name in ("token",):
+    for name in ("cache", "token"):
         if not _alive(PORTS[name]):
             _start(name, env)
     # Retry loop for proxy readiness
-    token_ok = _wait_alive(9798, retries=10, delay=0.3)
-    _log.info("aphrodite: token=%s", "UP" if token_ok else "DOWN")
+    cache_ok = _wait_alive(PORTS["cache"], retries=10, delay=0.3)
+    token_ok = _wait_alive(PORTS["token"], retries=10, delay=0.3)
+    _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
 
 
 def _wait_alive(port, retries=10, delay=0.3):

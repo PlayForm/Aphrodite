@@ -120,15 +120,15 @@ def register(ctx):
     ctx.register_hook("post_llm_call", _store_conversation_turn)
     ctx.register_hook("transform_tool_result", _transform_tool_result)
 
-    ctx.register_tool(name="aphrodite_rebuild", schema=REBUILD_SCHEMA, handler=_rebuild_handler)
-    ctx.register_tool(name="aphrodite_compress", schema=COMPRESS_SCHEMA, handler=_compress_handler)
-    ctx.register_tool(name="aphrodite_retrieve", schema=RETRIEVE_SCHEMA, handler=_retrieve_handler)
-    ctx.register_tool(name="aphrodite_stats", schema=STATS_SCHEMA, handler=_stats_handler)
-    ctx.register_tool(name="aphrodite_files", schema=FILES_SCHEMA, handler=_files_handler)
-    ctx.register_tool(name="aphrodite_diff", schema=DIFF_SCHEMA, handler=_diff_handler)
-    ctx.register_tool(name="aphrodite_search", schema=SEARCH_SCHEMA, handler=_search_handler)
-    ctx.register_tool(name="aphrodite_test", schema=TEST_SCHEMA, handler=_test_handler)
-    ctx.register_tool(name="aphrodite_catalog", schema=CATALOG_SCHEMA, handler=_catalog_handler)
+    ctx.register_tool(name="aphrodite_rebuild", schema=REBUILD_SCHEMA, handler=_rebuild_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_compress", schema=COMPRESS_SCHEMA, handler=_compress_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_retrieve", schema=RETRIEVE_SCHEMA, handler=_retrieve_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_stats", schema=STATS_SCHEMA, handler=_stats_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_files", schema=FILES_SCHEMA, handler=_files_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_diff", schema=DIFF_SCHEMA, handler=_diff_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_search", schema=SEARCH_SCHEMA, handler=_search_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_test", schema=TEST_SCHEMA, handler=_test_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_catalog", schema=CATALOG_SCHEMA, handler=_catalog_handler, toolset="aphrodite")
 
     engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
     if engine_configured:

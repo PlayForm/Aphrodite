@@ -20,6 +20,7 @@ from ._core import (
     _referenced_files,
 )
 from ._inline import _inline_compress
+from ._marker import _ccr_marker
 from ._proxy import _alive
 
 _log = logging.getLogger("aphrodite")
@@ -88,8 +89,8 @@ class AphroditeContextEngine(ContextEngine):
             self.threshold_tokens = int(self.context_length * self.threshold_percent / 100)
 
     def should_compress(self, prompt_tokens=None):
-        if self.threshold_percent == 0:
-            return False
+        if self.threshold_percent <= 0:
+            return self.threshold_percent == -1  # -1 = always, 0 = disabled
         tokens = prompt_tokens or self.last_prompt_tokens
         if not tokens:
             return False
@@ -178,9 +179,9 @@ class AphroditeContextEngine(ContextEngine):
             except Exception:
                 return messages
 
+        ccr = _ccr_marker(hash_val, "context", size_str, mode="engine")
         marker = (
-            f"[CONTEXT COMPRESSED: {len(middle)} messages → "
-            f"CCR:{hash_val}|{size_str}]\n"
+            f"{ccr}\n"
             f"These messages were offloaded to reduce context. "
             f"Retrieve with: aphrodite_retrieve({hash_val}).\n"
             f"The {self.protect_last_n} messages below are your active context."
@@ -213,10 +214,11 @@ class AphroditeContextEngine(ContextEngine):
     def update_model(self, model="", context_length=0, base_url="", api_key="", provider="", api_mode="", **kw):
         if context_length:
             self.context_length = context_length
-            self.threshold_tokens = 1
+            self.threshold_tokens = int(context_length * self.threshold_percent / 100)
 
     def on_session_reset(self):
-        global _turn_counter
+        import aphrodite._core as _c
+
         self.last_prompt_tokens = 0
         self.last_completion_tokens = 0
         self.last_total_tokens = 0
@@ -224,7 +226,7 @@ class AphroditeContextEngine(ContextEngine):
         self.last_compression = {}
         _inline_clear()
         _conv_index.clear()
-        _turn_counter = 0
+        _c._turn_counter = 0
         _referenced_files.clear()
         _recent_markers.clear()
         _log.info("aphrodite v%s: session reset - inline store + memory cleared", PLUGIN_VERSION)
