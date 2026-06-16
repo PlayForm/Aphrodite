@@ -6,8 +6,8 @@ import logging
 import urllib.request
 
 from ._core import PORTS, _hash_alias, _inline_store, _inline_store_put
-from ._proxy import _alive
-from ._resolve import _resolve_recursive
+from ._proxy import _alive_cached
+from ._resolve import _filter_lines, _resolve_recursive
 
 _log = logging.getLogger("aphrodite")
 
@@ -22,20 +22,24 @@ def _retrieve_handler(args=None, **kwargs):
     if "|" in hash_val:
         hash_val = hash_val.split("|")[0].strip()
     query = args.get("query", "")
-    if not hash_val:
-        return '{"error": "missing hash parameter"}'
+    path = args.get("path", "").strip()
+    if not hash_val and not path:
+        return json.dumps({"error": "missing hash or path parameter"})
     try:
+        if path:
+            with open(path, "r") as f:
+                content = f.read()
+            if query:
+                content = _filter_lines(content, query)
+            return json.dumps({"content": content, "path": path, "size": len(content)})
         content = _resolve_recursive(hash_val)
         if content is not None and not content.startswith("<<<CCR:"):
             if query:
-                lines = [l for l in content.splitlines() if query.lower() in l.lower()]
-                if lines:
-                    return json.dumps({"content": "\n".join(lines), "hash": hash_val, "size": len("\n".join(lines))})
-                return json.dumps({"content": content, "hash": hash_val, "size": len(content)})
+                content = _filter_lines(content, query)
             return json.dumps({"content": content, "hash": hash_val, "size": len(content)})
-        return f'{{"error": "CCR entry not found: {hash_val}"}}'
+        return json.dumps({"error": f"CCR entry not found: {hash_val}"})
     except Exception as e:
-        return f'{{"error": "retrieve failed: {str(e)}"}}'
+        return json.dumps({"error": f"retrieve failed: {e}"})
 
 
 def _compress_handler(args=None, **kwargs):
@@ -59,12 +63,12 @@ def _compress_handler(args=None, **kwargs):
     canonical = _hash_alias.get(full_h, h)
     if canonical in _inline_store:
         return json.dumps(
-            {"hash": canonical, "type": type_hint, "size": len(content), "source": "cache_hit", "compression_ratio": None, "note": "already in store"}
+            {"hash": canonical, "type": type_hint, "size": len(content), "source": "cache_hit", "compression_ratio": 1.0, "note": "already in store"}
         )
 
     try:
         data = json.dumps({"content": content}).encode()
-        target = PORTS["token"] if _alive(PORTS["token"]) else PORTS["cache"]
+        target = PORTS["token"] if _alive_cached(PORTS["token"]) else PORTS["cache"]
         req = urllib.request.Request(
             f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/octet-stream"}
         )
@@ -74,7 +78,6 @@ def _compress_handler(args=None, **kwargs):
         if h:
             _hash_alias[full_h] = h
             _inline_store_put(h, content)  # mirror in inline store (canonical key)
-            _inline_store.move_to_end(h)
         return json.dumps(
             {"hash": h, "type": type_hint, "size": len(content), "compression_ratio": result.get("compression_ratio")}
         )
@@ -82,7 +85,6 @@ def _compress_handler(args=None, **kwargs):
         # Fallback: store inline under canonical short hash
         _hash_alias[full_h] = h
         _inline_store_put(h, content)
-        _inline_store.move_to_end(h)
         return json.dumps(
             {"hash": h, "type": type_hint, "size": len(content), "source": "inline_fallback", "compression_ratio": 0}
         )

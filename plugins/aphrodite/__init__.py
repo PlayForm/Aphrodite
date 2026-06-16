@@ -22,6 +22,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -56,11 +57,13 @@ from ._core import (
     _increment_turn,
     _inline_clear,
     _inline_store,
-    _log,
     _recent_markers,
     _referenced_files,
     _reset_turn_counter,
 )
+
+# Local logger (not re-exported from _core)
+_log = logging.getLogger("aphrodite")
 
 # ── Engine ────────────────────────────────────────────────────────
 from ._engine import (
@@ -85,7 +88,6 @@ from ._hooks import (
     _files_handler,
     _git_summary,
     _group_into_turns,
-    _parse_ccr_markers,
     _pre_llm_hook,
     _rebuild_handler,
     _search_handler,
@@ -97,7 +99,7 @@ from ._hooks import (
     _transform_tool_result,
 )
 from ._inline import _inline_compress, _inline_retrieve
-from ._marker import _ccr_marker, _compress_via_proxy
+from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
 from ._proxy import _alive, _alive_cache, _load_env, _start, _wait_alive, on_start
 from ._resolve import _resolve_one, _resolve_recursive
 
@@ -108,6 +110,10 @@ from ._tools import (
     _compress_handler,
     _retrieve_handler,
 )
+
+
+# Sync docstring version with PLUGIN_VERSION
+__doc__ = (__doc__ or "").replace("v1.61.0", f"v{PLUGIN_VERSION}")
 
 
 # ── Plugin registration ───────────────────────────────────────────
@@ -132,10 +138,15 @@ def register(ctx):
     engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
     if engine_configured:
         try:
-            ctx.register_context_engine(AphroditeContextEngine())
+            engine = AphroditeContextEngine()
+            ctx.register_context_engine(engine)
+            # Explicitly register on_session_start - Hermes may not auto-call it on engines
+            ctx.register_hook("on_session_start", engine.on_session_start)
             _log.info("aphrodite context engine registered")
         except Exception as e:
-            _log.warning("context engine registration skipped [%s]: %s", type(e).__name__, e)
+            msg = f"aphrodite context engine registration failed [{type(e).__name__}]: {e}"
+            _log.warning(msg)
+            print(msg, file=sys.stderr)
     else:
         _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
 

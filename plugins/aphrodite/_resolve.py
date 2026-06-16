@@ -1,11 +1,14 @@
 """aphrodite - CCR resolution (retrieve + recursive unpacking)."""
 
 import json
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ._core import _CCR_RE, PORTS, RECURSIVE_DEPTH, _inline_store_put
 from ._inline import _inline_retrieve
+from ._marker import _get_conn, _put_conn  # reuse keep-alive connection pool
+
+# Shared executor for concurrent proxy lookups - avoids per-call creation overhead
+_EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 
 def _filter_lines(content: str, query: str) -> str:
@@ -42,34 +45,42 @@ def _resolve_one(hash_val, timeout=4, query=""):
     payload = {"hash": hash_val}
     if query:
         payload["query"] = query
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = {}
-        for port in (PORTS["token"], PORTS["cache"]):
-            futures[executor.submit(_proxy_lookup, port, payload, timeout)] = port
-        for future in as_completed(futures):
-            try:
-                result = future.result()
-                if result is not None:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    return result
-            except Exception:
-                continue
+    futures = {}
+    for port in (PORTS["token"], PORTS["cache"]):
+        futures[_EXECUTOR.submit(_proxy_lookup, port, payload, timeout)] = port
+    for future in as_completed(futures):
+        try:
+            result = future.result()
+            if result is not None:
+                return result
+        except Exception:
+            continue
     return None
 
 
 def _proxy_lookup(port: int, payload: dict, timeout: int = 4) -> str | None:
-    """Try a single proxy port and return the content if found."""
+    """Try a single proxy port and return the content if found.
+
+    Uses thread-local keep-alive HTTP connection from _marker.py to avoid
+    TCP handshake overhead on repeated calls to the same proxy port.
+    Broken connections are evicted and recreated on the next call.
+    """
     try:
         data = json.dumps(payload).encode()
-        req = urllib.request.Request(
-            f"http://127.0.0.1:{port}/retrieve", data=data, headers={"Content-Type": "application/json"}
+        conn = _get_conn(port)
+        conn.request(
+            "POST",
+            "/retrieve",
+            body=data,
+            headers={"Content-Type": "application/json", "Connection": "keep-alive"},
         )
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            result = json.loads(r.read())
+        r = conn.getresponse()
+        result = json.loads(r.read())
+        r.close()
         if result.get("found"):
             return result["content"]
     except Exception:
-        pass
+        _put_conn(port)  # ditch broken connection, reopen fresh next time
     return None
 
 
@@ -115,6 +126,8 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
             nested_content = _resolve_recursive(nested_hash, depth + 1, resolved)
             replacements[full_marker] = nested_content
     for marker_str, replacement in replacements.items():
-        content = content.replace(marker_str, replacement, 1)
-    _inline_store_put(hash_val, content)
+        content = content.replace(marker_str, replacement)
+    # Guard re-store: skip if expanded content exceeds 512KB to avoid ballooning inline store
+    if len(content) <= 524288:
+        _inline_store_put(hash_val, content)
     return content
