@@ -2,23 +2,21 @@
 """
 Launch headroom as a standalone caching proxy for Hermes Agent.
 
-Two modes:
-    cache — response caching only (:9799), minimizes API costs
-    token — full compression + CCR (:9800)
+Modes:
+    cache       — response caching only (:9799), saves API costs
+    token       — full compression + CCR (:9800)
+    benchmark   — cache mode with max workers to saturate cache
 
 Usage:
-    python3 scripts/run-headroom-proxy.py cache
-    python3 scripts/run-headroom-proxy.py token
+    python3 scripts/run-headroom-proxy.py cache       # 1 worker, full traceability
+    python3 scripts/run-headroom-proxy.py benchmark   # 8 workers, cache saturation
 
 Auth:
-    Uses APHRODITE_API_KEY from environment (same key Hermes uses)
-    Falls back to DEEPSEEK_API_KEY, then HEADROOM_DEEPSEEK_KEY
+    source ~/.privateenvsh first (APHRODITE_API_KEY, HEADROOM_DEEPSEEK_KEY, OPENAI_API_KEY)
 
-Optimized for Hermes:
-    --openai-api-url → DeepSeek OpenAI-compatible endpoint
-    --no-subscription-tracking → removes subscription polling overhead
-    --no-optimize (cache mode) → pure caching, zero compression overhead
-    --workers 2 → balanced for local dev
+Worker guidance:
+    --workers 1   → full traceability, single worker for debugging savings
+    --workers 8   → cache saturation, benchmark mode (note CCR fragmentation warning)
 """
 import os
 import sys
@@ -42,30 +40,39 @@ def main():
     configs = {
         "cache": {
             "port": 9799,
-            "desc": "headroom-cache — response caching only (:9799)",
-            "flags": ["--no-optimize", "--no-ccr-marker"],
+            "workers": 1,
+            "desc": "headroom-cache — 1 worker, full traceability (:9799)",
+            "flags": ["--no-optimize", "--no-ccr-marker", "--no-telemetry"],
+        },
+        "benchmark": {
+            "port": 9799,
+            "workers": 8,
+            "desc": "headroom-benchmark — 8 workers, cache saturation (:9799)",
+            "flags": ["--no-optimize", "--no-ccr-marker", "--no-telemetry"],
         },
         "token": {
             "port": 9800,
+            "workers": 1,
             "desc": "headroom-token — full compression + CCR (:9800)",
-            "flags": [],
+            "flags": ["--no-telemetry"],
         },
     }
 
     if mode not in configs:
-        print(f"Usage: {sys.argv[0]} [cache|token]")
+        print(f"Usage: {sys.argv[0]} [cache|benchmark|token]")
         for m, c in configs.items():
-            print(f"  {m:<7} — {c['desc']}")
+            print(f"  {m:<11} — {c['desc']}")
         sys.exit(1)
 
     cfg = configs[mode]
     api_key = get_api_key()
     if not api_key:
-        print("ERROR: Set APHRODITE_API_KEY, DEEPSEEK_API_KEY, or HEADROOM_DEEPSEEK_KEY", file=sys.stderr)
+        print("ERROR: source ~/.privateenvsh first", file=sys.stderr)
         sys.exit(1)
 
     print(f"=== {cfg['desc']} ===")
     print(f"  Upstream: {DEEPSEEK_URL}")
+    print(f"  Workers:  {cfg['workers']}")
     print()
 
     cmd = [
@@ -74,7 +81,7 @@ def main():
         "--host", "127.0.0.1",
         "--openai-api-url", DEEPSEEK_URL,
         "--mode", "token",
-        "--workers", "2",
+        "--workers", str(cfg["workers"]),
         "--no-subscription-tracking",
         *cfg["flags"],
     ]
