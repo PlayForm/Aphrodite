@@ -5,8 +5,9 @@
 //! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
 use std::sync::Arc;
-use axum::{routing::{any, delete, get, post}, http::StatusCode, response::IntoResponse, Json, Router};
+use axum::{extract::ConnectInfo, routing::{any, delete, get, post}, http::StatusCode, response::IntoResponse, Json, Router};
 use clap::Parser;
+use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -16,11 +17,28 @@ use aphrodite::retrieve;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Try multi-proxy config first, fall back to CLI
+    let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
+    let (proxies, log_compact): (Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
+        let config = MultiConfig::load()?;
+        let proxies: Vec<(String, Cli)> = config.proxies.iter().map(|p| {
+            let cli = config.resolve(p);
+            let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
+            (name, cli)
+        }).collect();
+        let log_compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
+        (proxies, log_compact)
+    } else {
+        let cli = Cli::parse();
+        let log_compact = cli.log_compact || std::env::var("APHRODITE_LOG_COMPACT").is_ok();
+        let name = format!("{}", cli.listen);
+        (vec![(name, cli)], log_compact)
+    };
+
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info"));
-    let compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
     let subscriber = tracing_subscriber::registry().with(filter);
-    if compact {
+    if log_compact {
         subscriber
             .with(tracing_subscriber::fmt::layer().compact().with_target(false).without_time())
             .try_init()?;
@@ -29,21 +47,6 @@ async fn main() -> anyhow::Result<()> {
             .with(tracing_subscriber::fmt::layer())
             .try_init()?;
     }
-
-    // Try multi-proxy config first, fall back to CLI
-    let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
-    let proxies: Vec<(String, Cli)> = if std::path::Path::new(&config_path).exists() {
-        let config = MultiConfig::load()?;
-        config.proxies.iter().map(|p| {
-            let cli = config.resolve(p);
-            let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
-            (name, cli)
-        }).collect()
-    } else {
-        let cli = Cli::parse();
-        let name = format!("{}", cli.listen);
-        vec![(name, cli)]
-    };
 
     tracing::info!("starting {} proxy listener(s)", proxies.len());
 
@@ -61,9 +64,10 @@ async fn main() -> anyhow::Result<()> {
     shutdown_signal().await;
     tracing::info!("shutdown signal received, stopping all listeners");
 
-    for h in handles {
+    for h in &handles {
         h.abort();
     }
+    futures::future::join_all(handles).await;
 
     Ok(())
 }
@@ -94,16 +98,24 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
         .route("/health", get(health_check))
         .route("/health/upstream", get({
             let s = state.clone();
-            move || async move {
-                let ok = s.client
-                    .get(format!("{}/models", s.api_url.trim_end_matches('/')))
-                    .header("Authorization", format!("Bearer {}", s.api_key))
-                    .timeout(std::time::Duration::from_secs(5))
-                    .send()
-                    .await
-                    .map(|r| r.status().is_success())
-                    .unwrap_or(false);
-                Json(serde_json::json!({"upstream": ok}))
+            move |ConnectInfo(addr): ConnectInfo<SocketAddr>| {
+                let s = s.clone();
+                async move {
+                    if !addr.ip().is_loopback() {
+                        return (StatusCode::FORBIDDEN, Json(serde_json::json!({
+                            "error": "only loopback clients allowed"
+                        }))).into_response();
+                    }
+                    let ok = s.client
+                        .get(format!("{}/models", s.api_url.trim_end_matches('/')))
+                        .header("Authorization", format!("Bearer {}", s.api_key))
+                        .timeout(std::time::Duration::from_secs(5))
+                        .send()
+                        .await
+                        .map(|r| r.status().is_success())
+                        .unwrap_or(false);
+                    Json(serde_json::json!({"upstream": ok})).into_response()
+                }
             }
         }))
         .route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
@@ -158,6 +170,11 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
                 out.push_str(&format!("aphrodite_ccr_misses {}\n", stats["ccr"]["misses"]));
                 out.push_str(&format!("aphrodite_ccr_created {}\n", stats["ccr"]["created"]));
                 out.push_str(&format!("aphrodite_tool_relay_calls {}\n", stats["tool_relay_calls"]));
+                // LLM response cache
+                if let Some(cache) = stats["cache"].as_object() {
+                    out.push_str(&format!("aphrodite_cache_hits {}\n", cache["hits"]));
+                    out.push_str(&format!("aphrodite_cache_misses {}\n", cache["misses"]));
+                }
                 // Latency buckets
                 if let Some(buckets) = stats["latency_buckets_us"].as_array() {
                     for (i, v) in buckets.iter().enumerate() {
@@ -192,7 +209,7 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(cli.listen).await?;
     tracing::info!(addr = %listener.local_addr()?, "listening");
 
-    axum::serve(listener, app)
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 

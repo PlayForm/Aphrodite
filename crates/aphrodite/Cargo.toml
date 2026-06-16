@@ -29,13 +29,17 @@ thiserror = { workspace = true }
 bytes = { workspace = true }
 futures = "0.3"
 futures-util = "0.3"
+rand = "0.8"
+tokio-util = { version = "0.7", features = ["rt"] }
 url = "2"
 http = "1"
 http-body-util = "0.1"
 hyper = "1"
 uuid = { version = "1", features = ["v4"] }
+lru = "0.12"
 dirs = "5"
 
 chrono = { version = "0.4", features = ["serde"] }
 
 toml = "0.8"
+zstd = { version = "0.13", default-features = false }

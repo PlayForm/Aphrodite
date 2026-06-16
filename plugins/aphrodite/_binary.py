@@ -69,8 +69,10 @@ def _check_binary_version() -> bool:
     return False
 
 
-def _ensure_binary() -> bool:
+def _ensure_binary(existence_check: bool = False) -> bool:
     """Ensure the aphrodite binary exists and matches BIN_VERSION."""
+    if existence_check:
+        return bool(os.path.exists(BINARY) and os.access(BINARY, os.X_OK) and _check_binary_version())
     if os.path.exists(BINARY) and os.access(BINARY, os.X_OK):
         if _check_binary_version():
             return True
