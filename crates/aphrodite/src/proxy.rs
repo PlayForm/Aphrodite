@@ -185,6 +185,10 @@ pub struct AppState {
 	#[cfg(not(feature = "scripting"))]
 	pub script_engine: Option<()>,
 
+	/// Session-scoped hint context — LLM-injected mode switches that
+	/// affect all future CCR operations. Hints compose additively.
+	pub hint_context: crate::hints::HintContext,
+
 	// Extended metrics
 	pub inline_ccr_hits: AtomicU64,
 	pub inline_ccr_misses: AtomicU64,
@@ -511,6 +515,8 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 		}),
 		#[cfg(not(feature = "scripting"))]
 		script_engine: None,
+
+		hint_context: crate::hints::HintContext::new(),
 
 		inline_ccr_hits: AtomicU64::new(0),
 		inline_ccr_misses: AtomicU64::new(0),
@@ -1680,6 +1686,13 @@ pub async fn handle_tool_relay(
 	state.tool_relay_calls.fetch_add(1, Ordering::Relaxed);
 	tracing::info!(tool = %req.tool, "tool_relay");
 
+	// Parse _ccr_hint from LLM — session-scoped mode switch.
+	// Example: params: { _ccr_hint: "debug" } → agent enters debug mode.
+	if let Some(hint_val) = req.params.get("_ccr_hint").and_then(|v| v.as_str()) {
+		state.hint_context.parse_and_push(hint_val);
+		tracing::info!(hint = %hint_val, "ccr hint applied");
+	}
+
 	// Validate aphrodite_retrieve: hash is required. Query-only requests without
 	// hash are invalid and must return 400 BAD_REQUEST instead of silently passing through.
 	if req.tool == "aphrodite_retrieve" && req.params.get("hash").and_then(|v| v.as_str()).is_none() {
@@ -2049,6 +2062,7 @@ mod tests {
 			fill_pct: AtomicU64::new(9000),
 			task_tracker: TaskTracker::new(),
 			script_engine: None,
+			hint_context: crate::hints::HintContext::new(),
 			inline_ccr_hits: AtomicU64::new(0),
 			inline_ccr_misses: AtomicU64::new(0),
 			tool_relay_success: AtomicU64::new(0),
@@ -2158,6 +2172,7 @@ mod tests {
 			fill_pct: AtomicU64::new(9000),
 			task_tracker: TaskTracker::new(),
 			script_engine: None,
+			hint_context: crate::hints::HintContext::new(),
 			inline_ccr_hits: AtomicU64::new(0),
 			inline_ccr_misses: AtomicU64::new(0),
 			tool_relay_success: AtomicU64::new(0),

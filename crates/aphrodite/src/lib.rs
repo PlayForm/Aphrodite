@@ -88,6 +88,7 @@ pub mod config;
 pub mod proxy;
 pub mod retrieve;
 pub mod scripting;
+pub mod hints;
 
 /// Check if Rhai scripting is enabled via env var or CLI flag.
 /// Feature-gated: returns false when compiled without `scripting` feature.
