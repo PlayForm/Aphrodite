@@ -24,7 +24,7 @@ _alive_cache = {}  # {port: (result, timestamp)}
 _alive_turn_cache: dict[int, bool] = {}  # {port: bool}
 
 # ── Proxy environment keys (whitelist) ──────────────────────
-_PROXY_ENV_KEYS = {"PATH", "HOME", "APHRODITE_API_KEY"}
+_PROXY_ENV_KEYS = {"PATH", "HOME", "APHRODITE_API_KEY", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "SSL_CERT_FILE", "TMPDIR", "TMP", "TEMP"}
 
 # ── Auto-expand guidance (set by on_start after proxy launch) ──
 _expand_guidance: str = ""
@@ -122,7 +122,7 @@ def _kill(pid, timeout=0.3):
     except (OSError, ProcessLookupError, ValueError):
         return  # Already dead or bogus PID
     for sig_nr in (signal.SIGTERM, signal.SIGKILL):
-        try:
+        try:  # noqa: SIM105 — intentional kill loop, not a context manager case
             os.kill(int(pid), sig_nr)
         except Exception:
             pass
@@ -133,8 +133,15 @@ def _kill(pid, timeout=0.3):
             os.kill(int(pid), 0)
         except (OSError, ProcessLookupError):
             return  # SIGTERM worked
-    # SIGKILL sent, brief grace
-    time.sleep(0.1)
+    # SIGKILL sent — busy-wait until the process is reaped (up to 1s)
+    pid_int = int(pid)
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid_int, 0)
+        except (OSError, ProcessLookupError):
+            return  # Reaped
+        time.sleep(0.05)
 
 
 def _start(name, env):
@@ -174,11 +181,8 @@ def _start(name, env):
     # then falls back to loading .env file directly.
     key = os.environ.get("APHRODITE_API_KEY", env.get("APHRODITE_API_KEY", ""))
     if not key:
-        key = _load_env().get("APHRODITE_API_KEY", "")
-    if not key:
         _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
         return
-    # Pass API key as environment variable instead of CLI arg so it's not visible in ps aux
     env["APHRODITE_API_KEY"] = key
     mode_flag = "cache" if name == "cache" else "token"
     args = [BINARY, "--listen", f"127.0.0.1:{port}", "--mode", mode_flag, "--tool-relay"]
@@ -189,12 +193,13 @@ def _start(name, env):
         _log.warning("aphrodite %s: binary not executable at %s", name, BINARY)
         return
 
+    log_path = os.path.join(BINARY_DIR, f"proxy-{name}.log")
     try:
         proc = subprocess.Popen(
             args,
             env={k: env[k] for k in _PROXY_ENV_KEYS if k in env},
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=open(log_path, "a"),  # noqa: SIM115 — daemon needs open handle, not context manager
+            stderr=subprocess.STDOUT,
             start_new_session=True,
         )
     except Exception as e:
@@ -214,7 +219,7 @@ def _inject_expand_guidance():
     """Return auto-expand guidance string explaining that tool CCR markers are resolved inline."""
     return (
         "[APHRODITE] Tool outputs are auto-expanded - you see full content inline, "
-        "no \u00ab\u00ab\u00abCCR:...\u00bb\u00bb\u00bb markers for tool results. "
+        "no <<<CCR:...>>> markers for tool results. "
         "If you ever see a CCR marker (for context or terminal output), use "
         "aphrodite_retrieve(hash) to fetch it."
     )
@@ -231,9 +236,20 @@ def on_start(**kw):
     _alive_cache.clear()
 
     env = {**os.environ, **_load_env()}
-    for name in ("cache", "token"):
-        if not _alive(PORTS[name]):
-            _start(name, env)
+    if not env.get("APHRODITE_API_KEY"):
+        _log.warning("APHRODITE_API_KEY not found in environment - proxy won't start")
+        return
+    # Launch both proxies concurrently (skip if already alive)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        start_futs = {}
+        for name in ("cache", "token"):
+            if not _alive(PORTS[name]):
+                start_futs[name] = pool.submit(_start, name, env)
+        for name, fut in start_futs.items():
+            try:
+                fut.result()
+            except Exception as exc:
+                _log.warning("_start(%s) failed: %s", name, exc)
     # Retry loop for proxy readiness (concurrent - cuts worst-case 6s→3s)
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         cache_fut = pool.submit(_wait_alive, PORTS["cache"], retries=10, delay=0.3)

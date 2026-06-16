@@ -46,7 +46,7 @@ from ._core import (
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
 from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
-from ._proxy import _alive, _alive_cached, _alive_turn_cache, _expand_guidance
+from ._proxy import _alive, _alive_cache, _alive_cached, _alive_turn_cache, _expand_guidance
 from ._resolve import _resolve_one
 from ._tools import _compress_handler, _retrieve_handler
 
@@ -420,6 +420,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     # Refresh turn-scoped alive cache for consistent proxy state within this turn
     global _scanned_msg_idx, _last_user_msg, _catalog_injected_this_turn
+    _alive_cache.clear()  # force fresh probes — turn cache refresh below replaces them
     _alive_turn_cache.clear()
     _alive_turn_cache[PORTS["token"]] = _alive(PORTS["token"])
     _alive_turn_cache[PORTS["cache"]] = _alive(PORTS["cache"])

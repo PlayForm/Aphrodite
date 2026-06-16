@@ -1,14 +1,25 @@
 """aphrodite - CCR resolution (retrieve + recursive unpacking)."""
 
+import atexit
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
 
 from ._core import _CCR_RE, PORTS, RECURSIVE_DEPTH, _inline_store_put
 from ._inline import _inline_retrieve
 from ._marker import _get_conn, _put_conn  # reuse keep-alive connection pool
+from ._proxy import _alive_turn_cache
 
 # Shared executor for concurrent proxy lookups - avoids per-call creation overhead
-_EXECUTOR = ThreadPoolExecutor(max_workers=2)
+_EXECUTOR: ThreadPoolExecutor | None = None
+
+
+def _get_executor() -> ThreadPoolExecutor:
+    global _EXECUTOR
+    if _EXECUTOR is None:
+        _EXECUTOR = ThreadPoolExecutor(max_workers=2)
+        atexit.register(_EXECUTOR.shutdown, wait=False)
+    return _EXECUTOR
 
 
 def _filter_lines(content: str, query: str) -> str:
@@ -19,7 +30,9 @@ def _filter_lines(content: str, query: str) -> str:
     if not query:
         return content
     lines = [l for l in content.splitlines() if query.lower() in l.lower()]
-    return "\n".join(lines) if lines else content
+    if not lines:
+        return f"[aphrodite: no lines matched {query!r} \u2014 returning full content]\n{content}"
+    return "\n".join(lines)
 
 
 def _resolve_one(hash_val, timeout=4, query=""):
@@ -46,12 +59,18 @@ def _resolve_one(hash_val, timeout=4, query=""):
     if query:
         payload["query"] = query
     futures = {}
+    executor = _get_executor()
     for port in (PORTS["token"], PORTS["cache"]):
-        futures[_EXECUTOR.submit(_proxy_lookup, port, payload, timeout)] = port
-    for future in as_completed(futures):
+        if not _alive_turn_cache.get(port, True):
+            continue
+        futures[executor.submit(_proxy_lookup, port, payload, timeout)] = port
+    for future in as_completed(futures, timeout=timeout + 1):
         try:
             result = future.result()
             if result is not None:
+                for other in futures:
+                    if not other.done():
+                        other.cancel()
                 return result
         except Exception:
             continue
@@ -80,7 +99,10 @@ def _proxy_lookup(port: int, payload: dict, timeout: int = 4) -> str | None:
         if result.get("found"):
             return result["content"]
     except Exception:
-        _put_conn(port)  # ditch broken connection, reopen fresh next time
+        # _put_conn evicts/discards the broken connection (sets pool entry to
+        # None) so the next call to _get_conn opens a fresh one. Despite the
+        # name, this is a discard, not a return.
+        _put_conn(port)
     return None
 
 
@@ -106,12 +128,15 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
         _visited = set()
     if hash_val in _visited:
         return resolved.get(hash_val)
+    # _visited is per-call (not persistent across invocations) — added here
+    # for cycle detection only; it is NOT removed on early returns because cycles
+    # are detected by the `if hash_val in _visited` guard above.
     _visited.add(hash_val)
     if depth >= RECURSIVE_DEPTH or hash_val in resolved:
         return resolved.get(hash_val)
     content = _resolve_one(hash_val)
     if content is None:
-        return f"<<<CCR:{hash_val}|unresolved>>>"
+        return f"[CCR_UNRESOLVED:{hash_val}]"
     resolved[hash_val] = content
     # Use finditer to get full match strings (group(0)) plus capture groups
     nested = list(_CCR_RE.finditer(content))
@@ -131,3 +156,14 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
     if len(content) <= 524288:
         _inline_store_put(hash_val, content)
     return content
+
+
+@lru_cache(maxsize=64)
+def _cached_expand(hash_val: str) -> str | None:
+    """LRU-cached wrapper around _resolve_recursive.
+
+    Prevents re-expanding large documents on repeated requests for the same
+    hash.  Caches the fully resolved string keyed by hash only (no query),
+    so repeated calls to resolve the same hash are O(1) after the first.
+    """
+    return _resolve_recursive(hash_val)
