@@ -1,4 +1,4 @@
-//! `/retrieve` endpoint — resolve CCR markers to original content.
+//! `/retrieve` endpoint - resolve CCR markers to original content.
 
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ pub struct RetrieveRequest {
     pub hash: Option<String>,
     pub query: Option<String>,
     pub path: Option<String>,
-    /// DEPRECATED — path-based file reads disabled for security. Use hash or query instead.
+    /// DEPRECATED - path-based file reads disabled for security. Use hash or query instead.
     #[serde(default)]
     pub offset: usize,
     #[serde(default)]
@@ -78,6 +78,19 @@ pub async fn handle_retrieve(
             }
         }
     };
+
+    // Decompress zstd if magic bytes are present
+    if content.as_bytes().starts_with(&[0x28, 0xB5, 0x2F, 0xFD]) {
+        match zstd::decode_all(content.as_bytes()) {
+            Ok(decompressed) => {
+                content = String::from_utf8_lossy(&decompressed).to_string();
+                tracing::debug!("zstd-decompressed content, {}b -> {}b", content.len(), decompressed.len());
+            }
+            Err(e) => {
+                tracing::warn!("zstd decompress failed for hash content: {}", e);
+            }
+        }
+    }
 
     // Apply query filter, then pagination
     content = filter_content(&content, req.query.as_deref());

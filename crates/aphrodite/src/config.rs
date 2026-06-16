@@ -79,6 +79,10 @@ pub struct Cli {
     #[arg(long)]
     pub dev: bool,
 
+    /// Use compact log format (no timestamps, no targets)
+    #[arg(long, env = "APHRODITE_LOG_COMPACT")]
+    pub log_compact: bool,
+
     /// Upstream request timeout in seconds (default: 300)
     #[arg(long, default_value = "300")]
     pub timeout: u64,
@@ -133,23 +137,32 @@ impl MultiConfig {
         Cli {
             mode: match cfg.mode.as_deref() {
                 Some("token") => ProxyMode::Token,
-                Some("cache") | None => ProxyMode::Cache,
+                Some("cache") => ProxyMode::Cache,
+                None => {
+                    tracing::info!("no mode specified, defaulting to token");
+                    ProxyMode::Token
+                }
                 Some(other) => {
-                    tracing::warn!("unknown mode {:?}, defaulting to cache", other);
-                    ProxyMode::Cache
+                    tracing::warn!("unknown mode {:?}, defaulting to token", other);
+                    ProxyMode::Token
                 }
             },
             listen: cfg.listen.as_deref()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or_else(|| "127.0.0.1:9797".parse().unwrap()),
             api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
-            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok()).unwrap_or_default(),
+            api_key: {
+                let key: String = cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok()).unwrap_or_default();
+                if key.is_empty() {
+                    tracing::warn!("no API key configured - all upstream requests will fail");
+                }
+                key
+            },
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
             max_context: cfg.max_context.unwrap_or(1_000_000),
             max_output: cfg.max_output.unwrap_or(384_000),
             // Fall back to /tmp if dirs::data_dir() returns None (non-standard systems)
-            ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| {
-                
+            ccr_db_path: cfg.ccr_db_path.clone().filter(|s| !s.is_empty()).map(Into::into).unwrap_or_else(|| {
                 dirs::data_dir()
                     .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
                     .join("aphrodite").join("ccr.db")
@@ -160,7 +173,16 @@ impl MultiConfig {
             notify_url: cfg.notify_url.clone(),
             notify_key: cfg.notify_key.clone(),
             dev: cfg.dev.unwrap_or(false),
-            timeout: cfg.timeout.unwrap_or(300),
+            log_compact: false,
+            timeout: {
+                let t = cfg.timeout.unwrap_or(300);
+                if t > 600 {
+                    tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
+                    600
+                } else {
+                    t
+                }
+            },
         }
     }
 }
