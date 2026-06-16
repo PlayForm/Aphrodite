@@ -1430,6 +1430,67 @@ fn format_ccr_output(preview: &str, ct: &str, metadata: &str, hash: &str, size: 
 	format!("{preview}\n[{ct}: {metadata}]\n<<<CCR:{hash}|{ct}|{size}>>>")
 }
 
+/// Build a smart content-type-aware preview for the CCR output.
+///
+/// Returns the most informative excerpt based on content type:
+/// - Code: first 3 lines (imports + first signature)
+/// - Error: the actual error line, not the traceback header
+/// - Diff: first file changed
+/// - JSON: key count summary
+/// - Default: first line, ~250 chars
+fn build_preview(content: &str, ct: &str) -> String {
+	match ct {
+		"code_rust" | "code_python" | "code_go" | "code_js" | "code" => {
+			// Code: first 3 non-empty lines (imports + first signature)
+			content.lines()
+				.filter(|l| !l.trim().is_empty())
+				.take(3)
+				.collect::<Vec<_>>()
+				.join("\n")
+				.chars()
+				.take(300)
+				.collect()
+		}
+		"error" => {
+			// Error: find the actual error line, skip traceback noise
+			let err_line = content.lines()
+				.find(|l| l.contains("Error:") || l.contains("error[") || l.contains("panicked"))
+				.unwrap_or_else(|| content.lines().next().unwrap_or(""));
+			err_line.chars().take(300).collect()
+		}
+		"diff" => {
+			// Diff: show which files changed
+			let files: Vec<&str> = content.lines()
+				.filter(|l| l.starts_with("diff --git "))
+				.take(2)
+				.collect();
+			if files.is_empty() {
+				content.lines().next().unwrap_or("").chars().take(200).collect()
+			} else {
+				files.join("\n").chars().take(300).collect()
+			}
+		}
+		"json" | "tool_output" => {
+			// JSON: first line + key count
+			let first = content.lines().next().unwrap_or("");
+			let key_count = content.matches("\":").count();
+			format!("{} … {} keys", first.chars().take(150).collect::<String>(), key_count)
+		}
+		"build_output" => {
+			// Build: show status line
+			content.lines()
+				.find(|l| l.contains("Compiling") || l.contains("Finished") || l.contains("error"))
+				.unwrap_or_else(|| content.lines().next().unwrap_or(""))
+				.chars().take(250)
+				.collect()
+		}
+		_ => {
+			// Default: first line, ~250 chars
+			content.lines().next().unwrap_or("").chars().take(250).collect()
+		}
+	}
+}
+
 /// Create a CCR marker with preview and structure for the LLM.
 ///
 /// Uses [`format_ccr_output`] for the output layout. The LLM reads the
@@ -1438,16 +1499,7 @@ fn format_ccr_output(preview: &str, ct: &str, metadata: &str, hash: &str, size: 
 fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
 	let size = content.len();
 	let metadata = generate_metadata(content, ct);
-
-	// Preview: first line of content, ~250 chars
-	let preview: String = content
-		.lines()
-		.next()
-		.unwrap_or("")
-		.chars()
-		.take(250)
-		.collect();
-
+	let preview = build_preview(content, ct);
 	format_ccr_output(&preview, ct, &metadata, hash, size)
 }
 
