@@ -29,17 +29,22 @@ def _load_env():
                 if line.startswith("export "):
                     kv = line[7:].split("=", 1)
                     if len(kv) == 2:
-                        env[kv[0]] = _env_val(kv[1])
+                        env[kv[0]] = _env_val(kv[1], kv[0])
                 elif "=" in line and not line.startswith("#"):
                     kv = line.split("=", 1)
-                    env[kv[0]] = _env_val(kv[1])
+                    env[kv[0]] = _env_val(kv[1], kv[0])
     except Exception as exc:
         _log.warning("_load_env: failed to read %s - %s", ENV_FILE, exc)
     return env
 
 
-def _env_val(val):
-    """Parse a .env value: extract between matching quotes or strip inline # comment."""
+def _env_val(val, key_name=""):
+    """Parse a .env value: extract between matching quotes or strip inline # comment.
+
+    If ``key_name`` is supplied and the value contains ``#`` followed by hex-like
+    characters (common in truncated API keys), a warning is logged instead of silently
+    stripping what may be part of the credential.
+    """
     val = val.strip()
     if val.startswith('"'):
         end = val.find('"', 1)
@@ -50,7 +55,19 @@ def _env_val(val):
         if end != -1:
             return val[1:end]
     # Unquoted: split on # to remove inline comment
-    return val.split("#")[0].strip()
+    if "#" in val:
+        before, after = val.split("#", 1)
+        after_stripped = after.strip()
+        # If the suffix looks like a credential fragment (≥4 hex-like chars) warn
+        if key_name and after_stripped and len(after_stripped) >= 4:
+            _log.warning(
+                "_env_val: %s contains '#' followed by '%s' - "
+                "possible key truncation, consider quoting the value",
+                key_name,
+                after_stripped[:20],
+            )
+        return before.strip()
+    return val
 
 
 def _alive(port, timeout=3):

@@ -158,7 +158,7 @@ curl -s http://127.0.0.1:9797/health
 | Pane | Role | Command |
 |------|------|---------|
 | 0 | Proxy | `RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'` |
-| 1 | Hermes (barebone) | `APHRODITE_DEV=1 hermes -m deepseek-v4-pro` |
+| 1 | Hermes (barebone) | `APHRODITE_PASSTHROUGH=1 hermes -m deepseek-v4-pro` |
 | 2 | Hermes (token proxy) | `hermes -p aphrodite-proxy-cache -m deepseek-v4-pro` |
 
 ---
