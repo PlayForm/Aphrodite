@@ -131,6 +131,8 @@ impl MultiConfig {
 	}
 
 	/// Resolve a ProxyConfig with defaults applied.
+	/// API key fallback chain: `proxy.api_key` → `defaults.api_key` →
+	/// `APHRODITE_API_KEY` → `DEEPSEEK_API_KEY` → `HEADROOM_DEEPSEEK_KEY`.
 	/// Returns an error if no API key is found after all fallbacks.
 	pub fn resolve(&self, cfg: &ProxyConfig) -> anyhow::Result<Cli> {
 		let d = self.defaults.as_ref();
@@ -145,6 +147,17 @@ impl MultiConfig {
 		if api_key.is_empty() {
 			anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml");
 		}
+		// Resolve listen: must parse or fail (no silent default when listen is explicitly set)
+		let listen: SocketAddr = match cfg.listen.as_deref() {
+			Some(s) => s.parse().map_err(|_| anyhow::anyhow!("invalid listen address: {s}"))?,
+			None => "127.0.0.1:9797".parse().unwrap(),
+		};
+		// Validate max_output < max_context
+		let max_context = cfg.max_context.unwrap_or(1_000_000);
+		let max_output = cfg.max_output.unwrap_or(384_000);
+		if max_output >= max_context {
+			anyhow::bail!("max_output ({max_output}) must be less than max_context ({max_context})");
+		}
 		Ok(Cli {
 			mode: match cfg.mode.as_deref() {
 				Some("token") => ProxyMode::Token,
@@ -158,11 +171,7 @@ impl MultiConfig {
 					ProxyMode::Token
 				},
 			},
-			listen: cfg
-				.listen
-				.as_deref()
-				.and_then(|s| s.parse().ok())
-				.unwrap_or_else(|| "127.0.0.1:9797".parse().unwrap()),
+			listen,
 			api_url: cfg
 				.api_url
 				.clone()
@@ -174,8 +183,8 @@ impl MultiConfig {
 				.clone()
 				.or_else(|| d.and_then(|d| d.model.clone()))
 				.unwrap_or_else(|| "default-model".into()),
-			max_context: cfg.max_context.unwrap_or(1_000_000),
-			max_output: cfg.max_output.unwrap_or(384_000),
+			max_context,
+			max_output,
 			// Fall back to ~/.hermes/aphrodite/ if dirs::home_dir() returns None
 			ccr_db_path: cfg
 				.ccr_db_path

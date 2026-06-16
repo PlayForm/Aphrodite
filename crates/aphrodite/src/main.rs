@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 use axum::{
-	extract::{ConnectInfo, Request},
+	extract::{ConnectInfo, DefaultBodyLimit, Request},
 	http::StatusCode,
 	middleware::{self, Next},
 	response::{IntoResponse, Json},
@@ -22,8 +22,25 @@ use aphrodite::config::{Cli, MultiConfig, ProxyMode};
 use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, handle_ccr_delete, health_check};
 use aphrodite::retrieve;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
+	// Worker thread count — I/O-bound proxy needs more than CPU cores.
+	// Default: 4× CPU or 32 minimum. Override: APHRODITE_WORKER_THREADS.
+	let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
+		.ok()
+		.and_then(|v| v.parse::<usize>().ok())
+		.unwrap_or_else(|| {
+			let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
+			(cpus * 4).max(32)
+		});
+	let runtime = tokio::runtime::Builder::new_multi_thread()
+		.worker_threads(worker_threads)
+		.enable_all()
+		.build()
+		.expect("tokio runtime");
+	runtime.block_on(run())
+}
+
+async fn run() -> anyhow::Result<()> {
 	// Try multi-proxy config first, fall back to CLI
 	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
 	let (proxies, log_compact): (Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
@@ -268,6 +285,41 @@ async fn run_single(
                 if let Some(ratio) = stats["compression_ratio_ema"].as_f64() {
                     out.push_str(&format!("aphrodite_compression_ratio_ema {:.2}\n", ratio));
                 }
+                // Inline CCR
+                if let Some(icc) = stats["inline_ccr"].as_object() {
+                    if let Some(h) = icc["hits"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_hits {h}\n")); }
+                    if let Some(m) = icc["misses"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_misses {m}\n")); }
+                }
+                // Tool relay success/failure
+                if let Some(tr) = stats["tool_relay"].as_object() {
+                    if let Some(s) = tr["success"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_success {s}\n")); }
+                    if let Some(f) = tr["failure"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_failure {f}\n")); }
+                }
+                // Notify success/failure
+                if let Some(n) = stats["notify"].as_object() {
+                    if let Some(s) = n["success"].as_u64() { out.push_str(&format!("aphrodite_notify_success {s}\n")); }
+                    if let Some(f) = n["failure"].as_u64() { out.push_str(&format!("aphrodite_notify_failure {f}\n")); }
+                }
+                // Upstream errors
+                if let Some(ue) = stats["upstream_errors"].as_object() {
+                    if let Some(c) = ue["4xx"].as_u64() { out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"4xx\"}} {c}\n")); }
+                    if let Some(c) = ue["5xx"].as_u64() { out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"5xx\"}} {c}\n")); }
+                    if let Some(t) = ue["timeouts"].as_u64() { out.push_str(&format!("aphrodite_upstream_timeouts_total {t}\n")); }
+                }
+                // CCR store info
+                if let Some(cs) = stats["ccr_store"].as_object() {
+                    if let Some(e) = cs["entries"].as_u64() { out.push_str(&format!("aphrodite_ccr_store_entries {e}\n")); }
+                    if let Some(b) = cs["bytes_approx"].as_u64() { out.push_str(&format!("aphrodite_ccr_store_bytes {b}\n")); }
+                }
+                // Body bytes
+                if let Some(bb) = stats["body_bytes"].as_object() {
+                    if let Some(r) = bb["request"].as_u64() { out.push_str(&format!("aphrodite_request_body_bytes_total {r}\n")); }
+                    if let Some(r) = bb["response"].as_u64() { out.push_str(&format!("aphrodite_response_body_bytes_total {r}\n")); }
+                }
+                // Upstream latency
+                if let Some(ul) = stats["upstream_latency_micros"].as_u64() {
+                    out.push_str(&format!("aphrodite_upstream_latency_seconds_sum {:.6}\n", ul as f64 / 1_000_000.0));
+                }
                 (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")], out)
             }
         }))
@@ -296,7 +348,9 @@ async fn run_single(
         }))
         .route("/*path", any(proxy::proxy_handler))
         // Loopback enforcement layer on all non-/health routes
-        .layer(middleware::from_fn(loopback_only));
+        .layer(middleware::from_fn(loopback_only))
+        // 1 MB body limit on restricted routes
+        .layer(DefaultBodyLimit::max(1024 * 1024));
 
 	// Public route (no loopback enforcement) merged with restricted routes
 	let app = Router::new()

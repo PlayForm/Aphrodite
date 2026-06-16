@@ -32,7 +32,7 @@ use headroom_core::ccr::backends::sqlite::SqliteCcrStore;
 use headroom_core::ccr::{compute_key, CcrStore};
 use tokio_util::task::TaskTracker;
 
-/// API key wrapper with safe Debug - never leaks to logs.
+/// API key wrapper with safe Debug and Display - never leaks to logs.
 #[derive(Clone)]
 pub struct Secret(pub(crate) String);
 
@@ -44,7 +44,14 @@ impl std::fmt::Debug for Secret {
 
 impl std::fmt::Display for Secret {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
+		write!(f, "[REDACTED]")
+	}
+}
+
+impl Secret {
+	/// Expose the raw API key value for use in HTTP headers.
+	pub fn expose(&self) -> &str {
+		&self.0
 	}
 }
 
@@ -170,6 +177,22 @@ pub struct AppState {
 	/// Derived from compression_ratio_ema: higher compression = lower fill = more headroom.
 	/// Used by the Python plugin to set x-headroom-budget for adaptive compression.
 	pub fill_pct: AtomicU64,
+
+	// Extended metrics
+	pub inline_ccr_hits: AtomicU64,
+	pub inline_ccr_misses: AtomicU64,
+	pub tool_relay_success: AtomicU64,
+	pub tool_relay_failure: AtomicU64,
+	pub notify_success: AtomicU64,
+	pub notify_failure: AtomicU64,
+	pub upstream_errors_4xx: AtomicU64,
+	pub upstream_errors_5xx: AtomicU64,
+	pub upstream_timeouts: AtomicU64,
+	pub ccr_store_entries: AtomicU64,
+	pub ccr_store_bytes: AtomicU64,
+	pub request_body_bytes: AtomicU64,
+	pub response_body_bytes: AtomicU64,
+	pub upstream_latency_micros: AtomicU64,
 }
 
 impl AppState {
@@ -209,6 +232,33 @@ impl AppState {
 			"compression_ratio_ema": self.compression_ratio_ema.load(Ordering::Relaxed) as f64 / 100.0,
 			"last_errors": self.last_errors.lock().map(|v| v.iter().rev().take(5).cloned().collect::<Vec<_>>()).unwrap_or_default(),
 			"request_history": self.request_history.lock().map(|v| v.clone()).unwrap_or_default(),
+			"inline_ccr": {
+				"hits": self.inline_ccr_hits.load(Ordering::Relaxed),
+				"misses": self.inline_ccr_misses.load(Ordering::Relaxed),
+			},
+			"tool_relay": {
+				"total": self.tool_relay_calls.load(Ordering::Relaxed),
+				"success": self.tool_relay_success.load(Ordering::Relaxed),
+				"failure": self.tool_relay_failure.load(Ordering::Relaxed),
+			},
+			"notify": {
+				"success": self.notify_success.load(Ordering::Relaxed),
+				"failure": self.notify_failure.load(Ordering::Relaxed),
+			},
+			"upstream_errors": {
+				"4xx": self.upstream_errors_4xx.load(Ordering::Relaxed),
+				"5xx": self.upstream_errors_5xx.load(Ordering::Relaxed),
+				"timeouts": self.upstream_timeouts.load(Ordering::Relaxed),
+			},
+			"ccr_store": {
+				"entries": self.ccr_store_entries.load(Ordering::Relaxed),
+				"bytes_approx": self.ccr_store_bytes.load(Ordering::Relaxed),
+			},
+			"body_bytes": {
+				"request": self.request_body_bytes.load(Ordering::Relaxed),
+				"response": self.response_body_bytes.load(Ordering::Relaxed),
+			},
+			"upstream_latency_micros": self.upstream_latency_micros.load(Ordering::Relaxed),
 		})
 	}
 
@@ -374,8 +424,13 @@ pub struct CcrNotification {
 // ── Build state ─────────────────────────────────────────────────────
 
 pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
+	// Tuned HttpClient for high-concurrency API proxy workload.
+	// Default pool: 100 idle connections per host, 90s idle timeout, keepalive.
 	let client = HttpClient::builder()
 		.timeout(std::time::Duration::from_secs(cli.timeout))
+		.pool_max_idle_per_host(100)
+		.pool_idle_timeout(std::time::Duration::from_secs(90))
+		.tcp_keepalive(std::time::Duration::from_secs(60))
 		.build()?;
 
 	let ccr: Option<Arc<dyn CcrStore>> = match cli.mode {
@@ -432,12 +487,27 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 		ccr_misses: AtomicU64::new(0),
 		ccr_created: AtomicU64::new(0),
 		tool_relay_calls: AtomicU64::new(0),
-		compression_ratio_ema: AtomicU64::new(1000), // initial: 10.0x - neutral, avoids startup scale-up
+		compression_ratio_ema: AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
 		response_cache: Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
 		cache_hits: AtomicU64::new(0),
 		cache_misses: AtomicU64::new(0),
 		fill_pct: AtomicU64::new(9000), // 90.00% - moderate fill initial default
 		task_tracker: TaskTracker::new(),
+
+		inline_ccr_hits: AtomicU64::new(0),
+		inline_ccr_misses: AtomicU64::new(0),
+		tool_relay_success: AtomicU64::new(0),
+		tool_relay_failure: AtomicU64::new(0),
+		notify_success: AtomicU64::new(0),
+		notify_failure: AtomicU64::new(0),
+		upstream_errors_4xx: AtomicU64::new(0),
+		upstream_errors_5xx: AtomicU64::new(0),
+		upstream_timeouts: AtomicU64::new(0),
+		ccr_store_entries: AtomicU64::new(0),
+		ccr_store_bytes: AtomicU64::new(0),
+		request_body_bytes: AtomicU64::new(0),
+		response_body_bytes: AtomicU64::new(0),
+		upstream_latency_micros: AtomicU64::new(0),
 	})
 }
 
@@ -498,6 +568,7 @@ pub async fn proxy_handler(
 	body: Bytes,
 ) -> impl IntoResponse {
 	state.requests_total.fetch_add(1, Ordering::Relaxed);
+	state.request_body_bytes.fetch_add(body.len() as u64, Ordering::Relaxed);
 	let t0 = std::time::Instant::now();
 	let req_id = uuid::Uuid::new_v4().to_string();
 	let req_id_short = &req_id[..8];
@@ -531,7 +602,7 @@ pub async fn proxy_handler(
 
 	let body_vec = body.to_vec();
 	let cache_key = if is_chat_completion {
-		cache_key_from_body(&body_vec, &state.api_key.0)
+		cache_key_from_body(&body_vec, state.api_key.expose())
 	} else {
 		None
 	};
@@ -539,6 +610,8 @@ pub async fn proxy_handler(
 	if let Some(ck) = cache_key {
 		if let Some(cached_body) = state.response_cache.lock().ok().and_then(|mut cache| cache.get(&ck).cloned()) {
 			state.cache_hits.fetch_add(1, Ordering::Relaxed);
+			state.tokens_saved.fetch_add(cached_body.len() as u64 / 4, Ordering::Relaxed);
+			// Estimate tokens saved: ~4 bytes per token for the cached content
 			if state.dev {
 				tracing::info!(
 					id = %req_id_short,
@@ -552,7 +625,10 @@ pub async fn proxy_handler(
 				.header("X-Aphrodite-Cache", "HIT")
 				.header(
 					"X-Aphrodite-Fill-Pct",
-					&format!("{:.1}", state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0),
+					{
+						let v = state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0;
+						if v.is_finite() { format!("{:.1}", v) } else { "0.0".to_string() }
+					},
 				)
 				.body(Body::from(cached_body))
 				.unwrap();
@@ -573,7 +649,7 @@ pub async fn proxy_handler(
 			.request(method.clone(), &url)
 			.header("Content-Type", "application/json; charset=utf-8")
 			.header("Accept", "application/json")
-			.header("Authorization", format!("Bearer {}", state.api_key));
+			.header("Authorization", format!("Bearer {}", state.api_key.expose()));
 		let mut req = req;
 		for (key, val) in headers.iter() {
 			let k = key.as_str().to_lowercase();
@@ -600,10 +676,17 @@ pub async fn proxy_handler(
 		}
 	}
 	match upstream_result {
-		Ok(response) => {
-			let status = response.status();
-			// Extract content-type before consuming response body
-			let content_type = response.headers().get("content-type").cloned();
+	Ok(response) => {
+		let status = response.status();
+		// Track upstream errors by status code
+		let status_code = status.as_u16();
+		if status_code >= 500 {
+			state.upstream_errors_5xx.fetch_add(1, Ordering::Relaxed);
+		} else if status_code >= 400 {
+			state.upstream_errors_4xx.fetch_add(1, Ordering::Relaxed);
+		}
+		// Extract content-type before consuming response body
+		let content_type = response.headers().get("content-type").cloned();
 			let resp_body = match response.bytes().await {
 				Ok(b) => b,
 				Err(e) => {
@@ -615,6 +698,12 @@ pub async fn proxy_handler(
 						.into_response();
 				},
 			};
+
+			// Track upstream latency (before compression)
+			let upstream_elapsed = t0.elapsed().as_micros() as u64;
+			state.upstream_latency_micros.fetch_add(upstream_elapsed, Ordering::Relaxed);
+			// Track response body bytes
+			state.response_body_bytes.fetch_add(resp_body.len() as u64, Ordering::Relaxed);
 
 			// Only compress Chat Completions responses
 			let elapsed = t0.elapsed();
@@ -669,7 +758,10 @@ pub async fn proxy_handler(
 						.header("X-Aphrodite-Cache", "MISS")
 						.header(
 							"X-Aphrodite-Fill-Pct",
-							&format!("{:.1}", state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0),
+							{
+								let v = state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0;
+								if v.is_finite() { format!("{:.1}", v) } else { "0.0".to_string() }
+							},
 						)
 						.body(Body::from(body))
 						.unwrap();
@@ -713,7 +805,10 @@ pub async fn proxy_handler(
 			let mut builder = Response::builder().status(status).header("X-Aphrodite-Cache", "MISS");
 			builder = builder.header(
 				"X-Aphrodite-Fill-Pct",
-				&format!("{:.1}", state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0),
+				{
+					let v = state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0;
+					if v.is_finite() { format!("{:.1}", v) } else { "0.0".to_string() }
+				},
 			);
 			if let Some(ct) = content_type {
 				builder = builder.header("Content-Type", ct);
@@ -721,6 +816,7 @@ pub async fn proxy_handler(
 			builder.body(Body::from(resp_body)).unwrap()
 		},
 		Err(e) => {
+			state.upstream_timeouts.fetch_add(1, Ordering::Relaxed);
 			state.record_latency(t0.elapsed());
 			state.record_request(req_id_short, method.as_str(), path.path(), 502, false, t0.elapsed().as_millis());
 			state.record_error(format!("upstream: {}", e));
@@ -747,6 +843,11 @@ fn detect_content_type(content: &str) -> &'static str {
 
 	// Structured output detection
 	if content.starts_with('{') || content.starts_with('[') {
+		// Validate JSON before classifying
+		if serde_json::from_str::<serde_json::Value>(content).is_err() {
+			// Not valid JSON despite starting with { or [ - treat as text
+			return "text";
+		}
 		if content.contains("exit_code") || content.contains("\"status\"") {
 			return "tool_output";
 		}
@@ -1290,7 +1391,6 @@ async fn compress_chat_completion(
 							state
 								.tokens_saved
 								.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
-							state.requests_compressed.fetch_add(1, Ordering::Relaxed);
 						}
 
 						let (compressed, orig_len) = {
@@ -1321,7 +1421,12 @@ async fn compress_chat_completion(
 					// so later retrievals can find tiny entries without a backend round-trip.
 					let hash = compute_key(content.as_bytes());
 					if let Ok(mut map) = state.inline_ccr.lock() {
-						map.put(hash, content.to_string());
+						if map.contains(&hash) {
+							state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+						} else {
+							state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
+							map.put(hash, content.to_string());
+						}
 					}
 				}
 			}
@@ -1350,7 +1455,6 @@ async fn compress_chat_completion(
 											state
 												.tokens_saved
 												.fetch_add((args_owned.len() - hash.len()) as u64, Ordering::Relaxed);
-											state.requests_compressed.fetch_add(1, Ordering::Relaxed);
 										}
 										let (compressed, orig_len) = {
 											let compressed = smart_marker(&hash, &args_owned, ct);
@@ -1366,7 +1470,12 @@ async fn compress_chat_completion(
 								} else if args_owned.len() > INLINE_CCR_THRESHOLD {
 									let hash = compute_key(args_owned.as_bytes());
 									if let Ok(mut map) = state.inline_ccr.lock() {
-										map.put(hash, args_owned);
+										if map.contains(&hash) {
+											state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+										} else {
+											state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
+											map.put(hash, args_owned);
+										}
 									}
 								}
 							}
@@ -1411,11 +1520,19 @@ pub async fn handle_tool_relay(
 	}
 
 	if let Some(cb) = &req.callback_url {
+		// SSRF protection: only https:// URLs allowed
+		let parsed_url = match url::Url::parse(cb) {
+			Ok(u) if u.scheme() == "https" => u,
+			_ => {
+				tracing::warn!(callback_url = %cb, "tool_relay callback skipped: only https scheme allowed");
+				return Json(ToolRelayResponse { success: true, result: None, error: None, async_call: false }).into_response();
+			},
+		};
 		let tracker = state.task_tracker.clone();
 		let state = state.clone();
 		let tool = req.tool.clone();
 		let params = req.params.clone();
-		let cb = cb.clone();
+		let cb = parsed_url.to_string();
 		tracker.spawn(async move {
 			let result = execute_tool_relay(&state, &tool, &params).await;
 			let _ = state
@@ -1431,9 +1548,11 @@ pub async fn handle_tool_relay(
 
 	match execute_tool_relay(&state, &req.tool, &req.params).await {
 		Ok(val) => {
+			state.tool_relay_success.fetch_add(1, Ordering::Relaxed);
 			Json(ToolRelayResponse { success: true, result: Some(val), error: None, async_call: false }).into_response()
 		},
 		Err(e) => {
+			state.tool_relay_failure.fetch_add(1, Ordering::Relaxed);
 			Json(ToolRelayResponse { success: false, result: None, error: Some(e), async_call: false }).into_response()
 		},
 	}
@@ -1450,9 +1569,11 @@ async fn execute_tool_relay(
 			// Check inline_ccr first (no round-trip needed for tiny entries)
 			if let Ok(mut map) = state.inline_ccr.lock() {
 				if let Some(content) = map.get(hash) {
+					state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
 					return Ok(serde_json::json!({"found": true, "content": content.clone()}));
 				}
 			}
+			state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
 			// Fallback to CCR store
 			if let Some(ccr) = &state.ccr {
 				match ccr_get(ccr, hash).await {
@@ -1470,7 +1591,12 @@ async fn execute_tool_relay(
 			if size < INLINE_CCR_THRESHOLD as usize {
 				// Tiny content: store inline to avoid CCR backend round-trip
 				if let Ok(mut map) = state.inline_ccr.lock() {
-					map.put(hash.clone(), content.to_string());
+					if map.contains(&hash) {
+						state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+					} else {
+						state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
+						map.put(hash.clone(), content.to_string());
+					}
 				}
 				Ok(
 					serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}),
@@ -1544,8 +1670,21 @@ pub async fn handle_ccr_create(
 					let tracker = state.task_tracker.clone();
 					let client = state.client.clone();
 					let url = notify_url.clone();
+					let key = state.notify_key.clone();
+					let state_clone = state.clone();
 					tracker.spawn(async move {
-						let _ = client.post(&url).json(&notification).send().await;
+						let mut req = client.post(&url).json(&notification);
+						if let Some(k) = &key {
+							req = req.header("Authorization", format!("Bearer {k}"));
+						}
+						match req.timeout(Duration::from_secs(5)).send().await {
+							Ok(r) if r.status().is_success() => {
+								state_clone.notify_success.fetch_add(1, Ordering::Relaxed);
+							},
+							_ => {
+								state_clone.notify_failure.fetch_add(1, Ordering::Relaxed);
+							},
+						}
 					});
 				}
 
@@ -1571,7 +1710,16 @@ pub async fn handle_ccr_create(
 		}
 	} else {
 		// Treat raw body as content directly
-		let content = String::from_utf8(body.to_vec()).unwrap_or_default();
+		let content = match String::from_utf8(body.to_vec()) {
+			Ok(c) => c,
+			Err(_) => {
+				return (
+					StatusCode::BAD_REQUEST,
+					Json(serde_json::json!({"error": "invalid UTF-8 in body"})),
+				)
+					.into_response();
+			},
+		};
 		let original_size = content.len();
 		let hash = compute_key(content.as_bytes());
 
@@ -1695,7 +1843,7 @@ mod tests {
 			ccr_misses: AtomicU64::new(0),
 			ccr_created: AtomicU64::new(0),
 			tool_relay_calls: AtomicU64::new(0),
-			compression_ratio_ema: AtomicU64::new(1000), // initial: 10.0x - neutral, avoids startup scale-up
+			compression_ratio_ema: AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
 			request_history: Mutex::new(VecDeque::new()),
 			inline_ccr: Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
 			latency_buckets: [
@@ -1713,6 +1861,20 @@ mod tests {
 			cache_misses: AtomicU64::new(0),
 			fill_pct: AtomicU64::new(9000),
 			task_tracker: TaskTracker::new(),
+			inline_ccr_hits: AtomicU64::new(0),
+			inline_ccr_misses: AtomicU64::new(0),
+			tool_relay_success: AtomicU64::new(0),
+			tool_relay_failure: AtomicU64::new(0),
+			notify_success: AtomicU64::new(0),
+			notify_failure: AtomicU64::new(0),
+			upstream_errors_4xx: AtomicU64::new(0),
+			upstream_errors_5xx: AtomicU64::new(0),
+			upstream_timeouts: AtomicU64::new(0),
+			ccr_store_entries: AtomicU64::new(0),
+			ccr_store_bytes: AtomicU64::new(0),
+			request_body_bytes: AtomicU64::new(0),
+			response_body_bytes: AtomicU64::new(0),
+			upstream_latency_micros: AtomicU64::new(0),
 		};
 		assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
 	}
@@ -1789,7 +1951,7 @@ mod tests {
 			ccr_misses: AtomicU64::new(0),
 			ccr_created: AtomicU64::new(0),
 			tool_relay_calls: AtomicU64::new(0),
-			compression_ratio_ema: AtomicU64::new(1000), // initial: 10.0x - neutral, avoids startup scale-up
+			compression_ratio_ema: AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
 			request_history: Mutex::new(VecDeque::new()),
 			inline_ccr: Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
 			latency_buckets: [
@@ -1807,6 +1969,20 @@ mod tests {
 			cache_misses: AtomicU64::new(0),
 			fill_pct: AtomicU64::new(9000),
 			task_tracker: TaskTracker::new(),
+			inline_ccr_hits: AtomicU64::new(0),
+			inline_ccr_misses: AtomicU64::new(0),
+			tool_relay_success: AtomicU64::new(0),
+			tool_relay_failure: AtomicU64::new(0),
+			notify_success: AtomicU64::new(0),
+			notify_failure: AtomicU64::new(0),
+			upstream_errors_4xx: AtomicU64::new(0),
+			upstream_errors_5xx: AtomicU64::new(0),
+			upstream_timeouts: AtomicU64::new(0),
+			ccr_store_entries: AtomicU64::new(0),
+			ccr_store_bytes: AtomicU64::new(0),
+			request_body_bytes: AtomicU64::new(0),
+			response_body_bytes: AtomicU64::new(0),
+			upstream_latency_micros: AtomicU64::new(0),
 		}
 	}
 }
