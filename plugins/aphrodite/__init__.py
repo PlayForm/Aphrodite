@@ -62,9 +62,6 @@ from ._core import (
     _reset_turn_counter,
 )
 
-# Local logger (not re-exported from _core)
-_log = logging.getLogger("aphrodite")
-
 # ── Engine ────────────────────────────────────────────────────────
 from ._engine import (
     AphroditeContextEngine,
@@ -111,6 +108,8 @@ from ._tools import (
     _retrieve_handler,
 )
 
+# Local logger (not re-exported from _core)
+_log = logging.getLogger("aphrodite")
 
 # Sync docstring version with PLUGIN_VERSION
 __doc__ = (__doc__ or "").replace("v1.61.0", f"v{PLUGIN_VERSION}")

@@ -39,7 +39,7 @@ def _retrieve_handler(args=None, **kwargs):
                 return json.dumps({"error": f"path outside workspace boundary: {path}"})
             if not os.path.isfile(resolved):
                 return json.dumps({"error": f"not a file: {path}"})
-            with open(resolved, "r") as f:
+            with open(resolved) as f:
                 content = f.read(_MAX_PATH_READ)
                 remainder = f.read(1)
                 if remainder:

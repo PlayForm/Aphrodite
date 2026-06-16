@@ -6,12 +6,12 @@
 
 use std::sync::Arc;
 use axum::{
-    extract::{ConnectInfo, Request},
-    http::StatusCode,
-    middleware::{self, Next},
-    response::{IntoResponse, Json},
-    routing::{any, delete, get, post},
-    Router,
+	extract::{ConnectInfo, Request},
+	http::StatusCode,
+	middleware::{self, Next},
+	response::{IntoResponse, Json},
+	routing::{any, delete, get, post},
+	Router,
 };
 use clap::Parser;
 use std::net::SocketAddr;
@@ -24,157 +24,154 @@ use aphrodite::retrieve;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Try multi-proxy config first, fall back to CLI
-    let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
-    let (proxies, log_compact): (Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
-        let config = MultiConfig::load(&config_path)?;
-        let proxies: Vec<(String, Cli)> = config.proxies.iter().map(|p| {
-            let cli = config.resolve(p)?;
-            let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
-            Ok((name, cli))
-        }).collect::<anyhow::Result<Vec<_>>>()?;
-        let log_compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
-        (proxies, log_compact)
-    } else {
-        let cli = Cli::parse();
-        let log_compact = cli.log_compact || std::env::var("APHRODITE_LOG_COMPACT").is_ok();
-        let name = format!("{}", cli.listen);
-        (vec![(name, cli)], log_compact)
-    };
+	// Try multi-proxy config first, fall back to CLI
+	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
+	let (proxies, log_compact): (Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
+		let config = MultiConfig::load(&config_path)?;
+		let proxies: Vec<(String, Cli)> = config
+			.proxies
+			.iter()
+			.map(|p| {
+				let cli = config.resolve(p)?;
+				let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
+				Ok((name, cli))
+			})
+			.collect::<anyhow::Result<Vec<_>>>()?;
+		let log_compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
+		(proxies, log_compact)
+	} else {
+		let cli = Cli::parse();
+		let log_compact = cli.log_compact || std::env::var("APHRODITE_LOG_COMPACT").is_ok();
+		let name = format!("{}", cli.listen);
+		(vec![(name, cli)], log_compact)
+	};
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
-    let subscriber = tracing_subscriber::registry().with(filter);
-    if log_compact {
-        subscriber
-            .with(tracing_subscriber::fmt::layer().compact().with_target(false).without_time())
-            .try_init()?;
-    } else {
-        subscriber
-            .with(tracing_subscriber::fmt::layer())
-            .try_init()?;
-    }
+	let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+	let subscriber = tracing_subscriber::registry().with(filter);
+	if log_compact {
+		subscriber
+			.with(tracing_subscriber::fmt::layer().compact().with_target(false).without_time())
+			.try_init()?;
+	} else {
+		subscriber.with(tracing_subscriber::fmt::layer()).try_init()?;
+	}
 
-    tracing::info!(
-        "aphrodite v{} ({}{}) • {} • {}",
-        option_env!("APHRODITE_VERSION").unwrap_or("?"),
-        option_env!("APHRODITE_GIT_HASH").unwrap_or("?"),
-        option_env!("APHRODITE_PROFILE").map(|p| format!(", {p}")).unwrap_or_default(),
-        option_env!("APHRODITE_BUILD_DATE").unwrap_or("?"),
-        option_env!("APHRODITE_TARGET").unwrap_or("?"),
-    );
+	tracing::info!(
+		"aphrodite v{} ({}{}) • {} • {}",
+		option_env!("APHRODITE_VERSION").unwrap_or("?"),
+		option_env!("APHRODITE_GIT_HASH").unwrap_or("?"),
+		option_env!("APHRODITE_PROFILE").map(|p| format!(", {p}")).unwrap_or_default(),
+		option_env!("APHRODITE_BUILD_DATE").unwrap_or("?"),
+		option_env!("APHRODITE_TARGET").unwrap_or("?"),
+	);
 
-    tracing::info!("starting {} proxy listener(s)", proxies.len());
+	tracing::info!("starting {} proxy listener(s)", proxies.len());
 
-    // Shared shutdown watch channel - single signal source propagates to all proxies.
-    // Initial value false; main() sets true on first Ctrl+C/SIGTERM,
-    // each run_single() task waits on the receiver for graceful_shutdown.
-    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+	// Shared shutdown watch channel - single signal source propagates to all proxies.
+	// Initial value false; main() sets true on first Ctrl+C/SIGTERM,
+	// each run_single() task waits on the receiver for graceful_shutdown.
+	let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
-    let mut handles = Vec::new();
-    for (name, cli) in proxies {
-        let rx = shutdown_rx.clone();
-        let handle = tokio::spawn(async move {
-            if let Err(e) = run_single(name, cli, rx).await {
-                tracing::error!(%e, "proxy listener failed");
-            }
-        });
-        handles.push(handle);
-    }
-    // Drop the original sender so run_single receivers get a RecvError::Closed
-    // when main() finishes (SIGTERM alternative: drop triggers changed() wakeup).
-    drop(shutdown_rx);
+	let mut handles = Vec::new();
+	for (name, cli) in proxies {
+		let rx = shutdown_rx.clone();
+		let handle = tokio::spawn(async move {
+			if let Err(e) = run_single(name, cli, rx).await {
+				tracing::error!(%e, "proxy listener failed");
+			}
+		});
+		handles.push(handle);
+	}
+	// Drop the original sender so run_single receivers get a RecvError::Closed
+	// when main() finishes (SIGTERM alternative: drop triggers changed() wakeup).
+	drop(shutdown_rx);
 
-    // Wait for first shutdown signal - triggers graceful shutdown in all proxies
-    shutdown_signal().await;
-    let _ = shutdown_tx.send(true);
-    tracing::info!("shutdown signal received, draining in-flight requests...");
+	// Wait for first shutdown signal - triggers graceful shutdown in all proxies
+	shutdown_signal().await;
+	let _ = shutdown_tx.send(true);
+	tracing::info!("shutdown signal received, draining in-flight requests...");
 
-    // Clone abort handles so we can force-kill after handles are moved into join_all
-    let abort_handles: Vec<_> = handles.iter().map(|h| h.abort_handle()).collect();
+	// Clone abort handles so we can force-kill after handles are moved into join_all
+	let abort_handles: Vec<_> = handles.iter().map(|h| h.abort_handle()).collect();
 
-    // Listen for a second Ctrl+C to force immediate shutdown
-    let second_signal = async {
-        let _ = tokio::signal::ctrl_c().await;
-        tracing::warn!("second shutdown signal received, forcing immediate shutdown");
-    };
-    tokio::pin!(second_signal);
+	// Listen for a second Ctrl+C to force immediate shutdown
+	let second_signal = async {
+		let _ = tokio::signal::ctrl_c().await;
+		tracing::warn!("second shutdown signal received, forcing immediate shutdown");
+	};
+	tokio::pin!(second_signal);
 
-    // 5-second drain timeout before forcing abort
-    let drain_timeout = tokio::time::sleep(std::time::Duration::from_secs(5));
-    tokio::pin!(drain_timeout);
+	// 5-second drain timeout before forcing abort
+	let drain_timeout = tokio::time::sleep(std::time::Duration::from_secs(5));
+	tokio::pin!(drain_timeout);
 
-    // Wait for graceful drain (via axum's with_graceful_shutdown), second signal, or timeout.
-    // NOTE: do NOT re-await drain_fut after select! - it was polled by select! and
-    // re-awaiting would be double-poll UB. Abort handles handle the remaining tasks.
-    let drain_fut = futures::future::join_all(handles);
-    tokio::pin!(drain_fut);
+	// Wait for graceful drain (via axum's with_graceful_shutdown), second signal, or timeout.
+	// NOTE: do NOT re-await drain_fut after select! - it was polled by select! and
+	// re-awaiting would be double-poll UB. Abort handles handle the remaining tasks.
+	let drain_fut = futures::future::join_all(handles);
+	tokio::pin!(drain_fut);
 
-    tokio::select! {
-        _ = &mut drain_fut => {
-            tracing::info!("all proxy listeners completed gracefully");
-        }
-        _ = &mut drain_timeout => {
-            tracing::info!("drain timeout (5s) reached, aborting remaining tasks");
-            for h in &abort_handles {
-                h.abort();
-            }
-        }
-        _ = &mut second_signal => {
-            tracing::info!("force shutdown on second signal, aborting remaining tasks");
-            for h in &abort_handles {
-                h.abort();
-            }
-        }
-    }
+	tokio::select! {
+		_ = &mut drain_fut => {
+			tracing::info!("all proxy listeners completed gracefully");
+		}
+		_ = &mut drain_timeout => {
+			tracing::info!("drain timeout (5s) reached, aborting remaining tasks");
+			for h in &abort_handles {
+				h.abort();
+			}
+		}
+		_ = &mut second_signal => {
+			tracing::info!("force shutdown on second signal, aborting remaining tasks");
+			for h in &abort_handles {
+				h.abort();
+			}
+		}
+	}
 
-    Ok(())
+	Ok(())
 }
 
 async fn run_single(
-    name: String,
-    mut cli: Cli,
-    mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+	name: String,
+	mut cli: Cli,
+	mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
-    // Resolve relative ccr_db_path against the binary directory, not CWD.
-    // This way the database path is stable regardless of where the process is launched from.
-    if !cli.ccr_db_path.as_os_str().is_empty() && !cli.ccr_db_path.is_absolute() {
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
-                let old = cli.ccr_db_path.display().to_string();
-                cli.ccr_db_path = exe_dir.join(&cli.ccr_db_path);
-                tracing::info!(
-                    "resolved relative ccr_db_path from {} to {}",
-                    old,
-                    cli.ccr_db_path.display()
-                );
-            }
-        }
-    }
-    if let Some(parent) = cli.ccr_db_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
+	// Resolve relative ccr_db_path against the binary directory, not CWD.
+	// This way the database path is stable regardless of where the process is launched from.
+	if !cli.ccr_db_path.as_os_str().is_empty() && !cli.ccr_db_path.is_absolute() {
+		if let Ok(exe_path) = std::env::current_exe() {
+			if let Some(exe_dir) = exe_path.parent() {
+				let old = cli.ccr_db_path.display().to_string();
+				cli.ccr_db_path = exe_dir.join(&cli.ccr_db_path);
+				tracing::info!("resolved relative ccr_db_path from {} to {}", old, cli.ccr_db_path.display());
+			}
+		}
+	}
+	if let Some(parent) = cli.ccr_db_path.parent() {
+		std::fs::create_dir_all(parent)?;
+	}
 
-    let state = Arc::new(proxy::build_state(&cli).await?);
-    let task_tracker = state.task_tracker.clone();
+	let state = Arc::new(proxy::build_state(&cli).await?);
+	let task_tracker = state.task_tracker.clone();
 
-    let mode_str = match cli.mode {
-        ProxyMode::Cache => "cache",
-        ProxyMode::Token => "token",
-    };
+	let mode_str = match cli.mode {
+		ProxyMode::Cache => "cache",
+		ProxyMode::Token => "token",
+	};
 
-    tracing::info!(
-        name = %name,
-        listen = %cli.listen,
-        mode = %mode_str,
-        api_url = %cli.api_url,
-        model = %cli.model,
-        tool_relay = cli.tool_relay,
-        "proxy starting"
-    );
+	tracing::info!(
+		name = %name,
+		listen = %cli.listen,
+		mode = %mode_str,
+		api_url = %cli.api_url,
+		model = %cli.model,
+		tool_relay = cli.tool_relay,
+		"proxy starting"
+	);
 
-    // Restricted routes - loopback-only enforcement for everything except /health
-    let restricted = Router::new()
+	// Restricted routes - loopback-only enforcement for everything except /health
+	let restricted = Router::new()
         .route("/health/upstream", get({
             let s = state.clone();
             move |ConnectInfo(addr): ConnectInfo<SocketAddr>| {
@@ -301,61 +298,63 @@ async fn run_single(
         // Loopback enforcement layer on all non-/health routes
         .layer(middleware::from_fn(loopback_only));
 
-    // Public route (no loopback enforcement) merged with restricted routes
-    let app = Router::new()
-        .route("/health", get(health_check))
-        .merge(restricted)
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+	// Public route (no loopback enforcement) merged with restricted routes
+	let app = Router::new()
+		.route("/health", get(health_check))
+		.merge(restricted)
+		.layer(CorsLayer::permissive())
+		.with_state(state);
 
-    let listener = tokio::net::TcpListener::bind(cli.listen).await?;
-    tracing::info!(addr = %listener.local_addr()?, "listening");
+	let listener = tokio::net::TcpListener::bind(cli.listen).await?;
+	tracing::info!(addr = %listener.local_addr()?, "listening");
 
-    // Graceful shutdown triggered by shared watch channel - fires when main()
-    // calls shutdown_tx.send(true) after OS signal, or when sender is dropped.
-    let shutdown_fut = async move {
-        let _ = shutdown_rx.changed().await;
-    };
-    let serve_result = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .with_graceful_shutdown(shutdown_fut)
-        .await;
+	// Graceful shutdown triggered by shared watch channel - fires when main()
+	// calls shutdown_tx.send(true) after OS signal, or when sender is dropped.
+	let shutdown_fut = async move {
+		let _ = shutdown_rx.changed().await;
+	};
+	let serve_result = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+		.with_graceful_shutdown(shutdown_fut)
+		.await;
 
-    // Close task tracker BEFORE propagating serve error so background tasks
-    // are not leaked when serve fails (e.g. epoll registration error).
-    task_tracker.close();
-    task_tracker.wait().await;
-    tracing::debug!("all background tasks completed");
+	// Close task tracker BEFORE propagating serve error so background tasks
+	// are not leaked when serve fails (e.g. epoll registration error).
+	task_tracker.close();
+	task_tracker.wait().await;
+	tracing::debug!("all background tasks completed");
 
-    serve_result?;
+	serve_result?;
 
-    Ok(())
+	Ok(())
 }
 
 /// Middleware that rejects non-loopback clients on all routes except /health.
 /// /health is intentionally exempt so external load-balancer probes work.
 async fn loopback_only(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    request: Request,
-    next: Next,
+	ConnectInfo(addr): ConnectInfo<SocketAddr>,
+	request: Request,
+	next: Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-    if !addr.ip().is_loopback() {
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(serde_json::json!({"error": "only loopback clients allowed"})),
-        ));
-    }
-    Ok(next.run(request).await)
+	if !addr.ip().is_loopback() {
+		return Err((
+			StatusCode::FORBIDDEN,
+			Json(serde_json::json!({"error": "only loopback clients allowed"})),
+		));
+	}
+	Ok(next.run(request).await)
 }
 
 async fn shutdown_signal() {
-    let ctrl_c = async { let _ = tokio::signal::ctrl_c().await; };
-    #[cfg(unix)]
-    let terminate = async {
-        if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            s.recv().await;
-        }
-    };
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-    tokio::select! { _ = ctrl_c => {}, _ = terminate => {} }
+	let ctrl_c = async {
+		let _ = tokio::signal::ctrl_c().await;
+	};
+	#[cfg(unix)]
+	let terminate = async {
+		if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+			s.recv().await;
+		}
+	};
+	#[cfg(not(unix))]
+	let terminate = std::future::pending::<()>();
+	tokio::select! { _ = ctrl_c => {}, _ = terminate => {} }
 }

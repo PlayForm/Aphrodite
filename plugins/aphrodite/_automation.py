@@ -5,7 +5,6 @@ allowing callers to aggregate and display a one-shot automation summary.
 """
 
 import json
-import logging
 import os
 import socket
 import subprocess
@@ -13,12 +12,10 @@ import time
 from pathlib import Path
 
 from ._core import (
+    BIN_VERSION,
     BINARY,
     BINARY_DIR,
-    BIN_VERSION,
-    PLUGIN_VERSION,
     PORTS,
-    _git_cache,
     _log,
 )
 

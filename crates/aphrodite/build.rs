@@ -43,10 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	);
 
 	// Git commit hash (short form)
-	if let Ok(output) = Command::new("git")
-		.args(["rev-parse", "--short", "HEAD"])
-		.output()
-	{
+	if let Ok(output) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output() {
 		if output.status.success() {
 			let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
 			if !hash.is_empty() {
@@ -56,10 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	}
 
 	// Build timestamp (UTC ISO 8601)
-	if let Ok(output) = Command::new("date")
-		.args(["-u", "+%Y-%m-%dT%H:%M:%SZ"])
-		.output()
-	{
+	if let Ok(output) = Command::new("date").args(["-u", "+%Y-%m-%dT%H:%M:%SZ"]).output() {
 		if output.status.success() {
 			let ts = String::from_utf8_lossy(&output.stdout).trim().to_string();
 			if !ts.is_empty() {
@@ -69,10 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	}
 
 	// Target triple
-	println!(
-		"cargo:rustc-env=APHRODITE_TARGET={}",
-		env::var("TARGET").unwrap_or_default()
-	);
+	println!("cargo:rustc-env=APHRODITE_TARGET={}", env::var("TARGET").unwrap_or_default());
 
 	// Rustc version
 	if let Ok(output) = Command::new("rustc").arg("--version").output() {
@@ -85,10 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	}
 
 	// Build profile (debug / release)
-	println!(
-		"cargo:rustc-env=APHRODITE_PROFILE={}",
-		env::var("PROFILE").unwrap_or_default()
-	);
+	println!("cargo:rustc-env=APHRODITE_PROFILE={}", env::var("PROFILE").unwrap_or_default());
 
 	Ok(())
 }
