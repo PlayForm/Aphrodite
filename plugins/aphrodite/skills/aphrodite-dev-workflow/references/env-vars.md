@@ -6,7 +6,7 @@ All thresholds are configurable via environment variables. Defaults shown.
 
 | Env Var | Default | Effect |
 |---------|---------|--------|
-| `APHRODITE_ENGINE_THRESHOLD_PCT` | 0 | Trigger at N% context (0=always compress) |
+| `APHRODITE_ENGINE_THRESHOLD_PCT` | 50 | Trigger at N% context. -1=always compress, 0=disabled, >0=fill% |
 | `APHRODITE_ENGINE_PROTECT_FIRST` | 2 | Messages kept at head |
 | `APHRODITE_ENGINE_PROTECT_LAST` | 5 | Messages kept at tail |
 | `APHRODITE_ENGINE_MIN_MSGS` | 0 | Min messages before compress triggers |
