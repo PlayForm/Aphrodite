@@ -87,3 +87,17 @@
 pub mod config;
 pub mod proxy;
 pub mod retrieve;
+pub mod scripting;
+
+/// Check if Rhai scripting is enabled via env var or CLI flag.
+/// Feature-gated: returns false when compiled without `scripting` feature.
+pub fn scripting_enabled() -> bool {
+	#[cfg(feature = "scripting")]
+	{
+		std::env::var("APHRODITE_SCRIPTING").map(|v| v == "1").unwrap_or(false)
+	}
+	#[cfg(not(feature = "scripting"))]
+	{
+		false
+	}
+}

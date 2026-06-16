@@ -21,6 +21,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 use aphrodite::config::{Cli, MultiConfig, ProxyMode};
 use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, handle_ccr_delete, health_check};
 use aphrodite::retrieve;
+use aphrodite::scripting;
 
 fn main() -> anyhow::Result<()> {
 	// Worker thread count — I/O-bound proxy needs more than CPU cores.

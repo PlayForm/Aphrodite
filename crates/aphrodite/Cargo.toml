@@ -43,6 +43,11 @@ chrono = { version = "0.4", features = ["serde"] }
 
 toml = "1.1"
 zstd = { version = "0.13", default-features = false }
+rhai = { version = "1", optional = true }
+
+[features]
+default = []
+scripting = ["rhai"]
 
 [build-dependencies]
 serde = { workspace = true }
