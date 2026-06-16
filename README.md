@@ -9,7 +9,7 @@
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![bench](https://img.shields.io/badge/bench-19/19-green)](.hermes/PERFORMANCE.md)
 [![bugs](https://img.shields.io/badge/bugs-46/49-yellow)](.hermes/TASKS.md)
-[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](LICENSE)
+[![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
 ---
 
@@ -220,4 +220,4 @@ Aphrodite is a single Rust crate at `crates/aphrodite/`, using the workspace res
 
 ---
 
-*Single Rust binary. Zero forced dependencies. Apache-2.0.*
+*Single Rust binary. Zero forced dependencies. CC0-1.0.*
