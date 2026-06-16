@@ -12,6 +12,10 @@ PUSH="${2:-}"
 
 cd "$REPO_ROOT"
 
+# Sync submodules recursively
+git submodule update --init --recursive
+git add --force vendor/headroom 2>/dev/null || true
+
 # Stage all changes
 git add -u
 git add docs/ scripts/ plugins/aphrodite/ 2>/dev/null || true
