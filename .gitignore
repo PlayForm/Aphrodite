@@ -24,17 +24,19 @@ env/
 *.log
 *.lock
 *.tar.gz
-hermes-archive*
-
 # Profile runtime (symlinks + local state)
 profiles/*/bin/
 profiles/*/cache/
 profiles/*/cron/
+profiles/*/logs/
 profiles/*/memories/
 profiles/*/plugins/
 profiles/*/skills/
+profiles/*/sessions/
+profiles/*/lsp/
 profiles/*/state.db*
 profiles/*/*.json
+profiles/*/*_cache*
 profiles/*/.hermes_*
 profiles/*/.skills_*
 profiles/*/.update_check
@@ -70,3 +72,13 @@ aphrodite.local.toml
 *.pem
 *.key
 id_rsa*
+
+# Hermes leaks (catch-all)
+**/state.db*
+**/auth.json
+**/auth.lock
+**/.hermes_*
+**/.skills_*
+**/.update_check
+**/__pycache__/
+**/.DS_Store
