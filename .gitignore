@@ -1,50 +1,51 @@
-# Dependencies
-node_modules/
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Python
 __pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
+*.py[cod]
+*$py.class
+*.so
 *.egg-info/
 dist/
 build/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.last_update_check
-.env
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# Hermes / dev artifacts
 .hermes/
-reports/session_accumulator.json
-.bfg-report/
-.headroom
+.DS_Store
+*.log
+*.lock.auth
+*.lock.memories
+*.lock.cron
+profiles/*/cron/
+profiles/*/memories/
+profiles/*/auth.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
 target/
-target/**/*
 
-hermes-archive.tar.gz
-
-aphrodite.toml
-plugins/aphrodite/.test-results.json
-
-# Profile runtime artifacts
-profiles/**/*/.*snapshot*.json
-profiles/**/*/.hermes_history
-profiles/**/*/.update_check
-profiles/**/*/auth.json
-profiles/**/*/auth.lock
-profiles/**/*/bin/
-profiles/**/*/cache/
-profiles/**/*/cron/
-profiles/**/*/interrupt_debug.log
-profiles/**/*/logs/
-profiles/**/*/models_dev_cache.json
-profiles/**/*/ollama_cloud_models_cache.json
-profiles/**/*/plugins/
-profiles/**/*/provider_models_cache.json
-profiles/**/*/sessions/
-profiles/**/*/skills/
-profiles/**/*/state.db*
-
+# Secrets (never commit)
+.env
 .env.sh
-
-# Session comparison docs (generated, explicit)
-.hermes/SESSION-*.md
+aphrodite.local.toml
+*.pem
+*.key
+id_rsa*

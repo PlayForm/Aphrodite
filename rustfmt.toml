@@ -1,0 +1,7 @@
+max_width = 100
+tab_spaces = 4
+edition = "2021"
+fn_single_line = true
+match_block_trailing_comma = true
+reorder_imports = true
+group_imports = "StdExternalCrate"

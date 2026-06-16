@@ -1,0 +1,39 @@
+# Docker
+.dockerignore
+Dockerfile
+.docker/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# GitHub
+.github/
+
+# Hermes
+.hermes/
+
+# Rust
+target/
+Cargo.lock
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+pip-wheel-metadata/
+
+# Dev
+*.log
+*.lock
+.DS_Store
+node_modules/
+
+# Secrets
+.env
+.env.sh
+*.pem
+*.key
