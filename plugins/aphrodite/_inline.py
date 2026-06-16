@@ -3,7 +3,7 @@
 import hashlib
 import zlib
 
-from ._core import _inline_store
+from ._core import _inline_store, _inline_store_put
 
 
 def _inline_compress(content):
@@ -17,10 +17,7 @@ def _inline_compress(content):
             raw_bytes = content.encode("latin-1")
     raw = zlib.compress(raw_bytes, 9)
     h_bare = hashlib.sha256(raw_bytes).hexdigest()[:14]
-    _inline_store[h_bare] = content
-    # Keep store bounded (LRU eviction)
-    if len(_inline_store) > 500:
-        _inline_store.popitem(last=False)
+    _inline_store_put(h_bare, content)
     return "i:" + h_bare, len(raw)
 
 

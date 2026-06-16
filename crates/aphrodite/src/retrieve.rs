@@ -53,12 +53,28 @@ pub async fn handle_retrieve(
             }
         };
 
-        match &state.ccr {
-            Some(ccr) => {
-                match ccr.get(&hash) {
-                    Some(c) => {
-                        state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        c
+        // Check inline_ccr first (no round-trip needed for tiny entries)
+        if let Ok(mut map) = state.inline_ccr.lock() {
+            if let Some(cached) = map.get(&hash) {
+                state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                cached.clone()
+            } else {
+                // Fallback to CCR backend
+                match &state.ccr {
+                    Some(ccr) => {
+                        match ccr.get(&hash) {
+                            Some(c) => {
+                                state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                c
+                            }
+                            None => {
+                                state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
+                                    found: false, content: None, source: "none".into(),
+                                    error: Some(format!("CCR entry not found: {}", hash)),
+                                })).into_response();
+                            }
+                        }
                     }
                     None => {
                         state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -69,12 +85,31 @@ pub async fn handle_retrieve(
                     }
                 }
             }
-            None => {
-                state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
-                    found: false, content: None, source: "none".into(),
-                    error: Some(format!("CCR entry not found: {}", hash)),
-                })).into_response();
+        } else {
+            // Poisoned lock: fallback to CCR backend
+            match &state.ccr {
+                Some(ccr) => {
+                    match ccr.get(&hash) {
+                        Some(c) => {
+                            state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            c
+                        }
+                        None => {
+                            state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
+                                found: false, content: None, source: "none".into(),
+                                error: Some(format!("CCR entry not found: {}", hash)),
+                            })).into_response();
+                        }
+                    }
+                }
+                None => {
+                    state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    return (StatusCode::NOT_FOUND, Json(RetrieveResponse {
+                        found: false, content: None, source: "none".into(),
+                        error: Some(format!("CCR entry not found: {}", hash)),
+                    })).into_response();
+                }
             }
         }
     };
