@@ -46,7 +46,7 @@ from ._core import (
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
-from ._marker import _ccr_marker, _classify_content, _compress_via_proxy, _parse_ccr_markers, _parse_errors
+from ._marker import _ccr_marker, _classify_content, _compress_via_proxy, _make_ccr_preview, _parse_ccr_markers, _parse_errors
 from ._proxy import (
     _alive,
     _alive_cache,
@@ -82,15 +82,170 @@ __all__ = [
 ]
 
 # ── Module-level frozenset constants ───────────────────────────
+# Only aphrodite_* tools are protected from double-compression
+# (they already compress at the proxy level via tool_relay).
+# Everything else — read_file, skill_view, session_search, etc. —
+# flows through the normal compression pipeline.
 _ESSENTIAL_TOOLS: frozenset = frozenset({
-    "skill_view", "skills_list", "skill_manage", "memory",
-    "session_search", "read_file", "read_terminal",
+    "aphrodite_catalog", "aphrodite_compress", "aphrodite_diff",
+    "aphrodite_files", "aphrodite_rebuild", "aphrodite_reclassify",
+    "aphrodite_retrieve", "aphrodite_search", "aphrodite_stats",
+    "aphrodite_test",
 })
 _READ_KEYWORDS: frozenset = frozenset({
     "read", "show", "view", "get", "cat", "display", "retrieve",
     "fetch", "look", "see", "open", "inspect", "check", "print",
     "dump", "output",
 })
+
+# ── Tool output formatting ─────────────────────────────────────
+# Transforms raw JSON from aphrodite meta-tools into readable
+# markdown tables for the LLM, preserving all data.
+
+
+def _format_aphrodite_output(tool_name: str, result: str) -> str:
+    """Format aphrodite tool JSON output into rich markdown.
+
+    Called from _transform_tool_result for tools in _ESSENTIAL_TOOLS.
+    Returns formatted string, or original result if unparseable/unknown.
+    """
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return result
+
+    if tool_name == "aphrodite_catalog":
+        return _fmt_catalog(data)
+    elif tool_name == "aphrodite_stats":
+        return _fmt_stats(data)
+    elif tool_name == "aphrodite_diff":
+        return _fmt_diff(data)
+    elif tool_name == "aphrodite_files":
+        return _fmt_files(data)
+
+    return result
+
+
+def _fmt_catalog(data: dict) -> str:
+    items = data.get("items", [])
+    total_saved = data.get("total_saved", 0)
+    conv_turns = data.get("conv_turns", 0)
+    ref_files = data.get("referenced_files", 0)
+
+    if total_saved >= 1024:
+        saved_str = f"{total_saved / 1024:.1f}KB"
+    else:
+        saved_str = f"{total_saved}B"
+
+    lines = [
+        f"Catalog: {len(items)} items {saved_str} saved {conv_turns} turns {ref_files} files"
+    ]
+
+    if items:
+        by_type = data.get("by_type", {})
+        if by_type:
+            type_summary = " ".join(
+                f"{t}({v['count']})" for t, v in sorted(by_type.items())
+            )
+            lines.append(f"Types: {type_summary}")
+
+        lines.append("")
+        lines.append("| Hash | Type | Size | Preview |")
+        lines.append("|------|------|------|---------|")
+        for item in items:
+            h = item.get("hash", "")[:10]
+            t = item.get("type", "")
+            s = item.get("size", 0)
+            sz = f"{s / 1024:.0f}KB" if s >= 1024 else f"{s}B"
+            p = (item.get("preview", "") or "")[:80].replace("|", "\\|")
+            lines.append(f"| {h} | {t} | {sz} | {p} |")
+    else:
+        lines.append("No compressed items yet.")
+
+    return "\n".join(lines)
+
+
+def _fmt_stats(data: dict) -> str:
+    lines = ["Aphrodite Stats", ""]
+
+    # Proxy health
+    proxy = data.get("proxy", {})
+    lines.append("proxy:")
+    for name in ["token", "cache"]:
+        p = proxy.get(name, {})
+        if p.get("alive"):
+            lines.append(
+                f"  {name}: on {p.get('ccr_created', 0)} created "
+                f"{p.get('ccr_hits', 0)} hits {p.get('tokens_saved', 0)} tokens saved"
+            )
+        else:
+            lines.append(f"  {name}: off")
+
+    # Engine
+    eng = data.get("engine", {})
+    lines.append("")
+    if eng.get("active"):
+        lines.append(
+            f"engine: on {eng.get('threshold_tokens', 0)} threshold "
+            f"{eng.get('compressions', 0)} compressions "
+            f"{eng.get('protect_first_n', 0)}/{eng.get('protect_last_n', 0)} protect"
+        )
+    else:
+        lines.append("engine: off")
+
+    # Inline store
+    inline = data.get("inline_store", {})
+    entries = inline.get("entries", 0)
+    total_bytes = inline.get("total_bytes", 0)
+    if total_bytes >= 1024:
+        bytes_str = f"{total_bytes / 1024:.1f}KB"
+    else:
+        bytes_str = f"{total_bytes}B"
+    lines.append(f"inline: {entries} entries {bytes_str}")
+
+    return "\n".join(lines)
+
+
+def _fmt_diff(data: dict) -> str:
+    turns = data.get("recent", [])
+    total = data.get("turns", 0)
+
+    lines = [f"Turn History: {total} turns"]
+    if turns:
+        lines.append("")
+        for t in turns[:10]:
+            tnum = t.get("turn", "?")
+            summary = (t.get("summary", "") or "")[:100]
+            lines.append(f"T{tnum}: {summary}")
+    else:
+        lines.append("No turn history yet.")
+
+    return "\n".join(lines)
+
+
+def _fmt_files(data: dict) -> str:
+    files = data.get("files", [])
+    count = data.get("count", len(files) if isinstance(files, list) else 0)
+
+    if count == 0:
+        return "Referenced Files: 0 files"
+
+    lines = [f"Referenced Files: {count} files", ""]
+
+    if isinstance(files, dict):
+        for tool, paths in files.items():
+            lines.append(f"{tool}:")
+            for p in paths[:20]:
+                lines.append(f"  {p}")
+    elif isinstance(files, list):
+        for f in files[:30]:
+            if isinstance(f, dict):
+                lines.append(f"  {f.get('path', '')} ({f.get('tool', '')})")
+            else:
+                lines.append(f"  {f}")
+
+    return "\n".join(lines)
+
 
 # ── Hooks ─────────────────────────────────────────────────────
 
@@ -268,27 +423,14 @@ def _transform_tool_result(
     # so the LLM always sees navigation/aid info inline; regular
     # tool results stay wrapped as CCR markers to save context.
     marker_type = "aphrodite" if tool_name.startswith("aphrodite_") else "tool"
-    skip = (
-        _ESSENTIAL_TOOLS | {"aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
-        if token_alive
-        else _ESSENTIAL_TOOLS
-        | {
-            "execute_code",
-            "patch",
-            "write_file",
-            "search_files",
-            "todo",
-            "aphrodite_retrieve",
-            "aphrodite_compress",
-            "aphrodite_stats",
-        }
-    )
+    skip = _ESSENTIAL_TOOLS
     if tool_name in skip:
         if DEBUG_LOGGING:
             _log.debug(
                 "transform_tool_result: SKIP %s %.1fms (in skip list)", tool_name[:40], (time.time() - _t0) * 1000
             )
-        return result
+        # Format aphrodite tool outputs as rich markdown for readability
+        return _format_aphrodite_output(tool_name, result)
 
     threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cache_alive else INLINE_THRESHOLD
     result_len = len(result)
@@ -321,7 +463,7 @@ def _transform_tool_result(
             )
         return result
 
-    preview = result[:120].replace("\\n", " ").strip()
+    preview = _make_ccr_preview(result)
     metadata = _extract_tool_metadata(tool_name, args, result)
 
     # Try proxy compression first
@@ -1128,7 +1270,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
             return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
 
-    preview = output[:200].replace("\n", " ").strip()
+    preview = _make_ccr_preview(output)
 
     # Try proxy compression first
     if proxy_available:

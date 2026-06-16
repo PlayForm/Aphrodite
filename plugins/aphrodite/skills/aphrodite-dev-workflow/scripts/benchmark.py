@@ -5,7 +5,7 @@ Endpoints:
   GET  /health      → {"status":"ok","checks":{"cache":…,"token":…}}
   GET  /stats       → {"mode":"token","requests":{…},"ccr":{…}}
   GET  /ccr/list    → {"entries":N,"backend":"sqlite","mode":"token"}
-  POST /ccr/create  → body {"content":"…"}  → {"hash":"…","compression_ratio":…}
+  POST /ccr/create  → body {"content":"…"}  → {"hash":"…","token_savings_ratio":…}
   POST /retrieve    → body {"hash":"…"}      → {"found":true,"content":"…","source":"ccr"}
 
 Phases: health → compress (5 sizes × 3 types) → retrieve → catalog.

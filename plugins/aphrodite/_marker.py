@@ -67,17 +67,63 @@ def _classify_content(content: str) -> dict:
         ln = len(lines)
         trimmed = content[:5000]  # only analyse first 5KB for classification
 
-        # ── diff content ──────────────────────────────────────────
-        if trimmed.startswith("diff --git") or trimmed.startswith("---"):
+        # ── diff content (absorptive) ────────────────────────────
+        if trimmed.startswith("diff --git") or trimmed.startswith("---") or any(
+            line.startswith("diff --git") for line in lines[:5]
+        ):
             meta = {"type": "diff", "ln": str(ln)}
-            for line in lines[:10]:
+            files = set()
+            plus = minus = 0
+            for line in lines:
                 m = re.match(r"^\+\+\+ b/(.+)$", line)
                 if m:
                     meta["fn"] = m.group(1)
-                    break
+                    files.add(m.group(1))
+                elif line.startswith("--- a/"):
+                    files.add(line.split("/", 2)[-1].split(None, 1)[0] if "/" in line else line)
+                elif line.startswith("+") and not line.startswith("+++"):
+                    plus += 1
+                elif line.startswith("-") and not line.startswith("---"):
+                    minus += 1
+            if files:
+                meta["files"] = str(len(files))
+            meta["+"] = str(plus)
+            meta["-"] = str(minus)
             return meta
 
-        # ── Rust build errors ──────────────────────────────────────
+        # ── Terminal output (exit code pattern) ──
+        # Must come before build_output — terminal captures of build
+        # commands have "Compiling" lines but end with an exit code.
+        for line in lines[-5:]:
+            m = re.match(r"exit code[\s:]+(\d+)", line.strip(), re.IGNORECASE)
+            if m:
+                last_line = ""
+                for l2 in lines:
+                    s = l2.strip()
+                    if s:
+                        last_line = s
+                meta = {"type": "terminal", "exit": m.group(1)}
+                if last_line:
+                    meta["last"] = last_line[:60]
+                for l2 in lines[:3]:
+                    if l2.strip().startswith("$") or l2.strip().startswith(">"):
+                        meta["cmd"] = l2.strip()[:40]
+                        break
+                return meta
+
+        # ── Build output (absorptive) ────────────────────────────
+        # Must come before build_error — "Compiling" is normal output,
+        # "error[E" is a subset. We detect build output first, then
+        # let build_error refine only when it's the dominant signal.
+        if any("Compiling" in line or "Compiling" in line for line in lines[:30]):
+            meta = {"type": "build_output", "ln": str(ln)}
+            error_count = sum(1 for line in lines if "error[" in line or line.strip().startswith("error:"))
+            warning_count = sum(1 for line in lines if "warning:" in line)
+            meta["errors"] = str(error_count)
+            meta["warnings"] = str(warning_count)
+            return meta
+
+        # ── Rust build errors ────────────────────────────────────
         if "error[E" in trimmed:
             meta = {"type": "build_error", "ln": str(ln)}
             for line in lines[:20]:
@@ -138,24 +184,6 @@ def _classify_content(content: str) -> dict:
             except (json.JSONDecodeError, ValueError):
                 pass
 
-        # ── Terminal output (exit code pattern) ──
-        for line in lines[-5:]:
-            m = re.match(r"exit code[\s:]+(\d+)", line.strip(), re.IGNORECASE)
-            if m:
-                last_line = ""
-                for l2 in lines:
-                    s = l2.strip()
-                    if s:
-                        last_line = s
-                meta = {"type": "terminal", "exit": m.group(1)}
-                if last_line:
-                    meta["last"] = last_line[:60]
-                for l2 in lines[:3]:
-                    if l2.strip().startswith("$") or l2.strip().startswith(">"):
-                        meta["cmd"] = l2.strip()[:40]
-                        break
-                return meta
-
         # ── Search output (file:line: text pattern) ───────────────
         file_line_count = 0
         for line in lines[:200]:
@@ -164,17 +192,118 @@ def _classify_content(content: str) -> dict:
         if file_line_count > 3 and file_line_count > ln * 0.3:
             return {"type": "search_files", "files": str(file_line_count), "ln": str(ln)}
 
-        # ── Tabular/structured output ─────────────────────────────
+        # ── Tabular/structured output ──────────────────────────
         pipe_count = sum(1 for line in lines[:50] if "|" in line)
         if pipe_count >= 3 and pipe_count > ln * 0.2:
             return {"type": "tabular", "rows": str(pipe_count), "ln": str(ln)}
 
-        # ── Fallback: text ────────────────────────────────────────
+        # ── Error / traceback (absorptive) ─────────────────────
+        if any("Traceback" in line or "panic" in line or "Error:" in line for line in lines[:10]):
+            error_msg = "unknown"
+            for line in lines:
+                s = line.strip()
+                if "Error:" in s or "panic" in s:
+                    error_msg = s[:80]
+                    break
+                if "error:" in s.lower():
+                    error_msg = s[:80]
+                    break
+            # Also try last line for simple error messages
+            if error_msg == "unknown" and lines:
+                last = lines[-1].strip()
+                if last:
+                    error_msg = last[:80]
+            return {"type": "error", "msg": error_msg, "ln": str(ln)}
+
+        # ── Git commit log (absorptive) ────────────────────────
+        if ln >= 2 and re.match(r"^[a-f0-9]{7,40}\s", lines[0].strip()):
+            parts = lines[0].strip().split(None, 2)
+            if len(parts) >= 2:
+                subj = parts[-1] if len(parts) > 1 else ""
+                return {"type": "commit", "hash": parts[0][:8], "subject": subj[:80], "ln": str(ln)}
+
+        # ── Fallback: text ─────────────────────────────────────
         return {"type": "text", "ln": str(ln)}
     except Exception:
         if logging.getLogger("aphrodite").isEnabledFor(logging.DEBUG):
             logging.getLogger("aphrodite").debug("_classify_content: failed for %d-char content", len(content) if isinstance(content, str) else 0)
         return {"type": "text", "ln": str(len(content.splitlines())) if isinstance(content, str) else 0}
+
+
+def _make_ccr_preview(content: str, klass: dict | None = None) -> str:
+    """Generate an absorptive, content-aware CCR preview.
+
+    Uses the classification to produce a structured 1-liner that helps
+    the LLM decide whether to retrieve. Each content type gets a
+    consistent, scannable format — the "absorptive" pattern means new
+    content of the same type automatically gets the same treatment.
+
+    Args:
+        content: Raw content string.
+        klass: Pre-computed classification dict (from _classify_content).
+               If None, classification runs inline.
+
+    Returns:
+        A rich, single-line preview string (≤120 chars, pipe-safe).
+    """
+    if klass is None:
+        klass = _classify_content(content)
+
+    ctype = klass.get("type", "text")
+    ln = klass.get("ln", "?")
+
+    if ctype == "diff":
+        fn = klass.get("fn", "")
+        files = klass.get("files", "")
+        plus = klass.get("+", "?")
+        minus = klass.get("-", "?")
+        if fn and not files:
+            files = "1"
+        parts = [f"{files or '?'}f", f"+{plus}/-{minus}", f"{ln}L"]
+        if fn:
+            parts.append(fn[:40])
+        return f"[diff:{' '.join(parts)}]"
+    elif ctype == "build_output":
+        return f"[build:{klass.get('errors','0')}E {klass.get('warnings','0')}W {ln}L]"
+    elif ctype == "build_error":
+        code = klass.get("code", "?")
+        loc = klass.get("loc", "")
+        parts = [code]
+        if loc:
+            parts.append(loc[:40])
+        parts.append(f"{ln}L")
+        return f"[error:{' '.join(parts)}]"
+    elif ctype == "error":
+        return f"[error:{klass.get('msg','?')[:110]}]"
+    elif ctype == "commit":
+        return f"[commit:{klass.get('hash','???????')} {klass.get('subject','')[:100]}]"
+    elif ctype == "terminal":
+        exit_code = klass.get("exit", "?")
+        cmd = klass.get("cmd", "")
+        clean = re.sub(r"^[\$>]\s*", "", cmd.strip()) if cmd else "?"
+        return f"[terminal:{clean[:40]} exit={exit_code}]"[:120]
+    elif ctype == "search_files" or ctype == "search_results":
+        files = klass.get("files", klass.get("total", "?"))
+        return f"[grep:{files} matches {ln}L]"
+    elif ctype == "tabular":
+        return f"[table:{klass.get('rows','?')} rows {ln}L]"
+    elif ctype == "json":
+        keys = klass.get("keys", "")
+        return f"[json:{keys} {ln}L]"[:120]
+    elif ctype == "json_list":
+        return f"[json:{klass.get('len','?')} items {ln}L]"
+    elif ctype == "process_output":
+        pid = klass.get("pid", "?")
+        uptime = klass.get("uptime", "")
+        parts = [f"pid={pid}"]
+        if uptime:
+            parts.append(f"up={uptime}")
+        parts.append(f"{ln}L")
+        return f"[process:{' '.join(parts)}]"
+    else:
+        # Fallback: first meaningful content, classified
+        first = content[:110].replace("\n", " ").replace("\r", " ").strip()
+        return f"[{ctype}:{first}]"[:120]
 
 
 def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None, meta=None, center=None):
