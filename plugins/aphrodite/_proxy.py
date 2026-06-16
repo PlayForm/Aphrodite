@@ -1,11 +1,12 @@
 """aphrodite — proxy lifecycle (env loading, health checks, launch)."""
-import os
 import json
-import time
-import subprocess
-import urllib.request
 import logging
-from ._core import PORTS, BINARY, ENV_FILE
+import os
+import subprocess
+import time
+import urllib.request
+
+from ._core import BINARY, ENV_FILE, PORTS
 
 _log = logging.getLogger("aphrodite")
 

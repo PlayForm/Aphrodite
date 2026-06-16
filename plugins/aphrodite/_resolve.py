@@ -1,10 +1,10 @@
 """aphrodite — CCR resolution (retrieve + recursive unpacking)."""
 import json
 import urllib.request
-from ._core import _inline_store, _CCR_RE, RECURSIVE_DEPTH
+
+from ._core import _CCR_RE, RECURSIVE_DEPTH, _inline_store, _recent_markers
 from ._inline import _inline_retrieve
 
-_recent_markers = []  # populated by __init__.py wiring
 
 def _resolve_one(hash_val, timeout=4, query=""):
     """Resolve a single CCR hash. Checks inline store first, then tries both proxies."""
