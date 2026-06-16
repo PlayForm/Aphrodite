@@ -7,8 +7,8 @@ import re
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.58"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.4"  # plugin version
+BIN_VERSION = "v0.5.59"  # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.62.5"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -65,12 +65,25 @@ _inline_store = {}
 _referenced_files = {}  # {filepath: last_tool_name}
 _recent_markers = []  # [{hash, type, size, preview}]
 _conv_index = {}  # {turn_num: (hash, summary, size)}
-_turn_counter = 0
+_state = {"turn_counter": 0}
 _git_cache = {}  # {ts, summary}
 _FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
 
 
 # ── Shared utilities ──────────────────────────────────────────
+def _reset_turn_counter():
+    _state["turn_counter"] = 0
+
+
+def _increment_turn():
+    _state["turn_counter"] += 1
+    return _state["turn_counter"]
+
+
+def _get_turn_counter():
+    return _state["turn_counter"]
+
+
 def _fmt_size(b):
     if b >= 1_000_000:
         return f"{b / 1_000_000:.1f}MB"

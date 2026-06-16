@@ -6,6 +6,7 @@ import logging
 import urllib.request
 
 from ._core import PORTS, _inline_store
+from ._proxy import _alive
 from ._resolve import _resolve_recursive
 
 _log = logging.getLogger("aphrodite")
@@ -29,9 +30,9 @@ def _retrieve_handler(args=None, **kwargs):
             if query:
                 lines = [l for l in content.splitlines() if query.lower() in l.lower()]
                 if lines:
-                    return "\n".join(lines)
-                return content  # no matches, return full content
-            return content
+                    return json.dumps({"content": "\n".join(lines), "hash": hash_val, "size": len("\n".join(lines))})
+                return json.dumps({"content": content, "hash": hash_val, "size": len(content)})
+            return json.dumps({"content": content, "hash": hash_val, "size": len(content)})
         return f'{{"error": "CCR entry not found: {hash_val}"}}'
     except Exception as e:
         return f'{{"error": "retrieve failed: {str(e)}"}}'
@@ -50,13 +51,14 @@ def _compress_handler(args=None, **kwargs):
     h = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
     if h in _inline_store:
         return json.dumps(
-            {"hash": h, "type": type_hint, "size": len(content), "source": "cache", "compression_ratio": 0}
+            {"hash": h, "type": type_hint, "size": len(content), "source": "cache_hit", "compression_ratio": None, "note": "already in store"}
         )
 
     try:
         data = json.dumps({"content": content}).encode()
+        target = PORTS["token"] if _alive(PORTS["token"]) else PORTS["cache"]
         req = urllib.request.Request(
-            f"http://127.0.0.1:{PORTS['token']}/ccr/create", data=data, headers={"Content-Type": "application/json"}
+            f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())

@@ -8,7 +8,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from ._core import BINARY, ENV_FILE, PORTS
+from ._core import BINARY, BINARY_DIR, ENV_FILE, PORTS
 
 _log = logging.getLogger("aphrodite")
 
@@ -45,11 +45,14 @@ def _alive(port, timeout=3):
     try:
         r = urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=timeout)
         body = r.read().decode().strip()
-        try:
-            data = json.loads(body)
-            result = data.get("status") in ("healthy", "ok", "degraded")
-        except Exception:
-            result = body.strip() == "ok"
+        if not body:
+            result = True
+        else:
+            try:
+                data = json.loads(body)
+                result = data.get("status") in ("healthy", "ok", "degraded")
+            except Exception:
+                result = body.strip() == "ok"
     except Exception:
         result = False
     _alive_cache[port] = (result, now)
@@ -94,7 +97,7 @@ def _start(name, env):
 
     # ── Write PID file ──────────────────────────────────────
     try:
-        Path(f"/tmp/aphrodite-{name}.pid").write_text(str(proc.pid))
+        Path(os.path.join(BINARY_DIR, f"proxy-{name}.pid")).write_text(str(proc.pid))
     except Exception as exc:
         _log.warning("failed to write PID file for %s - %s", name, exc)
 

@@ -32,7 +32,8 @@ from ._core import (
     _inline_store,
     _recent_markers,
     _referenced_files,
-    _turn_counter,
+    _reset_turn_counter,
+    _increment_turn,
 )
 from ._engine import AphroditeContextEngine, get_engine
 from ._inline import _inline_compress, _inline_retrieve
@@ -239,7 +240,6 @@ REBUILD_SCHEMA = {
 
 def _store_conversation_turn(conversation_history=None, assistant_response=None, turn_id=0, **kwargs):
     """Post-LLM-call: store the current exchange in CCR for later retrieval."""
-    global _turn_counter
     if not conversation_history or assistant_response is None:
         return
 
@@ -251,8 +251,7 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
         return
 
     target = PORTS["token"] if token_alive else PORTS["cache"]
-    _turn_counter += 1
-    tnum = _turn_counter
+    tnum = _increment_turn()
 
     # Capture the last user message from conversation history
     last_user = ""
@@ -649,7 +648,7 @@ def _group_into_turns(conversation_history):
 
 def _extract_preview(marker, conversation_history):
     """Extract a short preview for a CCR marker from conversation history.
-    
+
     NOTE: No longer called by catalog loop - replaced by O(1) preview_cache.
     Kept as fallback for manual/inline use outside pre_llm_hook.
     """
