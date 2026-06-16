@@ -317,7 +317,7 @@ def _write_startup_log(cache_ok, token_ok, auto_summary):
 def _inject_expand_guidance():
     """Return auto-expand guidance string explaining that tool CCR markers are resolved inline."""
     return (
-        "[APHRODITE] Tool outputs are auto-expanded - you see full content inline, "
+        "💋 Tool outputs are auto-expanded - you see full content inline, "
         "no <<<CCR:...>>> markers for tool results. "
         "If you ever see a CCR marker (for context or terminal output), use "
         "aphrodite_retrieve(hash) to fetch it."
@@ -378,6 +378,8 @@ def on_start(**kw):
 
     # Startup observability log
     _write_startup_log(cache_ok, token_ok, auto_summary)
+
+    return f"💋 aphrodite v{PLUGIN_VERSION} — cache={'UP' if cache_ok else 'DOWN'} token={'UP' if token_ok else 'DOWN'}"
 
 
 def _wait_alive(port, retries=10, delay=0.3):

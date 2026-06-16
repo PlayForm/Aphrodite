@@ -99,7 +99,7 @@ def _inject_session_instruction(conversation_history):
     """Inject ephemeral system message with aphrodite version + proxy info.
 
     Called once per session from ``_pre_llm_hook`` on its first invocation.
-    Injects a single ``[APHRODITE]`` system message so every session starts
+    Injects a single ``💋`` system message so every session starts
     with the agent aware of the CCR toolchain and proxy state.
     """
     # Determine engine threshold display
@@ -113,7 +113,7 @@ def _inject_session_instruction(conversation_history):
     token_alive = _alive_cached(PORTS["token"])
     # Build the instruction
     lines = [
-        f"[APHRODITE] v{PLUGIN_VERSION} active.",
+        f"💋 aphrodite v{PLUGIN_VERSION} active.",
     ]
     if token_alive:
         lines.append(
@@ -763,7 +763,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     # ── 3. Build the catalog (mode-aware) ─────────────────────
     parts = []
     if markers or _conv_index or compress_hint or len(_referenced_files) > 5 or DEBUG_LOGGING or _expand_guidance:
-        parts.append("[APHRODITE]")
+        parts.append("💋")
 
         # Auto-expand guidance - reminds LLM that tool CCR markers are
         # resolved inline and only context/terminal markers need retrieval
