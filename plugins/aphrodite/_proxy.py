@@ -1,4 +1,23 @@
-"""aphrodite - proxy lifecycle (env loading, health checks, launch)."""
+"""aphrodite - proxy lifecycle (env loading, health checks, launch).
+
+/ccr/create CONTRACT
+────────────────────
+All callers send the CONTENT ITSELF as raw bytes with
+Content-Type: application/octet-stream - NO JSON wrapper.
+
+  Correct:  POST /ccr/create  body=<raw bytes of content>  Content-Type: octet-stream
+  Wrong:    POST /ccr/create  body={"content":"<content>"}  Content-Type: application/json
+
+The proxy reads the request body directly as the content to compress.
+No JSON parsing of the body - it IS the content.
+
+Callers (all verified to send raw bytes + octet-stream):
+  _marker.py      _compress_via_proxy   → content.encode("utf-8")
+  _hooks.py       _store_conversation   → json.dumps({...}).encode()  [wraps in JSON dict - intentional, this IS the data model]
+  _hooks.py       turn archive          → packed.encode()             [raw JSON array bytes]
+  _tools.py       _compress_handler     → content.encode()            [raw content bytes]
+  _engine.py      compress              → packed.encode()             [raw packed bytes]
+"""
 
 import concurrent.futures
 import http.client

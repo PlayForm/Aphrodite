@@ -45,7 +45,7 @@ from ._core import (
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
-from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
+from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers, _parse_errors
 from ._proxy import _alive, _alive_cache, _alive_cached, _alive_turn_cache, _expand_guidance
 from ._resolve import _resolve_one
 from ._tools import _compress_handler, _retrieve_handler
@@ -588,7 +588,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                         )
                     packed = json.dumps(summaries)
                     if len(packed) > 500:
-                        data = json.dumps({"content": packed}).encode()
+                        data = packed.encode()
                         req = urllib.request.Request(
                             f"http://127.0.0.1:{target}/ccr/create",
                             data=data,
@@ -1052,6 +1052,7 @@ def _stats_handler(args=None, **kwargs):
         result["engine"] = {
             "active": True,
             "compressions": eng.compression_count,
+            "marker_parse_errors": _parse_errors,
             "threshold_tokens": eng.threshold_tokens,
             "last_prompt_tokens": eng.last_prompt_tokens,
             "context_length": eng.context_length,

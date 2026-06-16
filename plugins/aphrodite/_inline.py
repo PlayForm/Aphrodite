@@ -7,14 +7,8 @@ from ._core import _inline_store, _inline_store_put
 
 def _inline_compress(content):
     """Compress content locally using zlib, store in session dict. Returns (hash, compressed_size)."""
-    try:
-        raw_bytes = content.encode("utf-8")
-    except UnicodeEncodeError:
-        # Non-UTF-8 content: encode with lossy replacement, fall back to latin-1
-        raw_bytes = content.encode("utf-8", errors="replace")
-        if not raw_bytes:
-            raw_bytes = content.encode("latin-1")
-    h_bare = hashlib.sha256(raw_bytes).hexdigest()[:16]
+    raw_bytes = content.encode("utf-8")
+    h_bare = hashlib.sha256(raw_bytes).hexdigest()[:24]
     _inline_store_put(h_bare, content)
     return "i:" + h_bare, len(content)
 
