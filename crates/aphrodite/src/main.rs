@@ -60,19 +60,68 @@ async fn main() -> anyhow::Result<()> {
         handles.push(handle);
     }
 
-    // Wait for shutdown signal
+    // Wait for first shutdown signal — triggers graceful shutdown in all proxies
     shutdown_signal().await;
-    tracing::info!("shutdown signal received, stopping all listeners");
+    tracing::info!("shutdown signal received, draining in-flight requests...");
 
-    for h in &handles {
-        h.abort();
+    // Clone abort handles so we can force-kill after handles are moved into join_all
+    let abort_handles: Vec<_> = handles.iter().map(|h| h.abort_handle()).collect();
+
+    // Listen for a second Ctrl+C to force immediate shutdown
+    let second_signal = async {
+        let _ = tokio::signal::ctrl_c().await;
+        tracing::warn!("second shutdown signal received, forcing immediate shutdown");
+    };
+    tokio::pin!(second_signal);
+
+    // 5-second drain timeout before forcing abort
+    let drain_timeout = tokio::time::sleep(std::time::Duration::from_secs(5));
+    tokio::pin!(drain_timeout);
+
+    // Wait for graceful drain (via axum's with_graceful_shutdown), second signal, or timeout
+    let drain_fut = futures::future::join_all(handles);
+    tokio::pin!(drain_fut);
+
+    tokio::select! {
+        _ = &mut drain_fut => {
+            tracing::info!("all proxy listeners completed gracefully");
+        }
+        _ = &mut drain_timeout => {
+            tracing::info!("drain timeout (5s) reached, aborting remaining tasks");
+            for h in &abort_handles {
+                h.abort();
+            }
+            // Let aborted tasks settle
+            let _ = (&mut drain_fut).await;
+        }
+        _ = &mut second_signal => {
+            tracing::info!("force shutdown on second signal, aborting remaining tasks");
+            for h in &abort_handles {
+                h.abort();
+            }
+            let _ = (&mut drain_fut).await;
+        }
     }
-    futures::future::join_all(handles).await;
 
     Ok(())
 }
 
-async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
+async fn run_single(name: String, mut cli: Cli) -> anyhow::Result<()> {
+    // Resolve relative ccr_db_path against the binary directory, not CWD.
+    // This way the database path is stable regardless of where the process is launched from.
+    if !cli.ccr_db_path.as_os_str().is_empty() && !cli.ccr_db_path.is_absolute() {
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                let old = cli.ccr_db_path.display().to_string();
+                cli.ccr_db_path = exe_dir.join(&cli.ccr_db_path);
+                tracing::info!(
+                    "resolved relative ccr_db_path from {} to {}",
+                    old,
+                    cli.ccr_db_path.display()
+                );
+            }
+        }
+    }
     if let Some(parent) = cli.ccr_db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
