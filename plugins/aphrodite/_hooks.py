@@ -250,7 +250,7 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
     last_user = ""
     for msg in reversed(conversation_history):
         if msg.get("role") == "user":
-            last_user = msg.get("content", "")[:200]
+            last_user = msg.get("content", "")
             break
 
     summary = f"T{tnum}: {last_user}… → {str(assistant_response)[:200]}"
@@ -271,7 +271,7 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
                     {
                         "turn": tnum,
                         "user": last_user,
-                        "assistant": str(assistant_response)[:5000],
+                        "assistant": str(assistant_response),
                     }
                 )
             }
