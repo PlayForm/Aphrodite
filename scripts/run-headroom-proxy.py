@@ -10,14 +10,14 @@ Usage:
     python3 scripts/run-headroom-proxy.py cache
     python3 scripts/run-headroom-proxy.py token
 
-Requires:
-    headroom CLI installed (pip install headroom-ai or vendor venv)
-    HEADROOM_DEEPSEEK_KEY env var (or DEEPSEEK_API_KEY / APHRODITE_API_KEY)
+Auth:
+    Uses APHRODITE_API_KEY from environment (same key Hermes uses)
+    Falls back to DEEPSEEK_API_KEY, then HEADROOM_DEEPSEEK_KEY
 
-Optimized launch parameters for Hermes:
+Optimized for Hermes:
     --openai-api-url → DeepSeek OpenAI-compatible endpoint
     --no-subscription-tracking → removes subscription polling overhead
-    --no-optimize (cache mode) → pure caching, no compression
+    --no-optimize (cache mode) → pure caching, zero compression overhead
     --workers 2 → balanced for local dev
 """
 import os
@@ -30,9 +30,9 @@ DEEPSEEK_URL = "https://api.deepseek.com/v1"
 
 def get_api_key():
     return (
-        os.environ.get("HEADROOM_DEEPSEEK_KEY")
+        os.environ.get("APHRODITE_API_KEY")
         or os.environ.get("DEEPSEEK_API_KEY")
-        or os.environ.get("APHRODITE_API_KEY", "")
+        or os.environ.get("HEADROOM_DEEPSEEK_KEY", "")
     )
 
 
@@ -61,7 +61,7 @@ def main():
     cfg = configs[mode]
     api_key = get_api_key()
     if not api_key:
-        print("ERROR: Set HEADROOM_DEEPSEEK_KEY, DEEPSEEK_API_KEY, or APHRODITE_API_KEY", file=sys.stderr)
+        print("ERROR: Set APHRODITE_API_KEY, DEEPSEEK_API_KEY, or HEADROOM_DEEPSEEK_KEY", file=sys.stderr)
         sys.exit(1)
 
     print(f"=== {cfg['desc']} ===")
@@ -80,7 +80,7 @@ def main():
     ]
 
     env = os.environ.copy()
-    env["HEADROOM_DEEPSEEK_KEY"] = api_key
+    env["APHRODITE_API_KEY"] = api_key
 
     proc = subprocess.Popen(cmd, env=env)
     print(f"PID: {proc.pid} | Health: curl http://127.0.0.1:{cfg['port']}/health")
