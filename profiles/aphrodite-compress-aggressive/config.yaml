@@ -184,7 +184,7 @@ auxiliary:
     timeout: 30
     extra_body: {}
   title_generation:
-    provider: auto
+    provider: deepseek
     model: ''
     base_url: ''
     api_key: ''
