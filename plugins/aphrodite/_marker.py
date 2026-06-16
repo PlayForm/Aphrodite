@@ -1,6 +1,7 @@
 """aphrodite — marker formatting and proxy compression."""
 import json
 import urllib.request
+
 from ._core import _CCR_RE
 
 

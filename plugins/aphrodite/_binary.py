@@ -1,10 +1,11 @@
 """aphrodite — binary download and platform detection."""
-import os
-import stat
-import platform
-import urllib.request
 import logging
-from ._core import BINARY, BINARY_DIR, BIN_VERSION, REPO
+import os
+import platform
+import stat
+import urllib.request
+
+from ._core import BIN_VERSION, BINARY, BINARY_DIR, REPO
 
 _log = logging.getLogger("aphrodite")
 
