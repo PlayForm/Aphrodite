@@ -37,7 +37,7 @@ from ._core import (
 )
 from ._engine import AphroditeContextEngine, get_engine
 from ._inline import _inline_compress, _inline_retrieve
-from ._marker import _ccr_marker, _compress_via_proxy
+from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
 from ._proxy import _alive, on_start
 from ._tools import COMPRESS_SCHEMA, RETRIEVE_SCHEMA, _compress_handler, _retrieve_handler
 
@@ -297,38 +297,6 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
         _log.debug("conv-cache: stored T%d → %s (%d total)", tnum, ccr["hash"], len(_conv_index))
     except Exception as exc:
         _log.debug("_store_conversation_turn: %s", exc)
-
-
-def _parse_ccr_markers(text):
-    """Parse <<<CCR:hash|type|size|mode>>> markers from text. Returns list of dicts."""
-    markers = []
-    for match in _CCR_RE.finditer(text):
-        m = match.group(1)
-        parts = m.split("|")
-        if len(parts) >= 3:
-            try:
-                sz = int(parts[2])
-                # Extract preview text after the >>> terminator
-                marker_end = match.end()  # position right after >>>
-                preview = text[marker_end:].strip()[:200] if marker_end < len(text) else ""
-                markers.append(
-                    {
-                        "hash": str(parts[0]) if parts[0] else "",
-                        "type": str(parts[1]),
-                        "size": sz,
-                        "mode": str(parts[3]) if len(parts) > 3 else "?",
-                        "preview": preview,
-                    }
-                )
-            except ValueError:
-                _log.debug("_parse_ccr_markers: malformed marker skipped in %d-char text", len(text) if isinstance(text, str) else 0)
-    # Filter out entries with missing/empty hashes
-    # Filter: real CCR hashes are hex (0-9,a-f), ≥8 chars. Placeholders like abc123 filtered.
-    return [
-        m
-        for m in markers
-        if m["hash"] and len(m["hash"]) >= 8 and all(c in "0123456789abcdef" for c in m["hash"].lower())
-    ]
 
 
 def _git_summary():

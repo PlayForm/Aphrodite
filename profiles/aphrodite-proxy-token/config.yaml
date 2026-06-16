@@ -27,6 +27,7 @@ agent:
   restart_drain_timeout: 180
   api_max_retries: 3
   service_tier: ''
+  show_tool_calls: true
   tool_use_enforcement: auto
   task_completion_guidance: true
   environment_probe: true
@@ -245,8 +246,8 @@ display:
   tui_auto_resume_recent: false
   tui_agents_nudge: true
   bell_on_complete: false
-  show_reasoning: false
-  streaming: false
+  show_reasoning: true
+  streaming: true
   timestamps: false
   final_response_markdown: strip
   persistent_output: true
@@ -494,7 +495,7 @@ tools:
     search_default_limit: 5
     max_search_limit: 20
 logging:
-  level: INFO
+  level: DEBUG
   max_size_mb: 5
   backup_count: 3
 model_catalog:
