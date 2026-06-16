@@ -82,3 +82,9 @@ id_rsa*
 **/.update_check
 **/__pycache__/
 **/.DS_Store
+
+# Aphrodite observability (local temp - gitignored)
+~/.hermes/temporary/
+~/.hermes/aphrodite/*.md
+~/.hermes/aphrodite/*.log
+~/.hermes/aphrodite/*.json
