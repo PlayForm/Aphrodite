@@ -25,6 +25,7 @@ def _cfg_int(name, default):
 
 
 ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 50)
+# Semantics: -1 = always compress, 0 = disabled, >0 = fill% threshold
 ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 1)
 ENGINE_PROTECT_LAST = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 1)
 ENGINE_MIN_MSGS = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 4)

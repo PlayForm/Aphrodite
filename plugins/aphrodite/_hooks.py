@@ -50,6 +50,7 @@ from ._tools import _compress_handler, _retrieve_handler
 # all hooks within the same turn see a consistent proxy state
 _alive_turn_cache: dict[int, bool] = {}  # {port: bool}
 _last_user_msg = ""  # cached by pre_llm_hook for store_conversation_turn
+_catalog_injected_this_turn: bool = False  # guard vs double-inject on LLM retry
 
 
 def _alive_cached(port: int) -> bool:
@@ -269,8 +270,8 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
 
     if _DEV:
         return
-    token_alive = _alive_cached(PORTS["token"])
-    cache_alive = _alive_cached(PORTS["cache"])
+    token_alive = _alive(PORTS["token"])
+    cache_alive = _alive(PORTS["cache"])
     if not token_alive and not cache_alive:
         return
 
@@ -361,12 +362,13 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         return
 
     # Refresh turn-scoped alive cache for consistent proxy state within this turn
-    global _alive_turn_cache, _scanned_msg_idx, _last_user_msg
+    global _alive_turn_cache, _scanned_msg_idx, _last_user_msg, _catalog_injected_this_turn
     _alive_turn_cache = {
         PORTS["token"]: _alive(PORTS["token"]),
         PORTS["cache"]: _alive(PORTS["cache"]),
     }
     _last_user_msg = user_message or ""  # cache for _store_conversation_turn
+    _catalog_injected_this_turn = False  # reset per-turn, allows re-injection on fresh calls
 
     token_alive = _alive_cached(PORTS["token"])
     cache_alive = _alive_cached(PORTS["cache"])
@@ -416,6 +418,10 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             ctx_len,
             _fmt_size(total_bytes),
         )
+
+    # CATALOG_MODE "tool" early-return when no markers - nothing to catalog
+    if CATALOG_MODE == "tool" and not markers:
+        return None
 
     # ── 2. Compress old turns to CCR (skip already-compressed) ──
     compress_hint = ""
@@ -524,7 +530,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             expanded = []
             for m in live:
                 h = m.get("hash", "")
-                if m["size"] < 10240 and h in _inline_store:
+                if m.get("size", 0) < 10240 and h in _inline_store:
                     content = _inline_store[h]
                     preview = content[:200].replace("\n", " ").strip()
                     preview_cache[h] = preview
@@ -606,11 +612,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 )
 
     if parts:
+        if _catalog_injected_this_turn:
+            if DEBUG_LOGGING:
+                _log.debug("pre_llm_hook: SKIP catalog inject (already injected this turn)")
+            return None
 
-        # ── Headroom passthrough marker ─────────────────────
-        if headroom_hdrs:
-            joined = " | ".join(f"{k}:{v}" for k, v in headroom_hdrs.items())
-            parts.append(f"  [x-headroom] {joined}")
         catalog = "\n".join(parts)
         if DEBUG_LOGGING:
             _log.debug(
@@ -626,6 +632,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             )
         # Inject catalog as ephemeral system message - Hermes expects None from pre_llm_call hooks
         conversation_history.append({"role": "system", "content": catalog, "ephemeral": True})
+        _catalog_injected_this_turn = True
     return None
 
 
@@ -683,6 +690,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     proxy_available = token_alive or cache_alive
 
     out_len = len(output)
+    orig_len = out_len  # saved before possible build mutation below
     if out_len < TERMINAL_THRESHOLD:  # use configured threshold
         if DEBUG_LOGGING:
             _log.debug(
@@ -763,9 +771,11 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                     h, _ = ccr
                     if DEBUG_LOGGING:
                         _log.debug("terminal_hook: BUILD-CCR %s:%s", "token" if token_alive else "cache", h)
+                    _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
                     return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
             # Inline fallback
             h, _ = _inline_compress(output)
+            _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
             return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
 
     preview = output[:200].replace("\n", " ").strip()
@@ -782,20 +792,22 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                     "terminal_hook: CCR %s:%s size=%s ratio=%.1fx",
                     "token" if token_alive else "cache",
                     h,
-                    out_len,
+                    orig_len,
                     ratio,
                 )
-            return f"<<<CCR:{h}|terminal|{out_len}>>> {preview}…(use aphrodite_retrieve)"
+            _recent_markers.append({"hash": h, "type": "terminal", "size": orig_len, "preview": preview})
+            return f"<<<CCR:{h}|terminal|{orig_len}>>> {preview}…(use aphrodite_retrieve)"
         elif DEBUG_LOGGING:
             _log.debug("terminal_hook: PROXY FAIL - returned no hash (cmd: %s)", command[:60])
 
     # Fallback: inline compression
-    if out_len >= INLINE_THRESHOLD:
+    if orig_len >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(output)
             if DEBUG_LOGGING:
-                _log.debug("terminal_hook: INLINE hash=%s size=%s", h, out_len)
-            return f"<<<CCR:{h}|terminal|{out_len}>>> {preview}…(use aphrodite_retrieve)"
+                _log.debug("terminal_hook: INLINE hash=%s size=%s", h, orig_len)
+            _recent_markers.append({"hash": h, "type": "terminal", "size": orig_len, "preview": preview})
+            return f"<<<CCR:{h}|terminal|{orig_len}>>> {preview}…(use aphrodite_retrieve)"
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("terminal_hook: INLINE FAIL (cmd: %s)", command[:60])
@@ -951,6 +963,18 @@ def _search_handler(args=None, **kwargs):
     args = args if isinstance(args, dict) else {}
     query = args.get("query", "").lower()
     ccr_type = args.get("type", "")
+
+    # Guard: require minimum query length for meaningful search
+    if query and len(query) < 3:
+        return json.dumps(
+            {
+                "query": query,
+                "type_filter": ccr_type,
+                "matches": 0,
+                "error": "query too short - minimum 3 characters required",
+                "results": [],
+            }
+        )
 
     # Lazily initialize trigram index on first search
     if not _inline_index_enabled and _inline_store:
@@ -1120,25 +1144,27 @@ def _test_handler(args=None, **kwargs):
         feature_results = {}
         for name, env_overrides in toggles.items():
             saved = {k: os.environ.get(k, "") for k in env_overrides}
-            for k, v in env_overrides.items():
-                os.environ[k] = v
-            feature_results[name] = {
-                "env": env_overrides,
-                "proxy_alive": _alive(9798),
-                "cache_alive": _alive(9797),
-                "thresholds": {
-                    "terminal": TERMINAL_THRESHOLD,
-                    "inline": INLINE_THRESHOLD,
-                    "tool_token": TOOL_THRESHOLD_TOKEN,
-                    "tool_cache": TOOL_THRESHOLD_CACHE,
-                },
-                "engine_threshold": ENGINE_THRESHOLD_PCT,
-            }
-            for k, orig in saved.items():
-                if orig:
-                    os.environ[k] = orig
-                else:
-                    os.environ.pop(k, None)
+            try:
+                for k, v in env_overrides.items():
+                    os.environ[k] = v
+                feature_results[name] = {
+                    "env": env_overrides,
+                    "proxy_alive": _alive(9798),
+                    "cache_alive": _alive(9797),
+                    "thresholds": {
+                        "terminal": TERMINAL_THRESHOLD,
+                        "inline": INLINE_THRESHOLD,
+                        "tool_token": TOOL_THRESHOLD_TOKEN,
+                        "tool_cache": TOOL_THRESHOLD_CACHE,
+                    },
+                    "engine_threshold": ENGINE_THRESHOLD_PCT,
+                }
+            finally:
+                for k, orig in saved.items():
+                    if orig:
+                        os.environ[k] = orig
+                    else:
+                        os.environ.pop(k, None)
         report["feature_toggles"] = feature_results
 
     report["summary"] = {
