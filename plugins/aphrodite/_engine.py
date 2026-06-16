@@ -1,4 +1,4 @@
-"""aphrodite — ContextEngine for Hermes compression pipeline."""
+"""aphrodite - ContextEngine for Hermes compression pipeline."""
 
 import json
 import logging
@@ -46,8 +46,8 @@ def _fire_hook(name, **kwargs):
         from hermes_cli.plugins import invoke_hook
 
         invoke_hook(name, **kwargs)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.debug("_fire_hook %s: %s", name, exc)
 
 
 class AphroditeContextEngine(ContextEngine):
@@ -122,7 +122,7 @@ class AphroditeContextEngine(ContextEngine):
                 boundary += 1
                 tail_n += 1
             # After sweeping orphan tool messages, scan backward to find
-            # the assistant that owns them — not the last tool message.
+            # the assistant that owns them - not the last tool message.
             while boundary > head_n and messages[boundary - 1].get("role") in ("tool", "assistant"):
                 if messages[boundary - 1].get("tool_calls"):
                     boundary -= 1
@@ -169,14 +169,15 @@ class AphroditeContextEngine(ContextEngine):
                 with urllib.request.urlopen(req, timeout=5) as r:
                     ccr = json.loads(r.read())
                 hash_val = ccr["hash"]
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.debug("compress: proxy CCR fail - %s", exc)
 
         if not hash_val:
             try:
                 hash_val, _ = _inline_compress(packed)
                 size_str = _fmt_size(len(packed))
             except Exception:
+                _log.warning("compress: inline fallback failed for %d-byte packed msgs", len(packed))
                 return messages
 
         ccr = _ccr_marker(hash_val, "context", size_str, mode="engine")

@@ -3,9 +3,9 @@
 Launch headroom as a standalone caching proxy for Hermes Agent.
 
 Modes:
-    cache       — response caching only (:9799), saves API costs
-    token       — full compression + CCR (:9800)
-    benchmark   — cache mode with max workers to saturate cache
+    cache       - response caching only (:9799), saves API costs
+    token       - full compression + CCR (:9800)
+    benchmark   - cache mode with max workers to saturate cache
 
 Usage:
     python3 scripts/run-headroom-proxy.py cache       # 1 worker, full traceability
@@ -41,19 +41,19 @@ def main():
         "cache": {
             "port": 9799,
             "workers": 1,
-            "desc": "headroom-cache — 1 worker, full traceability (:9799)",
+            "desc": "headroom-cache - 1 worker, full traceability (:9799)",
             "flags": ["--no-optimize", "--no-ccr-marker", "--no-telemetry"],
         },
         "benchmark": {
             "port": 9799,
             "workers": 8,
-            "desc": "headroom-benchmark — 8 workers, cache saturation (:9799)",
+            "desc": "headroom-benchmark - 8 workers, cache saturation (:9799)",
             "flags": ["--no-optimize", "--no-ccr-marker", "--no-telemetry"],
         },
         "token": {
             "port": 9800,
             "workers": 1,
-            "desc": "headroom-token — full compression + CCR (:9800)",
+            "desc": "headroom-token - full compression + CCR (:9800)",
             "flags": ["--no-telemetry"],
         },
     }
@@ -61,7 +61,7 @@ def main():
     if mode not in configs:
         print(f"Usage: {sys.argv[0]} [cache|benchmark|token]")
         for m, c in configs.items():
-            print(f"  {m:<11} — {c['desc']}")
+            print(f"  {m:<11} - {c['desc']}")
         sys.exit(1)
 
     cfg = configs[mode]
@@ -73,6 +73,9 @@ def main():
     print(f"=== {cfg['desc']} ===")
     print(f"  Upstream: {DEEPSEEK_URL}")
     print(f"  Workers:  {cfg['workers']}")
+    if cfg["workers"] > 1:
+        print()
+        print("[WARN] CCR fragmentation possible with >1 worker. Use 1 worker for deterministic CCR.")
     print()
 
     cmd = [

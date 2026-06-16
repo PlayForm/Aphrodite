@@ -1,4 +1,4 @@
-//! aphrodite — Reverse proxy with Chat Completions API support.
+//! aphrodite - Reverse proxy with Chat Completions API support.
 //!
 //! Two modes:
 //! - **Cache** (:9797): In-memory CCR, lightweight compression, no tool injection.
@@ -29,7 +29,7 @@ use headroom_core::ccr::backends::in_memory::InMemoryCcrStore;
 use headroom_core::ccr::backends::sqlite::SqliteCcrStore;
 use headroom_core::ccr::{compute_key, CcrStore};
 
-/// API key wrapper with safe Debug — never leaks to logs.
+/// API key wrapper with safe Debug - never leaks to logs.
 #[derive(Clone)]
 pub struct Secret(pub(crate) String);
 
@@ -77,21 +77,29 @@ pub struct AppState {
     pub tool_relay: bool,
     pub notify_url: Option<String>,
     pub notify_key: Option<String>,
-    /// Dev mode — verbose logging.
+    /// Dev mode - verbose logging.
     pub dev: bool,
 
     // Structured debug
     /// Ring buffer of last 50 request summaries
+    /// Lock uses `.lock().map(...).unwrap_or_default()` - poison is safely
+    /// tolerated: a poisoned mutex returns Err, and unwrap_or_default gives
+    /// an empty/logical-default so the proxy stays up.
     pub request_history: std::sync::Mutex<Vec<serde_json::Value>>,
-    /// Inline CCR for tiny entries — no round-trip needed (< INLINE_CCR_THRESHOLD bytes)
+    /// Inline CCR for tiny entries - no round-trip needed (< INLINE_CCR_THRESHOLD bytes)
+    /// Lock uses `.lock().map(...)` - same poison safety pattern.
     pub inline_ccr: std::sync::Mutex<std::collections::HashMap<String, String>>,
 
     // Stats
     /// Latency histogram buckets (microseconds): 1ms, 10ms, 100ms, 1s, 10s
     pub latency_buckets: [AtomicU64; 5],
     /// Track last N errors for hot-path analysis
+    /// Mapped through `.lock().map(...)` - a poisoned lock returns Err and
+    /// unwrap_or_default provides an empty Vec so error recording degrades
+    /// gracefully without crashing the proxy.
     pub last_errors: std::sync::Mutex<Vec<String>>,
     /// Compression decision counters by content type
+    /// Uses `.lock().map(...)` - poison tolerant by design.
     pub compressions_by_type: std::sync::Mutex<std::collections::HashMap<String, u64>>,
 
     // Stats
@@ -147,16 +155,16 @@ impl AppState {
         }
     }
 
-    /// Per-type threshold — code stays in context longer, logs compressed aggressively.
+    /// Per-type threshold - code stays in context longer, logs compressed aggressively.
     fn threshold_for(&self, ct: &str) -> usize {
         let base = self.compress_threshold();
         // Auto-tune: adjust thresholds based on historical compression ratios
         let ratio = self.compression_ratio_ema.load(Ordering::Relaxed) as f64 / 100.0;
         let tune = if ratio > 20.0 {
-            // Very aggressive — raise thresholds to preserve more content
+            // Very aggressive - raise thresholds to preserve more content
             2.0
         } else if ratio < 3.0 && ratio > 0.0 {
-            // Very conservative — lower thresholds to compress more
+            // Very conservative - lower thresholds to compress more
             0.5
         } else {
             1.0
@@ -314,7 +322,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         ccr_misses: AtomicU64::new(0),
         ccr_created: AtomicU64::new(0),
         tool_relay_calls: AtomicU64::new(0),
-        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x — neutral, avoids startup scale-up
+        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x - neutral, avoids startup scale-up
     })
 }
 
@@ -322,7 +330,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
 
 
-/// Generate a simple summary — first 3 lines or first 200 chars.
+/// Generate a simple summary - first 3 lines or first 200 chars.
 #[allow(dead_code)]
 fn generate_summary(content: &str) -> String {
     let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).take(3).collect();
@@ -334,7 +342,7 @@ fn generate_summary(content: &str) -> String {
     }
 }
 
-/// Catch-all proxy handler — forwards any request to DeepSeek.
+/// Catch-all proxy handler - forwards any request to DeepSeek.
 /// Specifically handles Chat Completions API at /v1/chat/completions.
 pub async fn proxy_handler(
     State(state): State<Arc<AppState>>,
@@ -505,7 +513,7 @@ fn detect_content_type(content: &str) -> &'static str {
         return "json";
     }
     
-    // Error output — always keep visible
+    // Error output - always keep visible
     if first_line.contains("error") || first_line.contains("Error") || first_line.contains("ERROR")
         || first_line.contains("Traceback") || first_line.contains("panic")
         || first_line.starts_with("thread '") 
@@ -544,9 +552,9 @@ fn detect_content_type(content: &str) -> &'static str {
         return "git";
     }
     
-    // Code detection — language-specific
+    // Code detection - language-specific
     if content.lines().count() > 3 {
-        // Rust — line-anchored to avoid false positives on Python/log text containing "fn "
+        // Rust - line-anchored to avoid false positives on Python/log text containing "fn "
         if content.lines().any(|l| {
             let t = l.trim_start();
             t.starts_with("fn ") || t.starts_with("pub fn ") || t.starts_with("async fn ")
@@ -688,7 +696,7 @@ async fn compress_chat_completion(
                     }
                 }
 
-                // Tool injection removed — aphrodite_retrieve is registered by the Python plugin.
+                // Tool injection removed - aphrodite_retrieve is registered by the Python plugin.
                 // Injecting into the response tool_calls array was incorrect (Bug 18).
             }
         }
@@ -745,6 +753,7 @@ async fn execute_tool_relay(
                 let hash = compute_key(content.as_bytes());
                 let size = content.len();
                 ccr.put(&hash, content);
+                state.tokens_saved.fetch_add(size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
                 Ok(serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}))
             } else {
                 Err("CCR not enabled".into())
@@ -780,7 +789,7 @@ pub async fn handle_ccr_create(
         state.ccr_created.fetch_add(1, Ordering::Relaxed);
         state.tokens_saved.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
 
-        // Background summary disabled — burns process + extra CCR entries
+        // Background summary disabled - burns process + extra CCR entries
         // if req.content.len() > 1024 { ... }
     }
 
@@ -833,8 +842,8 @@ pub async fn handle_ccr_list(
 pub async fn health_check(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    // Local-only health — no upstream API call (done separately via /health/upstream)
-    // Always 200 — capability state conveyed via JSON body (CCR is optional/opt-in)
+    // Local-only health - no upstream API call (done separately via /health/upstream)
+    // Always 200 - capability state conveyed via JSON body (CCR is optional/opt-in)
     let ccr_ok = state.ccr.is_some();
 
     (StatusCode::OK, Json(serde_json::json!({
@@ -877,7 +886,7 @@ mod tests {
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
-        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x — neutral, avoids startup scale-up
+        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x - neutral, avoids startup scale-up
             request_history: Mutex::new(Vec::new()),
         inline_ccr: Mutex::new(std::collections::HashMap::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
@@ -966,7 +975,7 @@ mod tests {
             ccr_misses: AtomicU64::new(0),
             ccr_created: AtomicU64::new(0),
             tool_relay_calls: AtomicU64::new(0),
-        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x — neutral, avoids startup scale-up
+        compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x - neutral, avoids startup scale-up
             request_history: Mutex::new(Vec::new()),
         inline_ccr: Mutex::new(std::collections::HashMap::new()),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],

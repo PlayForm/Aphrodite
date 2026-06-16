@@ -1,4 +1,4 @@
-"""aphrodite — tool handlers and schemas."""
+"""aphrodite - tool handlers and schemas."""
 
 import hashlib
 import json
@@ -17,6 +17,9 @@ def _retrieve_handler(args=None, **kwargs):
     """Resolve CCR markers with recursive depth. Scans for nested markers."""
     args = args if isinstance(args, dict) else {}
     hash_val = args.get("hash", "")
+    # Defensive: if the user passes a full <<<CCR:hash|type|size>>> marker, extract just the hash
+    if "|" in hash_val:
+        hash_val = hash_val.split("|")[0]
     query = args.get("query", "")
     if not hash_val:
         return '{"error": "missing hash parameter"}'
@@ -92,7 +95,7 @@ RETRIEVE_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "hash": {"type": "string", "description": "CCR marker hash to retrieve"},
+            "hash": {"type": "string", "description": "CCR marker hash to retrieve. Extract from <<<CCR:hash|type|size>>> markers - the hash is the first pipe-delimited segment."},
             "query": {
                 "type": "string",
                 "description": "Optional: filter retrieved content to lines containing this query string",
