@@ -3,13 +3,13 @@
 import logging
 import os
 import re
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.61"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.7"  # plugin version
+BIN_VERSION = "v0.5.62"  # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.62.8"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -64,14 +64,25 @@ if DEBUG_LOGGING:
     )
 
 # ── CCR regex (shared) ───────────────────────────────────────
-_CCR_RE = re.compile(r'(?:\[|<<<)CCR:([^|\]>]+)(?:[^\]>]*)?(?:\]|>>>)')
+_CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\]>]+)(?:[^\]]*)?(?:\]|>>>|⫸)')
 
-# ── Inline compression store (session-scoped) ─────────────────
-_inline_store = OrderedDict()
+# ── Inline compression store (session-scoped, capped at 500) ──
+class _CappedStore(OrderedDict):
+    """OrderedDict that auto-evicts oldest entries when exceeding MAX_STORE."""
+
+    MAX_STORE = 500
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        while len(self) > self.MAX_STORE:
+            self.popitem(last=False)
+
+
+_inline_store: _CappedStore = _CappedStore()
 
 # ── Shared session state ──────────────────────────────────────
 _referenced_files = {}  # {filepath: last_tool_name}
-_recent_markers = []  # [{hash, type, size, preview}]
+_recent_markers: deque = deque(maxlen=200)  # [{hash, type, size, preview}] deque auto-evicts oldest
 _conv_index = {}  # {turn_num: (hash, summary, size)}
 _state = {"turn_counter": 0}
 _git_cache = {}  # {ts, summary}
@@ -103,3 +114,15 @@ def _fmt_size(b):
 def _inline_clear():
     """Clear the inline store (called on session reset)."""
     _inline_store.clear()
+
+
+def _inline_store_put(h, content):
+    """Store content in inline store with LRU eviction at MAX=500.
+
+    Promotes the key to the end (most recently used) on write,
+    so the oldest (least recently used) entries are evicted first
+    when the store exceeds its capacity.
+    """
+    if h in _inline_store:
+        _inline_store.move_to_end(h)
+    _inline_store[h] = content

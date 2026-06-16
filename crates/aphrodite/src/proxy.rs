@@ -130,7 +130,8 @@ pub struct AppState {
     pub request_history: std::sync::Mutex<Vec<serde_json::Value>>,
     /// Inline CCR for tiny entries - no round-trip needed (< INLINE_CCR_THRESHOLD bytes)
     /// Lock uses `.lock().map(...)` - same poison safety pattern.
-    pub inline_ccr: std::sync::Mutex<std::collections::HashMap<String, String>>,
+    /// Bounded to 1024 entries via LruCache to prevent unbounded memory growth.
+    pub inline_ccr: std::sync::Mutex<lru::LruCache<String, String>>,
 
     // Stats
     /// Latency histogram buckets (microseconds): 1ms, 10ms, 100ms, 1s, 10s
@@ -214,6 +215,11 @@ impl AppState {
     /// Per-type threshold - code stays in context longer, logs compressed aggressively.
     fn threshold_for(&self, ct: &str) -> usize {
         let base = self.compress_threshold();
+        // Noisy types: exclude from auto-tune, keep at base/2 always
+        match ct {
+            "linter" | "build_output" | "log" => return base / 2,
+            _ => {}
+        }
         // Auto-tune: adjust thresholds based on historical compression ratios
         let ratio = self.compression_ratio_ema.load(Ordering::Relaxed) as f64 / 100.0;
         let tune = if ratio > 20.0 {
@@ -233,8 +239,6 @@ impl AppState {
             "text" => base * 2,
             "tool_output" => base,
             "json" => base,
-            "linter" => base / 2,
-            "build_output" | "log" => base / 2,
             _ => base,
         }
     }
@@ -372,7 +376,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         last_errors: Mutex::new(Vec::new()),
         compressions_by_type: Mutex::new(HashMap::new()),
         request_history: Mutex::new(Vec::new()),
-        inline_ccr: Mutex::new(std::collections::HashMap::new()),
+        inline_ccr: Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
         requests_total: AtomicU64::new(0),
         requests_compressed: AtomicU64::new(0),
         tokens_saved: AtomicU64::new(0),
@@ -398,23 +402,36 @@ fn generate_summary(content: &str) -> String {
     if lines.len() >= 2 {
         format!("[summary] {} lines, {}B: {}", content.lines().count(), content.len(), lines.join(" | "))
     } else {
-        let preview = &content[..content.len().min(200)];
+        let preview: String = content.char_indices()
+            .take_while(|(i, _)| *i < 200)
+            .map(|(_, c)| c)
+            .collect();
         format!("[summary] {}B: {}", content.len(), preview)
     }
 }
 
 /// Compute a cache key from a Chat Completions request body: hash(model + messages).
+/// Uses FNV-1a (deterministic across restarts, unlike DefaultHasher).
 /// Returns None if the body can't be parsed as JSON or lacks model/messages.
 fn cache_key_from_body(body: &[u8]) -> Option<u64> {
-    use std::hash::{Hash, Hasher};
     let v: serde_json::Value = serde_json::from_slice(body).ok()?;
     let model = v.get("model")?.as_str()?;
     let messages = v.get("messages")?;
     let messages_str = serde_json::to_string(messages).ok()?;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    model.hash(&mut hasher);
-    messages_str.hash(&mut hasher);
-    Some(hasher.finish())
+    // FNV-1a 64-bit hash - deterministic across process restarts
+    Some(fnv1a_64(&[model.as_bytes(), b":", messages_str.as_bytes()].concat()))
+}
+
+/// FNV-1a 64-bit hash over bytes. Deterministic across restarts.
+fn fnv1a_64(bytes: &[u8]) -> u64 {
+    const FNV_OFFSET: u64 = 14695981039346656037;
+    const FNV_PRIME: u64 = 1099511628211;
+    let mut hash = FNV_OFFSET;
+    for &b in bytes {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
 }
 
 /// Catch-all proxy handler - forwards any request to DeepSeek.
@@ -477,7 +494,7 @@ pub async fn proxy_handler(
             }
             return Response::builder()
                 .status(StatusCode::OK)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", "application/json; charset=utf-8")
                 .header("X-Aphrodite-Cache", "HIT")
                 .body(Body::from(cached_body))
                 .unwrap();
@@ -494,7 +511,7 @@ pub async fn proxy_handler(
     let mut upstream_result = Err("unreachable".to_string());
     for attempt in 1..=3u32 {
         let req = state.client.request(method.clone(), &url)
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json; charset=utf-8")
             .header("Accept", "application/json")
             .header("Authorization", format!("Bearer {}", state.api_key));
         let mut req = req;
@@ -564,7 +581,7 @@ pub async fn proxy_handler(
                     }
                     return Response::builder()
                         .status(status)
-                        .header("Content-Type", "application/json")
+                        .header("Content-Type", "application/json; charset=utf-8")
                         .header("X-Aphrodite-Compressed", "true")
                         .header("X-Aphrodite-Cache", "MISS")
                         .body(Body::from(body))
@@ -575,7 +592,12 @@ pub async fn proxy_handler(
             if state.dev {
                 let elapsed = t0.elapsed();
                 let body_preview = if resp_body.len() > 500 {
-                    format!("{}... ({} total)", std::str::from_utf8(&resp_body[..200]).unwrap_or("?"), resp_body.len())
+                    let s = std::str::from_utf8(&resp_body).unwrap_or("?");
+                    let preview: String = s.char_indices()
+                        .take_while(|(i, _)| *i < 200)
+                        .map(|(_, c)| c)
+                        .collect();
+                    format!("{}... ({} total)", preview, resp_body.len())
                 } else {
                     std::str::from_utf8(&resp_body).unwrap_or("?").to_string()
                 };
@@ -713,8 +735,20 @@ fn detect_content_type(content: &str) -> &'static str {
         }
     }
     
-    // Terminal output
-    if content.lines().count() > 5 {
+    // Log output - only if content has explicit log markers
+    if content.lines().any(|l| {
+        let t = l.trim();
+        t.starts_with('[')
+            && (t.contains("INFO") || t.contains("WARN") || t.contains("ERROR")
+                || t.contains("DEBUG") || t.contains("TRACE")
+                || t.contains("FATAL") || t.contains("PANIC"))
+    }) || content.lines().any(|l| {
+        let t = l.trim();
+        // Timestamp pattern: ISO-like or syslog-like date at start
+        t.starts_with(|c: char| c.is_ascii_digit())
+            && t.len() > 10
+            && (t.contains(':') || t.contains('-'))
+    }) {
         return "log";
     }
     "text"
@@ -723,7 +757,12 @@ fn detect_content_type(content: &str) -> &'static str {
 /// Create a standard CCR marker the LLM can parse to decide retrieval.
 fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
     let size = content.len();
-    let preview = &content[..content.len().min(120)];
+    let boundary = content.char_indices()
+        .take_while(|(i, _)| *i < 120)
+        .last()
+        .map(|(i, c)| i + c.len_utf8())
+        .unwrap_or(0);
+    let preview = &content[..boundary];
     let oneliner = preview.lines().next().unwrap_or(preview).trim();
     let summary = generate_summary(content);
     format!("<<<CCR:{}|{}|{}>>> {} | {}", hash, ct, size, oneliner, summary)
@@ -762,7 +801,12 @@ async fn compress_chat_completion(
                         let (compressed, orig_len) = {
                             let compressed = match state.mode {
                                 ProxyMode::Cache => {
-                                    let preview = &content[..content.len().min(512)];
+                                    let boundary = content.char_indices()
+                                        .take_while(|(i, _)| *i < 512)
+                                        .last()
+                                        .map(|(i, c)| i + c.len_utf8())
+                                        .unwrap_or(0);
+                                    let preview = &content[..boundary];
                                     format!("<<<CCR:{}|{}|{}>>>\n{}", hash, ct, content.len(), preview)
                                 }
                                 ProxyMode::Token => {
@@ -783,7 +827,7 @@ async fn compress_chat_completion(
                     // so later retrievals can find tiny entries without a backend round-trip.
                     let hash = compute_key(content.as_bytes());
                     if let Ok(mut map) = state.inline_ccr.lock() {
-                        map.insert(hash, content.to_string());
+                        map.put(hash, content.to_string());
                     }
                 }
             }
@@ -817,9 +861,15 @@ async fn compress_chat_completion(
                                             state.record_compression(ct2);
                                             (compressed, len)
                                         };
+                                        let marker_len = compressed.len();
                                         *args = serde_json::Value::String(compressed);
                                         did_compress = true;
-                        state.update_compression_ratio(orig_len, hash.len());
+                        state.update_compression_ratio(orig_len, marker_len);
+                                    }
+                                } else if args_owned.len() > INLINE_CCR_THRESHOLD {
+                                    let hash = compute_key(args_owned.as_bytes());
+                                    if let Ok(mut map) = state.inline_ccr.lock() {
+                                        map.put(hash, args_owned);
                                     }
                                 }
                             }
@@ -846,11 +896,12 @@ pub async fn handle_tool_relay(
     tracing::info!(tool = %req.tool, "tool_relay");
 
     if let Some(cb) = &req.callback_url {
+        let tracker = state.task_tracker.clone();
         let state = state.clone();
         let tool = req.tool.clone();
         let params = req.params.clone();
         let cb = cb.clone();
-        tokio::spawn(async move {
+        tracker.spawn(async move {
             let result = execute_tool_relay(&state, &tool, &params).await;
             let _ = state.client.post(&cb).json(&result).send().await;
         });
@@ -869,6 +920,13 @@ async fn execute_tool_relay(
     match tool {
         "aphrodite_retrieve" => {
             let hash = params.get("hash").and_then(|v| v.as_str()).ok_or("missing hash")?;
+            // Check inline_ccr first (no round-trip needed for tiny entries)
+            if let Ok(mut map) = state.inline_ccr.lock() {
+                if let Some(content) = map.get(hash) {
+                    return Ok(serde_json::json!({"found": true, "content": content.clone()}));
+                }
+            }
+            // Fallback to CCR store
             if let Some(ccr) = &state.ccr {
                 match ccr_get(ccr, hash).await {
                     Some(content) => Ok(serde_json::json!({"found": true, "content": content})),
@@ -880,9 +938,15 @@ async fn execute_tool_relay(
         }
         "aphrodite_compress" => {
             let content = params.get("content").and_then(|v| v.as_str()).ok_or("missing content")?;
-            if let Some(ccr) = &state.ccr {
-                let hash = compute_key(content.as_bytes());
-                let size = content.len();
+            let hash = compute_key(content.as_bytes());
+            let size = content.len();
+            if size < INLINE_CCR_THRESHOLD as usize {
+                // Tiny content: store inline to avoid CCR backend round-trip
+                if let Ok(mut map) = state.inline_ccr.lock() {
+                    map.put(hash.clone(), content.to_string());
+                }
+                Ok(serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}))
+            } else if let Some(ccr) = &state.ccr {
                 ccr_put(ccr, &hash, content).await;
                 state.tokens_saved.fetch_add(size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
                 Ok(serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}))
@@ -934,9 +998,10 @@ pub async fn handle_ccr_create(
             ttl: req.ttl_seconds.unwrap_or(3600),
             tags: req.tags.unwrap_or_default(),
         };
+        let tracker = state.task_tracker.clone();
         let client = state.client.clone();
         let url = notify_url.clone();
-        tokio::spawn(async move { let _ = client.post(&url).json(&notification).send().await; });
+        tracker.spawn(async move { let _ = client.post(&url).json(&notification).send().await; });
     }
 
     let compressed_size = hash.len();
@@ -1074,13 +1139,14 @@ mod tests {
             tool_relay_calls: AtomicU64::new(0),
         compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x - neutral, avoids startup scale-up
             request_history: Mutex::new(Vec::new()),
-        inline_ccr: Mutex::new(std::collections::HashMap::new()),
+        inline_ccr: Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
             compressions_by_type: Mutex::new(HashMap::new()),
             response_cache: Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
             cache_hits: AtomicU64::new(0),
             cache_misses: AtomicU64::new(0),
+            task_tracker: TaskTracker::new(),
         };
         assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
     }
@@ -1166,13 +1232,14 @@ mod tests {
             tool_relay_calls: AtomicU64::new(0),
         compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x - neutral, avoids startup scale-up
             request_history: Mutex::new(Vec::new()),
-        inline_ccr: Mutex::new(std::collections::HashMap::new()),
+        inline_ccr: Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
             compressions_by_type: Mutex::new(HashMap::new()),
             response_cache: Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
             cache_hits: AtomicU64::new(0),
             cache_misses: AtomicU64::new(0),
+            task_tracker: TaskTracker::new(),
         }
     }
 }

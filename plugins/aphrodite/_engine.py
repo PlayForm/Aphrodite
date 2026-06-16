@@ -17,8 +17,10 @@ from ._core import (
     _fmt_size,
     _inline_clear,
     _inline_store,
+    _inline_store_put,
     _recent_markers,
     _referenced_files,
+    _reset_turn_counter,
 )
 from ._inline import _inline_compress
 from ._marker import _ccr_marker
@@ -49,6 +51,21 @@ def _fire_hook(name, **kwargs):
         invoke_hook(name, **kwargs)
     except Exception as exc:
         _log.debug("_fire_hook %s: %s", name, exc)
+
+
+def _pack_msg(messages):
+    """Serialize messages for CCR storage, conditionally including tool fields."""
+    out = []
+    for m in messages:
+        entry = {"role": m.get("role", ""), "content": str(m.get("content", ""))}
+        tool_call_id = m.get("tool_call_id")
+        if tool_call_id and m.get("role") == "tool":
+            entry["tool_call_id"] = tool_call_id
+        tool_calls = m.get("tool_calls")
+        if tool_calls:
+            entry["tool_calls"] = tool_calls
+        out.append(entry)
+    return json.dumps(out, separators=(",", ":"))
 
 
 class AphroditeContextEngine(ContextEngine):
@@ -102,7 +119,7 @@ class AphroditeContextEngine(ContextEngine):
     def compress(self, messages, current_tokens=None, focus_topic=None):
         if len(messages) <= self.min_messages_to_compress:
             return messages
-        head_n = self.protect_first_n
+        head_n = max(self.protect_first_n, 1)
         tail_n = self.protect_last_n
 
         is_editing = False
@@ -140,16 +157,7 @@ class AphroditeContextEngine(ContextEngine):
         if len(middle) < 3:
             return messages
 
-        packed = json.dumps(
-            [
-                {
-                    "role": m.get("role", ""),
-                    "content": str(m.get("content", "")),
-                    "tool_call_id": m.get("tool_call_id", ""),
-                }
-                for m in middle
-            ]
-        )
+        packed = _pack_msg(middle)
         if len(packed) < 200:
             return messages
 
@@ -161,11 +169,11 @@ class AphroditeContextEngine(ContextEngine):
         if token_alive or cache_alive:
             target = PORTS["token"] if token_alive else PORTS["cache"]
             try:
-                data = json.dumps({"content": packed}).encode()
+                data = packed.encode()
                 req = urllib.request.Request(
                     f"http://127.0.0.1:{target}/ccr/create",
                     data=data,
-                    headers={"Content-Type": "application/json"},
+                    headers={"Content-Type": "application/octet-stream"},
                 )
                 with urllib.request.urlopen(req, timeout=5) as r:
                     ccr = json.loads(r.read())
@@ -181,13 +189,12 @@ class AphroditeContextEngine(ContextEngine):
                 _log.warning("compress: inline fallback failed for %d-byte packed msgs", len(packed))
                 return messages
 
-        _inline_store[hash_val] = packed
+        _inline_store_put(hash_val, packed)
+        _inline_store.move_to_end(hash_val)
         preview = packed[:120].replace("\n", " ").strip()
         _recent_markers.append({"hash": hash_val, "type": "context", "size": len(packed), "preview": preview})
-        if len(_recent_markers) > 200:
-            _recent_markers.pop(0)
 
-        ccr = _ccr_marker(hash_val, "context", size_str, mode="engine")
+        ccr = _ccr_marker(hash_val, "context", len(packed), mode="engine")
         marker = (
             f"{ccr}\n"
             f"These messages were offloaded to reduce context. "
@@ -225,8 +232,6 @@ class AphroditeContextEngine(ContextEngine):
             self.threshold_tokens = int(context_length * self.threshold_percent / 100)
 
     def on_session_reset(self):
-        import aphrodite._core as _c
-
         self.last_prompt_tokens = 0
         self.last_completion_tokens = 0
         self.last_total_tokens = 0
@@ -234,7 +239,7 @@ class AphroditeContextEngine(ContextEngine):
         self.last_compression = {}
         _inline_clear()
         _conv_index.clear()
-        _c._reset_turn_counter()
+        _reset_turn_counter()
         _referenced_files.clear()
         _recent_markers.clear()
         _log.info("aphrodite v%s: session reset - inline store + memory cleared", PLUGIN_VERSION)

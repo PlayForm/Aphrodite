@@ -5,7 +5,7 @@ import json
 import logging
 import urllib.request
 
-from ._core import PORTS, _inline_store
+from ._core import PORTS, _inline_store, _inline_store_put
 from ._proxy import _alive
 from ._resolve import _resolve_recursive
 
@@ -17,16 +17,16 @@ _log = logging.getLogger("aphrodite")
 def _retrieve_handler(args=None, **kwargs):
     """Resolve CCR markers with recursive depth. Scans for nested markers."""
     args = args if isinstance(args, dict) else {}
-    hash_val = args.get("hash", "")
+    hash_val = args.get("hash", "").strip()
     # Defensive: if the user passes a full <<<CCR:hash|type|size>>> marker, extract just the hash
     if "|" in hash_val:
-        hash_val = hash_val.split("|")[0]
+        hash_val = hash_val.split("|")[0].strip()
     query = args.get("query", "")
     if not hash_val:
         return '{"error": "missing hash parameter"}'
     try:
         content = _resolve_recursive(hash_val)
-        if content and not content.startswith("<<<CCR:"):
+        if content is not None and not content.startswith("<<<CCR:"):
             if query:
                 lines = [l for l in content.splitlines() if query.lower() in l.lower()]
                 if lines:
@@ -43,13 +43,20 @@ def _compress_handler(args=None, **kwargs):
     checks local cache first, only hits proxy on miss."""
     args = args if isinstance(args, dict) else {}
     content = args.get("content", "")
+    # Guard: non-string content (e.g. dict/list) must be serialized
+    if not isinstance(content, str):
+        try:
+            content = json.dumps(content)
+        except Exception:
+            return '{"error": "content must be a string or JSON-serializable"}'
     type_hint = args.get("type", "text")
     if not content:
         return '{"error": "missing content parameter"}'
 
     # Pop the API: check local cache first (content-addressable store)
-    h = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
-    if h in _inline_store:
+    full_h = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    h = full_h[:16]
+    if h in _inline_store or full_h in _inline_store:
         return json.dumps(
             {"hash": h, "type": type_hint, "size": len(content), "source": "cache_hit", "compression_ratio": None, "note": "already in store"}
         )
@@ -64,13 +71,19 @@ def _compress_handler(args=None, **kwargs):
             result = json.loads(r.read())
         h = result.get("hash", h)
         if h:
-            _inline_store[h] = content  # mirror in inline store for aphrodite_search
+            _inline_store_put(h, content)  # mirror in inline store for aphrodite_search
+            _inline_store_put(full_h, content)  # also store under full hash
+            _inline_store.move_to_end(h)
+            _inline_store.move_to_end(full_h)
         return json.dumps(
             {"hash": h, "type": type_hint, "size": len(content), "compression_ratio": result.get("compression_ratio")}
         )
     except Exception:
-        # Fallback: store inline anyway
-        _inline_store[h] = content
+        # Fallback: store inline anyway (both short and full hash)
+        _inline_store_put(h, content)
+        _inline_store_put(full_h, content)
+        _inline_store.move_to_end(h)
+        _inline_store.move_to_end(full_h)
         return json.dumps(
             {"hash": h, "type": type_hint, "size": len(content), "source": "inline_fallback", "compression_ratio": 0}
         )
@@ -104,6 +117,6 @@ RETRIEVE_SCHEMA = {
             },
             "path": {"type": "string", "description": "Optional: file path to read directly (bypasses CCR)"},
         },
-        "required": [],
+        "required": ["hash"],
     },
 }
