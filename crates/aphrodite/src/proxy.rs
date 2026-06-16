@@ -81,6 +81,16 @@ const INLINE_CCR_THRESHOLD: usize = 256;
 /// Chat Completions API path.
 const CHAT_COMPLETIONS_PATH: &str = "/v1/chat/completions";
 
+/// Code multiplier: how many times the base threshold for code content.
+/// Coding-optimized default: 2× (compresses code aggressively, LLM retrieves on demand).
+/// Override: APHRODITE_CODE_MULTIPLIER env var (e.g. 4 to preserve more code).
+fn code_multiplier() -> usize {
+	std::env::var("APHRODITE_CODE_MULTIPLIER")
+		.ok()
+		.and_then(|v| v.parse().ok())
+		.unwrap_or(2)
+}
+
 // ── spawn_blocking wrappers for CcrStore (rusqlite is blocking) ─────
 
 /// Wrapper for `ccr.get()` on a blocking thread.
@@ -298,7 +308,7 @@ impl AppState {
 		let base = (base as f64 * tune) as usize;
 		match ct {
 			"error" => base * 8,
-			"code_rust" | "code_python" | "code_go" | "code_js" | "code" => base * 4,
+			"code_rust" | "code_python" | "code_go" | "code_js" | "code" => base * code_multiplier(),
 			"diff" | "git" => base * 2,
 			"text" => base * 2,
 			"tool_output" => base,
