@@ -4,13 +4,19 @@ import logging
 import os
 import platform
 import re
+import ssl
 import stat
 import subprocess
 import urllib.request
 
+import certifi
+
 from ._core import BIN_VERSION, BINARY, BINARY_DIR, REPO
 
 _log = logging.getLogger("aphrodite")
+
+# Version-check cache: skip subprocess after first successful check
+_cached_version_ok: bool = False
 
 # Valid binary magic bytes: ELF, Mach-O, PE
 _BINARY_MAGICS = frozenset((
@@ -28,8 +34,8 @@ def _restore_bak(bak):
     if os.path.exists(bak):
         try:
             os.replace(bak, bak[:-4])  # strip ".bak" → BINARY
-        except Exception:
-            pass
+        except Exception as e:
+            _log.warning("restoring .bak failed: %s", e)
 
 
 def _detect_platform() -> str:
@@ -57,7 +63,8 @@ def _download_binary() -> bool:
     download_url = f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite-{plat}"
     _log.info("downloading aphrodite %s from %s", BIN_VERSION, download_url)
     try:
-        with urllib.request.urlopen(download_url, timeout=30) as r:
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        with urllib.request.urlopen(download_url, timeout=30, context=ctx) as r:
             with open(BINARY, "wb") as f:
                 while True:
                     chunk = r.read(65536)
@@ -72,7 +79,7 @@ def _download_binary() -> bool:
         # 🛡 Magic-byte validation
         with open(BINARY, "rb") as f:
             magic = f.read(4)
-        if magic not in _BINARY_MAGICS:
+        if magic not in _BINARY_MAGICS and not magic.startswith(b'MZ'):
             _log.warning("downloaded binary has invalid magic bytes: %r", magic)
             _restore_bak(bak)
             return False
@@ -96,6 +103,9 @@ def _download_binary() -> bool:
 
 def _check_binary_version() -> bool:
     """Check if the installed binary matches BIN_VERSION. Returns True if match."""
+    global _cached_version_ok
+    if _cached_version_ok:
+        return True
     try:
         r = subprocess.run(
             [BINARY, "--version"],
@@ -105,6 +115,7 @@ def _check_binary_version() -> bool:
         )
         version_str = r.stdout.strip() or r.stderr.strip()
         if version_str and re.search(r'\b' + re.escape(BIN_VERSION.lstrip("v")) + r'\b', version_str):
+            _cached_version_ok = True
             return True
         _log.info(
             "binary version mismatch: got %r, expected %s - re-downloading",

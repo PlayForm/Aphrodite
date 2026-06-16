@@ -895,6 +895,17 @@ pub async fn handle_tool_relay(
     state.tool_relay_calls.fetch_add(1, Ordering::Relaxed);
     tracing::info!(tool = %req.tool, "tool_relay");
 
+    // Validate aphrodite_retrieve: hash is required. Query-only requests without
+    // hash are invalid and must return 400 BAD_REQUEST instead of silently passing through.
+    if req.tool == "aphrodite_retrieve" && req.params.get("hash").and_then(|v| v.as_str()).is_none() {
+        return (StatusCode::BAD_REQUEST, Json(ToolRelayResponse {
+            success: false,
+            result: None,
+            error: Some("`hash` is required for aphrodite_retrieve. Requests with only `query` and no `hash` are invalid.".into()),
+            async_call: false,
+        })).into_response();
+    }
+
     if let Some(cb) = &req.callback_url {
         let tracker = state.task_tracker.clone();
         let state = state.clone();
@@ -905,12 +916,12 @@ pub async fn handle_tool_relay(
             let result = execute_tool_relay(&state, &tool, &params).await;
             let _ = state.client.post(&cb).json(&result).send().await;
         });
-        return Json(ToolRelayResponse { success: true, result: None, error: None, async_call: true });
+        return Json(ToolRelayResponse { success: true, result: None, error: None, async_call: true }).into_response();
     }
 
     match execute_tool_relay(&state, &req.tool, &req.params).await {
-        Ok(val) => Json(ToolRelayResponse { success: true, result: Some(val), error: None, async_call: false }),
-        Err(e) => Json(ToolRelayResponse { success: false, result: None, error: Some(e), async_call: false }),
+        Ok(val) => Json(ToolRelayResponse { success: true, result: Some(val), error: None, async_call: false }).into_response(),
+        Err(e) => Json(ToolRelayResponse { success: false, result: None, error: Some(e), async_call: false }).into_response(),
     }
 }
 

@@ -16,10 +16,12 @@ from ._core import (
     PORTS,
     _conv_index,
     _fmt_size,
+    _git_cache,
     _inline_clear,
     _inline_store_put,
     _recent_markers,
     _referenced_files,
+    _reset_scanned_msg_idx,
     _reset_turn_counter,
 )
 from ._inline import _inline_compress
@@ -131,12 +133,17 @@ class AphroditeContextEngine(ContextEngine):
           -1  Always compress (any context fill triggers compression).
            0  Never compress (disabled entirely).
           >0  Compress when prompt_tokens >= context_length * pct / 100.
+
+        Messages-based fallback: when no token data is available yet,
+        use compression count as heuristic for long context.
         """
         if self.threshold_percent <= 0:
             return self.threshold_percent == -1  # -1 = always, 0 = disabled
         tokens = prompt_tokens or self.last_prompt_tokens
         if not tokens:
-            return False
+            # Messages-based fallback: if we've compressed before,
+            # context is likely long again
+            return self.compression_count > 0
         if not self.context_length:
             return False
         return (tokens / self.context_length) * 100 >= self.threshold_percent
@@ -155,7 +162,11 @@ class AphroditeContextEngine(ContextEngine):
         if is_editing:
             tail_n = max(tail_n, 8)
 
-        if len(messages) > tail_n:
+        # Early clamp: prevent negative boundary during sweep, ensures safety
+        tail_n = min(tail_n, len(messages) - head_n)
+
+        # Sweep orphan tool messages into the protected tail block
+        if tail_n > 0:
             boundary = len(messages) - tail_n
             while boundary < len(messages) and messages[boundary].get("role") == "tool":
                 boundary += 1
@@ -169,6 +180,7 @@ class AphroditeContextEngine(ContextEngine):
                     break
                 boundary -= 1
                 tail_n += 1
+            # Re-clamp sweep adjustments
             tail_n = min(tail_n, len(messages) - head_n)
 
         head = messages[:head_n]
@@ -185,7 +197,7 @@ class AphroditeContextEngine(ContextEngine):
         hash_val = None
         size_str = _fmt_size(len(packed))
 
-        from ._hooks import _alive_cached
+        from ._proxy import _alive_cached
 
         token_alive = _alive_cached(PORTS["token"])
         cache_alive = _alive_cached(PORTS["cache"])
@@ -264,6 +276,11 @@ class AphroditeContextEngine(ContextEngine):
         _reset_turn_counter()
         _referenced_files.clear()
         _recent_markers.clear()
+        _reset_scanned_msg_idx()
+        _git_cache.clear()
+        from ._proxy import _alive_turn_cache
+
+        _alive_turn_cache.clear()
         _log.info("aphrodite v%s: session reset - inline store + memory cleared", PLUGIN_VERSION)
 
     def on_session_start(self, session_id="", **kw):

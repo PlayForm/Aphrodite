@@ -1,5 +1,6 @@
 """aphrodite - hook handlers for Hermes tool/terminal/LLM calls."""
 
+import hashlib
 import json
 import logging
 import os
@@ -29,37 +30,30 @@ from ._core import (
     _conv_index,
     _fmt_size,
     _git_cache,
+    _hash_alias,
+    _increment_turn,
+    _init_trigram_index,
     _inline_bytes,
     _inline_index,
     _inline_index_enabled,
     _inline_store,
     _inline_store_put,
-    _init_trigram_index,
     _recent_markers,
     _referenced_files,
-    _reset_turn_counter,
-    _increment_turn,
     _scanned_msg_idx,
+    _state,
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
 from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
-from ._proxy import _alive
+from ._proxy import _alive, _alive_cached, _alive_turn_cache, _expand_guidance
 from ._resolve import _resolve_one
 from ._tools import _compress_handler, _retrieve_handler
 
-# Turn-scoped alive cache - refreshed at pre_llm_hook entry so
-# all hooks within the same turn see a consistent proxy state
-_alive_turn_cache: dict[int, bool] = {}  # {port: bool}
 _last_user_msg = ""  # cached by pre_llm_hook for store_conversation_turn
 _catalog_injected_this_turn: bool = False  # guard vs double-inject on LLM retry
+_session_instruction_injected: bool = False  # guard: only inject session intro once
 
-
-def _alive_cached(port: int) -> bool:
-    """Check turn-scoped cache first, fall through to _alive()."""
-    if port in _alive_turn_cache:
-        return _alive_turn_cache[port]
-    return _alive(port)
 
 # These are defined within this module (extracted from original monolithic file)
 # _track_file_refs, _fmt_size, _extract_preview, _group_into_turns are defined below
@@ -89,6 +83,58 @@ _READ_KEYWORDS: frozenset = frozenset({
 
 # ── Hooks ─────────────────────────────────────────────────────
 
+# Layer 1: inject session-start instruction on first _pre_llm_hook call
+def _inject_session_instruction(conversation_history):
+    """Inject ephemeral system message with aphrodite version + proxy info.
+
+    Called once per session from ``_pre_llm_hook`` on its first invocation.
+    Injects a single ``[APHRODITE]`` system message so every session starts
+    with the agent aware of the CCR toolchain and proxy state.
+    """
+    # Determine engine threshold display
+    threshold = ENGINE_THRESHOLD_PCT
+    if threshold == 0:
+        thresh_str = "disabled (0)"
+    elif threshold == -1:
+        thresh_str = "always (-1)"
+    else:
+        thresh_str = f"{threshold}%"
+    token_alive = _alive_cached(PORTS["token"])
+    # Build the instruction
+    lines = [
+        "[APHRODITE] v{version} active.".format(version=PLUGIN_VERSION),
+    ]
+    if token_alive:
+        lines.append(
+            "  Token proxy :9798 active | engine threshold={thresh} | "
+            "tools auto-expand inline (<{limit})".format(
+                thresh=thresh_str, limit=_fmt_size(AUTO_EXPAND_LIMIT),
+            )
+        )
+    else:
+        lines.append(
+            "  Token proxy :9798 offline | inline fallback active | "
+            "engine threshold={thresh}".format(thresh=thresh_str)
+        )
+    lines.append(
+        "  Use <<<CCR:hash|type|size>>> markers for compressed context. "
+        "Call aphrodite_retrieve(hash) to fetch content, "
+        "aphrodite_catalog to list available entries."
+    )
+    lines.append(
+        "  ─ Layer 2: per-turn catalog injected below each turn ─"
+    )
+    lines.append(
+        "  ─ Layer 3: load aphrodite-tool-guide skill for full tool reference ─"
+    )
+    instruction = "\n".join(lines)
+    conversation_history.append(
+        {"role": "system", "content": instruction, "ephemeral": True}
+    )
+    _log.info("injected session instruction v%s", PLUGIN_VERSION)
+    global _session_instruction_injected
+    _session_instruction_injected = True
+
 def _transform_tool_result(
     tool_name="",
     args=None,
@@ -117,13 +163,14 @@ def _transform_tool_result(
     _track_file_refs(tool_name, args)
     if _DEV:
         return result  # dev mode: passthrough
-    # Headroom bypass headers for all CCR markers from this hook
-    HEADROOM_HDRS = {"x-headroom-bypass": "true", "x-headroom-mode": "passthrough"}
     token_alive = _alive_cached(9798)
     cache_alive = _alive_cached(9797)
     proxy_available = token_alive or cache_alive
 
-    # Essential tools: never compress - agent needs immediate access to skills, memory, session history
+    # Determine marker type: aphrodite meta-tools get auto-expanded
+    # so the LLM always sees navigation/aid info inline; regular
+    # tool results stay wrapped as CCR markers to save context.
+    marker_type = "aphrodite" if tool_name.startswith("aphrodite_") else "tool"
     skip = (
         _ESSENTIAL_TOOLS | {"aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
         if token_alive
@@ -185,6 +232,10 @@ def _transform_tool_result(
         ccr = _compress_via_proxy(result, target)
         if ccr:
             h, sz = ccr
+            # Bridge hash formats: map full SHA-256 → canonical proxy hash
+            # so _compress_handler can find inline-cached content (#51)
+            full_sha = hashlib.sha256(result.encode("utf-8")).hexdigest()
+            _hash_alias[full_sha] = h
             label = "token" if token_alive else "cache"
             if DEBUG_LOGGING:
                 ratio = result_len / max(len(h), 1)
@@ -197,9 +248,9 @@ def _transform_tool_result(
                     ratio,
                     (time.time() - _t0) * 1000,
                 )
-            _recent_markers.append({"hash": h, "type": "tool", "size": result_len, "preview": preview})
+            _recent_markers.append({"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"]})
             _inline_store_put(h, result)
-            return _ccr_marker(h, "tool", result_len, label, preview, headers=HEADROOM_HDRS)
+            return _ccr_marker(h, marker_type, result_len, label, preview)
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s - proxy returned no hash", tool_name[:40])
 
@@ -207,6 +258,10 @@ def _transform_tool_result(
     if result_len >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(result)
+            # Bridge hash formats: map full SHA-256 → canonical inline hash
+            # so _compress_handler can find inline-cached content (#51)
+            full_sha = hashlib.sha256(result.encode("utf-8")).hexdigest()
+            _hash_alias[full_sha] = h
             if DEBUG_LOGGING:
                 _log.debug(
                     "transform_tool_result: INLINE %s hash=%s size=%s %.1fms",
@@ -215,8 +270,8 @@ def _transform_tool_result(
                     result_len,
                     (time.time() - _t0) * 1000,
                 )
-            _recent_markers.append({"hash": h, "type": "tool", "size": result_len, "preview": preview})
-            return _ccr_marker(h, "tool", result_len, "inline", preview, headers=HEADROOM_HDRS)
+            _recent_markers.append({"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"]})
+            return _ccr_marker(h, marker_type, result_len, "inline", preview)
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("transform_tool_result: INLINE FAIL %s", tool_name[:40])
@@ -305,7 +360,7 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
             }
         ).encode()
         req = urllib.request.Request(
-            f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/json"}
+            f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/octet-stream"}
         )
         with urllib.request.urlopen(req, timeout=2) as r:
             ccr = json.loads(r.read())
@@ -364,11 +419,10 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         return
 
     # Refresh turn-scoped alive cache for consistent proxy state within this turn
-    global _alive_turn_cache, _scanned_msg_idx, _last_user_msg, _catalog_injected_this_turn
-    _alive_turn_cache = {
-        PORTS["token"]: _alive(PORTS["token"]),
-        PORTS["cache"]: _alive(PORTS["cache"]),
-    }
+    global _scanned_msg_idx, _last_user_msg, _catalog_injected_this_turn
+    _alive_turn_cache.clear()
+    _alive_turn_cache[PORTS["token"]] = _alive(PORTS["token"])
+    _alive_turn_cache[PORTS["cache"]] = _alive(PORTS["cache"])
     _last_user_msg = user_message or ""  # cache for _store_conversation_turn
     _catalog_injected_this_turn = False  # reset per-turn, allows re-injection on fresh calls
 
@@ -378,7 +432,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
     ctx_len = len(conversation_history)
 
-    # ── 0. Pass through x-headroom-* headers (skip bypass) ──
+    # ── 0a. Inject session-start instruction (once per session) ──
+    if not _session_instruction_injected and not _DEV:
+        _inject_session_instruction(conversation_history)
+
+    # ── 0b. Pass through x-headroom-* headers (skip bypass) ──
     headroom_hdrs = {}
     headers = kwargs.get("headers")
     if headers:
@@ -450,8 +508,8 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 if len(parts) < 3:
                     continue
                 marker_type = str(parts[1])
-                if marker_type != "tool":
-                    continue  # only expand tool-type markers
+                if marker_type != "aphrodite":
+                    continue  # only expand aphrodite meta-tool markers
                 try:
                     marker_size = int(parts[2])
                 except ValueError:
@@ -529,7 +587,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                         req = urllib.request.Request(
                             f"http://127.0.0.1:{target}/ccr/create",
                             data=data,
-                            headers={"Content-Type": "application/json"},
+                            headers={"Content-Type": "application/octet-stream"},
                         )
                         with urllib.request.urlopen(req, timeout=3) as r:
                             ccr = json.loads(r.read())
@@ -548,8 +606,31 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     # ── 3. Build the catalog (mode-aware) ─────────────────────
     parts = []
-    if markers or _conv_index or compress_hint or len(_referenced_files) > 5 or DEBUG_LOGGING:
+    if markers or _conv_index or compress_hint or len(_referenced_files) > 5 or DEBUG_LOGGING or _expand_guidance:
         parts.append("[APHRODITE]")
+
+        # Auto-expand guidance - reminds LLM that tool CCR markers are
+        # resolved inline and only context/terminal markers need retrieval
+        if _expand_guidance:
+            parts.append(f"  {_expand_guidance}")
+
+        # ── Auto line: build status + uncommitted changes + proxy health ─
+        from ._automation import _auto_build_watch, _auto_commit_reminder
+
+        auto_parts = []
+        build_info = _auto_build_watch()
+        if build_info:
+            auto_parts.append(build_info.replace("  ", ""))
+        commit_info = _auto_commit_reminder()
+        if commit_info:
+            auto_parts.append(commit_info.replace("  ", ""))
+        up_ports = [str(port) for name, port in PORTS.items() if _alive_turn_cache.get(port)]
+        if up_ports:
+            auto_parts.append(f"proxy: {','.join(up_ports)} up")
+        else:
+            auto_parts.append("proxy: none ⚠")
+        if auto_parts:
+            parts.append("  [AUTO] " + " | ".join(auto_parts))
 
         # Debug banner (only in DEBUG mode or full catalog)
         if DEBUG_LOGGING or CATALOG_MODE == "full":
@@ -585,6 +666,22 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 parts.append(f"  mode={mode} | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
         elif CATALOG_MODE != "tool":
             parts.append(f"  mode=inline | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
+
+        # Auto-expand guidance
+        if markers:
+            parts.append(
+                "  ⚡ Tool outputs auto-expand before you see them - full content is inline. "
+                "Context/terminal markers require aphrodite_retrieve(hash) to fetch."
+            )
+
+        # Layer 2: per-turn hint with counts and cross-reference
+        if markers or len(_expanded_hashes) > 0 or not _session_instruction_injected:
+            hint = [
+                "  [{} markers available | {} tool outputs auto-expanded this turn]".format(len(markers), len(_expanded_hashes)),
+                "  Call aphrodite_catalog to list all entries, aphrodite_retrieve(hash) to fetch.",
+                "  For full tool reference, load aphrodite-tool-guide skill (skill_view).",
+            ]
+            parts.extend(hint)
 
         # Engine stats
         engine = get_engine()
@@ -848,12 +945,18 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                 ccr = _compress_via_proxy(output, target)
                 if ccr:
                     h, _ = ccr
+                    # Bridge hash formats for _compress_handler cache hits (#51)
+                    full_sha = hashlib.sha256(output.encode("utf-8")).hexdigest()
+                    _hash_alias[full_sha] = h
                     if DEBUG_LOGGING:
                         _log.debug("terminal_hook: BUILD-CCR %s:%s", "token" if token_alive else "cache", h)
                     _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
                     return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
             # Inline fallback
             h, _ = _inline_compress(output)
+            # Bridge hash formats for _compress_handler cache hits (#51)
+            full_sha = hashlib.sha256(output.encode("utf-8")).hexdigest()
+            _hash_alias[full_sha] = h
             _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
             return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
 
@@ -865,6 +968,9 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         ccr = _compress_via_proxy(output, target)
         if ccr:
             h, _ = ccr
+            # Bridge hash formats for _compress_handler cache hits (#51)
+            full_sha = hashlib.sha256(output.encode("utf-8")).hexdigest()
+            _hash_alias[full_sha] = h
             if DEBUG_LOGGING:
                 ratio = out_len / max(len(h), 1)
                 _log.debug(
@@ -883,6 +989,9 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     if orig_len >= INLINE_THRESHOLD:
         try:
             h, _ = _inline_compress(output)
+            # Bridge hash formats for _compress_handler cache hits (#51)
+            full_sha = hashlib.sha256(output.encode("utf-8")).hexdigest()
+            _hash_alias[full_sha] = h
             if DEBUG_LOGGING:
                 _log.debug("terminal_hook: INLINE hash=%s size=%s", h, orig_len)
             _recent_markers.append({"hash": h, "type": "terminal", "size": orig_len, "preview": preview})
@@ -1070,13 +1179,15 @@ def _search_handler(args=None, **kwargs):
     # ── Search inline store (trigram-indexed when index enabled) ──
     if query:
         # Use trigram index for candidate lookup
-        trigrams = set(query[i : i + 3] for i in range(len(query) - 2))
+        trigrams = {query[i : i + 3] for i in range(len(query) - 2)}
         candidates = set()
         if trigrams and _inline_index:
             for tri in trigrams:
                 candidates |= _inline_index.get(tri, set())
-        # Fallback: scan entire store if index empty or query too short for trigrams
-        if not candidates:
+        # Fallback: full scan only if index is truly empty (nothing indexed yet).
+        # If index exists but produced no candidates, the query has no matches
+        # - no need to scan, the trigram index is completeness-guaranteed.
+        if not candidates and not _inline_index:
             candidates = set(_inline_store.keys())
         for h in candidates:
             content = _inline_store.get(h)

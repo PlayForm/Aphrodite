@@ -8,8 +8,8 @@ from collections import OrderedDict, deque
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.64"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.9"  # plugin version
+BIN_VERSION = "v0.5.65"  # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.62.10"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -36,7 +36,7 @@ INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
 # HEADROOM_SSE_BUFFER_MAX_BYTES check: if set, bump INLINE_THRESHOLD to 1MB
 # so headroom's SSE buffer isn't overwhelmed by small inline compressions
 if os.environ.get("HEADROOM_SSE_BUFFER_MAX_BYTES"):
-    INLINE_THRESHOLD = 1_048_576
+    INLINE_THRESHOLD = max(INLINE_THRESHOLD, 1_048_576)
 RECURSIVE_DEPTH = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
 AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 51200)
 DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
@@ -66,7 +66,7 @@ if DEBUG_LOGGING:
     )
 
 # ── CCR regex (shared) ───────────────────────────────────────
-_CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\]>]+)(?:[^\]]*)?(?:\]|>>>|⫸)')
+_CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\\>⫸]+)(?:\|[^\\\]]*?)?(?:\]|>>>|⫸)')
 
 # ── Hash alias: maps full SHA256 hash → short 16-char hash ──
 _hash_alias: dict = {}  # {full_sha256: short_hash}
@@ -85,7 +85,7 @@ class _CappedStore(OrderedDict):
     def popitem(self, last=True):
         key, value = super().popitem(last=last)
         global _inline_bytes
-        _inline_bytes -= len(value)
+        _inline_bytes -= len(value) if value else 0
         if _inline_index_enabled:
             _remove_trigram_index(key)
         return key, value
@@ -95,10 +95,11 @@ _inline_store: _CappedStore = _CappedStore()
 _inline_index: dict = {}  # {trigram: set_of_hashes} for O(1) search
 _inline_bytes: int = 0  # tracked byte count (avoids sum(len(v) for v ...))
 _inline_index_enabled: bool = False  # lazily enabled on first index build
+_hash_to_trigrams: dict = {}  # {hash: set_of_trigrams} reverse index for O(1) eviction
 
 # ── Shared session state ──────────────────────────────────────
 _referenced_files: OrderedDict = OrderedDict()  # {filepath: last_tool_name} LRU via move_to_end
-_recent_markers: deque = deque(maxlen=200)  # [{hash, type, size, preview}] deque auto-evicts oldest
+_recent_markers: deque = deque(maxlen=_cfg_int("APHRODITE_RECENT_MARKERS_MAX", 500))  # [{hash, type, size, preview, turn}] deque auto-evicts oldest; tuned for bursty workflows
 _conv_index = {}  # {turn_num: (hash, summary, size)}
 _state = {"turn_counter": 0}
 _scanned_msg_idx = 0  # for incremental marker scan in pre_llm_hook
@@ -107,6 +108,11 @@ _FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
 
 
 # ── Shared utilities ──────────────────────────────────────────
+def _reset_scanned_msg_idx():
+    global _scanned_msg_idx
+    _scanned_msg_idx = 0
+
+
 def _reset_turn_counter():
     _state["turn_counter"] = 0
 
@@ -130,10 +136,12 @@ def _fmt_size(b):
 
 def _inline_clear():
     """Clear the inline store (called on session reset)."""
-    global _inline_bytes
+    global _inline_bytes, _inline_index_enabled
     _inline_store.clear()
     _inline_index.clear()
+    _hash_to_trigrams.clear()
     _inline_bytes = 0
+    _inline_index_enabled = False
 
 
 def _init_trigram_index():
@@ -146,34 +154,43 @@ def _init_trigram_index():
 
 
 def _index_trigrams(h, content):
-    """Split content into trigrams and index under hash."""
+    """Split content into trigrams and index under hash. Populates both
+    forward (_inline_index) and reverse (_hash_to_trigrams) indices."""
     lower = content.lower()
-    trigrams = set(lower[i : i + 3] for i in range(len(lower) - 2))
+    trigrams = {lower[i : i + 3] for i in range(len(lower) - 2)}
+    _hash_to_trigrams[h] = trigrams
     for tri in trigrams:
         _inline_index.setdefault(tri, set()).add(h)
 
 
 def _remove_trigram_index(h):
-    """Remove all index entries for a given hash."""
-    for tri_set in _inline_index.values():
-        tri_set.discard(h)
+    """Remove all index entries for a given hash (O(1) via reverse index)."""
+    trigrams = _hash_to_trigrams.pop(h, ())
+    for tri in trigrams:
+        s = _inline_index.get(tri)
+        if s:
+            s.discard(h)
+            if not s:
+                del _inline_index[tri]
 
 
 def _inline_store_put(h, content):
     """Store content in inline store with LRU eviction at MAX=500.
 
-    Promotes the key to the end (most recently used) on write,
-    so the oldest (least recently used) entries are evicted first
-    when the store exceeds its capacity. Also indexes trigrams for
-    O(1) search and tracks total bytes.
+    __setitem__ handles ordering and eviction automatically. On update,
+    old trigrams are unindexed before re-indexing the new content.
+    Returns True if the entry was newly added, False if updated.
     """
     global _inline_bytes
-    if h in _inline_store:
+    is_new = h not in _inline_store
+    if not is_new:
         old_len = len(_inline_store[h])
         _inline_bytes -= old_len
-        _inline_store.move_to_end(h)
+        if _inline_index_enabled:
+            _remove_trigram_index(h)
     _inline_store[h] = content
     _inline_bytes += len(content)
     # Index trigrams for search
     if _inline_index_enabled:
         _index_trigrams(h, content)
+    return is_new

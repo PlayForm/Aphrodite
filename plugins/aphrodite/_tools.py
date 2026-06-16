@@ -66,7 +66,7 @@ def _compress_handler(args=None, **kwargs):
         data = json.dumps({"content": content}).encode()
         target = PORTS["token"] if _alive(PORTS["token"]) else PORTS["cache"]
         req = urllib.request.Request(
-            f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/json"}
+            f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/octet-stream"}
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())

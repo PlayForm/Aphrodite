@@ -1,14 +1,16 @@
 """aphrodite - proxy lifecycle (env loading, health checks, launch)."""
 
+import concurrent.futures
+import http.client
 import json
 import logging
 import os
-import socket
+import signal
 import subprocess
 import time
 from pathlib import Path
 
-from ._core import BINARY, BINARY_DIR, ENV_FILE, PORTS
+from ._core import _DEV, BINARY, BINARY_DIR, DEBUG_LOGGING, ENV_FILE, PORTS
 
 _log = logging.getLogger("aphrodite")
 
@@ -17,6 +19,15 @@ _PROCS: dict[int, subprocess.Popen] = {}  # {port: Popen}
 
 # ── Alive cache (5-second TTL) ──────────────────────────────
 _alive_cache = {}  # {port: (result, timestamp)}
+
+# ── Turn-scoped alive cache (refreshed by pre_llm_hook each turn) ──
+_alive_turn_cache: dict[int, bool] = {}  # {port: bool}
+
+# ── Proxy environment keys (whitelist) ──────────────────────
+_PROXY_ENV_KEYS = {"PATH", "HOME", "APHRODITE_API_KEY"}
+
+# ── Auto-expand guidance (set by on_start after proxy launch) ──
+_expand_guidance: str = ""
 
 
 def _load_env():
@@ -61,10 +72,10 @@ def _env_val(val, key_name=""):
         # If the suffix looks like a credential fragment (≥4 hex-like chars) warn
         if key_name and after_stripped and len(after_stripped) >= 4:
             _log.warning(
-                "_env_val: %s contains '#' followed by '%s' - "
+                "_env_val: %s contains '#' followed by '%s...' - "
                 "possible key truncation, consider quoting the value",
                 key_name,
-                after_stripped[:20],
+                after_stripped[:3],
             )
         return before.strip()
     return val
@@ -78,20 +89,11 @@ def _alive(port, timeout=3):
         if now - ts < 5:
             return result
     try:
-        sock = socket.create_connection(("127.0.0.1", port), timeout=timeout)
-        with sock:
-            sock.sendall(b"GET /health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
-            body = b""
-            while True:
-                chunk = sock.recv(4096)
-                if not chunk:
-                    break
-                body += chunk
-        # Extract body after the HTTP headers
-        if b"\r\n\r\n" in body:
-            body = body.split(b"\r\n\r\n", 1)[1].decode().strip()
-        else:
-            body = body.decode().strip()
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+        conn.request("GET", "/health", headers={"Connection": "close"})
+        resp = conn.getresponse()
+        body = resp.read().decode().strip()
+        conn.close()
         if not body:
             result = True
         else:
@@ -106,18 +108,25 @@ def _alive(port, timeout=3):
     return result
 
 
+def _alive_cached(port: int) -> bool:
+    """Check turn-scoped cache first, fall through to _alive()."""
+    if port in _alive_turn_cache:
+        return _alive_turn_cache[port]
+    return _alive(port)
+
+
 def _kill(pid, timeout=0.3):
     """Kill a process by PID with SIGTERM, escalate to SIGKILL after timeout."""
     try:
         os.kill(int(pid), 0)  # Probe - still alive?
     except (OSError, ProcessLookupError, ValueError):
         return  # Already dead or bogus PID
-    for sig in ("TERM", "KILL"):
+    for sig_nr in (signal.SIGTERM, signal.SIGKILL):
         try:
-            subprocess.run(["kill", f"-{sig}", str(pid)], capture_output=True, timeout=3)
+            os.kill(int(pid), sig_nr)
         except Exception:
             pass
-        if sig == "KILL":
+        if sig_nr == signal.SIGKILL:
             break
         time.sleep(timeout)
         try:
@@ -183,7 +192,7 @@ def _start(name, env):
     try:
         proc = subprocess.Popen(
             args,
-            env=env,
+            env={k: env[k] for k in _PROXY_ENV_KEYS if k in env},
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -201,20 +210,53 @@ def _start(name, env):
         _log.warning("failed to write PID file for %s - %s", name, exc)
 
 
+def _inject_expand_guidance():
+    """Return auto-expand guidance string explaining that tool CCR markers are resolved inline."""
+    return (
+        "[APHRODITE] Tool outputs are auto-expanded - you see full content inline, "
+        "no \u00ab\u00ab\u00abCCR:...\u00bb\u00bb\u00bb markers for tool results. "
+        "If you ever see a CCR marker (for context or terminal output), use "
+        "aphrodite_retrieve(hash) to fetch it."
+    )
+
+
 def on_start(**kw):
-    """Hermes session_start hook - ensure binary + launch proxy."""
+    """Hermes session_start hook - ensure binary + launch proxy + auto-setup."""
     from ._binary import _ensure_binary
 
     if not _ensure_binary():
         _log.error("cannot start - binary not available")
         return
+    # Clear stale cache before checking (fixes stale state across session restarts)
+    _alive_cache.clear()
+
     env = {**os.environ, **_load_env()}
     for name in ("cache", "token"):
         if not _alive(PORTS[name]):
             _start(name, env)
-    # Retry loop for proxy readiness
-    cache_ok = _wait_alive(PORTS["cache"], retries=10, delay=0.3)
-    token_ok = _wait_alive(PORTS["token"], retries=10, delay=0.3)
+    # Retry loop for proxy readiness (concurrent - cuts worst-case 6s→3s)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        cache_fut = pool.submit(_wait_alive, PORTS["cache"], retries=10, delay=0.3)
+        token_fut = pool.submit(_wait_alive, PORTS["token"], retries=10, delay=0.3)
+        cache_ok = cache_fut.result()
+        token_ok = token_fut.result()
+
+    # ── Auto-setup: run all auto checks and display ────────────
+    from ._automation import run_all
+
+    auto_summary = run_all()
+    if auto_summary:
+        _log.debug(auto_summary)
+        if DEBUG_LOGGING:
+            print(auto_summary)
+
+    # Auto-expand guidance: explain inline resolution to the LLM,
+    # skipped in dev/passthrough mode or if no proxy came up
+    global _expand_guidance
+    if not _DEV and (cache_ok or token_ok):
+        _expand_guidance = _inject_expand_guidance()
+        _log.debug("expand guidance set (%d chars)", len(_expand_guidance))
+
     _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
 
 

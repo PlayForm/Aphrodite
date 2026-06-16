@@ -1,29 +1,44 @@
 """aphrodite - marker formatting and proxy compression."""
 
-import base64
 import http.client
 import json
 import logging
 import re
 import threading
+import time
 
 from ._core import _CCR_RE
 
 _log = logging.getLogger("aphrodite")
 
 # Compiled regex for valid CCR hash validation
-_VALID_HASH_RE = re.compile(r"^(?:[0-9a-f]{8,}|i:[0-9a-f]{6,})$")
+_VALID_HASH_RE = re.compile(r"^(?:[0-9a-f]{24,}|i:[0-9a-f]{6,})$")
 
 # ── Thread-local connection pool (keep-alive reuse) ──────────
 _tls = threading.local()
 
 
 def _get_conn(port: int) -> http.client.HTTPConnection:
-    """Get or create a keep-alive HTTPConnection for the given port (thread-local)."""
+    """Get or create a keep-alive HTTPConnection for the given port (thread-local).
+
+    Connections idle for >60s are evicted and recreated.
+    """
     if not hasattr(_tls, "conns"):
         _tls.conns = {}
+        _tls.conn_ts = {}
+    # Evict idle connections (>60s since last use)
+    now = time.time()
+    if port in _tls.conns:
+        if now - _tls.conn_ts.get(port, 0) > 60:
+            try:
+                _tls.conns[port].close()
+            except Exception:
+                pass
+            del _tls.conns[port]
+            del _tls.conn_ts[port]
     if port not in _tls.conns:
         _tls.conns[port] = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+    _tls.conn_ts[port] = now
     return _tls.conns[port]
 
 
@@ -35,9 +50,11 @@ def _put_conn(port: int) -> None:
         except Exception:
             pass
         del _tls.conns[port]
+        if hasattr(_tls, "conn_ts") and port in _tls.conn_ts:
+            del _tls.conn_ts[port]
 
 
-def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headers=None):
+def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
     """Build a standard CCR marker string.
 
     Args:
@@ -46,7 +63,6 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headers=None):
         size: Original size in bytes.
         mode: Proxy mode (token, cache, inline, etc.).
         preview: Optional text preview (pipe-safe, control-char-stripped).
-        headers: Optional dict of extra key=value pairs embedded in the marker.
     """
     parts = [hash_val, ccr_type, str(size)]
     if mode:
@@ -55,9 +71,6 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headers=None):
         safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
         safe = "".join(c if c >= " " or c == "\t" else " " for c in safe)
         parts.append(f"preview={safe}")
-    if headers:
-        for k, v in headers.items():
-            parts.append(f"{k}={v}")
     return f"<<<CCR:{'|'.join(parts)}>>>"
 
 
@@ -71,7 +84,7 @@ def _compress_via_proxy(content, target_port):
     JSON serialization overhead - the proxy reads the request body directly.
     """
     try:
-        data = content.encode()
+        data = content.encode("utf-8")
         conn = _get_conn(target_port)
         conn.request(
             "POST",
@@ -122,12 +135,7 @@ def _parse_ccr_markers(text):
                 preview = ""
                 for part in parts[3:]:
                     if part.startswith("preview="):
-                        raw = part[len("preview="):]
-                        # Try base64 decode first (legacy format), fall back to plain text
-                        try:
-                            preview = base64.urlsafe_b64decode(raw).decode("utf-8", errors="replace")
-                        except Exception:
-                            preview = raw
+                        preview = part[len("preview="):]
                         break
                 markers.append(
                     {
