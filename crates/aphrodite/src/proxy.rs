@@ -986,12 +986,16 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 				.lines()
 				.filter(|l| {
 					let t = l.trim_start();
-					t.starts_with("fn ") || t.starts_with("pub fn ")
+					t.starts_with("fn ") || t.starts_with("pub fn ") || t.starts_with("async fn ")
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after_fn = if t.starts_with("pub fn ") {
+					let after_fn = if t.starts_with("pub async fn ") {
+						&t[14..]
+					} else if t.starts_with("pub fn ") {
 						&t[7..]
+					} else if t.starts_with("async fn ") {
+						&t[9..]
 					} else if t.starts_with("fn ") {
 						&t[3..]
 					} else {
@@ -1026,6 +1030,39 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 				parts.push(format!("structs={}", structs.join(",")));
 			}
 
+			// impl blocks: impl TypeName or impl Trait for TypeName
+			let impls: Vec<&str> = content
+				.lines()
+				.filter(|l| {
+					let t = l.trim_start();
+					t.starts_with("impl ") || t.starts_with("pub impl ")
+				})
+				.filter_map(|l| {
+					let t = l.trim_start();
+					let after = if t.starts_with("pub impl ") { &t[9..] } else { &t[5..] };
+					after.split_whitespace().next().map(|w| w.trim_end_matches('<'))
+				})
+				.collect();
+			if !impls.is_empty() {
+				parts.push(format!("impls={}", impls.join(",")));
+			}
+
+			let traits: Vec<&str> = content
+				.lines()
+				.filter(|l| {
+					let t = l.trim_start();
+					t.starts_with("trait ") || t.starts_with("pub trait ")
+				})
+				.filter_map(|l| {
+					let t = l.trim_start();
+					let after = if t.starts_with("pub trait ") { &t[10..] } else { &t[6..] };
+					after.split(|c: char| c == ' ' || c == '<' || c == '{').next().filter(|s| !s.is_empty())
+				})
+				.collect();
+			if !traits.is_empty() {
+				parts.push(format!("traits={}", traits.join(",")));
+			}
+
 			parts.push(format!("ln={}", line_count));
 		},
 		"code_python" => {
@@ -1034,11 +1071,11 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 				.lines()
 				.filter(|l| {
 					let t = l.trim_start();
-					t.starts_with("def ")
+					t.starts_with("def ") || t.starts_with("async def ")
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after = &t[4..];
+					let after = if t.starts_with("async def ") { &t[10..] } else { &t[4..] };
 					after
 						.split(|c: char| c == '(' || c == ' ' || c == ':')
 						.next()
@@ -1086,6 +1123,22 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 				.collect();
 			if !imports.is_empty() {
 				parts.push(format!("imports={}", imports.join(",")));
+			}
+			// Decorators: @route, @dataclass, @staticmethod, etc.
+			let decorators: Vec<&str> = content
+				.lines()
+				.filter(|l| {
+					let t = l.trim_start();
+					t.starts_with('@')
+				})
+				.filter_map(|l| {
+					let t = l.trim_start();
+					let name = &t[1..];
+					name.split(|c: char| c == '(' || c == ' ').next().filter(|s| !s.is_empty())
+				})
+				.collect();
+			if !decorators.is_empty() {
+				parts.push(format!("decorators={}", decorators.join(",")));
 			}
 			parts.push(format!("ln={}", line_count));
 		},
@@ -1135,6 +1188,36 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 		},
 		"code" => {
 			parts.push("lang=gen".to_string());
+			// Try to extract function-like signatures from unknown code
+			let sigs: Vec<&str> = content
+				.lines()
+				.filter(|l| {
+					let t = l.trim_start();
+					t.starts_with("fn ") || t.starts_with("def ") || t.starts_with("func ")
+						|| t.starts_with("function ") || t.starts_with("class ") || t.starts_with("struct ")
+				})
+				.filter_map(|l| {
+					let t = l.trim_start();
+					if t.starts_with("fn ") {
+						t[3..].split(|c: char| c == '(' || c == ' ').next()
+					} else if t.starts_with("def ") {
+						t[4..].split(|c: char| c == '(' || c == ' ').next()
+					} else if t.starts_with("func ") {
+						t[5..].split(|c: char| c == '(' || c == ' ').next()
+					} else if t.starts_with("function ") {
+						t[9..].split(|c: char| c == '(' || c == ' ').next()
+					} else if t.starts_with("class ") {
+						t[6..].split(|c: char| c == '(' || c == ' ').next()
+					} else if t.starts_with("struct ") {
+						t[7..].split(|c: char| c == '(' || c == ' ').next()
+					} else {
+						None
+					}
+				})
+				.collect();
+			if !sigs.is_empty() {
+				parts.push(format!("sigs={}", sigs.join(",")));
+			}
 			parts.push(format!("ln={}", line_count));
 		},
 		"error" => {
@@ -1330,11 +1413,12 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 		},
 	}
 
-	// Build final string: pipe-safe (| -> /), max 200 chars
-	let result = parts.join("|").replace('|', "/").replace('\n', " ").replace('\r', "");
-	let truncated: String = result.chars().take(200).collect();
+	// Build final string: ;-separated key=value pairs (; safe within CCR marker's | delimiters)
+	// Comma separates list items within values. Max 400 chars (coding-tuned: enough for ~25 functions).
+	let result = parts.join(";").replace('\n', " ").replace('\r', "");
+	let truncated: String = result.chars().take(400).collect();
 	truncated
-		.trim_end_matches(|c: char| c == '|' || c == ' ' || c == ',' || c == '/')
+		.trim_end_matches(|c: char| c == ';' || c == ' ' || c == ',')
 		.to_string()
 }
 
