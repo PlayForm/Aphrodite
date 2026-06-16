@@ -1,7 +1,7 @@
 name: aphrodite
-version: 1.62.1
+version: 1.62.2
 description: "CCR compression plugin - smoke test suite, feature toggles, regression tracking, 9 tools, catalog mode toggle."
-kind: plugin
+kind: standalone
 provides_hooks:
   - on_session_start
   - transform_tool_result

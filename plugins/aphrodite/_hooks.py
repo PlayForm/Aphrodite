@@ -378,9 +378,14 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             for m in _parse_ccr_markers(content):
                 total_bytes += m["size"]
                 markers.append(m)
-    global _recent_markers
+    # Merge with existing: keep markers not found in new scan, cap at 200
+    seen_hashes = {m["hash"] for m in markers if "hash" in m}
+    for old_m in _recent_markers:
+        if old_m.get("hash") not in seen_hashes:
+            markers.append(old_m)
+            seen_hashes.add(old_m["hash"])
     _recent_markers.clear()
-    _recent_markers.extend(markers)  # cache for aphrodite_search
+    _recent_markers.extend(markers[:200])  # cap to prevent unbounded growth
     if DEBUG_LOGGING and markers:
         _log.debug(
             "pre_llm_hook: scanned %d CCR markers across %d msgs, %s total compressed",
@@ -427,6 +432,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                             f"({len(old_turns)} turns compressed, last {kept} raw)\n"
                             f"  retrieve: aphrodite_retrieve({ccr['hash']})"
                         )
+                        # Store sentinel to prevent re-compression on LLM failure
+                        for t in old_turns:
+                            _conv_index[t["id"]] = (ccr["hash"], f"turn {t['id']}", 0)
                 except Exception:
                     pass
 
