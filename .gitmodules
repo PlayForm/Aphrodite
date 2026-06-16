@@ -1,3 +1,4 @@
 [submodule "vendor/headroom"]
-	path = vendor/headroom
-	url = https://github.com/chopratejas/headroom.git
+path = vendor/headroom
+url = https://github.com/chopratejas/headroom.git
+ignore = all
