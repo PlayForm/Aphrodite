@@ -125,6 +125,13 @@ class AphroditeContextEngine(ContextEngine):
             self.threshold_tokens = int(self.context_length * self.threshold_percent / 100)
 
     def should_compress(self, prompt_tokens=None):
+        """Determine if engine should compress based on threshold.
+
+        Special threshold values:
+          -1  Always compress (any context fill triggers compression).
+           0  Never compress (disabled entirely).
+          >0  Compress when prompt_tokens >= context_length * pct / 100.
+        """
         if self.threshold_percent <= 0:
             return self.threshold_percent == -1  # -1 = always, 0 = disabled
         tokens = prompt_tokens or self.last_prompt_tokens
