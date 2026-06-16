@@ -8,8 +8,8 @@ from collections import OrderedDict, deque
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.63"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.8"  # plugin version
+BIN_VERSION = "v0.5.64"  # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.62.9"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -38,6 +38,7 @@ INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
 if os.environ.get("HEADROOM_SSE_BUFFER_MAX_BYTES"):
     INLINE_THRESHOLD = 1_048_576
 RECURSIVE_DEPTH = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
+AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 51200)
 DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
 CATALOG_MODE = os.environ.get("APHRODITE_CATALOG", "compact")
 
