@@ -3,7 +3,7 @@ name: aphrodite-dev-workflow
 description: "End-to-end aphrodite plugin + proxy development: cargo watch, WezTerm MCP, Hermes testing, binary build, git workflow."
 version: 1.7.0
 platforms: [macos]
-related_skills: [aphrodite-iterate-release, aphrodite-hook-reference, aphrodite-tool-guide, hermes-z-execution]
+related_skills: [aphrodite-hook-reference, aphrodite-tool-guide]
 ---
 
 # Aphrodite Development Workflow
@@ -14,7 +14,7 @@ Complete development cycle for the aphrodite Hermes plugin and Rust proxy binary
 
 Any aphrodite development: plugin code changes, proxy Rust changes, hook debugging, testing via Hermes, binary rebuilds, git workflow. Also load `aphrodite-tool-guide` for the user-facing tool reference (CCR lifecycle, catalog vs search, stats interpretation).
 
-**CRITICAL — agent must load this skill at session start**: The system prompt lists aphrodite skills but the agent does not auto-load them. The agent will happily run benchmarks, read engine code, and report metrics without ever loading this skill — missing key pitfalls like the cache-vs-token profile issue, the `--no-optimize` headroom passthrough, and the mutual exclusion of `compression.enabled` and `context.engine`. If the agent hasn't loaded this skill after the first user message about aphrodite, load it immediately.
+**CRITICAL - agent must load this skill at session start**: The system prompt lists aphrodite skills but the agent does not auto-load them. The agent will happily run benchmarks, read engine code, and report metrics without ever loading this skill - missing key pitfalls like the cache-vs-token profile issue, the `--no-optimize` headroom passthrough, and the mutual exclusion of `compression.enabled` and `context.engine`. If the agent hasn't loaded this skill after the first user message about aphrodite, load it immediately.
 
 ## Architecture
 
@@ -444,7 +444,7 @@ cd /Volumes/CORSAIR/Developer/macOS/Application/PlayForm/HermesCompress && \
 hermes -z "Run strict pyright on plugins/aphrodite/. Write a temp pyrightconfig-full.json, run pyright --project /tmp/pyrightconfig-full.json ., report errors/warnings/file count." --model deepseek-v4-flash
 ```
 
-Launch via `terminal(background=true)`. Results arrive via `process(action="poll")`. See `hermes-z-execution` skill.
+Launch via `terminal(background=true)`. Results arrive via `process(action="poll")`.
 
 ## Testing the Context Engine
 
@@ -501,7 +501,7 @@ grep -A10 "APHRODITE.*DEBUG MODE" ~/.hermes/logs/agent.log | tail -12
 
 ## Content Type Detection
 
-The proxy's `detect_content_type()` identifies 13 content categories for adaptive compression thresholds. See `references/content-types.md` in the `aphrodite-iterate-release` skill for the full taxonomy.
+The proxy's `detect_content_type()` identifies 13 content categories for adaptive compression thresholds. See `references/content-types.md` in the aphrodite skill references for the full taxonomy.
 
 Key facts for debugging:
 - Code (×4 threshold) preserves more content in context
@@ -635,8 +635,8 @@ Profiles MUST have differentiated `default_skills` - identical lists defeat the 
 
 | Profile | Skills |
 |---|---|
-| `barebone` | `plan-then-delegate`, `execution-blocks` only - no aphrodite toolset |
-| `compress-off` | `plan-then-delegate`, `execution-blocks` only - compression disabled, CCR tools confuse agent |
+| `barebone` | No aphrodite toolset |
+| `compress-off` | Compression disabled, CCR tools excluded |
 | `compress-light/medium/aggressive` | + `aphrodite-dev-workflow` |
 | `proxy-cache` | + `aphrodite-dev-workflow` (but `compression.enabled: false`) |
 | `proxy-token` | + `aphrodite-dev-workflow` |
@@ -730,7 +730,7 @@ Then launch with `--yolo` flag. Restart the desktop app after config changes - t
 
 - **Git rule**: Never `git reset`, `git push --force`, or `git rebase`. Follow `git add`, `git commit` only. This applies to all subagents and the orchestrator.
 
-- **Release compare links**: Every GitHub release MUST include a compare link as the first line: `**[Compare vPREV...vCURRENT](https://github.com/PlayForm/Aphrodite/compare/vPREV...vCURRENT)**`. Add retroactively with `gh release edit`. This is part of the release notes template in execution-blocks skill.
+- **Release compare links**: Every GitHub release MUST include a compare link as the first line: `**[Compare vPREV...vCURRENT](https://github.com/PlayForm/Aphrodite/compare/vPREV...vCURRENT)**`. Add retroactively with `gh release edit`.
 
 - **CCR persistence: NONE.** All stores are in-memory (token proxy HashMap, cache proxy HashMap, Python inline OrderedDict). Nothing survives proxy restart or Hermes exit. The catalog shows session-only entries - empty on fresh sessions. When the user asks "do you have access to cache from previous runs?", the answer is no. `ccr_entries: "?"` in aphrodite_stats means the Python plugin can't see proxy-side entries. Use raw `/stats` for the real count.
 
@@ -738,7 +738,7 @@ Then launch with `--yolo` flag. Restart the desktop app after config changes - t
 
 - **Persistent stats via /stats/db**: SQLite-backed endpoint returning cumulative data: total entries, bytes original/compressed, DB size, oldest entry age. Survives proxy restarts. Query on session start for accumulated metrics. Separate from `/stats` which is in-memory and resets.
 
-- **aggressive profile uses cache proxy, not token**: The `aphrodite-compress-aggressive` profile defaults to `provider: aphrodite-cache` (:9797) which serves cached LLM responses and skips compression. This produces 99% cache hits and near-zero compression activity. The cache proxy will show `ccr_created: 0, tokens_saved: 0` even though the plugin is working — it's routing through the wrong proxy. All compression happens on the token proxy (:9798). **This is the #1 cause of "why isn't compression working?"** — the stats show everything healthy but zero compression because the profile is hitting the cache port. For actual aggressive compression, change to `provider: aphrodite-token` (:9798): `hermes config set model.provider aphrodite-token --profile aphrodite-compress-aggressive`. Cache mode = speed, token mode = compression. Choose explicitly. Verify with `aphrodite_stats()` — if `proxy.cache.ccr_created = 0` but `proxy.token.ccr_created > 0`, you're routing through the wrong port.
+- **aggressive profile uses cache proxy, not token**: The `aphrodite-compress-aggressive` profile defaults to `provider: aphrodite-cache` (:9797) which serves cached LLM responses and skips compression. This produces 99% cache hits and near-zero compression activity. The cache proxy will show `ccr_created: 0, tokens_saved: 0` even though the plugin is working - it's routing through the wrong proxy. All compression happens on the token proxy (:9798). **This is the #1 cause of "why isn't compression working?"** - the stats show everything healthy but zero compression because the profile is hitting the cache port. For actual aggressive compression, change to `provider: aphrodite-token` (:9798): `hermes config set model.provider aphrodite-token --profile aphrodite-compress-aggressive`. Cache mode = speed, token mode = compression. Choose explicitly. Verify with `aphrodite_stats()` - if `proxy.cache.ccr_created = 0` but `proxy.token.ccr_created > 0`, you're routing through the wrong port.
 
 - **hermes -z flash summaries only**: Flash workers report only their final summary - full file reads, tool outputs, and intermediate results stay in the worker's session. Main session sees conclusions, not raw data. Plan instructions to be self-contained enough that the summary captures all needed information. When in doubt, ask the worker to write verification results to a file both sessions can read.
 - **aphrodite.toml api_key overrides env var.** The `api_key = "sk-..."` field in `aphrodite.toml` takes priority over `APHRODITE_API_KEY` env var. If proxy returns 401, check toml for hardcoded expired keys. Comment out or remove the field to use env var.
@@ -781,7 +781,7 @@ Then launch with `--yolo` flag. Restart the desktop app after config changes - t
   | 3 | `plugins/aphrodite/plugin.yaml` | `version:` | `1.62.1` |
   | 4 | `crates/aphrodite/Cargo.toml` | `version =` | `"0.5.54"` |
 
-  The Rust binary embeds its version at compile time - rebuild after bumping Cargo.toml. For the fast iteration loop (bump→fix→build→push→release), see the `aphrodite-iterate-release` skill.
+  The Rust binary embeds its version at compile time - rebuild after bumping Cargo.toml.
 - **GitHub release commands**: After building the binary and pushing the tag, create the release:
   ```bash
   # If release already exists at this tag (forced update), delete first:

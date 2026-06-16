@@ -1,7 +1,7 @@
-"""Atomic test 04 — hardcoded absolute path in _rebuild_handler.
+"""Atomic test 04 - hardcoded absolute path in _rebuild_handler.
 
-Bug:  repo = "REPLACED/Developer/Application/PlayForm/HermesCompress"
-      This breaks on any machine that is not Nikola's MacBook.
+Bug:  repo = "/Users/username/Projects/HermesCompress"
+      This breaks on any machine that is not the developer's machine.
 Fix:  Derive the repo root from __file__ so it always points to the
       checked-out workspace regardless of where it lives.
 
@@ -13,7 +13,7 @@ import os
 # ---------- buggy version ----------
 
 def _rebuild_handler_buggy() -> str:
-    repo = "REPLACED/Developer/Application/PlayForm/HermesCompress"
+    repo = "/Users/username/Projects/HermesCompress"
     return repo
 
 # ---------- fixed version ----------
@@ -32,8 +32,8 @@ fixed_path = _rebuild_handler_fixed()
 
 assert buggy_path.startswith("/Users/"), "Should be a hardcoded user path"
 assert os.path.isdir(fixed_path), f"Fixed repo root must exist: {fixed_path}"
-assert not fixed_path.startswith("REPLACED"), "Should not contain personal path"
+assert not fixed_path.startswith("/Users/username"), "Should not contain personal path"
 
-print("04 OK — hardcoded path replaced with __file__-relative resolution")
+print("04 OK - hardcoded path replaced with __file__-relative resolution")
 print(f"  buggy path : {buggy_path}")
 print(f"  fixed path : {fixed_path}")
