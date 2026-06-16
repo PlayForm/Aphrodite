@@ -14,6 +14,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
 use axum::{
     body::Body,
@@ -28,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use headroom_core::ccr::backends::in_memory::InMemoryCcrStore;
 use headroom_core::ccr::backends::sqlite::SqliteCcrStore;
 use headroom_core::ccr::{compute_key, CcrStore};
+use tokio_util::task::TaskTracker;
 
 /// API key wrapper with safe Debug - never leaks to logs.
 #[derive(Clone)]
@@ -61,8 +63,48 @@ use crate::config::{Cli, ProxyMode};
 const CACHE_COMPRESS_THRESHOLD: usize = 8192;
 /// Content size threshold for aphrodite mode compression (1KB).
 const TOKEN_COMPRESS_THRESHOLD: usize = 1024;
+/// Inline CCR threshold - content below this size is stored in the inline HashMap
+/// instead of SQLite/in-memory CCR backends, avoiding round-trip overhead.
+const INLINE_CCR_THRESHOLD: usize = 256;
 /// Chat Completions API path.
 const CHAT_COMPLETIONS_PATH: &str = "/v1/chat/completions";
+
+// ── spawn_blocking wrappers for CcrStore (rusqlite is blocking) ─────
+
+/// Wrapper for `ccr.get()` on a blocking thread.
+async fn ccr_get(ccr: &Arc<dyn CcrStore>, hash: &str) -> Option<String> {
+    let ccr = ccr.clone();
+    let hash = hash.to_owned();
+    tokio::task::spawn_blocking(move || ccr.get(&hash)).await.unwrap_or(None)
+}
+
+/// Wrapper for `ccr.put()` on a blocking thread.
+async fn ccr_put(ccr: &Arc<dyn CcrStore>, hash: &str, content: &str) {
+    let ccr = ccr.clone();
+    let hash = hash.to_owned();
+    let content = content.to_owned();
+    let _ = tokio::task::spawn_blocking(move || ccr.put(&hash, &content)).await;
+}
+
+/// Wrapper for `ccr.del()` on a blocking thread.
+#[allow(dead_code)]
+async fn ccr_del(ccr: &Arc<dyn CcrStore>, hash: &str) -> bool {
+    let ccr = ccr.clone();
+    let hash = hash.to_owned();
+    tokio::task::spawn_blocking(move || ccr.del(&hash)).await.unwrap_or(false)
+}
+
+/// Wrapper for `ccr.len()` on a blocking thread.
+async fn ccr_len(ccr: &Arc<dyn CcrStore>) -> usize {
+    let ccr = ccr.clone();
+    tokio::task::spawn_blocking(move || ccr.len()).await.unwrap_or(0)
+}
+
+/// Wrapper for `ccr.stats_db()` on a blocking thread.
+async fn ccr_stats_db(ccr: &Arc<dyn CcrStore>) -> Option<serde_json::Value> {
+    let ccr = ccr.clone();
+    tokio::task::spawn_blocking(move || ccr.stats_db()).await.unwrap_or(None)
+}
 
 // ── State ──────────────────────────────────────────────────────────
 
@@ -111,6 +153,16 @@ pub struct AppState {
     pub ccr_created: AtomicU64,
     pub tool_relay_calls: AtomicU64,
     pub compression_ratio_ema: AtomicU64,  // ×100 for EMA of compression ratio
+
+    // LLM API response cache (model+messages → compressed response)
+    /// LRU cache: hash(model+messages) → serialized response body
+    pub response_cache: std::sync::Mutex<lru::LruCache<u64, Vec<u8>>>,
+    pub cache_hits: AtomicU64,
+    pub cache_misses: AtomicU64,
+
+    /// Tracks async background tasks (tool relay callbacks, CCR notifications)
+    /// so shutdown waits for them to complete before exiting.
+    pub task_tracker: TaskTracker,
 }
 
 impl AppState {
@@ -134,6 +186,10 @@ impl AppState {
                 "created": self.ccr_created.load(Ordering::Relaxed),
             },
             "tool_relay_calls": self.tool_relay_calls.load(Ordering::Relaxed),
+            "cache": {
+                "hits": self.cache_hits.load(Ordering::Relaxed),
+                "misses": self.cache_misses.load(Ordering::Relaxed),
+            },
             "latency_buckets_us": [
                 self.latency_buckets[0].load(Ordering::Relaxed),
                 self.latency_buckets[1].load(Ordering::Relaxed),
@@ -325,6 +381,10 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
         ccr_created: AtomicU64::new(0),
         tool_relay_calls: AtomicU64::new(0),
         compression_ratio_ema: AtomicU64::new(1000),  // initial: 10.0x - neutral, avoids startup scale-up
+        response_cache: Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
+        cache_hits: AtomicU64::new(0),
+        cache_misses: AtomicU64::new(0),
+        task_tracker: TaskTracker::new(),
     })
 }
 
@@ -333,7 +393,6 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 
 
 /// Generate a simple summary - first 3 lines or first 200 chars.
-#[allow(dead_code)]
 fn generate_summary(content: &str) -> String {
     let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).take(3).collect();
     if lines.len() >= 2 {
@@ -342,6 +401,20 @@ fn generate_summary(content: &str) -> String {
         let preview = &content[..content.len().min(200)];
         format!("[summary] {}B: {}", content.len(), preview)
     }
+}
+
+/// Compute a cache key from a Chat Completions request body: hash(model + messages).
+/// Returns None if the body can't be parsed as JSON or lacks model/messages.
+fn cache_key_from_body(body: &[u8]) -> Option<u64> {
+    use std::hash::{Hash, Hasher};
+    let v: serde_json::Value = serde_json::from_slice(body).ok()?;
+    let model = v.get("model")?.as_str()?;
+    let messages = v.get("messages")?;
+    let messages_str = serde_json::to_string(messages).ok()?;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    model.hash(&mut hasher);
+    messages_str.hash(&mut hasher);
+    Some(hasher.finish())
 }
 
 /// Catch-all proxy handler - forwards any request to DeepSeek.
@@ -386,6 +459,38 @@ pub async fn proxy_handler(
     let is_chat_completion = deepseek_path == CHAT_COMPLETIONS_PATH.trim_start_matches('/');
 
     let body_vec = body.to_vec();
+    let cache_key = if is_chat_completion {
+        cache_key_from_body(&body_vec)
+    } else {
+        None
+    };
+    // Check LLM API response cache before upstream call
+    if let Some(ck) = cache_key {
+        if let Some(cached_body) = state.response_cache.lock().ok().and_then(|mut cache| cache.get(&ck).cloned()) {
+            state.cache_hits.fetch_add(1, Ordering::Relaxed);
+            if state.dev {
+                tracing::info!(
+                    id = %req_id_short,
+                    cached_len = cached_body.len(),
+                    "<<< CACHE HIT"
+                );
+            }
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "application/json")
+                .header("X-Aphrodite-Cache", "HIT")
+                .body(Body::from(cached_body))
+                .unwrap();
+        } else {
+            state.cache_misses.fetch_add(1, Ordering::Relaxed);
+            if state.dev {
+                tracing::info!(
+                    id = %req_id_short,
+                    "<<< CACHE MISS"
+                );
+            }
+        }
+    }
     let mut upstream_result = Err("unreachable".to_string());
     for attempt in 1..=3u32 {
         let req = state.client.request(method.clone(), &url)
@@ -403,7 +508,9 @@ pub async fn proxy_handler(
             Ok(r) => { upstream_result = Ok(r); break; }
             Err(e) => {
                 if attempt < 3 {
-                    let ms = 100 * 2u64.pow(attempt - 1);
+                    let base_ms = 100 * 2u64.pow(attempt - 1);
+                    let jitter = rand::random::<f64>() * 0.5 + 0.75; // 0.75x to 1.25x
+                    let ms = (base_ms as f64 * jitter) as u64;
                     tracing::warn!(attempt, backoff_ms = ms, "upstream retry after error: {}", e);
                     tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
                 } else {
@@ -449,10 +556,17 @@ pub async fn proxy_handler(
                         );
                     }
                     let body = serde_json::to_vec(&compressed).unwrap_or_else(|_| resp_body.to_vec());
+                    // Store in LLM response cache
+                    if let Some(ck) = cache_key {
+                        if let Ok(mut cache) = state.response_cache.lock() {
+                            cache.put(ck, body.clone());
+                        }
+                    }
                     return Response::builder()
                         .status(status)
                         .header("Content-Type", "application/json")
                         .header("X-Aphrodite-Compressed", "true")
+                        .header("X-Aphrodite-Cache", "MISS")
                         .body(Body::from(body))
                         .unwrap();
                 }
@@ -477,7 +591,13 @@ pub async fn proxy_handler(
             // Use already-extracted content_type (fetched before response.bytes())
             state.record_latency(t0.elapsed());
             state.record_request(req_id_short, method.as_str(), path.path(), status.as_u16(), false, t0.elapsed().as_millis());
-            let mut builder = Response::builder().status(status);
+            // Store raw response in LLM cache if applicable
+            if let Some(ck) = cache_key {
+                if let Ok(mut cache) = state.response_cache.lock() {
+                    cache.put(ck, resp_body.to_vec());
+                }
+            }
+            let mut builder = Response::builder().status(status).header("X-Aphrodite-Cache", "MISS");
             if let Some(ct) = content_type {
                 builder = builder.header("Content-Type", ct);
             }
@@ -556,14 +676,15 @@ fn detect_content_type(content: &str) -> &'static str {
     
     // Code detection - language-specific
     if content.lines().count() > 3 {
-        // Rust - line-anchored to avoid false positives on Python/log text containing "fn "
+        // Rust - require fn keyword PLUS one of arrow, borrow, or use
+        // to distinguish from Python/JavaScript that happens to contain "fn "
         if content.lines().any(|l| {
             let t = l.trim_start();
             t.starts_with("fn ") || t.starts_with("pub fn ") || t.starts_with("async fn ")
                 || t.starts_with("pub async fn ") || t.starts_with("impl ")
                 || t.starts_with("struct ") || t.starts_with("pub struct ")
                 || t.starts_with("enum ") || t.starts_with("pub enum ")
-        }) {
+        }) && (content.contains("-> ") || content.contains("&") || content.contains("use ")) {
             return "code_rust";
         }
         // Python
@@ -604,7 +725,8 @@ fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
     let size = content.len();
     let preview = &content[..content.len().min(120)];
     let oneliner = preview.lines().next().unwrap_or(preview).trim();
-    format!("<<<CCR:{}|{}|{}>>> {}", hash, ct, size, oneliner)
+    let summary = generate_summary(content);
+    format!("<<<CCR:{}|{}|{}>>> {} | {}", hash, ct, size, oneliner, summary)
 }
 
 /// Compress a Chat Completions API response with smart markers.
@@ -628,11 +750,11 @@ async fn compress_chat_completion(
                 if content.len() > threshold {
                     if let Some(ccr) = &state.ccr {
                         let hash = compute_key(content.as_bytes());
-                        if ccr.get(&hash).is_some() {
+                        if ccr_get(ccr, &hash).await.is_some() {
                             state.ccr_hits.fetch_add(1, Ordering::Relaxed);
                         } else {
                             state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-                            ccr.put(&hash, content);
+                            ccr_put(ccr, &hash, content).await;
                             state.ccr_created.fetch_add(1, Ordering::Relaxed);
                             state.tokens_saved.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
                         }
@@ -656,6 +778,13 @@ async fn compress_chat_completion(
                         did_compress = true;
                         state.update_compression_ratio(orig_len, marker_len);
                     }
+                } else if content.len() > INLINE_CCR_THRESHOLD {
+                    // Below compression threshold but above inline threshold: store in inline_ccr
+                    // so later retrievals can find tiny entries without a backend round-trip.
+                    let hash = compute_key(content.as_bytes());
+                    if let Ok(mut map) = state.inline_ccr.lock() {
+                        map.insert(hash, content.to_string());
+                    }
                 }
             }
         }
@@ -673,11 +802,11 @@ async fn compress_chat_completion(
                                 if args_owned.len() > threshold {
                                     if let Some(ccr) = &state.ccr {
                                         let hash = compute_key(args_owned.as_bytes());
-                                        if ccr.get(&hash).is_some() {
+                                        if ccr_get(ccr, &hash).await.is_some() {
                                             state.ccr_hits.fetch_add(1, Ordering::Relaxed);
                                         } else {
                                             state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-                                            ccr.put(&hash, &args_owned);
+                                            ccr_put(ccr, &hash, &args_owned).await;
                                             state.ccr_created.fetch_add(1, Ordering::Relaxed);
                                             state.tokens_saved.fetch_add((args_owned.len() - hash.len()) as u64, Ordering::Relaxed);
                                         }
@@ -741,7 +870,7 @@ async fn execute_tool_relay(
         "aphrodite_retrieve" => {
             let hash = params.get("hash").and_then(|v| v.as_str()).ok_or("missing hash")?;
             if let Some(ccr) = &state.ccr {
-                match ccr.get(hash) {
+                match ccr_get(ccr, hash).await {
                     Some(content) => Ok(serde_json::json!({"found": true, "content": content})),
                     None => Ok(serde_json::json!({"found": false})),
                 }
@@ -754,7 +883,7 @@ async fn execute_tool_relay(
             if let Some(ccr) = &state.ccr {
                 let hash = compute_key(content.as_bytes());
                 let size = content.len();
-                ccr.put(&hash, content);
+                ccr_put(ccr, &hash, content).await;
                 state.tokens_saved.fetch_add(size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
                 Ok(serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}))
             } else {
@@ -762,16 +891,17 @@ async fn execute_tool_relay(
             }
         }
         "aphrodite_list" => {
-            match &state.ccr {
-                Some(ccr) => Ok(serde_json::json!({
-                    "entries": ccr.len(),
-                    "backend": match state.mode {
-                        ProxyMode::Cache => "in_memory",
-                        ProxyMode::Token => "sqlite",
-                    },
-                })),
-                None => Ok(serde_json::json!({"entries": 0, "message": "CCR not enabled"})),
-            }
+            let entries = match &state.ccr {
+                Some(ccr) => ccr_len(ccr).await,
+                None => 0,
+            };
+            Ok(serde_json::json!({
+                "entries": entries,
+                "backend": match state.mode {
+                    ProxyMode::Cache => "in_memory",
+                    ProxyMode::Token => "sqlite",
+                },
+            }))
         }
         _ => Err(format!("Unknown tool: {}", tool)),
     }
@@ -787,7 +917,7 @@ pub async fn handle_ccr_create(
     let hash = req.key.unwrap_or_else(|| compute_key(req.content.as_bytes()));
 
     if let Some(ccr) = &state.ccr {
-        ccr.put(&hash, &req.content);
+        ccr_put(ccr, &hash, &req.content).await;
         state.ccr_created.fetch_add(1, Ordering::Relaxed);
         state.tokens_saved.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
 
@@ -822,17 +952,20 @@ pub async fn handle_ccr_list(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     match &state.ccr {
-        Some(ccr) => Json(serde_json::json!({
-            "entries": ccr.len(),
-            "backend": match state.mode {
-                ProxyMode::Cache => "in_memory",
-                ProxyMode::Token => "sqlite",
-            },
-            "mode": match state.mode {
-                ProxyMode::Cache => "cache",
-                ProxyMode::Token => "token",
-            },
-        })),
+        Some(ccr) => {
+            let entries = ccr_len(ccr).await;
+            Json(serde_json::json!({
+                "entries": entries,
+                "backend": match state.mode {
+                    ProxyMode::Cache => "in_memory",
+                    ProxyMode::Token => "sqlite",
+                },
+                "mode": match state.mode {
+                    ProxyMode::Cache => "cache",
+                    ProxyMode::Token => "token",
+                },
+            }))
+        }
         None => Json(serde_json::json!({"entries": 0, "message": "CCR not enabled"})),
     }
 }
@@ -845,7 +978,7 @@ pub async fn handle_ccr_delete(
 ) -> impl IntoResponse {
     match &state.ccr {
         Some(ccr) => {
-            let existed = ccr.del(&hash);
+            let existed = ccr_del(ccr, &hash).await;
             if existed {
                 (StatusCode::OK, Json(serde_json::json!({"deleted": true, "hash": hash})))
             } else {
@@ -871,7 +1004,7 @@ pub async fn handle_stats_db(
     };
     match &state.ccr {
         Some(ccr) => {
-            match ccr.stats_db() {
+            match ccr_stats_db(ccr).await {
                 Some(stats) => Json(stats).into_response(),
                 None => (
                     StatusCode::OK,
@@ -945,6 +1078,9 @@ mod tests {
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
             compressions_by_type: Mutex::new(HashMap::new()),
+            response_cache: Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
+            cache_hits: AtomicU64::new(0),
+            cache_misses: AtomicU64::new(0),
         };
         assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
     }
@@ -1034,6 +1170,9 @@ mod tests {
             latency_buckets: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)],
             last_errors: Mutex::new(Vec::new()),
             compressions_by_type: Mutex::new(HashMap::new()),
+            response_cache: Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
+            cache_hits: AtomicU64::new(0),
+            cache_misses: AtomicU64::new(0),
         }
     }
 }

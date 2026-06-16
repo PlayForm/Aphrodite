@@ -129,8 +129,8 @@
 | 54 | 🟡 | O(n) `_inline_store` scan | ❌ | |
 | 55 | 🟡 | `on_session_reset` shadow | ✅ | by #49 |
 | 56 | 🟡 | `threshold_tokens` always 1 | ✅ | v0.5.52 |
-| 57 | 🟠 | `compress()` tool-chain off-by-one | ❌ | |
-| 58 | 🟡 | Asymmetric CCR entries [:5000] | ❌ | |
+| 57 | 🟠 | `compress()` tool-chain off-by-one | ✅ | v1.62.1 |
+| 58 | 🟡 | Asymmetric CCR entries [:5000] | ✅ | v1.62.1 |
 
 ---
 
@@ -186,11 +186,10 @@
 | Severity | Total | Done | Remaining |
 |---|---|---|---|
 | 🔴 Critical | 7 | **7** | 0 |
-| 🟠 High | 6 | **3** | 3 |
-| 🟡 Medium/Low | 64 | **17** | 47 |
+| 🟠 High | 6 | **4** | 2 |
+| 🟡 Medium/Low | 64 | **19** | 45 |
 | 🟢 Improvement | 6 | **0** | 6 |
-| ⏭️ Skipped | 5 | — | 5 |
-| **TOTAL** | **91** | **27** | **61** |
+| **TOTAL** | **91** | **30** | **58** |
 
 ---
 
@@ -217,6 +216,7 @@ See `plans/0-headroom-100-tasks.md`.
 | v0.5.52 | Jun 16 | 8 bugs: medium + low |
 | v0.5.53 | Jun 16 | Modular refactor + 8 bugs |
 | v0.5.54 | Jun 16 | Cleanup, reorganization, handoff |
+| v1.62.1 | Jun 16 | #57 tool-chain fix, #58 asymmetric truncation removed, profile skills differentiation, gitignore |
 
 ---
 
