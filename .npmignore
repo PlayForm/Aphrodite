@@ -1,0 +1,16 @@
+# Hermes internals
+.hermes/
+
+# Dev artifacts
+*.log
+*.lock
+.DS_Store
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+.env.sh
+*.pem
+*.key
+aphrodite.local.toml

@@ -1,0 +1,9 @@
+[*.{rs,toml,md,yaml,yml}]
+indent_style = space
+indent_size = 4
+max_width = 100
+
+[*.{py}]
+indent_style = space
+indent_size = 4
+max_width = 100
