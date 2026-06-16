@@ -851,6 +851,7 @@ async fn compress_chat_completion(
                             ccr_put(ccr, &hash, content).await;
                             state.ccr_created.fetch_add(1, Ordering::Relaxed);
                             state.tokens_saved.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
+                            state.requests_compressed.fetch_add(1, Ordering::Relaxed);
                         }
 
                         let (compressed, orig_len) = {
@@ -908,6 +909,7 @@ async fn compress_chat_completion(
                                             ccr_put(ccr, &hash, &args_owned).await;
                                             state.ccr_created.fetch_add(1, Ordering::Relaxed);
                                             state.tokens_saved.fetch_add((args_owned.len() - hash.len()) as u64, Ordering::Relaxed);
+                                            state.requests_compressed.fetch_add(1, Ordering::Relaxed);
                                         }
                                         let (compressed, orig_len) = {
                                             let compressed = smart_marker(&hash, &args_owned, ct);
@@ -1060,6 +1062,7 @@ pub async fn handle_ccr_create(
                     ccr_put(ccr, &hash, &req.content).await;
                     state.ccr_created.fetch_add(1, Ordering::Relaxed);
                     state.tokens_saved.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
+                    state.requests_compressed.fetch_add(1, Ordering::Relaxed);
                 }
 
                 if let Some(notify_url) = &state.notify_url {
@@ -1099,6 +1102,7 @@ pub async fn handle_ccr_create(
         if let Some(ccr) = &state.ccr {
             ccr_put(ccr, &hash, &content).await;
             state.ccr_created.fetch_add(1, Ordering::Relaxed);
+            state.requests_compressed.fetch_add(1, Ordering::Relaxed);
             state.tokens_saved.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
         }
 
