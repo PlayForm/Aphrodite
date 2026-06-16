@@ -388,6 +388,28 @@ def _extract_tool_metadata(tool_name, args, result):
         return None
 
 
+def _classifier_says_skip(klass: dict) -> bool:
+    """Classifier poll: does the content have nothing worth retrieving?
+
+    If the classifier signals clean/inert output (0E/0W build, exit=0 terminal,
+    0 match search, etc.), we skip CCR marker emission. The preview IS the
+    complete story — creating a `<<<CCR:hash>>>` marker just baits the LLM
+    into a wasteful retrieval round-trip.
+
+    The content IS still stored in CCR for search/history. We just don't
+    show the marker to the LLM.
+    """
+    ctype = klass.get("type", "")
+    if ctype in ("build_output", "build_error"):
+        if klass.get("errors", "0") in ("0", "") and klass.get("warnings", "0") in ("0", ""):
+            return True
+    if ctype == "terminal" and klass.get("exit") == "0":
+        return True
+    if ctype in ("search_files", "search_results") and klass.get("total", "0") in ("0", ""):
+        return True
+    return False
+
+
 def _transform_tool_result(
     tool_name="",
     args=None,
@@ -464,7 +486,20 @@ def _transform_tool_result(
             )
         return result
 
-    preview = _make_ccr_preview(result, model_family=_detect_model_family())
+    # ── Trust the classifier: skip CCR for clean/uninteresting outputs ──
+    # The classifier poll ("real poll intent") determines if content is
+    # worth an LLM retrieval. Clean outputs get stored for history but
+    # the CCR marker is omitted — the preview IS the complete story.
+    klass = _classify_content(result)
+    if _classifier_says_skip(klass):
+        # Store silently via proxy for search/history, but suppress CCR marker.
+        # The LLM sees ONLY the preview — no bait to retrieve.
+        if proxy_available:
+            target = PORTS["token"] if token_alive else PORTS["cache"]
+            _compress_via_proxy(result, target, headers=_headroom_context or None)
+        return _make_ccr_preview(result, klass=klass, model_family=_detect_model_family())
+
+    preview = _make_ccr_preview(result, klass=klass, model_family=_detect_model_family())
     metadata = _extract_tool_metadata(tool_name, args, result)
 
     # Try proxy compression first
@@ -1242,6 +1277,12 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                 summary += f" | errors: {'; '.join(errors[:5])}"
             if warnings:
                 summary += f" | warnings: {'; '.join(warnings[:3])}"
+
+            # ── Clean build: no CCR needed, return summary inline ─────
+            if not errors and not warnings:
+                if DEBUG_LOGGING:
+                    _log.debug("terminal_hook: clean build — inline summary, no CCR")
+                return summary
             out_len = len(summary)
             if DEBUG_LOGGING:
                 _log.debug(
@@ -1270,6 +1311,11 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             _hash_alias[full_sha] = h
             _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
             return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
+
+    # ── Classifier poll: clean terminal outputs skip CCR ───────────────
+    klass = _classify_content(output)
+    if _classifier_says_skip(klass):
+        return _make_ccr_preview(output, klass=klass, model_family=_detect_model_family())
 
     preview = _make_ccr_preview(output, model_family=_detect_model_family())
 
