@@ -77,6 +77,7 @@ def _compress_handler(args=None, **kwargs):
         except Exception:
             return '{"error": "content must be a string or JSON-serializable"}'
     type_hint = args.get("type", "text")
+    center = args.get("_ccr_center") or args.get("center")
     if not content:
         return '{"error": "missing content parameter"}'
 
@@ -95,6 +96,8 @@ def _compress_handler(args=None, **kwargs):
         tool_headers = {"Content-Type": "application/octet-stream"}
         if _headroom_context:
             tool_headers.update(_headroom_context)
+        if center:
+            tool_headers["X-Aphrodite-Center"] = center
         req = urllib.request.Request(
             f"http://127.0.0.1:{target}/ccr/create", data=data, headers=tool_headers
         )
@@ -126,6 +129,10 @@ COMPRESS_SCHEMA = {
             "type": {
                 "type": "string",
                 "description": "Optional: content type hint - code, log, diff, error, json, build_output, text",
+            },
+            "_ccr_center": {
+                "type": "string",
+                "description": "Optional: center string that travels with the marker. Use code_rust, code_python, debug, compact, verbose, or any identifier. The center annotates the marker and survives retrievals.",
             },
         },
         "required": ["content"],
