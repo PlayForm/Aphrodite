@@ -2,7 +2,7 @@
 import json
 import urllib.request
 
-from ._core import _CCR_RE, RECURSIVE_DEPTH, _inline_store, _recent_markers
+from ._core import _CCR_RE, RECURSIVE_DEPTH, _inline_store
 from ._inline import _inline_retrieve
 
 
