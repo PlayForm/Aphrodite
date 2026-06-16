@@ -1,17 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-	<defs>
-		<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-			<stop offset="0%" stop-color="#ff3366" />
-			<stop offset="50%" stop-color="#cc2255" />
-			<stop offset="100%" stop-color="#990044" />
-		</linearGradient>
-	</defs>
-	<!-- Aphrodite rose/heart -->
-	<path d="M60 20 C60 10, 30 15, 30 40 C30 65, 60 100, 60 100 C60 100, 90 65, 90 40 C90 15, 60 10, 60 20Z"
-		fill="url(#g)" opacity="0.9" />
-	<!-- Inner highlight -->
-	<path d="M60 30 C60 25, 42 30, 42 48 C42 65, 60 88, 60 88 C60 88, 78 65, 78 48 C78 30, 60 25, 60 30Z" fill="#ff6688"
-		opacity="0.4" />
-	<!-- Dot -->
-	<circle cx="60" cy="42" r="6" fill="#ffccdd" opacity="0.8" />
+  <defs>
+    <pattern id="diag" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="4" x2="8" y2="4" stroke="#1a1a2e" stroke-width="3" stroke-linecap="round"/>
+    </pattern>
+    <clipPath id="center">
+      <ellipse cx="60" cy="55" rx="35" ry="30"/>
+    </clipPath>
+  </defs>
+  <!-- Background field: dark diagonal dashes -->
+  <rect width="120" height="120" fill="url(#diag)"/>
+  <!-- Center cluster: red diagonal dashes -->
+  <rect width="120" height="120" fill="url(#diag)" clip-path="url(#center)"/>
+  <rect width="120" height="120" fill="#cc2244" opacity="0.3" clip-path="url(#center)"/>
+  <!-- Dark core -->
+  <ellipse cx="55" cy="52" rx="12" ry="10" fill="#1a1a2e" opacity="0.8"/>
+  <!-- Faint accent lines -->
+  <line x1="75" y1="35" x2="90" y2="30" stroke="#999" stroke-width="0.5" opacity="0.4"/>
+  <line x1="80" y1="55" x2="95" y2="55" stroke="#999" stroke-width="0.5" opacity="0.3"/>
+  <line x1="72" y1="75" x2="88" y2="78" stroke="#999" stroke-width="0.5" opacity="0.3"/>
 </svg>
