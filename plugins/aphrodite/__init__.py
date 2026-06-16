@@ -1,19 +1,19 @@
 """
-aphrodite v1.61.0 — CCR compression plugin for Hermes Agent.
+aphrodite v1.61.0 - CCR compression plugin for Hermes Agent.
 
 Auto-install + launch aphrodite proxies:
 - Cache (:9797): in-memory CCR, >8KB threshold
 - Token (:9798): SQLite CCR, tool relay, >1KB threshold
 
 Modules:
-  _core      — constants, thresholds, CCR regex, inline store
-  _inline    — zlib fallback compression
-  _marker    — CCR marker formatting, proxy compression, marker parsing
-  _binary    — binary download + platform detection
-  _proxy     — proxy lifecycle (env, health, launch)
-  _tools     — 9 tool handlers + schemas, file tracking, conversation memory
-  _hooks     — Hook handlers (transform_tool_result, terminal, pre_llm, post_llm)
-  _engine    — ContextEngine for Hermes compression pipeline
+  _core      - constants, thresholds, CCR regex, inline store
+  _inline    - zlib fallback compression
+  _marker    - CCR marker formatting, proxy compression, marker parsing
+  _binary    - binary download + platform detection
+  _proxy     - proxy lifecycle (env, health, launch)
+  _tools     - 9 tool handlers + schemas, file tracking, conversation memory
+  _hooks     - Hook handlers (transform_tool_result, terminal, pre_llm, post_llm)
+  _engine    - ContextEngine for Hermes compression pipeline
 
 On session_start: downloads binary, launches token proxy on :9798.
 """
@@ -58,7 +58,9 @@ from ._core import (
     _log,
     _recent_markers,
     _referenced_files,
-    _turn_counter,
+    _reset_turn_counter,
+    _increment_turn,
+    _get_turn_counter,
 )
 
 # ── Engine ────────────────────────────────────────────────────────
@@ -140,7 +142,7 @@ def register(ctx):
     else:
         _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
 
-    _log.info("aphrodite v%s registered — 9 tools + hooks", PLUGIN_VERSION)
+    _log.info("aphrodite v%s registered - 9 tools + hooks", PLUGIN_VERSION)
 
     if DEBUG_LOGGING:
         lines = [

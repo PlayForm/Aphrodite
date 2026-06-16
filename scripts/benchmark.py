@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aphrodite proxy benchmark — direct HTTP against :9798.
+"""Aphrodite proxy benchmark - direct HTTP against :9798.
 
 Endpoints:
   GET  /health      → {"status":"ok","checks":{"cache":…,"token":…}}
@@ -9,7 +9,15 @@ Endpoints:
   POST /retrieve    → body {"hash":"…"}      → {"found":true,"content":"…","source":"ccr"}
 """
 
-import json, os, random, statistics, string, sys, time, urllib.request, urllib.error
+import json
+import os
+import random
+import statistics
+import string
+import sys
+import time
+import urllib.error
+import urllib.request
 
 PROXY = os.environ.get("APHRODITE_PROXY", "http://127.0.0.1:9798")
 API_KEY = os.environ.get("APHRODITE_API_KEY", "")
@@ -41,10 +49,12 @@ def req(method: str, endpoint: str, body: dict | None = None, timeout: int = 30)
 
 def make_text(size: int) -> str:
     words = "the quick brown fox jumps over lazy dog".split()
-    chunks = []; remaining = size
+    chunks = []
+    remaining = size
     while remaining > 0:
         w = random.choice(words)
-        chunks.append(w); remaining -= len(w) + 1
+        chunks.append(w)
+        remaining -= len(w) + 1
     return " ".join(chunks)[:size]
 
 
@@ -61,7 +71,8 @@ def make_code(size: int) -> str:
     ]
     while remaining > 0:
         line = (" " * random.randint(0, 4)) + random.choice(snippets)
-        lines.append(line); remaining -= len(line) + 1
+        lines.append(line)
+        remaining -= len(line) + 1
     return "\n".join(lines)[:size]
 
 
@@ -71,7 +82,8 @@ def make_json(size: int) -> str:
         key = "".join(random.choices(string.ascii_lowercase, k=8))
         val = "".join(random.choices(string.ascii_letters + string.digits, k=20))
         item = f'  "{key}": "{val}"'
-        items.append(item); remaining -= len(item) + 2
+        items.append(item)
+        remaining -= len(item) + 2
     return "{\n" + ",\n".join(items) + "\n}" if items else "{}"
 
 
@@ -156,7 +168,8 @@ def main():
     # ── Phase 1: Health + Stats ──
     print("\n── Phase 1: Proxy ──")
     for fn in [phase_health, phase_stats]:
-        r = fn(); RESULTS.append(r)
+        r = fn()
+        RESULTS.append(r)
         tag = "✓" if r["pass"] else "✗"
         print(f"  {tag} {r['name']:<10} {r['latency_ms']:>7.1f}ms  {r.get('detail','')}")
 
@@ -170,7 +183,8 @@ def main():
         for tname, genfn in types.items():
             iters = 5 if sbytes <= 10240 else 3
             r = phase_compress(f"{slabel}/{tname}", lambda sz=sbytes, fn=genfn: fn(sz), iters)
-            RESULTS.append(r); all_hashes.extend(r["hashes"])
+            RESULTS.append(r)
+            all_hashes.extend(r["hashes"])
             tag = "✓" if r["pass"] else "✗"
             print(f"  {tag} {r['name']:<26} avg={r['latency_ms']:>7.1f}ms  p50={r['latency_p50']:>7.1f}ms  ratio={r['ratio_mean']:>8.1f}x  ({r['original_size']}B→hash)")
     print(f"  → {len(all_hashes)} hashes stored")
@@ -178,7 +192,8 @@ def main():
     # ── Phase 3: Retrieve ──
     print("\n── Phase 3: Retrieve ──")
     if all_hashes:
-        r = phase_retrieve(all_hashes); RESULTS.append(r)
+        r = phase_retrieve(all_hashes)
+        RESULTS.append(r)
         tag = "✓" if r["pass"] else "✗"
         print(f"  {tag} {r['name']:<26} avg={r['latency_ms']:>7.1f}ms  p50={r['latency_p50']:>7.1f}ms  p95={r['latency_p95']:>7.1f}ms  found={r['found']}/{r['iterations']}")
     else:
@@ -186,7 +201,8 @@ def main():
 
     # ── Phase 4: Catalog ──
     print("\n── Phase 4: Catalog ──")
-    r = phase_catalog(); RESULTS.append(r)
+    r = phase_catalog()
+    RESULTS.append(r)
     tag = "✓" if r["pass"] else "✗"
     print(f"  {tag} {r['name']:<26} latency={r['latency_ms']:>7.1f}ms  entries={r['entry_count']}")
 
@@ -206,7 +222,7 @@ def main():
     if retr_lats:
         print(f"  Retrieve avg: {statistics.mean(retr_lats):.1f}ms  min={min(retr_lats):.1f}ms  max={max(retr_lats):.1f}ms")
     if ratios:
-        print(f"  Ratio range:  {min(ratios):.0f}x – {max(ratios):.0f}x (median {statistics.median(ratios):.0f}x)")
+        print(f"  Ratio range:  {min(ratios):.0f}x - {max(ratios):.0f}x (median {statistics.median(ratios):.0f}x)")
 
     # Save JSON
     out = os.path.abspath(os.path.join(os.path.dirname(__file__) or ".", "..", ".hermes", "benchmark-results.json"))

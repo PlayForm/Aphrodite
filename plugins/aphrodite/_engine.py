@@ -16,6 +16,7 @@ from ._core import (
     _conv_index,
     _fmt_size,
     _inline_clear,
+    _inline_store,
     _recent_markers,
     _referenced_files,
 )
@@ -180,6 +181,12 @@ class AphroditeContextEngine(ContextEngine):
                 _log.warning("compress: inline fallback failed for %d-byte packed msgs", len(packed))
                 return messages
 
+        _inline_store[hash_val] = packed
+        preview = packed[:120].replace("\n", " ").strip()
+        _recent_markers.append({"hash": hash_val, "type": "context", "size": len(packed), "preview": preview})
+        if len(_recent_markers) > 200:
+            _recent_markers.pop(0)
+
         ccr = _ccr_marker(hash_val, "context", size_str, mode="engine")
         marker = (
             f"{ccr}\n"
@@ -227,7 +234,7 @@ class AphroditeContextEngine(ContextEngine):
         self.last_compression = {}
         _inline_clear()
         _conv_index.clear()
-        _c._turn_counter = 0
+        _c._reset_turn_counter()
         _referenced_files.clear()
         _recent_markers.clear()
         _log.info("aphrodite v%s: session reset - inline store + memory cleared", PLUGIN_VERSION)
