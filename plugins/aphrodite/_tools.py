@@ -139,7 +139,7 @@ COMPRESS_SCHEMA = {
     },
 }
 RETRIEVE_SCHEMA = {
-    "name": "aphrodite_retrieve",
+    "name": "💋",
     "description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query. Supports file path reads. Recursively resolves nested CCR markers up to 3 levels deep.",
     "parameters": {
         "type": "object",
