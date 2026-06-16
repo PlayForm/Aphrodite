@@ -54,6 +54,7 @@ def _get_active_profile() -> str | None:
 def _auto_health_check() -> str:
     """curl both proxies, warn if either is down."""
     lines: list[str] = []
+    health_data: dict[str, dict] = {}
     for name, port in PORTS.items():
         try:
             sock = socket.create_connection(("127.0.0.1", port), timeout=2)
@@ -69,8 +70,11 @@ def _auto_health_check() -> str:
                     body = body.split(b"\r\n\r\n", 1)[1]
             status = body.decode().strip()
             lines.append(f"  {name}:{port:>5} UP")
+            health_data[name] = {"port": port, "status": "UP", "detail": status[:200]}
         except Exception:
-            lines.append(f"  {name}:{port:>5} DOWN ⚠ - proxy may need restart")
+            lines.append(f"  {name}:{port:>5} DOWN - proxy may need restart")
+            health_data[name] = {"port": port, "status": "DOWN", "detail": None}
+    _write_health_json(health_data)
     return "\n".join(lines) if lines else ""
 
 
@@ -202,6 +206,23 @@ def _auto_commit_reminder() -> str:
         return f"  git: {modified} uncommitted file{'s' if modified != 1 else ''} (use cc/gcommit)"
     except Exception:
         return ""
+
+
+def _write_health_json(health_data: dict) -> None:
+    """Write structured health snapshot to ~/.hermes/aphrodite/health-<ts>.json."""
+    ts = int(time.time())
+    json_path = os.path.expanduser(f"~/.hermes/aphrodite/health-{ts}.json")
+    try:
+        snapshot = {
+            "timestamp": ts,
+            "iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts)),
+            "proxies": health_data,
+        }
+        with open(json_path, "w") as f:
+            json.dump(snapshot, f, indent=2)
+        _log.debug("health json written: %s (%d proxies)", json_path, len(health_data))
+    except Exception as exc:
+        _log.warning("health json write failed: %s", exc)
 
 
 # ── aggregate ──────────────────────────────────────────────────────────
