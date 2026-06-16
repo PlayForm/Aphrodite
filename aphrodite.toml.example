@@ -4,6 +4,8 @@
 api_url = "https://api.deepseek.com"
 model = "deepseek-v4-pro"
 ccr_ttl_seconds = 3600
+# api_key is read from APHRODITE_API_KEY env var by default.
+# Only set this if you cannot use the env var.
 api_key = ""
 
 [[proxies]]
