@@ -1,11 +1,21 @@
 {
     "include": ["."],
     "exclude": ["__pycache__", ".ruff_cache"],
-    "typeCheckingMode": "basic",
-    "reportMissingImports": false,
-    "reportMissingTypeStubs": false,
-    "reportUnknownMemberType": false,
-    "reportUnknownVariableType": false,
-    "reportUnknownArgumentType": false,
-    "reportMissingParameterType": true
+    "typeCheckingMode": "strict",
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": "warning",
+    "reportMissingParameterType": "warning",
+    "reportUnknownArgumentType": "warning",
+    "reportUnknownMemberType": "warning",
+    "reportUnknownVariableType": "warning",
+    "reportUnknownParameterType": "warning",
+    "reportUnknownLambdaType": "warning",
+    "reportMissingTypeArgument": "warning",
+    "reportGeneralTypeIssues": "warning",
+    "reportOptionalMemberAccess": "warning",
+    "reportOptionalSubscript": "warning",
+    "reportOptionalIterable": "warning",
+    "reportOptionalContextManager": "warning",
+    "reportOptionalCall": "warning",
+    "reportOptionalOperand": "warning"
 }
