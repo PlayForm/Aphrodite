@@ -37,8 +37,10 @@ fi
 CURRENT=$(grep '^version' "$CARGO_TOML" | head -1 | sed 's/.*"\(.*\)"/\1/')
 NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
 
-# Bump
+# Bump Cargo.toml
 sed -i '' "s/version = \"$CURRENT\"/version = \"$NEW\"/" "$CARGO_TOML"
+# Sync Python BIN_VERSION
+sed -i '' "s/BIN_VERSION = \"v$CURRENT\"/BIN_VERSION = \"v$NEW\"/" plugins/aphrodite/_core.py
 echo "[bump] $CURRENT → $NEW"
 
 # Build
