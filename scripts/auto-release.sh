@@ -13,7 +13,7 @@ PUSH="${2:-}"
 cd "$REPO_ROOT"
 
 # Sync submodules to their remote tracking branches
-git submodule update --init --remote
+git submodule update --remote --recursive --merge
 git add --force vendor/headroom 2>/dev/null || true
 
 # Stage all changes
