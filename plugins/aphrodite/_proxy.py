@@ -1,4 +1,5 @@
 """aphrodite — proxy lifecycle (env loading, health checks, launch)."""
+
 import json
 import logging
 import os
@@ -66,7 +67,8 @@ def _start(name, env):
     try:
         subprocess.Popen(
             args,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
     except Exception as e:
@@ -76,6 +78,7 @@ def _start(name, env):
 def on_start(**kw):
     """Hermes session_start hook — ensure binary + launch proxy."""
     from ._binary import _ensure_binary
+
     if not _ensure_binary():
         _log.error("cannot start - binary not available")
         return

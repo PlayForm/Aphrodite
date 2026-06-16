@@ -1,4 +1,5 @@
 """aphrodite — tool handlers and schemas."""
+
 import hashlib
 import json
 import logging
@@ -10,6 +11,7 @@ from ._resolve import _resolve_recursive
 _log = logging.getLogger("aphrodite")
 
 # ── Tools ─────────────────────────────────────────────────────
+
 
 def _retrieve_handler(args=None, **kwargs):
     """Resolve CCR markers with recursive depth. Scans for nested markers."""
@@ -42,34 +44,31 @@ def _compress_handler(args=None, **kwargs):
         return '{"error": "missing content parameter"}'
 
     # Pop the API: check local cache first (content-addressable store)
-    h = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
+    h = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
     if h in _inline_store:
-        return json.dumps({"hash": h, "type": type_hint, "size": len(content),
-                           "source": "cache", "compression_ratio": 0})
+        return json.dumps(
+            {"hash": h, "type": type_hint, "size": len(content), "source": "cache", "compression_ratio": 0}
+        )
 
     try:
         data = json.dumps({"content": content}).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:9798/ccr/create",
-            data=data,
-            headers={"Content-Type": "application/json"}
+            "http://127.0.0.1:9798/ccr/create", data=data, headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())
         h = result.get("hash", h)
         if h:
             _inline_store[h] = content  # mirror in inline store for aphrodite_search
-        return json.dumps({
-            "hash": h,
-            "type": type_hint,
-            "size": len(content),
-            "compression_ratio": result.get("compression_ratio")
-        })
+        return json.dumps(
+            {"hash": h, "type": type_hint, "size": len(content), "compression_ratio": result.get("compression_ratio")}
+        )
     except Exception:
         # Fallback: store inline anyway
         _inline_store[h] = content
-        return json.dumps({"hash": h, "type": type_hint, "size": len(content),
-                           "source": "inline_fallback", "compression_ratio": 0})
+        return json.dumps(
+            {"hash": h, "type": type_hint, "size": len(content), "source": "inline_fallback", "compression_ratio": 0}
+        )
 
 
 COMPRESS_SCHEMA = {
@@ -79,10 +78,13 @@ COMPRESS_SCHEMA = {
         "type": "object",
         "properties": {
             "content": {"type": "string", "description": "Content to compress and store in CCR"},
-            "type": {"type": "string", "description": "Optional: content type hint - code, log, diff, error, json, build_output, text"}
+            "type": {
+                "type": "string",
+                "description": "Optional: content type hint - code, log, diff, error, json, build_output, text",
+            },
         },
-        "required": ["content"]
-    }
+        "required": ["content"],
+    },
 }
 RETRIEVE_SCHEMA = {
     "name": "aphrodite_retrieve",
@@ -91,11 +93,12 @@ RETRIEVE_SCHEMA = {
         "type": "object",
         "properties": {
             "hash": {"type": "string", "description": "CCR marker hash to retrieve"},
-            "query": {"type": "string", "description": "Optional: filter retrieved content to lines containing this query string"},
-            "path": {"type": "string", "description": "Optional: file path to read directly (bypasses CCR)"}
+            "query": {
+                "type": "string",
+                "description": "Optional: filter retrieved content to lines containing this query string",
+            },
+            "path": {"type": "string", "description": "Optional: file path to read directly (bypasses CCR)"},
         },
-        "required": []
-    }
+        "required": [],
+    },
 }
-
-

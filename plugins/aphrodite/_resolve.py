@@ -1,4 +1,5 @@
 """aphrodite — CCR resolution (retrieve + recursive unpacking)."""
+
 import json
 import urllib.request
 
@@ -21,9 +22,7 @@ def _resolve_one(hash_val, timeout=4, query=""):
         try:
             data = json.dumps(payload).encode()
             req = urllib.request.Request(
-                f"http://127.0.0.1:{port}/retrieve",
-                data=data,
-                headers={"Content-Type": "application/json"}
+                f"http://127.0.0.1:{port}/retrieve", data=data, headers={"Content-Type": "application/json"}
             )
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 result = json.loads(r.read())
@@ -44,18 +43,18 @@ def _resolve_recursive(hash_val, depth=0, resolved=None):
         return resolved.get(hash_val, "")
     content = _resolve_one(hash_val)
     if content is None:
-        return f'<<<CCR:{hash_val}|unresolved>>>'
+        return f"<<<CCR:{hash_val}|unresolved>>>"
     resolved[hash_val] = content
     nested = _CCR_RE.findall(content)
     if not nested:
         return content
     replacements = {}
     for marker in nested:
-        parts = marker.split('|')
+        parts = marker.split("|")
         if len(parts) >= 1 and parts[0] not in resolved:
             nested_hash = parts[0]
             nested_content = _resolve_recursive(nested_hash, depth + 1, resolved)
-            replacements[f'<<<CCR:{marker}>>>'] = nested_content
+            replacements[f"<<<CCR:{marker}>>>"] = nested_content
     for marker_str, replacement in replacements.items():
         content = content.replace(marker_str, replacement)
     return content

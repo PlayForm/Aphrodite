@@ -93,7 +93,7 @@ pub async fn handle_retrieve(
         }
     }
 
-    let source = if req.path.is_some() { format!("file:{}", req.path.as_ref().unwrap()) } else { "ccr".into() };
+    let source = if let Some(p) = &req.path { format!("file:{}", p) } else { "ccr".into() };
     Json(RetrieveResponse {
         found: true,
         content: Some(content),
