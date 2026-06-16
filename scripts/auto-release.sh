@@ -12,8 +12,8 @@ PUSH="${2:-}"
 
 cd "$REPO_ROOT"
 
-# Sync submodules recursively
-git submodule update --init --recursive
+# Sync submodules to their remote tracking branches
+git submodule update --init --remote
 git add --force vendor/headroom 2>/dev/null || true
 
 # Stage all changes
