@@ -8,7 +8,7 @@ import re
 import threading
 import time
 
-from ._core import _CCR_RE
+from ._core import _CCR_RE, _extract_code_structure
 
 _log = logging.getLogger("aphrodite")
 
@@ -230,7 +230,7 @@ def _classify_content(content: str) -> dict:
         return {"type": "text", "ln": str(len(content.splitlines())) if isinstance(content, str) else 0}
 
 
-def _make_ccr_preview(content: str, klass: dict | None = None) -> str:
+def _make_ccr_preview(content: str, klass: dict | None = None, model_family: str = "compact") -> str:
     """Generate an absorptive, content-aware CCR preview.
 
     Uses the classification to produce a structured 1-liner that helps
@@ -242,6 +242,9 @@ def _make_ccr_preview(content: str, klass: dict | None = None) -> str:
         content: Raw content string.
         klass: Pre-computed classification dict (from _classify_content).
                If None, classification runs inline.
+        model_family: Preview strategy — 'compact' (Claude), 'code_first'
+                      (DeepSeek/coding), 'balance' (GPT/general). Controls
+                      whether metadata or code excerpts come first.
 
     Returns:
         A rich, single-line preview string (≤120 chars, pipe-safe).
@@ -251,6 +254,43 @@ def _make_ccr_preview(content: str, klass: dict | None = None) -> str:
 
     ctype = klass.get("type", "text")
     ln = klass.get("ln", "?")
+
+    # ── Code types: structure-map preview ──────────────────────────────────
+    if ctype in ("code", "code_rust", "code_python", "code_go", "code_js"):
+        lang = {"code_rust": "rust", "code_python": "python",
+                "code_go": "go", "code_js": "js"}.get(ctype, "")
+        struct = _extract_code_structure(content, lang)
+        if struct:
+            # Build navigable structure preview
+            parts = []
+            if struct.get("fns"):
+                parts.append(f"{len(struct['fns'])}fns")
+            if struct.get("structs"):
+                parts.append(f"{len(struct['structs'])}structs")
+            if struct.get("impls"):
+                parts.append(f"{len(struct['impls'])}impls")
+            if struct.get("classes"):
+                parts.append(f"{len(struct['classes'])}classes")
+
+            summary = "|".join(parts) if parts else "?"
+
+            if model_family == "code_first":
+                # DeepSeek: show first 2 signatures inline for context
+                sigs = struct.get("fns", [])[:2]
+                sig_str = "; ".join(sigs) if sigs else ""
+                return f"[{ctype}:{summary} {sig_str} {ln}L]"[:120]
+            elif model_family == "balance":
+                # GPT: metadata + first signature
+                sig = struct.get("fns", [None])[0]
+                sig_str = f" {sig}" if sig else ""
+                return f"[{ctype}:{summary}{sig_str} {ln}L]"[:120]
+            else:
+                # compact (Claude): metadata only
+                return f"[{ctype}:{summary} {ln}L]"[:120]
+
+        # Fallback for code without detected structure
+        first = content[:110].replace("\\n", " ").replace("\\r", " ").strip()
+        return f"[{ctype}:{first}]"[:120]
 
     if ctype == "diff":
         fn = klass.get("fn", "")

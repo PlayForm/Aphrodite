@@ -36,13 +36,14 @@ from ._core import (
     _init_trigram_index,
     _inline_bytes,
     _inline_index,
-    _inline_index_enabled,
+    _inline_bytes,
     _inline_store,
     _inline_store_put,
     _recent_markers,
-    _referenced_files,
+    _reset_scanned_msg_idx,
     _scanned_msg_idx,
     _state,
+    _detect_model_family,
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
@@ -463,7 +464,7 @@ def _transform_tool_result(
             )
         return result
 
-    preview = _make_ccr_preview(result)
+    preview = _make_ccr_preview(result, model_family=_detect_model_family())
     metadata = _extract_tool_metadata(tool_name, args, result)
 
     # Try proxy compression first
@@ -1270,7 +1271,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
             return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
 
-    preview = _make_ccr_preview(output)
+    preview = _make_ccr_preview(output, model_family=_detect_model_family())
 
     # Try proxy compression first
     if proxy_available:
