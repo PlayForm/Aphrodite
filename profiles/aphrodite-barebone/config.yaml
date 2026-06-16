@@ -29,4 +29,4 @@ agent:
   default_skills:
   - plan-then-delegate
   - execution-blocks
-  - aphrodite-dev-workflow
+  # aphrodite-dev-workflow intentionally excluded — barebone has no aphrodite toolset

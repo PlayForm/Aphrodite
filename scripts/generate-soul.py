@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Generate comprehensive SOUL.md for all aphrodite profiles."""
+import argparse
 import os
+import subprocess
+import sys
 
 HOME = os.path.expanduser("~")
 
@@ -195,10 +198,27 @@ profiles = {
     "aphrodite-compress-aggressive":("aphrodite-cache → :9797", "aphrodite", "10%", "9797"),
 }
 
+parser = argparse.ArgumentParser(description="Generate SOUL.md for profile directories")
+parser.add_argument("--dry-run", action="store_true", help="Print what would be written, do not write")
+parser.add_argument("--force", action="store_true", help="Overwrite even if uncommitted edits exist")
+args = parser.parse_args()
+
+# Check for dirty files in profile SOUL.md directories
+dirty = subprocess.run(
+    ["git", "-C", os.path.join(HOME, ".hermes"), "diff", "--name-only", "--", "profiles/*/SOUL.md"],
+    capture_output=True, text=True
+).stdout.strip()
+if dirty and not args.force:
+    print(f"[WARN] Uncommitted SOUL.md edits:\n{dirty}\nUse --force to overwrite.")
+    sys.exit(1)
+
 for name, (provider, engine, threshold, port) in profiles.items():
     content = SOUL_TEMPLATE.format(name=name, provider=provider, engine=engine, threshold=threshold, port=port)
     path = os.path.join(HOME, ".hermes", "profiles", name, "SOUL.md")
-    with open(path, "w") as f:
-        f.write(content)
+    if args.dry_run:
+        print(f"[dry-run] Would write {path} ({len(content)} bytes)")
+    else:
+        with open(path, "w") as f:
+            f.write(content)
 
 print("All 7 SOUL.md files updated with comprehensive content")

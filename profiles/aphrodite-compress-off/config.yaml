@@ -28,4 +28,4 @@ agent:
   default_skills:
   - plan-then-delegate
   - execution-blocks
-  - aphrodite-dev-workflow
+  # aphrodite-dev-workflow excluded — compression is disabled, CCR tools would confuse agent
