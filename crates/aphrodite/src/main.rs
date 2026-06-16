@@ -55,6 +55,15 @@ async fn main() -> anyhow::Result<()> {
             .try_init()?;
     }
 
+    tracing::info!(
+        "aphrodite v{} ({}{}) • {} • {}",
+        option_env!("APHRODITE_VERSION").unwrap_or("?"),
+        option_env!("APHRODITE_GIT_HASH").unwrap_or("?"),
+        option_env!("APHRODITE_PROFILE").map(|p| format!(", {p}")).unwrap_or_default(),
+        option_env!("APHRODITE_BUILD_DATE").unwrap_or("?"),
+        option_env!("APHRODITE_TARGET").unwrap_or("?"),
+    );
+
     tracing::info!("starting {} proxy listener(s)", proxies.len());
 
     // Shared shutdown watch channel - single signal source propagates to all proxies.
@@ -278,7 +287,16 @@ async fn run_single(
         .route("/ccr/{hash}", delete(handle_ccr_delete))
         .route("/favicon.ico", get(|| async { StatusCode::NOT_FOUND }))
         .route("/robots.txt", get(|| async { "User-agent: *\nDisallow: /\n" }))
-        .route("/", get(|| async { Json(serde_json::json!({"proxy": "aphrodite", "version": env!("CARGO_PKG_VERSION")})) }))
+        .route("/", get(|| async {
+            Json(serde_json::json!({
+                "proxy": "aphrodite",
+                "version": env!("CARGO_PKG_VERSION"),
+                "git_hash": option_env!("APHRODITE_GIT_HASH"),
+                "build_date": option_env!("APHRODITE_BUILD_DATE"),
+                "target": option_env!("APHRODITE_TARGET"),
+                "profile": option_env!("APHRODITE_PROFILE"),
+            }))
+        }))
         .route("/*path", any(proxy::proxy_handler))
         // Loopback enforcement layer on all non-/health routes
         .layer(middleware::from_fn(loopback_only));
