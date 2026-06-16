@@ -1539,20 +1539,14 @@ async fn compress_chat_completion(
 	let choices = response.get_mut("choices")?.as_array_mut()?;
 	let base_threshold = state.compress_threshold(); // floor threshold for all types
 
-	// Headroom budget: lower values compress more aggressively (multiplier < 1.0)
-	// Coding-tuned: never below 0.5× — semantics and tool chains are worth the tokens
+	// Headroom budget: lower values compress more aggressively.
+	// Coding-tuned: smooth linear curve from 0.50 (empty) to 1.0 (full).
+	// Never below 0.5× — semantics and tool chains are worth the tokens.
 	let budget_mult = headroom_budget
 		.and_then(|b| {
 			let val: f64 = b.parse().ok()?;
-			Some(if val < 25.0 {
-				0.50
-			} else if val < 50.0 {
-				0.75
-			} else if val < 75.0 {
-				0.85
-			} else {
-				1.0
-			})
+			// Linear interpolation: 0.50 + (fill% * 0.50), clamped [0.50, 1.0]
+			Some((0.50 + (val / 100.0) * 0.50).clamp(0.50, 1.0))
 		})
 		.unwrap_or(1.0);
 	let mut did_compress = false;

@@ -150,10 +150,18 @@ class AphroditeContextEngine(ContextEngine):
         return (tokens / self.context_length) * 100 >= self.threshold_percent
 
     def compress(self, messages, current_tokens=None, focus_topic=None):
-        if len(messages) <= self.min_messages_to_compress:
+        # Dynamic MIN_MSGS: scale with session size (10% of messages, min 12, max 50)
+        dynamic_min = max(self.min_messages_to_compress, min(len(messages) // 10, 50))
+        if len(messages) <= dynamic_min:
             return messages
+
+        # Never compress system messages — critical instructions stay raw
+        has_system = any(m.get("role") == "system" for m in messages)
         head_n = max(self.protect_first_n, 1)
         tail_n = self.protect_last_n
+        # If system messages present, extend protection to cover them
+        if has_system:
+            head_n = max(head_n, sum(1 for m in messages[:20] if m.get("role") == "system") + head_n)
 
         is_editing = False
         for msg in messages[-10:]:
