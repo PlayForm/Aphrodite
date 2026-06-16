@@ -133,13 +133,12 @@ def _kill(pid, timeout=0.3):
             os.kill(int(pid), 0)
         except (OSError, ProcessLookupError):
             return  # SIGTERM worked
-    # SIGKILL sent - busy-wait until the process is reaped (up to 1s)
+    # SIGKILL sent - reap via waitpid instead of busy-wait polling (up to 1s)
     pid_int = int(pid)
     deadline = time.monotonic() + 1.0
     while time.monotonic() < deadline:
-        try:
-            os.kill(pid_int, 0)
-        except (OSError, ProcessLookupError):
+        wpid, _ = os.waitpid(pid_int, os.WNOHANG)
+        if wpid == pid_int:
             return  # Reaped
         time.sleep(0.05)
 
@@ -147,6 +146,9 @@ def _kill(pid, timeout=0.3):
 def _start(name, env):
     """Launch the aphrodite proxy binary."""
     port = PORTS[name]
+
+    # ── Ensure log directory exists ──────────────────────────
+    os.makedirs(BINARY_DIR, exist_ok=True)
 
     # ── Stale PID check ────────────────────────────────────
     try:
@@ -176,13 +178,11 @@ def _start(name, env):
         _log.warning("port conflict check failed for :%s - %s", port, exc)
 
     # ── Launch ──────────────────────────────────────────────
-    # Lazy key resolution: read fresh each call instead of caching at import time.
-    # Checks os.environ first (per-request freshness), then env dict (pre-loaded .env),
-    # then falls back to loading .env file directly.
     key = os.environ.get("APHRODITE_API_KEY", env.get("APHRODITE_API_KEY", ""))
     if not key:
-        _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
-        return
+        raise ValueError(
+            "APHRODITE_API_KEY not set in env or .env - proxy can't authenticate"
+        )
     env["APHRODITE_API_KEY"] = key
     mode_flag = "cache" if name == "cache" else "token"
     args = [BINARY, "--listen", f"127.0.0.1:{port}", "--mode", mode_flag, "--tool-relay"]
@@ -200,6 +200,7 @@ def _start(name, env):
             env={k: env[k] for k in _PROXY_ENV_KEYS if k in env},
             stdout=open(log_path, "a"),  # noqa: SIM115 - daemon needs open handle, not context manager
             stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
             start_new_session=True,
         )
     except Exception as e:

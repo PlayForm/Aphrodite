@@ -424,7 +424,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     # Refresh turn-scoped alive cache for consistent proxy state within this turn
     global _scanned_msg_idx, _last_user_msg, _catalog_injected_this_turn
-    _alive_cache.clear()  # force fresh probes - turn cache refresh below replaces them
+    _alive_cache.clear()  # purge 5s cache so turn-probes below are fresh
     _alive_turn_cache.clear()
     _alive_turn_cache[PORTS["token"]] = _alive(PORTS["token"])
     _alive_turn_cache[PORTS["cache"]] = _alive(PORTS["cache"])
