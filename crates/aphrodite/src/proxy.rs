@@ -1680,11 +1680,7 @@ pub async fn handle_tool_relay(
 	state.tool_relay_calls.fetch_add(1, Ordering::Relaxed);
 	tracing::info!(tool = %req.tool, "tool_relay");
 
-	// Parse _ccr_center from LLM — disambiguates intent for this operation.
-	// Example: _ccr_center="code_rust" → use Rust-specific content handling.
-	let hint = req.params.get("_ccr_center").and_then(|v| v.as_str());
-
-	// Validate aphrodite_retrieve: hash is required. Query-only requests without
+	// Validate aphrodite_retrieve: hash is required.
 	// hash are invalid and must return 400 BAD_REQUEST instead of silently passing through.
 	if req.tool == "aphrodite_retrieve" && req.params.get("hash").and_then(|v| v.as_str()).is_none() {
 		return (
