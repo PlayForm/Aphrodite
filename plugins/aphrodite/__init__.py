@@ -24,8 +24,6 @@ import logging
 import os
 import time
 
-from ._binary import _detect_platform, _download_binary, _ensure_binary
-
 # ── Core imports (re-export everything) ──────────────────────────
 from ._core import (
     _CCR_RE,
@@ -66,7 +64,6 @@ from ._core import (
 # ── Engine ────────────────────────────────────────────────────────
 from ._engine import (
     AphroditeContextEngine,
-    _engine,
     _fire_hook,
     _set_engine,
     get_engine,
@@ -115,8 +112,6 @@ from ._tools import (
 # ── Plugin registration ───────────────────────────────────────────
 def register(ctx):
     """Register hooks, tools, and context engine with Hermes."""
-    if not _ensure_binary(existence_check=True):
-        _log.warning("aphrodite binary not found - will download on session_start")
     ctx.register_hook("on_session_start", on_start)
     ctx.register_hook("pre_llm_call", _pre_llm_hook)
     ctx.register_hook("transform_terminal_output", _transform_terminal_hook)

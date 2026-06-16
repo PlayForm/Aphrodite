@@ -7,7 +7,6 @@ import subprocess
 import time
 import urllib.request
 
-from ._binary import _ensure_binary
 from ._core import (
     _CCR_RE,
     _DEV,
@@ -23,7 +22,6 @@ from ._core import (
     MAX_REQUEST_BODY_SIZE,
     PLUGIN_VERSION,
     PORTS,
-    RECURSIVE_DEPTH,
     TERMINAL_THRESHOLD,
     TOOL_THRESHOLD_CACHE,
     TOOL_THRESHOLD_TOKEN,
@@ -31,16 +29,28 @@ from ._core import (
     _fmt_size,
     _git_cache,
     _inline_store,
+    _inline_store_put,
     _recent_markers,
     _referenced_files,
     _reset_turn_counter,
     _increment_turn,
 )
-from ._engine import AphroditeContextEngine, get_engine
+from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
 from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
-from ._proxy import _alive, on_start
-from ._tools import COMPRESS_SCHEMA, RETRIEVE_SCHEMA, _compress_handler, _retrieve_handler
+from ._proxy import _alive
+from ._tools import _compress_handler, _retrieve_handler
+
+# Turn-scoped alive cache - refreshed at pre_llm_hook entry so
+# all hooks within the same turn see a consistent proxy state
+_alive_turn_cache: dict[int, bool] = {}  # {port: bool}
+
+
+def _alive_cached(port: int) -> bool:
+    """Check turn-scoped cache first, fall through to _alive()."""
+    if port in _alive_turn_cache:
+        return _alive_turn_cache[port]
+    return _alive(port)
 
 # These are defined within this module (extracted from original monolithic file)
 # _track_file_refs, _fmt_size, _extract_preview, _group_into_turns are defined below
@@ -58,19 +68,6 @@ __all__ = [
 ]
 
 # ── Hooks ─────────────────────────────────────────────────────
-
-# ── Canonical JSON serializer ────────────────────────────────
-
-
-def _serialize_canonical(obj):
-    """Serialize to canonical JSON: minimal separators, no ASCII escaping.
-
-    Use for deterministic JSON wire format where whitespace and
-    Unicode-independent output is required (e.g. hash inputs,
-    header payloads, idempotent digest computation).
-    """
-    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
-
 
 def _transform_tool_result(
     tool_name="",
@@ -96,14 +93,14 @@ def _transform_tool_result(
     if not result or not isinstance(result, str) or not result.strip():
         return result
 
+    # Track file references for aphrodite_files tool (before dev guard to always track)
+    _track_file_refs(tool_name, args)
     if _DEV:
         return result  # dev mode: passthrough
     # Headroom bypass headers for all CCR markers from this hook
     HEADROOM_HDRS = {"x-headroom-bypass": "true", "x-headroom-mode": "passthrough"}
-    # Track file references for aphrodite_files tool
-    _track_file_refs(tool_name, args)
-    token_alive = _alive(9798)
-    cache_alive = _alive(9797)
+    token_alive = _alive_cached(9798)
+    cache_alive = _alive_cached(9797)
     proxy_available = token_alive or cache_alive
 
     # Essential tools: never compress - agent needs immediate access to skills, memory, session history
@@ -190,9 +187,7 @@ def _transform_tool_result(
                     (time.time() - _t0) * 1000,
                 )
             _recent_markers.append({"hash": h, "type": "tool", "size": result_len, "preview": preview})
-            if len(_recent_markers) > 200:
-                _recent_markers.pop(0)
-            _inline_store[h] = result  # mirror for aphrodite_search
+            _inline_store_put(h, result)
             return _ccr_marker(h, "tool", result_len, label, preview, headers=HEADROOM_HDRS)
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s - proxy returned no hash", tool_name[:40])
@@ -210,8 +205,6 @@ def _transform_tool_result(
                     (time.time() - _t0) * 1000,
                 )
             _recent_markers.append({"hash": h, "type": "tool", "size": result_len, "preview": preview})
-            if len(_recent_markers) > 200:
-                _recent_markers.pop(0)
             return _ccr_marker(h, "tool", result_len, "inline", preview, headers=HEADROOM_HDRS)
         except Exception:
             if DEBUG_LOGGING:
@@ -268,8 +261,8 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
 
     if _DEV:
         return
-    token_alive = _alive(PORTS["token"])
-    cache_alive = _alive(PORTS["cache"])
+    token_alive = _alive_cached(PORTS["token"])
+    cache_alive = _alive_cached(PORTS["cache"])
     if not token_alive and not cache_alive:
         return
 
@@ -297,13 +290,9 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
     try:
         data = json.dumps(
             {
-                "content": json.dumps(
-                    {
-                        "turn": tnum,
-                        "user": last_user,
-                        "assistant": str(assistant_response),
-                    }
-                )
+                "turn": tnum,
+                "user": last_user,
+                "assistant": str(assistant_response),
             }
         ).encode()
         req = urllib.request.Request(
@@ -314,7 +303,7 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
 
         _conv_index[tnum] = (ccr["hash"], summary, len(str(assistant_response)))
         if len(_conv_index) > 100:
-            oldest = min(_conv_index.keys())
+            oldest = next(iter(_conv_index))
             del _conv_index[oldest]
 
         _log.debug("conv-cache: stored T%d → %s (%d total)", tnum, ccr["hash"], len(_conv_index))
@@ -361,15 +350,23 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     if not conversation_history or not isinstance(conversation_history, list):
         return
 
-    token_alive = _alive(PORTS["token"])
-    cache_alive = _alive(PORTS["cache"])
+    # Refresh turn-scoped alive cache for consistent proxy state within this turn
+    global _alive_turn_cache
+    _alive_turn_cache = {
+        PORTS["token"]: _alive(PORTS["token"]),
+        PORTS["cache"]: _alive(PORTS["cache"]),
+    }
+
+    token_alive = _alive_cached(PORTS["token"])
+    cache_alive = _alive_cached(PORTS["cache"])
     proxy_available = token_alive or cache_alive
     target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
     ctx_len = len(conversation_history)
 
     # ── 0. Pass through x-headroom-* headers (skip bypass) ──
     headroom_hdrs = {}
-    for k, v in kwargs.items():
+    headers = kwargs.get("headers", {})
+    for k, v in (headers or {}).items():
         kl = k.lower()
         if kl.startswith("x-headroom-") and kl != "x-headroom-bypass":
             headroom_hdrs[k] = v
@@ -390,7 +387,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             markers.append(old_m)
             seen_hashes.add(old_m["hash"])
     _recent_markers.clear()
-    _recent_markers.extend(markers[:200])  # cap to prevent unbounded growth
+    _recent_markers.extend(markers)  # deque(maxlen=200) handles capping
     if DEBUG_LOGGING and markers:
         _log.debug(
             "pre_llm_hook: scanned %d CCR markers across %d msgs, %s total compressed",
@@ -416,8 +413,8 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                         summaries.append(
                             {
                                 "turn": t["id"],
-                                "user": t.get("user", "")[:300],
-                                "assistant": t.get("assistant", "(tool calls)")[:300],
+                                "user": t.get("user", "")[:1000],
+                                "assistant": t.get("assistant", "(tool calls)")[:1000],
                             }
                         )
                     packed = json.dumps(summaries)
@@ -588,7 +585,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 "output",
             }
             last_user = user_message or ""
-            if isinstance(conversation_history, list):
+            if not last_user and isinstance(conversation_history, list):
                 for msg in reversed(conversation_history):
                     if msg.get("role") == "user":
                         last_user = str(msg.get("content", ""))[:200].lower()
@@ -621,7 +618,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 len(markers),
                 sum(1 for m in markers if len(str(m.get("hash", ""))) < 4),
             )
-        return catalog
+        # Inject catalog as ephemeral system message - Hermes expects None from pre_llm_call hooks
+        conversation_history.append({"role": "system", "content": catalog, "ephemeral": True})
+    return None
 
 
 def _group_into_turns(conversation_history):
@@ -673,8 +672,8 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     _t0 = time.time()
     if _DEV:
         return output  # dev mode: passthrough
-    token_alive = _alive(PORTS["token"])
-    cache_alive = _alive(PORTS["cache"])
+    token_alive = _alive_cached(PORTS["token"])
+    cache_alive = _alive_cached(PORTS["cache"])
     proxy_available = token_alive or cache_alive
 
     out_len = len(output)
@@ -729,7 +728,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                 if stripped not in counts:
                     unique.append(stripped)
                 counts[stripped] = counts.get(stripped, 0) + 1
-                prev = stripped
+            prev = stripped
 
         # Build summary: unique error/warning lines + total
         errors = [l for l in unique if "error" in l.lower() and l not in ("error:", "error")]
@@ -758,7 +757,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                 return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
         # Inline fallback
         h, _ = _inline_compress(output)
-        return f"<<<CCR:{h}|build|{len(output)}|inline>>> {summary}…(use aphrodite_retrieve)"
+        return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
 
     preview = output[:200].replace("\n", " ").strip()
 
@@ -787,7 +786,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             h, _ = _inline_compress(output)
             if DEBUG_LOGGING:
                 _log.debug("terminal_hook: INLINE hash=%s size=%s", h, out_len)
-            return f"<<<CCR:{h}|terminal|{out_len}|inline>>> {preview}…(use aphrodite_retrieve)"
+            return f"<<<CCR:{h}|terminal|{out_len}>>> {preview}…(use aphrodite_retrieve)"
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("terminal_hook: INLINE FAIL (cmd: %s)", command[:60])
@@ -952,7 +951,7 @@ def _search_handler(args=None, **kwargs):
         results.append({"source": "turn", "turn": tnum, "hash": h, "summary": summary, "size": size})
 
     # Search inline store
-    for h, content in _inline_store.items():
+    for h, content in list(_inline_store.items()):
         if query and query not in content.lower():
             continue
         preview = content[:200].replace("\n", " ").strip()
@@ -1028,13 +1027,11 @@ def _test_handler(args=None, **kwargs):
     test(
         "retrieve_roundtrip",
         lambda: (
-            json.loads(_compress_handler(args={"content": "def foo():\n    return 42\n", "type": "code"}))["hash"]
+            (h := json.loads(_compress_handler(args={"content": "def foo():\n    return 42\n", "type": "code"}))["hash"])
             and "def foo"
             in _retrieve_handler(
                 args={
-                    "hash": json.loads(
-                        _compress_handler(args={"content": "def foo():\n    return 42\n", "type": "code"})
-                    )["hash"]
+                    "hash": h
                 }
             )
         ),
@@ -1118,7 +1115,7 @@ def _test_handler(args=None, **kwargs):
 
     # ── Save results for regression comparison ─────────────
     try:
-        results_path = os.path.join(os.path.dirname(__file__), ".test-results.json")
+        results_path = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite", ".test-results.json")
         prev = {}
         if os.path.exists(results_path):
             with open(results_path) as f:
@@ -1165,94 +1162,4 @@ SEARCH_SCHEMA = {
 }
 
 
-def register(ctx):
-    # Install binary on registration
-    _ensure_binary()
-    ctx.register_hook("on_session_start", on_start)
-    ctx.register_hook("pre_llm_call", _pre_llm_hook)
-    ctx.register_hook("transform_terminal_output", _transform_terminal_hook)
-    ctx.register_hook("post_llm_call", _store_conversation_turn)
-    ctx.register_hook("transform_tool_result", _transform_tool_result)
-    ctx.register_tool(
-        name="aphrodite_rebuild",
-        schema=REBUILD_SCHEMA,
-        handler=_rebuild_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_compress",
-        schema=COMPRESS_SCHEMA,
-        handler=_compress_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_retrieve",
-        schema=RETRIEVE_SCHEMA,
-        handler=_retrieve_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_stats",
-        schema=STATS_SCHEMA,
-        handler=_stats_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_files",
-        schema=FILES_SCHEMA,
-        handler=_files_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_diff",
-        schema=DIFF_SCHEMA,
-        handler=_diff_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_search",
-        schema=SEARCH_SCHEMA,
-        handler=_search_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_test",
-        schema=TEST_SCHEMA,
-        handler=_test_handler,
-        toolset="aphrodite",
-    )
-    ctx.register_tool(
-        name="aphrodite_catalog",
-        schema=CATALOG_SCHEMA,
-        handler=_catalog_handler,
-        toolset="aphrodite",
-    )
-    # Only register context engine when explicitly configured
-    engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
-    if engine_configured:
-        try:
-            ctx.register_context_engine(AphroditeContextEngine())
-            _log.info("aphrodite context engine registered")
-        except Exception as e:
-            _log.debug("context engine registration skipped: %s", e)
-    else:
-        _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
-    _log.info("aphrodite v%s registered - %d tools + hooks", PLUGIN_VERSION, 9)
 
-    # ── Debug banner: print configuration on startup ──────────
-    if DEBUG_LOGGING:
-        lines = [
-            "=" * 60,
-            f"APHRODITE v{PLUGIN_VERSION} - DEBUG MODE",
-            f"  Mode: {'proxy+hooks' if not engine_configured else 'proxy+hooks+engine'} | Engine: {'enabled' if engine_configured else 'disabled'} | Dev: {'on' if _DEV else 'off'}",
-            f"  Thresholds: terminal={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_token={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE}",
-            f"  Engine: threshold={ENGINE_THRESHOLD_PCT}% protect={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min_msgs={ENGINE_MIN_MSGS}",
-            f"  CCR: regex={_CCR_RE.pattern} depth={RECURSIVE_DEPTH}",
-            "  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog",
-            f"  Catalog mode: {CATALOG_MODE} (APHRODITE_CATALOG=full|compact|tool)",
-            "  Proxies: cache=:9797 token=:9798 | waiting for session_start...",
-            "=" * 60,
-        ]
-        for line in lines:
-            print(line)
-            _log.info(line)

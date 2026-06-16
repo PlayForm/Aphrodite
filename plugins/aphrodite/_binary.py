@@ -3,6 +3,7 @@
 import logging
 import os
 import platform
+import re
 import stat
 import subprocess
 import urllib.request
@@ -10,6 +11,25 @@ import urllib.request
 from ._core import BIN_VERSION, BINARY, BINARY_DIR, REPO
 
 _log = logging.getLogger("aphrodite")
+
+# Valid binary magic bytes: ELF, Mach-O, PE
+_BINARY_MAGICS = frozenset((
+    b'\x7fELF',           # ELF
+    b'\xfe\xed\xfa\xce',  # Mach-O 32-bit
+    b'\xfe\xed\xfa\xcf',  # Mach-O 64-bit
+    b'\xcf\xfa\xed\xfe',  # Mach-O reverse-endian 64-bit
+    b'\xca\xfe\xba\xbe',  # Mach-O universal (fat binary)
+    b'MZ\x90\x00',        # PE (portable executable)
+))
+
+
+def _restore_bak(bak):
+    """Restore .bak to original binary path on download failure."""
+    if os.path.exists(bak):
+        try:
+            os.replace(bak, bak[:-4])  # strip ".bak" → BINARY
+        except Exception:
+            pass
 
 
 def _detect_platform() -> str:
@@ -26,6 +46,13 @@ def _detect_platform() -> str:
 def _download_binary() -> bool:
     """Download aphrodite binary from GitHub releases."""
     os.makedirs(BINARY_DIR, exist_ok=True)
+    # Rename existing binary to .bak so we don't leave the user with nothing on failure
+    bak = BINARY + ".bak"
+    if os.path.exists(BINARY):
+        try:
+            os.replace(BINARY, bak)
+        except Exception:
+            pass
     plat = _detect_platform()
     download_url = f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite-{plat}"
     _log.info("downloading aphrodite %s from %s", BIN_VERSION, download_url)
@@ -36,15 +63,30 @@ def _download_binary() -> bool:
         size = os.path.getsize(BINARY)
         if size == 0:
             _log.warning("downloaded binary is empty (0 bytes)")
+            _restore_bak(bak)
+            return False
+        # 🛡 Magic-byte validation
+        with open(BINARY, "rb") as f:
+            magic = f.read(4)
+        if magic not in _BINARY_MAGICS:
+            _log.warning("downloaded binary has invalid magic bytes: %r", magic)
+            _restore_bak(bak)
             return False
         os.chmod(BINARY, os.stat(BINARY).st_mode | stat.S_IEXEC)
         if not os.access(BINARY, os.X_OK):
             _log.warning("downloaded binary is not executable after chmod")
+            _restore_bak(bak)
             return False
+        # Success - remove .bak
+        try:
+            os.unlink(bak)
+        except Exception:
+            pass
         _log.info("aphrodite binary installed to %s (%s bytes)", BINARY, size)
         return True
     except Exception as e:
         _log.warning("download failed: %s - falling back to cargo build", e)
+        _restore_bak(bak)
         return False
 
 
@@ -58,7 +100,7 @@ def _check_binary_version() -> bool:
             timeout=5,
         )
         version_str = r.stdout.strip() or r.stderr.strip()
-        if version_str and BIN_VERSION.lstrip("v") in version_str:
+        if version_str and re.search(r'\b' + re.escape(BIN_VERSION.lstrip("v")) + r'\b', version_str):
             return True
         _log.info(
             "binary version mismatch: got %r, expected %s - re-downloading",
@@ -76,7 +118,12 @@ def _ensure_binary(existence_check: bool = False) -> bool:
     if os.path.exists(BINARY) and os.access(BINARY, os.X_OK):
         if _check_binary_version():
             return True
-        os.remove(BINARY)
+        # Rename to .bak before re-download so we can restore on failure
+        bak = BINARY + ".bak"
+        try:
+            os.replace(BINARY, bak)
+        except Exception:
+            pass
     if _download_binary():
         return True
     # Fallback: try local build

@@ -78,6 +78,7 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
     }
 
     let state = Arc::new(proxy::build_state(&cli).await?);
+    let task_tracker = state.task_tracker.clone();
 
     let mode_str = match cli.mode {
         ProxyMode::Cache => "cache",
@@ -210,8 +211,12 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
     tracing::info!(addr = %listener.local_addr()?, "listening");
 
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    	.with_graceful_shutdown(shutdown_signal())
+    	.await?;
+
+    task_tracker.close();
+    task_tracker.wait().await;
+    tracing::debug!("all background tasks completed");
 
     Ok(())
 }

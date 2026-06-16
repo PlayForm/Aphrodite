@@ -3,14 +3,17 @@
 import json
 import logging
 import os
+import socket
 import subprocess
 import time
-import urllib.request
 from pathlib import Path
 
 from ._core import BINARY, BINARY_DIR, ENV_FILE, PORTS
 
 _log = logging.getLogger("aphrodite")
+
+# ── Process tracking ─────────────────────────────────────────
+_PROCS: dict[int, subprocess.Popen] = {}  # {port: Popen}
 
 # ── Alive cache (5-second TTL) ──────────────────────────────
 _alive_cache = {}  # {port: (result, timestamp)}
@@ -26,13 +29,28 @@ def _load_env():
                 if line.startswith("export "):
                     kv = line[7:].split("=", 1)
                     if len(kv) == 2:
-                        env[kv[0]] = kv[1].strip('"').strip("'")
+                        env[kv[0]] = _env_val(kv[1])
                 elif "=" in line and not line.startswith("#"):
                     kv = line.split("=", 1)
-                    env[kv[0]] = kv[1].strip('"').strip("'")
+                    env[kv[0]] = _env_val(kv[1])
     except Exception as exc:
         _log.warning("_load_env: failed to read %s - %s", ENV_FILE, exc)
     return env
+
+
+def _env_val(val):
+    """Parse a .env value: extract between matching quotes or strip inline # comment."""
+    val = val.strip()
+    if val.startswith('"'):
+        end = val.find('"', 1)
+        if end != -1:
+            return val[1:end]
+    elif val.startswith("'"):
+        end = val.find("'", 1)
+        if end != -1:
+            return val[1:end]
+    # Unquoted: split on # to remove inline comment
+    return val.split("#")[0].strip()
 
 
 def _alive(port, timeout=3):
@@ -43,8 +61,20 @@ def _alive(port, timeout=3):
         if now - ts < 5:
             return result
     try:
-        r = urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=timeout)
-        body = r.read().decode().strip()
+        sock = socket.create_connection(("127.0.0.1", port), timeout=timeout)
+        with sock:
+            sock.sendall(b"GET /health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+            body = b""
+            while True:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    break
+                body += chunk
+        # Extract body after the HTTP headers
+        if b"\r\n\r\n" in body:
+            body = body.split(b"\r\n\r\n", 1)[1].decode().strip()
+        else:
+            body = body.decode().strip()
         if not body:
             result = True
         else:
@@ -59,9 +89,46 @@ def _alive(port, timeout=3):
     return result
 
 
+def _kill(pid, timeout=0.3):
+    """Kill a process by PID with SIGTERM, escalate to SIGKILL after timeout."""
+    try:
+        os.kill(int(pid), 0)  # Probe - still alive?
+    except (OSError, ProcessLookupError, ValueError):
+        return  # Already dead or bogus PID
+    for sig in ("TERM", "KILL"):
+        try:
+            subprocess.run(["kill", f"-{sig}", str(pid)], capture_output=True, timeout=3)
+        except Exception:
+            pass
+        if sig == "KILL":
+            break
+        time.sleep(timeout)
+        try:
+            os.kill(int(pid), 0)
+        except (OSError, ProcessLookupError):
+            return  # SIGTERM worked
+    # SIGKILL sent, brief grace
+    time.sleep(0.1)
+
+
 def _start(name, env):
     """Launch the aphrodite proxy binary."""
     port = PORTS[name]
+
+    # ── Stale PID check ────────────────────────────────────
+    try:
+        pid_path = Path(os.path.join(BINARY_DIR, f"proxy-{name}.pid"))
+        if pid_path.exists():
+            old_pid = int(pid_path.read_text().strip())
+            try:
+                os.kill(old_pid, 0)  # Process alive?
+                _log.warning("stale PID %s for %s - killing it", old_pid, name)
+                _kill(old_pid)
+            except (OSError, ProcessLookupError):
+                pass  # already dead
+            pid_path.unlink(missing_ok=True)
+    except Exception as exc:
+        _log.warning("stale PID check failed for %s - %s", name, exc)
 
     # ── Port conflict resolution ────────────────────────────
     try:
@@ -69,8 +136,7 @@ def _start(name, env):
         if r.stdout.strip():
             pid = r.stdout.strip()
             _log.warning("port %s in use by PID %s - killing it", port, pid)
-            subprocess.run(["kill", pid], capture_output=True, timeout=3)
-            time.sleep(0.2)  # brief grace for the port to free
+            _kill(pid)
     except FileNotFoundError:
         _log.warning("lsof not available - skipping port conflict check")
     except Exception as exc:
@@ -86,12 +152,21 @@ def _start(name, env):
     if not key:
         _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
         return
+    # Pass API key as environment variable instead of CLI arg so it's not visible in ps aux
+    env["APHRODITE_API_KEY"] = key
     mode_flag = "cache" if name == "cache" else "token"
-    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key, "--mode", mode_flag, "--tool-relay"]
+    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--mode", mode_flag, "--tool-relay"]
     _log.info("starting aphrodite %s on :%s", name, port)
+
+    # ── Binary guard ──────────────────────────────────────
+    if not os.path.isfile(BINARY) or not os.access(BINARY, os.X_OK):
+        _log.warning("aphrodite %s: binary not executable at %s", name, BINARY)
+        return
+
     try:
         proc = subprocess.Popen(
             args,
+            env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -99,6 +174,8 @@ def _start(name, env):
     except Exception as e:
         _log.warning("aphrodite %s launch failed: %s", name, e)
         return
+
+    _PROCS[port] = proc
 
     # ── Write PID file ──────────────────────────────────────
     try:
