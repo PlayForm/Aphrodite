@@ -23,5 +23,15 @@ target/**/*
 hermes-archive.tar.gz
 
 aphrodite.toml
-aphrodite.toml
 plugins/aphrodite/.test-results.json
+
+# Profile runtime artifacts
+profiles/*/cache/
+profiles/*/logs/
+profiles/*/bin/
+profiles/*/state.db*
+profiles/*/models_dev_cache.json
+profiles/*/ollama_cloud_models_cache.json
+profiles/*/provider_models_cache.json
+profiles/*/auth.lock
+profiles/*/.update_check
