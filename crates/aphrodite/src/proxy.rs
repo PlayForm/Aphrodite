@@ -185,10 +185,6 @@ pub struct AppState {
 	#[cfg(not(feature = "scripting"))]
 	pub script_engine: Option<()>,
 
-	/// Session-scoped hint context — LLM-injected mode switches that
-	/// affect all future CCR operations. Hints compose additively.
-	pub hint_context: crate::hints::HintContext,
-
 	// Extended metrics
 	pub inline_ccr_hits: AtomicU64,
 	pub inline_ccr_misses: AtomicU64,
@@ -515,8 +511,6 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 		}),
 		#[cfg(not(feature = "scripting"))]
 		script_engine: None,
-
-		hint_context: crate::hints::HintContext::new(),
 
 		inline_ccr_hits: AtomicU64::new(0),
 		inline_ccr_misses: AtomicU64::new(0),
@@ -1450,8 +1444,9 @@ fn generate_metadata(content: &str, ct: &str) -> String {
 ///
 /// Edit this function to change the layout the LLM sees when content
 /// is compressed. Three-line format by default: preview, structure, marker.
-fn format_ccr_output(preview: &str, ct: &str, metadata: &str, hash: &str, size: usize) -> String {
-	format!("{preview}\n[{ct}: {metadata}]\n<<<CCR:{hash}|{ct}|{size}>>>")
+fn format_ccr_output(preview: &str, ct: &str, metadata: &str, center: Option<&str>, hash: &str, size: usize) -> String {
+	let center_seg = center.map(|c| format!(";center={c}")).unwrap_or_default();
+	format!("{preview}\n[{ct}: {metadata}{center_seg}]\n<<<CCR:{hash}|{ct}|{size}>>>")
 }
 
 /// Build a smart content-type-aware preview for the CCR output.
@@ -1520,19 +1515,18 @@ fn build_preview(content: &str, ct: &str) -> String {
 /// Uses [`format_ccr_output`] for the output layout. The LLM reads the
 /// preview + structure first, then decides whether to call
 /// aphrodite_retrieve for the full content.
-fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
+fn smart_marker(hash: &str, content: &str, ct: &str, center: Option<&str>) -> String {
 	let size = content.len();
 	let metadata = generate_metadata(content, ct);
 	let preview = build_preview(content, ct);
-	format_ccr_output(&preview, ct, &metadata, hash, size)
+	format_ccr_output(&preview, ct, &metadata, center, hash, size)
 }
 
 /// Cache-mode CCR output — preview + marker, same template.
-fn cache_marker(hash: &str, content: &str, ct: &str) -> String {
+fn cache_marker(hash: &str, content: &str, ct: &str, center: Option<&str>) -> String {
 	let size = content.len();
-	// Cache mode: use smart preview (same as token, but 512 char budget)
 	let preview: String = content.chars().take(512).collect();
-	format_ccr_output(&preview, ct, "", hash, size)
+	format_ccr_output(&preview, ct, "", center, hash, size)
 }
 
 /// Compress a Chat Completions API response with smart markers.
@@ -1588,9 +1582,9 @@ async fn compress_chat_completion(
 						let (compressed, orig_len) = {
 							let compressed = match state.mode {
 								ProxyMode::Cache => {
-									cache_marker(&hash, content, ct)
+									cache_marker(&hash, content, ct, None)
 								},
-								ProxyMode::Token => smart_marker(&hash, content, ct),
+								ProxyMode::Token => smart_marker(&hash, content, ct, None),
 							};
 							let len = content.len();
 							state.record_compression(ct);
@@ -1642,7 +1636,7 @@ async fn compress_chat_completion(
 												.fetch_add((args_owned.len() - hash.len()) as u64, Ordering::Relaxed);
 										}
 										let (compressed, orig_len) = {
-											let compressed = smart_marker(&hash, &args_owned, ct);
+											let compressed = smart_marker(&hash, &args_owned, ct, None);
 											let len = args_owned.len();
 											state.record_compression(ct);
 											(compressed, len)
@@ -1686,12 +1680,9 @@ pub async fn handle_tool_relay(
 	state.tool_relay_calls.fetch_add(1, Ordering::Relaxed);
 	tracing::info!(tool = %req.tool, "tool_relay");
 
-	// Parse _ccr_hint from LLM — session-scoped mode switch.
-	// Example: params: { _ccr_hint: "debug" } → agent enters debug mode.
-	if let Some(hint_val) = req.params.get("_ccr_hint").and_then(|v| v.as_str()) {
-		state.hint_context.parse_and_push(hint_val);
-		tracing::info!(hint = %hint_val, "ccr hint applied");
-	}
+	// Parse _ccr_center from LLM — disambiguates intent for this operation.
+	// Example: _ccr_center="code_rust" → use Rust-specific content handling.
+	let hint = req.params.get("_ccr_center").and_then(|v| v.as_str());
 
 	// Validate aphrodite_retrieve: hash is required. Query-only requests without
 	// hash are invalid and must return 400 BAD_REQUEST instead of silently passing through.
@@ -1778,6 +1769,7 @@ async fn execute_tool_relay(
 		},
 		"aphrodite_compress" => {
 			let content = params.get("content").and_then(|v| v.as_str()).ok_or("missing content")?;
+			let center = params.get("_ccr_center").and_then(|v| v.as_str());
 			let hash = compute_key(content.as_bytes());
 			let size = content.len();
 			if size < INLINE_CCR_THRESHOLD as usize {
@@ -1792,7 +1784,7 @@ async fn execute_tool_relay(
 				}
 				Ok(
 						serde_json::json!({
-							"compressed": smart_marker(&hash, content, "compress"),
+							"compressed": smart_marker(&hash, content, "compress", center),
 							"hash": hash,
 							"original_size": size
 						}),
@@ -1804,7 +1796,7 @@ async fn execute_tool_relay(
 						.fetch_add(size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
 					Ok(
 						serde_json::json!({
-							"compressed": smart_marker(&hash, content, "compress"),
+							"compressed": smart_marker(&hash, content, "compress", center),
 							"hash": hash,
 							"original_size": size
 						}),
@@ -2062,7 +2054,6 @@ mod tests {
 			fill_pct: AtomicU64::new(9000),
 			task_tracker: TaskTracker::new(),
 			script_engine: None,
-			hint_context: crate::hints::HintContext::new(),
 			inline_ccr_hits: AtomicU64::new(0),
 			inline_ccr_misses: AtomicU64::new(0),
 			tool_relay_success: AtomicU64::new(0),
@@ -2172,7 +2163,6 @@ mod tests {
 			fill_pct: AtomicU64::new(9000),
 			task_tracker: TaskTracker::new(),
 			script_engine: None,
-			hint_context: crate::hints::HintContext::new(),
 			inline_ccr_hits: AtomicU64::new(0),
 			inline_ccr_misses: AtomicU64::new(0),
 			tool_relay_success: AtomicU64::new(0),
