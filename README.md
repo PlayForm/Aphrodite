@@ -41,10 +41,10 @@ Hermes → aphrodite (:9797/:9798) → any LLM API
 
 Every compressed tool output gets a **content‑aware, LLM‑native preview** instead of a raw text truncation. A 10‑type classifier runs on the content, then a structured preview is generated that lets the LLM decide whether to retrieve — without burning context.
 
-### Before → After
+### Without Aphrodite → With Aphrodite
 
-| Content type | Before (`result[:120]`) | After (absorptive) |
-| :----------- | :---------------------- | :----------------- |
+| Content type | Your agent sees without Aphrodite (`result[:120]`) | Your agent sees with Aphrodite (structured preview) |
+| :----------- | :-------------------------------------------------- | :-------------------------------------------------- |
 | Git diff | `diff --git a/foo.rs b/foo.rs --- a/foo.rs +++ b/foo.rs @@ -1 +1,2 @@ +added -old` | `[diff:1f +12/-3 42L foo.rs]` |
 | Build output | `Compiling foo v1.0 Compiling bar v2.0 error[E0425]: cannot find value warning: unused variable` | `[build:1E 2W 142L]` |
 | Traceback | `Traceback (most recent call last): File "x.py", line 42 AttributeError: 'NoneType'` | `[error:AttributeError 'NoneType' has no attribute 'x']` |
@@ -54,6 +54,8 @@ Every compressed tool output gets a **content‑aware, LLM‑native preview** in
 | Table output | `a b 1 2 3 4 5 6` | `[table:12 rows 15L]` |
 | JSON blob | `{"total_items": 2, "by_type": {"tool": {"count": 2}}, "items": [...]}` | `[json:total_items,by_type,items 30L]` |
 | Plain text | `some plain text output more lines here` | `[text:some plain text output more lines here]` |
+
+**The agent sees ~15 tokens of structured metadata instead of 120+ characters of noise.** It can pattern-match `[diff:` across dozens of markers and instantly decide which ones to retrieve.
 
 ### Classifier pipeline
 
@@ -84,33 +86,33 @@ _make_ccr_preview() → [type:key=val ...]  (≤120 chars, pipe‑safe)
 
 ## LLM‑Native Output Formatting 📋
 
-The `aphrodite_catalog`, `aphrodite_stats`, `aphrodite_diff`, and `aphrodite_files` tools return structured, token‑efficient output designed for LLM consumption — no emojis, no decorative cruft.
+The `aphrodite_catalog`, `aphrodite_stats`, `aphrodite_diff`, and `aphrodite_files` tools return structured, token‑efficient output designed for LLM consumption — no emojis, no decorative cruft. Your agent reads clean machine‑parseable text instead of decorative human‑facing output.
 
-### Before → After
+### Without Aphrodite → With Aphrodite
 
 **`aphrodite_catalog`**
 
-| Before | After |
+| Your agent sees without Aphrodite | Your agent sees with Aphrodite |
 | :----- | :---- |
 | `📦 Aphrodite Catalog — 2 items · 4.8KB saved · 2 turns · 0 files` | `Catalog: 2 items 4.8KB saved 2 turns 0 files` |
 | Raw JSON `{"total_items":2,"by_type":{...},"items":[...]}` | Markdown table with hash, type, size, preview |
 
 **`aphrodite_stats`**
 
-| Before | After |
+| Your agent sees without Aphrodite | Your agent sees with Aphrodite |
 | :----- | :---- |
 | `💋 Aphrodite Stats` / `✅ active` / `❌ down` | `Aphrodite Stats` / `on` / `off` |
 | `**Proxy:**` / `**Engine:**` / `**Inline:**` | `proxy:` / `engine:` / `inline:` |
 
 **`aphrodite_diff`**
 
-| Before | After |
+| Your agent sees without Aphrodite | Your agent sees with Aphrodite |
 | :----- | :---- |
 | `📜 Turn History — 2 turns` | `Turn History: 2 turns` |
 
 **`aphrodite_files`**
 
-| Before | After |
+| Your agent sees without Aphrodite | Your agent sees with Aphrodite |
 | :----- | :---- |
 | `📁 Referenced Files — 0 files` | `Referenced Files: 0 files` |
 
@@ -128,26 +130,26 @@ Tool output > threshold
   → CCR marker returned
 ```
 
-### Token savings per content type
+### Your agent's context budget
 
-| Content type | Raw size | Preview tokens | Full expansion tokens | Savings (preview vs full) |
-| :----------- | -------: | -------------: | --------------------: | ------------------------: |
-| Git diff (42L) | 2,100B | ~15 tok | ~350 tok | **23×** |
-| Build output (142L) | 8,500B | ~10 tok | ~1,400 tok | **140×** |
-| Traceback (4L) | 280B | ~12 tok | ~45 tok | **3.8×** |
-| Terminal (20L) | 1,200B | ~10 tok | ~200 tok | **20×** |
-| Git log (8 commits) | 640B | ~20 tok | ~100 tok | **5×** |
-| Table (50 rows) | 4,000B | ~8 tok | ~650 tok | **81×** |
-| JSON (30 keys) | 2,500B | ~10 tok | ~400 tok | **40×** |
+| Content type | Without Aphrodite | With Aphrodite | Savings |
+| :----------- | ----------------: | -------------: | ------: |
+| Git diff (42L) | ~350 tok | ~15 tok | **23×** |
+| Build output (142L) | ~1,400 tok | ~10 tok | **140×** |
+| Traceback | ~45 tok | ~12 tok | **3.8×** |
+| Terminal output | ~200 tok | ~10 tok | **20×** |
+| Git log (8 commits) | ~100 tok | ~20 tok | **5×** |
+| Table (50 rows) | ~650 tok | ~8 tok | **81×** |
+| JSON blob (30 keys) | ~400 tok | ~10 tok | **40×** |
 
-**Median savings: ~23× fewer tokens** for the LLM to decide retrieval.
+**Median: 23× fewer tokens** burned on tool output. Your agent gets context back for reasoning, not raw data dumps.
 
-### `_ESSENTIAL_TOOLS` refactor
+### `_ESSENTIAL_TOOLS` — what gets compressed
 
-| Before | After | Effect |
-| :----- | :---- | :----- |
-| `skill_view`, `skills_list`, `session_search`, `read_file`, `read_terminal`, `memory` protected from compression | Only `aphrodite_*` tools protected | 6 non‑aphrodite tools now compressible — `read_file`, `skill_view`, etc. flow through the normal pipeline |
-| Conditional skip logic (token_alive vs not) | `skip = _ESSENTIAL_TOOLS` | Simplified, predictable |
+| Tool | Without Aphrodite | With Aphrodite |
+| :--- | :---------------- | :------------- |
+| `read_file`, `skill_view`, `session_search`, `memory` | Raw output fills context | Compressed via CCR; agent retrieves on demand |
+| `aphrodite_*` tools (catalog, stats, etc.) | Verbose emoji-heavy text | LLM‑native compact format |
 
 ---
 
