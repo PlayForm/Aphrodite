@@ -1,14 +1,12 @@
 #!/bin/bash
 # auto-release.sh — commit all changes, bump version, build, tag, release
-# Usage: ./scripts/auto-release.sh ["commit message"] [--push]
-# If no message provided, uses last commit message with "release:" prefix.
-
+# auto-release.sh — commit, bump, build, tag, push — full pipeline
+# Usage: ./scripts/auto-release.sh ["commit message"]
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CARGO_TOML="$REPO_ROOT/crates/aphrodite/Cargo.toml"
 MSG="${1:-}"
-PUSH="${2:-}"
 
 cd "$REPO_ROOT"
 
@@ -58,12 +56,10 @@ git tag -d "v$NEW" 2>/dev/null || true
 GIT_EDITOR=true git tag -a "v$NEW" -m "v$NEW" 2>/dev/null || git tag "v$NEW"
 echo "[release] v$NEW tagged"
 
-# Push
-if [ "$PUSH" = "--push" ]; then
-    git push origin Current
-    git push origin "v$NEW"
-    echo "[push] done"
-fi
+# Push — always sync with remote
+git push origin Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
+git push origin "v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
+echo "[push] done"
 
 echo ""
 echo "=== v$NEW released ==="
