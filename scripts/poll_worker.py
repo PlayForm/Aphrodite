@@ -130,6 +130,9 @@ def run() -> int:
     toolsets_list = _normalize_toolsets(toolsets)
     if toolsets_list is None:
         toolsets_list = sorted(_get_platform_tools(cfg, "cli"))
+    # Always include aphrodite — workers need CCR compression hooks
+    if "aphrodite" not in toolsets_list:
+        toolsets_list = list(toolsets_list) + ["aphrodite"]
 
     _fb = get_fallback_chain(cfg)
 
