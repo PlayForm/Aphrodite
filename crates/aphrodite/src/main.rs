@@ -256,17 +256,17 @@ async fn run_single(
                 let mode_str = stats["mode"].as_str().unwrap_or("unknown");
                 out.push_str(&format!("aphrodite_requests_total{{mode=\"{}\"}} {}\n",
                     mode_str, stats["requests"]["total"]));
-                out.push_str(&format!("aphrodite_requests_compressed{{mode=\"{}\"}} {}\n",
+                out.push_str(&format!("aphrodite_requests_compressed_total{{mode=\"{}\"}} {}\n",
                     mode_str, stats["requests"]["compressed"]));
-                out.push_str(&format!("aphrodite_tokens_saved {}\n", stats["tokens_saved"]));
-                out.push_str(&format!("aphrodite_ccr_hits {}\n", stats["ccr"]["hits"]));
-                out.push_str(&format!("aphrodite_ccr_misses {}\n", stats["ccr"]["misses"]));
-                out.push_str(&format!("aphrodite_ccr_created {}\n", stats["ccr"]["created"]));
-                out.push_str(&format!("aphrodite_tool_relay_calls {}\n", stats["tool_relay_calls"]));
+                out.push_str(&format!("aphrodite_tokens_saved_total {}\n", stats["tokens_saved"]));
+                out.push_str(&format!("aphrodite_ccr_hits_total {}\n", stats["ccr"]["hits"]));
+                out.push_str(&format!("aphrodite_ccr_misses_total {}\n", stats["ccr"]["misses"]));
+                out.push_str(&format!("aphrodite_ccr_created_total {}\n", stats["ccr"]["created"]));
+                out.push_str(&format!("aphrodite_tool_relay_calls_total {}\n", stats["tool_relay_calls"]));
                 // LLM response cache
                 if let Some(cache) = stats["cache"].as_object() {
-                    out.push_str(&format!("aphrodite_cache_hits {}\n", cache["hits"]));
-                    out.push_str(&format!("aphrodite_cache_misses {}\n", cache["misses"]));
+                    out.push_str(&format!("aphrodite_cache_hits_total {}\n", cache["hits"]));
+                    out.push_str(&format!("aphrodite_cache_misses_total {}\n", cache["misses"]));
                 }
                 // Latency buckets
                 if let Some(buckets) = stats["latency_buckets_us"].as_array() {
@@ -287,18 +287,18 @@ async fn run_single(
                 }
                 // Inline CCR
                 if let Some(icc) = stats["inline_ccr"].as_object() {
-                    if let Some(h) = icc["hits"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_hits {h}\n")); }
-                    if let Some(m) = icc["misses"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_misses {m}\n")); }
+                    if let Some(h) = icc["hits"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_hits_total {h}\n")); }
+                    if let Some(m) = icc["misses"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_misses_total {m}\n")); }
                 }
                 // Tool relay success/failure
                 if let Some(tr) = stats["tool_relay"].as_object() {
-                    if let Some(s) = tr["success"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_success {s}\n")); }
-                    if let Some(f) = tr["failure"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_failure {f}\n")); }
+                    if let Some(s) = tr["success"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_success_total {s}\n")); }
+                    if let Some(f) = tr["failure"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_failure_total {f}\n")); }
                 }
                 // Notify success/failure
                 if let Some(n) = stats["notify"].as_object() {
-                    if let Some(s) = n["success"].as_u64() { out.push_str(&format!("aphrodite_notify_success {s}\n")); }
-                    if let Some(f) = n["failure"].as_u64() { out.push_str(&format!("aphrodite_notify_failure {f}\n")); }
+                    if let Some(s) = n["success"].as_u64() { out.push_str(&format!("aphrodite_notify_success_total {s}\n")); }
+                    if let Some(f) = n["failure"].as_u64() { out.push_str(&format!("aphrodite_notify_failure_total {f}\n")); }
                 }
                 // Upstream errors
                 if let Some(ue) = stats["upstream_errors"].as_object() {
@@ -318,7 +318,7 @@ async fn run_single(
                 }
                 // Upstream latency
                 if let Some(ul) = stats["upstream_latency_micros"].as_u64() {
-                    out.push_str(&format!("aphrodite_upstream_latency_seconds_sum {:.6}\n", ul as f64 / 1_000_000.0));
+                    out.push_str(&format!("aphrodite_upstream_latency_seconds_total {:.6}\n", ul as f64 / 1_000_000.0));
                 }
                 (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")], out)
             }
