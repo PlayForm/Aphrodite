@@ -1,4 +1,4 @@
-# Aphrodite — Atomic Test Examples
+# Aphrodite - Atomic Test Examples
 
 Each file in this directory is **self-contained** and exercises exactly one
 bug or improvement from the audit. Run any single file with:
@@ -14,7 +14,7 @@ No Rust binary, no live proxy, no API key required unless noted.
 | `01_env_var_typo.py` | `APHRODITEINLINE_THRESHOLD` typo | env var is read correctly |
 | `02_duplicate_declarations.py` | shadowed `_inline_store` / `INLINE_THRESHOLD` | configured value survives |
 | `03_alive_json_parse.py` | health-check JSON space mismatch | healthy status detected |
-| `04_hardcoded_path.py` | absolute `REDACTED` path | path resolves from `__file__` |
+| `04_hardcoded_path.py` | absolute `/Users/username` path | path resolves from `__file__` |
 | `05_platform_binary.py` | unused `_detect_platform` in download | URL includes platform tag |
 | `06_marker_glyph.py` | `⭷` vs `⫷` Unicode glyph mismatch | description matches format |
 | `07_tokens_saved.py` | `AtomicU64` never incremented | counter reflects savings |
