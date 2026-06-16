@@ -1523,7 +1523,7 @@ fn smart_marker(hash: &str, content: &str, ct: &str) -> String {
 /// Cache-mode CCR output — preview + marker, same template.
 fn cache_marker(hash: &str, content: &str, ct: &str) -> String {
 	let size = content.len();
-	// Cache mode: show first ~512 chars as preview (more generous — cache has no persistence)
+	// Cache mode: use smart preview (same as token, but 512 char budget)
 	let preview: String = content.chars().take(512).collect();
 	format_ccr_output(&preview, ct, "", hash, size)
 }
@@ -1777,16 +1777,24 @@ async fn execute_tool_relay(
 					}
 				}
 				Ok(
-					serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}),
-				)
-			} else if let Some(ccr) = &state.ccr {
-				ccr_put(ccr, &hash, content).await;
-				state
-					.tokens_saved
-					.fetch_add(size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
-				Ok(
-					serde_json::json!({"compressed": format!("<<<CCR:{}|compress|{}>>>", hash, size), "hash": hash, "original_size": size}),
-				)
+						serde_json::json!({
+							"compressed": smart_marker(&hash, content, "compress"),
+							"hash": hash,
+							"original_size": size
+						}),
+					)
+				} else if let Some(ccr) = &state.ccr {
+					ccr_put(ccr, &hash, content).await;
+					state
+						.tokens_saved
+						.fetch_add(size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
+					Ok(
+						serde_json::json!({
+							"compressed": smart_marker(&hash, content, "compress"),
+							"hash": hash,
+							"original_size": size
+						}),
+					)
 			} else {
 				Err("CCR not enabled".into())
 			}
