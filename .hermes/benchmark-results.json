@@ -1,0 +1,294 @@
+{
+  "timestamp": "2026-06-16T08:17:30",
+  "proxy": "http://127.0.0.1:9798",
+  "summary": {
+    "total": 19,
+    "passed": 19,
+    "failed": 0,
+    "compress_avg_ms": 4.0,
+    "retrieve_avg_ms": 5.5
+  },
+  "results": [
+    {
+      "name": "health",
+      "latency_ms": 13.5,
+      "pass": true,
+      "status": 200,
+      "detail": "cache=? token=?"
+    },
+    {
+      "name": "stats",
+      "latency_ms": 0.9,
+      "pass": true,
+      "detail": "mode=token requests=24 compressed=0 tokens_saved=23567 ccr_hits=2 ccr_created=7"
+    },
+    {
+      "name": "compress/1KB/text",
+      "iterations": 5,
+      "latency_ms": 0.8,
+      "latency_p50": 0.8,
+      "latency_p95": 0.9,
+      "ratio_mean": 42.6,
+      "ratio_median": 42.7,
+      "original_size": 1024,
+      "hashes": [
+        "faa27987a8ff7c9242f89746",
+        "3c091790acdaab7ad67094ff",
+        "0614908252b0a2a062efea9f",
+        "e23c4b8adc81dcd97ee3095f",
+        "963653c79c02d9a0de591eec"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/1KB/code",
+      "iterations": 5,
+      "latency_ms": 0.6,
+      "latency_p50": 0.7,
+      "latency_p95": 0.8,
+      "ratio_mean": 42.7,
+      "ratio_median": 42.7,
+      "original_size": 1024,
+      "hashes": [
+        "77097b79cc289534390f6e2f",
+        "ec99050ee71b8835f42b21ed",
+        "367f77d72603e68384e41758",
+        "f8e2e6ac01142ab456dd30e8",
+        "4ef2dd98931b51de6e38010b"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/1KB/json",
+      "iterations": 5,
+      "latency_ms": 0.6,
+      "latency_p50": 0.6,
+      "latency_p95": 0.7,
+      "ratio_mean": 42.8,
+      "ratio_median": 42.8,
+      "original_size": 1028,
+      "hashes": [
+        "0e3a36a886ec2fd24386eec1",
+        "0d9e3539d4d735aff6757727",
+        "b78cb37bac68f5b406d21e12",
+        "68d668b8c60a6cd4c51d408d",
+        "af58557cf749ccc11bbe89d2"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/10KB/text",
+      "iterations": 5,
+      "latency_ms": 0.9,
+      "latency_p50": 0.8,
+      "latency_p95": 1.0,
+      "ratio_mean": 426.7,
+      "ratio_median": 426.7,
+      "original_size": 10240,
+      "hashes": [
+        "ab84d20358d495da60d477b5",
+        "9d8b2e5ff9bfb1d69c654336",
+        "6762af669d01f768b78225da",
+        "ad56f7bb5478157accff9749",
+        "b24ca464883462bb39deffa3"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/10KB/code",
+      "iterations": 5,
+      "latency_ms": 0.8,
+      "latency_p50": 0.8,
+      "latency_p95": 1.0,
+      "ratio_mean": 426.7,
+      "ratio_median": 426.7,
+      "original_size": 10240,
+      "hashes": [
+        "7cc43b708648eff268798ab9",
+        "3a63662e2eeb04bef8b76000",
+        "a0a67f1ff8683c0f8aa14c48",
+        "152fe99c7737527a6cc48ee5",
+        "22a2d0f80defe95d0de80f54"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/10KB/json",
+      "iterations": 5,
+      "latency_ms": 1.1,
+      "latency_p50": 1.1,
+      "latency_p95": 1.4,
+      "ratio_mean": 427.6,
+      "ratio_median": 427.6,
+      "original_size": 10262,
+      "hashes": [
+        "8ac5f3aba51a894610f2bca7",
+        "4d5de8fbc08564c714dfc8e7",
+        "db431d198bb2362db55f26fe",
+        "451efdc0a2ae3c0d231b6ce8",
+        "aba31a3939c23784baf431d8"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/50KB/text",
+      "iterations": 3,
+      "latency_ms": 2.3,
+      "latency_p50": 2.3,
+      "latency_p95": 2.5,
+      "ratio_mean": 2133.3,
+      "ratio_median": 2133.3,
+      "original_size": 51200,
+      "hashes": [
+        "81ab708ab74555dafe7fb808",
+        "5270326b129d0830036722b0",
+        "e13a74ea48da8ca81dda5894"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/50KB/code",
+      "iterations": 3,
+      "latency_ms": 2.2,
+      "latency_p50": 2.2,
+      "latency_p95": 2.3,
+      "ratio_mean": 2133.3,
+      "ratio_median": 2133.3,
+      "original_size": 51200,
+      "hashes": [
+        "256121f463ada9afd25a2dcf",
+        "5c61ec2875e713a148e92ecb",
+        "c60f1aa0b6cc388debbd6136"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/50KB/json",
+      "iterations": 3,
+      "latency_ms": 2.8,
+      "latency_p50": 2.9,
+      "latency_p95": 3.0,
+      "ratio_mean": 2134.4,
+      "ratio_median": 2134.4,
+      "original_size": 51226,
+      "hashes": [
+        "1807bd9f3a9b302c8f5df1a8",
+        "f77829d7393304f4dec45003",
+        "dcd0e6be75f7d56782607180"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/100KB/text",
+      "iterations": 3,
+      "latency_ms": 4.0,
+      "latency_p50": 3.5,
+      "latency_p95": 5.6,
+      "ratio_mean": 4266.7,
+      "ratio_median": 4266.7,
+      "original_size": 102400,
+      "hashes": [
+        "6b2cc5f8b8dcacb7bc6dbfb8",
+        "c5358d27880e865f3b249ccd",
+        "4c91609c3016b34110cadeaf"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/100KB/code",
+      "iterations": 3,
+      "latency_ms": 3.0,
+      "latency_p50": 2.9,
+      "latency_p95": 3.3,
+      "ratio_mean": 4266.7,
+      "ratio_median": 4266.7,
+      "original_size": 102400,
+      "hashes": [
+        "bf8093c9c654fd06d8ac08c2",
+        "892272706a69e3bb4d1c845c",
+        "0daf5240c6d8c3538e46f4b8"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/100KB/json",
+      "iterations": 3,
+      "latency_ms": 3.9,
+      "latency_p50": 3.9,
+      "latency_p95": 3.9,
+      "ratio_mean": 4267.2,
+      "ratio_median": 4267.2,
+      "original_size": 102412,
+      "hashes": [
+        "705eb579a23533aef83fee46",
+        "0db50ce60516dcc87fdd7529",
+        "65ed95dc06a538f03f01bac4"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/500KB/text",
+      "iterations": 3,
+      "latency_ms": 9.2,
+      "latency_p50": 9.2,
+      "latency_p95": 9.6,
+      "ratio_mean": 21333.3,
+      "ratio_median": 21333.3,
+      "original_size": 511999,
+      "hashes": [
+        "da33f83c78ba73517bfb3127",
+        "1bd11ae6fa767d524300e9f3",
+        "82a126f039f89a2590891c0b"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/500KB/code",
+      "iterations": 3,
+      "latency_ms": 10.2,
+      "latency_p50": 10.2,
+      "latency_p95": 10.3,
+      "ratio_mean": 21333.3,
+      "ratio_median": 21333.3,
+      "original_size": 512000,
+      "hashes": [
+        "b3b5cb3020e4ae8ba2baa0e4",
+        "0e4fbe82c9ed90065b68e0f8",
+        "539f85eb3145f6047d9f775e"
+      ],
+      "pass": true
+    },
+    {
+      "name": "compress/500KB/json",
+      "iterations": 3,
+      "latency_ms": 17.8,
+      "latency_p50": 15.3,
+      "latency_p95": 23.0,
+      "ratio_mean": 21333.9,
+      "ratio_median": 21333.9,
+      "original_size": 512014,
+      "hashes": [
+        "be7d6b8e996329726af62de0",
+        "0e9c81b8cba29a9379756f9e",
+        "43f55e508c21641f4e60f98f"
+      ],
+      "pass": true
+    },
+    {
+      "name": "retrieve x10",
+      "iterations": 10,
+      "found": 10,
+      "errors": 0,
+      "latency_ms": 5.5,
+      "latency_p50": 5.5,
+      "latency_p95": 5.8,
+      "pass": true
+    },
+    {
+      "name": "catalog",
+      "latency_ms": 1.0,
+      "entry_count": 317,
+      "pass": true
+    }
+  ]
+}
