@@ -1470,15 +1470,78 @@ fn format_ccr_output(preview: &str, ct: &str, metadata: &str, center: Option<&st
 fn build_preview(content: &str, ct: &str) -> String {
 	match ct {
 		"code_rust" | "code_python" | "code_go" | "code_js" | "code" => {
-			// Code: first 3 non-empty lines (imports + first signature)
-			content.lines()
-				.filter(|l| !l.trim().is_empty())
-				.take(3)
-				.collect::<Vec<_>>()
-				.join("\n")
-				.chars()
-				.take(300)
-				.collect()
+			// Code: structure-map preview — extract fn/def/class/struct sigs
+			let mut fns: Vec<&str> = Vec::new();
+			let mut structs: Vec<&str> = Vec::new();
+			let mut impls: Vec<&str> = Vec::new();
+			let mut classes: Vec<&str> = Vec::new();
+			let mut budget: usize = 280;
+
+			for line in content.lines() {
+				if budget == 0 { break; }
+				let trimmed = line.trim();
+				if trimmed.is_empty() { continue; }
+
+				// Rust patterns
+				if ct == "code_rust" || ct == "code" {
+					if trimmed.strip_prefix("fn ").is_some() {
+						let sig: String = trimmed.chars().take(58).collect();
+						fns.push(trimmed); // store ref, build later
+						budget = budget.saturating_sub(sig.len() + 2);
+					} else if trimmed.strip_prefix("pub fn ").is_some() {
+						let sig: String = trimmed.chars().take(58).collect();
+						fns.push(trimmed);
+						budget = budget.saturating_sub(sig.len() + 2);
+					} else if trimmed.starts_with("struct ") || trimmed.starts_with("pub struct ") {
+						let s: String = trimmed.chars().take(50).collect();
+						structs.push(trimmed);
+						budget = budget.saturating_sub(s.len() + 2);
+					} else if trimmed.starts_with("impl ") {
+						let s: String = trimmed.chars().take(50).collect();
+						impls.push(trimmed);
+						budget = budget.saturating_sub(s.len() + 2);
+					}
+				}
+				// Python patterns
+				if ct == "code_python" || ct == "code" {
+					if (trimmed.starts_with("def ") || trimmed.starts_with("async def "))
+						&& trimmed.ends_with(':') {
+						let s: String = trimmed.chars().take(58).collect();
+						fns.push(trimmed);
+						budget = budget.saturating_sub(s.len() + 2);
+					} else if trimmed.starts_with("class ") && trimmed.ends_with(':') {
+						let s: String = trimmed.chars().take(50).collect();
+						classes.push(trimmed);
+						budget = budget.saturating_sub(s.len() + 2);
+					}
+				}
+				// Go patterns
+				if ct == "code_go" {
+					if trimmed.starts_with("func ") {
+						let s: String = trimmed.chars().take(58).collect();
+						fns.push(trimmed);
+						budget = budget.saturating_sub(s.len() + 2);
+					}
+				}
+			}
+
+			// Build summary line: [code_rust:3fns|2structs|1impl crate::proxy]
+			let mut parts: Vec<String> = Vec::new();
+			if !fns.is_empty() { parts.push(format!("{}fns", fns.len())); }
+			if !structs.is_empty() { parts.push(format!("{}structs", structs.len())); }
+			if !impls.is_empty() { parts.push(format!("{}impls", impls.len())); }
+			if !classes.is_empty() { parts.push(format!("{}classes", classes.len())); }
+			let summary = if parts.is_empty() { "?".to_string() } else { parts.join("|") };
+
+			// Show first 2 signatures inline
+			let sig_previews: Vec<String> = fns.iter().take(2)
+				.map(|s| s.chars().take(56).collect::<String>())
+				.collect();
+			let sig_str = sig_previews.join("; ");
+
+			let lines = content.lines().count();
+			format!("[{ct}:{summary} {sig_str} {lines}L]")
+				.chars().take(300).collect()
 		}
 		"error" => {
 			// Error: find the actual error line, skip traceback noise
