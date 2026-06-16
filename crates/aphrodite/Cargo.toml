@@ -13,33 +13,37 @@ path = "src/main.rs"
 
 [dependencies]
 headroom-core = { path = "../../vendor/headroom/crates/headroom-core" }
-axum = { version = "0.7", features = ["macros"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "io-util", "time", "tracing"] }
+axum = { version = "0.7.9", features = ["macros"] }
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "signal", "net", "io-util", "time", "tracing"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["trace", "request-id", "cors"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
-clap = { version = "4", features = ["derive", "env"] }
+tower-http = { version = "0.6.11", features = ["trace", "request-id", "cors"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
+clap = { version = "4.6.1", features = ["derive", "env"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "fmt"] }
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter", "fmt"] }
 tracing-appender = "0.2"
 anyhow = "1"
 thiserror = { workspace = true }
 bytes = { workspace = true }
 futures = "0.3"
 futures-util = "0.3"
-rand = "0.8"
-tokio-util = { version = "0.7", features = ["rt"] }
+rand = "0.10"
+tokio-util = { version = "0.7.18", features = ["rt"] }
 url = "2"
 http = "1"
 http-body-util = "0.1"
 hyper = "1"
-uuid = { version = "1", features = ["v4"] }
-lru = "0.12"
-dirs = "5"
+uuid = { version = "1.23.3", features = ["v4"] }
+lru = "0.18"
+dirs = "6"
 
 chrono = { version = "0.4", features = ["serde"] }
 
-toml = "0.8"
+toml = "1.1"
 zstd = { version = "0.13", default-features = false }
+
+[build-dependencies]
+serde = { workspace = true }
+toml = "1.1"
