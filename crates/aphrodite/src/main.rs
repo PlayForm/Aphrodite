@@ -193,9 +193,7 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
     tracing::info!(addr = %listener.local_addr()?, "listening");
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            tokio::signal::ctrl_c().await.ok();
-        })
+        .with_graceful_shutdown(shutdown_signal())
         .await?;
 
     Ok(())

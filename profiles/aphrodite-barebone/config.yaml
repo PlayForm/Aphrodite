@@ -353,7 +353,7 @@ human_delay:
   min_ms: 800
   max_ms: 2500
 context:
-  engine: compressor
+  engine: aphrodite
 memory:
   memory_enabled: true
   user_profile_enabled: true
@@ -448,7 +448,7 @@ matrix:
   free_response_rooms: ''
   allowed_rooms: ''
 approvals:
-  mode: manual
+  mode: false
   timeout: 60
   cron_mode: deny
   mcp_reload_confirm: true

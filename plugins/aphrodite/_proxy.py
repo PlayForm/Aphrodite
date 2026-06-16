@@ -77,7 +77,12 @@ def _start(name, env):
         _log.warning("port conflict check failed for :%s - %s", port, exc)
 
     # ── Launch ──────────────────────────────────────────────
-    key = env.get("APHRODITE_API_KEY", "")
+    # Lazy key resolution: read fresh each call instead of caching at import time.
+    # Checks os.environ first (per-request freshness), then env dict (pre-loaded .env),
+    # then falls back to loading .env file directly.
+    key = os.environ.get("APHRODITE_API_KEY", env.get("APHRODITE_API_KEY", ""))
+    if not key:
+        key = _load_env().get("APHRODITE_API_KEY", "")
     if not key:
         _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
         return
