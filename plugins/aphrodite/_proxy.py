@@ -122,7 +122,7 @@ def _kill(pid, timeout=0.3):
     except (OSError, ProcessLookupError, ValueError):
         return  # Already dead or bogus PID
     for sig_nr in (signal.SIGTERM, signal.SIGKILL):
-        try:  # noqa: SIM105 — intentional kill loop, not a context manager case
+        try:  # noqa: SIM105 - intentional kill loop, not a context manager case
             os.kill(int(pid), sig_nr)
         except Exception:
             pass
@@ -133,7 +133,7 @@ def _kill(pid, timeout=0.3):
             os.kill(int(pid), 0)
         except (OSError, ProcessLookupError):
             return  # SIGTERM worked
-    # SIGKILL sent — busy-wait until the process is reaped (up to 1s)
+    # SIGKILL sent - busy-wait until the process is reaped (up to 1s)
     pid_int = int(pid)
     deadline = time.monotonic() + 1.0
     while time.monotonic() < deadline:
@@ -198,7 +198,7 @@ def _start(name, env):
         proc = subprocess.Popen(
             args,
             env={k: env[k] for k in _PROXY_ENV_KEYS if k in env},
-            stdout=open(log_path, "a"),  # noqa: SIM115 — daemon needs open handle, not context manager
+            stdout=open(log_path, "a"),  # noqa: SIM115 - daemon needs open handle, not context manager
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
@@ -213,6 +213,31 @@ def _start(name, env):
         Path(os.path.join(BINARY_DIR, f"proxy-{name}.pid")).write_text(str(proc.pid))
     except Exception as exc:
         _log.warning("failed to write PID file for %s - %s", name, exc)
+
+
+def _write_startup_log(cache_ok, token_ok, auto_summary):
+    """Write structured startup log to ~/.hermes/aphrodite/startup-<ts>.log."""
+    from ._core import BIN_VERSION, PLUGIN_VERSION
+
+    ts = int(time.time())
+    log_path = os.path.expanduser(f"~/.hermes/aphrodite/startup-{ts}.log")
+    try:
+        lines = [
+            f"=== aphrodite startup [{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(ts))}] ===",
+            f"plugin_version={PLUGIN_VERSION}  binary_version={BIN_VERSION}",
+            f"proxy_cache={'UP' if cache_ok else 'DOWN'}  proxy_token={'UP' if token_ok else 'DOWN'}",
+            f"env: APHRODITE_DEBUG={os.environ.get('APHRODITE_DEBUG', '')}",
+            f"env: QUIET={os.environ.get('QUIET', '')}",
+            f"env: APHRODITE_CONTEXT_ENGINE={os.environ.get('APHRODITE_CONTEXT_ENGINE', '')}",
+        ]
+        if auto_summary:
+            lines.append("--- auto ---")
+            lines.append(auto_summary)
+        with open(log_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        _log.debug("startup log written: %s", log_path)
+    except Exception as exc:
+        _log.warning("failed to write startup log: %s", exc)
 
 
 def _inject_expand_guidance():
@@ -274,6 +299,9 @@ def on_start(**kw):
         _log.debug("expand guidance set (%d chars)", len(_expand_guidance))
 
     _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
+
+    # Startup observability log
+    _write_startup_log(cache_ok, token_ok, auto_summary)
 
 
 def _wait_alive(port, retries=10, delay=0.3):

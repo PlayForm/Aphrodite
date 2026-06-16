@@ -418,9 +418,13 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     if not conversation_history or not isinstance(conversation_history, list):
         return
 
+    quiet_mode = os.environ.get("QUIET", "") == "1"
+    if quiet_mode and DEBUG_LOGGING:
+        _log.debug("pre_llm_hook: quiet_mode=1, catalog injection suppressed")
+
     # Refresh turn-scoped alive cache for consistent proxy state within this turn
     global _scanned_msg_idx, _last_user_msg, _catalog_injected_this_turn
-    _alive_cache.clear()  # force fresh probes — turn cache refresh below replaces them
+    _alive_cache.clear()  # force fresh probes - turn cache refresh below replaces them
     _alive_turn_cache.clear()
     _alive_turn_cache[PORTS["token"]] = _alive(PORTS["token"])
     _alive_turn_cache[PORTS["cache"]] = _alive(PORTS["cache"])
@@ -787,6 +791,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     "  intent=read | recent CCRs available: "
                     + " ".join(f"aphrodite_retrieve({m['hash']})" for m in recent_markers)
                 )
+
+    if quiet_mode:
+        if DEBUG_LOGGING:
+            _log.debug("pre_llm_hook: quiet_mode=1, catalog skipped")
+        return None
 
     if parts:
         if _catalog_injected_this_turn:
