@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import urllib.request
 
 from agent.context_engine import ContextEngine
@@ -24,10 +25,25 @@ from ._core import (
 )
 from ._inline import _inline_compress
 from ._marker import _ccr_marker
-from ._proxy import _alive
 
 _log = logging.getLogger("aphrodite")
 _engine = None
+
+# Cached hook invocation - imported once at module level
+_invoke_hook = None
+_invoke_hook_ok = False
+try:
+    from hermes_cli.plugins import invoke_hook as _invoke_hook
+
+    _invoke_hook_ok = True
+except Exception:
+    pass
+
+# Compiled regex for edit-detection in compress()
+_EDITING_RE = re.compile(
+    r"\b(?:wrote|patched|modified|created|deleted|successfully|written)\b",
+    re.IGNORECASE,
+)
 
 
 def _set_engine(eng):
@@ -45,10 +61,10 @@ def get_engine():
 
 def _fire_hook(name, **kwargs):
     """Fire a Hermes hook so other plugins can listen to engine events."""
+    if not _invoke_hook_ok:
+        return
     try:
-        from hermes_cli.plugins import invoke_hook
-
-        invoke_hook(name, **kwargs)
+        _invoke_hook(name, **kwargs)
     except Exception as exc:
         _log.debug("_fire_hook %s: %s", name, exc)
 
@@ -57,7 +73,10 @@ def _pack_msg(messages):
     """Serialize messages for CCR storage, conditionally including tool fields."""
     out = []
     for m in messages:
-        entry = {"role": m.get("role", ""), "content": str(m.get("content", ""))}
+        content = m.get("content", "")
+        if not isinstance(content, str):
+            content = str(content)
+        entry = {"role": m.get("role", ""), "content": content}
         tool_call_id = m.get("tool_call_id")
         if tool_call_id and m.get("role") == "tool":
             entry["tool_call_id"] = tool_call_id
@@ -124,11 +143,7 @@ class AphroditeContextEngine(ContextEngine):
 
         is_editing = False
         for msg in messages[-10:]:
-            content = str(msg.get("content", ""))
-            if msg.get("role") == "tool" and any(
-                kw in content.lower()
-                for kw in ("wrote", "patched", "modified", "created", "deleted", "successfully", "written")
-            ):
+            if msg.get("role") == "tool" and _EDITING_RE.search(str(msg.get("content", ""))):
                 is_editing = True
                 break
         if is_editing:
@@ -164,8 +179,10 @@ class AphroditeContextEngine(ContextEngine):
         hash_val = None
         size_str = _fmt_size(len(packed))
 
-        token_alive = _alive(PORTS["token"])
-        cache_alive = _alive(PORTS["cache"])
+        from ._hooks import _alive_cached
+
+        token_alive = _alive_cached(PORTS["token"])
+        cache_alive = _alive_cached(PORTS["cache"])
         if token_alive or cache_alive:
             target = PORTS["token"] if token_alive else PORTS["cache"]
             try:
