@@ -14,8 +14,10 @@ Post v0.5.69 patterns that every agent must follow.
 ```bash
 GIT_EDITOR=true scripts/auto-release.sh "descriptive message"
 ```
-Handles: stage → commit → bump version → cargo build → cargo test → tag.
+Handles: stage → commit → bump version → cargo build → cargo test → tag → push to `Source` remote.
 One command. No editor prompts.
+
+Remote is `Source` (ssh), NOT `origin`. If push fails, verify remote name with `git remote -v`.
 
 ## Version Sync
 
