@@ -272,9 +272,9 @@ impl AppState {
 	/// Per-type threshold - code stays in context longer, logs compressed aggressively.
 	fn threshold_for(&self, ct: &str) -> usize {
 		let base = self.compress_threshold();
-		// Noisy types: exclude from auto-tune, keep at base/2 always
+		// Noisy types: keep at base threshold — coding sessions need build output visible
 		match ct {
-			"linter" | "build_output" | "log" => return base / 2,
+			"linter" | "build_output" | "log" => return base,
 			_ => {},
 		}
 		// Auto-tune: adjust thresholds based on historical compression ratios
@@ -1355,15 +1355,16 @@ async fn compress_chat_completion(
 	let base_threshold = state.compress_threshold(); // floor threshold for all types
 
 	// Headroom budget: lower values compress more aggressively (multiplier < 1.0)
+	// Coding-tuned: never below 0.5× — semantics and tool chains are worth the tokens
 	let budget_mult = headroom_budget
 		.and_then(|b| {
 			let val: f64 = b.parse().ok()?;
 			Some(if val < 25.0 {
-				0.25
+				0.50
 			} else if val < 50.0 {
-				0.5
-			} else if val < 75.0 {
 				0.75
+			} else if val < 75.0 {
+				0.85
 			} else {
 				1.0
 			})
