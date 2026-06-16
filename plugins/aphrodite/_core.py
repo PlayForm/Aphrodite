@@ -43,10 +43,10 @@ CATALOG_MODE = os.environ.get("APHRODITE_CATALOG", "compact")
 # Big-payload guard: skip compression entirely for payloads exceeding this
 MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)  # 100MB default
 
-_DEV = os.environ.get("APHRODITE_DEV", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
+_DEV = os.environ.get("APHRODITE_PASSTHROUGH", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 
 if _DEV:
-    _log.warning("aphrodite DEV MODE - plugin disabled, use cargo watch for proxies")
+    _log.warning("aphrodite PASSTHROUGH MODE - plugin disabled, use cargo watch for proxies")
 if DEBUG_LOGGING:
     _log.setLevel(logging.DEBUG)
     _log.debug(
@@ -66,7 +66,7 @@ if DEBUG_LOGGING:
 # ── CCR regex (shared) ───────────────────────────────────────
 _CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\]>]+)(?:[^\]]*)?(?:\]|>>>|⫸)')
 
-# ── Inline compression store (session-scoped, capped at 500) ──
+# ── Inline compression store + trigram index (session-scoped, capped at 500) ──
 class _CappedStore(OrderedDict):
     """OrderedDict that auto-evicts oldest entries when exceeding MAX_STORE."""
 
@@ -74,17 +74,29 @@ class _CappedStore(OrderedDict):
 
     def __setitem__(self, key, value):
         super().__setitem__(key, value)
-        while len(self) > self.MAX_STORE:
+        if len(self) > self.MAX_STORE:
             self.popitem(last=False)
+
+    def popitem(self, last=True):
+        key, value = super().popitem(last=last)
+        global _inline_bytes
+        _inline_bytes -= len(value)
+        if _inline_index_enabled:
+            _remove_trigram_index(key)
+        return key, value
 
 
 _inline_store: _CappedStore = _CappedStore()
+_inline_index: dict = {}  # {trigram: set_of_hashes} for O(1) search
+_inline_bytes: int = 0  # tracked byte count (avoids sum(len(v) for v ...))
+_inline_index_enabled: bool = False  # lazily enabled on first index build
 
 # ── Shared session state ──────────────────────────────────────
-_referenced_files = {}  # {filepath: last_tool_name}
+_referenced_files: OrderedDict = OrderedDict()  # {filepath: last_tool_name} LRU via move_to_end
 _recent_markers: deque = deque(maxlen=200)  # [{hash, type, size, preview}] deque auto-evicts oldest
 _conv_index = {}  # {turn_num: (hash, summary, size)}
 _state = {"turn_counter": 0}
+_scanned_msg_idx = 0  # for incremental marker scan in pre_llm_hook
 _git_cache = {}  # {ts, summary}
 _FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
 
@@ -113,7 +125,33 @@ def _fmt_size(b):
 
 def _inline_clear():
     """Clear the inline store (called on session reset)."""
+    global _inline_bytes
     _inline_store.clear()
+    _inline_index.clear()
+    _inline_bytes = 0
+
+
+def _init_trigram_index():
+    """Build trigram index from all inline store entries (one-time)."""
+    global _inline_index_enabled
+    _inline_index.clear()
+    for h, content in _inline_store.items():
+        _index_trigrams(h, content)
+    _inline_index_enabled = True
+
+
+def _index_trigrams(h, content):
+    """Split content into trigrams and index under hash."""
+    lower = content.lower()
+    trigrams = set(lower[i : i + 3] for i in range(len(lower) - 2))
+    for tri in trigrams:
+        _inline_index.setdefault(tri, set()).add(h)
+
+
+def _remove_trigram_index(h):
+    """Remove all index entries for a given hash."""
+    for tri_set in _inline_index.values():
+        tri_set.discard(h)
 
 
 def _inline_store_put(h, content):
@@ -121,8 +159,16 @@ def _inline_store_put(h, content):
 
     Promotes the key to the end (most recently used) on write,
     so the oldest (least recently used) entries are evicted first
-    when the store exceeds its capacity.
+    when the store exceeds its capacity. Also indexes trigrams for
+    O(1) search and tracks total bytes.
     """
+    global _inline_bytes
     if h in _inline_store:
+        old_len = len(_inline_store[h])
+        _inline_bytes -= old_len
         _inline_store.move_to_end(h)
     _inline_store[h] = content
+    _inline_bytes += len(content)
+    # Index trigrams for search
+    if _inline_index_enabled:
+        _index_trigrams(h, content)

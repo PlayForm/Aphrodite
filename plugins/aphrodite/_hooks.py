@@ -28,12 +28,17 @@ from ._core import (
     _conv_index,
     _fmt_size,
     _git_cache,
+    _inline_bytes,
+    _inline_index,
+    _inline_index_enabled,
     _inline_store,
     _inline_store_put,
+    _init_trigram_index,
     _recent_markers,
     _referenced_files,
     _reset_turn_counter,
     _increment_turn,
+    _scanned_msg_idx,
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
@@ -44,6 +49,7 @@ from ._tools import _compress_handler, _retrieve_handler
 # Turn-scoped alive cache - refreshed at pre_llm_hook entry so
 # all hooks within the same turn see a consistent proxy state
 _alive_turn_cache: dict[int, bool] = {}  # {port: bool}
+_last_user_msg = ""  # cached by pre_llm_hook for store_conversation_turn
 
 
 def _alive_cached(port: int) -> bool:
@@ -288,11 +294,13 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
         summary += f" [{file_tag}]"
 
     try:
+        # Cap stored assistant response at 4096 chars to bound turn index size
+        capped_resp = str(assistant_response)[:4096]
         data = json.dumps(
             {
                 "turn": tnum,
                 "user": last_user,
-                "assistant": str(assistant_response),
+                "assistant": capped_resp,
             }
         ).encode()
         req = urllib.request.Request(
@@ -301,10 +309,11 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
         with urllib.request.urlopen(req, timeout=2) as r:
             ccr = json.loads(r.read())
 
-        _conv_index[tnum] = (ccr["hash"], summary, len(str(assistant_response)))
-        if len(_conv_index) > 100:
+        # Pop oldest if at capacity before inserting (prevents transient >100)
+        if len(_conv_index) >= 100:
             oldest = next(iter(_conv_index))
             del _conv_index[oldest]
+        _conv_index[tnum] = (ccr["hash"], summary, len(capped_resp))
 
         _log.debug("conv-cache: stored T%d → %s (%d total)", tnum, ccr["hash"], len(_conv_index))
     except Exception as exc:
@@ -351,7 +360,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         return
 
     # Refresh turn-scoped alive cache for consistent proxy state within this turn
-    global _alive_turn_cache
+    global _alive_turn_cache, _scanned_msg_idx
     _alive_turn_cache = {
         PORTS["token"]: _alive(PORTS["token"]),
         PORTS["cache"]: _alive(PORTS["cache"]),
@@ -366,28 +375,33 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     # ── 0. Pass through x-headroom-* headers (skip bypass) ──
     headroom_hdrs = {}
     headers = kwargs.get("headers", {})
-    for k, v in (headers or {}).items():
-        kl = k.lower()
-        if kl.startswith("x-headroom-") and kl != "x-headroom-bypass":
-            headroom_hdrs[k] = v
+    if headers:
+        for k, v in headers.items():
+            kl = k.lower()
+            if kl.startswith("x-headroom-") and kl != "x-headroom-bypass":
+                headroom_hdrs[k] = v
 
-    # ── 1. Scan for CCR markers (injected by transform hooks) ──
+    # ── 1. Scan for CCR markers (incremental - only new messages) ──
     markers = []
     total_bytes = 0
-    for msg in conversation_history:
+    start_idx = max(0, _scanned_msg_idx)
+    for msg in conversation_history[start_idx:]:
         content = msg.get("content", "")
         if isinstance(content, str):
             for m in _parse_ccr_markers(content):
                 total_bytes += m["size"]
                 markers.append(m)
+    _scanned_msg_idx = ctx_len  # advance past current messages
     # Merge with existing: keep markers not found in new scan, cap at 200
     seen_hashes = {m["hash"] for m in markers if "hash" in m}
     for old_m in _recent_markers:
         if old_m.get("hash") not in seen_hashes:
             markers.append(old_m)
             seen_hashes.add(old_m["hash"])
-    _recent_markers.clear()
-    _recent_markers.extend(markers)  # deque(maxlen=200) handles capping
+    # Only mutate _recent_markers when the set of hashes actually changed
+    if seen_hashes != {m["hash"] for m in _recent_markers}:
+        _recent_markers.clear()
+        _recent_markers.extend(markers)  # deque(maxlen=200) handles capping
     if DEBUG_LOGGING and markers:
         _log.debug(
             "pre_llm_hook: scanned %d CCR markers across %d msgs, %s total compressed",
@@ -454,10 +468,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 f"  ⚙ thresholds: term={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_tok={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE} engine_pct={ENGINE_THRESHOLD_PCT}% prot={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min={ENGINE_MIN_MSGS}"
             )
 
-        # Git diff summary
-        git_info = _git_summary()
-        if git_info:
-            parts.append(f"  git: {git_info}")
+        # Git diff summary (skip in tool-only mode)
+        if CATALOG_MODE != "tool":
+            git_info = _git_summary()
+            if git_info:
+                parts.append(f"  git: {git_info}")
 
         # Compression wrapping summary (compact by type in compact/tool mode)
         if proxy_available:
@@ -496,14 +511,19 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             if not live and markers:
                 live = markers
 
-            # Auto-expand: resolve small cached items inline - LLM never sees aphrodite_retrieve
+            # Auto-expand: resolve small cached items inline in a single pass,
+            # building preview_cache to avoid double read and mutation of shared markers
+            preview_cache = {}
             expanded = []
             for m in live:
-                if m["size"] < 10240 and m["hash"] in _inline_store:
-                    content = _inline_store[m["hash"]]
-                    m["preview"] = content[:200].replace("\n", " ").strip()
-                    m["auto_expanded"] = True
-                expanded.append(m)
+                h = m.get("hash", "")
+                if m["size"] < 10240 and h in _inline_store:
+                    content = _inline_store[h]
+                    preview = content[:200].replace("\n", " ").strip()
+                    preview_cache[h] = preview
+                else:
+                    preview_cache[h] = m.get("preview", "")
+                expanded.append({**m, "preview": preview_cache[h]})
             live = expanded
 
             # Deduplicate by hash - keep first occurrence only
@@ -514,9 +534,6 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     seen.add(m["hash"])
                     deduped.append(m)
             live = deduped
-
-            # Pre-build hash→preview cache for O(1) lookup instead of O(m×n) scan
-            preview_cache = {m["hash"]: m.get("preview", "") for m in live if "hash" in m}
 
             by_type = {}
             for m in live:
@@ -714,50 +731,53 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             "test result:",
         )
     )
-    if is_build and output.count("\n") > 20:
+    if is_build:
         lines = output.splitlines()
-        # Count unique patterns, deduplicate consecutive repeats
-        unique = []
-        counts = {}
-        prev = None
-        for line in lines:
-            stripped = line.strip()
-            if stripped == prev:
-                counts[stripped] = counts.get(stripped, 1) + 1
-            else:
-                if stripped not in counts:
-                    unique.append(stripped)
-                counts[stripped] = counts.get(stripped, 0) + 1
-            prev = stripped
+        if len(lines) <= 20:
+            pass  # short build - passthrough to regular handling below
+        else:
+            # Count unique patterns, deduplicate consecutive repeats
+            unique = []
+            counts = {}
+            prev = None
+            for line in lines:
+                stripped = line.strip()
+                if stripped == prev:
+                    counts[stripped] = counts.get(stripped, 1) + 1
+                else:
+                    if stripped not in counts:
+                        unique.append(stripped)
+                    counts[stripped] = counts.get(stripped, 0) + 1
+                prev = stripped
 
-        # Build summary: unique error/warning lines + total
-        errors = [l for l in unique if "error" in l.lower() and l not in ("error:", "error")]
-        warnings = [l for l in unique if "warning" in l.lower() and "warning:" not in l]
-        summary = f"[build: {len(lines)} lines, {len(unique)} unique patterns]"
-        if errors:
-            summary += f" | errors: {'; '.join(errors[:5])}"
-        if warnings:
-            summary += f" | warnings: {'; '.join(warnings[:3])}"
-        out_len = len(summary)
-        if DEBUG_LOGGING:
-            _log.debug(
-                "terminal_hook: BUILD collapse %d→%d lines (cmd: %s)",
-                len(lines),
-                len(summary.split("\n")),
-                command[:60],
-            )
-        # Store full output in CCR, return summary
-        if proxy_available:
-            target = PORTS["token"] if token_alive else PORTS["cache"]
-            ccr = _compress_via_proxy(output, target)
-            if ccr:
-                h, _ = ccr
-                if DEBUG_LOGGING:
-                    _log.debug("terminal_hook: BUILD-CCR %s:%s", "token" if token_alive else "cache", h)
-                return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
-        # Inline fallback
-        h, _ = _inline_compress(output)
-        return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
+            # Build summary: unique error/warning lines + total
+            errors = [l for l in unique if "error" in l.lower() and l not in ("error:", "error")]
+            warnings = [l for l in unique if "warning" in l.lower() and "warning:" not in l]
+            summary = f"[build: {len(lines)} lines, {len(unique)} unique patterns]"
+            if errors:
+                summary += f" | errors: {'; '.join(errors[:5])}"
+            if warnings:
+                summary += f" | warnings: {'; '.join(warnings[:3])}"
+            out_len = len(summary)
+            if DEBUG_LOGGING:
+                _log.debug(
+                    "terminal_hook: BUILD collapse %d→%d lines (cmd: %s)",
+                    len(lines),
+                    len(summary.split("\n")),
+                    command[:60],
+                )
+            # Store full output in CCR, return summary
+            if proxy_available:
+                target = PORTS["token"] if token_alive else PORTS["cache"]
+                ccr = _compress_via_proxy(output, target)
+                if ccr:
+                    h, _ = ccr
+                    if DEBUG_LOGGING:
+                        _log.debug("terminal_hook: BUILD-CCR %s:%s", "token" if token_alive else "cache", h)
+                    return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
+            # Inline fallback
+            h, _ = _inline_compress(output)
+            return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
 
     preview = output[:200].replace("\n", " ").strip()
 
@@ -803,7 +823,7 @@ def _stats_handler(args=None, **kwargs):
         "engine": {},
         "inline_store": {
             "entries": len(_inline_store),
-            "total_bytes": sum(len(v) for v in _inline_store.values()),
+            "total_bytes": _inline_bytes,
         },
     }
 
@@ -857,16 +877,16 @@ STATS_SCHEMA = {
 
 
 def _track_file_refs(tool_name, args):
-    """Track file paths referenced by tool calls."""
+    """Track file paths referenced by tool calls. Uses OrderedDict LRU eviction."""
     if tool_name not in _FILE_TOOLS:
         return
     args = args if isinstance(args, dict) else {}
     path = args.get("path", args.get("file", ""))
     if path and isinstance(path, str) and len(path) < 500:
-        _referenced_files[path] = tool_name
+        _referenced_files[path] = tool_name  # set value (new or overwrite)
+        _referenced_files.move_to_end(path)  # promote to most recently used
         if len(_referenced_files) > 200:
-            oldest = next(iter(_referenced_files))
-            del _referenced_files[oldest]
+            _referenced_files.popitem(last=False)  # evict oldest (first inserted)
 
 
 def _files_handler(args=None, **kwargs):
@@ -938,24 +958,49 @@ CATALOG_SCHEMA = {
 
 
 def _search_handler(args=None, **kwargs):
-    """Search across compressed items by type or content pattern."""
+    """Search across compressed items by type or content pattern (trigram-indexed)."""
     args = args if isinstance(args, dict) else {}
     query = args.get("query", "").lower()
     ccr_type = args.get("type", "")
 
+    # Lazily initialize trigram index on first search
+    if not _inline_index_enabled and _inline_store:
+        _init_trigram_index()
+
     results = []
-    # Search conversation turn index
+
+    # ── Search conversation turn index ──
     for tnum, (h, summary, size) in sorted(_conv_index.items(), reverse=True):
         if query and query not in summary.lower():
             continue
         results.append({"source": "turn", "turn": tnum, "hash": h, "summary": summary, "size": size})
 
-    # Search inline store
-    for h, content in list(_inline_store.items()):
-        if query and query not in content.lower():
-            continue
-        preview = content[:200].replace("\n", " ").strip()
-        results.append({"source": "inline", "hash": h, "preview": preview, "size": len(content)})
+    # ── Search inline store (trigram-indexed when index enabled) ──
+    if query:
+        # Use trigram index for candidate lookup
+        trigrams = set(query[i : i + 3] for i in range(len(query) - 2))
+        candidates = set()
+        if trigrams and _inline_index:
+            for tri in trigrams:
+                candidates |= _inline_index.get(tri, set())
+        # Fallback: scan entire store if index empty or query too short for trigrams
+        if not candidates:
+            candidates = set(_inline_store.keys())
+        for h in candidates:
+            content = _inline_store.get(h)
+            if content is None:
+                continue
+            if query not in content.lower():
+                continue
+            preview = content[:200].replace("\n", " ").strip()
+            results.append({"source": "inline", "hash": h, "preview": preview, "size": len(content)})
+    else:
+        # No query - list all inline entries
+        for h, content in list(_inline_store.items()):
+            if query and query not in content.lower():
+                continue
+            preview = content[:200].replace("\n", " ").strip()
+            results.append({"source": "inline", "hash": h, "preview": preview, "size": len(content)})
 
     # Search recent marker catalog (from pre_llm_hook)
     for m in _recent_markers:

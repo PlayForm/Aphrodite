@@ -1,13 +1,40 @@
 """aphrodite - marker formatting and proxy compression."""
 
 import base64
+import http.client
 import json
 import logging
-import urllib.request
+import re
+import threading
 
 from ._core import _CCR_RE
 
 _log = logging.getLogger("aphrodite")
+
+# Compiled regex for valid CCR hash validation
+_VALID_HASH_RE = re.compile(r"^(?:[0-9a-f]{8,}|i:[0-9a-f]{6,})$")
+
+# ── Thread-local connection pool (keep-alive reuse) ──────────
+_tls = threading.local()
+
+
+def _get_conn(port: int) -> http.client.HTTPConnection:
+    """Get or create a keep-alive HTTPConnection for the given port (thread-local)."""
+    if not hasattr(_tls, "conns"):
+        _tls.conns = {}
+    if port not in _tls.conns:
+        _tls.conns[port] = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+    return _tls.conns[port]
+
+
+def _put_conn(port: int) -> None:
+    """Close and remove a connection (recovery after error)."""
+    if hasattr(_tls, "conns") and port in _tls.conns:
+        try:
+            _tls.conns[port].close()
+        except Exception:
+            pass
+        del _tls.conns[port]
 
 
 def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headers=None):
@@ -18,15 +45,16 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headers=None):
         ccr_type: Type label (tool, terminal, etc.).
         size: Original size in bytes.
         mode: Proxy mode (token, cache, inline, etc.).
-        preview: Optional text preview (base64-encoded).
+        preview: Optional text preview (pipe-safe, control-char-stripped).
         headers: Optional dict of extra key=value pairs embedded in the marker.
     """
     parts = [hash_val, ccr_type, str(size)]
     if mode:
         parts.append(mode)
     if preview:
-        preview_b64 = base64.urlsafe_b64encode(preview.encode()).decode()
-        parts.append(f"preview={preview_b64}")
+        safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
+        safe = "".join(c if c >= " " or c == "\t" else " " for c in safe)
+        parts.append(f"preview={safe}")
     if headers:
         for k, v in headers.items():
             parts.append(f"{k}={v}")
@@ -34,19 +62,32 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headers=None):
 
 
 def _compress_via_proxy(content, target_port):
-    """Compress content through proxy CCR. Returns (hash, compressed_size) or None."""
+    """Compress content through proxy CCR. Returns (hash, compressed_size) or None.
+
+    Uses a thread-local keep-alive HTTP connection pool to avoid TCP handshake
+    overhead on repeated calls to the same proxy port.
+
+    Sends raw bytes with ``Content-Type: application/octet-stream`` to skip
+    JSON serialization overhead - the proxy reads the request body directly.
+    """
     try:
-        data = json.dumps({"content": content}).encode()
-        req = urllib.request.Request(
-            f"http://127.0.0.1:{target_port}/ccr/create", data=data, headers={"Content-Type": "application/json"}
+        data = content.encode()
+        conn = _get_conn(target_port)
+        conn.request(
+            "POST",
+            "/ccr/create",
+            body=data,
+            headers={"Content-Type": "application/octet-stream", "Connection": "keep-alive"},
         )
-        with urllib.request.urlopen(req, timeout=3) as r:
-            ccr = json.loads(r.read())
+        r = conn.getresponse()
+        ccr = json.loads(r.read())
+        r.close()
         if "error" in ccr:
             _log.debug("_compress_via_proxy: proxy returned error on port %s - %s", target_port, ccr.get("error"))
             return None
         return ccr["hash"], len(content)
     except Exception:
+        _put_conn(target_port)  # ditch broken connection, reopen fresh next time
         return None
 
 
@@ -54,19 +95,18 @@ def _is_valid_ccr_hash(h):
     """Check if h is a valid CCR hash.
 
     Accepts pure hex (>=8 chars) or ``i:`` prefix followed by hex (>=6 chars rest).
+    Uses pre-compiled regex for O(n) validation instead of per-character loop.
     """
     if not h or len(h) < 8:
         return False
-    if h.startswith("i:"):
-        rest = h[2:]
-        return len(rest) >= 6 and all(c in "0123456789abcdef" for c in rest.lower())
-    return all(c in "0123456789abcdef" for c in h.lower())
+    return bool(_VALID_HASH_RE.match(h.lower()))
 
 
 def _parse_ccr_markers(text):
-    """Parse <<<CCR:hash|type|size|mode|preview=BASE64>>> markers from text. Returns list of dicts with preview."""
+    """Parse <<<CCR:hash|type|size|mode|preview=TEXT>>> markers from text. Returns list of dicts with preview."""
     markers = []
     for match in _CCR_RE.finditer(text):
+        h = match.group(1)  # hash directly from regex capture group
         full = match.group(0)
         # Extract inner content between CCR: and the closing delimiter
         inner = full.split("CCR:", 1)[1]
@@ -78,19 +118,20 @@ def _parse_ccr_markers(text):
         if len(parts) >= 3:
             try:
                 sz = int(parts[2])
-                # Parse embedded preview=BASE64 from marker parts (parts[3:])
+                # Parse embedded preview=TEXT from marker parts (parts[3:])
                 preview = ""
                 for part in parts[3:]:
                     if part.startswith("preview="):
+                        raw = part[len("preview="):]
+                        # Try base64 decode first (legacy format), fall back to plain text
                         try:
-                            preview_b64 = part[len("preview="):]
-                            preview = base64.urlsafe_b64decode(preview_b64).decode("utf-8", errors="replace")
+                            preview = base64.urlsafe_b64decode(raw).decode("utf-8", errors="replace")
                         except Exception:
-                            preview = ""
+                            preview = raw
                         break
                 markers.append(
                     {
-                        "hash": str(parts[0]) if parts[0] else "",
+                        "hash": h,  # from regex group(1), avoids string split
                         "type": str(parts[1]),
                         "size": sz,
                         "mode": str(parts[3]) if len(parts) > 3 else "?",
