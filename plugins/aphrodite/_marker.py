@@ -177,7 +177,7 @@ def _classify_content(content: str) -> dict:
         return {"type": "text", "ln": str(len(content.splitlines())) if isinstance(content, str) else 0}
 
 
-def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None, meta=None):
+def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None, meta=None, center=None):
     """Build a CCR output block: preview, structure, marker — each on its own line.
 
     Matches the Rust ``format_ccr_output`` layout. The LLM reads the
@@ -191,6 +191,7 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=N
         preview: Text preview (pipe-safe, control-char-stripped).
         headroom_budget: If set, truncates preview under tight budget.
         meta: Dict of structured metadata (lang, fns, structs, etc.).
+        center: Optional center string — travels with the marker.
     """
     # Line 1: preview
     lines = []
@@ -220,6 +221,9 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=N
     meta_str = ";".join(meta_parts)
     if len(meta_str) > 300:
         meta_str = meta_str[:297] + "..."
+    # Append center to structure line if present
+    if center:
+        meta_str = f"{meta_str};center={center}" if meta_str else f"center={center}"
     lines.append(f"[{ccr_type}: {meta_str}]" if meta_str else f"[{ccr_type}]")
 
     # Line 3: CCR marker
