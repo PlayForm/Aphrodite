@@ -1,7 +1,8 @@
 """aphrodite — inline compression (zlib fallback when proxy is down)."""
-import hashlib
 import base64
+import hashlib
 import zlib
+
 from ._core import _inline_store
 
 
