@@ -5,7 +5,7 @@ import json
 import logging
 import urllib.request
 
-from ._core import PORTS, _inline_store, _inline_store_put
+from ._core import PORTS, _hash_alias, _inline_store, _inline_store_put
 from ._proxy import _alive
 from ._resolve import _resolve_recursive
 
@@ -56,9 +56,10 @@ def _compress_handler(args=None, **kwargs):
     # Pop the API: check local cache first (content-addressable store)
     full_h = hashlib.sha256(content.encode("utf-8")).hexdigest()
     h = full_h[:16]
-    if h in _inline_store or full_h in _inline_store:
+    canonical = _hash_alias.get(full_h, h)
+    if canonical in _inline_store:
         return json.dumps(
-            {"hash": h, "type": type_hint, "size": len(content), "source": "cache_hit", "compression_ratio": None, "note": "already in store"}
+            {"hash": canonical, "type": type_hint, "size": len(content), "source": "cache_hit", "compression_ratio": None, "note": "already in store"}
         )
 
     try:
@@ -71,19 +72,17 @@ def _compress_handler(args=None, **kwargs):
             result = json.loads(r.read())
         h = result.get("hash", h)
         if h:
-            _inline_store_put(h, content)  # mirror in inline store for aphrodite_search
-            _inline_store_put(full_h, content)  # also store under full hash
+            _hash_alias[full_h] = h
+            _inline_store_put(h, content)  # mirror in inline store (canonical key)
             _inline_store.move_to_end(h)
-            _inline_store.move_to_end(full_h)
         return json.dumps(
             {"hash": h, "type": type_hint, "size": len(content), "compression_ratio": result.get("compression_ratio")}
         )
     except Exception:
-        # Fallback: store inline anyway (both short and full hash)
+        # Fallback: store inline under canonical short hash
+        _hash_alias[full_h] = h
         _inline_store_put(h, content)
-        _inline_store_put(full_h, content)
         _inline_store.move_to_end(h)
-        _inline_store.move_to_end(full_h)
         return json.dumps(
             {"hash": h, "type": type_hint, "size": len(content), "source": "inline_fallback", "compression_ratio": 0}
         )

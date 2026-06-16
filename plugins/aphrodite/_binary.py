@@ -59,7 +59,11 @@ def _download_binary() -> bool:
     try:
         with urllib.request.urlopen(download_url, timeout=30) as r:
             with open(BINARY, "wb") as f:
-                f.write(r.read())
+                while True:
+                    chunk = r.read(65536)
+                    if not chunk:
+                        break
+                    f.write(chunk)
         size = os.path.getsize(BINARY)
         if size == 0:
             _log.warning("downloaded binary is empty (0 bytes)")

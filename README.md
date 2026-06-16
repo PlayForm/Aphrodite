@@ -16,6 +16,9 @@
 ## Quick Start
 
 ```bash
+# One-command install (from cloned repo)
+bash <(curl -sSL https://raw.githubusercontent.com/PlayForm/Aphrodite/Current/install.sh)
+
 # Build the binary
 cargo build --release -p aphrodite
 

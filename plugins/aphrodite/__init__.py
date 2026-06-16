@@ -22,6 +22,7 @@ import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 import time
 
 # ── Core imports (re-export everything) ──────────────────────────
@@ -138,7 +139,17 @@ def register(ctx):
     else:
         _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
 
-    _log.info("aphrodite v%s registered - 9 tools + hooks", PLUGIN_VERSION)
+    # -- Bundle skills (namespaced as aphrodite:*) -----------------------------
+    _SKILLS_DIR = Path(__file__).parent / "skills"
+    _skills = [
+        ("aphrodite-dev-workflow", "End-to-end aphrodite development: cargo watch, proxy, smoke tests"),
+        ("aphrodite-hook-reference", "Complete Hermes hook API reference for the aphrodite plugin"),
+        ("aphrodite-iterate-release", "Iterative aphrodite development loop: fix, bump, build, test"),
+    ]
+    for _name, _desc in _skills:
+        ctx.register_skill(_name, _SKILLS_DIR / _name / "SKILL.md", _desc)
+
+    _log.info("aphrodite v%s registered - 9 tools + 3 skills + hooks", PLUGIN_VERSION)
 
     if DEBUG_LOGGING:
         lines = [
