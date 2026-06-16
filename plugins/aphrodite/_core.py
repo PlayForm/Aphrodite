@@ -26,7 +26,7 @@ def _cfg_int(name, default):
 
 ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 72)
 # Semantics: -1 = always compress, 0 = disabled, >0 = fill% threshold
-# Coding-tuned: compress at 72% — LLMs lose coherence above ~75%, so 72% gives max raw context
+# Coding-tuned: compress at 72%  -  LLMs lose coherence above ~75%, so 72% gives max raw context
 ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 5)
 ENGINE_PROTECT_LAST = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 7)
 # Coding-tuned: 5 head + 7 tail messages kept raw. Tool chains span 3-4 msg pairs; 7 covers complex chains

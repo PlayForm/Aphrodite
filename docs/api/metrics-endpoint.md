@@ -12,7 +12,7 @@ GET /metrics
 
 ## Access
 
-Loopback only — subject to `loopback_only` middleware. No auth.
+Loopback only  -  subject to `loopback_only` middleware. No auth.
 
 ## Content-Type
 
@@ -22,7 +22,7 @@ text/plain; version=0.0.4
 
 ## Format
 
-Prometheus text exposition format — one metric per line with optional labels.
+Prometheus text exposition format  -  one metric per line with optional labels.
 
 ## Metrics Output
 
@@ -75,7 +75,7 @@ aphrodite_latency_seconds_count               total count
 aphrodite_latency_seconds_sum                 total seconds (float)
 ```
 
-Source: `proxy.rs:latency_buckets` — 5-element AtomicU64 array with ranges <1ms, <10ms, <100ms, <1s, <10s.
+Source: `proxy.rs:latency_buckets`  -  5-element AtomicU64 array with ranges <1ms, <10ms, <100ms, <1s, <10s.
 
 ## Build Logic
 
@@ -87,8 +87,8 @@ let mut out = String::new();
 return (StatusCode::OK, [(CONTENT_TYPE, "text/plain; version=0.0.4")], out)
 ```
 
-Values from `AppState` AtomicU64 counters read with `Ordering::Relaxed` — no locking.
+Values from `AppState` AtomicU64 counters read with `Ordering::Relaxed`  -  no locking.
 
 ## Security Note
 
-No authentication — intentional for local-only deployments with loopback enforcement. In production, add a reverse-proxy auth layer or firewall this endpoint if exposed.
+No authentication  -  intentional for local-only deployments with loopback enforcement. In production, add a reverse-proxy auth layer or firewall this endpoint if exposed.

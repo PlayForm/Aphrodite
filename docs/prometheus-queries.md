@@ -1,4 +1,4 @@
-# Prometheus Queries — Aphrodite Proxy
+# Prometheus Queries  -  Aphrodite Proxy
 
 ## Quick curl
 
@@ -36,7 +36,7 @@ for r in d['data']['result']: print(f\"CCR created: {r['value'][1]}\")
 | **Total requests** | `aphrodite_requests_total` | `?query=aphrodite_requests_total` |
 | **Compressed requests** | `aphrodite_requests_compressed` | `?query=aphrodite_requests_compressed` |
 | **Request rate (/s)** | `rate(aphrodite_requests_total[1m])` | `?query=rate(aphrodite_requests_total[1m])` |
-| **Compression ratio** | `rate(aphrodite_requests_compressed[5m]) / rate(aphrodite_requests_total[5m])` | — |
+| **Compression ratio** | `rate(aphrodite_requests_compressed[5m]) / rate(aphrodite_requests_total[5m])` |  -  |
 | **Compression EMA** | `aphrodite_compression_ratio_ema` | `?query=aphrodite_compression_ratio_ema` |
 
 ```bash
@@ -92,7 +92,7 @@ curl -s "$PROM" --data-urlencode \
 | **Upstream 4xx** | `aphrodite_upstream_errors_total{code="4xx"}` | `?query=...` |
 | **Upstream 5xx** | `aphrodite_upstream_errors_total{code="5xx"}` | `?query=...` |
 | **Upstream timeouts** | `aphrodite_upstream_timeouts_total` | `?query=aphrodite_upstream_timeouts_total` |
-| **Error rate %** | `rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) / rate(aphrodite_requests_total[5m]) * 100` | — |
+| **Error rate %** | `rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) / rate(aphrodite_requests_total[5m]) * 100` |  -  |
 | **Tool relay success** | `aphrodite_tool_relay_success` | `?query=aphrodite_tool_relay_success` |
 | **Tool relay failure** | `aphrodite_tool_relay_failure` | `?query=aphrodite_tool_relay_failure` |
 | **Notify success** | `aphrodite_notify_success` | `?query=aphrodite_notify_success` |

@@ -118,7 +118,7 @@ Both callback and notification use Bearer token auth via `notify_key`.
 | Callback POST | 5 seconds | proxy.rs:1542 |
 | Notification POST | 5 seconds | proxy.rs:1680 |
 
-No retries — fire-and-forget. Success/failure tracked via `notify_success` / `notify_failure` counters.
+No retries  -  fire-and-forget. Success/failure tracked via `notify_success` / `notify_failure` counters.
 
 ## Task Tracker
 

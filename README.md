@@ -1,8 +1,10 @@
-# [Aphrodite] 💋 (`aphrodite`)
-
-> CCR compression proxy for Hermes Agent — sub‑ms compress, 10× ratio, dual‑mode.
+<p align="center">
+  <img src="assets/aphrodite.svg" alt="Aphrodite" width="120">
+</p>
 
 [Aphrodite]: https://github.com/PlayForm/Aphrodite
+
+> CCR compression proxy for Hermes Agent  -  sub‑ms compress, 10× ratio, dual‑mode.
 
 [![release](https://img.shields.io/badge/release-v0.5.68-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![plugin](https://img.shields.io/badge/plugin-v1.62.13-purple)](plugins/aphrodite/plugin.yaml)
@@ -110,16 +112,16 @@ body bytes, inline CCR, and store size.
 
 ```
 plugins/aphrodite/
-  __init__.py     — version, exports, proxy auto‑launch
-  _core.py        — constants, thresholds, CCR regex
-  _inline.py      — zlib fallback compression
-  _marker.py      — CCR marker formatting + parsing
-  _binary.py      — binary download + platform detection
-  _proxy.py       — proxy lifecycle (env, health, launch)
-  _tools.py       — 9 tool handlers + JSON schemas
-  _hooks.py       — transform, pre/post LLM, terminal
-  _engine.py      — ContextEngine for compression pipeline
-  _resolve.py     — recursive marker expansion
+  __init__.py      -  version, exports, proxy auto‑launch
+  _core.py         -  constants, thresholds, CCR regex
+  _inline.py       -  zlib fallback compression
+  _marker.py       -  CCR marker formatting + parsing
+  _binary.py       -  binary download + platform detection
+  _proxy.py        -  proxy lifecycle (env, health, launch)
+  _tools.py        -  9 tool handlers + JSON schemas
+  _hooks.py        -  transform, pre/post LLM, terminal
+  _engine.py       -  ContextEngine for compression pipeline
+  _resolve.py      -  recursive marker expansion
 ```
 
 ---

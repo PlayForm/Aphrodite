@@ -379,7 +379,7 @@ def on_start(**kw):
     # Startup observability log
     _write_startup_log(cache_ok, token_ok, auto_summary)
 
-    return f"💋 aphrodite v{PLUGIN_VERSION} — cache={'UP' if cache_ok else 'DOWN'} token={'UP' if token_ok else 'DOWN'}"
+    return f"💋 aphrodite v{PLUGIN_VERSION}  -  cache={'UP' if cache_ok else 'DOWN'} token={'UP' if token_ok else 'DOWN'}"
 
 
 def _wait_alive(port, retries=10, delay=0.3):

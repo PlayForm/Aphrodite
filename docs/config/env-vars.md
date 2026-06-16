@@ -11,8 +11,8 @@ Source of truth: `crates/aphrodite/src/config.rs` (CLI args with env fallbacks),
 | Variable | Default | Used In | Description |
 |----------|---------|---------|-------------|
 | `APHRODITE_API_KEY` | (required) | config.rs:143 | Primary API key for upstream LLM |
-| `DEEPSEEK_API_KEY` | — | config.rs:144 | Fallback #1 |
-| `HEADROOM_DEEPSEEK_KEY` | — | config.rs:145 | Fallback #2 |
+| `DEEPSEEK_API_KEY` |  -  | config.rs:144 | Fallback #1 |
+| `HEADROOM_DEEPSEEK_KEY` |  -  | config.rs:145 | Fallback #2 |
 | `APHRODITE_API_URL` | `https://api.openai.com` | config.rs:35 | Upstream API base URL |
 | `APHRODITE_MODEL` | `default-model` | config.rs:43 | Model name to forward |
 
@@ -32,8 +32,8 @@ Source of truth: `crates/aphrodite/src/config.rs` (CLI args with env fallbacks),
 
 | Variable | Default | Used In | Description |
 |----------|---------|---------|-------------|
-| `APHRODITE_NOTIFY_URL` | — | config.rs:71 | Hermes callback URL for CCR events |
-| `APHRODITE_NOTIFY_KEY` | — | config.rs:75 | Bearer token for callback auth |
+| `APHRODITE_NOTIFY_URL` |  -  | config.rs:71 | Hermes callback URL for CCR events |
+| `APHRODITE_NOTIFY_KEY` |  -  | config.rs:75 | Bearer token for callback auth |
 
 ## Python Plugin (Hermes)
 
@@ -69,7 +69,7 @@ Source of truth: `crates/aphrodite/src/config.rs` (CLI args with env fallbacks),
 | `APHRODITE_AUTO_EXPAND_LIMIT` | `51200` | _core.py:41 | Max size for auto-expanding tool CCR markers |
 | `APHRODITE_MAX_REQUEST_BODY_SIZE` | `104857600` (100MB) | _core.py:46 | Skip compression above this |
 | `APHRODITE_RECENT_MARKERS_MAX` | `500` | _core.py:102 | Max markers in deque |
-| `HEADROOM_SSE_BUFFER_MAX_BYTES` | — | _core.py:38 | If set, bumps `INLINE_THRESHOLD` to 1MB |
+| `HEADROOM_SSE_BUFFER_MAX_BYTES` |  -  | _core.py:38 | If set, bumps `INLINE_THRESHOLD` to 1MB |
 
 ## Resolution Order
 

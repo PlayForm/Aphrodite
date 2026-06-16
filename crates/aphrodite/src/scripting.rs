@@ -1,6 +1,6 @@
-//! Rhai scripting engine — user-defined micro-scripts.
+//! Rhai scripting engine  -  user-defined micro-scripts.
 //! Feature-gated behind `APHRODITE_SCRIPTING=1`.
-//! Compiles scripts per-call (no AST storage — avoids Send issues).
+//! Compiles scripts per-call (no AST storage  -  avoids Send issues).
 
 #[cfg(feature = "scripting")]
 mod engine {

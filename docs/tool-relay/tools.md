@@ -185,9 +185,9 @@ Last 10 turns from `_conv_index`.
 ### Handler (_hooks.py:1318)
 ```
 Searches:
-1. _conv_index (turn summaries) — linear scan
-2. _inline_store — trigram-indexed (lazy init)
-3. _recent_markers — linear scan
+1. _conv_index (turn summaries)  -  linear scan
+2. _inline_store  -  trigram-indexed (lazy init)
+3. _recent_markers  -  linear scan
 Results deduplicated by hash, max 20.
 ```
 

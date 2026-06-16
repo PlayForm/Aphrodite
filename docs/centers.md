@@ -1,22 +1,22 @@
-# Centers — AI Conversation Memory Tokens
+# Centers  -  AI Conversation Memory Tokens
 
 ## Vision
 
 A **center** is a traveling memory annotation embedded in CCR markers.
-When the AI first encounters content, it deposits a center — a note about
+When the AI first encounters content, it deposits a center  -  a note about
 what it was thinking. Future retrievals see that center and understand
 the original context.
 
 ## Evolution Path
 
-### v1 (current) — Simple String Annotation
+### v1 (current)  -  Simple String Annotation
 ```
 _ccr_center="code_rust"     → marker shows ;center=code_rust
 _ccr_center="debug"         → marker shows ;center=debug
 ```
 The center is a single string. It annotates, it doesn't accumulate.
 
-### v2 — Bucketed Centers
+### v2  -  Bucketed Centers
 ```
 _ccr_center="bucket:review"  → marks file for review
 _ccr_center="bucket:todo"    → adds to TODO inventory
@@ -25,7 +25,7 @@ _ccr_center="bucket:bug"     → flags as bug-related
 Centers gain structure. Buckets categorize the intent. Multiple AIs
 can add to different buckets on the same CCR entry.
 
-### v3 — Accumulative Centers
+### v3  -  Accumulative Centers
 ```
 Marker carries: ;center=code_rust;bucket=review,todo
 ```
@@ -33,7 +33,7 @@ Future AIs append to existing centers. A file marked "code_rust" by AI-1
 gets "bucket:review" added by AI-2. Centers accumulate over time, building
 a collaborative annotation layer on compressed content.
 
-### v4 — Center as File System
+### v4  -  Center as File System
 ```
 ~/.hermes/aphrodite/centers/
   code_rust/     → files understood as Rust

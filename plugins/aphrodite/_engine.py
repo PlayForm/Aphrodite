@@ -155,7 +155,7 @@ class AphroditeContextEngine(ContextEngine):
         if len(messages) <= dynamic_min:
             return messages
 
-        # Never compress system messages — critical instructions stay raw
+        # Never compress system messages  -  critical instructions stay raw
         has_system = any(m.get("role") == "system" for m in messages)
         head_n = max(self.protect_first_n, 1)
         tail_n = self.protect_last_n

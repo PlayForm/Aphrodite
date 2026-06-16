@@ -20,7 +20,7 @@ rate(aphrodite_ccr_created[5m])
 ## Latency
 
 ```
-# P50 latency (seconds) — requires histogram_quantile
+# P50 latency (seconds)  -  requires histogram_quantile
 histogram_quantile(0.50, rate(aphrodite_latency_seconds_bucket[5m]))
 
 # P95 latency
@@ -83,7 +83,7 @@ rate(aphrodite_tool_relay_calls[5m])
 # LLM response cache hit rate
 rate(aphrodite_cache_hits[5m]) / (rate(aphrodite_cache_hits[5m]) + rate(aphrodite_cache_misses[5m])) * 100
 
-# Cache hit rate (combined — CCR + LLM)
+# Cache hit rate (combined  -  CCR + LLM)
 rate(aphrodite_ccr_hits[5m]) + rate(aphrodite_cache_hits[5m])
 ```
 

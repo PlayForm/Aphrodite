@@ -134,7 +134,7 @@ pub fn compute_key(payload: &[u8]) -> String {
     h.to_hex().as_str()[..24].to_string()
 }
 ```
-BLAKE3, first 24 hex chars (96 bits). Deterministic — same content always yields same hash.
+BLAKE3, first 24 hex chars (96 bits). Deterministic  -  same content always yields same hash.
 
 From `vendor/headroom/crates/headroom-core/src/ccr/mod.rs:86`.
 
@@ -147,7 +147,7 @@ From `vendor/headroom/crates/headroom-core/src/ccr/mod.rs:86`.
 
 ### Miss Path
 - `ccr_misses` incremented
-- `ccr.put(hash, content)` — stored
+- `ccr.put(hash, content)`  -  stored
 - `ccr_created` incremented
 - `tokens_saved` += content.len() - hash.len()
 - Marker generated, content replaced
@@ -162,7 +162,7 @@ CCR backends compress content with zstd before storage (magic bytes: `0x28, 0xB5
 <<<CCR:{hash}|{type}|{size}>>>
 {first 512 bytes of content}
 ```
-Preview appended after marker — simpler format, no structured metadata.
+Preview appended after marker  -  simpler format, no structured metadata.
 
 ### Token Mode (proxy.rs:1408 → smart_marker)
 ```
@@ -185,7 +185,7 @@ Exponential moving average with α=0.2 (20% weight on new observation).
 
 ### Initial Value
 ```rust
-compression_ratio_ema: AtomicU64::new(200),  // 2.0x — conservative, avoids startup scale-up
+compression_ratio_ema: AtomicU64::new(200),  // 2.0x  -  conservative, avoids startup scale-up
 ```
 
 ### Fill Percentage

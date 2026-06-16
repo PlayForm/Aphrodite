@@ -75,7 +75,7 @@ All values extracted from `crates/aphrodite/src/proxy.rs:detect_content_type()` 
 | `cache` | Stored via cache proxy (:9797) | In-memory |
 | `inline` | Stored in Python plugin inline store | `_CappedStore` (OrderedDict, max 500) |
 | `engine` | Created by ContextEngine | CCR backend |
-| `?` | Unknown mode (parse fallback) | — |
+| `?` | Unknown mode (parse fallback) |  -  |
 
 ## Preview Truncation by Headroom Budget
 

@@ -138,7 +138,7 @@ From `main.rs:run_single()` (lines 190-353):
 |-------|--------|
 | CORS | `CorsLayer::permissive()` |
 | Body limit | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`) |
-| Loopback enforcement | `middleware::from_fn(loopback_only)` — all routes except `/health` |
+| Loopback enforcement | `middleware::from_fn(loopback_only)`  -  all routes except `/health` |
 
 ## HTTP Client Config
 

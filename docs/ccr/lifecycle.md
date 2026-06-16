@@ -119,7 +119,7 @@ Same flow +:
 
 ### Inline (proxy.rs inline_ccr)
 - LRU eviction when capacity (1024) exceeded
-- No TTL — pure LRU
+- No TTL  -  pure LRU
 
 ### Python Inline (_core.py:_CappedStore)
 - LRU eviction when > 500 entries
@@ -154,7 +154,7 @@ Based on compression_ratio_ema (×100):
 | > 20.0 | 2.0 | Raise thresholds (compress less, preserve more) |
 | 3.0 .. 20.0 | 1.0 | Default |
 | < 3.0 | 0.5 | Lower thresholds (compress more aggressively) |
-| 0.0 | 1.0 | No history — default |
+| 0.0 | 1.0 | No history  -  default |
 
 Note: `linter`, `build_output`, `log` types are excluded from auto-tune (always base/2).
 

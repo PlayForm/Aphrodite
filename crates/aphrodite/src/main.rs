@@ -23,7 +23,7 @@ use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_li
 use aphrodite::retrieve;
 
 fn main() -> anyhow::Result<()> {
-	// Worker thread count — I/O-bound proxy needs more than CPU cores.
+	// Worker thread count  -  I/O-bound proxy needs more than CPU cores.
 	// Default: 4× CPU or 32 minimum. Override: APHRODITE_WORKER_THREADS.
 	let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
 		.ok()

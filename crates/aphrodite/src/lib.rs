@@ -1,4 +1,4 @@
-//! # aphrodite — LLM proxy with CCR + tool relay
+//! # aphrodite  -  LLM proxy with CCR + tool relay
 //!
 //! Generic proxy for any OpenAI-compatible API. Two modes:
 //! - **Cache** (:9797): in-memory CCR, >8KB threshold, preview preserved
@@ -46,8 +46,8 @@
 //! |------|------|------------|-------|---------|
 //! | LICENSE | 7.0KB | 24B | 290x | 40ms |
 //! | README | 2.5KB | 24B | 103x | 64ms |
-//! | 20KB text | 20KB | 24B | 833x | — |
-//! | **Retrieve** | 20KB | — | — | **27ms avg** |
+//! | 20KB text | 20KB | 24B | 833x |  -  |
+//! | **Retrieve** | 20KB |  -  |  -  | **27ms avg** |
 //!
 //! ## Config (aphrodite.toml)
 //!

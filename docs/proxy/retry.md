@@ -31,7 +31,7 @@ sleep_ms = base_ms × jitter
 |---------|-----------|------------|
 | 1 | 100 | 75 – 125 |
 | 2 | 200 | 150 – 250 |
-| 3 | (not retried, final attempt) | — |
+| 3 | (not retried, final attempt) |  -  |
 
 From proxy.rs line 667:
 ```rust
@@ -42,7 +42,7 @@ let ms = (base_ms as f64 * jitter) as u64;
 
 ## Retry Scope
 
-**Only transport errors** — connection failures, DNS resolution failures, TLS handshake errors. NOT HTTP error status codes (4xx, 5xx). When the upstream responds with an error status, the response body is returned to the client without retries.
+**Only transport errors**  -  connection failures, DNS resolution failures, TLS handshake errors. NOT HTTP error status codes (4xx, 5xx). When the upstream responds with an error status, the response body is returned to the client without retries.
 
 From proxy.rs line 666:
 ```rust
@@ -61,7 +61,7 @@ Err(e) => {
 - Connection refused
 - DNS resolution failure
 - TLS handshake error
-- Timeout (reqwest `send()` error — different from upstream HTTP timeout)
+- Timeout (reqwest `send()` error  -  different from upstream HTTP timeout)
 - Connection reset
 
 ### NOT Retried

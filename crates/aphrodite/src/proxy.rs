@@ -178,7 +178,7 @@ pub struct AppState {
 	/// Used by the Python plugin to set x-headroom-budget for adaptive compression.
 	pub fill_pct: AtomicU64,
 
-	/// Rhai scripting engine — user-defined micro-scripts for hook injection.
+	/// Rhai scripting engine  -  user-defined micro-scripts for hook injection.
 	/// None when scripting feature is disabled or not configured.
 	#[cfg(feature = "scripting")]
 	pub script_engine: Option<std::sync::Arc<crate::scripting::ScriptEngine>>,
@@ -279,7 +279,7 @@ impl AppState {
 	/// Per-type threshold - code stays in context longer, logs compressed aggressively.
 	fn threshold_for(&self, ct: &str) -> usize {
 		let base = self.compress_threshold();
-		// Noisy types: keep at base threshold — coding sessions need build output visible
+		// Noisy types: keep at base threshold  -  coding sessions need build output visible
 		match ct {
 			"linter" | "build_output" | "log" => return base,
 			_ => {},
@@ -502,7 +502,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 		fill_pct: AtomicU64::new(9000), // 90.00% - moderate fill initial default
 		task_tracker: TaskTracker::new(),
 
-		// Scripting engine — enabled via --scripting or APHRODITE_SCRIPTING=1
+		// Scripting engine  -  enabled via --scripting or APHRODITE_SCRIPTING=1
 		#[cfg(feature = "scripting")]
 		script_engine: crate::scripting_enabled().then(|| {
 			let engine = crate::scripting::ScriptEngine::new();
@@ -1522,7 +1522,7 @@ fn smart_marker(hash: &str, content: &str, ct: &str, center: Option<&str>) -> St
 	format_ccr_output(&preview, ct, &metadata, center, hash, size)
 }
 
-/// Cache-mode CCR output — preview + marker, same template.
+/// Cache-mode CCR output  -  preview + marker, same template.
 fn cache_marker(hash: &str, content: &str, ct: &str, center: Option<&str>) -> String {
 	let size = content.len();
 	let preview: String = content.chars().take(512).collect();
@@ -1541,7 +1541,7 @@ async fn compress_chat_completion(
 
 	// Headroom budget: lower values compress more aggressively.
 	// Coding-tuned: smooth linear curve from 0.50 (empty) to 1.0 (full).
-	// Never below 0.5× — semantics and tool chains are worth the tokens.
+	// Never below 0.5×  -  semantics and tool chains are worth the tokens.
 	let budget_mult = headroom_budget
 		.and_then(|b| {
 			let val: f64 = b.parse().ok()?;
