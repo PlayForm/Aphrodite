@@ -317,10 +317,9 @@ def _write_startup_log(cache_ok, token_ok, auto_summary):
 def _inject_expand_guidance():
     """Return auto-expand guidance string explaining that tool CCR markers are resolved inline."""
     return (
-        "💋 Tool outputs are auto-expanded - you see full content inline, "
+        "💋 Tool outputs are auto-expanded — you see full content inline, "
         "no <<<CCR:...>>> markers for tool results. "
-        "If you ever see a CCR marker (for context or terminal output), use "
-        "aphrodite_retrieve(hash) to fetch it."
+        "If you see a CCR marker, retrieve only if the preview hints at useful content."
     )
 
 

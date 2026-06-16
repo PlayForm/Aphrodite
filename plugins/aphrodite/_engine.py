@@ -241,7 +241,7 @@ class AphroditeContextEngine(ContextEngine):
         marker = (
             f"{ccr}\n"
             f"These messages were offloaded to reduce context. "
-            f"Retrieve with: aphrodite_retrieve({hash_val}).\n"
+            f"Use aphrodite_retrieve({hash_val}) if needed.\n"
             f"The {self.protect_last_n} messages below are your active context."
         )
         self.compression_count += 1
