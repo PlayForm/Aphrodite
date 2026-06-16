@@ -3,8 +3,8 @@
 Add headroom proxy providers to ~/.hermes/config.yaml.
 
 Adds two new providers:
-    headroom-cache — response caching via headroom on :9799
-    headroom-token — full compression via headroom on :9800
+    headroom-cache - response caching via headroom on :9799
+    headroom-token - full compression via headroom on :9800
 
 Usage:
     python3 scripts/setup-headroom-providers.py
@@ -25,6 +25,9 @@ def main():
 
     providers = config.setdefault("providers", {})
 
+    # Both providers authenticate via APHRODITE_API_KEY at runtime.
+    # HEADROOM_DEEPSEEK_KEY is the env-var name used for the api_key_env field
+    # in the Hermes provider config, but the actual key value is APHRODITE_API_KEY.
     providers["headroom-cache"] = {
         "api_key_env": "HEADROOM_DEEPSEEK_KEY",
         "base_url": "http://127.0.0.1:9799",

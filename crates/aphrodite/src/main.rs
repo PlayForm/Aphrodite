@@ -1,4 +1,4 @@
-//! aphrodite — Multi-proxy LLM proxy with CCR + tool relay.
+//! aphrodite - Multi-proxy LLM proxy with CCR + tool relay.
 //!
 //! Two modes:
 //! 1. Single proxy: `aphrodite --mode cache --listen :9797 --api-key KEY`
@@ -31,7 +31,8 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Try multi-proxy config first, fall back to CLI
-    let proxies: Vec<(String, Cli)> = if std::path::Path::new("aphrodite.toml").exists() {
+    let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
+    let proxies: Vec<(String, Cli)> = if std::path::Path::new(&config_path).exists() {
         let config = MultiConfig::load()?;
         config.proxies.iter().map(|p| {
             let cli = config.resolve(p);
@@ -110,6 +111,8 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
             let s = state.clone();
             move || async move { Json(s.stats_json()) }
         }))
+        // NOTE: No auth on /metrics - intentional for local-only deployments.
+        // In production, add a reverse-proxy auth layer or firewall this endpoint.
         .route("/metrics", get({
             let s = state.clone();
             move || async move {
