@@ -1,14 +1,45 @@
 """aphrodite — hook handlers for Hermes tool/terminal/LLM calls."""
-import os, json, time, urllib.request
+import hashlib
+import json
 import logging
-from ._core import (_inline_store, _CCR_RE, PORTS, DEBUG_LOGGING, _DEV,
-    TERMINAL_THRESHOLD, INLINE_THRESHOLD, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE,
-    ENGINE_THRESHOLD_PCT, ENGINE_PROTECT_FIRST, ENGINE_PROTECT_LAST,
-    ENGINE_MIN_MSGS, CATALOG_MODE)
-from ._proxy import _alive
-from ._marker import _compress_via_proxy, _ccr_marker, _parse_ccr_markers
+import os
+import subprocess
+import time
+import urllib.request
+
+from ._binary import _ensure_binary
+from ._core import (
+    _CCR_RE,
+    _DEV,
+    _FILE_TOOLS,
+    BINARY,
+    CATALOG_MODE,
+    DEBUG_LOGGING,
+    ENGINE_MIN_MSGS,
+    ENGINE_PROTECT_FIRST,
+    ENGINE_PROTECT_LAST,
+    ENGINE_THRESHOLD_PCT,
+    INLINE_THRESHOLD,
+    PLUGIN_VERSION,
+    PORTS,
+    RECURSIVE_DEPTH,
+    TERMINAL_THRESHOLD,
+    TOOL_THRESHOLD_CACHE,
+    TOOL_THRESHOLD_TOKEN,
+    _conv_index,
+    _fmt_size,
+    _git_cache,
+    _inline_clear,
+    _inline_store,
+    _recent_markers,
+    _referenced_files,
+    _turn_counter,
+)
+from ._engine import AphroditeContextEngine, get_engine
 from ._inline import _inline_compress, _inline_retrieve
-from ._engine import get_engine
+from ._marker import _ccr_marker, _compress_via_proxy
+from ._proxy import _alive, on_start
+from ._tools import COMPRESS_SCHEMA, RETRIEVE_SCHEMA, _compress_handler, _retrieve_handler
 
 # These are defined within this module (extracted from original monolithic file)
 # _track_file_refs, _fmt_size, _extract_preview, _group_into_turns are defined below
@@ -25,7 +56,7 @@ def _transform_tool_result(
     **kwargs,
 ):
     """Compress tool outputs via CCR. Proxy first, inline fallback when proxy down.
-    
+
     Dual-mode: proxy CCR (token >1KB, cache >8KB) with inline fallback (>4KB).
     Works without proxy - no provider switch required.
     """
@@ -62,7 +93,7 @@ def _transform_tool_result(
         return result
 
     preview = result[:120].replace('\\n', ' ').strip()
-    
+
     # Try proxy compression first
     if proxy_available:
         target = PORTS["token"] if token_alive else PORTS["cache"]
@@ -80,7 +111,7 @@ def _transform_tool_result(
             return _ccr_marker(h, "tool", result_len, label, preview)
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s - proxy returned no hash", tool_name[:40])
-    
+
     # Fallback: inline compression (works without proxy)
     if result_len >= INLINE_THRESHOLD:
         try:
@@ -110,7 +141,7 @@ def _rebuild_handler(args=None, **kwargs):
     )
     if result.returncode != 0:
         return f'{{"error": "build failed: {result.stderr[-200:]}"}}'
-    
+
     src = os.path.join(repo, "target/release/aphrodite")
     if os.path.exists(src):
         import shutil
@@ -128,9 +159,6 @@ REBUILD_SCHEMA = {
 
 
 # ── Conversation Memory via CCR ─────────────────────────────────────
-
-_conv_index = {}  # {sequential_number: (hash, summary, size)}
-_turn_counter = 0  # sequential counter (Hermes turn_id is a UUID string)
 
 
 def _store_conversation_turn(conversation_history=None, assistant_response=None, turn_id=0, **kwargs):
@@ -213,12 +241,10 @@ def _parse_ccr_markers(text):
                 pass
     # Filter out entries with missing/empty hashes
     # Filter: real CCR hashes are hex (0-9,a-f), ≥8 chars. Placeholders like abc123 filtered.
-    return [m for m in markers 
-            if m['hash'] and len(m['hash']) >= 8 
+    return [m for m in markers
+            if m['hash'] and len(m['hash']) >= 8
             and all(c in '0123456789abcdef' for c in m['hash'].lower())]
 
-
-_git_cache = {}  # {summary: timestamp}
 
 def _git_summary():
     """Get cached git diff --stat summary. Returns string or None."""
@@ -319,17 +345,17 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     parts = []
     if markers or _conv_index or compress_hint or len(_referenced_files) > 5 or DEBUG_LOGGING:
         parts.append("[APHRODITE]")
-        
+
         # Debug banner (only in DEBUG mode or full catalog)
         if DEBUG_LOGGING or CATALOG_MODE == "full":
             parts.append(f"  ⚙ v{PLUGIN_VERSION} | mode={'proxy+hooks' if not os.environ.get('APHRODITE_CONTEXT_ENGINE') else 'proxy+hooks+engine'} | engine={'enabled' if os.environ.get('APHRODITE_CONTEXT_ENGINE')=='1' else 'off'} | dev={'on' if _DEV else 'off'}")
             parts.append(f"  ⚙ thresholds: term={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_tok={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE} engine_pct={ENGINE_THRESHOLD_PCT}% prot={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min={ENGINE_MIN_MSGS}")
-        
+
         # Git diff summary
         git_info = _git_summary()
         if git_info:
             parts.append(f"  git: {git_info}")
-        
+
         # Compression wrapping summary (compact by type in compact/tool mode)
         if proxy_available:
             mode = "token" if token_alive else "cache"
@@ -349,22 +375,22 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 parts.append(f"  mode={mode} | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
         elif CATALOG_MODE != "tool":
             parts.append(f"  mode=inline | {len(markers)} compressed items ({_fmt_size(total_bytes)} saved)")
-        
+
         # Engine stats
         engine = get_engine()
         if engine and engine.compression_count > 0:
             parts.append(f"  engine: {engine.compression_count} compressions | last: {engine.last_compression.get('messages_compressed', '?')} msgs → CCR:{engine.last_compression.get('hash', '?')[:8]}")
-        
+
         # Turn archive
         if compress_hint:
             parts.append(compress_hint)
-        
+
         # Full CCR catalog: grouped by type with previews (full mode only)
         if CATALOG_MODE == "full" and markers:
             live = [m for m in markers if m['hash'] in _inline_store or _inline_retrieve(m['hash'])]
             if not live and markers:
                 live = markers
-            
+
             # Auto-expand: resolve small cached items inline - LLM never sees aphrodite_retrieve
             expanded = []
             for m in live:
@@ -374,7 +400,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     m['auto_expanded'] = True
                 expanded.append(m)
             live = expanded
-            
+
             # Deduplicate by hash — keep first occurrence only
             seen = set()
             deduped = []
@@ -383,11 +409,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     seen.add(m['hash'])
                     deduped.append(m)
             live = deduped
-            
+
             by_type = {}
             for m in live:
                 by_type.setdefault(m['type'], []).append(m)
-            
+
             parts.append(f"  catalog ({len(markers)} items):")
             for ctype, items in sorted(by_type.items()):
                 visible = min(len(items), 3)
@@ -400,12 +426,12 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     parts.append(f"      CCR:{h} | {_fmt_size(m['size'])} | {preview}")
                 if len(items) > visible:
                     parts.append(f"      ... +{len(items)-visible} more (use aphrodite_retrieve)")
-        
+
         # Conversation memory (full mode only - already in system prompt)
         if CATALOG_MODE == "full" and _conv_index:
             recent = sorted(_conv_index.items(), reverse=True)[:3]
             parts.append("  memory: " + " | ".join(f"T{t}" for t, _ in recent))
-        
+
         # File tree: compact in non-full modes
         if len(_referenced_files) > 5:
             if CATALOG_MODE == "full":
@@ -422,14 +448,14 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     parts.append(f"    ... +{len(by_dir)-8} more dirs")
             else:
                 parts.append(f"  files: {len(_referenced_files)} referenced")
-        
+
         # Context hint (skip in tool mode)
         if CATALOG_MODE != "tool" and ctx_len > 20:
             if ctx_len > 100:
                 parts.append(f"  ⚠ context={ctx_len} msgs - prefer aphrodite_retrieve over scanning")
             else:
                 parts.append(f"  context={ctx_len} msgs")
-        
+
         # Read-intent detection (skip in tool mode)
         if CATALOG_MODE != "tool":
             READ_KEYWORDS = {"read", "show", "view", "get", "cat", "display",
@@ -452,9 +478,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     if parts:
         catalog = "\n".join(parts)
         if DEBUG_LOGGING:
-            _log.debug("pre_llm_hook: catalog (%d lines, %d markers, %d files)", 
+            _log.debug("pre_llm_hook: catalog (%d lines, %d markers, %d files)",
                        len(parts), len(markers), len(_referenced_files))
-            _log.debug("pre_llm_hook: %d markers parsed, %d skipped (empty/bad hash)", 
+            _log.debug("pre_llm_hook: %d markers parsed, %d skipped (empty/bad hash)",
                        len(markers), sum(1 for m in markers if len(str(m.get('hash',''))) < 4))
         return catalog
 
@@ -538,7 +564,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                     unique.append(stripped)
                 counts[stripped] = counts.get(stripped, 0) + 1
                 prev = stripped
-        
+
         # Build summary: unique error/warning lines + total
         errors = [l for l in unique if 'error' in l.lower() and l not in ('error:', 'error')]
         warnings = [l for l in unique if 'warning' in l.lower() and 'warning:' not in l]
@@ -564,7 +590,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         return f'<<<CCR:{h}|build|{len(output)}|inline>>> {summary}…(use aphrodite_retrieve)'
 
     preview = output[:200].replace('\n', ' ').strip()
-    
+
     # Try proxy compression first
     if proxy_available:
         target = PORTS["token"] if token_alive else PORTS["cache"]
@@ -577,7 +603,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             return f'<<<CCR:{h}|terminal|{out_len}>>> {preview}…(use aphrodite_retrieve)'
         elif DEBUG_LOGGING:
             _log.debug("terminal_hook: PROXY FAIL - returned no hash (cmd: %s)", command[:60])
-    
+
     # Fallback: inline compression
     if out_len >= INLINE_THRESHOLD:
         try:
@@ -594,24 +620,13 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
     return output
 
 
-def _inline_clear():
-    """Clear the inline store (called on session reset)."""
-    _inline_store.clear()
-
-
-def _fmt_size(b):
-    if b >= 1_000_000: return f"{b/1_000_000:.1f}MB"
-    if b >= 1000: return f"{b/1000:.1f}KB"
-    return f"{b}B"
-
-
 def _stats_handler(args=None, **kwargs):
     """Return proxy health, CCR stats, engine status, inline store size."""
     result = {"proxy": {}, "engine": {}, "inline_store": {
         "entries": len(_inline_store),
         "total_bytes": sum(len(v) for v in _inline_store.values()),
     }}
-    
+
     # Proxy health
     for name, port in PORTS.items():
         try:
@@ -631,7 +646,7 @@ def _stats_handler(args=None, **kwargs):
             }
         except Exception:
             result["proxy"][name] = {"alive": False}
-    
+
     # Engine status
     eng = get_engine()
     if eng:
@@ -648,7 +663,7 @@ def _stats_handler(args=None, **kwargs):
         }
     else:
         result["engine"] = {"active": False}
-    
+
     return json.dumps(result)
 
 
@@ -659,10 +674,7 @@ STATS_SCHEMA = {
 }
 
 # ── File tracking (for aphrodite_files tool) ──────────────────
-_referenced_files = {}  # {filepath: last_tool_name}
-_recent_markers = []     # list of {hash, type, size, preview} from catalog
 
-_FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
 
 def _track_file_refs(tool_name, args):
     """Track file paths referenced by tool calls."""
@@ -746,31 +758,31 @@ def _search_handler(args=None, **kwargs):
     args = args if isinstance(args, dict) else {}
     query = args.get("query", "").lower()
     ccr_type = args.get("type", "")
-    
+
     results = []
     # Search conversation turn index
     for tnum, (h, summary, size) in sorted(_conv_index.items(), reverse=True):
         if query and query not in summary.lower():
             continue
         results.append({"source": "turn", "turn": tnum, "hash": h, "summary": summary, "size": size})
-    
+
     # Search inline store
     for h, content in _inline_store.items():
         if query and query not in content.lower():
             continue
         preview = content[:200].replace('\n', ' ').strip()
         results.append({"source": "inline", "hash": h, "preview": preview, "size": len(content)})
-    
+
     # Search recent marker catalog (from pre_llm_hook)
     for m in _recent_markers:
         if query and query not in m.get('preview', '').lower():
             continue
-        results.append({"source": "marker", "hash": m['hash'], "type": m.get('type', '?'), 
+        results.append({"source": "marker", "hash": m['hash'], "type": m.get('type', '?'),
                         "size": m.get('size', 0), "preview": m.get('preview', '')[:200]})
-    
+
     if ccr_type:
         results = [r for r in results if ccr_type in r.get("type", "") or ccr_type in r.get("summary", "") + r.get("preview", "")]
-    
+
     return json.dumps({
         "query": query,
         "type_filter": ccr_type,
@@ -785,7 +797,7 @@ def _test_handler(args=None, **kwargs):
     args = args if isinstance(args, dict) else {}
     mode = args.get("mode", "quick")  # quick, full, matrix
     report = {"suite": "aphrodite_smoke", "version": PLUGIN_VERSION, "mode": mode, "tests": []}
-    
+
     def test(name, fn):
         try:
             t0 = time.time()
@@ -794,24 +806,24 @@ def _test_handler(args=None, **kwargs):
             report["tests"].append({"name": name, "status": "PASS", "elapsed_ms": round(elapsed, 1), "result": result})
         except Exception as e:
             report["tests"].append({"name": name, "status": "FAIL", "error": str(e)})
-    
+
     # ── Tool smoke tests ─────────────────────────────────
     test("compress_json", lambda: json.loads(_compress_handler(args={"content": '{"a":1,"b":[2,3]}', "type": "json"})))
     test("compress_code", lambda: json.loads(_compress_handler(args={"content": "def foo():\n    return 42\n", "type": "code"})))
     test("compress_cache_hit", lambda: _compress_handler(args={"content": '{"a":1,"b":[2,3]}', "type": "json"}))  # should hit cache
-    
+
     test("retrieve_roundtrip", lambda: "def foo" in _retrieve_handler(args={"hash": hashlib.sha256(b"def foo():\n    return 42\n").hexdigest()[:16]}))
-    
+
     test("stats", lambda: json.loads(_stats_handler())["proxy"])
-    
+
     test("files_empty", lambda: json.loads(_files_handler())["count"] == 0)
-    
+
     test("diff_empty", lambda: json.loads(_diff_handler())["turns"] == 0)
-    
+
     # ── Proxy health ─────────────────────────────────────
     test("proxy_health", lambda: _alive(9798))
     test("proxy_metrics", lambda: _alive(9797))
-    
+
     # ── Full mode: heavy compression test ────────────────
     if mode in ("full", "matrix"):
         big_payload = json.dumps({"data": list(range(1000)), "nested": {"deep": {"values": [i*i for i in range(200)]}}})
@@ -819,7 +831,7 @@ def _test_handler(args=None, **kwargs):
         test("search_find", lambda: json.loads(_search_handler(args={"query": "deep"}))["matches"] >= 1)
         test("terminal_threshold", lambda: TERMINAL_THRESHOLD > 0)
         test("inline_threshold", lambda: INLINE_THRESHOLD > 0)
-    
+
     # ── Matrix mode: settings sweep ──────────────────────
     if mode == "matrix":
         settings = {"results": {}}
@@ -833,7 +845,7 @@ def _test_handler(args=None, **kwargs):
                     "compresses_never": pct >= 100,
                 }
         report["settings_matrix"] = settings
-    
+
     # ── Pipeline mode: full + matrix + feature toggles ─────
     if mode == "pipeline":
         # Feature toggle: test with/without debug, with/without compression
@@ -866,13 +878,13 @@ def _test_handler(args=None, **kwargs):
                 else:
                     os.environ.pop(k, None)
         report["feature_toggles"] = feature_results
-    
+
     report["summary"] = {
         "total": len(report["tests"]),
         "passed": sum(1 for t in report["tests"] if t["status"] == "PASS"),
         "failed": sum(1 for t in report["tests"] if t["status"] == "FAIL"),
     }
-    
+
     # ── Save results for regression comparison ─────────────
     try:
         results_path = os.path.join(os.path.dirname(__file__), ".test-results.json")
@@ -993,7 +1005,7 @@ def register(ctx):
     else:
         _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
     _log.info("aphrodite v%s registered - %d tools + hooks", PLUGIN_VERSION, 9)
-    
+
     # ── Debug banner: print configuration on startup ──────────
     if DEBUG_LOGGING:
         lines = [
@@ -1003,9 +1015,9 @@ def register(ctx):
             f"  Thresholds: terminal={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_token={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE}",
             f"  Engine: threshold={ENGINE_THRESHOLD_PCT}% protect={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min_msgs={ENGINE_MIN_MSGS}",
             f"  CCR: regex={_CCR_RE.pattern} depth={RECURSIVE_DEPTH}",
-            f"  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog",
+            "  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog",
             f"  Catalog mode: {CATALOG_MODE} (APHRODITE_CATALOG=full|compact|tool)",
-            f"  Proxies: cache=:9797 token=:9798 | waiting for session_start...",
+            "  Proxies: cache=:9797 token=:9798 | waiting for session_start...",
             "=" * 60,
         ]
         for line in lines:
