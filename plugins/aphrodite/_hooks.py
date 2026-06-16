@@ -20,6 +20,7 @@ from ._core import (
     ENGINE_PROTECT_LAST,
     ENGINE_THRESHOLD_PCT,
     INLINE_THRESHOLD,
+    MAX_REQUEST_BODY_SIZE,
     PLUGIN_VERSION,
     PORTS,
     RECURSIVE_DEPTH,
@@ -58,6 +59,18 @@ __all__ = [
 
 # ── Hooks ─────────────────────────────────────────────────────
 
+# ── Canonical JSON serializer ────────────────────────────────
+
+
+def _serialize_canonical(obj):
+    """Serialize to canonical JSON: minimal separators, no ASCII escaping.
+
+    Use for deterministic JSON wire format where whitespace and
+    Unicode-independent output is required (e.g. hash inputs,
+    header payloads, idempotent digest computation).
+    """
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+
 
 def _transform_tool_result(
     tool_name="",
@@ -85,6 +98,8 @@ def _transform_tool_result(
 
     if _DEV:
         return result  # dev mode: passthrough
+    # Headroom bypass headers for all CCR markers from this hook
+    HEADROOM_HDRS = {"x-headroom-bypass": "true", "x-headroom-mode": "passthrough"}
     # Track file references for aphrodite_files tool
     _track_file_refs(tool_name, args)
     token_alive = _alive(9798)
@@ -125,6 +140,14 @@ def _transform_tool_result(
 
     threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cache_alive else INLINE_THRESHOLD
     result_len = len(result)
+    # Big-payload guard: skip compression for payloads exceeding MAX_REQUEST_BODY_SIZE
+    if result_len > MAX_REQUEST_BODY_SIZE:
+        if DEBUG_LOGGING:
+            _log.debug(
+                "transform_tool_result: SKIP %s size=%s > MAX_REQUEST_BODY_SIZE=%s",
+                tool_name[:40], result_len, MAX_REQUEST_BODY_SIZE,
+            )
+        return result
     if result_len < threshold:
         if DEBUG_LOGGING:
             _log.debug(
@@ -170,7 +193,7 @@ def _transform_tool_result(
             if len(_recent_markers) > 200:
                 _recent_markers.pop(0)
             _inline_store[h] = result  # mirror for aphrodite_search
-            return _ccr_marker(h, "tool", result_len, label, preview)
+            return _ccr_marker(h, "tool", result_len, label, preview, headers=HEADROOM_HDRS)
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s - proxy returned no hash", tool_name[:40])
 
@@ -189,7 +212,7 @@ def _transform_tool_result(
             _recent_markers.append({"hash": h, "type": "tool", "size": result_len, "preview": preview})
             if len(_recent_markers) > 200:
                 _recent_markers.pop(0)
-            return _ccr_marker(h, "tool", result_len, "inline", preview)
+            return _ccr_marker(h, "tool", result_len, "inline", preview, headers=HEADROOM_HDRS)
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("transform_tool_result: INLINE FAIL %s", tool_name[:40])
@@ -343,6 +366,13 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     proxy_available = token_alive or cache_alive
     target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
     ctx_len = len(conversation_history)
+
+    # ── 0. Pass through x-headroom-* headers (skip bypass) ──
+    headroom_hdrs = {}
+    for k, v in kwargs.items():
+        kl = k.lower()
+        if kl.startswith("x-headroom-") and kl != "x-headroom-bypass":
+            headroom_hdrs[k] = v
 
     # ── 1. Scan for CCR markers (injected by transform hooks) ──
     markers = []
@@ -573,6 +603,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 )
 
     if parts:
+
+        # ── Headroom passthrough marker ─────────────────────
+        if headroom_hdrs:
+            joined = " | ".join(f"{k}:{v}" for k, v in headroom_hdrs.items())
+            parts.append(f"  [x-headroom] {joined}")
         catalog = "\n".join(parts)
         if DEBUG_LOGGING:
             _log.debug(

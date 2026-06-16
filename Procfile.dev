@@ -1,0 +1,9 @@
+# ── Aphrodite dev Procfile ─────────────────────────────────
+# Usage: `hermes dev` or `cat Procfile.dev | xargs -L1 -P3 sh -c`
+#
+# Each line runs a background process for the dev stack.
+# Environment variables are loaded from ~/.hermes/.env.
+
+proxy_cache:  cargo run -p aphrodite -- --listen 127.0.0.1:9797 --mode cache --tool-relay --db /tmp/aphrodite-cache.db
+proxy_token:  cargo run -p aphrodite -- --listen 127.0.0.1:9798 --mode token --tool-relay --db /tmp/aphrodite-token.db
+headroom:     HEADROOM_CONFIG=./headroom.toml headroom serve --port 9900
