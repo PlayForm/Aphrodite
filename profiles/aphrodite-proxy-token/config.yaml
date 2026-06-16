@@ -1,0 +1,26 @@
+model:
+  default: deepseek-v4-pro
+  provider: aphrodite-token
+providers:
+  deepseek:
+    api_key_env: APHRODITE_API_KEY
+    max_tokens: 65536
+    provider: deepseek
+  aphrodite-cache:
+    api_key_env: APHRODITE_API_KEY
+    base_url: http://127.0.0.1:9797
+    max_tokens: 65536
+    provider: deepseek
+  aphrodite-token:
+    api_key_env: APHRODITE_API_KEY
+    base_url: http://127.0.0.1:9798
+    max_tokens: 65536
+    provider: deepseek
+fallback_providers:
+- deepseek
+context:
+  engine: aphrodite
+compression:
+  enabled: true
+  threshold: 0.5
+toolsets: '["hermes-cli", "aphrodite"]'
