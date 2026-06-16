@@ -21,6 +21,7 @@ provides_tools:
   - aphrodite_test
   - aphrodite_catalog
 provides_context_engine: true
+# Ships skills: aphrodite-dev-workflow, aphrodite-hook-reference, aphrodite-iterate-release
 install_message: |
   aphrodite v1.62.8 - CCR compression plugin for Hermes Agent.
   Proxies: token (:9798, SQLite, >1KB), cache (:9797, in-memory, >8KB).

@@ -17,7 +17,6 @@ from ._core import (
     _conv_index,
     _fmt_size,
     _inline_clear,
-    _inline_store,
     _inline_store_put,
     _recent_markers,
     _referenced_files,
@@ -207,7 +206,6 @@ class AphroditeContextEngine(ContextEngine):
                 return messages
 
         _inline_store_put(hash_val, packed)
-        _inline_store.move_to_end(hash_val)
         preview = packed[:120].replace("\n", " ").strip()
         _recent_markers.append({"hash": hash_val, "type": "context", "size": len(packed), "preview": preview})
 

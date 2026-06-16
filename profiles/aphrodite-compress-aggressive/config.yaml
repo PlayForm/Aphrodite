@@ -39,10 +39,7 @@ agent:
   image_input_mode: auto
   disabled_toolsets: []
   show_tool_calls: true
-  default_skills:
-  - plan-then-delegate
-  - execution-blocks
-  - aphrodite-dev-workflow
+  default_skills: '["plan-then-delegate","execution-blocks","aphrodite-dev-workflow","aphrodite-tool-guide"]'
 terminal:
   backend: local
   modal_mode: auto

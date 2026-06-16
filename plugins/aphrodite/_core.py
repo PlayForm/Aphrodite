@@ -8,7 +8,7 @@ from collections import OrderedDict, deque
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.62"  # binary download version (must match Cargo.toml)
+BIN_VERSION = "v0.5.63"  # binary download version (must match Cargo.toml)
 PLUGIN_VERSION = "1.62.8"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
@@ -65,6 +65,9 @@ if DEBUG_LOGGING:
 
 # ── CCR regex (shared) ───────────────────────────────────────
 _CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\]>]+)(?:[^\]]*)?(?:\]|>>>|⫸)')
+
+# ── Hash alias: maps full SHA256 hash → short 16-char hash ──
+_hash_alias: dict = {}  # {full_sha256: short_hash}
 
 # ── Inline compression store + trigram index (session-scoped, capped at 500) ──
 class _CappedStore(OrderedDict):
