@@ -2,9 +2,13 @@
   <img src="assets/aphrodite.svg" alt="Aphrodite" width="120">
 </p>
 
+---
+
+# [Aphrodite] 💋 (`aphrodite`)
+
 [Aphrodite]: https://github.com/PlayForm/Aphrodite
 
-> CCR compression proxy for Hermes Agent  -  sub‑ms compress, 10× ratio, dual‑mode.
+> CCR compression proxy for Hermes Agent — sub‑ms compress, 10× ratio, dual‑mode.
 
 [![release](https://img.shields.io/badge/release-v0.5.68-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![plugin](https://img.shields.io/badge/plugin-v1.62.13-purple)](plugins/aphrodite/plugin.yaml)
