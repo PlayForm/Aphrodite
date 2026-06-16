@@ -174,9 +174,11 @@ impl AppState {
             "error" => base * 8,
             "code_rust" | "code_python" | "code_go" | "code_js" | "code" => base * 4,
             "diff" | "git" => base * 2,
+            "text" => base * 2,
             "tool_output" => base,
-            "build_output" | "log" => base / 2,
             "json" => base,
+            "linter" => base / 2,
+            "build_output" | "log" => base / 2,
             _ => base,
         }
     }
@@ -835,6 +837,27 @@ pub async fn handle_ccr_list(
     }
 }
 
+
+
+pub async fn handle_ccr_delete(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(hash): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    match &state.ccr {
+        Some(ccr) => {
+            let existed = ccr.del(&hash);
+            if existed {
+                (StatusCode::OK, Json(serde_json::json!({"deleted": true, "hash": hash})))
+            } else {
+                (StatusCode::NOT_FOUND, Json(serde_json::json!({"deleted": false, "hash": hash, "error": "not found"})))
+            }
+        }
+        None => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"error": "CCR not enabled"})),
+        ),
+    }
+}
 
 
 // ── Health check ────────────────────────────────────────────────────
