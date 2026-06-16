@@ -13,10 +13,10 @@ path = "src/main.rs"
 
 [dependencies]
 headroom-core = { path = "../../vendor/headroom/crates/headroom-core" }
-axum = { version = "0.7.9", features = ["macros"] }
+axum = { version = "0.8.9", features = ["macros"] }
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "signal", "net", "io-util", "time", "tracing"] }
 tower = "0.5"
-tower-http = { version = "0.6.11", features = ["trace", "request-id", "cors"] }
+tower-http = { version = "0.7.0", features = ["trace", "request-id", "cors"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
 serde = { workspace = true }
