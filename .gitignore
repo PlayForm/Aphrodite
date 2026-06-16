@@ -26,19 +26,21 @@ aphrodite.toml
 plugins/aphrodite/.test-results.json
 
 # Profile runtime artifacts
-profiles/*/plugins/
-profiles/*/skills/
-profiles/*/cache/
-profiles/*/logs/
-profiles/*/bin/
-profiles/*/sessions/
-profiles/*/cron/
-profiles/*/state.db*
-profiles/*/models_dev_cache.json
-profiles/*/ollama_cloud_models_cache.json
-profiles/*/provider_models_cache.json
-profiles/*/.*snapshot*.json
-profiles/*/auth.lock
-profiles/*/.update_check
-profiles/*/.hermes_history
-profiles/*/auth.json
+profiles/**/*/plugins/
+profiles/**/*/skills/
+profiles/**/*/cache/
+profiles/**/*/logs/
+profiles/**/*/bin/
+profiles/**/*/sessions/
+profiles/**/*/cron/
+profiles/**/*/state.db*
+profiles/**/*/models_dev_cache.json
+profiles/**/*/ollama_cloud_models_cache.json
+profiles/**/*/provider_models_cache.json
+profiles/**/*/.*snapshot*.json
+profiles/**/*/auth.lock
+profiles/**/*/.update_check
+profiles/**/*/.hermes_history
+profiles/**/*/auth.json
+
+.env.sh
