@@ -36,3 +36,6 @@ display:
   show_reasoning: true
 logging:
   level: DEBUG
+auxiliary:
+  title_generation:
+    provider: deepseek
