@@ -148,10 +148,10 @@ impl MultiConfig {
             max_context: cfg.max_context.unwrap_or(1_000_000),
             max_output: cfg.max_output.unwrap_or(384_000),
             ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| {
-                let default = dirs::data_dir()
+                
+                dirs::data_dir()
                     .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-                    .join("aphrodite").join("ccr.db");
-                default.into()
+                    .join("aphrodite").join("ccr.db")
             }),
             ccr_ttl_seconds: cfg.ccr_ttl_seconds.or_else(|| d.and_then(|d| d.ccr_ttl_seconds)).unwrap_or(3600),
             no_ccr_marker: false,
