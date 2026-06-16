@@ -5,7 +5,7 @@ import json
 import logging
 import urllib.request
 
-from ._core import _inline_store
+from ._core import PORTS, _inline_store
 from ._resolve import _resolve_recursive
 
 _log = logging.getLogger("aphrodite")
@@ -56,7 +56,7 @@ def _compress_handler(args=None, **kwargs):
     try:
         data = json.dumps({"content": content}).encode()
         req = urllib.request.Request(
-            "http://127.0.0.1:9798/ccr/create", data=data, headers={"Content-Type": "application/json"}
+            f"http://127.0.0.1:{PORTS['token']}/ccr/create", data=data, headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())

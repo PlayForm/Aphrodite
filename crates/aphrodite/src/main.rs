@@ -5,13 +5,13 @@
 //! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
 use std::sync::Arc;
-use axum::{routing::{any, get, post}, http::StatusCode, Json, Router};
+use axum::{routing::{any, delete, get, post}, http::StatusCode, Json, Router};
 use clap::Parser;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use aphrodite::config::{Cli, MultiConfig, ProxyMode};
-use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, health_check};
+use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, handle_ccr_delete, health_check};
 use aphrodite::retrieve;
 
 #[tokio::main]
@@ -151,6 +151,7 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
         .route("/tool/relay", post(handle_tool_relay))
         .route("/ccr/create", post(handle_ccr_create))
         .route("/ccr/list", get(handle_ccr_list))
+        .route("/ccr/{hash}", delete(handle_ccr_delete))
         .route("/favicon.ico", get(|| async { StatusCode::NOT_FOUND }))
         .route("/robots.txt", get(|| async { "User-agent: *\nDisallow: /\n" }))
         .route("/", get(|| async { Json(serde_json::json!({"proxy": "aphrodite", "version": env!("CARGO_PKG_VERSION")})) }))
