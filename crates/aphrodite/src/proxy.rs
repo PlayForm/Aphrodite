@@ -178,6 +178,13 @@ pub struct AppState {
 	/// Used by the Python plugin to set x-headroom-budget for adaptive compression.
 	pub fill_pct: AtomicU64,
 
+	/// Rhai scripting engine — user-defined micro-scripts for hook injection.
+	/// None when scripting feature is disabled or not configured.
+	#[cfg(feature = "scripting")]
+	pub script_engine: Option<std::sync::Arc<crate::scripting::ScriptEngine>>,
+	#[cfg(not(feature = "scripting"))]
+	pub script_engine: Option<()>,
+
 	// Extended metrics
 	pub inline_ccr_hits: AtomicU64,
 	pub inline_ccr_misses: AtomicU64,
@@ -493,6 +500,16 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 		cache_misses: AtomicU64::new(0),
 		fill_pct: AtomicU64::new(9000), // 90.00% - moderate fill initial default
 		task_tracker: TaskTracker::new(),
+
+		// Scripting engine — enabled via --scripting or APHRODITE_SCRIPTING=1
+		#[cfg(feature = "scripting")]
+		script_engine: crate::scripting_enabled().then(|| {
+			let engine = crate::scripting::ScriptEngine::new();
+			tracing::info!("scripting engine loaded with rhai scripts");
+			std::sync::Arc::new(engine)
+		}),
+		#[cfg(not(feature = "scripting"))]
+		script_engine: None,
 
 		inline_ccr_hits: AtomicU64::new(0),
 		inline_ccr_misses: AtomicU64::new(0),
