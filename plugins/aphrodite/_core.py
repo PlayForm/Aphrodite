@@ -40,7 +40,12 @@ INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
 if os.environ.get("HEADROOM_SSE_BUFFER_MAX_BYTES"):
     INLINE_THRESHOLD = max(INLINE_THRESHOLD, 1_048_576)
 RECURSIVE_DEPTH = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
-AUTO_EXPAND_LIMIT = 0 if os.environ.get("APHRODITE_NO_AUTO_EXPAND") == "1" else _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 51200)
+# Auto-expand: OFF by default — LLM sees raw CCR markers and retrieves on demand.
+# Set APHRODITE_AUTO_EXPAND=1 to enable auto-expansion (resolves markers inline).
+# Set APHRODITE_AUTO_EXPAND_LIMIT=N to cap what gets auto-expanded (bytes).
+AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 0)
+if os.environ.get("APHRODITE_AUTO_EXPAND") == "1":
+    AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 51200)
 DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
 CATALOG_MODE = os.environ.get("APHRODITE_CATALOG", "compact")
 
