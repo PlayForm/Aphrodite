@@ -59,8 +59,8 @@ GIT_EDITOR=true git tag -a "v$NEW" -m "v$NEW" 2>/dev/null || git tag "v$NEW"
 echo "[release] v$NEW tagged"
 
 # Push — always sync with remote
-git push origin Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
-git push origin "v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
+git push Source Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
+git push Source "v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
 echo "[push] done"
 
 echo ""
