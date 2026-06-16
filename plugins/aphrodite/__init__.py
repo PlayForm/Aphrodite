@@ -17,51 +17,97 @@ Modules:
 
 On session_start: downloads binary, launches token proxy on :9798.
 """
-import os
-import logging
-import json
-import time
 import hashlib
+import json
+import logging
+import os
+import time
+
+from ._binary import _detect_platform, _download_binary, _ensure_binary
 
 # ── Core imports (re-export everything) ──────────────────────────
 from ._core import (
-    PORTS, REPO, BIN_VERSION, PLUGIN_VERSION, BINARY_DIR, BINARY, ENV_FILE, _log,
-    _cfg_int, ENGINE_THRESHOLD_PCT, ENGINE_PROTECT_FIRST, ENGINE_PROTECT_LAST,
-    ENGINE_MIN_MSGS, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE,
-    TERMINAL_THRESHOLD, INLINE_THRESHOLD, RECURSIVE_DEPTH,
-    DEBUG_LOGGING, CATALOG_MODE, _DEV, _CCR_RE, _inline_store,
-)
-
-from ._inline import _inline_compress, _inline_retrieve
-from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
-from ._binary import _detect_platform, _download_binary, _ensure_binary
-from ._proxy import _load_env, _alive_cache, _alive, _start, on_start, _wait_alive
-from ._resolve import _resolve_one, _resolve_recursive
-
-# ── Tools + state ─────────────────────────────────────────────────
-from ._tools import (
-    _retrieve_handler, _compress_handler,
-    COMPRESS_SCHEMA, RETRIEVE_SCHEMA,
-)
-
-# ── Hooks (contains some tools + all hook handlers) ────────────────
-from ._hooks import (
-    _transform_tool_result, _store_conversation_turn, _git_summary,
-    _pre_llm_hook, _transform_terminal_hook, _parse_ccr_markers,
-    _rebuild_handler, _stats_handler, _files_handler, _diff_handler,
-    _catalog_handler, _search_handler, _test_handler,
-    _track_file_refs, _fmt_size, _inline_clear,
-    _extract_preview, _group_into_turns,
-    REBUILD_SCHEMA, STATS_SCHEMA,
-    FILES_SCHEMA, DIFF_SCHEMA, CATALOG_SCHEMA, SEARCH_SCHEMA, TEST_SCHEMA,
-    _referenced_files, _recent_markers, _conv_index, _turn_counter,
-    _git_cache, _FILE_TOOLS,
+    _CCR_RE,
+    _DEV,
+    BIN_VERSION,
+    BINARY,
+    BINARY_DIR,
+    CATALOG_MODE,
+    DEBUG_LOGGING,
+    ENGINE_MIN_MSGS,
+    ENGINE_PROTECT_FIRST,
+    ENGINE_PROTECT_LAST,
+    ENGINE_THRESHOLD_PCT,
+    ENV_FILE,
+    INLINE_THRESHOLD,
+    PLUGIN_VERSION,
+    PORTS,
+    RECURSIVE_DEPTH,
+    REPO,
+    TERMINAL_THRESHOLD,
+    TOOL_THRESHOLD_CACHE,
+    TOOL_THRESHOLD_TOKEN,
+    _cfg_int,
+    _inline_store,
+    _log,
 )
 
 # ── Engine ────────────────────────────────────────────────────────
 from ._engine import (
-    AphroditeContextEngine, _engine, _set_engine, get_engine, _fire_hook,
+    AphroditeContextEngine,
+    _engine,
+    _fire_hook,
+    _set_engine,
+    get_engine,
 )
+
+# ── Hooks (contains some tools + all hook handlers) ────────────────
+from ._hooks import (
+    _FILE_TOOLS,
+    CATALOG_SCHEMA,
+    DIFF_SCHEMA,
+    FILES_SCHEMA,
+    REBUILD_SCHEMA,
+    SEARCH_SCHEMA,
+    STATS_SCHEMA,
+    TEST_SCHEMA,
+    _catalog_handler,
+    _conv_index,
+    _diff_handler,
+    _extract_preview,
+    _files_handler,
+    _fmt_size,
+    _git_cache,
+    _git_summary,
+    _group_into_turns,
+    _inline_clear,
+    _parse_ccr_markers,
+    _pre_llm_hook,
+    _rebuild_handler,
+    _recent_markers,
+    _referenced_files,
+    _search_handler,
+    _stats_handler,
+    _store_conversation_turn,
+    _test_handler,
+    _track_file_refs,
+    _transform_terminal_hook,
+    _transform_tool_result,
+    _turn_counter,
+)
+from ._inline import _inline_compress, _inline_retrieve
+from ._marker import _ccr_marker, _compress_via_proxy
+from ._proxy import _alive, _alive_cache, _load_env, _start, _wait_alive, on_start
+from ._resolve import _resolve_one, _resolve_recursive
+
+# ── Tools + state ─────────────────────────────────────────────────
+from ._tools import (
+    COMPRESS_SCHEMA,
+    RETRIEVE_SCHEMA,
+    _compress_handler,
+    _retrieve_handler,
+)
+
 
 # ── Plugin registration ───────────────────────────────────────────
 def register(ctx):

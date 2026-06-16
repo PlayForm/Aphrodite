@@ -1,63 +1,15 @@
 """aphrodite — tool handlers and schemas."""
-import os, json, time, hashlib, urllib.request
+import hashlib
+import json
 import logging
-from ._core import (_inline_store, _CCR_RE, RECURSIVE_DEPTH, PLUGIN_VERSION,
-    PORTS, BINARY, DEBUG_LOGGING, _DEV, TERMINAL_THRESHOLD, INLINE_THRESHOLD,
-    TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE, ENGINE_THRESHOLD_PCT,
-    ENGINE_PROTECT_FIRST, ENGINE_PROTECT_LAST, ENGINE_MIN_MSGS, CATALOG_MODE)
-from ._proxy import _alive
+import urllib.request
+
+from ._core import _inline_store
 from ._resolve import _resolve_one, _resolve_recursive
-from ._marker import _compress_via_proxy, _ccr_marker, _parse_ccr_markers
-from ._inline import _inline_compress, _inline_retrieve
 
 _log = logging.getLogger("aphrodite")
-_referenced_files = {}
-_recent_markers = []
-_conv_index = {}
-_turn_counter = 0
-_git_cache = {}
-_FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
 
 # ── Tools ─────────────────────────────────────────────────────
-
-def _resolve_recursive(hash_val, depth=0, resolved=None):
-    """Recursively resolve CCR markers in content, up to max depth.
-    
-    After retrieving content, scans for nested <<<CCR:...>>> markers
-    and resolves them in parallel, replacing markers with resolved content.
-    """
-    if resolved is None:
-        resolved = {}
-    
-    if depth >= RECURSIVE_DEPTH or hash_val in resolved:
-        return resolved.get(hash_val, "")
-    
-    content = _resolve_one(hash_val)
-    if content is None:
-            return f'<<<CCR:{hash_val}|unresolved>>>'
-    
-    resolved[hash_val] = content
-    
-    # Find nested CCR markers
-    nested = _CCR_RE.findall(content)
-    if not nested:
-        return content
-    
-    # Resolve nested markers in parallel (sequential for simplicity)
-    replacements = {}
-    for marker in nested:
-        parts = marker.split('|')
-        if len(parts) >= 1 and parts[0] not in resolved:
-            nested_hash = parts[0]
-            nested_content = _resolve_recursive(nested_hash, depth + 1, resolved)
-            replacements[f'<<<CCR:{marker}>>>'] = nested_content
-    
-    # Replace markers with resolved content
-    for marker_str, replacement in replacements.items():
-        content = content.replace(marker_str, replacement)
-    
-    return content
-
 
 def _retrieve_handler(args=None, **kwargs):
     """Resolve CCR markers with recursive depth. Scans for nested markers."""
@@ -88,13 +40,13 @@ def _compress_handler(args=None, **kwargs):
     type_hint = args.get("type", "text")
     if not content:
         return '{"error": "missing content parameter"}'
-    
+
     # Pop the API: check local cache first (content-addressable store)
     h = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
     if h in _inline_store:
-        return json.dumps({"hash": h, "type": type_hint, "size": len(content), 
+        return json.dumps({"hash": h, "type": type_hint, "size": len(content),
                            "source": "cache", "compression_ratio": 0})
-    
+
     try:
         data = json.dumps({"content": content}).encode()
         req = urllib.request.Request(
@@ -113,10 +65,10 @@ def _compress_handler(args=None, **kwargs):
             "size": len(content),
             "compression_ratio": result.get("compression_ratio")
         })
-    except Exception as e:
+    except Exception:
         # Fallback: store inline anyway
         _inline_store[h] = content
-        return json.dumps({"hash": h, "type": type_hint, "size": len(content), 
+        return json.dumps({"hash": h, "type": type_hint, "size": len(content),
                            "source": "inline_fallback", "compression_ratio": 0})
 
 

@@ -1,10 +1,7 @@
 """aphrodite core — constants, thresholds, CCR regex, inline store."""
+import logging
 import os
 import re
-import logging
-import hashlib
-import base64
-import zlib
 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
@@ -18,8 +15,10 @@ _log = logging.getLogger("aphrodite")
 
 # ── Configurable thresholds (env vars) ────────────────────────
 def _cfg_int(name, default):
-    try: return int(os.environ.get(name, str(default)))
-    except: return default
+    try:
+        return int(os.environ.get(name, str(default)))
+    except Exception:
+        return default
 
 ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 50)
 ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 1)
@@ -51,3 +50,25 @@ _CCR_RE = re.compile(r'<<<CCR:([^>]+)>>>')
 
 # ── Inline compression store (session-scoped) ─────────────────
 _inline_store = {}
+
+# ── Shared session state ──────────────────────────────────────
+_referenced_files = {}  # {filepath: last_tool_name}
+_recent_markers = []     # [{hash, type, size, preview}]
+_conv_index = {}         # {turn_num: (hash, summary, size)}
+_turn_counter = 0
+_git_cache = {}          # {ts, summary}
+_FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}
+
+
+# ── Shared utilities ──────────────────────────────────────────
+def _fmt_size(b):
+    if b >= 1_000_000:
+        return f"{b / 1_000_000:.1f}MB"
+    if b >= 1000:
+        return f"{b / 1000:.1f}KB"
+    return f"{b}B"
+
+
+def _inline_clear():
+    """Clear the inline store (called on session reset)."""
+    _inline_store.clear()
