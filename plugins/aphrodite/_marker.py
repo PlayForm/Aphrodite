@@ -13,6 +13,7 @@ _log = logging.getLogger("aphrodite")
 
 # Compiled regex for valid CCR hash validation
 _VALID_HASH_RE = re.compile(r"^(?:[0-9a-f]{24,}|i:[0-9a-f]{6,})$")
+_parse_errors = 0  # count of malformed CCR markers silently skipped
 
 # ── Thread-local connection pool (keep-alive reuse) ──────────
 _tls = threading.local()
@@ -37,8 +38,7 @@ def _get_conn(port: int) -> http.client.HTTPConnection:
             del _tls.conns[port]
             del _tls.conn_ts[port]
     if port not in _tls.conns:
-        _tls.conns[port] = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
-    _tls.conn_ts[port] = now
+        _tls.conns[port] = http.client.HTTPConnection("127.0.0.1", port, timeout=0.5)
     return _tls.conns[port]
 
 
@@ -69,12 +69,12 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
         parts.append(mode)
     if preview:
         safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
-        safe = "".join(c if c >= " " or c == "\t" else " " for c in safe)
+        safe = "".join(c if c >= " " else " " for c in safe)
         parts.append(f"preview={safe}")
     return f"<<<CCR:{'|'.join(parts)}>>>"
 
 
-def _compress_via_proxy(content, target_port):
+def _compress_via_proxy(content, target_port, headers=None):
     """Compress content through proxy CCR. Returns (hash, compressed_size) or None.
 
     Uses a thread-local keep-alive HTTP connection pool to avoid TCP handshake
@@ -86,15 +86,21 @@ def _compress_via_proxy(content, target_port):
     try:
         data = content.encode("utf-8")
         conn = _get_conn(target_port)
+        hdrs = {"Content-Type": "application/octet-stream", "Connection": "keep-alive"}
+        if headers:
+            for k, v in headers.items():
+                if k.lower().startswith("x-headroom-"):
+                    hdrs[k] = str(v)
         conn.request(
             "POST",
             "/ccr/create",
             body=data,
-            headers={"Content-Type": "application/octet-stream", "Connection": "keep-alive"},
+            headers=hdrs,
         )
         r = conn.getresponse()
-        ccr = json.loads(r.read())
+        ccr = json.loads(r.read(4096))
         r.close()
+        _tls.conn_ts[target_port] = time.time()
         if "error" in ccr:
             _log.debug("_compress_via_proxy: proxy returned error on port %s - %s", target_port, ccr.get("error"))
             return None
@@ -107,8 +113,8 @@ def _compress_via_proxy(content, target_port):
 def _is_valid_ccr_hash(h):
     """Check if h is a valid CCR hash.
 
-    Accepts pure hex (>=8 chars) or ``i:`` prefix followed by hex (>=6 chars rest).
-    Uses pre-compiled regex for O(n) validation instead of per-character loop.
+    Fast-reject short strings before regex; the regex enforces >=24 hex chars
+    for proxy hashes (>=6 hex for i: inline hashes).
     """
     if not h or len(h) < 8:
         return False
@@ -117,9 +123,9 @@ def _is_valid_ccr_hash(h):
 
 def _parse_ccr_markers(text):
     """Parse <<<CCR:hash|type|size|mode|preview=TEXT>>> markers from text. Returns list of dicts with preview."""
+    global _parse_errors
     markers = []
     for match in _CCR_RE.finditer(text):
-        h = match.group(1)  # hash directly from regex capture group
         full = match.group(0)
         # Extract inner content between CCR: and the closing delimiter
         inner = full.split("CCR:", 1)[1]
@@ -128,6 +134,7 @@ def _parse_ccr_markers(text):
                 inner = inner[: -len(suffix)]
                 break
         parts = inner.split("|")
+        h = parts[0]  # hash from first pipe-delimited field
         if len(parts) >= 3:
             try:
                 sz = int(parts[2])
@@ -139,7 +146,7 @@ def _parse_ccr_markers(text):
                         break
                 markers.append(
                     {
-                        "hash": h,  # from regex group(1), avoids string split
+                        "hash": h,  # from parts[0], the single source of truth
                         "type": str(parts[1]),
                         "size": sz,
                         "mode": str(parts[3]) if len(parts) > 3 else "?",
@@ -147,6 +154,7 @@ def _parse_ccr_markers(text):
                     }
                 )
             except ValueError:
+                _parse_errors += 1
                 _log.debug("_parse_ccr_markers: malformed marker skipped in %d-char text", len(text) if isinstance(text, str) else 0)
     # Filter: real CCR hashes are hex (0-9,a-f), >=8 chars,
     # or start with "i:" followed by pure hex.

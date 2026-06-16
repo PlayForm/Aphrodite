@@ -35,7 +35,7 @@ def _filter_lines(content: str, query: str) -> str:
     return "\n".join(lines)
 
 
-def _resolve_one(hash_val, timeout=4, query=""):
+def _resolve_one(hash_val, timeout=4, query="", headers=None):
     """Resolve a single CCR hash. Checks inline store first, then tries both proxies
     concurrently using ThreadPoolExecutor for reduced latency.
 
@@ -63,7 +63,7 @@ def _resolve_one(hash_val, timeout=4, query=""):
     for port in (PORTS["token"], PORTS["cache"]):
         if not _alive_turn_cache.get(port, True):
             continue
-        futures[executor.submit(_proxy_lookup, port, payload, timeout)] = port
+        futures[executor.submit(_proxy_lookup, port, payload, timeout, headers)] = port
     for future in as_completed(futures, timeout=timeout + 1):
         try:
             result = future.result()
@@ -77,7 +77,7 @@ def _resolve_one(hash_val, timeout=4, query=""):
     return None
 
 
-def _proxy_lookup(port: int, payload: dict, timeout: int = 4) -> str | None:
+def _proxy_lookup(port: int, payload: dict, timeout: int = 4, headers: dict | None = None) -> str | None:
     """Try a single proxy port and return the content if found.
 
     Uses thread-local keep-alive HTTP connection from _marker.py to avoid
@@ -87,11 +87,16 @@ def _proxy_lookup(port: int, payload: dict, timeout: int = 4) -> str | None:
     try:
         data = json.dumps(payload).encode()
         conn = _get_conn(port)
+        hdrs = {"Content-Type": "application/json", "Connection": "keep-alive"}
+        if headers:
+            for k, v in headers.items():
+                if k.lower().startswith("x-headroom-"):
+                    hdrs[k] = str(v)
         conn.request(
             "POST",
             "/retrieve",
             body=data,
-            headers={"Content-Type": "application/json", "Connection": "keep-alive"},
+            headers=hdrs,
         )
         r = conn.getresponse()
         result = json.loads(r.read())

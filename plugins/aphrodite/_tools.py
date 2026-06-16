@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import os
 import urllib.request
 
 from ._core import PORTS, _hash_alias, _inline_store, _inline_store_put
@@ -10,6 +11,10 @@ from ._proxy import _alive_cached
 from ._resolve import _filter_lines, _resolve_recursive
 
 _log = logging.getLogger("aphrodite")
+
+# ── Workspace boundary for path-mode file reads ────────────────
+_WORKSPACE_ROOT = os.path.realpath(".")
+_MAX_PATH_READ = 10_485_760  # 10MB cap
 
 # ── Tools ─────────────────────────────────────────────────────
 
@@ -19,6 +24,8 @@ def _retrieve_handler(args=None, **kwargs):
     args = args if isinstance(args, dict) else {}
     hash_val = args.get("hash", "").strip()
     # Defensive: if the user passes a full <<<CCR:hash|type|size>>> marker, extract just the hash
+    if hash_val.startswith("<<<CCR:"):
+        hash_val = hash_val.removeprefix("<<<CCR:").removesuffix(">>>").strip()
     if "|" in hash_val:
         hash_val = hash_val.split("|")[0].strip()
     query = args.get("query", "")
@@ -27,8 +34,16 @@ def _retrieve_handler(args=None, **kwargs):
         return json.dumps({"error": "missing hash or path parameter"})
     try:
         if path:
-            with open(path, "r") as f:
-                content = f.read()
+            resolved = os.path.realpath(path)
+            if not resolved.startswith(_WORKSPACE_ROOT):
+                return json.dumps({"error": f"path outside workspace boundary: {path}"})
+            if not os.path.isfile(resolved):
+                return json.dumps({"error": f"not a file: {path}"})
+            with open(resolved, "r") as f:
+                content = f.read(_MAX_PATH_READ)
+                remainder = f.read(1)
+                if remainder:
+                    content += "\n... [truncated at 10MB]"
             if query:
                 content = _filter_lines(content, query)
             return json.dumps({"content": content, "path": path, "size": len(content)})
@@ -38,6 +53,14 @@ def _retrieve_handler(args=None, **kwargs):
                 content = _filter_lines(content, query)
             return json.dumps({"content": content, "hash": hash_val, "size": len(content)})
         return json.dumps({"error": f"CCR entry not found: {hash_val}"})
+    except MemoryError:
+        raise
+    except PermissionError:
+        return json.dumps({"error": f"permission denied: {path}"})
+    except IsADirectoryError:
+        return json.dumps({"error": f"is a directory, not a file: {path}"})
+    except FileNotFoundError:
+        return json.dumps({"error": f"file not found: {path}"})
     except Exception as e:
         return json.dumps({"error": f"retrieve failed: {e}"})
 
@@ -59,7 +82,7 @@ def _compress_handler(args=None, **kwargs):
 
     # Pop the API: check local cache first (content-addressable store)
     full_h = hashlib.sha256(content.encode("utf-8")).hexdigest()
-    h = full_h[:16]
+    h = full_h[:24]
     canonical = _hash_alias.get(full_h, h)
     if canonical in _inline_store:
         return json.dumps(
@@ -67,7 +90,7 @@ def _compress_handler(args=None, **kwargs):
         )
 
     try:
-        data = json.dumps({"content": content}).encode()
+        data = content.encode("utf-8")
         target = PORTS["token"] if _alive_cached(PORTS["token"]) else PORTS["cache"]
         req = urllib.request.Request(
             f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/octet-stream"}
@@ -118,6 +141,6 @@ RETRIEVE_SCHEMA = {
             },
             "path": {"type": "string", "description": "Optional: file path to read directly (bypasses CCR)"},
         },
-        "required": ["hash"],
+        "required": [],
     },
 }
