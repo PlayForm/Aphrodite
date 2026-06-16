@@ -120,11 +120,15 @@ class AphroditeContextEngine(ContextEngine):
             while boundary < len(messages) and messages[boundary].get("role") == "tool":
                 boundary += 1
                 tail_n += 1
-            if boundary > 0 and messages[boundary - 1].get("role") == "assistant":
-                tool_calls = messages[boundary - 1].get("tool_calls", [])
-                if tool_calls:
+            # After sweeping orphan tool messages, scan backward to find
+            # the assistant that owns them — not the last tool message.
+            while boundary > head_n and messages[boundary - 1].get("role") in ("tool", "assistant"):
+                if messages[boundary - 1].get("tool_calls"):
                     boundary -= 1
                     tail_n += 1
+                    break
+                boundary -= 1
+                tail_n += 1
             tail_n = min(tail_n, len(messages) - head_n)
 
         head = messages[:head_n]
