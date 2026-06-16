@@ -1,6 +1,5 @@
 """aphrodite - inline compression (zlib fallback when proxy is down)."""
 
-import base64
 import hashlib
 import zlib
 
@@ -9,16 +8,26 @@ from ._core import _inline_store
 
 def _inline_compress(content):
     """Compress content locally using zlib, store in session dict. Returns (hash, compressed_size)."""
-    compressed = base64.urlsafe_b64encode(zlib.compress(content.encode("utf-8"), 9)).decode("ascii")
-    h = "i:" + hashlib.sha256(content.encode("utf-8")).hexdigest()[:14]
-    _inline_store[h] = content
-    # Keep store bounded
+    try:
+        raw_bytes = content.encode("utf-8")
+    except UnicodeEncodeError:
+        # Non-UTF-8 content: encode with lossy replacement, fall back to latin-1
+        raw_bytes = content.encode("utf-8", errors="replace")
+        if not raw_bytes:
+            raw_bytes = content.encode("latin-1")
+    raw = zlib.compress(raw_bytes, 9)
+    h_bare = hashlib.sha256(raw_bytes).hexdigest()[:14]
+    _inline_store[h_bare] = content
+    # Keep store bounded (LRU eviction)
     if len(_inline_store) > 500:
-        oldest = next(iter(_inline_store))
-        del _inline_store[oldest]
-    return h, len(compressed)
+        _inline_store.popitem(last=False)
+    return "i:" + h_bare, len(raw)
 
 
 def _inline_retrieve(hash_val):
     """Retrieve content from inline store. Returns content or None."""
-    return _inline_store.get(hash_val[2:] if hash_val.startswith("i:") else hash_val)
+    h_bare = hash_val[2:] if hash_val.startswith("i:") else hash_val
+    if h_bare not in _inline_store:
+        return None
+    _inline_store.move_to_end(h_bare)  # LRU promotion
+    return _inline_store[h_bare]

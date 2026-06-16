@@ -5,7 +5,7 @@
 //! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
 use std::sync::Arc;
-use axum::{routing::{any, delete, get, post}, http::StatusCode, Json, Router};
+use axum::{routing::{any, delete, get, post}, http::StatusCode, response::IntoResponse, Json, Router};
 use clap::Parser;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -110,6 +110,36 @@ async fn run_single(name: String, cli: Cli) -> anyhow::Result<()> {
         .route("/stats", get({
             let s = state.clone();
             move || async move { Json(s.stats_json()) }
+        }))
+        .route("/stats/db", get({
+            let s = state.clone();
+            move || async move {
+                let mode = match s.mode {
+                    ProxyMode::Cache => "cache",
+                    ProxyMode::Token => "token",
+                };
+                match &s.ccr {
+                    Some(ccr) => match ccr.stats_db() {
+                        Some(stats) => Json(stats).into_response(),
+                        None => (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "error": "stats_db not available for this backend",
+                                "mode": mode,
+                            })),
+                        )
+                            .into_response(),
+                    },
+                    None => (
+                        StatusCode::OK,
+                        Json(serde_json::json!({
+                            "error": "CCR not enabled",
+                            "mode": mode,
+                        })),
+                    )
+                        .into_response(),
+                }
+            }
         }))
         // NOTE: No auth on /metrics - intentional for local-only deployments.
         // In production, add a reverse-proxy auth layer or firewall this endpoint.
