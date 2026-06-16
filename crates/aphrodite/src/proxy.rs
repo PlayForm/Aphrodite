@@ -435,6 +435,7 @@ pub async fn build_state(cli: &Cli) -> anyhow::Result<AppState> {
 	// Default pool: 100 idle connections per host, 90s idle timeout, keepalive.
 	let client = HttpClient::builder()
 		.timeout(std::time::Duration::from_secs(cli.timeout))
+		.connect_timeout(std::time::Duration::from_secs(10))
 		.pool_max_idle_per_host(100)
 		.pool_idle_timeout(std::time::Duration::from_secs(90))
 		.tcp_keepalive(std::time::Duration::from_secs(60))
