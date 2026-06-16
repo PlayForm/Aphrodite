@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'aphrodite-cache'
+    static_configs:
+      - targets: ['host.docker.internal:9797']
+    metrics_path: /metrics
+
+  - job_name: 'aphrodite-token'
+    static_configs:
+      - targets: ['host.docker.internal:9798']
+    metrics_path: /metrics
