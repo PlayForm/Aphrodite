@@ -137,7 +137,8 @@ impl MultiConfig {
 	pub fn resolve(&self, cfg: &ProxyConfig) -> anyhow::Result<Cli> {
 		let d = self.defaults.as_ref();
 		let api_key: String = cfg
-			.api_key
+			// API key fallback chain: explicit config → APHRODITE_API_KEY → DEEPSEEK_API_KEY → HEADROOM_DEEPSEEK_KEY
+		.api_key
 			.clone()
 			.or_else(|| d.and_then(|d| d.api_key.clone()))
 			.or_else(|| std::env::var("APHRODITE_API_KEY").ok())

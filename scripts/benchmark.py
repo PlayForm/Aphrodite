@@ -5,7 +5,7 @@ Endpoints:
   GET  /health      → {"status":"ok","checks":{"cache":…,"token":…}}
   GET  /stats       → {"mode":"token","requests":{…},"ccr":{…}}
   GET  /ccr/list    → {"entries":N,"backend":"sqlite","mode":"token"}
-  POST /ccr/create  → body {"content":"…"}  → {"hash":"…","compression_ratio":…}
+  POST /ccr/create  → body {"content":"…"}  → {"hash":"…","token_savings_ratio":…}
   POST /retrieve    → body {"hash":"…"}      → {"found":true,"content":"…","source":"ccr"}
 """
 
@@ -124,7 +124,7 @@ def phase_compress(label: str, generator, iterations: int = 3):
             h = r["body"].get("hash", "")
             if h:
                 hashes.append(h)
-                cr = r["body"].get("compression_ratio", 0)
+                cr = r["body"].get("token_savings_ratio", 0)
                 ratios.append(cr)
 
     return {"name": f"compress/{label}", "iterations": len(latencies), "latency_ms": round(statistics.mean(latencies),1) if latencies else 0,
