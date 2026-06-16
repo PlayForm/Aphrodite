@@ -47,11 +47,11 @@ echo "[build] OK"
 cargo test -p aphrodite 2>&1 | tail -1
 echo "[test] OK"
 
-# Commit version bump + tag
+# Commit version bump + tag (no editor prompts)
 git add -u
 git commit -m "release(aphrodite): v$NEW — $MSG"
 git tag -d "v$NEW" 2>/dev/null || true
-git tag "v$NEW"
+GIT_EDITOR=true git tag -a "v$NEW" -m "v$NEW" 2>/dev/null || git tag "v$NEW"
 echo "[release] v$NEW tagged"
 
 # Push
