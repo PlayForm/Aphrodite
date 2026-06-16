@@ -73,6 +73,17 @@ __all__ = [
     "SEARCH_SCHEMA", "TEST_SCHEMA", "CATALOG_SCHEMA",
 ]
 
+# ── Module-level frozenset constants ───────────────────────────
+_ESSENTIAL_TOOLS: frozenset = frozenset({
+    "skill_view", "skills_list", "skill_manage", "memory",
+    "session_search", "read_file", "read_terminal",
+})
+_READ_KEYWORDS: frozenset = frozenset({
+    "read", "show", "view", "get", "cat", "display", "retrieve",
+    "fetch", "look", "see", "open", "inspect", "check", "print",
+    "dump", "output",
+})
+
 # ── Hooks ─────────────────────────────────────────────────────
 
 def _transform_tool_result(
@@ -110,15 +121,6 @@ def _transform_tool_result(
     proxy_available = token_alive or cache_alive
 
     # Essential tools: never compress - agent needs immediate access to skills, memory, session history
-    _ESSENTIAL_TOOLS = {
-        "skill_view",
-        "skills_list",
-        "skill_manage",
-        "memory",
-        "session_search",
-        "read_file",
-        "read_terminal",
-    }
     skip = (
         _ESSENTIAL_TOOLS | {"aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
         if token_alive
@@ -275,12 +277,8 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
     target = PORTS["token"] if token_alive else PORTS["cache"]
     tnum = _increment_turn()
 
-    # Capture the last user message from conversation history
-    last_user = ""
-    for msg in reversed(conversation_history):
-        if msg.get("role") == "user":
-            last_user = msg.get("content", "")
-            break
+    # Use cached last user message from pre_llm_hook (avoids scanning full history)
+    last_user = _last_user_msg
 
     summary = f"T{tnum}: {last_user}… → {str(assistant_response)[:200]}"
     # Tag by file type for better retrieval
@@ -320,15 +318,18 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
         _log.debug("_store_conversation_turn: %s", exc)
 
 
-def _git_summary():
-    """Get cached git diff --stat summary. Returns string or None."""
+def _git_summary(cwd: str | None = None):
+    """Get cached git diff --stat summary. Returns string or None.
+    ``cwd`` defaults to the session's current working directory."""
+    if cwd is None:
+        cwd = os.getcwd()
     now = time.time()
     if _git_cache.get("ts", 0) > now - 30:
         return _git_cache.get("summary")
     try:
         import subprocess
 
-        r = subprocess.run(["git", "diff", "--stat"], capture_output=True, text=True, timeout=3)
+        r = subprocess.run(["git", "diff", "--stat"], capture_output=True, text=True, timeout=3, cwd=cwd)
         if r.returncode == 0 and r.stdout.strip():
             summary = r.stdout.strip().split("\n")[-1] if r.stdout.strip() else None
             _git_cache["ts"] = now
@@ -360,11 +361,12 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         return
 
     # Refresh turn-scoped alive cache for consistent proxy state within this turn
-    global _alive_turn_cache, _scanned_msg_idx
+    global _alive_turn_cache, _scanned_msg_idx, _last_user_msg
     _alive_turn_cache = {
         PORTS["token"]: _alive(PORTS["token"]),
         PORTS["cache"]: _alive(PORTS["cache"]),
     }
+    _last_user_msg = user_message or ""  # cache for _store_conversation_turn
 
     token_alive = _alive_cached(PORTS["token"])
     cache_alive = _alive_cached(PORTS["cache"])
@@ -374,20 +376,23 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
     # ── 0. Pass through x-headroom-* headers (skip bypass) ──
     headroom_hdrs = {}
-    headers = kwargs.get("headers", {})
+    headers = kwargs.get("headers")
     if headers:
         for k, v in headers.items():
             kl = k.lower()
             if kl.startswith("x-headroom-") and kl != "x-headroom-bypass":
                 headroom_hdrs[k] = v
 
-    # ── 1. Scan for CCR markers (incremental - only new messages) ──
+    # ── 1. Scan for CCR markers (incremental - only tool/system messages + "CCR:" fast-check) ──
     markers = []
     total_bytes = 0
     start_idx = max(0, _scanned_msg_idx)
     for msg in conversation_history[start_idx:]:
+        role = msg.get("role", "")
+        if role not in ("tool", "system"):  # user/assistant messages never carry CCR markers
+            continue
         content = msg.get("content", "")
-        if isinstance(content, str):
+        if isinstance(content, str) and "CCR:" in content:  # fast substring check before full regex
             for m in _parse_ccr_markers(content):
                 total_bytes += m["size"]
                 markers.append(m)
@@ -398,10 +403,12 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         if old_m.get("hash") not in seen_hashes:
             markers.append(old_m)
             seen_hashes.add(old_m["hash"])
-    # Only mutate _recent_markers when the set of hashes actually changed
+    # Only append new markers (hash-set-diff) instead of full clear+extend
     if seen_hashes != {m["hash"] for m in _recent_markers}:
-        _recent_markers.clear()
-        _recent_markers.extend(markers)  # deque(maxlen=200) handles capping
+        current_hashes = {m["hash"] for m in _recent_markers}
+        for m in markers:
+            if m["hash"] not in current_hashes:
+                _recent_markers.append(m)
     if DEBUG_LOGGING and markers:
         _log.debug(
             "pre_llm_hook: scanned %d CCR markers across %d msgs, %s total compressed",
@@ -583,24 +590,6 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 
         # Read-intent detection (skip in tool mode)
         if CATALOG_MODE != "tool":
-            READ_KEYWORDS = {
-                "read",
-                "show",
-                "view",
-                "get",
-                "cat",
-                "display",
-                "retrieve",
-                "fetch",
-                "look",
-                "see",
-                "open",
-                "inspect",
-                "check",
-                "print",
-                "dump",
-                "output",
-            }
             last_user = user_message or ""
             if not last_user and isinstance(conversation_history, list):
                 for msg in reversed(conversation_history):
@@ -608,7 +597,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                         last_user = str(msg.get("content", ""))[:200].lower()
                         break
             words = set(last_user.lower().split())
-            has_read_intent = bool(words & READ_KEYWORDS)
+            has_read_intent = bool(words & _READ_KEYWORDS)
             if has_read_intent and markers:
                 recent_markers = markers[-3:]
                 parts.append(
