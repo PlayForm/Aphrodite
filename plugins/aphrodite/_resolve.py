@@ -8,7 +8,7 @@ from functools import lru_cache
 from ._core import _CCR_RE, PORTS, RECURSIVE_DEPTH, _inline_store_put
 from ._inline import _inline_retrieve
 from ._marker import _get_conn, _put_conn  # reuse keep-alive connection pool
-from ._proxy import _alive_turn_cache
+from ._proxy import _alive_turn_cache, _headroom_context
 
 # Shared executor for concurrent proxy lookups - avoids per-call creation overhead
 _EXECUTOR: ThreadPoolExecutor | None = None
@@ -111,7 +111,7 @@ def _proxy_lookup(port: int, payload: dict, timeout: int = 4, headers: dict | No
     return None
 
 
-def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
+def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None, headers=None):
     """Resolve a CCR hash and recursively unpack all nested <<<CCR:...>>> markers.
 
     Calls _resolve_one to fetch the content for the top-level hash, then scans
@@ -119,6 +119,9 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
     up to RECURSIVE_DEPTH levels deep (default 5). Uses ``_visited`` set to prevent
     infinite recursion on self-referential or circular markers, and ``resolved``
     dict to cache already-resolved hashes so they are not re-fetched.
+
+    ``headers`` (optional) is forwarded to _resolve_one → _proxy_lookup so
+    x-headroom-* context carriers through expansions.
 
     Returns the fully resolved content string, or None if the hash was not
     resolved (e.g. max depth exceeded with no cached result). When a hash
@@ -139,7 +142,7 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
     _visited.add(hash_val)
     if depth >= RECURSIVE_DEPTH or hash_val in resolved:
         return resolved.get(hash_val)
-    content = _resolve_one(hash_val)
+    content = _resolve_one(hash_val, headers=headers or (_headroom_context or None))
     if content is None:
         return f"[CCR_UNRESOLVED:{hash_val}]"
     resolved[hash_val] = content
@@ -153,7 +156,7 @@ def _resolve_recursive(hash_val, depth=0, resolved=None, _visited=None):
         parts = match.group(1).split("|")
         if len(parts) >= 1 and parts[0] not in resolved:
             nested_hash = parts[0]
-            nested_content = _resolve_recursive(nested_hash, depth + 1, resolved)
+            nested_content = _resolve_recursive(nested_hash, depth + 1, resolved, headers=headers)
             replacements[full_marker] = nested_content
     for marker_str, replacement in replacements.items():
         content = content.replace(marker_str, replacement)
@@ -170,5 +173,8 @@ def _cached_expand(hash_val: str) -> str | None:
     Prevents re-expanding large documents on repeated requests for the same
     hash.  Caches the fully resolved string keyed by hash only (no query),
     so repeated calls to resolve the same hash are O(1) after the first.
+
+    Threads _headroom_context through to _resolve_recursive for session
+    header continuity.
     """
-    return _resolve_recursive(hash_val)
+    return _resolve_recursive(hash_val, headers=_headroom_context or None)

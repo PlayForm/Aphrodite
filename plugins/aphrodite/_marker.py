@@ -54,7 +54,7 @@ def _put_conn(port: int) -> None:
             del _tls.conn_ts[port]
 
 
-def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
+def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None):
     """Build a standard CCR marker string.
 
     Args:
@@ -63,6 +63,9 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
         size: Original size in bytes.
         mode: Proxy mode (token, cache, inline, etc.).
         preview: Optional text preview (pipe-safe, control-char-stripped).
+        headroom_budget: If set (int or str), lower values truncate preview
+            earlier so the marker itself takes fewer tokens under tight
+            budget.  Ignored when preview is empty.
     """
     parts = [hash_val, ccr_type, str(size)]
     if mode:
@@ -70,6 +73,18 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
     if preview:
         safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
         safe = "".join(c if c >= " " else " " for c in safe)
+        # Truncate preview based on headroom budget (lower budget = shorter)
+        if headroom_budget is not None:
+            try:
+                budget = int(headroom_budget)
+                if budget < 25:
+                    safe = safe[:30]
+                elif budget < 50:
+                    safe = safe[:60]
+                elif budget < 75:
+                    safe = safe[:100]
+            except (ValueError, TypeError):
+                pass  # non-numeric budget, keep full preview
         parts.append(f"preview={safe}")
     return f"<<<CCR:{'|'.join(parts)}>>>"
 

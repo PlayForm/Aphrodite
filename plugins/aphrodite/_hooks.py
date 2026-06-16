@@ -46,7 +46,7 @@ from ._core import (
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
 from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers, _parse_errors
-from ._proxy import _alive, _alive_cache, _alive_cached, _alive_turn_cache, _expand_guidance
+from ._proxy import _alive, _alive_cache, _alive_cached, _alive_turn_cache, _expand_guidance, _headroom_context, _query_and_set_headroom_budget, _update_headroom_context
 from ._resolve import _resolve_one
 from ._tools import _compress_handler, _retrieve_handler
 
@@ -229,7 +229,7 @@ def _transform_tool_result(
     # Try proxy compression first
     if proxy_available:
         target = PORTS["token"] if token_alive else PORTS["cache"]
-        ccr = _compress_via_proxy(result, target)
+        ccr = _compress_via_proxy(result, target, headers=_headroom_context or None)
         if ccr:
             h, sz = ccr
             # Bridge hash formats: map full SHA-256 → canonical proxy hash
@@ -250,7 +250,7 @@ def _transform_tool_result(
                 )
             _recent_markers.append({"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"]})
             _inline_store_put(h, result)
-            return _ccr_marker(h, marker_type, result_len, label, preview)
+            return _ccr_marker(h, marker_type, result_len, label, preview, headroom_budget=_headroom_context.get("x-headroom-budget"))
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s - proxy returned no hash", tool_name[:40])
 
@@ -271,7 +271,7 @@ def _transform_tool_result(
                     (time.time() - _t0) * 1000,
                 )
             _recent_markers.append({"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"]})
-            return _ccr_marker(h, marker_type, result_len, "inline", preview)
+            return _ccr_marker(h, marker_type, result_len, "inline", preview, headroom_budget=_headroom_context.get("x-headroom-budget"))
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("transform_tool_result: INLINE FAIL %s", tool_name[:40])
@@ -359,8 +359,11 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
                 "assistant": capped_resp,
             }
         ).encode()
+        store_headers = {"Content-Type": "application/octet-stream"}
+        if _headroom_context:
+            store_headers.update(_headroom_context)
         req = urllib.request.Request(
-            f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/octet-stream"}
+            f"http://127.0.0.1:{target}/ccr/create", data=data, headers=store_headers
         )
         with urllib.request.urlopen(req, timeout=2) as r:
             ccr = json.loads(r.read())
@@ -437,7 +440,11 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     target = PORTS["token"] if token_alive else PORTS["cache"] if cache_alive else None
     ctx_len = len(conversation_history)
 
-    # ── 0a. Inject session-start instruction (once per session) ──
+    # ── 0a. Headroom feedback loop: query fill_pct from proxy, set headroom_budget ──
+    if target and proxy_available:
+        _query_and_set_headroom_budget(target)
+
+    # ── 0b. Inject session-start instruction (once per session) ──
     if not _session_instruction_injected and not _DEV:
         _inject_session_instruction(conversation_history)
 
@@ -445,6 +452,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     headroom_hdrs = {}
     headers = kwargs.get("headers")
     if headers:
+        _update_headroom_context(dict(headers))
         for k, v in headers.items():
             kl = k.lower()
             if kl.startswith("x-headroom-") and kl != "x-headroom-bypass":
@@ -589,10 +597,13 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     packed = json.dumps(summaries)
                     if len(packed) > 500:
                         data = packed.encode()
+                        archive_headers = {"Content-Type": "application/octet-stream"}
+                        if _headroom_context:
+                            archive_headers.update(_headroom_context)
                         req = urllib.request.Request(
                             f"http://127.0.0.1:{target}/ccr/create",
                             data=data,
-                            headers={"Content-Type": "application/octet-stream"},
+                            headers=archive_headers,
                         )
                         with urllib.request.urlopen(req, timeout=3) as r:
                             ccr = json.loads(r.read())
@@ -952,7 +963,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             # Store full output in CCR, return summary
             if proxy_available:
                 target = PORTS["token"] if token_alive else PORTS["cache"]
-                ccr = _compress_via_proxy(output, target)
+                ccr = _compress_via_proxy(output, target, headers=_headroom_context or None)
                 if ccr:
                     h, _ = ccr
                     # Bridge hash formats for _compress_handler cache hits (#51)

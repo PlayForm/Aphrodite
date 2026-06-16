@@ -48,6 +48,60 @@ _PROXY_ENV_KEYS = {"PATH", "HOME", "APHRODITE_API_KEY", "DYLD_LIBRARY_PATH", "DY
 # ── Auto-expand guidance (set by on_start after proxy launch) ──
 _expand_guidance: str = ""
 
+# ── Headroom session context (tracked at session start, refreshed per-turn) ──
+_headroom_context: dict[str, str] = {}  # {"x-headroom-budget": "...", "x-headroom-fill": "..."}
+
+
+def _update_headroom_context(headers: dict | None) -> None:
+    """Update _headroom_context from an LLM-call headers dict.
+
+    Called each turn by ``_pre_llm_hook`` so compression calls in
+    ``_transform_tool_result`` and ``_transform_terminal_hook`` inherit
+    the same session context.  Only ``x-headroom-*`` keys are kept;
+    ``x-headroom-bypass`` is explicitly excluded.
+    """
+    global _headroom_context
+    if not headers:
+        return
+    fresh = {}
+    for k, v in headers.items():
+        kl = k.lower()
+        if kl.startswith("x-headroom-") and kl != "x-headroom-bypass":
+            fresh[k] = str(v)
+    if fresh:
+        _headroom_context.update(fresh)
+
+
+def _query_and_set_headroom_budget(port: int, timeout: float = 2.0) -> None:
+    """Query proxy /health for fill_pct and set x-headroom-budget in _headroom_context.
+
+    Lower fill_pct → more headroom → higher budget (less aggressive compression).
+    Higher fill_pct → less headroom → lower budget (more aggressive compression).
+    Budget is clamped to [5, 99].
+    """
+    global _headroom_context
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+        conn.request("GET", "/health", headers={"Connection": "close"})
+        resp = conn.getresponse()
+        body = resp.read().decode().strip()
+        conn.close()
+        if body:
+            data = json.loads(body)
+            fill_pct = data.get("fill_pct")
+            if fill_pct is not None:
+                fill_pct = float(fill_pct)
+                # budget = 100 - fill_pct, clamped [5, 99]
+                budget = max(5, min(99, int(100.0 - fill_pct)))
+                _headroom_context["x-headroom-budget"] = str(budget)
+                if DEBUG_LOGGING:
+                    _log.debug(
+                        "headroom: fill_pct=%.1f%% budget=%d (from %s)",
+                        fill_pct, budget, port,
+                    )
+    except Exception as exc:
+        _log.debug("headroom query failed on :%d: %s", port, exc)
+
 
 def _load_env():
     """Load .env file into a dict."""
@@ -279,6 +333,8 @@ def on_start(**kw):
         return
     # Clear stale cache before checking (fixes stale state across session restarts)
     _alive_cache.clear()
+    # Reset headroom context for the new session
+    _headroom_context.clear()
 
     env = {**os.environ, **_load_env()}
     if not env.get("APHRODITE_API_KEY"):
