@@ -346,7 +346,7 @@ async fn run_single(
                 "profile": option_env!("APHRODITE_PROFILE"),
             }))
         }))
-        .route("/*path", any(proxy::proxy_handler))
+        .route("/{*path}", any(proxy::proxy_handler))
         // Loopback enforcement layer on all non-/health routes
         .layer(middleware::from_fn(loopback_only))
         // 1 MB body limit on restricted routes
