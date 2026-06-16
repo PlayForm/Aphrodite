@@ -5,7 +5,14 @@
 //! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
 use std::sync::Arc;
-use axum::{extract::ConnectInfo, routing::{any, delete, get, post}, http::StatusCode, response::IntoResponse, Json, Router};
+use axum::{
+    extract::{ConnectInfo, Request},
+    http::StatusCode,
+    middleware::{self, Next},
+    response::{IntoResponse, Json},
+    routing::{any, delete, get, post},
+    Router,
+};
 use clap::Parser;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
@@ -20,12 +27,12 @@ async fn main() -> anyhow::Result<()> {
     // Try multi-proxy config first, fall back to CLI
     let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
     let (proxies, log_compact): (Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
-        let config = MultiConfig::load()?;
+        let config = MultiConfig::load(&config_path)?;
         let proxies: Vec<(String, Cli)> = config.proxies.iter().map(|p| {
-            let cli = config.resolve(p);
+            let cli = config.resolve(p)?;
             let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
-            (name, cli)
-        }).collect();
+            Ok((name, cli))
+        }).collect::<anyhow::Result<Vec<_>>>()?;
         let log_compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
         (proxies, log_compact)
     } else {
@@ -50,18 +57,28 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("starting {} proxy listener(s)", proxies.len());
 
+    // Shared shutdown watch channel - single signal source propagates to all proxies.
+    // Initial value false; main() sets true on first Ctrl+C/SIGTERM,
+    // each run_single() task waits on the receiver for graceful_shutdown.
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
     let mut handles = Vec::new();
     for (name, cli) in proxies {
+        let rx = shutdown_rx.clone();
         let handle = tokio::spawn(async move {
-            if let Err(e) = run_single(name, cli).await {
+            if let Err(e) = run_single(name, cli, rx).await {
                 tracing::error!(%e, "proxy listener failed");
             }
         });
         handles.push(handle);
     }
+    // Drop the original sender so run_single receivers get a RecvError::Closed
+    // when main() finishes (SIGTERM alternative: drop triggers changed() wakeup).
+    drop(shutdown_rx);
 
-    // Wait for first shutdown signal — triggers graceful shutdown in all proxies
+    // Wait for first shutdown signal - triggers graceful shutdown in all proxies
     shutdown_signal().await;
+    let _ = shutdown_tx.send(true);
     tracing::info!("shutdown signal received, draining in-flight requests...");
 
     // Clone abort handles so we can force-kill after handles are moved into join_all
@@ -78,7 +95,9 @@ async fn main() -> anyhow::Result<()> {
     let drain_timeout = tokio::time::sleep(std::time::Duration::from_secs(5));
     tokio::pin!(drain_timeout);
 
-    // Wait for graceful drain (via axum's with_graceful_shutdown), second signal, or timeout
+    // Wait for graceful drain (via axum's with_graceful_shutdown), second signal, or timeout.
+    // NOTE: do NOT re-await drain_fut after select! - it was polled by select! and
+    // re-awaiting would be double-poll UB. Abort handles handle the remaining tasks.
     let drain_fut = futures::future::join_all(handles);
     tokio::pin!(drain_fut);
 
@@ -91,22 +110,23 @@ async fn main() -> anyhow::Result<()> {
             for h in &abort_handles {
                 h.abort();
             }
-            // Let aborted tasks settle
-            let _ = (&mut drain_fut).await;
         }
         _ = &mut second_signal => {
             tracing::info!("force shutdown on second signal, aborting remaining tasks");
             for h in &abort_handles {
                 h.abort();
             }
-            let _ = (&mut drain_fut).await;
         }
     }
 
     Ok(())
 }
 
-async fn run_single(name: String, mut cli: Cli) -> anyhow::Result<()> {
+async fn run_single(
+    name: String,
+    mut cli: Cli,
+    mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+) -> anyhow::Result<()> {
     // Resolve relative ccr_db_path against the binary directory, not CWD.
     // This way the database path is stable regardless of where the process is launched from.
     if !cli.ccr_db_path.as_os_str().is_empty() && !cli.ccr_db_path.is_absolute() {
@@ -144,8 +164,8 @@ async fn run_single(name: String, mut cli: Cli) -> anyhow::Result<()> {
         "proxy starting"
     );
 
-    let app = Router::new()
-        .route("/health", get(health_check))
+    // Restricted routes - loopback-only enforcement for everything except /health
+    let restricted = Router::new()
         .route("/health/upstream", get({
             let s = state.clone();
             move |ConnectInfo(addr): ConnectInfo<SocketAddr>| {
@@ -227,9 +247,16 @@ async fn run_single(name: String, mut cli: Cli) -> anyhow::Result<()> {
                 }
                 // Latency buckets
                 if let Some(buckets) = stats["latency_buckets_us"].as_array() {
+                    let mut total_count: u64 = 0;
                     for (i, v) in buckets.iter().enumerate() {
                         let le = match i { 0=>"0.001", 1=>"0.01", 2=>"0.1", 3=>"1.0", 4=>"10.0", _=>"+Inf"};
-                        out.push_str(&format!("aphrodite_latency_seconds_bucket{{le=\"{}\"}} {}\n", le, v));
+                        let count = v.as_u64().unwrap_or(0);
+                        total_count += count;
+                        out.push_str(&format!("aphrodite_latency_seconds_bucket{{le=\"{}\"}} {}\n", le, total_count));
+                    }
+                    out.push_str(&format!("aphrodite_latency_seconds_count {}\n", total_count));
+                    if let Some(total_us) = stats["total_latency_micros"].as_u64() {
+                        out.push_str(&format!("aphrodite_latency_seconds_sum {:.6}\n", total_us as f64 / 1_000_000.0));
                     }
                 }
                 if let Some(ratio) = stats["compression_ratio_ema"].as_f64() {
@@ -253,21 +280,53 @@ async fn run_single(name: String, mut cli: Cli) -> anyhow::Result<()> {
         .route("/robots.txt", get(|| async { "User-agent: *\nDisallow: /\n" }))
         .route("/", get(|| async { Json(serde_json::json!({"proxy": "aphrodite", "version": env!("CARGO_PKG_VERSION")})) }))
         .route("/*path", any(proxy::proxy_handler))
+        // Loopback enforcement layer on all non-/health routes
+        .layer(middleware::from_fn(loopback_only));
+
+    // Public route (no loopback enforcement) merged with restricted routes
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .merge(restricted)
         .layer(CorsLayer::permissive())
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(cli.listen).await?;
     tracing::info!(addr = %listener.local_addr()?, "listening");
 
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-    	.with_graceful_shutdown(shutdown_signal())
-    	.await?;
+    // Graceful shutdown triggered by shared watch channel - fires when main()
+    // calls shutdown_tx.send(true) after OS signal, or when sender is dropped.
+    let shutdown_fut = async move {
+        let _ = shutdown_rx.changed().await;
+    };
+    let serve_result = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .with_graceful_shutdown(shutdown_fut)
+        .await;
 
+    // Close task tracker BEFORE propagating serve error so background tasks
+    // are not leaked when serve fails (e.g. epoll registration error).
     task_tracker.close();
     task_tracker.wait().await;
     tracing::debug!("all background tasks completed");
 
+    serve_result?;
+
     Ok(())
+}
+
+/// Middleware that rejects non-loopback clients on all routes except /health.
+/// /health is intentionally exempt so external load-balancer probes work.
+async fn loopback_only(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    request: Request,
+    next: Next,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    if !addr.ip().is_loopback() {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "only loopback clients allowed"})),
+        ));
+    }
+    Ok(next.run(request).await)
 }
 
 async fn shutdown_signal() {

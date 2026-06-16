@@ -26,6 +26,7 @@ from ._core import (
 )
 from ._inline import _inline_compress
 from ._marker import _ccr_marker
+from ._proxy import _headroom_context
 
 _log = logging.getLogger("aphrodite")
 _engine = None
@@ -228,7 +229,7 @@ class AphroditeContextEngine(ContextEngine):
         preview = packed[:120].replace("\n", " ").strip()
         _recent_markers.append({"hash": hash_val, "type": "context", "size": len(packed), "preview": preview})
 
-        ccr = _ccr_marker(hash_val, "context", len(packed), mode="engine")
+        ccr = _ccr_marker(hash_val, "context", len(packed), mode="engine", headroom_budget=_headroom_context.get("x-headroom-budget"))
         marker = (
             f"{ccr}\n"
             f"These messages were offloaded to reduce context. "

@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite"
-version = "0.5.65"
+version = "0.5.66"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 headroom-core = { path = "../../vendor/headroom/crates/headroom-core" }
 axum = { version = "0.7", features = ["macros"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "io-util", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "io-util", "time", "tracing"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "request-id", "cors"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }

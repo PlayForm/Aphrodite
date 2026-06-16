@@ -1,5 +1,5 @@
 name: aphrodite
-version: 1.62.10
+version: 1.62.11
 description: "CCR compression plugin - smoke test suite, feature toggles, regression tracking, 9 tools, catalog mode toggle."
 kind: standalone
 min_hermes_version: '0.16.0'
@@ -24,7 +24,7 @@ provides_context_engine: true
 # Engine threshold: -1=always compress, 0=disabled, >0=fill% (see _core.py, APHRODITE_ENGINE_THRESHOLD_PCT)
 # Ships skills: aphrodite-dev-workflow, aphrodite-hook-reference, aphrodite-iterate-release
 install_message: |
-  aphrodite v1.62.10 - CCR compression plugin for Hermes Agent.
+  aphrodite v1.62.11 - CCR compression plugin for Hermes Agent.
   Proxies: token (:9798, SQLite, >1KB), cache (:9797, in-memory, >8KB).
   Engine: APHRODITE_CONTEXT_ENGINE=1 to enable context engine.
   Debug: APHRODITE_DEBUG=1 hermes ...

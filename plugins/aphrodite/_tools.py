@@ -7,7 +7,7 @@ import os
 import urllib.request
 
 from ._core import PORTS, _hash_alias, _inline_store, _inline_store_put
-from ._proxy import _alive_cached
+from ._proxy import _alive_cached, _headroom_context
 from ._resolve import _filter_lines, _resolve_recursive
 
 _log = logging.getLogger("aphrodite")
@@ -92,8 +92,11 @@ def _compress_handler(args=None, **kwargs):
     try:
         data = content.encode("utf-8")
         target = PORTS["token"] if _alive_cached(PORTS["token"]) else PORTS["cache"]
+        tool_headers = {"Content-Type": "application/octet-stream"}
+        if _headroom_context:
+            tool_headers.update(_headroom_context)
         req = urllib.request.Request(
-            f"http://127.0.0.1:{target}/ccr/create", data=data, headers={"Content-Type": "application/octet-stream"}
+            f"http://127.0.0.1:{target}/ccr/create", data=data, headers=tool_headers
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             result = json.loads(r.read())

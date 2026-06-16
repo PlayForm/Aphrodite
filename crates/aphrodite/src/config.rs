@@ -125,16 +125,26 @@ pub struct ProxyConfig {
 }
 
 impl MultiConfig {
-    /// Load from aphrodite.toml in the current directory.
-    pub fn load() -> anyhow::Result<Self> {
-        let content = std::fs::read_to_string("aphrodite.toml")?;
+    /// Load from the given aphrodite.toml path.
+    pub fn load(path: &str) -> anyhow::Result<Self> {
+        let content = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&content)?)
     }
 
     /// Resolve a ProxyConfig with defaults applied.
-    pub fn resolve(&self, cfg: &ProxyConfig) -> Cli {
+    /// Returns an error if no API key is found after all fallbacks.
+    pub fn resolve(&self, cfg: &ProxyConfig) -> anyhow::Result<Cli> {
         let d = self.defaults.as_ref();
-        Cli {
+        let api_key: String = cfg.api_key.clone()
+            .or_else(|| d.and_then(|d| d.api_key.clone()))
+            .or_else(|| std::env::var("APHRODITE_API_KEY").ok())
+            .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
+            .or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok())
+            .unwrap_or_default();
+        if api_key.is_empty() {
+            anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml");
+        }
+        Ok(Cli {
             mode: match cfg.mode.as_deref() {
                 Some("token") => ProxyMode::Token,
                 Some("cache") => ProxyMode::Cache,
@@ -151,21 +161,15 @@ impl MultiConfig {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or_else(|| "127.0.0.1:9797".parse().unwrap()),
             api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
-            api_key: {
-                let key: String = cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok()).unwrap_or_default();
-                if key.is_empty() {
-                    tracing::warn!("no API key configured - all upstream requests will fail");
-                }
-                key
-            },
+            api_key,
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
             max_context: cfg.max_context.unwrap_or(1_000_000),
             max_output: cfg.max_output.unwrap_or(384_000),
-            // Fall back to /tmp if dirs::data_dir() returns None (non-standard systems)
+            // Fall back to ~/.hermes/aphrodite/ if dirs::home_dir() returns None
             ccr_db_path: cfg.ccr_db_path.clone().filter(|s| !s.is_empty()).map(Into::into).unwrap_or_else(|| {
-                dirs::data_dir()
+                dirs::home_dir()
                     .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-                    .join("aphrodite").join("ccr.db")
+                    .join(".hermes").join("aphrodite").join("ccr.db")
             }),
             ccr_ttl_seconds: cfg.ccr_ttl_seconds.or_else(|| d.and_then(|d| d.ccr_ttl_seconds)).unwrap_or(3600),
             no_ccr_marker: false,
@@ -183,7 +187,7 @@ impl MultiConfig {
                     t
                 }
             },
-        }
+        })
     }
 }
 
