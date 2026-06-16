@@ -1686,7 +1686,7 @@ pub async fn handle_tool_relay(
 
 	// Validate aphrodite_retrieve: hash is required. Query-only requests without
 	// hash are invalid and must return 400 BAD_REQUEST instead of silently passing through.
-	if (req.tool == "aphrodite_retrieve" || req.tool == "💋") && req.params.get("hash").and_then(|v| v.as_str()).is_none() {
+	if req.tool == "aphrodite_retrieve" && req.params.get("hash").and_then(|v| v.as_str()).is_none() {
 		return (
 			StatusCode::BAD_REQUEST,
 			Json(ToolRelayResponse {
@@ -1747,7 +1747,7 @@ async fn execute_tool_relay(
 	params: &serde_json::Value,
 ) -> Result<serde_json::Value, String> {
 	match tool {
-		"aphrodite_retrieve" | "💋" => {
+		"aphrodite_retrieve" => {
 			let hash = params.get("hash").and_then(|v| v.as_str()).ok_or("missing hash")?;
 			// Check inline_ccr first (no round-trip needed for tiny entries)
 			if let Ok(mut map) = state.inline_ccr.lock() {
