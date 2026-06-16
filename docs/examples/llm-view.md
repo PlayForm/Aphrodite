@@ -1,4 +1,4 @@
-# CCR Examples — What the LLM Actually Sees
+# CCR Examples  -  What the LLM Actually Sees
 
 ## Conversation Flow with Mermaid
 
@@ -10,7 +10,7 @@ sequenceDiagram
     participant CCR as CCR Store
     participant API as DeepSeek API
 
-    Note over LLM,API: Turn 1 — LLM reads a file
+    Note over LLM,API: Turn 1  -  LLM reads a file
 
     LLM->>Agent: read_file("proxy.rs")
     Agent->>Proxy: POST /v1/chat/completions
@@ -32,7 +32,7 @@ sequenceDiagram
 
 ## Scenario 1: Reading a Rust File
 
-### Raw (uncompressed — below threshold)
+### Raw (uncompressed  -  below threshold)
 ```rust
 use std::sync::Arc;
 use axum::{Router, extract::State};
@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-### Compressed (what the LLM sees — v0.5.78)
+### Compressed (what the LLM sees  -  v0.5.78)
 ```
 use std::sync::Arc;
 use axum::{Router, extract::State};
@@ -57,8 +57,8 @@ fn main() -> anyhow::Result<()> {
 
 **The LLM reads:**
 - Line 1: Actual code preview (first 3 lines)
-- Line 2: Structure summary — knows what functions/structs exist
-- Line 3: CCR marker — can call `aphrodite_retrieve("abc123def456")` for full content
+- Line 2: Structure summary  -  knows what functions/structs exist
+- Line 3: CCR marker  -  can call `aphrodite_retrieve("abc123def456")` for full content
 
 **Token savings:** 4832 bytes → ~120 bytes (40× compression)
 
@@ -83,9 +83,9 @@ error[E0308]: mismatched types
 <<<CCR:def789|error|892>>>
 ```
 
-**The LLM sees the error line directly** — no need to retrieve unless it wants the full trace.
+**The LLM sees the error line directly**  -  no need to retrieve unless it wants the full trace.
 
-## Scenario 3: With Hint — LLM enters debug mode
+## Scenario 3: With Hint  -  LLM enters debug mode
 
 ```mermaid
 sequenceDiagram
@@ -94,24 +94,24 @@ sequenceDiagram
     participant Proxy
     participant Hints as HintContext
 
-    Note over LLM,Hints: Turn 1 — LLM sets hint
+    Note over LLM,Hints: Turn 1  -  LLM sets hint
     LLM->>Agent: aphrodite_compress(content, _ccr_hint="debug")
     Agent->>Proxy: POST /tool/relay {tool: "aphrodite_compress", params: {_ccr_hint: "debug"}}
     Proxy->>Hints: parse_and_push("debug")
     Note over Hints: Session mode: DEBUG
 
-    Note over LLM,Hints: Turn 2 — LLM reads a file (hint applies)
+    Note over LLM,Hints: Turn 2  -  LLM reads a file (hint applies)
     LLM->>Agent: read_file("proxy.rs")
     Agent->>Proxy: Tool output → compress (debug mode active)
     Proxy->>Hints: has(Debug) → true → deeper extraction, more preview
     Proxy-->>Agent: Verbose marker with full structure
 
-    Note over LLM,Hints: Turn 3 — LLM switches to review
+    Note over LLM,Hints: Turn 3  -  LLM switches to review
     LLM->>Agent: aphrodite_retrieve(hash, _ccr_hint="review")
     Proxy->>Hints: parse_and_push("review")
     Note over Hints: Session mode: DEBUG + REVIEW (composed)
 
-    Note over LLM,Hints: Turn 4 — LLM reads a diff
+    Note over LLM,Hints: Turn 4  -  LLM reads a diff
     LLM->>Agent: Terminal: git diff
     Proxy->>Hints: has(Review) → true → keep imports, show full diffs
     Proxy-->>Agent: Diff with imports preserved
@@ -151,7 +151,7 @@ graph TD
     I --> J[LLM sees: error line + structure + marker]
     J --> K[Turn 5: LLM retrieves full content]
     K --> L[aphrodite_retrieve hash=abc123]
-    L --> M[Returns full content — hint context applied to format]
+    L --> M[Returns full content  -  hint context applied to format]
 
     style B fill:#e1f5fe
     style G fill:#e1f5fe

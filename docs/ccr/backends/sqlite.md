@@ -1,6 +1,6 @@
 # SQLite CCR Backend
 
-Origin: Persistent, shareable CCR store for production (token mode) proxy deployments. Survives worker restarts. WAL-mode with lazy TTL purging — no background threads.
+Origin: Persistent, shareable CCR store for production (token mode) proxy deployments. Survives worker restarts. WAL-mode with lazy TTL purging  -  no background threads.
 
 Source of truth: `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs`
 
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS ccr_entries (
 );
 ```
 
-No secondary indexes — single-row-per-PK lookups only. Purge sweeps use `WHERE created_at + ttl_seconds <= ?1` on the (small) table.
+No secondary indexes  -  single-row-per-PK lookups only. Purge sweeps use `WHERE created_at + ttl_seconds <= ?1` on the (small) table.
 
 ## Connection Configuration
 
@@ -41,7 +41,7 @@ pub struct SqliteCcrStore {
 pub fn open(path: impl AsRef<Path>, default_ttl_seconds: u64) -> rusqlite::Result<Self>
 ```
 
-Errors surface to caller — no silent fallback to in-memory.
+Errors surface to caller  -  no silent fallback to in-memory.
 
 ## Methods
 
@@ -65,7 +65,7 @@ ON CONFLICT(hash) DO UPDATE SET
     ttl_seconds = excluded.ttl_seconds
 ```
 
-Upsert by primary key — idempotent re-store. Returns `false` on SQL error (logs warning, does not panic).
+Upsert by primary key  -  idempotent re-store. Returns `false` on SQL error (logs warning, does not panic).
 
 ### del(hash: &str) -> bool
 

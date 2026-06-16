@@ -12,7 +12,7 @@ GET /health
 
 ## Access
 
-**Public** — no loopback enforcement. The only endpoint exempt from the `loopback_only` middleware (main.rs:357):
+**Public**  -  no loopback enforcement. The only endpoint exempt from the `loopback_only` middleware (main.rs:357):
 ```rust
 // Public route (no loopback enforcement) merged with restricted routes
 let app = Router::new()
@@ -32,7 +32,7 @@ let app = Router::new()
 }
 ```
 
-Always returns HTTP 200 — capability state conveyed via JSON body (CCR is optional/opt-in).
+Always returns HTTP 200  -  capability state conveyed via JSON body (CCR is optional/opt-in).
 
 ## Fields
 

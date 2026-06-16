@@ -1,21 +1,78 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-  <defs>
-    <pattern id="diag" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <line x1="0" y1="4" x2="8" y2="4" stroke="#1a1a2e" stroke-width="3" stroke-linecap="round"/>
-    </pattern>
-    <clipPath id="center">
-      <ellipse cx="60" cy="55" rx="35" ry="30"/>
-    </clipPath>
-  </defs>
-  <!-- Background field: dark diagonal dashes -->
-  <rect width="120" height="120" fill="url(#diag)"/>
-  <!-- Center cluster: red diagonal dashes -->
-  <rect width="120" height="120" fill="url(#diag)" clip-path="url(#center)"/>
-  <rect width="120" height="120" fill="#cc2244" opacity="0.3" clip-path="url(#center)"/>
-  <!-- Dark core -->
-  <ellipse cx="55" cy="52" rx="12" ry="10" fill="#1a1a2e" opacity="0.8"/>
-  <!-- Faint accent lines -->
-  <line x1="75" y1="35" x2="90" y2="30" stroke="#999" stroke-width="0.5" opacity="0.4"/>
-  <line x1="80" y1="55" x2="95" y2="55" stroke="#999" stroke-width="0.5" opacity="0.3"/>
-  <line x1="72" y1="75" x2="88" y2="78" stroke="#999" stroke-width="0.5" opacity="0.3"/>
+  <style>
+    text { font-family: monospace; font-size: 6px; }
+  </style>
+  <!-- Background -->
+  <rect width="120" height="120" fill="#1a1a2e"/>
+  <!-- Kiss mark # characters -->
+  <g fill="#cc2244">
+    <!-- Upper lip -->
+    <text x="43" y="31">#</text>
+    <text x="51" y="31">#</text>
+    <text x="77" y="31">#</text>
+    <text x="78" y="31">#</text>
+    <text x="40" y="32">#</text>
+    <text x="53" y="32">#</text>
+    <text x="67" y="32">#</text>
+    <text x="80" y="32">#</text>
+    <text x="38" y="33">#</text>
+    <text x="55" y="33">#</text>
+    <text x="65" y="33">#</text>
+    <text x="82" y="33">#</text>
+    <text x="57" y="34">#</text>
+    <text x="35" y="35">#</text>
+    <text x="58" y="35">#</text>
+    <text x="85" y="35">#</text>
+    <text x="34" y="36">#</text>
+    <text x="59" y="36">#</text>
+    <text x="33" y="37">#</text>
+    <text x="87" y="37">#</text>
+    <!-- Diagonal slash -->
+    <text x="92" y="41">#</text>
+    <text x="27" y="42">#</text>
+    <text x="93" y="42">#</text>
+    <text x="21" y="46">#</text>
+    <text x="99" y="46">#</text>
+    <text x="101" y="47">#</text>
+    <text x="103" y="48">#</text>
+    <text x="12" y="50">#</text>
+    <text x="108" y="50">#</text>
+    <text x="9" y="51">#</text>
+    <text x="115" y="52">#</text>
+    <text x="116" y="52">#</text>
+    <!-- Bottom sweep -->
+    <text x="1" y="59">#</text>
+    <text x="119" y="59">#</text>
+    <text x="2" y="60">#</text>
+    <text x="118" y="60">#</text>
+    <text x="116" y="61">#</text>
+    <text x="115" y="62">#</text>
+    <text x="113" y="63">#</text>
+    <text x="110" y="65">#</text>
+    <text x="107" y="67">#</text>
+    <text x="106" y="68">#</text>
+    <text x="102" y="71">#</text>
+    <text x="101" y="72">#</text>
+    <text x="20" y="73">#</text>
+    <text x="100" y="73">#</text>
+    <text x="21" y="74">#</text>
+    <text x="99" y="74">#</text>
+    <text x="96" y="76">#</text>
+    <text x="26" y="78">#</text>
+    <text x="94" y="78">#</text>
+    <text x="92" y="79">#</text>
+    <text x="91" y="80">#</text>
+    <text x="90" y="81">#</text>
+    <text x="88" y="82">#</text>
+    <text x="85" y="84">#</text>
+    <text x="83" y="85">#</text>
+    <text x="39" y="86">#</text>
+    <text x="81" y="86">#</text>
+    <text x="77" y="87">#</text>
+    <text x="78" y="87">#</text>
+    <!-- Bottom centre -->
+    <text x="68" y="89">#</text>
+    <text x="69" y="89">#</text>
+    <text x="70" y="89">#</text>
+  </g>
 </svg>

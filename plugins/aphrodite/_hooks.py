@@ -192,7 +192,7 @@ def _extract_tool_metadata(tool_name, args, result):
                         else:
                             meta["files"] = str(data.get("total_count", data.get("count", "?")))
                 except (json.JSONDecodeError, ValueError):
-                    # Not JSON — count lines matching grep output format
+                    # Not JSON  -  count lines matching grep output format
                     line_count = 0
                     for line in result.splitlines():
                         line = line.strip()

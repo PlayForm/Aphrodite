@@ -157,8 +157,8 @@ if t > 600 {
 ## Mode
 
 ### Valid Values
-- `"token"` — SQLite CCR, >1KB threshold, tool relay, aggressive compression
-- `"cache"` — In-memory CCR, >8KB threshold, no tool relay
+- `"token"`  -  SQLite CCR, >1KB threshold, tool relay, aggressive compression
+- `"cache"`  -  In-memory CCR, >8KB threshold, no tool relay
 
 ### Unknown Values
 ```rust
@@ -203,12 +203,12 @@ When running without aphrodite.toml, CLI args mirror these fields:
 | model | `--model` | `APHRODITE_MODEL` |
 | ccr_db_path | `--ccr-db-path` | `APHRODITE_DB` |
 | ccr_ttl_seconds | `--ccr-ttl` | `APHRODITE_CCR_TTL` |
-| tool_relay | `--tool-relay` | — |
+| tool_relay | `--tool-relay` |  -  |
 | notify_url | `--notify-url` | `APHRODITE_NOTIFY_URL` |
 | notify_key | `--notify-key` | `APHRODITE_NOTIFY_KEY` |
-| dev | `--dev` | — |
+| dev | `--dev` |  -  |
 | log_compact | `--log-compact` | `APHRODITE_LOG_COMPACT` |
-| timeout | `--timeout` | — |
+| timeout | `--timeout` |  -  |
 
 ## Example: Full Multi-Proxy
 

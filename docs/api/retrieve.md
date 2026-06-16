@@ -1,6 +1,6 @@
 # Retrieve Endpoint
 
-Origin: Programmatic CCR retrieval — resolve a hash to its original content, with optional query filtering and pagination. Used by the LLM agent when `aphrodite_retrieve` is called.
+Origin: Programmatic CCR retrieval  -  resolve a hash to its original content, with optional query filtering and pagination. Used by the LLM agent when `aphrodite_retrieve` is called.
 
 Source of truth: `crates/aphrodite/src/retrieve.rs:handle_retrieve()` (line 33)
 

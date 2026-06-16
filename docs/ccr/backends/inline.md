@@ -25,7 +25,7 @@ From `proxy.rs` line 482.
 
 ## TTL
 
-None — pure LRU eviction. Entries evicted when LruCache exceeds capacity on `put()`.
+None  -  pure LRU eviction. Entries evicted when LruCache exceeds capacity on `put()`.
 
 ## Storage Decision
 
@@ -69,11 +69,11 @@ In `proxy.rs:execute_tool_relay()` (line 1568):
 
 ## Lock Safety
 
-`Mutex<LruCache>` — lock is held only for cache operations (lookup/insert). Lock is dropped before any `.await` (e.g., before spawning blocking CCR store tasks) to avoid `!Send` MutexGuard crossing await points.
+`Mutex<LruCache>`  -  lock is held only for cache operations (lookup/insert). Lock is dropped before any `.await` (e.g., before spawning blocking CCR store tasks) to avoid `!Send` MutexGuard crossing await points.
 
 ## Python Plugin Inline Store (Separate)
 
-The Python plugin maintains its own inline store (`_core.py:_CappedStore`, max 500 entries) for when the proxy is down. This is NOT the same store — it lives in the Hermes Python process, not in the proxy Rust process.
+The Python plugin maintains its own inline store (`_core.py:_CappedStore`, max 500 entries) for when the proxy is down. This is NOT the same store  -  it lives in the Hermes Python process, not in the proxy Rust process.
 
 | Property | Rust Inline (LruCache) | Python Inline (_CappedStore) |
 |----------|----------------------|------------------------------|

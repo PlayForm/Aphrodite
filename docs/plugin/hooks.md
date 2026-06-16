@@ -60,7 +60,7 @@ LLM Response
 
 ## 1. on_session_start
 
-Not directly implemented as a hook handler — instead, `_inject_session_instruction()` fires on the *first* `pre_llm_call` invocation (guarded by `_session_instruction_injected` flag).
+Not directly implemented as a hook handler  -  instead, `_inject_session_instruction()` fires on the *first* `pre_llm_call` invocation (guarded by `_session_instruction_injected` flag).
 
 ### Injected Message (Line 115)
 ```
@@ -72,7 +72,7 @@ Not directly implemented as a hook handler — instead, `_inject_session_instruc
   ─ Layer 3: load aphrodite-tool-guide skill for full tool reference ─
 ```
 
-Ephemeral: true — not persisted in conversation.
+Ephemeral: true  -  not persisted in conversation.
 
 ## 2. transform_tool_result
 
@@ -157,8 +157,8 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 2. **Headroom feedback**: query proxy fill_pct, set budget
 3. **Inject session instruction** (first call only)
 4. **Pass x-headroom-* headers** to proxy
-5. **Scan for CCR markers** (incremental — only new tool/system messages)
-6. **Auto-expand small tool markers** (< AUTO_EXPAND_LIMIT, type=aphrodite) — replace in-line
+5. **Scan for CCR markers** (incremental  -  only new tool/system messages)
+6. **Auto-expand small tool markers** (< AUTO_EXPAND_LIMIT, type=aphrodite)  -  replace in-line
 7. **Compress old conversation turns** (turns > 6) → CCR
 8. **Build catalog**:
    - AUTO line: build status, git status, proxy health
@@ -261,8 +261,8 @@ T{tnum}: {user_msg_first_chars}… → {assistant_response_first_200_chars} [{fi
 |------|-----------------|---------|--------|
 | transform_tool_result | TOOL_THRESHOLD_TOKEN / TOOL_THRESHOLD_CACHE | 1024 / 8192 | _DEV, skip set, < threshold, >100MB, existing CCR |
 | transform_terminal_output | TERMINAL_THRESHOLD | 2048 | _DEV, < threshold, existing CCR |
-| pre_llm_call (turn archive) | ctx_len > 30, turns > 6, packed > 500B | — | No proxy |
-| pre_llm_call (catalog) | Always (if markers/files/engine) | — | quiet_mode=1 |
+| pre_llm_call (turn archive) | ctx_len > 30, turns > 6, packed > 500B |  -  | No proxy |
+| pre_llm_call (catalog) | Always (if markers/files/engine) |  -  | quiet_mode=1 |
 
 ## Dev Mode
 

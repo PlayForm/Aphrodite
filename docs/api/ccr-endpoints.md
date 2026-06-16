@@ -1,6 +1,6 @@
 # CCR Management Endpoints
 
-Origin: Programmatic CCR create, list, and delete — allowing the Python plugin, Hermes agent, and external tools to manage compressed content entries directly.
+Origin: Programmatic CCR create, list, and delete  -  allowing the Python plugin, Hermes agent, and external tools to manage compressed content entries directly.
 
 Source of truth: `crates/aphrodite/src/proxy.rs:handle_ccr_create()` (line 1635), `handle_ccr_list()` (line 1751), `handle_ccr_delete()` (line 1771)
 

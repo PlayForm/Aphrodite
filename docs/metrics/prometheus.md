@@ -10,7 +10,7 @@ Source of truth: `crates/aphrodite/src/main.rs` `/metrics` handler (lines 251-32
 GET /metrics
 Content-Type: text/plain; version=0.0.4
 ```
-No auth — intentional for local-only deployments (loopback-enforced). Firewall or reverse-proxy auth layer recommended for production.
+No auth  -  intentional for local-only deployments (loopback-enforced). Firewall or reverse-proxy auth layer recommended for production.
 
 ## All 31 Metrics
 
@@ -25,75 +25,75 @@ No auth — intentional for local-only deployments (loopback-enforced). Firewall
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_tokens_saved` | counter | — | Total tokens saved via compression |
+| `aphrodite_tokens_saved` | counter |  -  | Total tokens saved via compression |
 
 ### CCR Operations
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_ccr_hits` | counter | — | CCR cache hits |
-| `aphrodite_ccr_misses` | counter | — | CCR cache misses |
-| `aphrodite_ccr_created` | counter | — | New CCR entries created |
-| `aphrodite_ccr_store_entries` | gauge | — | Current entries in CCR store |
-| `aphrodite_ccr_store_bytes` | gauge | — | Approximate bytes stored |
+| `aphrodite_ccr_hits` | counter |  -  | CCR cache hits |
+| `aphrodite_ccr_misses` | counter |  -  | CCR cache misses |
+| `aphrodite_ccr_created` | counter |  -  | New CCR entries created |
+| `aphrodite_ccr_store_entries` | gauge |  -  | Current entries in CCR store |
+| `aphrodite_ccr_store_bytes` | gauge |  -  | Approximate bytes stored |
 
 ### Tool Relay
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_tool_relay_calls` | counter | — | Total tool relay invocations |
-| `aphrodite_tool_relay_success` | counter | — | Successful tool executions |
-| `aphrodite_tool_relay_failure` | counter | — | Failed tool executions |
+| `aphrodite_tool_relay_calls` | counter |  -  | Total tool relay invocations |
+| `aphrodite_tool_relay_success` | counter |  -  | Successful tool executions |
+| `aphrodite_tool_relay_failure` | counter |  -  | Failed tool executions |
 
 ### Response Cache
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_cache_hits` | counter | — | LLM response cache hits |
-| `aphrodite_cache_misses` | counter | — | LLM response cache misses |
+| `aphrodite_cache_hits` | counter |  -  | LLM response cache hits |
+| `aphrodite_cache_misses` | counter |  -  | LLM response cache misses |
 
 ### Inline CCR
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_inline_ccr_hits` | counter | — | Inline LruCache hits |
-| `aphrodite_inline_ccr_misses` | counter | — | Inline LruCache misses |
+| `aphrodite_inline_ccr_hits` | counter |  -  | Inline LruCache hits |
+| `aphrodite_inline_ccr_misses` | counter |  -  | Inline LruCache misses |
 
 ### Notification Callbacks
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_notify_success` | counter | — | Successful callback notifications |
-| `aphrodite_notify_failure` | counter | — | Failed callback notifications |
+| `aphrodite_notify_success` | counter |  -  | Successful callback notifications |
+| `aphrodite_notify_failure` | counter |  -  | Failed callback notifications |
 
 ### Upstream Errors
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `aphrodite_upstream_errors_total` | counter | `code` (4xx/5xx) | Upstream HTTP error responses |
-| `aphrodite_upstream_timeouts_total` | counter | — | Upstream connection timeouts |
+| `aphrodite_upstream_timeouts_total` | counter |  -  | Upstream connection timeouts |
 
 ### Body Bytes
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_request_body_bytes_total` | counter | — | Total request body bytes received |
-| `aphrodite_response_body_bytes_total` | counter | — | Total response body bytes sent |
+| `aphrodite_request_body_bytes_total` | counter |  -  | Total request body bytes received |
+| `aphrodite_response_body_bytes_total` | counter |  -  | Total response body bytes sent |
 
 ### Latency
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `aphrodite_latency_seconds` | histogram | `le` (0.001/0.01/0.1/1.0/10.0) | End-to-end request latency distribution |
-| `aphrodite_latency_seconds_count` | counter | — | Total latency observations |
-| `aphrodite_latency_seconds_sum` | counter | — | Total latency in seconds |
-| `aphrodite_upstream_latency_seconds_sum` | counter | — | Total upstream latency in seconds |
+| `aphrodite_latency_seconds_count` | counter |  -  | Total latency observations |
+| `aphrodite_latency_seconds_sum` | counter |  -  | Total latency in seconds |
+| `aphrodite_upstream_latency_seconds_sum` | counter |  -  | Total upstream latency in seconds |
 
 ### Compression Ratio
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aphrodite_compression_ratio_ema` | gauge | — | Exponential moving average of compression ratio |
+| `aphrodite_compression_ratio_ema` | gauge |  -  | Exponential moving average of compression ratio |
 
 ## Latency Bucket Boundaries
 
@@ -121,9 +121,9 @@ for (i, v) in buckets.iter().enumerate() {
 
 ## metrics_handler Code Location
 
-`main.rs` lines 251-325 — builds Prometheus text from `stats_json()` values.
+`main.rs` lines 251-325  -  builds Prometheus text from `stats_json()` values.
 
-Internal: `stats_json()` at `proxy.rs:199` — returns the same JSON used by `/stats` endpoint.
+Internal: `stats_json()` at `proxy.rs:199`  -  returns the same JSON used by `/stats` endpoint.
 
 ## Example Output
 
@@ -210,7 +210,7 @@ Returns `stats_json()` directly as JSON. Loopback only.
 
 ## Endpoint: /stats/db
 
-Returns `ccr.stats_db()` — only available for SQLite backend:
+Returns `ccr.stats_db()`  -  only available for SQLite backend:
 ```json
 {
     "total_entries": 3056,

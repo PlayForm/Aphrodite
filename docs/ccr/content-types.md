@@ -6,7 +6,7 @@ Source of truth: `crates/aphrodite/src/proxy.rs:detect_content_type()` (line 841
 
 ## Detection Order (Rust)
 
-`detect_content_type()` at proxy.rs:841 returns exactly one type per invocation. Order matters — first match wins:
+`detect_content_type()` at proxy.rs:841 returns exactly one type per invocation. Order matters  -  first match wins:
 
 ```
 1. JSON (starts with '{' or '[') → validate JSON
@@ -90,19 +90,19 @@ Always at `base / 2`, regardless of auto-tune state.
 ```
 "error"
 ```
-Keeps errors visible — the highest threshold tier.
+Keeps errors visible  -  the highest threshold tier.
 
 ### Code Types (×4)
 ```
 "code_rust", "code_python", "code_go", "code_js", "code"
 ```
-Code should stay in context longer — developer may need to read it.
+Code should stay in context longer  -  developer may need to read it.
 
 ### Diff/Tracked Types (×2)
 ```
 "diff", "git", "text"
 ```
-Moderate compression — diffs and git output are moderately valuable.
+Moderate compression  -  diffs and git output are moderately valuable.
 
 ### Default (×1)
 ```

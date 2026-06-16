@@ -46,7 +46,7 @@ compress(messages, current_tokens, focus_topic):
     3. Editing detection:
        a. Scan last 10 messages for tool role + editing keywords
           (wrote|patched|modified|created|deleted|successfully|written)
-       b. If editing: tail_n = max(tail_n, 8) — protect active edits
+       b. If editing: tail_n = max(tail_n, 8)  -  protect active edits
     4. Clamp tail_n ≤ len(messages) - head_n
     5. Sweep orphan tool messages into tail:
        a. Forward scan from boundary: include tool messages
@@ -78,7 +78,7 @@ def _pack_msg(messages):
         if tool_calls: entry["tool_calls"] = tool_calls
     return json.dumps(out, separators=(",", ":"))
 ```
-Compact JSON — no whitespace.
+Compact JSON  -  no whitespace.
 
 ## Editing Detection
 
@@ -87,7 +87,7 @@ Compact JSON — no whitespace.
 re.compile(r"\b(?:wrote|patched|modified|created|deleted|successfully|written)\b", re.IGNORECASE)
 ```
 
-When editing is detected in the last 10 messages: `tail_n = max(tail_n, 8)` — protects more context to avoid losing the agent's editing momentum.
+When editing is detected in the last 10 messages: `tail_n = max(tail_n, 8)`  -  protects more context to avoid losing the agent's editing momentum.
 
 ## Orphan Tool Message Sweep
 
@@ -99,7 +99,7 @@ Lines 170-185 handle the case where compressing middle messages would break tool
 
 ## Mutual Exclusion
 
-The context engine and `compression.enabled` SHOULD NOT both be active — the engine provides a different strategy (compress middle, keep head/tail) vs. per-tool compression (compress individual tool outputs). From plugin.yaml description.
+The context engine and `compression.enabled` SHOULD NOT both be active  -  the engine provides a different strategy (compress middle, keep head/tail) vs. per-tool compression (compress individual tool outputs). From plugin.yaml description.
 
 ## Hooks
 

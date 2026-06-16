@@ -1,6 +1,6 @@
 # In-Memory CCR Backend
 
-Origin: Process-local, sharded concurrent CCR store for cache (:9797) mode. Lightweight — no persistence needed for the ephemeral cache proxy. Distinct keys never contend on reads; capacity-bound eviction is the only serialized step.
+Origin: Process-local, sharded concurrent CCR store for cache (:9797) mode. Lightweight  -  no persistence needed for the ephemeral cache proxy. Distinct keys never contend on reads; capacity-bound eviction is the only serialized step.
 
 Source of truth: `vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs`
 
@@ -102,13 +102,13 @@ Prevents unbounded queue growth from stale keys (entries that expired and were r
 
 ## TTL Expiry
 
-Lazy — checked on `get()`, not via background thread. Uses `remove_if()` for atomic check-and-remove:
+Lazy  -  checked on `get()`, not via background thread. Uses `remove_if()` for atomic check-and-remove:
 - Closes the TOCTOU race where: Thread A sees expired entry → drops read lock → Thread B re-inserts fresh entry with same hash → A's `remove()` wipes B's fresh data.
 - With `remove_if`, predicate evaluation and removal happen under the same shard write lock.
 
 ## Concurrency Model
 
-- **Reads**: Distinct hashes hash to distinct DashMap shards — no contention.
+- **Reads**: Distinct hashes hash to distinct DashMap shards  -  no contention.
 - **Writes**: `get_mut` on same hash serializes, but `put` on different hashes land in different shards.
 - **Eviction**: Only serialized step is the `order` mutex (held for O(1) push or small sweep).
 - **Poison**: Mutex locks recover from poison (log warning, continue).
@@ -119,4 +119,4 @@ Between `map.len() >= capacity` check and `evict_until_under_capacity()`, anothe
 
 ## Idempotency
 
-`put` on existing hash overwrites in place via `get_mut` — same semantics as SQLite's `ON CONFLICT(hash) DO UPDATE SET`.
+`put` on existing hash overwrites in place via `get_mut`  -  same semantics as SQLite's `ON CONFLICT(hash) DO UPDATE SET`.

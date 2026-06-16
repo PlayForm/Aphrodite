@@ -207,7 +207,7 @@ DELETE /ccr/{hash}
 
 ## health_check (line 1796)
 
-Health check endpoint. Always returns 200 — capability state conveyed in body.
+Health check endpoint. Always returns 200  -  capability state conveyed in body.
 
 ### Endpoint
 ```
