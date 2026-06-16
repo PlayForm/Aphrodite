@@ -1,20 +1,24 @@
-"""aphrodite — marker formatting and proxy compression."""
+"""aphrodite - marker formatting and proxy compression."""
 
+import base64
 import json
+import logging
 import urllib.request
 
 from ._core import _CCR_RE
 
+_log = logging.getLogger("aphrodite")
+
 
 def _ccr_marker(hash_val, ccr_type, size, mode="", preview=""):
     """Build a standard CCR marker string."""
-    base = f"<<<CCR:{hash_val}|{ccr_type}|{size}"
+    parts = [hash_val, ccr_type, str(size)]
     if mode:
-        base += f"|{mode}"
-    base += ">>>"
+        parts.append(mode)
     if preview:
-        base += f" {preview}"
-    return base
+        preview_b64 = base64.urlsafe_b64encode(preview.encode()).decode()
+        parts.append(f"preview={preview_b64}")
+    return f"<<<CCR:{'|'.join(parts)}>>>"
 
 
 def _compress_via_proxy(content, target_port):
@@ -45,5 +49,6 @@ def _parse_ccr_markers(text):
                     marker["mode"] = parts[3]
                 markers.append(marker)
             except (ValueError, IndexError):
-                pass
+                marker_text = match.group(0)[:100]
+                _log.warning("Malformed CCR marker ignored: %r", marker_text)
     return markers

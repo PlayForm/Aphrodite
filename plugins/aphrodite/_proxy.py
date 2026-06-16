@@ -1,4 +1,4 @@
-"""aphrodite — proxy lifecycle (env loading, health checks, launch)."""
+"""aphrodite - proxy lifecycle (env loading, health checks, launch)."""
 
 import json
 import logging
@@ -6,6 +6,7 @@ import os
 import subprocess
 import time
 import urllib.request
+from pathlib import Path
 
 from ._core import BINARY, ENV_FILE, PORTS
 
@@ -29,8 +30,8 @@ def _load_env():
                 elif "=" in line and not line.startswith("#"):
                     kv = line.split("=", 1)
                     env[kv[0]] = kv[1].strip('"').strip("'")
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("_load_env: failed to read %s - %s", ENV_FILE, exc)
     return env
 
 
@@ -58,14 +59,30 @@ def _alive(port, timeout=3):
 def _start(name, env):
     """Launch the aphrodite proxy binary."""
     port = PORTS[name]
+
+    # ── Port conflict resolution ────────────────────────────
+    try:
+        r = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True, timeout=5)
+        if r.stdout.strip():
+            pid = r.stdout.strip()
+            _log.warning("port %s in use by PID %s - killing it", port, pid)
+            subprocess.run(["kill", pid], capture_output=True, timeout=3)
+            time.sleep(0.2)  # brief grace for the port to free
+    except FileNotFoundError:
+        _log.warning("lsof not available - skipping port conflict check")
+    except Exception as exc:
+        _log.warning("port conflict check failed for :%s - %s", port, exc)
+
+    # ── Launch ──────────────────────────────────────────────
     key = env.get("APHRODITE_API_KEY", "")
     if not key:
         _log.warning("APHRODITE_API_KEY not set in env - proxy won't authenticate")
         return
-    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key, "--mode", "token", "--tool-relay"]
+    mode_flag = "cache" if name == "cache" else "token"
+    args = [BINARY, "--listen", f"127.0.0.1:{port}", "--api-key", key, "--mode", mode_flag, "--tool-relay"]
     _log.info("starting aphrodite %s on :%s", name, port)
     try:
-        subprocess.Popen(
+        proc = subprocess.Popen(
             args,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -73,10 +90,17 @@ def _start(name, env):
         )
     except Exception as e:
         _log.warning("aphrodite %s launch failed: %s", name, e)
+        return
+
+    # ── Write PID file ──────────────────────────────────────
+    try:
+        Path(f"/tmp/aphrodite-{name}.pid").write_text(str(proc.pid))
+    except Exception as exc:
+        _log.warning("failed to write PID file for %s - %s", name, exc)
 
 
 def on_start(**kw):
-    """Hermes session_start hook — ensure binary + launch proxy."""
+    """Hermes session_start hook - ensure binary + launch proxy."""
     from ._binary import _ensure_binary
 
     if not _ensure_binary():

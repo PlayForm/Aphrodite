@@ -1,4 +1,4 @@
-"""aphrodite — CCR resolution (retrieve + recursive unpacking)."""
+"""aphrodite - CCR resolution (retrieve + recursive unpacking)."""
 
 import json
 import urllib.request
@@ -8,7 +8,14 @@ from ._inline import _inline_retrieve
 
 
 def _resolve_one(hash_val, timeout=4, query=""):
-    """Resolve a single CCR hash. Checks inline store first, then tries both proxies."""
+    """Resolve a single CCR hash. Checks inline store first, then tries both proxies.
+
+    Resolves exactly ONE hash - does NOT unpack nested <<<CCR:...>>> markers.
+    Returns the content string on success, or None if the hash cannot be resolved
+    from any source (inline store, token proxy, cache proxy).
+
+    Use _resolve_recursive when the content may contain nested markers.
+    Use _resolve_one when you only need the raw content for a single hash."""
     content = _inline_retrieve(hash_val)
     if content is not None:
         if query:
@@ -36,7 +43,19 @@ def _resolve_one(hash_val, timeout=4, query=""):
 
 
 def _resolve_recursive(hash_val, depth=0, resolved=None):
-    """Recursively resolve CCR markers in content, up to max depth."""
+    """Resolve a CCR hash and recursively unpack all nested <<<CCR:...>>> markers.
+
+    Calls _resolve_one to fetch the content for the top-level hash, then scans
+    the result for nested <<<CCR:...>>> markers and resolves each one recursively
+    up to RECURSIVE_DEPTH levels deep (default 5). Also guards against circular
+    references via the ``resolved`` dict (content from previously seen hash_vals
+    is reused, not re-fetched).
+
+    Returns the fully resolved content string. When a hash cannot be resolved,
+    the unresolved marker is preserved as-is: ``<<<CCR:hash|unresolved>>>``.
+
+    Use _resolve_one when you only need the raw content for a single hash and
+    do NOT need to unpack nested markers."""
     if resolved is None:
         resolved = {}
     if depth >= RECURSIVE_DEPTH or hash_val in resolved:
@@ -56,5 +75,5 @@ def _resolve_recursive(hash_val, depth=0, resolved=None):
             nested_content = _resolve_recursive(nested_hash, depth + 1, resolved)
             replacements[f"<<<CCR:{marker}>>>"] = nested_content
     for marker_str, replacement in replacements.items():
-        content = content.replace(marker_str, replacement)
+        content = content.replace(marker_str, replacement, 1)
     return content

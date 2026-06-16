@@ -1,6 +1,6 @@
 //! CLI configuration for aphrodite.
 //!
-//! Generic LLM proxy — works with any OpenAI-compatible API.
+//! Generic LLM proxy - works with any OpenAI-compatible API.
 //! Cache and Token modes with CCR, tool relay, programmatic CCR.
 
 use clap::{Parser, ValueEnum};
@@ -10,15 +10,15 @@ use std::path::PathBuf;
 /// Proxy operation mode.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ProxyMode {
-    /// Cache mode — in-memory CCR, lightweight compression (>8KB threshold),
+    /// Cache mode - in-memory CCR, lightweight compression (>8KB threshold),
     /// preview preserved, no tool injection.
     Cache,
-    /// Token mode — SQLite CCR, aggressive compression (>1KB threshold),
+    /// Token mode - SQLite CCR, aggressive compression (>1KB threshold),
     /// tool injection, tool relay.
     Token,
 }
 
-/// aphrodite — generic LLM proxy with CCR, tool relay, and programmatic CCR.
+/// aphrodite - generic LLM proxy with CCR, tool relay, and programmatic CCR.
 /// Works with any OpenAI-compatible API (DeepSeek, OpenAI, Anthropic via proxy, etc.)
 #[derive(Parser, Debug, Clone)]
 #[command(name = "aphrodite", version, about)]
@@ -75,7 +75,7 @@ pub struct Cli {
     #[arg(long, env = "APHRODITE_NOTIFY_KEY")]
     pub notify_key: Option<String>,
 
-    /// Enable dev mode — verbose request/response logging
+    /// Enable dev mode - verbose request/response logging
     #[arg(long)]
     pub dev: bool,
 
@@ -143,10 +143,11 @@ impl MultiConfig {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or_else(|| "127.0.0.1:9797".parse().unwrap()),
             api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
-            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).unwrap_or_default(),
+            api_key: cfg.api_key.clone().or_else(|| d.and_then(|d| d.api_key.clone())).or_else(|| std::env::var("APHRODITE_API_KEY").ok()).or_else(|| std::env::var("DEEPSEEK_API_KEY").ok()).or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok()).unwrap_or_default(),
             model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
             max_context: cfg.max_context.unwrap_or(1_000_000),
             max_output: cfg.max_output.unwrap_or(384_000),
+            // Fall back to /tmp if dirs::data_dir() returns None (non-standard systems)
             ccr_db_path: cfg.ccr_db_path.clone().map(Into::into).unwrap_or_else(|| {
                 
                 dirs::data_dir()
