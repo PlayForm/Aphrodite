@@ -11,6 +11,7 @@ from ._core import (
     _CCR_RE,
     _DEV,
     _FILE_TOOLS,
+    AUTO_EXPAND_LIMIT,
     BINARY,
     CATALOG_MODE,
     DEBUG_LOGGING,
@@ -44,6 +45,7 @@ from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
 from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers
 from ._proxy import _alive
+from ._resolve import _resolve_one
 from ._tools import _compress_handler, _retrieve_handler
 
 # Turn-scoped alive cache - refreshed at pre_llm_hook entry so
@@ -418,6 +420,83 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             ctx_len,
             _fmt_size(total_bytes),
         )
+
+    # ── 1.5 Auto-expand small tool CCR markers ──────────────────
+    # For each tool-type marker small enough to inline, resolve and
+    # replace in conversation_history. Context/terminal markers stay
+    # as markers - the LLM retrieves them via catalog hints.
+    _expanded_hashes: set = set()  # hashes resolved and replaced inline
+    if AUTO_EXPAND_LIMIT > 0:
+        expanded_count = 0
+        for msg in conversation_history:
+            role = msg.get("role", "")
+            if role not in ("tool", "system"):
+                continue
+            content = msg.get("content", "")
+            if not isinstance(content, str) or "CCR:" not in content:
+                continue
+
+            replacements = {}  # full_marker_str -> resolved_content
+            for match in _CCR_RE.finditer(content):
+                full_marker = match.group(0)
+                h = match.group(1)
+                # Extract inner content between CCR: and closing delimiter
+                inner = full_marker.split("CCR:", 1)[1]
+                for suffix in (">>>", "]", "⫸"):
+                    if inner.endswith(suffix):
+                        inner = inner[: -len(suffix)]
+                        break
+                parts = inner.split("|")
+                if len(parts) < 3:
+                    continue
+                marker_type = str(parts[1])
+                if marker_type != "tool":
+                    continue  # only expand tool-type markers
+                try:
+                    marker_size = int(parts[2])
+                except ValueError:
+                    continue
+                if marker_size >= AUTO_EXPAND_LIMIT:
+                    continue  # too large, leave as marker
+
+                # Attempt resolution - inline store first, then proxy
+                resolved = _resolve_one(h, timeout=2)
+                if resolved is not None and len(resolved) < AUTO_EXPAND_LIMIT:
+                    replacements[full_marker] = resolved
+                    _expanded_hashes.add(h)
+                elif DEBUG_LOGGING:
+                    _log.debug(
+                        "pre_llm_hook: auto-expand skip %s size=%s (unresolved or oversized)",
+                        h[:12], marker_size,
+                    )
+
+            if replacements:
+                new_content = content
+                for old, new in replacements.items():
+                    new_content = new_content.replace(old, new, 1)
+                msg["content"] = new_content
+                n = len(replacements)
+                expanded_count += n
+                if DEBUG_LOGGING:
+                    _log.debug(
+                        "pre_llm_hook: auto-expanded %d tool marker(s) in %s message (%d→%d chars)",
+                        n, role, len(content), len(new_content),
+                    )
+        if expanded_count:
+            _log.debug(
+                "pre_llm_hook: auto-expanded %d tool CCR markers total (limit=%s)",
+                expanded_count, _fmt_size(AUTO_EXPAND_LIMIT),
+            )
+
+    # Filter out auto-expanded markers from catalog - already visible inline to LLM
+    if _expanded_hashes:
+        before = len(markers)
+        markers = [m for m in markers if m["hash"] not in _expanded_hashes]
+        if DEBUG_LOGGING:
+            _log.debug(
+                "pre_llm_hook: filtered %d expanded markers from catalog (%d → %d)",
+                before - len(markers), before, len(markers),
+            )
 
     # CATALOG_MODE "tool" early-return when no markers - nothing to catalog
     if CATALOG_MODE == "tool" and not markers:
