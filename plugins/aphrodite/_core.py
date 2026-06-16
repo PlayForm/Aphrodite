@@ -8,7 +8,7 @@ from collections import OrderedDict, deque
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.88"  # binary download version (must match Cargo.toml)
+BIN_VERSION = "v0.5.89"  # binary download version (must match Cargo.toml)
 PLUGIN_VERSION = "1.62.14"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
