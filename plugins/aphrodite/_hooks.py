@@ -282,9 +282,9 @@ def _inject_session_instruction(conversation_history):
             f"engine threshold={thresh_str}"
         )
     lines.append(
-        "  Use <<<CCR:hash|type|size>>> markers for compressed context. "
-        "Call aphrodite_retrieve(hash) to fetch content, "
-        "aphrodite_catalog to list available entries."
+        "  CCR markers (<<<CCR:hash|type|size>>>) point to compressed content. "
+        "Retrieve if the preview doesn't tell you enough; "
+        "aphrodite_catalog lists available entries."
     )
     lines.append(
         "  ─ Layer 2: per-turn catalog injected below each turn ─"
@@ -930,7 +930,6 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                             f"  [TURN ARCHIVE] CCR:{ccr['hash']} | "
                             f"turns T{turns[0]['id']}-T{old_turns[-1]['id']} "
                             f"({len(old_turns)} turns compressed, last {kept} raw)\n"
-                            f"  retrieve: aphrodite_retrieve({ccr['hash']})"
                         )
                         # Store sentinel to prevent re-compression on LLM failure
                         for t in old_turns:
@@ -1078,7 +1077,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     else:
                         parts.append(f"      CCR:{h} | {_fmt_size(m['size'])} | {preview}")
                 if len(items) > visible:
-                    parts.append(f"      ... +{len(items) - visible} more (use aphrodite_retrieve)")
+                    parts.append(f"      ... +{len(items) - visible} more")
 
             parts.append("  ⚡ Markers include structured metadata - use hints to decide retrieval.")
 
@@ -1107,7 +1106,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         # Context hint (skip in tool mode)
         if CATALOG_MODE != "tool" and ctx_len > 20:
             if ctx_len > 100:
-                parts.append(f"  ⚠ context={ctx_len} msgs - prefer aphrodite_retrieve over scanning")
+                parts.append(f"  ⚠ context={ctx_len} msgs — prefer catalog over scanning history")
             else:
                 parts.append(f"  context={ctx_len} msgs")
 
@@ -1123,9 +1122,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
             has_read_intent = bool(words & _READ_KEYWORDS)
             if has_read_intent and markers:
                 recent_markers = markers[-3:]
+                hashes = " ".join(m['hash'][:12] for m in recent_markers)
                 parts.append(
-                    "  intent=read | recent CCRs available: "
-                    + " ".join(f"aphrodite_retrieve({m['hash']})" for m in recent_markers)
+                    f"  intent=read | recent CCRs: {hashes}"
                 )
 
     if quiet_mode:
@@ -1303,7 +1302,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                     if DEBUG_LOGGING:
                         _log.debug("terminal_hook: BUILD-CCR %s:%s", "token" if token_alive else "cache", h)
                     _recent_markers.append({"hash": h, "type": "build", "size": len(output), "preview": summary})
-                    return f"<<<CCR:{h}|build|{len(output)}>>> {summary}…(use aphrodite_retrieve)"
+                    return f"<<<CCR:{h}|build|{len(output)}>>> {summary}"
             # Inline fallback
             h, _ = _inline_compress(output)
             # Bridge hash formats for _compress_handler cache hits (#51)
@@ -1338,7 +1337,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                     ratio,
                 )
             _recent_markers.append({"hash": h, "type": "terminal", "size": orig_len, "preview": preview})
-            return f"<<<CCR:{h}|terminal|{orig_len}>>> {preview}…(use aphrodite_retrieve)"
+            return f"<<<CCR:{h}|terminal|{orig_len}>>> {preview}"
         elif DEBUG_LOGGING:
             _log.debug("terminal_hook: PROXY FAIL - returned no hash (cmd: %s)", command[:60])
 
@@ -1352,7 +1351,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
             if DEBUG_LOGGING:
                 _log.debug("terminal_hook: INLINE hash=%s size=%s", h, orig_len)
             _recent_markers.append({"hash": h, "type": "terminal", "size": orig_len, "preview": preview})
-            return f"<<<CCR:{h}|terminal|{orig_len}>>> {preview}…(use aphrodite_retrieve)"
+            return f"<<<CCR:{h}|terminal|{orig_len}>>> {preview}"
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("terminal_hook: INLINE FAIL (cmd: %s)", command[:60])
@@ -1599,7 +1598,7 @@ def _search_handler(args=None, **kwargs):
             "query": query,
             "type_filter": ccr_type,
             "matches": len(results),
-            "hint": "Use aphrodite_retrieve(hash) on any result hash to get full content.",
+            "hint": "Use aphrodite_retrieve(hash) to expand any result hash.",
             "results": results[:20],
         }
     )
