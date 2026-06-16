@@ -1,4 +1,5 @@
 """aphrodite — marker formatting and proxy compression."""
+
 import json
 import urllib.request
 
@@ -21,9 +22,7 @@ def _compress_via_proxy(content, target_port):
     try:
         data = json.dumps({"content": content}).encode()
         req = urllib.request.Request(
-            f"http://127.0.0.1:{target_port}/ccr/create",
-            data=data,
-            headers={"Content-Type": "application/json"}
+            f"http://127.0.0.1:{target_port}/ccr/create", data=data, headers={"Content-Type": "application/json"}
         )
         with urllib.request.urlopen(req, timeout=3) as r:
             ccr = json.loads(r.read())
@@ -37,13 +36,13 @@ def _parse_ccr_markers(text):
     markers = []
     for match in _CCR_RE.finditer(text):
         m = match.group(1)
-        parts = m.split('|')
+        parts = m.split("|")
         if len(parts) >= 3:
             try:
                 sz = int(parts[2])
-                marker = {'hash': parts[0], 'type': parts[1], 'size': sz}
+                marker = {"hash": parts[0], "type": parts[1], "size": sz}
                 if len(parts) >= 4:
-                    marker['mode'] = parts[3]
+                    marker["mode"] = parts[3]
                 markers.append(marker)
             except (ValueError, IndexError):
                 pass

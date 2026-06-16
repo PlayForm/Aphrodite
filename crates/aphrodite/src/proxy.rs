@@ -494,7 +494,6 @@ pub async fn proxy_handler(
 }
 
 /// Detect content type for adaptive compression strategy.
-
 fn detect_content_type(content: &str) -> &'static str {
     let first_line = content.lines().next().unwrap_or("");
     

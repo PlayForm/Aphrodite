@@ -1,4 +1,5 @@
 """aphrodite — binary download and platform detection."""
+
 import logging
 import os
 import platform
@@ -48,6 +49,7 @@ def _ensure_binary() -> bool:
     local_bin = os.path.join(repo_dir, "crates", "aphrodite", "target", "release", "aphrodite")
     if os.path.exists(local_bin):
         import shutil
+
         shutil.copy2(local_bin, BINARY)
         os.chmod(BINARY, os.stat(BINARY).st_mode | stat.S_IEXEC)
         _log.info("copied local binary to %s", BINARY)
