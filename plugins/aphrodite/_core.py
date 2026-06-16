@@ -7,8 +7,8 @@ import re
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.57"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.3"  # plugin version
+BIN_VERSION = "v0.5.58"  # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.62.4"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
