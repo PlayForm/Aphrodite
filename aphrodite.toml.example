@@ -4,6 +4,7 @@
 api_url = "https://api.deepseek.com"
 model = "deepseek-v4-pro"
 ccr_ttl_seconds = 3600
+cache_port = 9798  # Cache proxy port (default: 9798)
 # api_key is read from APHRODITE_API_KEY env var by default.
 # Only set this if you cannot use the env var.
 api_key = ""
@@ -12,11 +13,11 @@ api_key = ""
 name = "cache"
 listen = "127.0.0.1:9797"
 mode = "cache"
-# dev = true  # set locally only — do not commit
+# dev = true  # set locally only - do not commit
 
 [[proxies]]
 name = "token"
 listen = "127.0.0.1:9798"
 mode = "token"
 tool_relay = true
-# dev = true  # set locally only — do not commit
+# dev = true  # set locally only - do not commit

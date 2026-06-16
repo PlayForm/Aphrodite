@@ -4,12 +4,14 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
 
-HOME = os.path.expanduser("~")
+HOME = str(Path.home())
+PROJECT_ROOT = Path(__file__).parent.parent
 
-SOUL_TEMPLATE = """# Aphrodite — HermesCompress
+SOUL_TEMPLATE = """# Aphrodite - HermesCompress
 
-You are an Aphrodite test agent inside **HermesCompress** — a context compression system for Hermes Agent.
+You are an Aphrodite test agent inside **HermesCompress** - a context compression system for Hermes Agent.
 
 ---
 
@@ -20,25 +22,25 @@ Hermes Agent
   ├─ provider: {provider}
   ├─ context engine: {engine} (threshold: {threshold})
   │
-  ├─ Headroom (:9799) — response caching, API cost savings
-  └─ Aphrodite (:9797/:9798) — CCR compression, tool relay
-       ├─ Cache (:9797) — in-memory CCR store, >8KB threshold
-       └─ Token (:9798) — SQLite CCR store, tool relay, >1KB threshold
+  ├─ Headroom (:9799) - response caching, API cost savings
+  └─ Aphrodite (:9797/:9798) - CCR compression, tool relay
+       ├─ Cache (:9797) - in-memory CCR store, >8KB threshold
+       └─ Token (:9798) - SQLite CCR store, tool relay, >1KB threshold
 ```
 
 ### Plugin Modules (10 files, was 1656-line monolith)
 ```
 plugins/aphrodite/
-├── __init__.py    — public API, re-exports, register()
-├── _core.py       — constants, thresholds, shared state, utilities
-├── _inline.py     — zlib fallback compression
-├── _marker.py     — CCR marker formatting, proxy compression, parsing
-├── _binary.py     — platform detection, binary download
-├── _proxy.py      — env loading, health checks, proxy launch
-├── _resolve.py    — CCR resolution + recursive unpack
-├── _tools.py      — retrieve + compress handlers + schemas
-├── _hooks.py      — 6 hooks + 7 tool handlers + conversation memory
-└── _engine.py     — ContextEngine for Hermes compression pipeline
+├── __init__.py    - public API, re-exports, register()
+├── _core.py       - constants, thresholds, shared state, utilities
+├── _inline.py     - zlib fallback compression
+├── _marker.py     - CCR marker formatting, proxy compression, parsing
+├── _binary.py     - platform detection, binary download
+├── _proxy.py      - env loading, health checks, proxy launch
+├── _resolve.py    - CCR resolution + recursive unpack
+├── _tools.py      - retrieve + compress handlers + schemas
+├── _hooks.py      - 6 hooks + 7 tool handlers + conversation memory
+└── _engine.py     - ContextEngine for Hermes compression pipeline
 ```
 
 ---
@@ -91,7 +93,7 @@ Run exactly ONCE, report numbers:
 
 ### Release Test
 1. Run `aphrodite_test mode=pipeline`
-2. Check `.test-results.json` — verify no regression (delta ≥ 0)
+2. Check `.test-results.json` - verify no regression (delta ≥ 0)
 3. Report pass/fail/skip counts
 
 ### Multi-Profile Test
@@ -165,13 +167,13 @@ python3 -c "see scripts/ for execution blocks"
 ## Working with Skills
 
 All profiles have full copies of development skills:
-- `execution-blocks` — parameterized command blocks (build, test, release, proxy)
-- `aphrodite-dev-workflow` — development environment + bug fixing
-- `aphrodite-iterate-release` — release workflow
-- `aphrodite-hook-reference` — hook API reference
-- `hermes-plugin-development` — plugin debugging + testing
-- `hermes-plugin-authoring` — creating new skills
-- `plan` — writing structured plans
+- `execution-blocks` - parameterized command blocks (build, test, release, proxy)
+- `aphrodite-dev-workflow` - development environment + bug fixing
+- `aphrodite-iterate-release` - release workflow
+- `aphrodite-hook-reference` - hook API reference
+- `hermes-plugin-development` - plugin debugging + testing
+- `hermes-plugin-authoring` - creating new skills
+- `plan` - writing structured plans
 
 Load any skill with `/skill <name>` or `skill_view(name='<name>')`.
 

@@ -1,6 +1,5 @@
-"""aphrodite — hook handlers for Hermes tool/terminal/LLM calls."""
+"""aphrodite - hook handlers for Hermes tool/terminal/LLM calls."""
 
-import hashlib
 import json
 import logging
 import os
@@ -46,6 +45,15 @@ from ._tools import COMPRESS_SCHEMA, RETRIEVE_SCHEMA, _compress_handler, _retrie
 # _referenced_files, _recent_markers, _conv_index, _FILE_TOOLS, _git_cache are module-level
 
 _log = logging.getLogger("aphrodite")
+
+__all__ = [
+    "_transform_tool_result", "_transform_terminal_hook",
+    "_pre_llm_hook", "_store_conversation_turn",
+    "_rebuild_handler", "_stats_handler", "_files_handler",
+    "_diff_handler", "_search_handler", "_test_handler", "_catalog_handler",
+    "REBUILD_SCHEMA", "STATS_SCHEMA", "FILES_SCHEMA", "DIFF_SCHEMA",
+    "SEARCH_SCHEMA", "TEST_SCHEMA", "CATALOG_SCHEMA",
+]
 
 # ── Hooks ─────────────────────────────────────────────────────
 
@@ -288,8 +296,8 @@ def _store_conversation_turn(conversation_history=None, assistant_response=None,
             del _conv_index[oldest]
 
         _log.debug("conv-cache: stored T%d → %s (%d total)", tnum, ccr["hash"], len(_conv_index))
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.debug("_store_conversation_turn: %s", exc)
 
 
 def _parse_ccr_markers(text):
@@ -314,7 +322,7 @@ def _parse_ccr_markers(text):
                     }
                 )
             except ValueError:
-                pass
+                _log.debug("_parse_ccr_markers: malformed marker skipped in %d-char text", len(text) if isinstance(text, str) else 0)
     # Filter out entries with missing/empty hashes
     # Filter: real CCR hashes are hex (0-9,a-f), ≥8 chars. Placeholders like abc123 filtered.
     return [
@@ -338,8 +346,8 @@ def _git_summary():
             _git_cache["ts"] = now
             _git_cache["summary"] = summary
             return summary
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.debug("_git_summary: %s", exc)
     return None
 
 
@@ -435,8 +443,8 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                         # Store sentinel to prevent re-compression on LLM failure
                         for t in old_turns:
                             _conv_index[t["id"]] = (ccr["hash"], f"turn {t['id']}", 0)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _log.debug("_pre_llm_hook turn archive: %s", exc)
 
     # ── 3. Build the catalog (mode-aware) ─────────────────────
     parts = []
@@ -504,7 +512,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 expanded.append(m)
             live = expanded
 
-            # Deduplicate by hash — keep first occurrence only
+            # Deduplicate by hash - keep first occurrence only
             seen = set()
             deduped = []
             for m in live:
@@ -512,6 +520,9 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     seen.add(m["hash"])
                     deduped.append(m)
             live = deduped
+
+            # Pre-build hash→preview cache for O(1) lookup instead of O(m×n) scan
+            preview_cache = {m["hash"]: m.get("preview", "") for m in live if "hash" in m}
 
             by_type = {}
             for m in live:
@@ -522,7 +533,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                 visible = min(len(items), 3)
                 parts.append(f"    [{ctype}] {len(items)} items:")
                 for i, m in enumerate(items[:visible]):
-                    preview = _extract_preview(m, conversation_history)
+                    preview = preview_cache.get(m["hash"], "")
                     h = str(m.get("hash", "")).strip()
                     if len(h) < 4 or h in ("{}", "?", "None", "null", "undefined"):
                         continue
@@ -627,15 +638,21 @@ def _group_into_turns(conversation_history):
         elif role == "assistant" and current:
             current["assistant"] = str(content)[:1000]
         elif role == "tool" and current:
-            # Tool results accumulate under the current turn
-            pass
+            # Store first 200 chars of tool content for turn summary
+            raw = str(content)[:200] if content else ""
+            if raw:
+                current.setdefault("tools", []).append(raw)
     if current:
         turns.append(current)
     return turns
 
 
 def _extract_preview(marker, conversation_history):
-    """Extract a short preview for a CCR marker from conversation history."""
+    """Extract a short preview for a CCR marker from conversation history.
+    
+    NOTE: No longer called by catalog loop - replaced by O(1) preview_cache.
+    Kept as fallback for manual/inline use outside pre_llm_hook.
+    """
     h = marker["hash"]
     for msg in conversation_history:
         c = msg.get("content", "")
@@ -953,6 +970,16 @@ def _search_handler(args=None, **kwargs):
             }
         )
 
+    # Deduplicate by hash before filtering
+    seen = set()
+    unique = []
+    for r in results:
+        h = r.get("hash", "")
+        if h and h not in seen:
+            seen.add(h)
+            unique.append(r)
+    results = unique
+
     if ccr_type:
         results = [
             r
@@ -999,8 +1026,15 @@ def _test_handler(args=None, **kwargs):
     test(
         "retrieve_roundtrip",
         lambda: (
-            "def foo"
-            in _retrieve_handler(args={"hash": hashlib.sha256(b"def foo():\n    return 42\n").hexdigest()[:16]})
+            json.loads(_compress_handler(args={"content": "def foo():\n    return 42\n", "type": "code"}))["hash"]
+            and "def foo"
+            in _retrieve_handler(
+                args={
+                    "hash": json.loads(
+                        _compress_handler(args={"content": "def foo():\n    return 42\n", "type": "code"})
+                    )["hash"]
+                }
+            )
         ),
     )
 
