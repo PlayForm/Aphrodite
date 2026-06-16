@@ -25,7 +25,7 @@ def _resolve_one(hash_val, timeout=4, query=""):
     payload = {"hash": hash_val}
     if query:
         payload["query"] = query
-    for port in (9797, 9798):
+    for port in (9798, 9797):
         try:
             data = json.dumps(payload).encode()
             req = urllib.request.Request(
@@ -76,4 +76,5 @@ def _resolve_recursive(hash_val, depth=0, resolved=None):
             replacements[f"<<<CCR:{marker}>>>"] = nested_content
     for marker_str, replacement in replacements.items():
         content = content.replace(marker_str, replacement, 1)
+    _inline_store[hash_val] = content
     return content

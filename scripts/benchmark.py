@@ -224,15 +224,48 @@ def main():
     if ratios:
         print(f"  Ratio range:  {min(ratios):.0f}x - {max(ratios):.0f}x (median {statistics.median(ratios):.0f}x)")
 
-    # Save JSON
-    out = os.path.abspath(os.path.join(os.path.dirname(__file__) or ".", "..", ".hermes", "benchmark-results.json"))
-    with open(out, "w") as f:
-        json.dump({"timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"), "proxy": PROXY,
-                    "summary": {"total": total, "passed": passes, "failed": total-passes,
-                                 "compress_avg_ms": round(statistics.mean(comp_lats),1) if comp_lats else None,
-                                 "retrieve_avg_ms": round(statistics.mean(retr_lats),1) if retr_lats else None},
-                    "results": RESULTS}, f, indent=2)
-    print(f"\n  Results → {out}")
+    # ── Previous run comparison ──
+    hist_path = os.path.abspath(os.path.join(os.path.dirname(__file__) or ".", "..", ".hermes", "benchmark-history.jsonl"))
+    prev = None
+    if os.path.exists(hist_path):
+        try:
+            with open(hist_path) as f:
+                lines = [l for l in f if l.strip()]
+            if lines:
+                prev = json.loads(lines[-1])
+        except Exception:
+            prev = None
+    if prev:
+        ps = prev.get("summary", {})
+        print(f"  Previous run: {prev.get('timestamp','?')}")
+        if comp_lats and ps.get("compress_avg_ms") is not None:
+            d = statistics.mean(comp_lats) - ps["compress_avg_ms"]
+            print(f"  Compress Δ:   {d:+.1f}ms vs previous")
+        if retr_lats and ps.get("retrieve_avg_ms") is not None:
+            d = statistics.mean(retr_lats) - ps["retrieve_avg_ms"]
+            print(f"  Retrieve Δ:   {d:+.1f}ms vs previous")
+
+    # Save timestamped result & append to cumulative history
+    ts_iso = time.strftime("%Y-%m-%dT%H:%M:%S")
+    ts_safe = time.strftime("%Y-%m-%dT%H-%M-%S")
+    base = os.path.abspath(os.path.join(os.path.dirname(__file__) or ".", "..", ".hermes"))
+    os.makedirs(base, exist_ok=True)
+    out_json = os.path.join(base, f"benchmark-{ts_safe}.json")
+    run_data = {"timestamp": ts_iso, "proxy": PROXY,
+                "summary": {"total": total, "passed": passes, "failed": total-passes,
+                             "compress_avg_ms": round(statistics.mean(comp_lats),1) if comp_lats else None,
+                             "retrieve_avg_ms": round(statistics.mean(retr_lats),1) if retr_lats else None},
+                "results": RESULTS}
+    with open(out_json, "w") as f:
+        json.dump(run_data, f, indent=2)
+    print(f"\n  Results → {out_json}")
+
+    # Append a compact entry to the cumulative JSONL history
+    hist_entry = {"timestamp": ts_iso, "proxy": PROXY, "summary": run_data["summary"],
+                  "file": f"benchmark-{ts_safe}.json"}
+    with open(hist_path, "a") as f:
+        f.write(json.dumps(hist_entry) + "\n")
+    print(f"  History → {hist_path}")
     return 0 if passes == total else 1
 
 

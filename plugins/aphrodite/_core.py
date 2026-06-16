@@ -3,12 +3,13 @@
 import logging
 import os
 import re
+from collections import OrderedDict
 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.5.59"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.5"  # plugin version
+BIN_VERSION = "v0.5.60"  # binary download version (must match Cargo.toml)
+PLUGIN_VERSION = "1.62.6"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
@@ -59,7 +60,7 @@ if DEBUG_LOGGING:
 _CCR_RE = re.compile(r"<<<CCR:([^>]{1,100})>>>")
 
 # ── Inline compression store (session-scoped) ─────────────────
-_inline_store = {}
+_inline_store = OrderedDict()
 
 # ── Shared session state ──────────────────────────────────────
 _referenced_files = {}  # {filepath: last_tool_name}

@@ -115,7 +115,8 @@ from ._tools import (
 # ── Plugin registration ───────────────────────────────────────────
 def register(ctx):
     """Register hooks, tools, and context engine with Hermes."""
-    _ensure_binary()
+    if not _ensure_binary(existence_check=True):
+        _log.warning("aphrodite binary not found - will download on session_start")
     ctx.register_hook("on_session_start", on_start)
     ctx.register_hook("pre_llm_call", _pre_llm_hook)
     ctx.register_hook("transform_terminal_output", _transform_terminal_hook)
@@ -138,7 +139,7 @@ def register(ctx):
             ctx.register_context_engine(AphroditeContextEngine())
             _log.info("aphrodite context engine registered")
         except Exception as e:
-            _log.debug("context engine registration skipped: %s", e)
+            _log.warning("context engine registration skipped [%s]: %s", type(e).__name__, e)
     else:
         _log.info("context engine not registered - set APHRODITE_CONTEXT_ENGINE=1 to enable")
 
