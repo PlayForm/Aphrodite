@@ -29,7 +29,6 @@ from ._core import (
     _conv_index,
     _fmt_size,
     _git_cache,
-    _inline_clear,
     _inline_store,
     _recent_markers,
     _referenced_files,

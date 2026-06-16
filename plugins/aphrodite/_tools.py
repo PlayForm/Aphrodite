@@ -5,7 +5,7 @@ import logging
 import urllib.request
 
 from ._core import _inline_store
-from ._resolve import _resolve_one, _resolve_recursive
+from ._resolve import _resolve_recursive
 
 _log = logging.getLogger("aphrodite")
 
