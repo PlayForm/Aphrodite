@@ -10,12 +10,12 @@ use std::path::PathBuf;
 /// Proxy operation mode.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ProxyMode {
-    /// Cache mode - in-memory CCR, lightweight compression (>8KB threshold),
-    /// preview preserved, no tool injection.
-    Cache,
-    /// Token mode - SQLite CCR, aggressive compression (>1KB threshold),
-    /// tool injection, tool relay.
-    Token,
+	/// Cache mode - in-memory CCR, lightweight compression (>8KB threshold),
+	/// preview preserved, no tool injection.
+	Cache,
+	/// Token mode - SQLite CCR, aggressive compression (>1KB threshold),
+	/// tool injection, tool relay.
+	Token,
 }
 
 /// aphrodite - generic LLM proxy with CCR, tool relay, and programmatic CCR.
@@ -23,171 +23,191 @@ pub enum ProxyMode {
 #[derive(Parser, Debug, Clone)]
 #[command(name = "aphrodite", version, about)]
 pub struct Cli {
-    /// Proxy mode: cache or token
-    #[arg(long, default_value = "token", env = "APHRODITE_MODE")]
-    pub mode: ProxyMode,
+	/// Proxy mode: cache or token
+	#[arg(long, default_value = "token", env = "APHRODITE_MODE")]
+	pub mode: ProxyMode,
 
-    /// Listen address
-    #[arg(long, default_value = "127.0.0.1:9797", env = "APHRODITE_LISTEN")]
-    pub listen: SocketAddr,
+	/// Listen address
+	#[arg(long, default_value = "127.0.0.1:9797", env = "APHRODITE_LISTEN")]
+	pub listen: SocketAddr,
 
-    /// Upstream API base URL
-    #[arg(long, default_value = "https://api.openai.com", env = "APHRODITE_API_URL")]
-    pub api_url: String,
+	/// Upstream API base URL
+	#[arg(long, default_value = "https://api.openai.com", env = "APHRODITE_API_URL")]
+	pub api_url: String,
 
-    /// Upstream API key
-    #[arg(long, env = "APHRODITE_API_KEY")]
-    pub api_key: String,
+	/// Upstream API key
+	#[arg(long, env = "APHRODITE_API_KEY")]
+	pub api_key: String,
 
-    /// Model name to forward (set via APHRODITE_MODEL env or --model)
-    #[arg(long, default_value = "default-model", env = "APHRODITE_MODEL")]
-    pub model: String,
+	/// Model name to forward (set via APHRODITE_MODEL env or --model)
+	#[arg(long, default_value = "default-model", env = "APHRODITE_MODEL")]
+	pub model: String,
 
-    /// Max context tokens
-    #[arg(long, default_value = "1000000")]
-    pub max_context: usize,
+	/// Max context tokens
+	#[arg(long, default_value = "1000000")]
+	pub max_context: usize,
 
-    /// Max output tokens
-    #[arg(long, default_value = "384000")]
-    pub max_output: usize,
+	/// Max output tokens
+	#[arg(long, default_value = "384000")]
+	pub max_output: usize,
 
-    /// SQLite database path for CCR storage
-    #[arg(long, env = "APHRODITE_DB", default_value = "")]
-    pub ccr_db_path: PathBuf,
+	/// SQLite database path for CCR storage
+	#[arg(long, env = "APHRODITE_DB", default_value = "")]
+	pub ccr_db_path: PathBuf,
 
-    /// CCR TTL in seconds (default: 3600 = 1 hour)
-    #[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
-    pub ccr_ttl_seconds: u64,
+	/// CCR TTL in seconds (default: 3600 = 1 hour)
+	#[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
+	pub ccr_ttl_seconds: u64,
 
-    /// Disable CCR markers in compressed output
-    #[arg(long)]
-    pub no_ccr_marker: bool,
+	/// Disable CCR markers in compressed output
+	#[arg(long)]
+	pub no_ccr_marker: bool,
 
-    /// Enable tool relay endpoint (POST /tool/relay)
-    #[arg(long)]
-    pub tool_relay: bool,
+	/// Enable tool relay endpoint (POST /tool/relay)
+	#[arg(long)]
+	pub tool_relay: bool,
 
-    /// Hermes callback URL for CCR notifications
-    #[arg(long, env = "APHRODITE_NOTIFY_URL")]
-    pub notify_url: Option<String>,
+	/// Hermes callback URL for CCR notifications
+	#[arg(long, env = "APHRODITE_NOTIFY_URL")]
+	pub notify_url: Option<String>,
 
-    /// Hermes API key for callback auth
-    #[arg(long, env = "APHRODITE_NOTIFY_KEY")]
-    pub notify_key: Option<String>,
+	/// Hermes API key for callback auth
+	#[arg(long, env = "APHRODITE_NOTIFY_KEY")]
+	pub notify_key: Option<String>,
 
-    /// Enable dev mode - verbose request/response logging
-    #[arg(long)]
-    pub dev: bool,
+	/// Enable dev mode - verbose request/response logging
+	#[arg(long)]
+	pub dev: bool,
 
-    /// Use compact log format (no timestamps, no targets)
-    #[arg(long, env = "APHRODITE_LOG_COMPACT")]
-    pub log_compact: bool,
+	/// Use compact log format (no timestamps, no targets)
+	#[arg(long, env = "APHRODITE_LOG_COMPACT")]
+	pub log_compact: bool,
 
-    /// Upstream request timeout in seconds (default: 300)
-    #[arg(long, default_value = "300")]
-    pub timeout: u64,
+	/// Upstream request timeout in seconds (default: 300)
+	#[arg(long, default_value = "300")]
+	pub timeout: u64,
 }
-
 
 /// Multi-proxy configuration loaded from aphrodite.toml.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MultiConfig {
-    pub defaults: Option<Defaults>,
-    pub proxies: Vec<ProxyConfig>,
+	pub defaults: Option<Defaults>,
+	pub proxies: Vec<ProxyConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Defaults {
-    pub api_url: Option<String>,
-    pub model: Option<String>,
-    pub ccr_ttl_seconds: Option<u64>,
-    pub api_key: Option<String>,
+	pub api_url: Option<String>,
+	pub model: Option<String>,
+	pub ccr_ttl_seconds: Option<u64>,
+	pub api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ProxyConfig {
-    pub name: Option<String>,
-    #[serde(default)]
-    pub listen: Option<String>,
-    pub mode: Option<String>,
-    pub api_key: Option<String>,
-    pub api_url: Option<String>,
-    pub model: Option<String>,
-    pub tool_relay: Option<bool>,
-    pub dev: Option<bool>,
-    pub ccr_ttl_seconds: Option<u64>,
-    pub ccr_db_path: Option<String>,
-    pub notify_url: Option<String>,
-    pub notify_key: Option<String>,
-    pub timeout: Option<u64>,
-    pub max_context: Option<usize>,
-    pub max_output: Option<usize>,
+	pub name: Option<String>,
+	#[serde(default)]
+	pub listen: Option<String>,
+	pub mode: Option<String>,
+	pub api_key: Option<String>,
+	pub api_url: Option<String>,
+	pub model: Option<String>,
+	pub tool_relay: Option<bool>,
+	pub dev: Option<bool>,
+	pub ccr_ttl_seconds: Option<u64>,
+	pub ccr_db_path: Option<String>,
+	pub notify_url: Option<String>,
+	pub notify_key: Option<String>,
+	pub timeout: Option<u64>,
+	pub max_context: Option<usize>,
+	pub max_output: Option<usize>,
 }
 
 impl MultiConfig {
-    /// Load from the given aphrodite.toml path.
-    pub fn load(path: &str) -> anyhow::Result<Self> {
-        let content = std::fs::read_to_string(path)?;
-        Ok(toml::from_str(&content)?)
-    }
+	/// Load from the given aphrodite.toml path.
+	pub fn load(path: &str) -> anyhow::Result<Self> {
+		let content = std::fs::read_to_string(path)?;
+		Ok(toml::from_str(&content)?)
+	}
 
-    /// Resolve a ProxyConfig with defaults applied.
-    /// Returns an error if no API key is found after all fallbacks.
-    pub fn resolve(&self, cfg: &ProxyConfig) -> anyhow::Result<Cli> {
-        let d = self.defaults.as_ref();
-        let api_key: String = cfg.api_key.clone()
-            .or_else(|| d.and_then(|d| d.api_key.clone()))
-            .or_else(|| std::env::var("APHRODITE_API_KEY").ok())
-            .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
-            .or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok())
-            .unwrap_or_default();
-        if api_key.is_empty() {
-            anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml");
-        }
-        Ok(Cli {
-            mode: match cfg.mode.as_deref() {
-                Some("token") => ProxyMode::Token,
-                Some("cache") => ProxyMode::Cache,
-                None => {
-                    tracing::info!("no mode specified, defaulting to token");
-                    ProxyMode::Token
-                }
-                Some(other) => {
-                    tracing::warn!("unknown mode {:?}, defaulting to token", other);
-                    ProxyMode::Token
-                }
-            },
-            listen: cfg.listen.as_deref()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or_else(|| "127.0.0.1:9797".parse().unwrap()),
-            api_url: cfg.api_url.clone().or_else(|| d.and_then(|d| d.api_url.clone())).unwrap_or_else(|| "https://api.openai.com".into()),
-            api_key,
-            model: cfg.model.clone().or_else(|| d.and_then(|d| d.model.clone())).unwrap_or_else(|| "default-model".into()),
-            max_context: cfg.max_context.unwrap_or(1_000_000),
-            max_output: cfg.max_output.unwrap_or(384_000),
-            // Fall back to ~/.hermes/aphrodite/ if dirs::home_dir() returns None
-            ccr_db_path: cfg.ccr_db_path.clone().filter(|s| !s.is_empty()).map(Into::into).unwrap_or_else(|| {
-                dirs::home_dir()
-                    .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-                    .join(".hermes").join("aphrodite").join("ccr.db")
-            }),
-            ccr_ttl_seconds: cfg.ccr_ttl_seconds.or_else(|| d.and_then(|d| d.ccr_ttl_seconds)).unwrap_or(3600),
-            no_ccr_marker: false,
-            tool_relay: cfg.tool_relay.unwrap_or(false),
-            notify_url: cfg.notify_url.clone(),
-            notify_key: cfg.notify_key.clone(),
-            dev: cfg.dev.unwrap_or(false),
-            log_compact: false,
-            timeout: {
-                let t = cfg.timeout.unwrap_or(300);
-                if t > 600 {
-                    tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
-                    600
-                } else {
-                    t
-                }
-            },
-        })
-    }
+	/// Resolve a ProxyConfig with defaults applied.
+	/// Returns an error if no API key is found after all fallbacks.
+	pub fn resolve(&self, cfg: &ProxyConfig) -> anyhow::Result<Cli> {
+		let d = self.defaults.as_ref();
+		let api_key: String = cfg
+			.api_key
+			.clone()
+			.or_else(|| d.and_then(|d| d.api_key.clone()))
+			.or_else(|| std::env::var("APHRODITE_API_KEY").ok())
+			.or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
+			.or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok())
+			.unwrap_or_default();
+		if api_key.is_empty() {
+			anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml");
+		}
+		Ok(Cli {
+			mode: match cfg.mode.as_deref() {
+				Some("token") => ProxyMode::Token,
+				Some("cache") => ProxyMode::Cache,
+				None => {
+					tracing::info!("no mode specified, defaulting to token");
+					ProxyMode::Token
+				},
+				Some(other) => {
+					tracing::warn!("unknown mode {:?}, defaulting to token", other);
+					ProxyMode::Token
+				},
+			},
+			listen: cfg
+				.listen
+				.as_deref()
+				.and_then(|s| s.parse().ok())
+				.unwrap_or_else(|| "127.0.0.1:9797".parse().unwrap()),
+			api_url: cfg
+				.api_url
+				.clone()
+				.or_else(|| d.and_then(|d| d.api_url.clone()))
+				.unwrap_or_else(|| "https://api.openai.com".into()),
+			api_key,
+			model: cfg
+				.model
+				.clone()
+				.or_else(|| d.and_then(|d| d.model.clone()))
+				.unwrap_or_else(|| "default-model".into()),
+			max_context: cfg.max_context.unwrap_or(1_000_000),
+			max_output: cfg.max_output.unwrap_or(384_000),
+			// Fall back to ~/.hermes/aphrodite/ if dirs::home_dir() returns None
+			ccr_db_path: cfg
+				.ccr_db_path
+				.clone()
+				.filter(|s| !s.is_empty())
+				.map(Into::into)
+				.unwrap_or_else(|| {
+					dirs::home_dir()
+						.unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+						.join(".hermes")
+						.join("aphrodite")
+						.join("ccr.db")
+				}),
+			ccr_ttl_seconds: cfg
+				.ccr_ttl_seconds
+				.or_else(|| d.and_then(|d| d.ccr_ttl_seconds))
+				.unwrap_or(3600),
+			no_ccr_marker: false,
+			tool_relay: cfg.tool_relay.unwrap_or(false),
+			notify_url: cfg.notify_url.clone(),
+			notify_key: cfg.notify_key.clone(),
+			dev: cfg.dev.unwrap_or(false),
+			log_compact: false,
+			timeout: {
+				let t = cfg.timeout.unwrap_or(300);
+				if t > 600 {
+					tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
+					600
+				} else {
+					t
+				}
+			},
+		})
+	}
 }
-

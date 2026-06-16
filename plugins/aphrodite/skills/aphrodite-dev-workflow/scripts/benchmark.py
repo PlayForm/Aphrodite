@@ -13,7 +13,15 @@ Search is plugin-level only (no proxy endpoint).
 Reports to .hermes/benchmark-results.json.
 """
 
-import json, os, random, statistics, string, sys, time, urllib.request, urllib.error
+import json
+import os
+import random
+import statistics
+import string
+import sys
+import time
+import urllib.error
+import urllib.request
 
 PROXY = os.environ.get("APHRODITE_PROXY", "http://127.0.0.1:9798")
 API_KEY = os.environ.get("APHRODITE_API_KEY", "")
@@ -44,7 +52,7 @@ def req(method: str, endpoint: str, body: dict | None = None, timeout: int = 30)
 
 
 def make_text(size: int) -> str:
-    words = "the quick brown fox jumps over lazy dog".split()
+    words = ["the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog"]
     chunks = []; remaining = size
     while remaining > 0:
         w = random.choice(words)

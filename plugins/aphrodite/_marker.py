@@ -1,5 +1,6 @@
 """aphrodite - marker formatting and proxy compression."""
 
+import contextlib
 import http.client
 import json
 import logging
@@ -29,14 +30,11 @@ def _get_conn(port: int) -> http.client.HTTPConnection:
         _tls.conn_ts = {}
     # Evict idle connections (>60s since last use)
     now = time.time()
-    if port in _tls.conns:
-        if now - _tls.conn_ts.get(port, 0) > 60:
-            try:
-                _tls.conns[port].close()
-            except Exception:
-                pass
-            del _tls.conns[port]
-            del _tls.conn_ts[port]
+    if port in _tls.conns and now - _tls.conn_ts.get(port, 0) > 60:
+        with contextlib.suppress(Exception):
+            _tls.conns[port].close()
+        del _tls.conns[port]
+        del _tls.conn_ts[port]
     if port not in _tls.conns:
         _tls.conns[port] = http.client.HTTPConnection("127.0.0.1", port, timeout=0.5)
     return _tls.conns[port]
@@ -45,16 +43,14 @@ def _get_conn(port: int) -> http.client.HTTPConnection:
 def _put_conn(port: int) -> None:
     """Close and remove a connection (recovery after error)."""
     if hasattr(_tls, "conns") and port in _tls.conns:
-        try:
+        with contextlib.suppress(Exception):
             _tls.conns[port].close()
-        except Exception:
-            pass
         del _tls.conns[port]
         if hasattr(_tls, "conn_ts") and port in _tls.conn_ts:
             del _tls.conn_ts[port]
 
 
-def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None):
+def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None, meta=None):
     """Build a standard CCR marker string.
 
     Args:
@@ -66,6 +62,8 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=N
         headroom_budget: If set (int or str), lower values truncate preview
             earlier so the marker itself takes fewer tokens under tight
             budget.  Ignored when preview is empty.
+        meta: Optional dict of structured metadata (e.g. lang, fns).
+            Serialized as JSON in a meta= segment within the marker.
     """
     parts = [hash_val, ccr_type, str(size)]
     if mode:
@@ -73,7 +71,6 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=N
     if preview:
         safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
         safe = "".join(c if c >= " " else " " for c in safe)
-        # Truncate preview based on headroom budget (lower budget = shorter)
         if headroom_budget is not None:
             try:
                 budget = int(headroom_budget)
@@ -86,6 +83,18 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=N
             except (ValueError, TypeError):
                 pass  # non-numeric budget, keep full preview
         parts.append(f"preview={safe}")
+    if meta:
+        # Flat pipe-delimited key=value pairs (matching Rust format)
+        meta_parts = []
+        for k, v in meta.items():
+            safe_v = str(v).replace("|", "/").replace("\n", " ").strip()
+            if safe_v:
+                meta_parts.append(f"{k}={safe_v}")
+        meta_str = "|".join(meta_parts)
+        if len(meta_str) > 200:
+            meta_str = meta_str[:197] + "..."
+        if meta_str:
+            parts.append(meta_str)
     return f"<<<CCR:{'|'.join(parts)}>>>"
 
 
@@ -137,7 +146,15 @@ def _is_valid_ccr_hash(h):
 
 
 def _parse_ccr_markers(text):
-    """Parse <<<CCR:hash|type|size|mode|preview=TEXT>>> markers from text. Returns list of dicts with preview."""
+    """Parse <<<CCR:hash|type|size|key=value|...>>> markers from text.
+
+    Returns list of dicts each containing:
+        hash, type, size, mode, preview, meta
+
+    ``meta`` is a dict with all key=value pairs found past parts[3],
+    including ``preview`` (which is stored both in ``preview`` and
+    ``meta["preview"]`` for backward compat).
+    """
     global _parse_errors
     markers = []
     for match in _CCR_RE.finditer(text):
@@ -153,19 +170,29 @@ def _parse_ccr_markers(text):
         if len(parts) >= 3:
             try:
                 sz = int(parts[2])
-                # Parse embedded preview=TEXT from marker parts (parts[3:])
-                preview = ""
+                # Parse mode + key=value pairs from parts[3:]
+                mode = "?"
+                meta = {}
                 for part in parts[3:]:
-                    if part.startswith("preview="):
-                        preview = part[len("preview="):]
-                        break
+                    if "=" in part:
+                        k, _, v = part.partition("=")
+                        meta[str(k)] = str(v)
+                    elif mode == "?":
+                        mode = str(part)
+                    else:
+                        # Extra positional part after mode — ignore
+                        pass
+                preview = meta.pop("preview", "")
+                # Remaining kv pairs are structured metadata (e.g. lang=rs, fns=main)
+                parsed_meta = meta if meta else {}
                 markers.append(
                     {
-                        "hash": h,  # from parts[0], the single source of truth
+                        "hash": h,
                         "type": str(parts[1]),
                         "size": sz,
-                        "mode": str(parts[3]) if len(parts) > 3 else "?",
+                        "mode": mode,
                         "preview": preview,
+                        "meta": parsed_meta,
                     }
                 )
             except ValueError:

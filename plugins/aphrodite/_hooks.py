@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -46,7 +47,16 @@ from ._core import (
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
 from ._marker import _ccr_marker, _compress_via_proxy, _parse_ccr_markers, _parse_errors
-from ._proxy import _alive, _alive_cache, _alive_cached, _alive_turn_cache, _expand_guidance, _headroom_context, _query_and_set_headroom_budget, _update_headroom_context
+from ._proxy import (
+    _alive,
+    _alive_cache,
+    _alive_cached,
+    _alive_turn_cache,
+    _expand_guidance,
+    _headroom_context,
+    _query_and_set_headroom_budget,
+    _update_headroom_context,
+)
 from ._resolve import _resolve_one
 from ._tools import _compress_handler, _retrieve_handler
 
@@ -102,19 +112,17 @@ def _inject_session_instruction(conversation_history):
     token_alive = _alive_cached(PORTS["token"])
     # Build the instruction
     lines = [
-        "[APHRODITE] v{version} active.".format(version=PLUGIN_VERSION),
+        f"[APHRODITE] v{PLUGIN_VERSION} active.",
     ]
     if token_alive:
         lines.append(
-            "  Token proxy :9798 active | engine threshold={thresh} | "
-            "tools auto-expand inline (<{limit})".format(
-                thresh=thresh_str, limit=_fmt_size(AUTO_EXPAND_LIMIT),
-            )
+            f"  Token proxy :9798 active | engine threshold={thresh_str} | "
+            f"tools auto-expand inline (<{_fmt_size(AUTO_EXPAND_LIMIT)})"
         )
     else:
         lines.append(
             "  Token proxy :9798 offline | inline fallback active | "
-            "engine threshold={thresh}".format(thresh=thresh_str)
+            f"engine threshold={thresh_str}"
         )
     lines.append(
         "  Use <<<CCR:hash|type|size>>> markers for compressed context. "
@@ -134,6 +142,94 @@ def _inject_session_instruction(conversation_history):
     _log.info("injected session instruction v%s", PLUGIN_VERSION)
     global _session_instruction_injected
     _session_instruction_injected = True
+
+
+def _extract_tool_metadata(tool_name, args, result):
+    """Extract structured metadata dict from tool_name, args, and result.
+
+    Returns a dict suitable for ``_ccr_marker(meta=...)``, or None
+    if no metadata can be extracted.  Soft-fails on any exception.
+    """
+    try:
+        args = args if isinstance(args, dict) else {}
+        if tool_name == "read_file":
+            path = args.get("path", args.get("file", ""))
+            if path and isinstance(path, str):
+                fn = os.path.basename(path)
+                _, ext = os.path.splitext(fn)
+                meta = {"fn": fn}
+                if ext:
+                    meta["ext"] = ext.lstrip(".")
+                # Count lines, extract def/class/fn names from result
+                lines = result.splitlines()
+                meta["lines"] = str(len(lines))
+                names = []
+                for line in lines:
+                    m = re.match(r"^\s*(?:class|struct|enum|trait|fn)\s+(\w+)", line)
+                    if m:
+                        names.append(m.group(1))
+                if names:
+                    meta["names"] = ",".join(names[:5])
+                return meta
+
+        elif tool_name == "search_files":
+            pattern = args.get("pattern", "")
+            if pattern:
+                meta = {"q": str(pattern)[:40]}
+                # Try to count files from JSON result
+                try:
+                    data = json.loads(result)
+                    if isinstance(data, list):
+                        meta["files"] = str(len(data))
+                    elif isinstance(data, dict):
+                        # Check common keys: "matches", "files", "results", "count"
+                        for key in ("matches", "files", "results"):
+                            val = data.get(key)
+                            if isinstance(val, list):
+                                meta["files"] = str(len(val))
+                                break
+                        else:
+                            meta["files"] = str(data.get("total_count", data.get("count", "?")))
+                except (json.JSONDecodeError, ValueError):
+                    # Not JSON — count lines matching grep output format
+                    line_count = 0
+                    for line in result.splitlines():
+                        line = line.strip()
+                        if line and not line.startswith((">", "<", "-", "+")):
+                            line_count += 1
+                    if line_count:
+                        meta["files"] = str(line_count)
+                return meta
+
+        elif tool_name == "terminal":
+            # Extract exit code from kwargs (passed through Hermes terminal hook)
+            exit_code = args.get("exit_code", args.get("returncode", ""))
+            if not exit_code:
+                # Try to find it in the result itself
+                for line in result.splitlines():
+                    m = re.match(r"exit code[:\s]+(\d+)", line.strip(), re.IGNORECASE)
+                    if m:
+                        exit_code = m.group(1)
+                        break
+            meta = {}
+            if exit_code:
+                meta["exit"] = str(exit_code)
+            # Last non-empty line of output
+            last_line = ""
+            for line in result.splitlines():
+                stripped = line.strip()
+                if stripped:
+                    last_line = stripped
+            if last_line:
+                meta["last"] = last_line[:60]
+            return meta if meta else None
+
+        return None
+    except Exception:
+        if DEBUG_LOGGING:
+            _log.debug("_extract_tool_metadata: failed for %s", tool_name[:40])
+        return None
+
 
 def _transform_tool_result(
     tool_name="",
@@ -225,6 +321,7 @@ def _transform_tool_result(
         return result
 
     preview = result[:120].replace("\\n", " ").strip()
+    metadata = _extract_tool_metadata(tool_name, args, result)
 
     # Try proxy compression first
     if proxy_available:
@@ -248,9 +345,15 @@ def _transform_tool_result(
                     ratio,
                     (time.time() - _t0) * 1000,
                 )
-            _recent_markers.append({"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"]})
+            _recent_markers.append(
+                {"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"], "meta": metadata or {}}
+            )
             _inline_store_put(h, result)
-            return _ccr_marker(h, marker_type, result_len, label, preview, headroom_budget=_headroom_context.get("x-headroom-budget"))
+            return _ccr_marker(
+                h, marker_type, result_len, label, preview,
+                headroom_budget=_headroom_context.get("x-headroom-budget"),
+                meta=metadata,
+            )
         elif DEBUG_LOGGING:
             _log.debug("transform_tool_result: PROXY FAIL %s - proxy returned no hash", tool_name[:40])
 
@@ -270,8 +373,14 @@ def _transform_tool_result(
                     result_len,
                     (time.time() - _t0) * 1000,
                 )
-            _recent_markers.append({"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"]})
-            return _ccr_marker(h, marker_type, result_len, "inline", preview, headroom_budget=_headroom_context.get("x-headroom-budget"))
+            _recent_markers.append(
+                {"hash": h, "type": marker_type, "size": result_len, "preview": preview, "turn": _state["turn_counter"], "meta": metadata or {}}
+            )
+            return _ccr_marker(
+                h, marker_type, result_len, "inline", preview,
+                headroom_budget=_headroom_context.get("x-headroom-budget"),
+                meta=metadata,
+            )
         except Exception:
             if DEBUG_LOGGING:
                 _log.debug("transform_tool_result: INLINE FAIL %s", tool_name[:40])
@@ -693,7 +802,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         # Layer 2: per-turn hint with counts and cross-reference
         if markers or len(_expanded_hashes) > 0 or not _session_instruction_injected:
             hint = [
-                "  [{} markers available | {} tool outputs auto-expanded this turn]".format(len(markers), len(_expanded_hashes)),
+                f"  [{len(markers)} markers available | {len(_expanded_hashes)} tool outputs auto-expanded this turn]",
                 "  Call aphrodite_catalog to list all entries, aphrodite_retrieve(hash) to fetch.",
                 "  For full tool reference, load aphrodite-tool-guide skill (skill_view).",
             ]
@@ -753,9 +862,16 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
                     h = str(m.get("hash", "")).strip()
                     if len(h) < 4 or h in ("{}", "?", "None", "null", "undefined"):
                         continue
-                    parts.append(f"      CCR:{h} | {_fmt_size(m['size'])} | {preview}")
+                    meta = m.get("meta", {}) or {}
+                    if meta:
+                        kvs = ", ".join(f"{k}={v}" for k, v in sorted(meta.items()))
+                        parts.append(f"      {h[:12]} - {m.get('type', '?')} [{kvs}] ({_fmt_size(m['size'])})")
+                    else:
+                        parts.append(f"      CCR:{h} | {_fmt_size(m['size'])} | {preview}")
                 if len(items) > visible:
                     parts.append(f"      ... +{len(items) - visible} more (use aphrodite_retrieve)")
+
+            parts.append("  ⚡ Markers include structured metadata - use hints to decide retrieval.")
 
         # Conversation memory (full mode only - already in system prompt)
         if CATALOG_MODE == "full" and _conv_index:
