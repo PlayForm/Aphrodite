@@ -1,6 +1,6 @@
-"""aphrodite - inline compression (zlib fallback when proxy is down)."""
+"""aphrodite - inline compression (hash-based session store when proxy is down)."""
 
-import zlib
+import hashlib
 
 from ._core import _inline_store, _inline_store_put
 
@@ -14,10 +14,9 @@ def _inline_compress(content):
         raw_bytes = content.encode("utf-8", errors="replace")
         if not raw_bytes:
             raw_bytes = content.encode("latin-1")
-    raw = zlib.compress(raw_bytes, 1)
-    h_bare = "{:08x}".format(zlib.crc32(raw_bytes) & 0xFFFFFFFF)
+    h_bare = hashlib.sha256(raw_bytes).hexdigest()[:16]
     _inline_store_put(h_bare, content)
-    return "i:" + h_bare, len(raw)
+    return "i:" + h_bare, len(content)
 
 
 def _inline_retrieve(hash_val):
