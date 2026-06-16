@@ -48,6 +48,10 @@ profiles/*/sessions/
 # Test artifacts
 plugins/aphrodite/.test-results.json
 
+# Aphrodite proxy binary (copied to profile/plugin dirs at build)
+plugins/aphrodite/aphrodite
+profiles/*/aphrodite/aphrodite
+
 # Local config (not committed)
 aphrodite.toml
 
