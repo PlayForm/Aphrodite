@@ -54,9 +54,11 @@ pub async fn handle_retrieve(
 	let mut content = {
 		let inline_hit = state.inline_ccr.lock().ok().and_then(|mut map| map.get(&hash).cloned());
 		if let Some(cached) = inline_hit {
+			state.inline_ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 			state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 			cached
 		} else {
+			state.inline_ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 			// Fallback to CCR backend
 			match &state.ccr {
 				Some(ccr) => match ccr_get(ccr, &hash).await {
@@ -105,6 +107,16 @@ pub async fn handle_retrieve(
 			},
 			Err(e) => {
 				tracing::warn!("zstd decompress failed for hash content: {}", e);
+				return (
+					StatusCode::INTERNAL_SERVER_ERROR,
+					Json(RetrieveResponse {
+						found: false,
+						content: None,
+						source: "ccr".into(),
+						error: Some("decompression failed".into()),
+					}),
+				)
+					.into_response();
 			},
 		}
 	}
@@ -114,6 +126,18 @@ pub async fn handle_retrieve(
 	if req.limit > 0 {
 		let lines: Vec<&str> = content.lines().collect();
 		let total = lines.len();
+		if req.offset >= total {
+			return (
+				StatusCode::BAD_REQUEST,
+				Json(RetrieveResponse {
+					found: false,
+					content: Some(format!("[offset {} out of range; document has {} lines]", req.offset, total)),
+					source: "ccr".into(),
+					error: None,
+				}),
+			)
+				.into_response();
+		}
 		let start = req.offset.min(total);
 		let end = (start + req.limit).min(total);
 		content = lines[start..end].join("\n");
@@ -129,6 +153,7 @@ pub async fn handle_retrieve(
 fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
 	match query {
 		Some(q) if !q.is_empty() => {
+			let q = if q.len() > 512 { &q[..512] } else { q };
 			let filtered: Vec<&str> = content
 				.lines()
 				.filter(|line| line.to_lowercase().contains(&q.to_lowercase()))
