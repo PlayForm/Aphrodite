@@ -12,8 +12,6 @@ permissions:
 on:
     push:
         tags: ["Aphrodite/v*"]
-    pull_request:
-        branches: [Current]
     workflow_dispatch:
 
 env:
