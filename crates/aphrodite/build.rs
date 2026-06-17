@@ -13,6 +13,11 @@
 //! Embeds version, git commit hash, build timestamp, target triple, rustc version,
 //! and build profile as compile-time environment variables (`APHRODITE_*`) for
 //! runtime display in startup logs, health checks, and version endpoints.
+//!
+//! CI builds rename the binary per target:
+//!   aphrodite-linux-amd64    (x86_64-unknown-linux-gnu)
+//!   aphrodite-macos-arm64    (aarch64-apple-darwin)
+//!   aphrodite-macos-amd64    (x86_64-apple-darwin)
 
 use serde::Deserialize;
 use std::env;
