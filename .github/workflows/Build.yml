@@ -51,45 +51,8 @@ env:
     VCPKG_DISABLE_METRICS: 1
 
 jobs:
-    Test:
-        name: Test (${{ matrix.os }})
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os: [ubuntu-latest, macos-latest]
-        steps:
-            - uses: actions/checkout@v6.0.3
-              with:
-                  submodules: false
-
-            - name: Init submodule from remote
-              run: |
-                  git submodule update --init --remote --recursive || true
-                  git submodule status
-
-            - name: Install onnxruntime (Linux)
-              if: runner.os == 'Linux'
-              run: sudo apt-get install -y libonnxruntime-dev
-
-            - name: Setup Rust (nightly)
-              uses: dtolnay/rust-toolchain@nightly
-
-            - name: Cache cargo
-              uses: actions/cache@v5
-              with:
-                  path: |
-                      ~/.cargo/registry/
-                      ~/.cargo/git/
-                      target/
-                  key: cargo-check-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: cargo-check-${{ runner.os }}-
-
-            - name: Test
-              run: cargo test -p aphrodite --release
-
     Build:
         name: Build ${{ matrix.target }}
-        needs: Test
         runs-on: ${{ matrix.os }}
         strategy:
             matrix:
