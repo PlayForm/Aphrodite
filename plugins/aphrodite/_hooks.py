@@ -2064,5 +2064,43 @@ PREFETCH_SCHEMA = {
 }
 
 
+# ── Prefetch registry (live schedule for background file loads) ─
+
+_prefetch_registry: dict = {}  # {path: {status, eta_s, hash, size, error}}
+
+
+def _prefetch_status_handler(args=None, **kwargs):
+    """Return the live prefetch schedule — what's loading, what's ready, ETAs."""
+    if not _prefetch_registry:
+        return "No active prefetches."
+
+    pending = [(p, r) for p, r in _prefetch_registry.items() if r.get("status") == "loading"]
+    ready = [(p, r) for p, r in _prefetch_registry.items() if r.get("status") == "ready"]
+    errors = [(p, r) for p, r in _prefetch_registry.items() if r.get("status") == "error"]
+
+    lines = [f"Prefetch schedule: {len(ready)} ready, {len(pending)} loading, {len(errors)} errors"]
+    lines.append("")
+    lines.append("| Status  | Path                          | Size    | ETA    | Hash      |")
+    lines.append("|---------|-------------------------------|---------|--------|-----------|")
+
+    for path, r in ready:
+        lines.append(f"| READY   | {path[:40]:<40} | {r.get('size', 0):>6}B | {r.get('elapsed_s', 0):>4.1f}s | {r.get('hash', '')[:10]:<10} |")
+    for path, r in pending:
+        lines.append(f"| LOADING | {path[:40]:<40} | {r.get('size', 0):>6}B | {r.get('eta_s', 0):>4.1f}s | —          |")
+    for path, r in errors:
+        lines.append(f"| ERROR   | {path[:40]:<40} | —       | —      | {str(r.get('error', '?'))[:30]:<30} |")
+
+    lines.append("")
+    lines.append("READY = retrieve now. LOADING = ETA is estimated, poll again.")
+    return "\n".join(lines)
+
+
+PREFETCH_STATUS_SCHEMA = {
+    "name": "aphrodite_prefetch_status",
+    "description": "Live prefetch schedule — what's loading, what's ready, ETAs per file. Use to plan retrievals without polling blindly.",
+    "parameters": {"type": "object", "properties": {}},
+}
+
+
 
 
