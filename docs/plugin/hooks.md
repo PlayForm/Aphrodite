@@ -2,7 +2,7 @@
 
 Origin: The aphrodite Python plugin intercepts 5 Hermes lifecycle hooks to compress tool and terminal output, inject catalog information before LLM calls, and store conversation turns.
 
-Source of truth: `plugins/aphrodite/plugin.yaml` (lines 7-12), `plugins/aphrodite/_hooks.py`, `plugins/aphrodite/_marker.py`, `plugins/aphrodite/_engine.py`
+Source of truth: `plugins/aphrodite/plugin.yaml` (lines 7-12), `plugins/aphrodite/_hooks/transform.py`, `plugins/aphrodite/_marker/marker.py`, `plugins/aphrodite/_engine.py`
 
 ## Hook Registration
 

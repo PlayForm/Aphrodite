@@ -2,7 +2,7 @@
 
 Origin: `detect_content_type()` in the proxy classifies every response payload so compression thresholds can adapt per-type (errors stay visible, verbose logs get compressed aggressively).
 
-Source of truth: `crates/aphrodite/src/proxy.rs:detect_content_type()` (line 841), `crates/aphrodite/src/proxy.rs:threshold_for()` (line 273), `plugins/aphrodite/_marker.py:_classify_content()` (line 53)
+Source of truth: `crates/aphrodite/src/proxy.rs:detect_content_type()` (line 841), `crates/aphrodite/src/proxy.rs:threshold_for()` (line 273), `plugins/aphrodite/_marker/marker.py:_classify_content()` (line 53)
 
 ## Detection Order (Rust)
 
@@ -29,7 +29,7 @@ Source of truth: `crates/aphrodite/src/proxy.rs:detect_content_type()` (line 841
 
 ## Detection Order (Python)
 
-`_classify_content()` at _marker.py:53 examines first 5,000 chars:
+`_classify_content()` at _marker/marker.py:53 examines first 5,000 chars:
 
 ```
 1. Diff: starts with "diff --git" or "---"
@@ -65,17 +65,17 @@ Source of truth: `crates/aphrodite/src/proxy.rs:detect_content_type()` (line 841
 | `build_output` | cargo build/test output | Noisy (÷2) | proxy.rs |
 | `log` | Structured log lines | Noisy (÷2) | proxy.rs |
 | `linter` | Linter/compiler error output | Noisy (÷2) | proxy.rs |
-| `build_error` | Rust error[E…] | n/a (Python only) | _marker.py |
-| `search_results` | JSON + total_count | n/a (Python only) | _marker.py |
-| `process_output` | JSON + session_id | n/a (Python only) | _marker.py |
-| `search_files` | JSON + matches or file:line: | n/a (Python only) | _marker.py |
-| `tabular` | Pipe-delimited rows | n/a (Python only) | _marker.py |
-| `json_list` | JSON list (Python only) | n/a (Python only) | _marker.py |
-| `tool` | Python tool result | v (Python plugin) | _hooks.py |
-| `terminal` | Python terminal output | v (Python plugin) | _hooks.py |
-| `aphrodite` | Aphrodite meta-tool output | v (Python plugin) | _hooks.py |
+| `build_error` | Rust error[E…] | n/a (Python only) | _marker/marker.py |
+| `search_results` | JSON + total_count | n/a (Python only) | _marker/marker.py |
+| `process_output` | JSON + session_id | n/a (Python only) | _marker/marker.py |
+| `search_files` | JSON + matches or file:line: | n/a (Python only) | _marker/marker.py |
+| `tabular` | Pipe-delimited rows | n/a (Python only) | _marker/marker.py |
+| `json_list` | JSON list (Python only) | n/a (Python only) | _marker/marker.py |
+| `tool` | Python tool result | v (Python plugin) | _hooks/transform.py |
+| `terminal` | Python terminal output | v (Python plugin) | _hooks/transform.py |
+| `aphrodite` | Aphrodite meta-tool output | v (Python plugin) | _hooks/transform.py |
 | `context` | Context engine compression | n/a (engine) | _engine.py |
-| `build` | Build output summary | n/a (Python plugin) | _hooks.py |
+| `build` | Build output summary | n/a (Python plugin) | _hooks/transform.py |
 | `compress` | Programmatic CCR create | n/a (Python plugin) | _tools.py |
 
 ## Threshold Groups (proxy.rs:273-301)

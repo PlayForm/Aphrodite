@@ -73,7 +73,7 @@ In `proxy.rs:execute_tool_relay()` (line 1568):
 
 ## Python Plugin Inline Store (Separate)
 
-The Python plugin maintains its own inline store (`_core.py:_CappedStore`, max 500 entries) for when the proxy is down. This is NOT the same store  -  it lives in the Hermes Python process, not in the proxy Rust process.
+The Python plugin maintains its own inline store (`_core/config.py:_CappedStore`, max 500 entries) for when the proxy is down. This is NOT the same store  -  it lives in the Hermes Python process, not in the proxy Rust process.
 
 | Property | Rust Inline (LruCache) | Python Inline (_CappedStore) |
 |----------|----------------------|------------------------------|

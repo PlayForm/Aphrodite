@@ -55,19 +55,23 @@ Aphrodite is a reverse proxy with CCR (Compress-Cache-Retrieve) compression for 
 ## Source of Truth
 
 All schemas, formats, and values are extracted verbatim from:
-- `crates/aphrodite/src/proxy.rs` (1988 lines)  -  proxy handler, compression pipeline, tool relay, CCR management, health check, AppState, content detection
-- `crates/aphrodite/src/retrieve.rs` (169 lines)  -  retrieve endpoint with zstd decompression, query filtering, pagination
-- `crates/aphrodite/src/config.rs` (222 lines)  -  CLI args, MultiConfig, ProxyConfig, resolution chain
-- `crates/aphrodite/src/main.rs` (414 lines)  -  routing, middleware, metrics handler, multi-proxy spawning, shutdown
-- `vendor/headroom/crates/headroom-core/src/ccr/mod.rs` (133 lines)  -  CcrStore trait, compute_key (BLAKE3), marker_for
-- `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs` (334 lines)  -  SQLite schema, WAL, upsert, lazy purge, stats_db
-- `vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs` (428 lines)  -  DashMap, FIFO eviction, queue compaction, TOCTOU safety
-- `plugins/aphrodite/_core.py` (196 lines)  -  constants, thresholds, CCR regex, inline store, trigram index
-- `plugins/aphrodite/_marker.py` (330 lines)  -  CCR marker generation, content classification, proxy compression, marker parsing
-- `plugins/aphrodite/_tools.py` (149 lines)  -  retrieve/compress handlers with JSON schemas
-- `plugins/aphrodite/_hooks.py` (1686 lines)  -  5 hook handlers, 7 additional tools, catalog builder
-- `plugins/aphrodite/_engine.py` (289 lines)  -  AphroditeContextEngine: compress, editing detection, orphan sweep
-- `plugins/aphrodite/plugin.yaml` (32 lines)  -  hook/tool/engine registration, install message
+- `crates/aphrodite/src/proxy.rs`  —  proxy handler, compression pipeline, tool relay, CCR management, health check, AppState, content detection
+- `crates/aphrodite/src/retrieve.rs`  —  retrieve endpoint with zstd decompression, query filtering, pagination
+- `crates/aphrodite/src/config.rs`  —  CLI args, MultiConfig, ProxyConfig, resolution chain
+- `crates/aphrodite/src/main.rs`  —  routing, middleware, metrics handler, multi-proxy spawning, shutdown
+- `vendor/headroom/crates/headroom-core/src/ccr/mod.rs`  —  CcrStore trait, compute_key (BLAKE3), marker_for
+- `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs`  —  SQLite schema, WAL, upsert, lazy purge, stats_db
+- `vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs`  —  DashMap, FIFO eviction, queue compaction, TOCTOU safety
+- `plugins/aphrodite/_core/config.py`  —  constants, thresholds, CCR regex, inline store, trigram index, model family
+- `plugins/aphrodite/_core/settings.py`  —  in‑memory settings store, API‑driven reload
+- `plugins/aphrodite/_core/state.py`  —  session state: turn counter, caches, CCR regex
+- `plugins/aphrodite/_marker/marker.py`  —  CCR marker generation, content classification, proxy compression, marker parsing
+- `plugins/aphrodite/_tools.py`  —  retrieve/compress handlers with JSON schemas
+- `plugins/aphrodite/_hooks/transform.py`  —  tool result compression, formatting, live container
+- `plugins/aphrodite/_hooks/session.py`  —  pre/post LLM hooks, catalog injection, turn storage
+- `plugins/aphrodite/_hooks/terminal.py`  —  terminal output compression
+- `plugins/aphrodite/_engine.py`  —  AphroditeContextEngine: compress, editing detection, orphan sweep
+- `plugins/aphrodite/plugin.yaml`  —  hook/tool/engine registration, install message
 
 ## Conventions
 

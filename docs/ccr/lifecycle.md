@@ -59,7 +59,7 @@ Three storage tiers by content size and mode:
 | Token mode | > 1KB | `SqliteCcrStore` (SQLite) | Unlimited (disk) | Configurable (default 3600s) |
 
 ### Python Plugin Inline Store
-Separate from Rust inline: `_CappedStore` (OrderedDict, max 500 entries) in `_core.py:75`. Used when proxy is down.
+Separate from Rust inline: `_CappedStore` (OrderedDict, max 500 entries) in `_core/config.py:75`. Used when proxy is down.
 
 ## Phase 4: Return Marker
 
@@ -121,7 +121,7 @@ Same flow +:
 - LRU eviction when capacity (1024) exceeded
 - No TTL  -  pure LRU
 
-### Python Inline (_core.py:_CappedStore)
+### Python Inline (_core/config.py:_CappedStore)
 - LRU eviction when > 500 entries
 - No TTL
 
@@ -158,7 +158,7 @@ Based on compression_ratio_ema (×100):
 
 Note: `linter`, `build_output`, `log` types are excluded from auto-tune (always base/2).
 
-### Python Plugin Thresholds (from _core.py)
+### Python Plugin Thresholds (from _core/config.py)
 
 | Env Var | Default | Scope |
 |---------|---------|-------|

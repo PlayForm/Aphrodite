@@ -2,7 +2,7 @@
 
 Origin: Compressed content must convey its hash, type, size, mode, preview, and structured metadata to the receiver (LLM agent or retrieve endpoint) in a single parseable string. The marker allows the receiver to decide whether to retrieve the full content without having to decompress it first.
 
-Source of truth: `plugins/aphrodite/_marker.py:_ccr_marker()` (line 180), `crates/aphrodite/src/proxy.rs:smart_marker()` (line 1342)
+Source of truth: `plugins/aphrodite/_marker/marker.py:_ccr_marker()` (line 180), `crates/aphrodite/src/proxy.rs:smart_marker()` (line 1342)
 
 ## Base Format
 
@@ -35,11 +35,11 @@ Source of truth: `plugins/aphrodite/_marker.py:_ccr_marker()` (line 180), `crate
 
 ### Short inlines (i: prefix)
 - Prefix: `i:` followed by 6+ hex chars
-- Validated by: `_marker.py:_is_valid_ccr_hash()` via `_VALID_HASH_RE` regex `^(?:[0-9a-f]{24,}|i:[0-9a-f]{6,})$`
+- Validated by: `_marker/marker.py:_is_valid_ccr_hash()` via `_VALID_HASH_RE` regex `^(?:[0-9a-f]{24,}|i:[0-9a-f]{6,})$`
 
 ## Type Enum
 
-All values extracted from `crates/aphrodite/src/proxy.rs:detect_content_type()` (line 841) and `plugins/aphrodite/_marker.py:_classify_content()` (line 53):
+All values extracted from `crates/aphrodite/src/proxy.rs:detect_content_type()` (line 841) and `plugins/aphrodite/_marker/marker.py:_classify_content()` (line 53):
 
 | Type | Detection | Threshold Multiplier |
 |------|-----------|---------------------|
@@ -79,7 +79,7 @@ All values extracted from `crates/aphrodite/src/proxy.rs:detect_content_type()` 
 
 ## Preview Truncation by Headroom Budget
 
-From `_marker.py:_ccr_marker()` (line 201):
+From `_marker/marker.py:_ccr_marker()` (line 201):
 
 | Budget | Preview Max |
 |--------|-------------|
@@ -90,7 +90,7 @@ From `_marker.py:_ccr_marker()` (line 201):
 
 ## Metadata Encoding Rules
 
-From `_marker.py:_ccr_marker()` (line 214) and `proxy.rs:generate_metadata()` (line 978):
+From `_marker/marker.py:_ccr_marker()` (line 214) and `proxy.rs:generate_metadata()` (line 978):
 
 - Format: `KEY=VALUE|KEY=VALUE|...` (flat, pipe-delimited)
 - Pipe `|` in values replaced with `/`
@@ -101,7 +101,7 @@ From `_marker.py:_ccr_marker()` (line 214) and `proxy.rs:generate_metadata()` (l
 
 ## Regex for Parsing
 
-From `plugins/aphrodite/_core.py` (line 69):
+From `plugins/aphrodite/_core/config.py` (line 69):
 ```python
 _CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\\>⫸]+)(?:\|[^\\\]]*?)?(?:\]|>>>|⫸)')
 ```

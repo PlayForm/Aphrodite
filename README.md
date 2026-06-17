@@ -14,8 +14,8 @@
 > Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.  
 > *One binary. Zero dependencies. 12.5M tokens saved.*
 
-[![release](https://img.shields.io/badge/release-v0.8.1-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![plugin](https://img.shields.io/badge/plugin-v1.62.16-purple)](plugins/aphrodite/plugin.yaml)
+[![release](https://img.shields.io/badge/release-v0.8.5-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![plugin](https://img.shields.io/badge/plugin-v1.62.20-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -227,7 +227,7 @@ Headroom auto-selects its compressor strategy based on content type. You can ove
 | Build output | raw compile lines + errors | `[build:1E 2W 142L]` |
 | Traceback | raw Python traceback | `[error:AttributeError 'NoneType']` |
 | Terminal | raw stdout + exit code | `[terminal:cargo build exit=0]` |
-| Git log | raw commit list | `[commit:afd634b release(v0.5.104)]` |
+| Git log | raw commit list | `[commit:afd634b release(v0.8.5)]` |
 | Rust error | raw error[E] block | `[error:E0308 src/main.rs:10:5 8L]` |
 | Table output | raw pipe-delimited text | `[table:12 rows 15L]` |
 | JSON blob | raw nested JSON | `[json:total_items,by_type 30L]` |
