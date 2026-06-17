@@ -10,7 +10,7 @@ from .state import _state
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
 BIN_VERSION = "v0.7.5"  # binary download version (must match Cargo.toml)
-PLUGIN_VERSION = "1.62.14"  # plugin version
+PLUGIN_VERSION = "1.62.15"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
