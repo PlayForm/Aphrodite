@@ -71,6 +71,9 @@ def _resolve_one(hash_val, timeout=4, query="", headers=None):
                 for other in futures:
                     if not other.done():
                         other.cancel()
+                # fetch → put: cache in inline store for future retrievals
+                if len(result) <= 524288:
+                    _inline_store_put(hash_val, result)
                 return result
         except Exception:
             continue
