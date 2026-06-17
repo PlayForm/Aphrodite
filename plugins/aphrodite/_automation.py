@@ -195,7 +195,7 @@ def _auto_commit_reminder() -> str:
             timeout=3,
             cwd=repo,
         )
-        lines = [l for l in r.stdout.strip().splitlines() if l.strip()]
+        lines = [ln for ln in r.stdout.strip().splitlines() if ln.strip()]
         if not lines:
             return ""
         # Count unique modified files

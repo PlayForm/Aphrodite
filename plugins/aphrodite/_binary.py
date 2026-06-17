@@ -1,5 +1,6 @@
 """aphrodite - binary download and platform detection."""
 
+import contextlib
 import logging
 import os
 import platform
@@ -62,10 +63,8 @@ def _download_binary() -> bool:
     # Rename existing binary to .bak so we don't leave the user with nothing on failure
     bak = BINARY + ".bak"
     if os.path.exists(BINARY):
-        try:
+        with contextlib.suppress(Exception):
             os.replace(BINARY, bak)
-        except Exception:
-            pass
     plat = _detect_platform()
     download_url = f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite-{plat}"
     if platform.system().lower() == "windows":
@@ -97,10 +96,8 @@ def _download_binary() -> bool:
             _restore_bak(bak)
             return False
         # Success - remove .bak
-        try:
+        with contextlib.suppress(Exception):
             os.unlink(bak)
-        except Exception:
-            pass
         _log.info("aphrodite binary installed to %s (%s bytes)", BINARY, size)
         return True
     except Exception as e:
@@ -143,10 +140,8 @@ def _ensure_binary(existence_check: bool = False) -> bool:
             return True
         # Rename to .bak before re-download so we can restore on failure
         bak = BINARY + ".bak"
-        try:
+        with contextlib.suppress(Exception):
             os.replace(BINARY, bak)
-        except Exception:
-            pass
     if _download_binary():
         return True
     # Fallback: try local build
