@@ -1,11 +1,12 @@
 # Hermes Tool Output Schemas
 
-Comprehensive reference of ALL tool output formats, their classification types,
-and extraction patterns. Used by the absorptive CCR preview pipeline.
+> **Every tool your agent runs produces output with a unique shape. This document maps every single one — 43 tools, 28 classification types, 100+ extraction patterns. The absorptive classifier uses this as its playbook.**
+
+Comprehensive reference of ALL Hermes tool output formats, their classification types, and extraction patterns. The single source of truth for the absorptive CCR preview pipeline. When new tools or output shapes appear, they get documented here first — the classifier follows.
 
 ---
 
-## Classification Taxonomy (22 types)
+## Classification Taxonomy (28 types)
 
 | Type | Detects | Key fields |
 |------|---------|------------|
