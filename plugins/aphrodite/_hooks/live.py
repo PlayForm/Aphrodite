@@ -32,15 +32,19 @@ def _is_live_tool(tool_name: str) -> bool:
     return tool_name in ("read_file",)
 
 
-def _wrap_as_live_container(content: str, tool_name: str) -> str:
-    """Wrap tool output in a live container CCR marker."""
+def _wrap_as_live_container(content: str, tool_name: str) -> str | None:
+    """Wrap tool output in a live container CCR marker.
+
+    Returns the CCR marker string if wrapped, or None if wrapping
+    was not needed (inactive, too small, or store failed).
+    """
     if not _is_live_tool(tool_name):
-        return content
+        return None
     if len(content) <= _MIN_BYTES:
-        return content
+        return None
     h = _store(content)
     if not h:
-        return content
+        return None
     size = len(content)
     return (
         f"<<<CCR:{h}|live|{size}>>>\n"

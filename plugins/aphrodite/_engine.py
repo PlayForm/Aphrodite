@@ -64,7 +64,7 @@ def get_engine():
 
 def _fire_hook(name, **kwargs):
     """Fire a Hermes hook so other plugins can listen to engine events."""
-    if not _invoke_hook_ok:
+    if not _invoke_hook_ok or _invoke_hook is None:
         return
     try:
         _invoke_hook(name, **kwargs)

@@ -29,8 +29,8 @@ from .catalog import _fmt_catalog
 from .classify import _classifier_says_skip
 from .diff import _fmt_diff
 from .files import _fmt_files, _track_file_refs
-from .stats import _fmt_stats
 from .live import _is_live_tool, _wrap_as_live_container
+from .stats import _fmt_stats
 
 _log = logging.getLogger("aphrodite.hooks.transform")
 
@@ -136,7 +136,7 @@ def _transform_tool_result(tool_name="", args=None, result="", **kwargs):
         return result
     # ── Live container: intercept read_file/search_files ─────────
     if _is_live_tool(tool_name):
-        live_marker = _wrap_as_live_container(tool_name, result, args)
+        live_marker = _wrap_as_live_container(result, tool_name)
         if live_marker is not None:
             _track_file_refs(tool_name, args)
             return live_marker

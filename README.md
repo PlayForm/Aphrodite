@@ -575,4 +575,15 @@ plugins/aphrodite/
 
 ---
 
+## Relationship to Headroom
+
+Aphrodite embeds [Headroom](https://github.com/PlayForm/headroom) — our
+**custom fork** of the Headroom compression library. The fork is tracked
+as a git submodule at `vendor/headroom/` and modified for Rust‑Python
+CCR parity, Hermes tool relay, and PlayForm branding.
+
+→ **[Full comparison: Aphrodite vs Headroom](docs/APHRODITE-HEADROOM.md)**  —  what we add, what we rewrote, how they ship together.
+
+---
+
 *Ready to save context?* [Install now](#quick-start) • [Read the docs](docs/) • [Report an issue](https://github.com/PlayForm/Aphrodite/issues) • [Security policy](SECURITY.md)

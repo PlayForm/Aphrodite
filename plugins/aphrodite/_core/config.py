@@ -4,8 +4,8 @@ import logging
 import os
 from collections import deque
 
-from .state import _state
 from . import settings as _settings
+from .state import _state
 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
@@ -37,7 +37,7 @@ def _load_toml_config() -> dict:
         import tomllib as _toml
     except ImportError:
         try:
-            import tomli as _toml
+            import tomli as _toml  # type: ignore[import-not-found]
         except ImportError:
             _log.debug("toml: no tomllib/tomli — TOML config skipped")
             _CONFIG = {}
@@ -325,10 +325,10 @@ def _detect_model_family(model_name: str | None = None) -> str:
 
     Priority: explicit arg → APHRODITE_MODEL env → _state["model"] → "compact"
     """
-    name = model_name or os.environ.get("APHRODITE_MODEL", "") or _state.get("model", "")
+    name = model_name or os.environ.get("APHRODITE_MODEL", "") or str(_state.get("model", ""))
     if not name:
         return MODEL_FAMILY  # TOML config default (code_first/compact/balance)
-    name_lower = name.lower().replace("-", "").replace("_", "")
+    name_lower: str = name.lower().replace("-", "").replace("_", "")
     for prefix, family in MODEL_FAMILY_MAP.items():
         if name_lower.startswith(prefix):
             return family

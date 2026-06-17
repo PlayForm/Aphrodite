@@ -27,7 +27,7 @@ _lock = threading.Lock()
 def _load_runtime_file() -> dict:
     """Read runtime-settings.json; return {} on any failure."""
     try:
-        with open(_RUNTIME_FILE, "r") as f:
+        with open(_RUNTIME_FILE) as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
