@@ -21,9 +21,9 @@ from ._core import (
     _inline_store_put,
     _recent_markers,
     _referenced_files,
+    _render_prompt_tmpl,
     _reset_scanned_msg_idx,
     _reset_turn_counter,
-    _render_prompt_tmpl,
 )
 from ._inline import _inline_compress
 from ._marker import _ccr_marker
