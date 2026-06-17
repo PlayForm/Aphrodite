@@ -23,6 +23,15 @@ use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_li
 use aphrodite::retrieve;
 
 fn main() -> anyhow::Result<()> {
+	// Handle --version early — clap version attribute is only wired through
+	// Cli::parse() which is skipped when aphrodite.toml exists (multi-proxy path).
+	// This ensures --version always works regardless of config state.
+	let args: Vec<String> = std::env::args().collect();
+	if args.iter().any(|a| a == "--version" || a == "-V") {
+		println!("aphrodite v{}", option_env!("APHRODITE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")));
+		return Ok(());
+	}
+
 	// Worker thread count  -  I/O-bound proxy needs more than CPU cores.
 	// Default: 4× CPU or 32 minimum. Override: APHRODITE_WORKER_THREADS.
 	let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
