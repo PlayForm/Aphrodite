@@ -8,7 +8,7 @@ NOT the Hermes TUI terminal.
 
 ```
 APHRODITE v1.49.0 - DEBUG MODE
-  Mode: proxy+hooks | Engine: disabled (APHRODITE_CONTEXT_ENGINE=0) | Dev: off
+  Mode: proxy+hooks | Engine: on/off (TOML: [compression].context_engine) | Dev: off
   Thresholds: terminal=2048 inline=4096 tool_token=1024 tool_cache=8192
   Engine: threshold=50% protect=2/5 min_msgs=30
   CCR: regex=<<<CCR:([^>]+)>>> depth=3
@@ -23,7 +23,7 @@ APHRODITE v1.49.0 - DEBUG MODE
 |-------|--------|-------------|
 | Version | `PLUGIN_VERSION` constant | Plugin version (e.g. 1.49.0) |
 | Mode | `engine_configured` env check | `proxy+hooks` (default) or `proxy+hooks+engine` |
-| Engine | `APHRODITE_CONTEXT_ENGINE` env | Whether context compression engine is enabled |
+| Engine | `[compression].context_engine` TOML | Whether context compression engine is enabled (default-on) |
 | Dev | `APHRODITE_PASSTHROUGH` env | Passthrough mode - disables all proxy routing |
 | Thresholds | `_cfg_int` env vars | terminal, inline, tool_token, tool_cache |
 | Engine params | `_cfg_int` env vars | threshold%, protect_first, protect_last, min_msgs |

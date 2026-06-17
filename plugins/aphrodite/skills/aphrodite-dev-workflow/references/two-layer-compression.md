@@ -36,7 +36,7 @@ messages to the conversation.
 ## Layer 2: Conversation Compression (context engine)
 
 Fires ONLY when prompt tokens exceed threshold_percent of context_length.
-Default: 50% fill. OPT-IN - requires APHRODITE_CONTEXT_ENGINE=1 + context.engine: aphrodite.
+Default: 50% fill. DEFAULT-ON — TOML toggle: [compression].context_engine = true
 
 ```
 Hermes calls compress(messages) before each LLM turn
