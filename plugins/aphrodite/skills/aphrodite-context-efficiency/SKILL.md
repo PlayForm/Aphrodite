@@ -15,7 +15,7 @@ When scanning codebases or verifying fixes, prefer `search_files` with targeted 
 over `read_file` with broad slices. Two reasons:
 
 1. `search_files` output is auto-compressed into CCR markers — each match is a tiny
-   `<CCR:hash|tool|size>>>` instead of hundreds of raw lines
+   `<<<CCR:hash|tool|size>>>` instead of hundreds of raw lines
 2. `search_files` with specific regex patterns returns only relevant lines, not the entire file
 
 Real example — verifying 18 audit fixes across proxy.rs (2182 lines):
