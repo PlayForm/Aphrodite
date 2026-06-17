@@ -143,9 +143,9 @@ class AphroditeContextEngine(ContextEngine):
             return self.threshold_percent == -1  # -1 = always, 0 = disabled
         tokens = prompt_tokens or self.last_prompt_tokens
         if not tokens:
-            # Messages-based fallback: if we've compressed before,
-            # context is likely long again
-            return self.compression_count > 0 and self.last_prompt_tokens > 0
+            # No token data from Hermes — return True to let compress() decide.
+            # compress() has its own guards (min_messages, protect bounds).
+            return True
         if not self.context_length:
             return False
         return (tokens / self.context_length) * 100 >= self.threshold_percent
