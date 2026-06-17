@@ -48,6 +48,7 @@ from ._core import (
     CLASSIFIER_POLL,
     MODEL_FAMILY,
     CATALOG_INTENT_HINTS,
+    CONTEXT_ENGINE,
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
@@ -577,7 +578,9 @@ def _transform_tool_result(
 
 
 def _rebuild_handler(args=None, **kwargs):
-    """Rebuild aphrodite crate and copy binary to ~/.hermes/aphrodite/."""
+    """Rebuild aphrodite crate, kill running proxies, replace binary, restart."""
+    import shutil
+
     repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     result = subprocess.run(
         ["cargo", "build", "--release", "-p", "aphrodite"],
@@ -591,13 +594,49 @@ def _rebuild_handler(args=None, **kwargs):
         return f'{{"error": "build failed: {result.stderr[-200:]}"}}'
 
     src = os.path.join(repo, "target/release/aphrodite")
-    if os.path.exists(src):
-        import shutil
+    if not os.path.exists(src):
+        return '{"error": "binary not found after build"}'
 
-        shutil.copy2(src, BINARY)
-        os.chmod(BINARY, 0o755)
-        return f'{{"ok": true, "size": {os.path.getsize(BINARY)}, "path": "{BINARY}"}}'
-    return '{"error": "binary not found after build"}'
+    # ── Kill running proxies ──────────────────────────────────────
+    killed = []
+    for port in PORTS.values():
+        try:
+            r = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True, timeout=5)
+            if r.stdout.strip():
+                for pid in r.stdout.strip().split("\n"):
+                    try:
+                        os.kill(int(pid), 9)
+                        killed.append(f":{port}({pid})")
+                    except (OSError, ProcessLookupError):
+                        pass
+        except FileNotFoundError:
+            killed.append(f":{port}(lsof-missing)")
+        except Exception:
+            pass
+
+    # ── Replace binary ───────────────────────────────────────────
+    shutil.copy2(src, BINARY)
+    os.chmod(BINARY, 0o755)
+
+    # ── Restart proxies ──────────────────────────────────────────
+    import time as _time
+    _time.sleep(0.3)  # let ports release
+    restarted = []
+    from ._proxy import _start as _proxy_start
+    for name in ("cache", "token"):
+        try:
+            _proxy_start(name, os.environ.copy())
+            restarted.append(name)
+        except Exception:
+            pass
+
+    return json.dumps({
+        "ok": True,
+        "size": os.path.getsize(BINARY),
+        "path": BINARY,
+        "killed": killed,
+        "restarted": restarted,
+    })
 
 
 REBUILD_SCHEMA = {
@@ -970,7 +1009,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         # Debug banner (only in DEBUG mode or full catalog)
         if DEBUG_LOGGING or CATALOG_MODE == "full":
             parts.append(
-                f"  ⚙ v{PLUGIN_VERSION} | mode={'proxy+hooks' if not os.environ.get('APHRODITE_CONTEXT_ENGINE') else 'proxy+hooks+engine'} | engine={'enabled' if os.environ.get('APHRODITE_CONTEXT_ENGINE') == '1' else 'off'} | dev={'on' if _DEV else 'off'}"
+                f"  ⚙ v{PLUGIN_VERSION} | engine={'on' if CONTEXT_ENGINE else 'off'} | dev={'on' if _DEV else 'off'}"
             )
             parts.append(
                 f"  ⚙ thresholds: term={TERMINAL_THRESHOLD} inline={INLINE_THRESHOLD} tool_tok={TOOL_THRESHOLD_TOKEN} tool_cache={TOOL_THRESHOLD_CACHE} engine_pct={ENGINE_THRESHOLD_PCT}% prot={ENGINE_PROTECT_FIRST}/{ENGINE_PROTECT_LAST} min={ENGINE_MIN_MSGS}"
