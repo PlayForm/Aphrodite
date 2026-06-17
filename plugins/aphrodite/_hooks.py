@@ -44,6 +44,10 @@ from ._core import (
     _scanned_msg_idx,
     _state,
     _detect_model_family,
+    _render_prompt_tmpl,
+    CLASSIFIER_POLL,
+    MODEL_FAMILY,
+    CATALOG_INTENT_HINTS,
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
@@ -281,11 +285,7 @@ def _inject_session_instruction(conversation_history):
             "  Token proxy :9798 offline | inline fallback active | "
             f"engine threshold={thresh_str}"
         )
-    lines.append(
-        "  CCR markers (<<<CCR:hash|type|size>>>) point to compressed content. "
-        "Retrieve if the preview doesn't tell you enough; "
-        "aphrodite_catalog lists available entries."
-    )
+    lines.append(_render_prompt_tmpl("session_inject"))
     lines.append(
         "  ─ Layer 2: per-turn catalog injected below each turn ─"
     )
@@ -399,6 +399,8 @@ def _classifier_says_skip(klass: dict) -> bool:
     The content IS still stored in CCR for search/history. We just don't
     show the marker to the LLM.
     """
+    if not CLASSIFIER_POLL:
+        return False
     ctype = klass.get("type", "")
     if ctype in ("build_output", "build_error"):
         if klass.get("errors", "0") in ("0", "") and klass.get("warnings", "0") in ("0", ""):
@@ -1106,7 +1108,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
         # Context hint (skip in tool mode)
         if CATALOG_MODE != "tool" and ctx_len > 20:
             if ctx_len > 100:
-                parts.append(f"  ⚠ context={ctx_len} msgs — prefer catalog over scanning history")
+                parts.append(_render_prompt_tmpl("catalog_context_warn", {"ctx": ctx_len}))
             else:
                 parts.append(f"  context={ctx_len} msgs")
 

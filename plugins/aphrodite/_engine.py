@@ -23,6 +23,7 @@ from ._core import (
     _referenced_files,
     _reset_scanned_msg_idx,
     _reset_turn_counter,
+    _render_prompt_tmpl,
 )
 from ._inline import _inline_compress
 from ._marker import _ccr_marker
@@ -240,8 +241,7 @@ class AphroditeContextEngine(ContextEngine):
         ccr = _ccr_marker(hash_val, "context", len(packed), mode="engine", headroom_budget=_headroom_context.get("x-headroom-budget"))
         marker = (
             f"{ccr}\n"
-            f"These messages were offloaded to reduce context. "
-            f"Use aphrodite_retrieve({hash_val}) if needed.\n"
+            f"{_render_prompt_tmpl('engine_offload', {'hash': hash_val, 'tail': str(self.protect_last_n)})}\n"
             f"The {self.protect_last_n} messages below are your active context."
         )
         self.compression_count += 1

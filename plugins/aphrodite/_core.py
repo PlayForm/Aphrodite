@@ -358,12 +358,12 @@ def _detect_model_family(model_name: str | None = None) -> str:
     """
     name = model_name or os.environ.get("APHRODITE_MODEL", "") or _state.get("model", "")
     if not name:
-        return "compact"
+        return MODEL_FAMILY  # TOML config default (code_first/compact/balance)
     name_lower = name.lower().replace("-", "").replace("_", "")
     for prefix, family in MODEL_FAMILY_MAP.items():
         if name_lower.startswith(prefix):
             return family
-    return "compact"
+    return MODEL_FAMILY  # TOML config default
 
 
 def _set_session_model(model_name: str) -> None:

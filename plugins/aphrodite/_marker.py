@@ -8,7 +8,17 @@ import re
 import threading
 import time
 
-from ._core import _CCR_RE, _extract_code_structure
+from ._core import (
+    _CCR_RE,
+    _extract_code_structure,
+    _render_template,
+    _render_marker_tmpl,
+    _render_prompt_tmpl,
+    PREVIEW_MAX_CHARS,
+    MODEL_FAMILY,
+    CLASSIFIER_POLL,
+    CCR_MARKER_HINT,
+)
 
 _log = logging.getLogger("aphrodite")
 
@@ -231,156 +241,104 @@ def _classify_content(content: str) -> dict:
 
 
 def _make_ccr_preview(content: str, klass: dict | None = None, model_family: str = "compact") -> str:
-    """Generate an absorptive, content-aware CCR preview.
+    """Generate a template-driven CCR preview from TOML config.
 
-    Uses the classification to produce a structured 1-liner that helps
-    the LLM decide whether to retrieve. Each content type gets a
-    consistent, scannable format — the "absorptive" pattern means new
-    content of the same type automatically gets the same treatment.
+    Builds template variables from the classifier, then delegates to
+    _render_template() for family-aware formatting. Falls back to hardcoded
+    defaults if TOML is missing or incomplete.
 
     Args:
         content: Raw content string.
-        klass: Pre-computed classification dict (from _classify_content).
-               If None, classification runs inline.
-        model_family: Preview strategy — 'compact' (Claude), 'code_first'
-                      (DeepSeek/coding), 'balance' (GPT/general). Controls
-                      whether metadata or code excerpts come first.
+        klass: Pre-computed classification dict. If None, classified inline.
+        model_family: 'compact' | 'code_first' | 'balance' — selects template set.
 
     Returns:
-        A rich, single-line preview string (≤120 chars, pipe-safe).
+        A rich, single-line preview string (≤ preview_max_chars, pipe-safe).
     """
     if klass is None:
         klass = _classify_content(content)
 
     ctype = klass.get("type", "text")
     ln = klass.get("ln", "?")
+    max_chars = PREVIEW_MAX_CHARS
 
-    # ── Code types: structure-map preview ──────────────────────────────────
+    # ── Build template vars from classifier ──────────────────────────
+    vars: dict = {
+        "type": ctype,
+        "ln": str(ln),
+        "first": content[:110].replace("\\n", " ").replace("\\r", " ").strip(),
+        "err": str(klass.get("errors", "0")),
+        "warn": str(klass.get("warnings", "0")),
+        "code": str(klass.get("code", "?")),
+        "loc": str(klass.get("loc", "")),
+        "msg": str(klass.get("msg", ""))[:110],
+        "commit": str(klass.get("hash", "???????")),
+        "subject": str(klass.get("subject", ""))[:100],
+        "exit": str(klass.get("exit", "?")),
+        "cmd": str(klass.get("cmd", "")),
+        "files": str(klass.get("files", klass.get("total", "?"))),
+        "fn": str(klass.get("fn", "")),
+        "plus": str(klass.get("+", "?")),
+        "minus": str(klass.get("-", "?")),
+        "keys": str(klass.get("keys", "")),
+        "items": str(klass.get("len", klass.get("rows", "?"))),
+        "pid": str(klass.get("pid", "?")),
+        "uptime": str(klass.get("uptime", "")),
+        "fns": "?",
+        "structs": "0",
+        "impls": "0",
+        "classes": "0",
+        "types": "0",
+        "sigs": "",
+    }
+
+    # ── Code structure-map enrichment ────────────────────────────────
     if ctype in ("code", "code_rust", "code_python", "code_go", "code_js"):
         lang = {"code_rust": "rust", "code_python": "python",
                 "code_go": "go", "code_js": "js"}.get(ctype, "")
         struct = _extract_code_structure(content, lang)
         if struct:
-            # Build navigable structure preview
-            parts = []
-            if struct.get("fns"):
-                parts.append(f"{len(struct['fns'])}fns")
-            if struct.get("structs"):
-                parts.append(f"{len(struct['structs'])}structs")
-            if struct.get("impls"):
-                parts.append(f"{len(struct['impls'])}impls")
-            if struct.get("classes"):
-                parts.append(f"{len(struct['classes'])}classes")
+            sigs = struct.get("fns", [])
+            vars["fns"] = str(len(sigs))
+            vars["structs"] = str(len(struct.get("structs", [])))
+            vars["impls"] = str(len(struct.get("impls", [])))
+            vars["classes"] = str(len(struct.get("classes", [])))
+            vars["types"] = str(len(struct.get("types", [])))
+            vars["sigs"] = "; ".join(sigs[:2]) if sigs else ""
 
-            summary = "|".join(parts) if parts else "?"
+    # ── Delegate to template system ──────────────────────────────────
+    result = _render_template(model_family, ctype, vars, "")
 
-            if model_family == "code_first":
-                # DeepSeek: show first 2 signatures inline for context
-                sigs = struct.get("fns", [])[:2]
-                sig_str = "; ".join(sigs) if sigs else ""
-                return f"[{ctype}:{summary} {sig_str} {ln}L]"[:120]
-            elif model_family == "balance":
-                # GPT: metadata + first signature
-                sig = struct.get("fns", [None])[0]
-                sig_str = f" {sig}" if sig else ""
-                return f"[{ctype}:{summary}{sig_str} {ln}L]"[:120]
-            else:
-                # compact (Claude): metadata only
-                return f"[{ctype}:{summary} {ln}L]"[:120]
+    if not result:
+        # Hard fallback — should never reach here with valid toml
+        result = f"[{ctype}:{vars['first']}]"
 
-        # Fallback for code without detected structure
-        first = content[:110].replace("\\n", " ").replace("\\r", " ").strip()
-        return f"[{ctype}:{first}]"[:120]
-
-    if ctype == "diff":
-        fn = klass.get("fn", "")
-        files = klass.get("files", "")
-        plus = klass.get("+", "?")
-        minus = klass.get("-", "?")
-        if fn and not files:
-            files = "1"
-        parts = [f"{files or '?'}f", f"+{plus}/-{minus}", f"{ln}L"]
-        if fn:
-            parts.append(fn[:40])
-        return f"[diff:{' '.join(parts)}]"
-    elif ctype == "build_output":
-        return f"[build:{klass.get('errors','0')}E {klass.get('warnings','0')}W {ln}L]"
-    elif ctype == "build_error":
-        code = klass.get("code", "?")
-        loc = klass.get("loc", "")
-        parts = [code]
-        if loc:
-            parts.append(loc[:40])
-        parts.append(f"{ln}L")
-        return f"[error:{' '.join(parts)}]"
-    elif ctype == "error":
-        return f"[error:{klass.get('msg','?')[:110]}]"
-    elif ctype == "commit":
-        return f"[commit:{klass.get('hash','???????')} {klass.get('subject','')[:100]}]"
-    elif ctype == "terminal":
-        exit_code = klass.get("exit", "?")
-        cmd = klass.get("cmd", "")
-        clean = re.sub(r"^[\$>]\s*", "", cmd.strip()) if cmd else "?"
-        return f"[terminal:{clean[:40]} exit={exit_code}]"[:120]
-    elif ctype == "search_files" or ctype == "search_results":
-        files = klass.get("files", klass.get("total", "?"))
-        return f"[grep:{files} matches {ln}L]"
-    elif ctype == "tabular":
-        return f"[table:{klass.get('rows','?')} rows {ln}L]"
-    elif ctype == "json":
-        keys = klass.get("keys", "")
-        return f"[json:{keys} {ln}L]"[:120]
-    elif ctype == "json_list":
-        return f"[json:{klass.get('len','?')} items {ln}L]"
-    elif ctype == "process_output":
-        pid = klass.get("pid", "?")
-        uptime = klass.get("uptime", "")
-        parts = [f"pid={pid}"]
-        if uptime:
-            parts.append(f"up={uptime}")
-        parts.append(f"{ln}L")
-        return f"[process:{' '.join(parts)}]"
-    else:
-        # Fallback: first meaningful content, classified
-        first = content[:110].replace("\n", " ").replace("\r", " ").strip()
-        return f"[{ctype}:{first}]"[:120]
+    return result[:max_chars].replace("|", "-")
 
 
 def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=None, meta=None, center=None):
-    """Build a CCR output block: preview, structure, marker  -  each on its own line.
+    """Build a CCR output block using TOML-driven template.
 
-    Matches the Rust ``format_ccr_output`` layout. The LLM reads the
-    preview + structure first, then decides whether to retrieve.
-
-    Args:
-        hash_val: CCR hash string.
-        ccr_type: Type label (tool, terminal, code_rust, etc.).
-        size: Original size in bytes.
-        mode: Proxy mode (token, cache, inline).
-        preview: Text preview (pipe-safe, control-char-stripped).
-        headroom_budget: If set, truncates preview under tight budget.
-        meta: Dict of structured metadata (lang, fns, structs, etc.).
-        center: Optional center string  -  travels with the marker.
+    Delegates to _render_marker_tmpl() which reads [templates.marker] from
+    aphrodite.toml. Falls back to hardcoded three-line format if TOML missing.
+    Headroom budget truncates preview under tight budgets.
     """
-    # Line 1: preview
-    lines = []
-    if preview:
-        safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
-        safe = "".join(c if c >= " " else " " for c in safe)
-        if headroom_budget is not None:
-            try:
-                budget = int(headroom_budget)
-                if budget < 25:
-                    safe = safe[:30]
-                elif budget < 50:
-                    safe = safe[:60]
-                elif budget < 75:
-                    safe = safe[:100]
-            except (ValueError, TypeError):
-                pass
-        lines.append(safe)
+    # Headroom budget: truncate preview for tight budgets
+    safe = preview.replace("|", "-").replace("\n", " ").replace("\r", " ").strip()
+    safe = "".join(c if c >= " " else " " for c in safe)
+    if headroom_budget is not None:
+        try:
+            budget = int(headroom_budget)
+            if budget < 25:
+                safe = safe[:30]
+            elif budget < 50:
+                safe = safe[:60]
+            elif budget < 75:
+                safe = safe[:100]
+        except (ValueError, TypeError):
+            pass
 
-    # Line 2: structure summary [type: key=val; key=val]
+    # Build metadata string
     meta_parts = []
     if meta:
         for k, v in meta.items():
@@ -390,18 +348,8 @@ def _ccr_marker(hash_val, ccr_type, size, mode="", preview="", headroom_budget=N
     meta_str = ";".join(meta_parts)
     if len(meta_str) > 300:
         meta_str = meta_str[:297] + "..."
-    # Append center to structure line if present
-    if center:
-        meta_str = f"{meta_str};center={center}" if meta_str else f"center={center}"
-    lines.append(f"[{ccr_type}: {meta_str}]" if meta_str else f"[{ccr_type}]")
 
-    # Line 3: CCR marker
-    parts = [hash_val, ccr_type, str(size)]
-    if mode:
-        parts.append(mode)
-    lines.append(f"<<<CCR:{'|'.join(parts)}>>>")
-
-    return "\n".join(lines)
+    return _render_marker_tmpl(safe, ccr_type, meta_str, center, hash_val, size)
 
 
 def _compress_via_proxy(content, target_port, headers=None):
