@@ -1,0 +1,10 @@
+packages:
+    - "!**/Target/**"
+
+preferWorkspacePackages: true
+
+linkWorkspacePackages: deep
+
+minimumReleaseAge: 0
+
+nodeLinker: hoisted
