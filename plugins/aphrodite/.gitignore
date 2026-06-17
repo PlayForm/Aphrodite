@@ -1,0 +1,73 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# Hermes / dev artifacts
+.hermes/
+.headroom/
+.DS_Store
+*.log
+*.lock
+*.tar.gz
+
+# Profiles — keep local, ship only examples
+profiles/
+!profiles/example/
+
+# Test artifacts
+plugins/aphrodite/.test-results.json
+
+# Aphrodite proxy binary (copied to profile/plugin dirs at build)
+plugins/aphrodite/aphrodite
+
+# Local config (not committed)
+aphrodite.toml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+target/
+
+# Secrets (never commit)
+.env
+.env.sh
+aphrodite.local.toml
+*.pem
+*.key
+id_rsa*
+
+# Catch-all leaks
+**/state.db*
+**/auth.json
+**/auth.lock
+**/.hermes_*
+**/.skills_*
+**/.update_check
+**/__pycache__/
+**/.DS_Store
+*.bak
+vendor/headroom/Cargo.lock

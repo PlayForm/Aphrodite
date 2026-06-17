@@ -1,26 +1,26 @@
 [project]
 name = "aphrodite-plugin"
-version = "1.62.20"
+version = "1.62.21"
 description = "CCR compression plugin for Hermes Agent  -  context compression via proxy"
 requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.13",
-    "pyright>=1.1",
-    "pytest>=8",
-    "pytest-asyncio>=1.0",
-    "pytest-xdist>=3",
-    "pytest-cov>=5",
-    "mypy>=1",
-    "black>=25",
-    "isort>=6",
-    "pre-commit>=4",
-    "build>=1",
-    "twine>=6",
-    "types-requests>=2",
-    "types-PyYAML>=6",
+    "ruff==0.15.17",
+    "pyright==1.1.410",
+    "pytest==8.4.2",
+    "pytest-asyncio==1.2.0",
+    "pytest-xdist==3.8.0",
+    "pytest-cov==7.1.0",
+    "mypy==1.19.1",
+    "black==25.11.0",
+    "isort==6.1.0",
+    "pre-commit==4.3.0",
+    "build==1.4.4",
+    "twine==6.2.0",
+    "types-requests==2.32.4.20260107",
+    "types-PyYAML==6.0.12.20250915",
 ]
 
 [build-system]
