@@ -83,8 +83,8 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                     counts[stripped] = counts.get(stripped, 0) + 1
                 prev = stripped
 
-            errors = [l for l in unique if "error" in l.lower() and l not in ("error:", "error")]
-            warnings = [l for l in unique if "warning" in l.lower() and "warning:" not in l]
+            errors = [line for line in unique if "error" in line.lower() and line not in ("error:", "error")]
+            warnings = [line for line in unique if "warning" in line.lower() and "warning:" not in line]
             summary = f"[build: {len(lines)} lines, {len(unique)} unique patterns]"
             if errors:
                 summary += f" | errors: {'; '.join(errors[:5])}"
