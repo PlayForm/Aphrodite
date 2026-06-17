@@ -6,7 +6,6 @@ import os
 import urllib.request
 
 from .._core import (
-    LIVE_CONTAINER,
     _CCR_RE,
     _DEV,
     AUTO_EXPAND_LIMIT,
@@ -50,8 +49,7 @@ def _inject_session_instruction(conversation_history):
     else:
         lines.append("  Token proxy :9798 offline | inline fallback active")
     lines.append(_render_prompt_tmpl("session_inject"))
-    if LIVE_CONTAINER:
-        lines.append(_render_prompt_tmpl("live_container_guidance"))
+
     lines.append("  ─ Layer 2: per-turn catalog injected below each turn ─")
     lines.append("  ─ Layer 3: load aphrodite-tool-guide skill for full tool reference ─")
     conversation_history.append({"role": "system", "content": "\n".join(lines), "ephemeral": True})
@@ -113,17 +111,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
     if target and proxy_available:
         _query_and_set_headroom_budget(target)
     if not _session_instruction_injected:
-        if LIVE_CONTAINER:
-            conversation_history.append({
-                "role": "system",
-                "content": (
-                    "LIVE CONTAINER MODE ACTIVE. For all file reads, use aphrodite_prefetch "
-                    "instead of read_file. Prefetch returns CCR markers instantly — files "
-                    "load in background. Retrieve content with aphrodite_retrieve(hash) "
-                    "only when you actually need it. Continue reasoning without waiting."
-                ),
-                "ephemeral": True,
-            })
+
         _inject_session_instruction(conversation_history)
     headers = kwargs.get("headers")
     if headers:
