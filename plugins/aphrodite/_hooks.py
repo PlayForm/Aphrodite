@@ -622,7 +622,7 @@ def _rebuild_handler(args=None, **kwargs):
     import time as _time
     _time.sleep(0.3)  # let ports release
     restarted = []
-    from ._proxy import _start as _proxy_start
+    from ._proxy import _start as _proxy_start, _query_proxy_version
     for name in ("cache", "token"):
         try:
             _proxy_start(name, os.environ.copy())
@@ -630,12 +630,17 @@ def _rebuild_handler(args=None, **kwargs):
         except Exception:
             pass
 
+    # ── Query proxy version after restart ────────────────────────
+    _time.sleep(0.3)
+    proxy_ver = _query_proxy_version(PORTS["token"]) or "?"
+
     return json.dumps({
         "ok": True,
         "size": os.path.getsize(BINARY),
         "path": BINARY,
         "killed": killed,
         "restarted": restarted,
+        "proxy_version": proxy_ver,
     })
 
 
