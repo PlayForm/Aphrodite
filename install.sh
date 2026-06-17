@@ -21,12 +21,12 @@ echo "  hermes: $HERMES"
 # --- 1. Binary ---------------------------------------------------------------
 mkdir -p "$(dirname "$BINARY")"
 if [ -f "$REPO/target/release/aphrodite" ]; then
-  cp "$REPO/target/release/aphrodite" "$BINARY"
-  chmod +x "$BINARY"
-  echo "  binary: $BINARY ($(du -h "$BINARY" | cut -f1))"
+	cp "$REPO/target/release/aphrodite" "$BINARY"
+	chmod +x "$BINARY"
+	echo "  binary: $BINARY ($(du -h "$BINARY" | cut -f1))"
 else
-  echo "  binary: SKIP - no release build at target/release/aphrodite"
-  echo "          Run: cargo build --release -p aphrodite"
+	echo "  binary: SKIP - no release build at target/release/aphrodite"
+	echo "          Run: cargo build --release -p aphrodite"
 fi
 
 # --- 2. Plugin symlink -------------------------------------------------------
@@ -47,37 +47,37 @@ echo "  skills: $HERMES/skills/hermes → $SKILLS_SRC"
 mkdir -p "$HERMES/profiles"
 
 PROFILE_NAMES=(
-  barebone
-  proxy-cache
-  proxy-token
-  compress-off
-  compress-light
-  compress-medium
-  compress-aggressive
+	barebone
+	proxy-cache
+	proxy-token
+	compress-off
+	compress-light
+	compress-medium
+	compress-aggressive
 )
 
 for name in "${PROFILE_NAMES[@]}"; do
-  profile="aphrodite-$name"
-  src="$REPO/profiles/$profile"
-  dst="$HERMES/profiles/$profile"
+	profile="aphrodite-$name"
+	src="$REPO/profiles/$profile"
+	dst="$HERMES/profiles/$profile"
 
-  if [ ! -d "$src" ]; then
-    echo "  profile: $profile - SKIP (no directory at $src)"
-    continue
-  fi
+	if [ ! -d "$src" ]; then
+		echo "  profile: $profile - SKIP (no directory at $src)"
+		continue
+	fi
 
-  # Remove stale symlink or directory, then re-link
-  rm -rf "$dst"
-  ln -sf "$src" "$dst"
+	# Remove stale symlink or directory, then re-link
+	rm -rf "$dst"
+	ln -sf "$src" "$dst"
 
-  # Ensure the plugin is listed in the profile's config
-  hermes plugins enable aphrodite --profile "$profile" 2>/dev/null || true
+	# Ensure the plugin is listed in the profile's config
+	hermes plugins enable aphrodite --profile "$profile" 2> /dev/null || true
 
-  echo "  profile: $profile ✓"
+	echo "  profile: $profile ✓"
 done
 
 # Also enable in the default (active) profile
-hermes plugins enable aphrodite 2>/dev/null || true
+hermes plugins enable aphrodite 2> /dev/null || true
 
 echo ""
 echo "=== done ==="

@@ -1,6 +1,8 @@
 ---
 name: aphrodite-proxy-lifecycle
-description: Proxy version detection, auto-restart on session start, cache safety across restarts, and background process workflow patterns.
+description:
+    Proxy version detection, auto-restart on session start, cache safety across
+    restarts, and background process workflow patterns.
 version: 1.0.0
 ---
 
@@ -8,14 +10,19 @@ version: 1.0.0
 
 ## Version-Aware Auto-Restart
 
-`_proxy/lifecycle.py:on_start()` queries `/health` for the running proxy version before skipping `_start()`. If the running version doesn't match `BIN_VERSION`, it kills the stale proxy and launches the new binary.
+`_proxy/lifecycle.py:on_start()` queries `/health` for the running proxy version
+before skipping `_start()`. If the running version doesn't match `BIN_VERSION`,
+it kills the stale proxy and launches the new binary.
 
 ### Cache Safety
-- **SQLite CCR store** survives restarts (disk-backed at `~/.hermes/aphrodite/ccr.db`)
+
+- **SQLite CCR store** survives restarts (disk-backed at
+  `~/.hermes/aphrodite/ccr.db`)
 - **In-memory cache** is rebuilt on next session start via `_restore_markers()`
 - No compressed content is lost
 
 ### Version Sources
+
 - `BIN_VERSION` in `_core/config.py` — plugin's expected binary version
 - Running version from proxy `/health` JSON `"version"` field
 - `PLUGIN_VERSION` — Python plugin version

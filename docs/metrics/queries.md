@@ -2,7 +2,8 @@
 
 Origin: PromQL reference for monitoring and alerting on Aphrodite proxy metrics.
 
-Source of truth: `docs/metrics/prometheus.md` (metric names), `crates/aphrodite/src/main.rs` `/metrics` handler
+Source of truth: `docs/metrics/prometheus.md` (metric names),
+`crates/aphrodite/src/main.rs` `/metrics` handler
 
 ## CCR Cache Performance
 
@@ -121,14 +122,14 @@ rate(aphrodite_inline_ccr_hits[5m]) / (rate(aphrodite_inline_ccr_hits[5m]) + rat
 
 ### Key Health Indicators
 
-| Panel | Query |
-|-------|-------|
-| Requests/sec | `rate(aphrodite_requests_total{mode="token"}[1m])` |
-| P95 Latency | `histogram_quantile(0.95, rate(aphrodite_latency_seconds_bucket[5m]))` |
-| Compression Rate | `rate(aphrodite_requests_compressed[5m]) / rate(aphrodite_requests_total[5m]) * 100` |
-| CCR Hit Rate | `rate(aphrodite_ccr_hits[5m]) / (rate(aphrodite_ccr_hits[5m]) + rate(aphrodite_ccr_misses[5m])) * 100` |
-| Tokens Saved/sec | `rate(aphrodite_tokens_saved[5m])` |
-| Error Rate | `rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) + rate(aphrodite_upstream_timeouts_total[5m])` |
+| Panel            | Query                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| Requests/sec     | `rate(aphrodite_requests_total{mode="token"}[1m])`                                                     |
+| P95 Latency      | `histogram_quantile(0.95, rate(aphrodite_latency_seconds_bucket[5m]))`                                 |
+| Compression Rate | `rate(aphrodite_requests_compressed[5m]) / rate(aphrodite_requests_total[5m]) * 100`                   |
+| CCR Hit Rate     | `rate(aphrodite_ccr_hits[5m]) / (rate(aphrodite_ccr_hits[5m]) + rate(aphrodite_ccr_misses[5m])) * 100` |
+| Tokens Saved/sec | `rate(aphrodite_tokens_saved[5m])`                                                                     |
+| Error Rate       | `rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) + rate(aphrodite_upstream_timeouts_total[5m])`  |
 
 ### Alerts
 

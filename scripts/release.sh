@@ -18,10 +18,10 @@ MINOR=$(echo "$CURRENT" | cut -d. -f2)
 PATCH=$(echo "$CURRENT" | cut -d. -f3)
 
 case "$BUMP" in
-    major) NEW="$((MAJOR+1)).0.0" ;;
-    minor) NEW="$MAJOR.$((MINOR+1)).0" ;;
-    patch) NEW="$MAJOR.$MINOR.$((PATCH+1))" ;;
-    *)     echo "Invalid bump: $BUMP (use patch|minor|major)" && exit 1 ;;
+	major) NEW="$((MAJOR + 1)).0.0" ;;
+	minor) NEW="$MAJOR.$((MINOR + 1)).0" ;;
+	patch) NEW="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+	*) echo "Invalid bump: $BUMP (use patch|minor|major)" && exit 1 ;;
 esac
 
 echo "=== aphrodite release: $CURRENT → $NEW ==="
@@ -56,11 +56,11 @@ echo "  Binary: target/release/aphrodite"
 echo "  Commit: $(git rev-parse --short HEAD)"
 
 if [ "$PUSH" = "--push" ]; then
-    echo ""
-    echo "Pushing..."
-    git push origin Current
-    git push origin "v$NEW"
-    echo "Pushed."
+	echo ""
+	echo "Pushing..."
+	git push origin Current
+	git push origin "v$NEW"
+	echo "Pushed."
 else
-    echo "  Push:   ./scripts/release.sh $BUMP --push"
+	echo "  Push:   ./scripts/release.sh $BUMP --push"
 fi

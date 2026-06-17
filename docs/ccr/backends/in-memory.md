@@ -1,8 +1,11 @@
 # In-Memory CCR Backend
 
-Origin: Process-local, sharded concurrent CCR store for cache (:9797) mode. Lightweight  -  no persistence needed for the ephemeral cache proxy. Distinct keys never contend on reads; capacity-bound eviction is the only serialized step.
+Origin: Process-local, sharded concurrent CCR store for cache (:9797) mode.
+Lightweight - no persistence needed for the ephemeral cache proxy. Distinct keys
+never contend on reads; capacity-bound eviction is the only serialized step.
 
-Source of truth: `vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs`
+Source of truth:
+`vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs`
 
 ## Struct
 
@@ -22,15 +25,18 @@ struct Entry {
 
 ## Constants
 
-| Constant | Value | Source |
-|----------|-------|--------|
-| DEFAULT_CAPACITY | 1,000 | `mod.rs:77` |
-| DEFAULT_TTL | 300s (5 min) | `mod.rs:79` |
+| Constant         | Value        | Source      |
+| ---------------- | ------------ | ----------- |
+| DEFAULT_CAPACITY | 1,000        | `mod.rs:77` |
+| DEFAULT_TTL      | 300s (5 min) | `mod.rs:79` |
 
-Note: The proxy constructs with capacity=10,000 and TTL from `cli.ccr_ttl_seconds` (default 3600s):
+Note: The proxy constructs with capacity=10,000 and TTL from
+`cli.ccr_ttl_seconds` (default 3600s):
+
 ```rust
 InMemoryCcrStore::with_capacity_and_ttl(10_000, Duration::from_secs(cli.ccr_ttl_seconds))
 ```
+
 From `proxy.rs:build_state()` (line 453).
 
 ## Constructors
@@ -98,25 +104,36 @@ Called when order.len() > capacity × 2:
   2. retain(|key| map.contains_key(key))
 ```
 
-Prevents unbounded queue growth from stale keys (entries that expired and were removed from DashMap but still linger in the order queue).
+Prevents unbounded queue growth from stale keys (entries that expired and were
+removed from DashMap but still linger in the order queue).
 
 ## TTL Expiry
 
-Lazy  -  checked on `get()`, not via background thread. Uses `remove_if()` for atomic check-and-remove:
-- Closes the TOCTOU race where: Thread A sees expired entry → drops read lock → Thread B re-inserts fresh entry with same hash → A's `remove()` wipes B's fresh data.
-- With `remove_if`, predicate evaluation and removal happen under the same shard write lock.
+Lazy - checked on `get()`, not via background thread. Uses `remove_if()` for
+atomic check-and-remove:
+
+- Closes the TOCTOU race where: Thread A sees expired entry → drops read lock →
+  Thread B re-inserts fresh entry with same hash → A's `remove()` wipes B's
+  fresh data.
+- With `remove_if`, predicate evaluation and removal happen under the same shard
+  write lock.
 
 ## Concurrency Model
 
-- **Reads**: Distinct hashes hash to distinct DashMap shards  -  no contention.
-- **Writes**: `get_mut` on same hash serializes, but `put` on different hashes land in different shards.
-- **Eviction**: Only serialized step is the `order` mutex (held for O(1) push or small sweep).
+- **Reads**: Distinct hashes hash to distinct DashMap shards - no contention.
+- **Writes**: `get_mut` on same hash serializes, but `put` on different hashes
+  land in different shards.
+- **Eviction**: Only serialized step is the `order` mutex (held for O(1) push or
+  small sweep).
 - **Poison**: Mutex locks recover from poison (log warning, continue).
 
 ## Race Condition: Soft-Cap
 
-Between `map.len() >= capacity` check and `evict_until_under_capacity()`, another thread could insert. The store may briefly exceed capacity. Eviction loop handles this by continuing to pop until `map.len() < capacity`.
+Between `map.len() >= capacity` check and `evict_until_under_capacity()`,
+another thread could insert. The store may briefly exceed capacity. Eviction
+loop handles this by continuing to pop until `map.len() < capacity`.
 
 ## Idempotency
 
-`put` on existing hash overwrites in place via `get_mut`  -  same semantics as SQLite's `ON CONFLICT(hash) DO UPDATE SET`.
+`put` on existing hash overwrites in place via `get_mut` - same semantics as
+SQLite's `ON CONFLICT(hash) DO UPDATE SET`.

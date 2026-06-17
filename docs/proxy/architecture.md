@@ -1,15 +1,19 @@
 # Proxy Architecture
 
-Origin: Aphrodite is a reverse proxy that sits between Hermes (the LLM agent) and the upstream LLM API (DeepSeek/OpenAI-compatible). It intercepts Chat Completions responses, compresses tool outputs via CCR, and provides tool relay for bidirectional communication.
+Origin: Aphrodite is a reverse proxy that sits between Hermes (the LLM agent)
+and the upstream LLM API (DeepSeek/OpenAI-compatible). It intercepts Chat
+Completions responses, compresses tool outputs via CCR, and provides tool relay
+for bidirectional communication.
 
-Source of truth: `crates/aphrodite/src/main.rs`, `crates/aphrodite/src/proxy.rs:build_state()` (line 426)
+Source of truth: `crates/aphrodite/src/main.rs`,
+`crates/aphrodite/src/proxy.rs:build_state()` (line 426)
 
 ## Two-Listener Model
 
-| Listener | Port | CCR Backend | Compression Threshold | Tool Relay | Mode |
-|----------|------|-------------|----------------------|------------|------|
-| Cache | :9797 | InMemoryCcrStore (DashMap, 10K entries) | >8KB (CACHE_COMPRESS_THRESHOLD) | No | ProxyMode::Cache |
-| Token | :9798 | SqliteCcrStore (SQLite, persistent) | >1KB (TOKEN_COMPRESS_THRESHOLD) | Yes | ProxyMode::Token |
+| Listener | Port  | CCR Backend                             | Compression Threshold           | Tool Relay | Mode             |
+| -------- | ----- | --------------------------------------- | ------------------------------- | ---------- | ---------------- |
+| Cache    | :9797 | InMemoryCcrStore (DashMap, 10K entries) | >8KB (CACHE_COMPRESS_THRESHOLD) | No         | ProxyMode::Cache |
+| Token    | :9798 | SqliteCcrStore (SQLite, persistent)     | >1KB (TOKEN_COMPRESS_THRESHOLD) | Yes        | ProxyMode::Token |
 
 ## Data Flow
 
@@ -30,6 +34,7 @@ Hermes Agent ← compressed response ←─────────────�
 30+ AtomicU64 counters, 4 Mutex-protected structures, 1 TaskTracker.
 
 ### Core Config (proxy.rs:117-129)
+
 ```rust
 pub client: HttpClient,           // reqwest pool: 100 idle per host, 90s idle timeout, 60s keepalive
 pub api_url: String,
@@ -45,12 +50,14 @@ pub dev: bool,                     // verbose request/response logging
 ```
 
 ### Cache Structures (proxy.rs:136-140)
+
 ```rust
 pub request_history: Mutex<VecDeque<serde_json::Value>>,  // last 50 requests
 pub inline_ccr: Mutex<lru::LruCache<String, String>>,      // 1024 entries, <256B threshold
 ```
 
 ### Primary Counters (proxy.rs:157-170)
+
 ```rust
 pub requests_total: AtomicU64,
 pub requests_compressed: AtomicU64,
@@ -65,22 +72,26 @@ pub cache_misses: AtomicU64,
 ```
 
 ### Latency Tracking (proxy.rs:144-146)
+
 ```rust
 pub latency_buckets: [AtomicU64; 5],    // <1ms, <10ms, <100ms, <1s, <10s
 pub total_latency_micros: AtomicU64,
 ```
 
 ### Error Tracking (proxy.rs:151)
+
 ```rust
 pub last_errors: Mutex<VecDeque<String>>,  // last 100 errors
 ```
 
 ### Compression Tracking (proxy.rs:154)
+
 ```rust
 pub compressions_by_type: Mutex<HashMap<String, u64>>,
 ```
 
 ### Extended Metrics (proxy.rs:182-195)
+
 ```rust
 pub inline_ccr_hits: AtomicU64,
 pub inline_ccr_misses: AtomicU64,
@@ -99,11 +110,13 @@ pub upstream_latency_micros: AtomicU64,
 ```
 
 ### Task Tracking
+
 ```rust
 pub task_tracker: TaskTracker,    // tracks async callbacks for graceful shutdown
 ```
 
 ### Adaptive State (proxy.rs:174-179)
+
 ```rust
 pub fill_pct: AtomicU64,          // ×100, 0-10000. fill_pct = 100 - (ratio_ema/20), clamped [1..99]
 pub response_cache: Mutex<lru::LruCache<u64, Vec<u8>>>,  // 128 entries, FNV-1a hash key
@@ -113,36 +126,37 @@ pub response_cache: Mutex<lru::LruCache<u64, Vec<u8>>>,  // 128 entries, FNV-1a 
 
 From `main.rs:run_single()` (lines 190-353):
 
-| Route | Method | Handler | Access |
-|-------|--------|---------|--------|
-| `/health` | GET | health_check | Public (no loopback enforcement) |
-| `/health/upstream` | GET | upstream probe | Loopback only |
-| `/version` | GET | CARGO_PKG_VERSION | Loopback only |
-| `/stats` | GET | stats_json() | Loopback only |
-| `/stats/db` | GET | ccr.stats_db() | Loopback only |
-| `/metrics` | GET | Prometheus text format | Loopback only (no auth) |
-| `/history` | GET | request_history | Loopback only |
-| `/retrieve` | POST | retrieve::handle_retrieve | Loopback only |
-| `/tool/relay` | POST | handle_tool_relay | Loopback only |
-| `/ccr/create` | POST | handle_ccr_create | Loopback only |
-| `/ccr/list` | GET | handle_ccr_list | Loopback only |
-| `/ccr/{hash}` | DELETE | handle_ccr_delete | Loopback only |
-| `/favicon.ico` | GET | 404 | Loopback only |
-| `/robots.txt` | GET | `Disallow: /` | Loopback only |
-| `/` | GET | version JSON | Loopback only |
-| `/{*path}` | ANY | proxy_handler | Loopback only |
+| Route              | Method | Handler                   | Access                           |
+| ------------------ | ------ | ------------------------- | -------------------------------- |
+| `/health`          | GET    | health_check              | Public (no loopback enforcement) |
+| `/health/upstream` | GET    | upstream probe            | Loopback only                    |
+| `/version`         | GET    | CARGO_PKG_VERSION         | Loopback only                    |
+| `/stats`           | GET    | stats_json()              | Loopback only                    |
+| `/stats/db`        | GET    | ccr.stats_db()            | Loopback only                    |
+| `/metrics`         | GET    | Prometheus text format    | Loopback only (no auth)          |
+| `/history`         | GET    | request_history           | Loopback only                    |
+| `/retrieve`        | POST   | retrieve::handle_retrieve | Loopback only                    |
+| `/tool/relay`      | POST   | handle_tool_relay         | Loopback only                    |
+| `/ccr/create`      | POST   | handle_ccr_create         | Loopback only                    |
+| `/ccr/list`        | GET    | handle_ccr_list           | Loopback only                    |
+| `/ccr/{hash}`      | DELETE | handle_ccr_delete         | Loopback only                    |
+| `/favicon.ico`     | GET    | 404                       | Loopback only                    |
+| `/robots.txt`      | GET    | `Disallow: /`             | Loopback only                    |
+| `/`                | GET    | version JSON              | Loopback only                    |
+| `/{*path}`         | ANY    | proxy_handler             | Loopback only                    |
 
 ## Middleware Stack
 
-| Layer | Config |
-|-------|--------|
-| CORS | `CorsLayer::permissive()` |
-| Body limit | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`) |
-| Loopback enforcement | `middleware::from_fn(loopback_only)`  -  all routes except `/health` |
+| Layer                | Config                                                             |
+| -------------------- | ------------------------------------------------------------------ |
+| CORS                 | `CorsLayer::permissive()`                                          |
+| Body limit           | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                        |
+| Loopback enforcement | `middleware::from_fn(loopback_only)` - all routes except `/health` |
 
 ## HTTP Client Config
 
 From `proxy.rs:build_state()` (line 429):
+
 ```rust
 HttpClient::builder()
     .timeout(Duration::from_secs(cli.timeout))     // default 300s, max 600s
@@ -171,11 +185,14 @@ Priority: aphrodite.toml → CLI args
 
 Config path: `APHRODITE_CONFIG_PATH` env var or `aphrodite.toml` (CWD).
 
-Each `[[proxies]]` entry spawns its own Tokio task with independent `run_single()`. A shared `tokio::sync::watch` channel propagates the shutdown signal to all listeners.
+Each `[[proxies]]` entry spawns its own Tokio task with independent
+`run_single()`. A shared `tokio::sync::watch` channel propagates the shutdown
+signal to all listeners.
 
 ## Worker Threads
 
 From `main.rs:main()` (line 28):
+
 ```rust
 let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
     .ok()
@@ -185,11 +202,13 @@ let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
         (cpus * 4).max(32)
     });
 ```
+
 Default: 4× CPU cores, minimum 32. Override via `APHRODITE_WORKER_THREADS`.
 
 ## Build Info
 
 Version info from env vars set by `build.rs`:
+
 ```rust
 env!("CARGO_PKG_VERSION")
 option_env!("APHRODITE_VERSION")

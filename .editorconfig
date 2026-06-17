@@ -1,9 +1,15 @@
-[*.{rs,toml,md,yaml,yml}]
-indent_style = space
-indent_size = 4
-max_width = 100
+root = true
 
-[*.{py}]
-indent_style = space
+[*]
+end_of_line = lf
+insert_final_newline = true
+tab_width = 4
 indent_size = 4
-max_width = 100
+indent_style = tab
+
+[*.{yaml,yml}]
+indent_style = space
+
+[*.rs]
+end_of_line = unset
+insert_final_newline = unset

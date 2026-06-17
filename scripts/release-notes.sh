@@ -7,18 +7,18 @@ set -euo pipefail
 
 TAG="${1:-}"
 TITLE="${2:-}"
-shift 2 2>/dev/null || true
+shift 2 2> /dev/null || true
 BODY="${*:-}"
 
 if [ -z "$TAG" ]; then
-  echo "Usage: $0 vX.Y.Z 'Title' 'Body text...'" >&2
-  exit 1
+	echo "Usage: $0 vX.Y.Z 'Title' 'Body text...'" >&2
+	exit 1
 fi
 
 # Extract previous tag for compare link
 PREV=$(git tag --sort=-v:refname | grep -v "$TAG" | head -1)
 
-cat <<EOF
+cat << EOF
 **[Compare ${PREV}...${TAG}](https://github.com/PlayForm/Aphrodite/compare/${PREV}...${TAG})**
 
 ${BODY}

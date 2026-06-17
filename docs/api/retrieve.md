@@ -1,6 +1,8 @@
 # Retrieve Endpoint
 
-Origin: Programmatic CCR retrieval  -  resolve a hash to its original content, with optional query filtering and pagination. Used by the LLM agent when `aphrodite_retrieve` is called.
+Origin: Programmatic CCR retrieval - resolve a hash to its original content,
+with optional query filtering and pagination. Used by the LLM agent when
+`aphrodite_retrieve` is called.
 
 Source of truth: `crates/aphrodite/src/retrieve.rs:handle_retrieve()` (line 33)
 
@@ -18,10 +20,10 @@ Loopback only.
 
 ```json
 {
-    "hash": "abc123...",
-    "query": "optional filter string",
-    "offset": 0,
-    "limit": 100
+	"hash": "abc123...",
+	"query": "optional filter string",
+	"offset": 0,
+	"limit": 100
 }
 ```
 
@@ -41,52 +43,57 @@ pub struct RetrieveRequest {
 ## Response
 
 ### Success (200)
+
 ```json
 {
-    "found": true,
-    "content": "original content...",
-    "source": "ccr",
-    "error": null
+	"found": true,
+	"content": "original content...",
+	"source": "ccr",
+	"error": null
 }
 ```
 
 ### Not Found (404)
+
 ```json
 {
-    "found": false,
-    "content": null,
-    "source": "none",
-    "error": "CCR entry not found: abc123..."
+	"found": false,
+	"content": null,
+	"source": "none",
+	"error": "CCR entry not found: abc123..."
 }
 ```
 
 ### Bad Request (400)
+
 ```json
 {
-    "found": false,
-    "content": null,
-    "source": "none",
-    "error": "`hash` required"
+	"found": false,
+	"content": null,
+	"source": "none",
+	"error": "`hash` required"
 }
 ```
 
 ### Pagination Out of Range (400)
+
 ```json
 {
-    "found": false,
-    "content": "[offset 500 out of range; document has 42 lines]",
-    "source": "ccr",
-    "error": null
+	"found": false,
+	"content": "[offset 500 out of range; document has 42 lines]",
+	"source": "ccr",
+	"error": null
 }
 ```
 
 ### Decompression Error (500)
+
 ```json
 {
-    "found": false,
-    "content": null,
-    "source": "ccr",
-    "error": "decompression failed"
+	"found": false,
+	"content": null,
+	"source": "ccr",
+	"error": "decompression failed"
 }
 ```
 
@@ -127,6 +134,7 @@ pub struct RetrieveResponse {
 ## Query Filter
 
 From `filter_content()` (retrieve.rs:153):
+
 ```rust
 fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
     match query {
@@ -154,6 +162,7 @@ fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
 ## Pagination
 
 From retrieve.rs:126:
+
 ```rust
 if req.limit > 0 {
     let lines: Vec<&str> = content.lines().collect();
@@ -170,6 +179,7 @@ if req.limit > 0 {
 ## Zstd Decompression
 
 From retrieve.rs:101:
+
 ```rust
 if content.as_bytes().starts_with(&[0x28, 0xB5, 0x2F, 0xFD]) {
     match zstd::decode_all(content.as_bytes()) {
@@ -183,16 +193,19 @@ if content.as_bytes().starts_with(&[0x28, 0xB5, 0x2F, 0xFD]) {
 }
 ```
 
-Magic bytes `0x28 0xB5 0x2F 0xFD` identify zstd-compressed frames stored by CCR backends.
+Magic bytes `0x28 0xB5 0x2F 0xFD` identify zstd-compressed frames stored by CCR
+backends.
 
 ## Source Tracking
 
-| source value | Meaning |
-|-------------|---------|
-| `"ccr"` | Found in CCR store (SQLite or in-memory) |
-| `"inline"` | Would be set for inline store (currently "ccr" is used) |
-| `"none"` | Not found (error response) |
+| source value | Meaning                                                 |
+| ------------ | ------------------------------------------------------- |
+| `"ccr"`      | Found in CCR store (SQLite or in-memory)                |
+| `"inline"`   | Would be set for inline store (currently "ccr" is used) |
+| `"none"`     | Not found (error response)                              |
 
 ## Production Note
 
-The inline_ccr lock is dropped BEFORE any `.await` to avoid `!Send MutexGuard` crossing await points. The entire check-and-resolve for inline is scoped in a block.
+The inline_ccr lock is dropped BEFORE any `.await` to avoid `!Send MutexGuard`
+crossing await points. The entire check-and-resolve for inline is scoped in a
+block.

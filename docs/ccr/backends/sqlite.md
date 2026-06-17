@@ -1,8 +1,11 @@
 # SQLite CCR Backend
 
-Origin: Persistent, shareable CCR store for production (token mode) proxy deployments. Survives worker restarts. WAL-mode with lazy TTL purging  -  no background threads.
+Origin: Persistent, shareable CCR store for production (token mode) proxy
+deployments. Survives worker restarts. WAL-mode with lazy TTL purging - no
+background threads.
 
-Source of truth: `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs`
+Source of truth:
+`vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs`
 
 ## Schema
 
@@ -15,14 +18,15 @@ CREATE TABLE IF NOT EXISTS ccr_entries (
 );
 ```
 
-No secondary indexes  -  single-row-per-PK lookups only. Purge sweeps use `WHERE created_at + ttl_seconds <= ?1` on the (small) table.
+No secondary indexes - single-row-per-PK lookups only. Purge sweeps use
+`WHERE created_at + ttl_seconds <= ?1` on the (small) table.
 
 ## Connection Configuration
 
-| Setting | Value | Rationale |
-|---------|-------|-----------|
-| journal_mode | WAL | Readers don't block writers |
-| synchronous | NORMAL | Tolerable data loss on power failure for CCR cache |
+| Setting      | Value  | Rationale                                          |
+| ------------ | ------ | -------------------------------------------------- |
+| journal_mode | WAL    | Readers don't block writers                        |
+| synchronous  | NORMAL | Tolerable data loss on power failure for CCR cache |
 
 ## Struct
 
@@ -41,7 +45,7 @@ pub struct SqliteCcrStore {
 pub fn open(path: impl AsRef<Path>, default_ttl_seconds: u64) -> rusqlite::Result<Self>
 ```
 
-Errors surface to caller  -  no silent fallback to in-memory.
+Errors surface to caller - no silent fallback to in-memory.
 
 ## Methods
 
@@ -65,13 +69,15 @@ ON CONFLICT(hash) DO UPDATE SET
     ttl_seconds = excluded.ttl_seconds
 ```
 
-Upsert by primary key  -  idempotent re-store. Returns `false` on SQL error (logs warning, does not panic).
+Upsert by primary key - idempotent re-store. Returns `false` on SQL error (logs
+warning, does not panic).
 
 ### del(hash: &str) -> bool
 
 ```sql
 DELETE FROM ccr_entries WHERE hash = ?1
 ```
+
 Returns `true` if rows affected > 0.
 
 ### len() -> usize
@@ -79,6 +85,7 @@ Returns `true` if rows affected > 0.
 ```sql
 SELECT COUNT(*) FROM ccr_entries
 ```
+
 Returns 0 on error.
 
 ### stats_db() -> Option<serde_json::Value>
@@ -109,18 +116,21 @@ Called from `get()` via `maybe_purge()`. Returns number of purged rows.
 const PURGE_DEBOUNCE_SECS: u64 = 60;
 ```
 
-`last_purge` mutex tracks last purge time. Purge only fires if ≥ 60s since last sweep.
+`last_purge` mutex tracks last purge time. Purge only fires if ≥ 60s since last
+sweep.
 
 ### Now
 
 ```rust
 SystemTime::now().duration_since(UNIX_EPOCH).as_secs()
 ```
+
 Falls back to 0 on clock-before-epoch (impossible on sane hosts).
 
 ## Poison Resilience
 
 All `Mutex::lock()` calls recover from poison:
+
 ```rust
 fn lock_conn(conn: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
     match conn.lock() {
@@ -138,6 +148,7 @@ fn lock_conn(conn: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
 When not specified: `~/.hermes/aphrodite/ccr.db`
 
 From `proxy.rs:build_state()` (line 438):
+
 ```rust
 dirs::home_dir()
     .unwrap_or_else(|| PathBuf::from("/tmp"))

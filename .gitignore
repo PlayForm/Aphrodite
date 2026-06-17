@@ -52,6 +52,10 @@ Thumbs.db
 # Build
 target/
 
+# JS / pnpm
+node_modules/
+pnpm-lock.yaml
+
 # Secrets (never commit)
 .env
 .env.sh

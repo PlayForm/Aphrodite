@@ -11,9 +11,12 @@ BIN="$INSTALL_DIR/aphrodite"
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 case "$ARCH" in
-    arm64|aarch64) ARCH="arm64" ;;
-    x86_64|amd64)  ARCH="x64" ;;
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+	arm64 | aarch64) ARCH="arm64" ;;
+	x86_64 | amd64) ARCH="x64" ;;
+	*)
+		echo "Unsupported architecture: $ARCH"
+		exit 1
+		;;
 esac
 
 echo "Installing aphrodite $VERSION for $OS-$ARCH..."
@@ -22,17 +25,17 @@ echo "Installing aphrodite $VERSION for $OS-$ARCH..."
 URL="https://github.com/$REPO/releases/download/$VERSION/aphrodite-$OS-$ARCH"
 mkdir -p "$INSTALL_DIR"
 curl -fsSL "$URL" -o "$BIN" || {
-    echo "Download failed. Trying release binary..."
-    curl -fsSL "https://github.com/$REPO/releases/latest/download/aphrodite" -o "$BIN" || {
-        echo "Failed to download. Build from source: cargo install aphrodite"
-        exit 1
-    }
+	echo "Download failed. Trying release binary..."
+	curl -fsSL "https://github.com/$REPO/releases/latest/download/aphrodite" -o "$BIN" || {
+		echo "Failed to download. Build from source: cargo install aphrodite"
+		exit 1
+	}
 }
 chmod +x "$BIN"
 
 # Create default config
 if [ ! -f "$INSTALL_DIR/aphrodite.toml" ]; then
-    cat > "$INSTALL_DIR/aphrodite.toml" << 'EOF'
+	cat > "$INSTALL_DIR/aphrodite.toml" << 'EOF'
 [defaults]
 api_url = "https://api.example.com"
 model = "gpt-4o"
@@ -48,7 +51,7 @@ listen = "127.0.0.1:9798"
 mode = "token"
 tool_relay = true
 EOF
-    echo "Default config created at $INSTALL_DIR/aphrodite.toml"
+	echo "Default config created at $INSTALL_DIR/aphrodite.toml"
 fi
 
 echo ""
