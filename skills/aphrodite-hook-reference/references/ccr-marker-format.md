@@ -3,16 +3,17 @@
 ## Marker Format
 
 **Standard ASCII markers** — universal compatibility, no Unicode issues:
+
 ```
 <<<CCR:{hash}|{type}|{size}|{mode}>>> {preview}
 ```
 
-| Field | Values | Source |
-|-------|--------|--------|
-| hash | 12-16 hex chars | Proxy SHA or inline SHA256 |
-| type | tool, terminal, context | Which hook produced it |
-| size | bytes integer | Original content size |
-| mode | token, cache, inline, ? | Compression source |
+| Field | Values                  | Source                     |
+| ----- | ----------------------- | -------------------------- |
+| hash  | 12-16 hex chars         | Proxy SHA or inline SHA256 |
+| type  | tool, terminal, context | Which hook produced it     |
+| size  | bytes integer           | Original content size      |
+| mode  | token, cache, inline, ? | Compression source         |
 
 ## Parsing
 
@@ -63,13 +64,15 @@ Tool output (>1KB token, >8KB cache)
 
 1. LLM sees `<<<CCR:hash|tool|size>>> preview`
 2. Calls `aphrodite_retrieve(hash)`
-3. `_resolve_one`: checks inline store first, then tries both proxies (9797, 9798)
-4. `_resolve_recursive`: scans result for nested <<<CCR:...>>> markers, resolves up to 3 levels deep
+3. `_resolve_one`: checks inline store first, then tries both proxies
+   (9797, 9798)
+4. `_resolve_recursive`: scans result for nested <<<CCR:...>>> markers, resolves
+   up to 3 levels deep
 5. Returns fully resolved content
 
 ## Thresholds
 
-| Source | Proxy Token | Proxy Cache | Inline Fallback |
-|--------|-------------|-------------|-----------------|
-| Tool output | >1KB | >8KB | >4KB |
+| Source          | Proxy Token         | Proxy Cache         | Inline Fallback   |
+| --------------- | ------------------- | ------------------- | ----------------- |
+| Tool output     | >1KB                | >8KB                | >4KB              |
 | Terminal output | >TERMINAL_THRESHOLD | >TERMINAL_THRESHOLD | >INLINE_THRESHOLD |

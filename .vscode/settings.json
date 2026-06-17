@@ -1,5 +1,5 @@
 {
-    "files.exclude": {
-        "**/vendor": false
-    }
+	"files.exclude": {
+		"**/vendor": false
+	}
 }

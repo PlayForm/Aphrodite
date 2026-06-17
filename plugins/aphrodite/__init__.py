@@ -119,7 +119,7 @@ from ._tools import (
 _log = logging.getLogger("aphrodite")
 
 # Sync docstring version with PLUGIN_VERSION
-__doc__ = (__doc__ or "").replace("v1.61.0", f"v{PLUGIN_VERSION}")
+__doc__ = (__doc__ or "").replace("v1.62.22", f"v{PLUGIN_VERSION}")
 
 
 # ── Plugin registration ───────────────────────────────────────────
@@ -180,7 +180,7 @@ def register(ctx):
     for _name, _desc in _skills:
         ctx.register_skill(_name, _skills_dir / _name / "SKILL.md", _desc)
 
-    _log.info("aphrodite v%s registered - 10 tools + 13 skills + hooks", PLUGIN_VERSION)
+    _log.info("aphrodite v%s registered — 12 tools + 14 skills + hooks", PLUGIN_VERSION)
 
     if DEBUG_LOGGING:
         lines = [

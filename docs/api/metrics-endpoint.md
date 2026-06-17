@@ -1,8 +1,11 @@
 # Metrics Endpoint
 
-Origin: Prometheus-compatible metrics exposition for monitoring and dashboarding. Always available on loopback without authentication (intentional for local-only deployments).
+Origin: Prometheus-compatible metrics exposition for monitoring and
+dashboarding. Always available on loopback without authentication (intentional
+for local-only deployments).
 
-Source of truth: `crates/aphrodite/src/main.rs` `/metrics` handler (lines 251-325)
+Source of truth: `crates/aphrodite/src/main.rs` `/metrics` handler (lines
+251-325)
 
 ## Endpoint
 
@@ -12,7 +15,7 @@ GET /metrics
 
 ## Access
 
-Loopback only  -  subject to `loopback_only` middleware. No auth.
+Loopback only - subject to `loopback_only` middleware. No auth.
 
 ## Content-Type
 
@@ -22,7 +25,7 @@ text/plain; version=0.0.4
 
 ## Format
 
-Prometheus text exposition format  -  one metric per line with optional labels.
+Prometheus text exposition format - one metric per line with optional labels.
 
 ## Metrics Output
 
@@ -65,6 +68,7 @@ aphrodite_upstream_latency_seconds_sum N.NNNNNN
 ## Latency Histogram
 
 Buckets are cumulative:
+
 ```
 aphrodite_latency_seconds_bucket{le="0.001"} <1ms_count
 aphrodite_latency_seconds_bucket{le="0.01"}  <10ms_count
@@ -75,11 +79,13 @@ aphrodite_latency_seconds_count               total count
 aphrodite_latency_seconds_sum                 total seconds (float)
 ```
 
-Source: `proxy.rs:latency_buckets`  -  5-element AtomicU64 array with ranges <1ms, <10ms, <100ms, <1s, <10s.
+Source: `proxy.rs:latency_buckets` - 5-element AtomicU64 array with ranges <1ms,
+<10ms, <100ms, <1s, <10s.
 
 ## Build Logic
 
 From main.rs:254-325:
+
 ```rust
 let stats = s.stats_json();
 let mut out = String::new();
@@ -87,8 +93,11 @@ let mut out = String::new();
 return (StatusCode::OK, [(CONTENT_TYPE, "text/plain; version=0.0.4")], out)
 ```
 
-Values from `AppState` AtomicU64 counters read with `Ordering::Relaxed`  -  no locking.
+Values from `AppState` AtomicU64 counters read with `Ordering::Relaxed` - no
+locking.
 
 ## Security Note
 
-No authentication  -  intentional for local-only deployments with loopback enforcement. In production, add a reverse-proxy auth layer or firewall this endpoint if exposed.
+No authentication - intentional for local-only deployments with loopback
+enforcement. In production, add a reverse-proxy auth layer or firewall this
+endpoint if exposed.

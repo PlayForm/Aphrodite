@@ -12,27 +12,28 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case "${1:-}" in
-    --stop)
-        bash "$SCRIPT_DIR/proxy-stop.sh"
-        bash "$SCRIPT_DIR/proxy-9797.sh" --stop 2>/dev/null || true
-        bash "$SCRIPT_DIR/proxy-9798.sh" --stop 2>/dev/null || true
-        echo "All proxies stopped"
-        exit 0
-        ;;
-    --status)
-        echo "=== :8787 (Python cache) ==="
-        python3 "$SCRIPT_DIR/proxy-start.py" --port 8787 --stop 2>/dev/null; curl -sf http://127.0.0.1:8787/health && echo "UP" || echo "DOWN"
-        echo ""
-        echo "=== :8788 (Rust token) ==="
-        bash "$SCRIPT_DIR/proxy-token.sh" --status 2>/dev/null || echo "DOWN"
-        echo ""
-        echo "=== :9797 (Rust cache) ==="
-        bash "$SCRIPT_DIR/proxy-9797.sh" --status 2>/dev/null || echo "DOWN"
-        echo ""
-        echo "=== :9798 (Rust token) ==="
-        bash "$SCRIPT_DIR/proxy-9798.sh" --status 2>/dev/null || echo "DOWN"
-        exit 0
-        ;;
+	--stop)
+		bash "$SCRIPT_DIR/proxy-stop.sh"
+		bash "$SCRIPT_DIR/proxy-9797.sh" --stop 2> /dev/null || true
+		bash "$SCRIPT_DIR/proxy-9798.sh" --stop 2> /dev/null || true
+		echo "All proxies stopped"
+		exit 0
+		;;
+	--status)
+		echo "=== :8787 (Python cache) ==="
+		python3 "$SCRIPT_DIR/proxy-start.py" --port 8787 --stop 2> /dev/null
+		curl -sf http://127.0.0.1:8787/health && echo "UP" || echo "DOWN"
+		echo ""
+		echo "=== :8788 (Rust token) ==="
+		bash "$SCRIPT_DIR/proxy-token.sh" --status 2> /dev/null || echo "DOWN"
+		echo ""
+		echo "=== :9797 (Rust cache) ==="
+		bash "$SCRIPT_DIR/proxy-9797.sh" --status 2> /dev/null || echo "DOWN"
+		echo ""
+		echo "=== :9798 (Rust token) ==="
+		bash "$SCRIPT_DIR/proxy-9798.sh" --status 2> /dev/null || echo "DOWN"
+		exit 0
+		;;
 esac
 
 echo "Launching all headroom proxies..."

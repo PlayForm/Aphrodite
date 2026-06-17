@@ -1,12 +1,13 @@
 # Hermes Context Engine API
 
-Hermes v0.16.0+ supports pluggable context engines that can replace the
-built-in ContextCompressor. This is the ONLY hook point where messages
-can actually be REMOVED from the API payload.
+Hermes v0.16.0+ supports pluggable context engines that can replace the built-in
+ContextCompressor. This is the ONLY hook point where messages can actually be
+REMOVED from the API payload.
 
 ## Registration
 
 In plugin's `register(ctx)`:
+
 ```python
 from agent.context_engine import ContextEngine
 
@@ -36,9 +37,11 @@ Config: `context.engine: my-engine` in config.yaml.
 ## Required Abstract Methods
 
 - `name` — short identifier string
-- `update_from_response(usage)` — called after each API response with token counts
+- `update_from_response(usage)` — called after each API response with token
+  counts
 - `should_compress(prompt_tokens)` — return True to trigger compression
-- `compress(messages, current_tokens, focus_topic)` — main compression entry, returns modified list
+- `compress(messages, current_tokens, focus_topic)` — main compression entry,
+  returns modified list
 
 ## Optional Methods
 
@@ -54,7 +57,8 @@ Config: `context.engine: my-engine` in config.yaml.
 
 ## Default Attributes (set on instance)
 
-- `last_prompt_tokens`, `last_completion_tokens`, `last_total_tokens` — token tracking
+- `last_prompt_tokens`, `last_completion_tokens`, `last_total_tokens` — token
+  tracking
 - `threshold_tokens`, `context_length` — compression thresholds
 - `compression_count` — counter
 - `threshold_percent: 0.75` — override for custom trigger ratio
@@ -64,12 +68,14 @@ Config: `context.engine: my-engine` in config.yaml.
 ## Discovery
 
 Source files:
+
 - `/agent/context_engine.py` — ContextEngine base class
 - `/agent/agent_init.py:1440-1500` — engine selection logic
 - `/hermes_cli/plugins.py:502` — `register_context_engine()`
 - `/hermes_cli/plugins.py:1920` — `get_plugin_context_engine()`
 
 Selection order:
+
 1. Config `context.engine` setting
 2. `plugins/context_engine/<name>/` directory (repo-shipped)
 3. `get_plugin_context_engine()` (general plugin system)
@@ -80,5 +86,5 @@ Selection order:
 `pre_llm_call` hook receives `conversation_history=list(messages)` — a COPY.
 Mutations are discarded. The hook can only RETURN a context string.
 
-`compress()` receives the ACTUAL message list and can modify it in place.
-This is where real message removal happens.
+`compress()` receives the ACTUAL message list and can modify it in place. This
+is where real message removal happens.

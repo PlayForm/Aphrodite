@@ -12,34 +12,34 @@ cd "$REPO_ROOT"
 
 # Sync submodules to their remote tracking branches
 git submodule update --remote --recursive --merge
-git add --force vendor/headroom 2>/dev/null || true
+git add --force vendor/headroom 2> /dev/null || true
 
 # Stage all changes
 git add -u
-git add docs/ scripts/ plugins/aphrodite/ 2>/dev/null || true
+git add docs/ scripts/ plugins/aphrodite/ 2> /dev/null || true
 
 # Use provided message or auto-generate from last commit
 if [ -z "$MSG" ]; then
-    MSG=$(git log -1 --format=%s)
-    # Strip any existing release prefix
-    MSG=$(echo "$MSG" | sed 's/^release(aphrodite): //')
+	MSG=$(git log -1 --format=%s)
+	# Strip any existing release prefix
+	MSG=$(echo "$MSG" | sed 's/^release(aphrodite): //')
 fi
 
 # Commit if there are changes
 if ! git diff --cached --quiet; then
-    git commit -m "$MSG"
-    echo "[commit] $MSG"
+	git commit -m "$MSG"
+	echo "[commit] $MSG"
 else
-    echo "[skip] nothing to commit"
+	echo "[skip] nothing to commit"
 fi
 
 # Read current version, bump patch (or minor with --minor flag)
 CURRENT=$(grep '^version' "$CARGO_TOML" | head -1 | sed 's/.*"\(.*\)"/\1/')
 if [ "${1:-}" = "--minor" ]; then
-    NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2+1".0"}')
-    shift
+	NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2+1".0"}')
+	shift
 else
-    NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
+	NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
 fi
 
 # Bump Cargo.toml
@@ -70,8 +70,8 @@ echo "[test] OK"
 # Commit version bump + tag (no editor prompts)
 git add -u
 git commit -m "release(aphrodite): v$NEW — $MSG"
-git tag -d "Aphrodite/v$NEW" 2>/dev/null || true
-GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2>/dev/null || git tag "Aphrodite/v$NEW"
+git tag -d "Aphrodite/v$NEW" 2> /dev/null || true
+GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2> /dev/null || git tag "Aphrodite/v$NEW"
 echo "[release] Aphrodite/v$NEW tagged"
 
 # Push — always sync with remote

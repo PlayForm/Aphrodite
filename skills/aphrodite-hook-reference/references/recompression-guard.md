@@ -26,5 +26,5 @@ skip = {"read_file", "read_terminal",
 ## Read-Intent Detection (pre_llm_hook)
 
 When the user's last message contains read keywords, surface
-`aphrodite_retrieve(hash)` hints for the 3 most recent CCR markers.
-This reduces unnecessary round-trips when the LLM was about to retrieve anyway.
+`aphrodite_retrieve(hash)` hints for the 3 most recent CCR markers. This reduces
+unnecessary round-trips when the LLM was about to retrieve anyway.

@@ -1,8 +1,12 @@
 # Aphrodite 💋 Hermes Plugin
 
-> **CCR compression plugin for Hermes Agent — sub‑ms tool output compression, 28‑type classifier, 12 tools, context engine.**
+> **CCR compression plugin for Hermes Agent — sub‑ms tool output compression,
+> 28‑type classifier, 12 tools, context engine.**
 
-Aphrodite intercepts tool output before it reaches the LLM and replaces it with compact, structured previews. The agent sees 15 tokens of metadata instead of 500 tokens of raw text — and retrieves the full content only when it actually needs it.
+Aphrodite intercepts tool output before it reaches the LLM and replaces it with
+compact, structured previews. The agent sees 15 tokens of metadata instead of
+500 tokens of raw text — and retrieves the full content only when it actually
+needs it.
 
 [![plugin](https://img.shields.io/badge/plugin-v1.62.21-purple)](plugin.yaml)
 [![hermes](https://img.shields.io/badge/hermes-≥0.16.0-blue)](https://github.com/NousResearch/hermes-agent)
@@ -14,7 +18,7 @@ Aphrodite intercepts tool output before it reaches the LLM and replaces it with 
 
 ```bash
 # Symlink into your Hermes profile
-ln -s "$(pwd)" ~/.hermes/profiles/<your-profile>/plugins/aphrodite
+ln -s "$(pwd)" ~/.hermes/profiles/ < your-profile > /plugins/aphrodite
 
 # Enable the plugin
 hermes plugins enable aphrodite
@@ -23,11 +27,15 @@ hermes plugins enable aphrodite
 hermes
 ```
 
-The plugin auto-downloads the `aphrodite` binary from [PlayForm/Aphrodite releases](https://github.com/PlayForm/Aphrodite/releases) on first launch. No manual build required.
+The plugin auto-downloads the `aphrodite` binary from
+[PlayForm/Aphrodite releases](https://github.com/PlayForm/Aphrodite/releases) on
+first launch. No manual build required.
 
 ## Configuration
 
-All settings live in `aphrodite.toml` (searched in: CWD → `~/.hermes/aphrodite/` → repo root). See the [monorepo](https://github.com/PlayForm/Aphrodite) for the full schema.
+All settings live in `aphrodite.toml` (searched in: CWD → `~/.hermes/aphrodite/`
+→ repo root). See the [monorepo](https://github.com/PlayForm/Aphrodite) for the
+full schema.
 
 ```toml
 # Minimal example — place in ~/.hermes/aphrodite/aphrodite.toml
@@ -78,27 +86,29 @@ export APHRODITE_API_KEY=<your-upstream-api-key>
 
 ## Tools
 
-| Tool | Description |
-| :--- | :--- |
-| `aphrodite_retrieve` | Resolve `<<<CCR:hash\|type>>>` markers |
-| `aphrodite_compress` | Compress content via CCR with type hint |
-| `aphrodite_stats` | Proxy health, engine status, inline store |
-| `aphrodite_rebuild` | Rebuild binary + restart proxies |
-| `aphrodite_files` | Tracked file references grouped by tool |
-| `aphrodite_diff` | Conversation turn history with summaries |
-| `aphrodite_search` | Search CCR store by keyword or type |
-| `aphrodite_test` | Smoke test suite (quick / full / pipeline) |
-| `aphrodite_catalog` | Full CCR catalog with hashes, types, sizes |
-| `aphrodite_reclassify` | Retroactive metadata enrichment |
-| `aphrodite_prefetch` | Background file read — markers instantly, files load concurrently |
-| `aphrodite_prefetch_status` | Prefetch queue status |
-| `aphrodite_poll_container` | Container health/heartbeat |
+| Tool                        | Description                                                       |
+| :-------------------------- | :---------------------------------------------------------------- |
+| `aphrodite_retrieve`        | Resolve `<<<CCR:hash\|type>>>` markers                            |
+| `aphrodite_compress`        | Compress content via CCR with type hint                           |
+| `aphrodite_stats`           | Proxy health, engine status, inline store                         |
+| `aphrodite_rebuild`         | Rebuild binary + restart proxies                                  |
+| `aphrodite_files`           | Tracked file references grouped by tool                           |
+| `aphrodite_diff`            | Conversation turn history with summaries                          |
+| `aphrodite_search`          | Search CCR store by keyword or type                               |
+| `aphrodite_test`            | Smoke test suite (quick / full / pipeline)                        |
+| `aphrodite_catalog`         | Full CCR catalog with hashes, types, sizes                        |
+| `aphrodite_reclassify`      | Retroactive metadata enrichment                                   |
+| `aphrodite_prefetch`        | Background file read — markers instantly, files load concurrently |
+| `aphrodite_prefetch_status` | Prefetch queue status                                             |
+| `aphrodite_poll_container`  | Container health/heartbeat                                        |
 
 ## More
 
-- **[Monorepo](https://github.com/PlayForm/Aphrodite)** — full docs, benchmark data, Rust proxy source
-- **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — the agent framework this plugin targets
+- **[Monorepo](https://github.com/PlayForm/Aphrodite)** — full docs, benchmark
+  data, Rust proxy source
+- **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** — the agent
+  framework this plugin targets
 
 ---
 
-*CC0‑1.0 — public domain. A PlayForm project.*
+_CC0‑1.0 — public domain. A PlayForm project._

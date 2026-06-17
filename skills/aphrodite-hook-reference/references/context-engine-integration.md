@@ -30,15 +30,15 @@ class MyEngine(ContextEngine):
     @property
     def name(self) -> str:  # MUST be @property, NOT class attribute
         return "my-engine"
-    
+
     # Token tracking (called after each API response)
     def update_from_response(self, usage: dict) -> None:
         self.last_prompt_tokens = usage.get("prompt_tokens", 0)
-    
+
     # Should we compress this turn?
     def should_compress(self, prompt_tokens=None) -> bool:
         return True  # always compress
-    
+
     # Compress messages — return new (shorter) message list
     def compress(self, messages, current_tokens=None, focus_topic=None):
         head = messages[:2]
@@ -46,7 +46,7 @@ class MyEngine(ContextEngine):
         middle = messages[2:-5]
         # Offload middle to CCR, return head + marker + tail
         return head + [marker] + tail
-    
+
     # Optional lifecycle
     def update_model(self, model, context_length, base_url="", api_key="", provider="", api_mode=""): ...
     def get_status(self): ...
@@ -63,16 +63,23 @@ invoke_hook("aphrodite_engine_compressed", engine=self, stats={...})
 ```
 
 Any plugin can listen:
+
 ```python
 ctx.register_hook("aphrodite_engine_compressed", my_callback)
 ```
 
 ## Common Pitfalls
 
-1. **Not inheriting from ContextEngine**: Silent failure — no error, just ignored
-2. **name as class attr instead of @property**: isinstance still passes but property lookup fails
-3. **update_model signature mismatch**: Wrong param count causes TypeError at startup
+1. **Not inheriting from ContextEngine**: Silent failure — no error, just
+   ignored
+2. **name as class attr instead of @property**: isinstance still passes but
+   property lookup fails
+3. **update_model signature mismatch**: Wrong param count causes TypeError at
+   startup
 4. **Config set mid-session**: Engine only activates on NEW sessions
-5. **pre_api_request hook**: Exists in VALID_HOOKS but never invoked — don't rely on it
-6. **conversation_history in pre_llm_call**: It's a COPY — mutations are discarded
-7. **Control chars in WezTerm MCP**: Send \x03 BEFORE new commands to avoid corruption
+5. **pre_api_request hook**: Exists in VALID_HOOKS but never invoked — don't
+   rely on it
+6. **conversation_history in pre_llm_call**: It's a COPY — mutations are
+   discarded
+7. **Control chars in WezTerm MCP**: Send \x03 BEFORE new commands to avoid
+   corruption

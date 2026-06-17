@@ -26,8 +26,10 @@ def _alive(port, timeout=3):
 ```
 
 Key points:
+
 - 5-second cache prevents ~12 seconds of socket overhead per turn
-- Uses `json.loads()` for proper health status parsing (not fragile string match)
+- Uses `json.loads()` for proper health status parsing (not fragile string
+  match)
 - Accepts "healthy", "ok", "degraded" as valid states
 - Falls back to `body.strip() == "ok"` for legacy proxies
 
@@ -43,17 +45,20 @@ def _wait_alive(port, retries=10, delay=0.3):
 ```
 
 Replaces the old `time.sleep(0.5)` fixed wait. Parameters:
+
 - 10 retries × 0.3s = 3s max wait (vs fixed 0.5s that often failed)
 - Configurable for slow machines
 
 ## Python `_resolve_one()` — Dual Proxy
 
 Tries BOTH proxy ports (9797 cache, 9798 token) sequentially, not just token.
-Content compressed via either proxy is retrievable from either since they share CCR stores.
+Content compressed via either proxy is retrievable from either since they share
+CCR stores.
 
 ## Rust Health Check — Decoupled
 
 `/health` (GET) — local-only, no upstream API call:
+
 ```rust
 pub async fn health_check(State(state): ...) -> impl IntoResponse {
     let ccr_ok = state.ccr.is_some();

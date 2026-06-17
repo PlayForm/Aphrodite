@@ -1,4 +1,4 @@
-# CCR Examples  -  What the LLM Actually Sees
+# CCR Examples - What the LLM Actually Sees
 
 ## Conversation Flow with Mermaid
 
@@ -32,7 +32,8 @@ sequenceDiagram
 
 ## Scenario 1: Reading a Rust File
 
-### Raw (uncompressed  -  below threshold)
+### Raw (uncompressed - below threshold)
+
 ```rust
 use std::sync::Arc;
 use axum::{Router, extract::State};
@@ -46,7 +47,8 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-### Compressed (what the LLM sees  -  v0.5.78)
+### Compressed (what the LLM sees - v0.5.78)
+
 ```
 use std::sync::Arc;
 use axum::{Router, extract::State};
@@ -56,15 +58,18 @@ fn main() -> anyhow::Result<()> {
 ```
 
 **The LLM reads:**
+
 - Line 1: Actual code preview (first 3 lines)
-- Line 2: Structure summary  -  knows what functions/structs exist
-- Line 3: CCR marker  -  can call `aphrodite_retrieve("abc123def456")` for full content
+- Line 2: Structure summary - knows what functions/structs exist
+- Line 3: CCR marker - can call `aphrodite_retrieve("abc123def456")` for full
+  content
 
 **Token savings:** 4832 bytes → ~120 bytes (40× compression)
 
 ## Scenario 2: Build Error
 
 ### Raw
+
 ```
 error[E0308]: mismatched types
    --> crates/aphrodite/src/proxy.rs:505:18
@@ -77,15 +82,17 @@ error: could not compile `aphrodite` (lib) due to 1 previous error
 ```
 
 ### Compressed
+
 ```
 error[E0308]: mismatched types
 [error: trace=crates/aphrodite/src/proxy.rs:505:18;msg=error[E0308]: mismatched types;N_errors=1]
 <<<CCR:def789|error|892>>>
 ```
 
-**The LLM sees the error line directly**  -  no need to retrieve unless it wants the full trace.
+**The LLM sees the error line directly** - no need to retrieve unless it wants
+the full trace.
 
-## Scenario 3: With Hint  -  LLM enters debug mode
+## Scenario 3: With Hint - LLM enters debug mode
 
 ```mermaid
 sequenceDiagram
@@ -132,6 +139,7 @@ pub async fn proxy_handler(State(state): State<Arc<AppState>>, method: Method, .
 ```
 
 **Differences with debug hint:**
+
 - 5-line preview instead of 3 (deeper extraction)
 - More function names extracted (lower filter threshold)
 - All structural elements included
@@ -161,6 +169,7 @@ graph TD
 ## Scenario 5: Expanded vs Unexpanded
 
 ### Unexpanded (what LLM sees in context)
+
 ```
 use std::sync::Arc;
 use axum::{Router, extract::State};
@@ -169,6 +178,7 @@ use axum::{Router, extract::State};
 ```
 
 ### Expanded (what LLM sees after retrieval)
+
 ```
 // Full 67,097 bytes of proxy.rs
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -179,16 +189,17 @@ pub async fn proxy_handler(...) -> impl IntoResponse { ... }
 ```
 
 ### Partial expansion (hint: "structure")
+
 ```
 [code_rust: lang=rs;fns=build_state,run_single,proxy_handler,handle_tool_relay,handle_ccr_create,smart_marker,generate_metadata,build_preview;structs=AppState,Secret,ToolRelayRequest,CcrCreateRequest;impls=AppState;traits=CcrStore;ln=1989]
 ```
 
 ## Token Economics
 
-| Scenario | Raw bytes | Compressed | Savings | What LLM pays |
-|----------|-----------|------------|---------|---------------|
-| proxy.rs (1989 lines) | 67,097 | ~180 | 373× | 3 lines + marker |
-| Build error | 892 | ~120 | 7× | Error line + marker |
-| JSON tool output | 8,234 | ~140 | 59× | First line + key count + marker |
-| Git diff (3 files) | 4,521 | ~150 | 30× | File names + change counts + marker |
-| With debug hint | 67,097 | ~250 | 268× | 5 lines + full structure + marker |
+| Scenario              | Raw bytes | Compressed | Savings | What LLM pays                       |
+| --------------------- | --------- | ---------- | ------- | ----------------------------------- |
+| proxy.rs (1989 lines) | 67,097    | ~180       | 373×    | 3 lines + marker                    |
+| Build error           | 892       | ~120       | 7×      | Error line + marker                 |
+| JSON tool output      | 8,234     | ~140       | 59×     | First line + key count + marker     |
+| Git diff (3 files)    | 4,521     | ~150       | 30×     | File names + change counts + marker |
+| With debug hint       | 67,097    | ~250       | 268×    | 5 lines + full structure + marker   |
