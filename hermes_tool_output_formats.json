@@ -1,0 +1,479 @@
+[
+  {
+    "tool_name": "read_file",
+    "output_shape": "Line-numbered text: 'LINE_NUM|CONTENT\\n' repeated. Optionally includes 'Hint: similar filenames...' suggestion footer.",
+    "examples": [
+      "1|use std::sync::Arc;\n2|use axum::{Router, extract::State};\n3|\n4|fn main() -> anyhow::Result<()> {",
+      "1|#!/usr/bin/env python3\n2|import json\n3|...\\nHint: Did you mean /path/to/other.py?"
+    ],
+    "classification_type": "text (default); reclassified as code_rust/code_python/code_go/code_js/code if programming language detected by structure extractor; otherwise json if parsable",
+    "key_extraction_fields": ["path/filename (fn)", "extension (ext)", "line_count (lines)", "code structure (fns, structs, classes)", "first 3 lines preview"],
+    "compression_benefit": "high — large files benefit from CCR marker + structure preview (e.g., 'fn=main structs=AppState ln=414')"
+  },
+  {
+    "tool_name": "write_file",
+    "output_shape": "JSON object or plain text confirming file write. May include syntax check warnings/errors as structured text (e.g., 'Syntax error at line 42: ...'). Returns status/confirmation text.",
+    "examples": [
+      "File written successfully: /path/to/file.py",
+      "{\"status\": \"written\", \"path\": \"/path/to/file.py\", \"bytes\": 1234, \"syntax_errors\": []}",
+      "{\"status\": \"written\", \"path\": \"/path/to/file.json\", \"syntax_errors\": [\"line 5: missing comma\"]}"
+    ],
+    "classification_type": "json (if JSON response); text (plain confirmation); error (if syntax errors present)",
+    "key_extraction_fields": ["path (fn)", "status", "bytes/size", "syntax_errors count", "line count (ln)"],
+    "compression_benefit": "low — typically short; only compress if syntax errors produce long output"
+  },
+  {
+    "tool_name": "patch",
+    "output_shape": "Unified diff format: '--- a/path\\n+++ b/path\\n@@ -start,len +start,len @@\\n context\\n-removed\\n+added\\n...' or structured patch result message.",
+    "examples": [
+      "--- a/src/main.rs\n+++ b/src/main.rs\n@@ -10,6 +10,8 @@\n use std::sync::Arc;\n+use new_crate::Module;\n+use another::Thing;\n fn main() {",
+      "Patch applied successfully (1 file changed, 2 insertions, 0 deletions)"
+    ],
+    "classification_type": "diff (if unified-diff pattern detected: '--- ', '+++ ', '@@ -'); text (confirmation message)",
+    "key_extraction_fields": ["file count (files)", "insertions (+)", "deletions (-)", "line count (ln)", "filename (fn)"],
+    "compression_benefit": "medium — diffs compress well; metadata like 'files=3 +12/-3' useful"
+  },
+  {
+    "tool_name": "search_files",
+    "output_shape": "Three output modes: (1) content: 'FILE_PATH:LINE_NUMBER:MATCHED_CONTENT\\n' repeated; (2) files_only: 'FILE_PATH\\n' repeated; (3) count: 'FILE_PATH:COUNT\\n' repeated. JSON-wrapped as {total_count, query, matches: [{file, line, content}]} when returned to LLM.",
+    "examples": [
+      "src/main.rs:42:fn main() -> anyhow::Result<()> {\nsrc/proxy.rs:841:pub fn detect_content_type",
+      "{\"total_count\": 15, \"query\": \"fn main\", \"matches\": [{\"file\": \"src/main.rs\", \"line\": 42, \"content\": \"fn main() ...\"}, ...]}",
+      "src/main.rs:3\nsrc/proxy.rs:15\nsrc/config.rs:8"
+    ],
+    "classification_type": "search_files (if file:line: pattern >3 matches and >30% of lines OR JSON with 'matches' key); search_results (JSON with 'total_count' + 'query'); text (plain listing)",
+    "key_extraction_fields": ["query/pattern (q)", "match count (total/total_count)", "file count", "line count (ln)"],
+    "compression_benefit": "medium — large result sets benefit from count+query preview"
+  },
+  {
+    "tool_name": "terminal",
+    "output_shape": "Raw stdout+stderr text from shell command. May end with 'exit code: N' status line. May include command echo ('$ command') at top. Can be build output (Compiling.../Finished...), test results (PASSED/FAILED), errors, or plain output.",
+    "examples": [
+      "   Compiling aphrodite v0.5.69\n   Compiling headroom-core v1.0.0\n    Finished release [optimized] target(s) in 12.34s\nexit code: 0",
+      "error[E0308]: mismatched types\n  --> src/proxy.rs:505:18\n...\nexit code: 101",
+      "Hello, world!\nexit code: 0"
+    ],
+    "classification_type": "terminal (exit code pattern in last 5 lines); build_output (Compiling/Finished/running/test lines); build_error (error[E pattern); error (first-line error keywords); text (fallback)",
+    "key_extraction_fields": ["command (cmd)", "exit code (exit)", "error count (errors)", "warning count (warnings)", "last line (last)", "line count (ln)"],
+    "compression_benefit": "very high — terminal output is often verbose; build output with '0E 2W 142L' preview saves dramatically"
+  },
+  {
+    "tool_name": "process",
+    "output_shape": "Varies by action: (list) — table/JSON of process list with session_id, pid, state; (poll) — new output delta text; (log) — paginated output with offset/limit; (wait) — complete output; (kill/write/submit/close) — confirmation message. Background process notifications include session_id.",
+    "examples": [
+      "{\"session_id\": \"abc123\", \"pid\": 12345, \"state\": \"running\", \"uptime\": 3600, \"output\": \"...\"}",
+      "Process abc123 killed (SIGTERM)",
+      "[new output since last poll]\\nline 1\\nline 2\\nexit code: 0"
+    ],
+    "classification_type": "process_output (JSON with 'session_id'); terminal (has exit code in output); json (JSON without session_id); text (plain confirmation)",
+    "key_extraction_fields": ["session_id", "pid/process_id", "uptime", "state", "action result", "exit code", "line count (ln)"],
+    "compression_benefit": "medium — log output can be verbose; poll deltas usually short"
+  },
+  {
+    "tool_name": "execute_code",
+    "output_shape": "Code execution output: stdout text, optional stderr, execution result/return value. May include traceback if error occurred.",
+    "examples": [
+      "42\n>>> Execution completed (0.1s)",
+      "Traceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\nNameError: name 'foo' is not defined"
+    ],
+    "classification_type": "error (if traceback/error in first lines); terminal (if exit-code pattern); code (if code-like output); text (plain result)",
+    "key_extraction_fields": ["return value/result", "error message (msg)", "trace location", "execution time", "line count (ln)"],
+    "compression_benefit": "medium — errors need visibility; successful outputs short"
+  },
+  {
+    "tool_name": "cronjob",
+    "output_shape": "JSON or structured text with cron job info: {id, schedule, status, last_run, next_run, command}. List action returns array of job objects.",
+    "examples": [
+      "{\"id\": \"job_1\", \"schedule\": \"0 */6 * * *\", \"status\": \"active\", \"last_run\": \"2025-06-17T12:00:00Z\", \"next_run\": \"2025-06-17T18:00:00Z\"}",
+      "[{\"id\": \"job_1\", ...}, {\"id\": \"job_2\", ...}]"
+    ],
+    "classification_type": "json_list (if array response); json (if single object or dict with keys)",
+    "key_extraction_fields": ["job count", "status summary", "schedule", "keys (top-level JSON keys)"],
+    "compression_benefit": "low — typically short scheduling info"
+  },
+  {
+    "tool_name": "delegate_task",
+    "output_shape": "Textual summary from delegated sub-agent. Contains task results, findings, and any files created/modified. Structured as a narrative report.",
+    "examples": [
+      "Task completed: analyzed 42 files, found 3 issues. Files created: /path/to/report.md. Summary: ..."
+    ],
+    "classification_type": "text (default); may be reclassified if contains JSON, errors, or diff patterns",
+    "key_extraction_fields": ["summary (first 110 chars)", "file count", "line count (ln)", "error/issue count"],
+    "compression_benefit": "high — delegate outputs can be very verbose; summary preview valuable"
+  },
+  {
+    "tool_name": "session_search",
+    "output_shape": "Search results from session history: array of matching messages/turns with relevance scores. Similar to search_files JSON format.",
+    "examples": [
+      "{\"total_count\": 8, \"query\": \"compression\", \"results\": [{\"turn\": 3, \"content\": \"...\", \"score\": 0.95}, ...]}"
+    ],
+    "classification_type": "search_results (JSON with 'total_count' + 'query'); json_list (array); json (object)",
+    "key_extraction_fields": ["query (q)", "total count", "turn numbers", "relevance scores"],
+    "compression_benefit": "medium — result sets scale with session length"
+  },
+  {
+    "tool_name": "memory",
+    "output_shape": "Memory store operation result: confirmation text, retrieved memory content, or list of memories. JSON for structured memory ops, plain text otherwise.",
+    "examples": [
+      "Memory stored: 'prefers Rust for backend services'",
+      "{\"memories\": [{\"id\": \"mem_1\", \"content\": \"User prefers Rust\", \"created_at\": \"...\"}]}"
+    ],
+    "classification_type": "json (JSON response); text (plain text confirmation/retrieval)",
+    "key_extraction_fields": ["memory count", "content preview (first 110 chars)", "operation type"],
+    "compression_benefit": "low — usually short memory snippets"
+  },
+  {
+    "tool_name": "skill_view",
+    "output_shape": "Full SKILL.md content displayed as markdown/text. Structured with frontmatter (YAML headers) and markdown body.",
+    "examples": [
+      "---\nname: skill-name\ndescription: ...\n---\n\n# Skill Title\nContent..."
+    ],
+    "classification_type": "text (long markdown); json (if frontmatter parsed as JSON); code (if view of code skill)",
+    "key_extraction_fields": ["skill name", "description", "line count (ln)", "heading structure"],
+    "compression_benefit": "medium — skills can be 100+ lines; structure preview useful"
+  },
+  {
+    "tool_name": "skill_manage",
+    "output_shape": "Confirmation text or status message about skill creation/update/deletion. May include path and version info.",
+    "examples": [
+      "Skill 'my-skill' installed to ~/.hermes/skills/my-skill/",
+      "{\"action\": \"install\", \"name\": \"my-skill\", \"version\": \"1.0.0\", \"path\": \"...\"}"
+    ],
+    "classification_type": "json (JSON response); text (plain confirmation)",
+    "key_extraction_fields": ["action", "skill name", "version", "path"],
+    "compression_benefit": "low — short confirmation messages"
+  },
+  {
+    "tool_name": "skills_list",
+    "output_shape": "Markdown table or JSON array listing installed skills: name, description, version, platforms.",
+    "examples": [
+      "| Name | Description | Version | Platforms |\n|------|------------|---------|----------|\n| skill-a | does X | 1.0.0 | macos |",
+      "[{\"name\": \"skill-a\", \"description\": \"does X\", \"version\": \"1.0.0\", \"platforms\": [\"macos\"]}]"
+    ],
+    "classification_type": "tabular (pipe-delimited table with >3 rows); json_list (if array response); json (object)",
+    "key_extraction_fields": ["skill count (rows/items)", "names (comma-separated)", "line count (ln)"],
+    "compression_benefit": "medium — many skills produce long tables"
+  },
+  {
+    "tool_name": "clarify",
+    "output_shape": "Question text asking user for clarification. Typically a short question or structured prompt.",
+    "examples": [
+      "Which file did you mean: src/main.rs or src/lib.rs?",
+      "Could you clarify whether you want the token proxy or cache proxy?"
+    ],
+    "classification_type": "text (short string)",
+    "key_extraction_fields": ["question text (first 110 chars)", "option count"],
+    "compression_benefit": "very low — short prompts"
+  },
+  {
+    "tool_name": "vision_analyze",
+    "output_shape": "Descriptive text of image contents. May include detected objects, text, faces, scene description, etc. JSON-wrapped with structured detection results.",
+    "examples": [
+      "Image analysis: A screenshot of a terminal window showing 'cargo build' output with 3 errors...",
+      "{\"description\": \"...\", \"objects\": [{\"label\": \"terminal\", \"confidence\": 0.98}], \"text\": [\"error: could not compile\"]}"
+    ],
+    "classification_type": "json (if structured response); text (descriptive); error (if the image shows an error)",
+    "key_extraction_fields": ["description preview (first 110 chars)", "object count", "detected text", "line count (ln)"],
+    "compression_benefit": "medium — descriptions can be verbose but usually <2KB"
+  },
+  {
+    "tool_name": "computer_use",
+    "output_shape": "Screenshot description + action result. May include coordinates, clicked elements, typed text, or screen state. JSON-wrapped with structured interaction data.",
+    "examples": [
+      "Clicked at (450, 320) on element 'Submit button'. Screen updated: ...",
+      "{\"action\": \"click\", \"coordinates\": {\"x\": 450, \"y\": 320}, \"element\": \"Submit button\", \"result\": \"Page navigated to /dashboard\"}"
+    ],
+    "classification_type": "json (structured); text (narrative); error (if action failed)",
+    "key_extraction_fields": ["action type", "result summary", "coordinates", "element", "line count (ln)"],
+    "compression_benefit": "low-medium — typically short action results"
+  },
+  {
+    "tool_name": "browser_navigate",
+    "output_shape": "Page navigated confirmation with URL, title, and optional state info. JSON or text.",
+    "examples": [
+      "Navigated to https://example.com — Page title: Example Domain",
+      "{\"url\": \"https://example.com\", \"title\": \"Example Domain\", \"status\": 200, \"state\": \"loaded\"}"
+    ],
+    "classification_type": "json (structured); text (plain confirmation)",
+    "key_extraction_fields": ["url", "title", "status code", "page state"],
+    "compression_benefit": "low — short confirmation"
+  },
+  {
+    "tool_name": "browser_snapshot",
+    "output_shape": "Accessibility tree / DOM snapshot — large structured text showing page structure. Array of elements with roles, names, states. Can be very large.",
+    "examples": [
+      "{\"elements\": [{\"role\": \"heading\", \"name\": \"Title\", \"level\": 1}, {\"role\": \"link\", \"name\": \"Home\"}, ...], \"total\": 342}",
+      "[{\"role\": \"button\", \"name\": \"Submit\", \"state\": \"enabled\"}, ...]"
+    ],
+    "classification_type": "json_list (large array); json (object wrapper); tabular (if table-like)",
+    "key_extraction_fields": ["element count (total/items)", "page title", "interactive elements count", "keys (top-level)"],
+    "compression_benefit": "very high — accessibility trees can be 10KB+; element count + key stats as preview"
+  },
+  {
+    "tool_name": "browser_click",
+    "output_shape": "Action confirmation + updated page snapshot. JSON or text describing what was clicked and result.",
+    "examples": [
+      "Clicked element 'Submit button' (button). Page updated: form submitted, navigating...",
+      "{\"action\": \"click\", \"element\": \"button 'Submit'\", \"navigated\": true, \"new_url\": \"...\"}"
+    ],
+    "classification_type": "json (structured); text (narrative confirmation)",
+    "key_extraction_fields": ["element", "action result", "new URL", "page state change"],
+    "compression_benefit": "low-medium — includes snapshot delta"
+  },
+  {
+    "tool_name": "browser_type",
+    "output_shape": "Confirmation of typed text into an element. Short text result.",
+    "examples": [
+      "Typed 'hello world' into input 'Search field'",
+      "{\"action\": \"type\", \"element\": \"input 'Search'\", \"text\": \"hello world\"}"
+    ],
+    "classification_type": "json (structured); text (plain confirmation)",
+    "key_extraction_fields": ["element", "typed text", "action result"],
+    "compression_benefit": "low — very short"
+  },
+  {
+    "tool_name": "browser_scroll",
+    "output_shape": "Confirmation of scroll action with new viewport position. Short text.",
+    "examples": [
+      "Scrolled down 500px. Viewport now at y=1500",
+      "{\"action\": \"scroll\", \"direction\": \"down\", \"amount\": 500, \"new_position\": {\"y\": 1500}}"
+    ],
+    "classification_type": "json (structured); text (plain)",
+    "key_extraction_fields": ["direction", "amount", "new position", "action result"],
+    "compression_benefit": "low — very short"
+  },
+  {
+    "tool_name": "browser_console",
+    "output_shape": "Console log output array — structured array of log entries with level, message, timestamp. Can be large.",
+    "examples": [
+      "[{\"level\": \"error\", \"message\": \"Uncaught TypeError: ...\", \"timestamp\": \"...\", \"source\": \"app.js:42\"}, ...]",
+      "[{\"level\": \"log\", \"message\": \"Page loaded\"}, {\"level\": \"warn\", \"message\": \"Deprecated API\"}]"
+    ],
+    "classification_type": "log (structured log entries with timestamps/levels); json_list (array); error (if mostly errors)",
+    "key_extraction_fields": ["entry count (len/items)", "error count", "warning count", "first message preview (msg)", "line count (ln)"],
+    "compression_benefit": "high — console logs can be very verbose; counts + message samples as preview"
+  },
+  {
+    "tool_name": "browser_back",
+    "output_shape": "Navigation confirmation — went back to previous page. Short text.",
+    "examples": [
+      "Navigated back to https://previous-page.com",
+      "{\"action\": \"back\", \"url\": \"https://previous-page.com\", \"title\": \"Previous Page\"}"
+    ],
+    "classification_type": "json (structured); text (plain)",
+    "key_extraction_fields": ["url", "title", "action result"],
+    "compression_benefit": "low — very short"
+  },
+  {
+    "tool_name": "browser_vision",
+    "output_shape": "Vision analysis result describing what's visible on the page. Can include detected text, elements, and scene descriptions. JSON or text.",
+    "examples": [
+      "Screenshot analysis: Form with 5 input fields, 2 buttons. Error banner visible: 'Invalid email format'...",
+      "{\"description\": \"...\", \"elements_detected\": [\"form\", \"input x5\", \"button x2\"], \"text_found\": [\"Invalid email format\"]}"
+    ],
+    "classification_type": "json (structured); text (descriptive); error (if error present in screenshot)",
+    "key_extraction_fields": ["description (first 110 chars)", "detected element count", "text found", "error presence"],
+    "compression_benefit": "medium — descriptions longer than standard vision_analyze"
+  },
+  {
+    "tool_name": "browser_get_images",
+    "output_shape": "Array of image URLs/descriptions found on the current page. JSON list.",
+    "examples": [
+      "[\"https://example.com/img1.png\", \"https://example.com/img2.jpg\"]",
+      "[{\"url\": \"...\", \"alt\": \"description\", \"dimensions\": \"800x600\"}, ...]"
+    ],
+    "classification_type": "json_list (array)",
+    "key_extraction_fields": ["image count (len/items)", "URL list preview"],
+    "compression_benefit": "low-medium — image lists can be long but compressible"
+  },
+  {
+    "tool_name": "browser_press",
+    "output_shape": "Confirmation of keyboard press action. Short text.",
+    "examples": [
+      "Pressed 'Enter' key",
+      "{\"action\": \"press\", \"key\": \"Enter\", \"result\": \"Form submitted\"}"
+    ],
+    "classification_type": "json (structured); text (plain)",
+    "key_extraction_fields": ["key pressed", "action result"],
+    "compression_benefit": "low — very short"
+  },
+  {
+    "tool_name": "image_generate",
+    "output_shape": "Image generation result: URL/path to generated image, optional prompt echo, metadata. JSON or text.",
+    "examples": [
+      "Image generated: /tmp/gen_abc123.png (1024x1024)",
+      "{\"url\": \"/tmp/gen_abc123.png\", \"dimensions\": \"1024x1024\", \"prompt\": \"...\", \"seed\": 42}"
+    ],
+    "classification_type": "json (structured); text (plain result)",
+    "key_extraction_fields": ["image path/url", "dimensions", "prompt summary", "line count (ln)"],
+    "compression_benefit": "low — typically short"
+  },
+  {
+    "tool_name": "text_to_speech",
+    "output_shape": "TTS result: path to audio file, duration, text content. JSON or text.",
+    "examples": [
+      "Audio generated: /tmp/tts_def789.mp3 (3.2s)",
+      "{\"audio_path\": \"/tmp/tts_def789.mp3\", \"duration_seconds\": 3.2, \"text\": \"Hello world\"}"
+    ],
+    "classification_type": "json (structured); text (plain)",
+    "key_extraction_fields": ["audio path", "duration", "text preview"],
+    "compression_benefit": "low — short result"
+  },
+  {
+    "tool_name": "web_search",
+    "output_shape": "JSON with search results: {query, results: [{title, url, snippet, score}, ...], total_count, search_time}. Array of web page summaries.",
+    "examples": [
+      "{\"query\": \"rust async patterns\", \"total_count\": 1500000, \"results\": [{\"title\": \"Async Rust Book\", \"url\": \"https://...\", \"snippet\": \"...\", \"score\": 0.95}, ...], \"search_time_ms\": 234}",
+      "[{\"title\": \"...\", \"url\": \"...\", \"snippet\": \"...\"}, ...]"
+    ],
+    "classification_type": "search_results (JSON with 'total_count' + 'query'); json_list (array); json (object)",
+    "key_extraction_fields": ["query", "result count (total/total_count)", "top snippets preview", "search time"],
+    "compression_benefit": "high — web results can be verbose with many snippets; query + count + top-3 preview"
+  },
+  {
+    "tool_name": "todo",
+    "output_shape": "Todo list in structured format: array of tasks with id, description, status, priority. JSON array or markdown table.",
+    "examples": [
+      "[{\"id\": 1, \"description\": \"Implement compression\", \"status\": \"in_progress\", \"priority\": \"high\"}, ...]",
+      "Todo list:\n- [x] Task 1 (done)\n- [ ] Task 2 (pending)"
+    ],
+    "classification_type": "json_list (array); tabular (if table); text (markdown list)",
+    "key_extraction_fields": ["task count", "completed count", "pending count", "line count (ln)"],
+    "compression_benefit": "low-medium — todo lists are typically manageable"
+  },
+  {
+    "tool_name": "aphrodite_catalog",
+    "output_shape": "Markdown table with compression catalog: Hash, Type, Size, Preview columns. Includes summary header: 'Catalog: N items XKB saved M turns F files'. Types breakdown under header.",
+    "examples": [
+      "Catalog: 2 items 4.8KB saved 2 turns 0 files\nTypes: tool(2)\n\n| Hash | Type | Size | Preview |\n|------|------|------|---------|\n| 7204304c | tool | 3KB | skill description... |\n| b2f819a1 | code_rust | 1.8KB | [code_rust:fn=main] |"
+    ],
+    "classification_type": "aphrodite (auto-expanded inline — NOT compressed); tabular (pipe-delimited table)",
+    "key_extraction_fields": ["total_items", "total_saved", "conv_turns", "referenced_files", "by_type map", "item hashes and previews"],
+    "compression_benefit": "not applicable — aphrodite meta-tool output is auto-expanded inline, never compressed. Always visible to LLM."
+  },
+  {
+    "tool_name": "aphrodite_compress",
+    "output_shape": "JSON: {hash, type, size, compression_ratio} or {compressed: '<<<CCR:hash|type|size>>>', hash, original_size}. Returns marker text + metadata.",
+    "examples": [
+      "{\"hash\": \"abc123def456\", \"type\": \"code_rust\", \"size\": 4832, \"compression_ratio\": 40.3}",
+      "{\"compressed\": \"<<<CCR:abc123def456|code_rust|4832>>>\", \"hash\": \"abc123def456\", \"original_size\": 4832}",
+      "<<<CCR:abc123def456|tool|1234|inline|preview=[...]><<<"
+    ],
+    "classification_type": "aphrodite (auto-expanded inline); compress (programmatic CCR create); json (JSON response)",
+    "key_extraction_fields": ["hash", "type", "size", "compression_ratio", "compressed marker text"],
+    "compression_benefit": "not applicable — meta-tool, never double-compressed"
+  },
+  {
+    "tool_name": "aphrodite_diff",
+    "output_shape": "Turn history list: 'Turn History: N turns\\n\\nT2: summary...\\nT1: summary...'. Maximum 10 turns, most recent first.",
+    "examples": [
+      "Turn History: 2 turns\n\nT2: read_file proxy.rs, terminal cargo build, compress result\nT1: aphrodite_retrieve abc123def456, patch src/main.rs"
+    ],
+    "classification_type": "aphrodite (auto-expanded inline); text (structured turn summaries)",
+    "key_extraction_fields": ["turn count (turns)", "turn summaries", "recent hashes"],
+    "compression_benefit": "not applicable — meta-tool, auto-expanded"
+  },
+  {
+    "tool_name": "aphrodite_files",
+    "output_shape": "Referenced files grouped by tool: 'Referenced Files: N files\\n\\nread_file:\\n  /path/to/file\\nwrite_file:\\n  /path/to/other'",
+    "examples": [
+      "Referenced Files: 3 files\n\nread_file:\n  /path/to/file1.py\n  /path/to/file2.rs\n\nwrite_file:\n  /path/to/output.json"
+    ],
+    "classification_type": "aphrodite (auto-expanded inline); text (grouped file listing)",
+    "key_extraction_fields": ["total file count (count)", "by_tool map", "all sorted paths"],
+    "compression_benefit": "not applicable — meta-tool, auto-expanded"
+  },
+  {
+    "tool_name": "aphrodite_rebuild",
+    "output_shape": "Build output JSON: Cargo build results, proxy kill/restart status, binary path. JSON with {build_result, killed, restarted, binary_path} or error JSON.",
+    "examples": [
+      "{\"build_result\": {\"exit\": 0, \"output\": \"Compiling...\\nFinished release\"}, \"killed\": [\":9798(12345)\"], \"restarted\": [\"cache\", \"token\"], \"binary\": \"~/.hermes/aphrodite/aphrodite\"}",
+      "{\"error\": \"build failed: error[E0308]: mismatched types...\"}"
+    ],
+    "classification_type": "build_output (compiling lines); error (if build failed); json (structured response)",
+    "key_extraction_fields": ["build exit code", "error/warning count", "killed proxies", "restarted proxies", "binary path"],
+    "compression_benefit": "medium — build output can be verbose; already auto-expanded but may flow through tool relay"
+  },
+  {
+    "tool_name": "aphrodite_retrieve",
+    "output_shape": "JSON: {content, hash/path, size} on success; {error: '...'} on failure. Or direct content text when auto-expanded. Resolves <<<CCR:...>>> markers recursively up to 3 levels.",
+    "examples": [
+      "{\"content\": \"use std::sync::Arc;\\n...full file contents...\", \"hash\": \"abc123def456\", \"size\": 4832}",
+      "{\"found\": true, \"content\": \"...\"}",
+      "{\"error\": \"Hash not found: xyz789\"}"
+    ],
+    "classification_type": "aphrodite (auto-expanded inline); json (response); text/code_* (resolved content type of expanded payload)",
+    "key_extraction_fields": ["hash", "path", "size", "content preview", "found status", "error"],
+    "compression_benefit": "not applicable — resolve tool; content returned inline"
+  },
+  {
+    "tool_name": "aphrodite_search",
+    "output_shape": "JSON or structured text with deduplicated search results. Max 20 results. Each entry has hash, type, size, preview, match_context.",
+    "examples": [
+      "{\"results\": [{\"hash\": \"abc123\", \"type\": \"code_rust\", \"size\": 4832, \"preview\": \"...\", \"match\": \"fn main()\"}], \"query\": \"main\", \"total\": 5, \"searched\": [\"conv_index\", \"inline_store\", \"recent_markers\"]}",
+      "Search results for 'main': 5 matches\n\nabc123 - code_rust (4.8KB) - fn main()\n..."
+    ],
+    "classification_type": "aphrodite (auto-expanded); search_results (if JSON with results); text",
+    "key_extraction_fields": ["query", "result count (total)", "matched hashes", "types found", "searched stores"],
+    "compression_benefit": "not applicable — meta-tool, auto-expanded"
+  },
+  {
+    "tool_name": "aphrodite_stats",
+    "output_shape": "Structured text block:\n'Aphrodite Stats\\n\\nproxy:\\n  token: on N created M hits K tokens saved\\n  cache: on/off ...\\n\\nengine: on THRESHOLD threshold N compressions X/Y protect\\ninline: N entries XB'",
+    "examples": [
+      "Aphrodite Stats\n\nproxy:\n  token: on 1 created 0 hits 37 tokens saved\n  cache: on 0 created 0 hits\n\nengine: on 550000 threshold 0 compressions 3/8 protect\ninline: 0 entries 0B"
+    ],
+    "classification_type": "aphrodite (auto-expanded inline); text (structured key-value pairs)",
+    "key_extraction_fields": ["proxy token status", "ccr_hits", "ccr_created", "tokens_saved", "engine active", "threshold", "compressions", "inline entries/bytes"],
+    "compression_benefit": "not applicable — meta-tool, auto-expanded"
+  },
+  {
+    "tool_name": "aphrodite_test",
+    "output_shape": "Structured test results with per-test pass/fail, summary counts, and timing. JSON or text. Varies by mode (quick/full/matrix/pipeline).",
+    "examples": [
+      "{\"mode\": \"quick\", \"passed\": 7, \"failed\": 0, \"skipped\": 0, \"results\": [{\"test\": \"compress\", \"status\": \"pass\", \"duration_ms\": 12}, ...], \"total_duration_ms\": 234}",
+      "Test Results (quick): 7/7 passed (234ms)\n  ✓ aphrodite_compress (12ms)\n  ✓ aphrodite_retrieve (8ms)\n  ..."
+    ],
+    "classification_type": "aphrodite (auto-expanded); json (structured results); build_output (if contains test result: lines)",
+    "key_extraction_fields": ["mode", "passed/failed count", "total duration", "per-test status", "error messages"],
+    "compression_benefit": "not applicable — meta-tool, auto-expanded"
+  },
+  {
+    "tool_name": "aphrodite_reclassify",
+    "output_shape": "JSON with reclassification results: original type, new type, confidence, and structural analysis output.",
+    "examples": [
+      "{\"hash\": \"abc123\", \"original_type\": \"text\", \"reclassified_type\": \"code_rust\", \"confidence\": 0.95, \"analysis\": {\"functions_found\": [\"main\"], \"line_count\": 414}}",
+      "{\"error\": \"Hash not found in CCR store\"}"
+    ],
+    "classification_type": "aphrodite (auto-expanded); json (structured)",
+    "key_extraction_fields": ["hash", "original_type", "reclassified_type", "confidence", "analysis details"],
+    "compression_benefit": "not applicable — meta-tool, auto-expanded"
+  },
+  {
+    "tool_name": "CCR_MARKER (compressed output)",
+    "output_shape": "When any tool output exceeds threshold, the raw output is replaced with a **CCR Marker Block**:\n1. Content preview lines (first 3-5 lines of original, type-dependent)\n2. Structure summary: `[code_rust: lang=rs;fns=main,run_single;structs=AppState;ln=414]`\n3. CCR marker: `<<<CCR:HASH|TYPE|SIZE|MODE|preview=PREVIEW|key=val|...>>>`\n\nFor cache mode: `<<<CCR:hash|type|size>>>\\n{first 512 bytes of content}`\nFor token mode: `<<<CCR:hash|type|size|metadata_flat>>>`",
+    "examples": [
+      "use std::sync::Arc;\nuse axum::{Router, extract::State};\nfn main() -> anyhow::Result<()> {\n[code_rust: lang=rs;fns=main,run_single,proxy_handler;structs=AppState;ln=414]\n<<<CCR:abc123def456|code_rust|4832|token|preview=use std::sync::Arc...|lang=rs|fns=main,run_single|ln=414>>>",
+      "error[E0308]: mismatched types\n[error: trace=src/proxy.rs:505:18;msg=E0308: mismatched types;N_errors=1]\n<<<CCR:def789|error|892|token|preview=error[E0308]...|trace=src/proxy.rs:505:18|msg=E0308>>>",
+      "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n[diff:1f +12/-3 42L src/main.rs]\n<<<CCR:f1e2d3c4|diff|4521|token|files=1|+=12|-=3|ln=42>>>",
+      "[json:total_items,by_type,items 30L]\n<<<CCR:1234abcd|json|8234|token|keys=total_items,by_type,items|ln=30>>>",
+      "\n<<<CCR:9a8b7c6d|build_output|12345|token|preview=Compiling...|errors=3|warnings=2|ln=234>>>",
+      "\n<<<CCR:i:abcd1234|terminal|5678|inline>> PREVIEW…(use aphrodite_retrieve)"
+    ],
+    "classification_type": "CCR marker (detected by regex: <<<CCR:...>>> or [CCR:...] or ⫷CCR:...⫸). Sub-classified into: code_rust, code_python, code_go, code_js, code, error, diff, git, json, tool_output, build_output, log, linter, terminal, text, search_results, search_files, process_output, tabular, commit",
+    "key_extraction_fields": ["hash (24-char hex or i:hex)", "type", "size (bytes)", "mode (token/cache/inline/engine)", "preview", "structured metadata (lang, fns, structs, classes, trace, msg, ln, keys, files, entries, adds, dels, exit, errors, warnings)"],
+    "compression_benefit": "this IS the compressed form — token savings: 40-373× depending on original size"
+  },
+  {
+    "tool_name": "CLASSIFIER_SKIP (clean output)",
+    "output_shape": "When classifier determines content has nothing worth retrieving (clean build: 0E 0W, exit=0 terminal, 0-match search), the raw output is replaced with **only the preview** — no CCR marker. The LLM sees just: `[build_output:0E 0W 142L]` or `[terminal:cargo build exit=0]`. Content IS stored in CCR for search/history.",
+    "examples": [
+      "[build_output:0E 0W 142L]",
+      "[terminal:cargo build exit=0]",
+      "[search_files:0 matches]"
+    ],
+    "classification_type": "build_output (0E 0W), terminal (exit=0), search_files/search_results (0 matches) — clean/inert outputs",
+    "key_extraction_fields": ["type tag", "error count (0)", "exit code (0)", "line count (ln)", "command (cmd)"],
+    "compression_benefit": "maximum — preview IS the complete story; no CCR marker baits unnecessary retrieval"
+  }
+]
