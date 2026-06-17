@@ -5,7 +5,7 @@ import logging
 import re
 import urllib.request
 
-from agent.context_engine import ContextEngine
+from agent.context_engine import ContextEngine  # type: ignore[import-not-found]
 
 from ._core import (
     ENGINE_MIN_MSGS,
@@ -36,7 +36,7 @@ _engine = None
 _invoke_hook = None
 _invoke_hook_ok = False
 try:
-    from hermes_cli.plugins import invoke_hook as _invoke_hook
+    from hermes_cli.plugins import invoke_hook as _invoke_hook  # type: ignore[import-not-found]
 
     _invoke_hook_ok = True
 except (ImportError, ModuleNotFoundError):
