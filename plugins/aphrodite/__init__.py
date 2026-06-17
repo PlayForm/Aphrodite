@@ -35,6 +35,7 @@ from ._core import (
     BINARY,
     BINARY_DIR,
     CATALOG_MODE,
+    CONTEXT_ENGINE,
     DEBUG_LOGGING,
     ENGINE_MIN_MSGS,
     ENGINE_PROTECT_FIRST,
@@ -137,7 +138,7 @@ def register(ctx):
     ctx.register_tool(name="aphrodite_catalog", schema=CATALOG_SCHEMA, handler=_catalog_handler, toolset="aphrodite")
     ctx.register_tool(name="aphrodite_reclassify", schema=RECLASSIFY_SCHEMA, handler=_aphrodite_reclassify_handler, toolset="aphrodite")
 
-    engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
+    engine_configured = CONTEXT_ENGINE
     if engine_configured:
         try:
             engine = AphroditeContextEngine()

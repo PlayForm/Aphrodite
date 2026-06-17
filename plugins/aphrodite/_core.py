@@ -167,6 +167,7 @@ DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
 CATALOG_MODE = _cfg_str("APHRODITE_CATALOG", "compact", ("compression", "catalog_mode"))
 CLASSIFIER_POLL = _cfg_bool("APHRODITE_CLASSIFIER_POLL", True, ("compression", "classifier_poll"))
 CODE_MULTIPLIER = _cfg_float("APHRODITE_CODE_MULTIPLIER", 3.0, ("compression", "code_multiplier"))
+CONTEXT_ENGINE = _cfg_bool("APHRODITE_CONTEXT_ENGINE", True, ("compression", "context_engine"))
 
 # Big-payload guard
 MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)
