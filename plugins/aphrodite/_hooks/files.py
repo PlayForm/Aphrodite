@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 
 from .._core import _FILE_TOOLS, _referenced_files
 
