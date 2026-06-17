@@ -144,6 +144,7 @@ jobs:
 
         steps:
             - name: Create GitHub Release
+              continue-on-error: true
               uses: softprops/action-gh-release@v3
               with:
                   generate_release_notes: true
