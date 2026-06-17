@@ -7,7 +7,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.11",
+    "ruff>=0.13",
     "pyright>=1.1",
     "pytest>=8",
     "pytest-asyncio>=1.0",
@@ -45,19 +45,14 @@ select = [
     "TCH",  # flake8-type-checking
 ]
 ignore = [
-    "E501",  # line too long (handled by formatter)
-    "B008",  # do not perform function calls in argument defaults
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
     "TCH003", # move type-only comments
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"_hooks.py" = ["E701", "E741", "N806", "B007"]
 "_tools.py" = ["E701", "E741"]
-"_resolve.py" = ["E741"]
-"_engine.py" = ["E701"]
-"_core.py" = ["E701"]
-"skills/*/scripts/*.py" = ["E702"]
 
 [tool.ruff.format]
 quote-style = "double"
