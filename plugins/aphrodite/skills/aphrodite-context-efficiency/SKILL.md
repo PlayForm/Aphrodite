@@ -93,3 +93,7 @@ If you MUST read a config file, use `read_file` with tight `offset`/`limit` boun
 - Sequential tool calls when independent ones could batch — adds unnecessary turn overhead
 - Retrieving `Cargo.toml` / `pyproject.toml` just to check a version — `search_files` inline match already has it
 - Retrieving a `search_files` result when the match count + file list is sufficient context
+- **Over-skilling**: loading skills you don't need. A terse user trigger means "work on the obvious task" — not "load every related skill". Load skills only when the task is clear
+- **Duplicate calls**: never re-run a terminal, skill_view, or retrieve whose result you just received. The output is cached; a duplicate returns identical content — wasted tokens
+- **Thinking spiral**: when "Σ ~N total" climbs past 100 without action, you're over-thinking. Make a tool call or give the user output
+- **Compressed previews are data**: `[json:success,name,description...]` and `[tool: ]` from compressed skill_view results mean compression worked. The preview IS the summary — only retrieve if it hints at unknown content you need

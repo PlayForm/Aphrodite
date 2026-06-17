@@ -4,6 +4,10 @@ Aphrodite is a reverse proxy with CCR (Compress-Cache-Retrieve) compression for 
 
 ## Index
 
+### Aphrodite & Headroom
+
+- [Comparison: Aphrodite vs Headroom](APHRODITE-HEADROOM.md)  —  What Aphrodite adds on top of our Headroom fork, what we rewrote, how they ship together
+
 ### CCR (Compress-Cache-Retrieve)
 
 - [Marker Format](ccr/marker-format.md)  -  `<<<CCR:hash|type|size>>>` schema with SHA-256 hash, 28 content types, TOML‑driven preview templates, and metadata encoding rules

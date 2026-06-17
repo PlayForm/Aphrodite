@@ -15,9 +15,9 @@ _MARKERS_PATH = os.path.join(BINARY_DIR, "recent-markers.json")
 def _save_markers() -> None:
     """Persist _recent_markers to disk for session resume. Called on shutdown."""
     try:
-        from .._hooks import _recent_markers
-    except ImportError:
         from .._core import _recent_markers
+    except ImportError:
+        from .._hooks import _recent_markers  # type: ignore[assignment]
     try:
         data = list(_recent_markers)
         with open(_MARKERS_PATH, "w") as f:
@@ -30,9 +30,9 @@ def _save_markers() -> None:
 def _restore_markers() -> None:
     """Load recent markers from disk into session state. Called by on_start()."""
     try:
-        from .._hooks import _recent_markers
-    except ImportError:
         from .._core import _recent_markers
+    except ImportError:
+        from .._hooks import _recent_markers  # type: ignore[assignment]
     try:
         if os.path.exists(_MARKERS_PATH):
             with open(_MARKERS_PATH) as f:

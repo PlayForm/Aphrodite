@@ -1,7 +1,7 @@
 """aphrodite — session state: turn counter, caches, conv index, CCR regex."""
-
 import re
 from collections import OrderedDict
+from typing import Any
 
 # ── CCR regex (shared) ───────────────────────────────────────
 _CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\\>⫸]+)(?:\|[^\\\]]*?)?(?:\]|>>>|⫸)')
@@ -12,7 +12,7 @@ _hash_alias: dict = {}  # {full_sha256: short_hash}
 # ── Shared session state ──────────────────────────────────────
 _referenced_files: OrderedDict = OrderedDict()  # {filepath: last_tool_name} LRU via move_to_end
 _conv_index = {}  # {turn_num: (hash, summary, size)}
-_state = {"turn_counter": 0}
+_state: dict[str, Any] = {"turn_counter": 0}
 _scanned_msg_idx = 0  # for incremental marker scan in pre_llm_hook
 _git_cache = {}  # {ts, summary}
 _FILE_TOOLS = {"read_file", "write_file", "patch", "search_files"}

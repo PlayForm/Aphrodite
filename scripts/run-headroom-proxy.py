@@ -19,8 +19,8 @@ Worker guidance:
     --workers 8   → cache saturation, benchmark mode (note CCR fragmentation warning)
 """
 import os
-import sys
 import subprocess
+import sys
 
 HEADROOM_BIN = "headroom"
 DEEPSEEK_URL = "https://api.deepseek.com/v1"

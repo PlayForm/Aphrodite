@@ -25,16 +25,19 @@ HERMES_SITE = os.path.join(
 sys.path.insert(0, HERMES_SITE)
 
 # Silence all logging
-import logging
+import logging  # noqa: E402
+
 logging.disable(logging.CRITICAL)
 
-from hermes_cli.config import load_config
-from hermes_cli.models import detect_provider_for_model
-from hermes_cli.runtime_provider import resolve_runtime_provider
-from hermes_cli.tools_config import _get_platform_tools
-from hermes_cli.fallback_config import get_fallback_chain
-from hermes_cli.oneshot import _normalize_toolsets, _oneshot_clarify_callback
-from run_agent import AIAgent
+from contextlib import suppress  # noqa: E402
+
+from hermes_cli.config import load_config  # noqa: E402
+from hermes_cli.fallback_config import get_fallback_chain  # noqa: E402
+from hermes_cli.models import detect_provider_for_model  # noqa: E402
+from hermes_cli.oneshot import _normalize_toolsets, _oneshot_clarify_callback  # noqa: E402
+from hermes_cli.runtime_provider import resolve_runtime_provider  # noqa: E402
+from hermes_cli.tools_config import _get_platform_tools  # noqa: E402
+from run_agent import AIAgent  # noqa: E402
 
 
 def run() -> int:
@@ -44,17 +47,15 @@ def run() -> int:
 
     prompt_file = sys.argv[1]
     try:
-        with open(prompt_file, "r", encoding="utf-8") as f:
+        with open(prompt_file, encoding="utf-8") as f:
             prompt = f.read()
     except FileNotFoundError:
         sys.stderr.write(f"Prompt file not found: {prompt_file}\n")
         return 1
 
     # Delete temp file immediately after reading
-    try:
+    with suppress(OSError):
         os.remove(prompt_file)
-    except OSError:
-        pass
 
     # Parse optional flags
     model = None
@@ -164,15 +165,11 @@ def run() -> int:
     sys.stdout.flush()
 
     # Clean up any stray session files
-    try:
+    with suppress(Exception):
         import glob
         for f in glob.glob(os.path.expanduser("~/.hermes/data/*oneshot*")):
-            try:
+            with suppress(OSError):
                 os.remove(f)
-            except OSError:
-                pass
-    except Exception:
-        pass
 
     return 0
 

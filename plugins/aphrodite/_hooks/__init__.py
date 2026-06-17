@@ -26,7 +26,6 @@ from .files import FILES_SCHEMA, _files_handler, _fmt_files, _track_file_refs
 from .git import _git_summary
 
 # ── Live: streaming terminal containers ──────────────────────────
-
 # ── Prefetch: background file load + compress ────────────────────
 from .prefetch import (
     PREFETCH_SCHEMA,

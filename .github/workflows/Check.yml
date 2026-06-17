@@ -81,7 +81,7 @@ jobs:
               run: cargo check -p aphrodite --release
 
     Python:
-        name: ruff check
+        name: ruff + pyright
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6.0.3
@@ -89,3 +89,6 @@ jobs:
             - uses: astral-sh/ruff-action@v3
               with:
                   src: plugins/aphrodite/
+
+            - name: pyright
+              run: npx pyright plugins/aphrodite/

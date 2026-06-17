@@ -10,6 +10,7 @@ Usage:
     python3 scripts/setup-headroom-providers.py
 """
 import os
+
 import yaml
 
 HERMES_CONFIG = os.path.expanduser("~/.hermes/config.yaml")

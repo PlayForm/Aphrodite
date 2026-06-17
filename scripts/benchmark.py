@@ -48,7 +48,7 @@ def req(method: str, endpoint: str, body: dict | None = None, timeout: int = 30)
 
 
 def make_text(size: int) -> str:
-    words = "the quick brown fox jumps over lazy dog".split()
+    words = ["the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog"]
     chunks = []
     remaining = size
     while remaining > 0:
@@ -230,7 +230,7 @@ def main():
     if os.path.exists(hist_path):
         try:
             with open(hist_path) as f:
-                lines = [l for l in f if l.strip()]
+                lines = [ln for ln in f if ln.strip()]
             if lines:
                 prev = json.loads(lines[-1])
         except Exception:
