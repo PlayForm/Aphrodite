@@ -1,201 +1,161 @@
 # Changelog
 
-## Latest
+## v0.7.0 — Atomization + Live Containers (2026-06-17)
 
-#### v0.5.62 / 1.62.8 - 2026-06-16
-- **Rust fixes R1-R12**: DefaultHasher-cache-stable, inline_ccr→LRU, task_tracker tests, UTF-8 safe slice, detect_content_type log fix, retrieve-inline-check, cache-retrieve route, EMA marker length fix, content-type charset, task_tracker spawn, auto-tune noisy exclude, shutdown close-wait
-- **Build monitor**: dedicated wezterm cli agent, 5s poll, writes `.hermes/build-status.json`
-- **Skills v3.0**: hermes-z-execution, plan-then-delegate, dev-metrics, build-monitor, execution-blocks - all with build monitor pattern + git rule
-- **CHANGELOG**: proper markdown hierarchy, no single-line entries, every release has `####` heading with date + version pair
+### Plugin Atomization — 29 Nested Modules
 
-#### v0.5.61 / 1.62.7 - 2026-06-16
-- headroom fixes: workspace header (`x-headroom-workspace`) preserved in proxy
-- deep integration with headroom subsystems (disk cache, benchmark, token modes)
+Three monolithic files split into deeply-nested single-responsibility modules:
 
-## Aphrodite Binary
+| Package | Modules | Max lines |
+|---------|---------|-----------|
+| `_core/` | config, store, template, struct, state, __init__ | 244 |
+| `_hooks/` | catalog, classify, diff, files, git, live, prefetch, rebuild, reclassify, search, session, session_helpers, stats, terminal, test, transform, __init__ | 245 |
+| `_marker/` | classify, compress, marker, parse, preview, __init__ | 246 |
 
-### Features and Enhancements
+Each file exports exactly one function. No file exceeds 250 lines. Originals preserved as `.py.bak`.
 
-#### v0.5.55 / 1.61.0 - 2026-06-16
-- headroom cache/benchmark/token modes
-- 1-8 workers
-- Hermes default provider
-- `--no-telemetry`
+### Live Containers — Streaming Terminal Output
 
-#### v0.5.46 / 1.55.0 - 2026-06-16
-- auto-expand cached CCR markers under 10KB
-- LLM never sees `aphrodite_retrieve` for small cached items
+`aphrodite_poll_container(hash)` — LLM never blocks on terminal output:
+- Process runs in background thread, output streams to container
+- Marker returned instantly — `<<<LIVE:hash|terminal|streaming>>>`
+- Poll anytime for partial output + status (running/done/error)
+- Content accumulates as process runs
 
-#### v0.5.42 / 1.51.0 - 2026-06-16
-- debug info injected into `[APHRODITE]` catalog block
-- version, mode, thresholds shown in conversation
+### CCR_UNRESOLVED Fix — Dual-Store Guarantee
 
-### Bug Fixes
+Every proxy compress/fetch now mirrors to inline zlib store:
+- `_resolve_one`: proxy fetch → `_inline_store_put`
+- `_transform_terminal_hook`: proxy compress → `_inline_store_put`
+- `_transform_tool_result`: proxy compress → `_inline_store_put`
+- Content always in both proxy SQLite AND inline store
 
-#### Critical
+### Persistent Markers — Session Resume
 
-##### v0.5.56 / 1.62.2 - 2026-06-16
-- 20+ Rust binary bugs fixed (DefaultHasher, inline_ccr, task_tracker, EMA, UTF-8 slicing, content-type, shutdown)
-- symlink chain fixed - single source via symlink chain, never copy
-- CHANGELOG restructured to proper markdown hierarchy
+`_recent_markers` persists across restarts:
+- `atexit` saves last 100 markers to `~/.hermes/aphrodite/recent-markers.json`
+- `on_start()` restores on session begin
+- TOC populated from previous session immediately
 
-##### v0.5.52 / 1.61.0 - 2026-06-16
-- mode warning now respects `--mode`
-- `--listen` made optional
-- first-turn skip for compression
-- `threshold_tokens` clamping fix
-- wildcard route matching on `/*`
-- `filter_content` zero-match edge case
-- `compress` size calculation fix
+### Prefetch + ETA Schedule
 
-##### v0.5.51 / 1.60.0 - 2026-06-16
-- `cache_alive` crash on empty response
-- `_recent_markers` shadowing bug
-- EMA ratio calculation fix
-- health check endpoint fix
-- double `detect_content_type` call
-- false Rust `+` detection in version strings
-- body read exhaustion in streaming
-- double elapsed time in metrics
-- port 9797 as the single default
-- XDG database path resolution
-- path read security hardening
+`aphrodite_prefetch(paths)` — background file read + compress:
+- Threads read files, classify, compress via proxy
+- Markers returned instantly — agent continues
+- `aphrodite_prefetch_status()` — live ETA schedule per file
+- Status: LOADING → READY (with elapsed time) → ERROR
 
-#### High
+### TOC — Table of Contents with Retrieve? Recommendations
 
-##### v0.5.62 / 1.62.8 - 2026-06-16
-- **R1**: DefaultHasher seeded per-process - cache keys stable across restarts
-- **R2**: EMA uses correct marker length instead of summary length
-- **R3**: `inline_ccr` replaced with LRU cache
-- **R4**: `task_tracker` called from test constructors
-- **R5**: UTF-8 safe string slicing at byte boundaries
-- **R6**: content-type charset normalised (strip `+json` suffixes for matching)
-- **R7**: `task_tracker.spawn()` used for background callbacks
-- **R8**: `detect_content_type` log false-positive eliminated
-- **R9**: noisy content types excluded from auto-tune
-- **R10**: `/retrieve` checks inline_ccr before falling through
-- **R11**: `/retrieve` route registered on cache-mode router
-- **R12**: `task_tracker.close()` called before `wait()` to prevent hang
+`aphrodite_catalog(mode='toc')` — compact decision table:
+- Shows every CCR entry with hash, type, size, preview
+- Retrieve? column: NO for clean outputs, YES for content worth retrieving
+- Agent checks TOC before any retrieval — eliminates blind retrieval reflex
 
-##### v0.5.61 / 1.62.7 - 2026-06-16
-- headroom workspace headers preserved in proxy
-- deep integration: disk cache mode, benchmark mode, token mode
+### Classifier Expansion
 
-##### v0.5.59 / 1.62.5 - 2026-06-16
-- inline marker eviction fixes
-- proxy state consistency fixes
+From 10 types → 28 types:
+- New: write_file, log, browser_snapshot, web_search, image_generate, todo, memory, cronjob, session_search
+- New language support: code_ts (TypeScript), code_sh (Shell)
+- All 28 types have TOML templates per model family
 
-##### v0.5.50 / 1.59.0 - 2026-06-16
-- restore engine fallback when no engine configured
-- dedup markers in catalog output
-- `context_length` needed when `update_from_response` not called
+### Classifier Poll — Zero-Token Clean Outputs
 
-##### v0.5.49 / 1.58.0 - 2026-06-16
-- engine defaults to `context_length` tokens when unknown
-- always compresses on threshold regardless of engine state
+`_classifier_says_skip()` suppresses CCR for inert content:
+- 0E/0W builds → preview inline, no marker
+- exit=0 terminals → skip CCR
+- 0-match searches → skip CCR
+- TOML toggle: `[compression].classifier_poll = true`
 
-##### v0.5.48 / 1.57.0 - 2026-06-16
-- engine `should_compress` falls back to 1 token minimum
-- works even when `update_from_response` not called
+### Model-Aware Templates
 
-##### v0.5.47 / 1.56.0 - 2026-06-16
-- `should_compress` uses `self.last_prompt_tokens` as fallback
-- engine actually compresses now
+Three template families per model:
+- `compact` (Claude): `[type:key=val]` metadata only
+- `code_first` (DeepSeek): code signatures before metadata
+- `balance` (GPT): metadata + first signature
+- TOML: `[previews].model_family = "code_first"`
 
-##### v0.5.45 / 1.54.0 - 2026-06-16
-- `saturating_sub` on `tokens_saved`
-- prevents overflow panic when hash > content length
+### Code Structure Maps
 
-##### v0.5.44 / 1.53.0 - 2026-06-16
-- liveness filter on catalog
-- only show markers with retrievable content, skip ghosts
+Code previews show navigable structure:
+- Rust: fn signatures, struct counts, impl counts
+- Python: def signatures, class counts
+- Go: func signatures, type counts
+- JS/TS: function signatures, class counts
+- Shell: function detection
 
-##### v0.5.43 / 1.52.0 - 2026-06-16
-- hex validation on CCR hash filter
-- requires ≥8 hex chars, removes `abc123` placeholders
+### TOML-Driven Configuration
 
-#### Medium / Low
+All features configurable in `aphrodite.toml`:
+- `[compression]` — 14 knobs (thresholds, engine, classifier poll, code multiplier)
+- `[previews]` — 4 knobs (model_family, code_structure_map, preview_max_chars)
+- `[prompts]` — 3 knobs (retrieve_guidance, ccr_marker_hint, catalog_intent_hints)
+- `[templates.preview.{family}]` — 18 per-type format strings × 3 families
+- `[templates.marker]` — CCR block format + hint string
+- `[templates.prompts]` — 5 prompt templates
+- `[templates.reverse]` — 25-type key map
 
-##### v0.5.57 / 1.62.3 - 2026-06-16
-- all medium severity bugs fixed
-- all low severity bugs fixed
+### Retrieval Bait Removal
 
-### Infrastructure
+All explicit `(use aphrodite_retrieve)` instructions removed:
+- Terminal/build CCR markers: clean pointers, no bait
+- Catalog entries: no per-marker retrieve commands
+- Session injection: "retrieve if preview doesn't tell you enough"
+- Context engine: "use if needed" instead of "retrieve with:"
+- Proxy guidance: "retrieve only if preview hints at useful content"
 
-#### v0.5.62 / 1.62.8 - 2026-06-16
-- build monitor: dedicated wezterm cli agent polls every 5s, writes `.hermes/build-status.json`
-- skills v3.0: hermes-z-execution, plan-then-delegate, dev-metrics, build-monitor, execution-blocks
-- CHANGELOG restructured to proper markdown hierarchy (no single-line entries)
-- git convention codified: `git add`, `git commit` only (no reset, force-push, rebase)
-- release workflow standardised: build → bump → commit → push → tag → gh release → profile sync
+### Agent Compatibility Documentation
 
-#### v0.5.60 / 1.62.6 - 2026-06-16
-- binary fixes for edge-case crashes
-- medium severity bug fixes
-- CC0 license switch
+22 platforms researched and documented:
+- 9 direct integration (Hermes, Aider, OpenHands, Codex, Cline, Continue, Cody, PostHog, Qodo)
+- 3 MCP-native (Cline, Cloudflare, Vercel)
+- 4 future SDK targets (Vercel AI SDK, Cloudflare Agents SDK, MCP Protocol, OpenAI Agents SDK)
 
-#### v0.5.59 / 1.62.5 - 2026-06-16
-- README documentation
-- benchmark lint fixes
-- `.env.sh` setup script
+### Context Engine Default-On
 
-#### v0.5.58 / 1.62.4 - 2026-06-16
-- 440-line proxy benchmark suite
-- `rust-toolchain.toml` pinned
-- CHANGELOG.md created
+`[compression].context_engine = true` — no `APHRODITE_CONTEXT_ENGINE=1` needed. Engine registers automatically at plugin load.
 
-#### v0.5.54 - 2026-06-16
-- remove duplicate shared-state definitions from `_hooks` / `_tools` / `_resolve`
+### Post-Rebuild Proxy Auto-Restart
 
-#### v0.5.53 - 2026-06-16
-- consolidate shared state into `_core.py`
-- break circular imports
+`aphrodite_rebuild()` now: kill proxies → copy binary → restart both → query version. One call replaces the binary without manual intervention.
 
-## Headroom
+### CI — Multi-Platform Builds
 
-### v0.7.12 - 2026-06-14
-- feat: winged sandal logo
-- headroom kwargs passthrough
+- 4 targets: Linux x86_64, macOS arm64, macOS x86_64, Windows x86_64
+- Binary naming: full Rust triple (e.g., `aphrodite-aarch64-apple-darwin`)
+- Shared cache between Check and Build workflows
+- Nightly toolchain everywhere
+- Tag trigger: `Aphrodite/v*` — single run per release
 
-### v0.7.11 - 2026-06-14
-- chore: bump version 0.7.10 → 0.7.11
+### Release Automation
 
-### v0.7.6 - 2026-06-13
-- chore: regenerate reports
-- freeze-cache tuning
-- save snapshots
+- `scripts/auto-release.sh --minor` for feature bumps
+- All 4 version locations auto-bumped: Cargo.toml, _core/config.py, pyproject.toml, __init__.py
+- `scripts/release-notes.sh` — shell-safe template generator
+- Tag format: `Aphrodite/v*`
 
-### v0.7.4 - 2026-06-13
-- feat: template-based report
-- cumulative benchmarks
-- linear arrows visualization
+### Plugin Lifecycle
 
-## Plugin Version History
+- `on_start()` auto-launches both proxies on session begin
+- Binary auto-downloaded from GitHub releases if missing
+- Plugin symlinks to repo for instant code updates
+- `env_passthrough` configured for API key forwarding
 
-| Plugin Version | Date       | Description                              |
-|----------------|------------|------------------------------------------|
-| v0.7.12        | 2026-06-14 | Winged sandal logo + headroom kwargs     |
-| v0.7.11        | 2026-06-14 | Version bump 0.7.10 → 0.7.11            |
-| v0.7.6         | 2026-06-13 | Regenerate reports, freeze-cache tuning  |
-| v0.7.4         | 2026-06-13 | Template report, cumulative benchmarks   |
-| v0.5.62        | 2026-06-16 | Rust fixes R1-R12 + build monitor + skills v3.0 |
-| v0.5.61        | 2026-06-16 | Headroom fixes + deep integration        |
-| v0.5.60        | 2026-06-16 | Binary fixes, medium bugs, CC0 license   |
-| v0.5.59        | 2026-06-16 | Inline fixes, README, benchmark lint     |
-| v0.5.58        | 2026-06-16 | Benchmark + toolchain + changelog        |
-| v0.5.57        | 2026-06-16 | All medium+low bugs fixed                |
-| v0.5.56        | 2026-06-16 | Critical + high bug fixes                |
-| v0.5.55        | 2026-06-16 | Headroom cache/benchmark/token modes     |
-| v0.5.54        | 2026-06-16 | Remove duplicate shared-state            |
-| v0.5.53        | 2026-06-16 | Consolidate shared state into `_core.py` |
-| v0.5.52        | 2026-06-16 | 8 bugs fixed                             |
-| v0.5.51        | 2026-06-16 | 13 bugs fixed                            |
-| v0.5.50        | 2026-06-16 | Engine fallback + dedup                  |
-| v0.5.49        | 2026-06-16 | Engine context_length fallback           |
-| v0.5.48        | 2026-06-16 | Engine should_compress fallback          |
-| v0.5.47        | 2026-06-16 | should_compress last_prompt_tokens       |
-| v0.5.46        | 2026-06-16 | Auto-expand CCR markers <10KB            |
-| v0.5.45        | 2026-06-16 | saturating_sub on tokens_saved           |
-| v0.5.44        | 2026-06-16 | Liveness filter on catalog               |
-| v0.5.43        | 2026-06-16 | Hex validation on CCR hash               |
-| v0.5.42        | 2026-06-16 | Debug info in catalog block              |
+### Tools: 14 (was 10)
+
+| Tool | Description |
+|------|-------------|
+| `aphrodite_retrieve` | Resolve CCR markers |
+| `aphrodite_compress` | Compress content via proxy |
+| `aphrodite_stats` | Proxy health, engine status |
+| `aphrodite_rebuild` | Rebuild, kill proxies, restart |
+| `aphrodite_files` | Tracked file references |
+| `aphrodite_diff` | Turn history |
+| `aphrodite_search` | Trigram-indexed CCR search |
+| `aphrodite_test` | Smoke test suite |
+| `aphrodite_catalog` | Full catalog + TOC mode |
+| `aphrodite_reclassify` | Retroactive metadata |
+| `aphrodite_prefetch` | Background file read |
+| `aphrodite_prefetch_status` | Live ETA schedule |
+| `aphrodite_poll_container` | Streaming terminal output |
+| `aphrodite_benchmark` | Performance benchmark |
