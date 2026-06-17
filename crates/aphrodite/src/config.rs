@@ -93,6 +93,9 @@ pub struct Cli {
 pub struct MultiConfig {
 	pub defaults: Option<Defaults>,
 	pub proxies: Vec<ProxyConfig>,
+	pub compression: Option<CompressionConfig>,
+	pub previews: Option<PreviewsConfig>,
+	pub prompts: Option<PromptsConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -101,6 +104,41 @@ pub struct Defaults {
 	pub model: Option<String>,
 	pub ccr_ttl_seconds: Option<u64>,
 	pub api_key: Option<String>,
+}
+
+/// Compression knobs — thresholds, engine, auto-expand, classifier poll.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct CompressionConfig {
+	pub engine_threshold_pct: Option<u32>,
+	pub engine_protect_first: Option<u32>,
+	pub engine_protect_last: Option<u32>,
+	pub engine_min_msgs: Option<u32>,
+	pub tool_threshold_token: Option<u32>,
+	pub tool_threshold_cache: Option<u32>,
+	pub terminal_threshold: Option<u32>,
+	pub inline_threshold: Option<u32>,
+	pub auto_expand: Option<bool>,
+	pub auto_expand_limit: Option<u32>,
+	pub catalog_mode: Option<String>,
+	pub classifier_poll: Option<bool>,
+	pub code_multiplier: Option<f64>,
+}
+
+/// Preview knobs — model-aware templates, code structure maps.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PreviewsConfig {
+	pub model_family: Option<String>,
+	pub code_structure_map: Option<bool>,
+	pub preview_max_chars: Option<u32>,
+	pub rust_preview_lines: Option<u32>,
+}
+
+/// Prompt knobs — how the system instructs the LLM about CCR.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PromptsConfig {
+	pub retrieve_guidance: Option<String>,
+	pub ccr_marker_hint: Option<bool>,
+	pub catalog_intent_hints: Option<bool>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

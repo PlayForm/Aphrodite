@@ -15,41 +15,171 @@ BINARY = os.path.join(BINARY_DIR, "aphrodite")
 ENV_FILE = os.path.join(os.path.expanduser("~"), ".hermes", ".env")
 _log = logging.getLogger("aphrodite")
 
+# ── TOML config loader ──────────────────────────────────────────
+# Priority: env var > aphrodite.toml > hardcoded default
+# aphrodite.toml is searched in: cwd, ~/.hermes/aphrodite/, REPO_ROOT
 
-# ── Configurable thresholds (env vars) ────────────────────────
-def _cfg_int(name, default):
+import sys as _sys
+import importlib.util as _importlib_util
+
+_CONFIG: dict | None = None
+
+
+def _load_toml_config() -> dict:
+    """Load aphrodite.toml from disk; returns {} on any failure."""
+    global _CONFIG
+    if _CONFIG is not None:
+        return _CONFIG
     try:
-        return int(os.environ.get(name, str(default)))
-    except Exception:
-        return default
+        import tomllib as _toml
+    except ImportError:
+        try:
+            import tomli as _toml
+        except ImportError:
+            _log.debug("toml: no tomllib/tomli — TOML config skipped")
+            _CONFIG = {}
+            return _CONFIG
+
+    search_paths = [
+        "aphrodite.toml",
+        os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite", "aphrodite.toml"),
+    ]
+    # Also try relative to this file's parent (repo root)
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    _repo_root = os.path.dirname(os.path.dirname(_this_dir))
+    search_paths.append(os.path.join(_repo_root, "aphrodite.toml"))
+
+    for path in search_paths:
+        try:
+            with open(path, "rb") as f:
+                _CONFIG = _toml.load(f)
+            _log.debug("toml: loaded %s (%d keys)", path, len(_CONFIG))
+            return _CONFIG
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            _log.debug("toml: parse error %s: %s", path, e)
+            continue
+
+    _CONFIG = {}
+    return _CONFIG
 
 
-ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 55)
-# Coding-optimized: compress at 55% — more headroom for new code. LLM retrieves on demand.
-ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 3)
-ENGINE_PROTECT_LAST = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 8)
-# Coding: 3 head (less old context) + 8 tail (keep recent tool chains visible)
-ENGINE_MIN_MSGS = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 12)
-TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 1024)
-TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 8192)
-TERMINAL_THRESHOLD = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 2048)
-INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
-# HEADROOM_SSE_BUFFER_MAX_BYTES check: if set, bump INLINE_THRESHOLD to 1MB
-# so headroom's SSE buffer isn't overwhelmed by small inline compressions
+def _toml_section(section: str) -> dict:
+    """Return a TOML section dict, or {} if missing."""
+    return _load_toml_config().get(section, {})
+
+
+# ── Config value resolution: env var → TOML → hardcoded default ─
+
+def _cfg_int(name: str, default: int, toml_key: tuple[str, str] | None = None) -> int:
+    """Resolve int config: env var → toml[section][key] → default."""
+    env_val = os.environ.get(name)
+    if env_val is not None:
+        try:
+            return int(env_val)
+        except ValueError:
+            pass
+    if toml_key:
+        section, key = toml_key
+        toml_val = _toml_section(section).get(key)
+        if toml_val is not None:
+            try:
+                return int(toml_val)
+            except (ValueError, TypeError):
+                pass
+    return default
+
+
+def _cfg_bool(name: str, default: bool, toml_key: tuple[str, str] | None = None) -> bool:
+    """Resolve bool config: env var → toml[section][key] → default."""
+    env_val = os.environ.get(name)
+    if env_val is not None:
+        return env_val.lower() in ("1", "true", "yes", "on")
+    if toml_key:
+        section, key = toml_key
+        toml_val = _toml_section(section).get(key)
+        if toml_val is not None:
+            if isinstance(toml_val, bool):
+                return toml_val
+            return str(toml_val).lower() in ("1", "true", "yes", "on")
+    return default
+
+
+def _cfg_str(name: str, default: str, toml_key: tuple[str, str] | None = None) -> str:
+    """Resolve str config: env var → toml[section][key] → default."""
+    env_val = os.environ.get(name)
+    if env_val is not None:
+        return env_val
+    if toml_key:
+        section, key = toml_key
+        toml_val = _toml_section(section).get(key)
+        if toml_val is not None:
+            return str(toml_val)
+    return default
+
+
+def _cfg_float(name: str, default: float, toml_key: tuple[str, str] | None = None) -> float:
+    """Resolve float config: env var → toml[section][key] → default."""
+    env_val = os.environ.get(name)
+    if env_val is not None:
+        try:
+            return float(env_val)
+        except ValueError:
+            pass
+    if toml_key:
+        section, key = toml_key
+        toml_val = _toml_section(section).get(key)
+        if toml_val is not None:
+            try:
+                return float(toml_val)
+            except (ValueError, TypeError):
+                pass
+    return default
+
+
+# ── Compression knobs ───────────────────────────────────────────
+
+# Engine (aggressive defaults — compress sooner, keep less)
+ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 45, ("compression", "engine_threshold_pct"))
+ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 2, ("compression", "engine_protect_first"))
+ENGINE_PROTECT_LAST = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 5, ("compression", "engine_protect_last"))
+ENGINE_MIN_MSGS = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 8, ("compression", "engine_min_msgs"))
+
+# Thresholds (aggressive — compress smaller outputs)
+TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 512, ("compression", "tool_threshold_token"))
+TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 4096, ("compression", "tool_threshold_cache"))
+TERMINAL_THRESHOLD = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 1024, ("compression", "terminal_threshold"))
+INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 2048, ("compression", "inline_threshold"))
+
+# HEADROOM_SSE_BUFFER_MAX_BYTES check
 if os.environ.get("HEADROOM_SSE_BUFFER_MAX_BYTES"):
     INLINE_THRESHOLD = max(INLINE_THRESHOLD, 1_048_576)
+
 RECURSIVE_DEPTH = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
-# Auto-expand: OFF by default — LLM sees raw CCR markers and retrieves on demand.
-# Set APHRODITE_AUTO_EXPAND=1 to enable auto-expansion (resolves markers inline).
-# Set APHRODITE_AUTO_EXPAND_LIMIT=N to cap what gets auto-expanded (bytes).
-AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 0)
+
+# Auto-expand (off by default)
+AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 0, ("compression", "auto_expand_limit"))
 if os.environ.get("APHRODITE_AUTO_EXPAND") == "1":
     AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 51200)
-DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
-CATALOG_MODE = os.environ.get("APHRODITE_CATALOG", "compact")
 
-# Big-payload guard: skip compression entirely for payloads exceeding this
-MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)  # 100MB default
+DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
+CATALOG_MODE = _cfg_str("APHRODITE_CATALOG", "compact", ("compression", "catalog_mode"))
+CLASSIFIER_POLL = _cfg_bool("APHRODITE_CLASSIFIER_POLL", True, ("compression", "classifier_poll"))
+CODE_MULTIPLIER = _cfg_float("APHRODITE_CODE_MULTIPLIER", 3.0, ("compression", "code_multiplier"))
+
+# Big-payload guard
+MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)
+
+# ── Preview knobs ───────────────────────────────────────────────
+MODEL_FAMILY = _cfg_str("APHRODITE_MODEL_FAMILY", "code_first", ("previews", "model_family"))
+CODE_STRUCTURE_MAP = _cfg_bool("APHRODITE_CODE_STRUCTURE_MAP", True, ("previews", "code_structure_map"))
+PREVIEW_MAX_CHARS = _cfg_int("APHRODITE_PREVIEW_MAX_CHARS", 120, ("previews", "preview_max_chars"))
+
+# ── Prompt knobs ────────────────────────────────────────────────
+RETRIEVE_GUIDANCE = _cfg_str("APHRODITE_RETRIEVE_GUIDANCE", "minimal", ("prompts", "retrieve_guidance"))
+CCR_MARKER_HINT = _cfg_bool("APHRODITE_CCR_MARKER_HINT", False, ("prompts", "ccr_marker_hint"))
+CATALOG_INTENT_HINTS = _cfg_bool("APHRODITE_CATALOG_INTENT_HINTS", False, ("prompts", "catalog_intent_hints"))
 
 _DEV = os.environ.get("APHRODITE_PASSTHROUGH", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 
@@ -404,3 +534,131 @@ def _extract_code_structure(content: str, language: str = "") -> dict:
             result["impls"] = items
 
     return result
+
+
+# ── Template rendering ───────────────────────────────────────────
+# Uses [templates] section from aphrodite.toml with {variable} substitution.
+# Falls back to hardcoded defaults if toml is missing or incomplete.
+
+def _render_template(
+    family: str,            # "compact" | "code_first" | "balance"
+    ctype: str,             # content type key (diff, build_output, ...)
+    vars: dict,             # template variables
+    default: str = "",      # fallback format string
+) -> str:
+    """Render a preview template for the given family + content type.
+
+    Resolution: toml[templates][preview][{family}][{ctype}] → reverse map
+    → [templates][preview][{family}][_default] → hardcoded default.
+    {variable} substitution with str.format(**safe_vars).
+    Unknown vars are left as-is.
+    """
+    templates = _toml_section("templates")
+    previews = templates.get("preview", {})
+    family_templates = previews.get(family, {})
+
+    # Resolve template string
+    tmpl = family_templates.get(ctype)
+    if tmpl is None:
+        # Try reverse key map
+        reverse_map = templates.get("reverse", {})
+        mapped = reverse_map.get(ctype, ctype)
+        tmpl = family_templates.get(mapped)
+    if tmpl is None:
+        tmpl = family_templates.get("_default", default)
+
+    if not tmpl:
+        return default
+
+    # Safe substitution: only vars that exist, strip None values
+    safe = {}
+    for k, v in vars.items():
+        if v is None:
+            safe[k] = ""
+        elif isinstance(v, str):
+            safe[k] = v
+        else:
+            safe[k] = str(v)
+
+    # Computed vars
+    fn_val = safe.get("fn", "")
+    safe["fx"] = f" {fn_val[:40]}" if fn_val else ""
+    cmd_val = safe.get("cmd", "")
+    safe["cmx"] = _re.sub(r'^[\$>]\s*', '', cmd_val.strip())[:40] if cmd_val else "?"
+    sigs_val = safe.get("sigs", "")
+    safe["sig1"] = sigs_val.split(";")[0].strip() if sigs_val else ""
+
+    try:
+        return tmpl.format(**safe)
+    except (KeyError, ValueError):
+        return tmpl  # return raw template if substitution fails
+
+
+def _render_marker_tmpl(
+    preview: str,
+    ctype: str,
+    meta: str,
+    center: str | None,
+    hash_val: str,
+    size: int,
+) -> str:
+    """Render a CCR marker block using template configuration.
+
+    Returns the full three-line block (preview + structure + marker)
+    or a compact single-line fallback.
+    """
+    templates = _toml_section("templates")
+    marker = templates.get("marker", {})
+    fmt = marker.get("format", "")
+    hint_str = marker.get("hint", "")
+
+    if not fmt:
+        # Fallback hardcoded format
+        center_seg = f";center={center}" if center else ""
+        hint = hint_str if CCR_MARKER_HINT and hint_str else ""
+        return f"{preview}{hint}\n[{ctype}: {meta}{center_seg}]\n<<<CCR:{hash_val}|{ctype}|{size}>>>"
+
+    center_seg = f";center={center}" if center else ""
+    hint = hint_str if CCR_MARKER_HINT and hint_str else ""
+
+    return fmt.format(
+        preview=preview,
+        type=ctype,
+        meta=meta,
+        center_seg=center_seg,
+        hash=hash_val,
+        size=size,
+        hint=hint,
+    )
+
+
+def _render_prompt_tmpl(name: str, vars: dict | None = None) -> str:
+    """Render a prompt template from [templates.prompts].
+
+    Args:
+        name: template key (session_inject, engine_offload, auto_expand_guidance, ...)
+        vars: optional {variable: value} dict for substitution
+    """
+    templates = _toml_section("templates")
+    prompts = templates.get("prompts", {})
+    tmpl = prompts.get(name, "")
+
+    if not tmpl:
+        # Hardcoded fallbacks
+        fallbacks = {
+            "session_inject": "CCR markers (<<<CCR:hash|type|size>>>) point to compressed content. Retrieve if the preview doesn't tell you enough; aphrodite_catalog lists available entries.",
+            "engine_offload": "These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} messages below are your active context.",
+            "auto_expand_guidance": "Tool outputs are auto-expanded — you see full content inline. If you see a CCR marker, retrieve only if the preview hints at useful content.",
+            "catalog_context_warn": "context={ctx} msgs — prefer catalog over scanning history",
+            "search_hint": "Use aphrodite_retrieve(hash) to expand any result hash.",
+        }
+        tmpl = fallbacks.get(name, "")
+
+    if vars:
+        safe = {k: str(v) if v is not None else "" for k, v in vars.items()}
+        try:
+            return tmpl.format(**safe)
+        except (KeyError, ValueError):
+            return tmpl
+
+    return tmpl
