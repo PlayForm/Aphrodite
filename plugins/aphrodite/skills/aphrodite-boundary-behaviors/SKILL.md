@@ -1,7 +1,7 @@
 ---
 name: aphrodite-boundary-behaviors
 description: "Boundaries between aphrodite compression layers: retrieve tool vs engine auto-expand, proxy vs inline storage, cross-proxy routing, center annotation vs storage. Testing and debugging these seams."
-version: 1.0.0
+version: 2.0.0
 platforms: [macos]
 related_skills: [aphrodite-tool-guide, aphrodite-dev-workflow]
 ---
@@ -10,7 +10,7 @@ related_skills: [aphrodite-tool-guide, aphrodite-dev-workflow]
 
 Knowledge about the boundaries (seams) between the three aphrodite compression layers:
 1. **Proxy** (Rust binary, :9797 cache / :9798 token) — stores CCR, produces markers
-2. **Python Plugin** (context engine, inline store) — auto-resolves markers, provides tools
+2. **Python Plugin** (context engine, inline store) — auto-resolves markers (when enabled), provides tools
 3. **Hermes Agent** (LLM) — sees markers, calls tools, triggers compression
 
 Understanding these boundaries is essential for testing and debugging why content appears or doesn't appear.
@@ -23,13 +23,13 @@ This is the most commonly confused boundary.
 |--------|--------------------------|-------------------|
 | Who triggers | LLM calls it explicitly | Plugin's `_pre_llm_hook` runs automatically |
 | When | On demand, any turn | Before each LLM turn |
-| Controlled by | N/A (always works) | `APHRODITE_NO_AUTO_EXPAND=1` disables |
+| Controlled by | N/A (always works) | `AUTO_EXPAND_LIMIT` from TOML `auto_expand_limit` (default 5 = effectively OFF). Set `APHRODITE_AUTO_EXPAND=1` to enable (limit=51200). |
 | Returns | Full expanded content | Full content inlined into context |
-| Marker removal | Marker stays in conversation | Small markers (<50KB) may be removed from catalog |
+| Marker removal | Marker stays in conversation | Small markers (< limit) resolved in-place |
 
-**Testing rule**: `APHRODITE_NO_AUTO_EXPAND=1` does NOT affect the retrieve tool. Calling `aphrodite_retrieve` always returns full content. To test auto-expand is disabled, examine what the LLM sees in its context (raw markers vs expanded), not the tool output.
+**Source**: `_hooks/session.py:155-189`, `_core/config.py:161-163`. `APHRODITE_NO_AUTO_EXPAND` does NOT exist in source — it was fictional in old skills.
 
-See `references/testing-auto-expand.md` for the full test protocol.
+**Testing rule**: Auto-expand is effectively OFF by default (limit=5 bytes). Calling `aphrodite_retrieve` always returns full content. To test auto-expand behavior, examine what the LLM sees in its context (raw markers vs expanded).
 
 ## Boundary 2: Proxy vs Inline Storage
 
@@ -97,4 +97,4 @@ aphrodite_retrieve(hash="<hash>")
 
 - `aphrodite-tool-guide` — tool reference, master-worker pattern, common pitfalls
 - `aphrodite-dev-workflow` — release pipeline, profile switching, build monitor
-- `references/testing-auto-expand.md` — detailed auto-expand test protocol
+- `aphrodite-auto-expand-testing` — full auto-expand test protocol

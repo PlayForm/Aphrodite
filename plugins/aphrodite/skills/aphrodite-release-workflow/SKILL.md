@@ -1,7 +1,7 @@
 ---
 name: aphrodite-release-workflow
 description: "Auto-release, version sync, CCR format, budget tuning, and new feature workflow for aphrodite v0.5.69+."
-version: 1.0.0
+version: 1.1.0
 platforms: [macos]
 ---
 
@@ -21,11 +21,25 @@ Remote is `Source` (ssh), NOT `origin`. If push fails, verify remote name with `
 
 ## Version Sync
 
-4 locations must match:
-1. `plugins/aphrodite/_core.py` — `BIN_VERSION` + `PLUGIN_VERSION`
+5 locations must match — auto-release.sh bumps all via `sed`:
+1. `plugins/aphrodite/_core/config.py` — `BIN_VERSION` + `PLUGIN_VERSION`
 2. `plugins/aphrodite/plugin.yaml` — `version:`
-3. `crates/aphrodite/Cargo.toml` — `version =`
-4. Auto-release script handles Cargo.toml + _core.py sync
+3. `plugins/aphrodite/pyproject.toml` — `version =`
+4. `plugins/aphrodite/__init__.py` — docstring `aphrodite vX.Y.Z`
+5. `crates/aphrodite/Cargo.toml` — `version =`
+
+If any location is stale after release, verify with:
+```bash
+grep -r 'BIN_VERSION\|PLUGIN_VERSION\|^version' plugins/aphrodite/_core/config.py plugins/aphrodite/plugin.yaml plugins/aphrodite/pyproject.toml plugins/aphrodite/__init__.py
+```
+
+### Binary Symlink
+
+The binary at `~/.hermes/aphrodite/aphrodite` should be a symlink to the repo build output:
+```bash
+ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/aphrodite
+```
+Every `cargo build --release` is immediately live — no manual copy. `_ensure_binary()` download path still works as fallback for fresh installs.
 
 ## CCR Format (v0.5.71+)
 
