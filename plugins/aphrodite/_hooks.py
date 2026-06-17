@@ -1523,8 +1523,13 @@ DIFF_SCHEMA = {
 
 
 def _catalog_handler(args=None, **kwargs):
-    """Return full compression catalog: all items with hashes, sizes, types, previews.
-    Use when catalog mode is 'tool' and you need detailed CCR information."""
+    """Return compression catalog. Mode 'toc' returns compact table-of-contents."""
+    args = args if isinstance(args, dict) else {}
+    mode = args.get("mode", "full")
+
+    if mode == "toc":
+        return _build_toc()
+
     items = []
     for m in _recent_markers:
         items.append({"hash": m["hash"], "type": m["type"], "size": m["size"], "preview": m.get("preview", "")[:120]})
@@ -1542,10 +1547,55 @@ def _catalog_handler(args=None, **kwargs):
     return json.dumps(result, indent=2)
 
 
+def _build_toc() -> str:
+    """Build a compact table-of-contents for the agent to quickly scan before retrieving.
+
+    Shows every CCR entry with hash, type, size, preview, and a 'Retrieve?'
+    recommendation (NO if the preview tells the full story, YES if retrieval
+    would add useful content).
+    """
+    markers = list(_recent_markers)
+    if not markers:
+        return "Catalog: 0 items"
+
+    lines = [
+        f"Catalog: {len(markers)} items, {sum(m['size'] for m in markers)}B saved",
+        "",
+        "| Hash    | Type           | Size  | Preview                          | Retrieve? |",
+        "|---------|----------------|-------|----------------------------------|-----------|",
+    ]
+
+    for m in reversed(markers[-20:]):  # last 20, newest first
+        h = m["hash"][:12]
+        t = m["type"][:14]
+        s = _fmt_size(m["size"])
+        p = (m.get("preview", "") or "")[:45].replace("|", "/")
+        # Retrieve recommendation: NO for clean outputs, YES otherwise
+        retrieve = "NO"
+        if t in ("build_output", "build_error"):
+            preview_lower = p.lower()
+            if "0e" not in preview_lower and "0w" not in preview_lower:
+                retrieve = "YES"
+        elif t == "terminal" and "exit=0" not in p:
+            retrieve = "YES"
+        elif t in ("grep", "search_files", "search_results") and "0 matches" not in p and "0m" not in p:
+            retrieve = "YES"
+        elif t not in ("build_output", "build_error", "terminal") and "0E 0W" not in p:
+            retrieve = "YES"
+
+        lines.append(f"| {h:<7} | {t:<14} | {s:>5} | {p:<45} | {retrieve:<9} |")
+
+    lines.extend(["", "Retrieve? = NO means the preview is sufficient — skip retrieval."])
+    return "\n".join(lines)
+
+
 CATALOG_SCHEMA = {
     "name": "aphrodite_catalog",
-    "description": "Return full compression catalog - all CCR items with hashes, sizes, types, and previews. Use when you need detailed information about what has been compressed.",
-    "parameters": {"type": "object", "properties": {}},
+    "description": "Return full compression catalog with hashes, sizes, types, previews. Mode 'toc' for compact table-of-contents with Retrieve? recommendations. Use toc BEFORE retrieving to avoid wasted round-trips.",
+    "parameters": {
+        "type": "object",
+        "properties": {"mode": {"type": "string", "description": "Optional: 'toc' for compact table-of-contents, default full catalog"}},
+    },
 }
 
 
