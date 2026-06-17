@@ -1,6 +1,13 @@
 """aphrodite - proxy lifecycle package (env, health, lifecycle, markers, startup)."""
 
-from .lifecycle import _PROCS, _kill, _start, _wait_alive, on_start
+from .env import (
+    _PROXY_ENV_KEYS,
+    _expand_guidance,
+    _headroom_context,
+    _inject_expand_guidance,
+    _load_env,
+    _update_headroom_context,
+)
 from .health import (
     _alive,
     _alive_cache,
@@ -10,14 +17,7 @@ from .health import (
     _query_and_set_headroom_budget,
     _query_proxy_version,
 )
-from .env import (
-    _PROXY_ENV_KEYS,
-    _expand_guidance,
-    _headroom_context,
-    _inject_expand_guidance,
-    _load_env,
-    _update_headroom_context,
-)
+from .lifecycle import _PROCS, _kill, _start, _wait_alive, on_start
 from .markers import _MARKERS_PATH, _restore_markers, _save_markers
 from .startup import _write_startup_log
 

@@ -4,7 +4,7 @@ import logging
 import os
 import time
 
-from .._core import BIN_VERSION, BINARY_DIR, PLUGIN_VERSION
+from .._core import BIN_VERSION, PLUGIN_VERSION
 
 _log = logging.getLogger("aphrodite")
 

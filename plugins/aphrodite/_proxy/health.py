@@ -5,7 +5,7 @@ import json
 import logging
 import time
 
-from .._core import PORTS, DEBUG_LOGGING
+from .._core import DEBUG_LOGGING
 
 _log = logging.getLogger("aphrodite")
 
