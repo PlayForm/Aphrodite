@@ -84,9 +84,17 @@ async fn run() -> anyhow::Result<()> {
 
 	tracing::info!("starting {} proxy listener(s)", proxies.len());
 
-	// ── Spawn config file watcher for hot-reload ──────────────────
-	let watch_path = config_path.clone();
-	tokio::spawn(async move {
+		// ── Spawn config file watcher for hot-reload ──────────────────
+		let watch_path = {
+			let p = std::path::PathBuf::from(&config_path);
+			if p.is_relative() {
+				std::env::current_dir().unwrap_or_default().join(&p)
+			} else {
+				p
+			}
+		};
+		let watch_path_str = watch_path.to_string_lossy().to_string();
+		tokio::spawn(async move {
 		use notify::{Event, EventKind, RecursiveMode, Watcher};
 		let (tx, mut rx) = tokio::sync::mpsc::channel(16);
 		let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
@@ -109,18 +117,18 @@ async fn run() -> anyhow::Result<()> {
 			tracing::warn!("failed to start config watcher: {e}");
 			return;
 		}
-		tracing::info!(path = %watch_path, "config file watcher active");
+		tracing::info!(path = %watch_path_str, "config file watcher active");
 		loop {
 			if rx.recv().await.is_some() {
 				// Debounce: wait 500ms for writes to settle
 				tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 				// Drain any additional events accumulated during debounce
 				while rx.try_recv().is_ok() {}
-				match aphrodite::config::MultiConfig::load(&watch_path) {
+				match aphrodite::config::MultiConfig::load(&watch_path_str) {
 					Ok(config) => {
 						let comp = config.compression.as_ref();
 						tracing::info!(
-							path = %watch_path,
+							path = %watch_path_str,
 							auto_expand_limit = comp.and_then(|c| c.auto_expand_limit).unwrap_or(0),
 							engine_threshold = comp.and_then(|c| c.engine_threshold_pct).unwrap_or(0),
 							"? config reloaded — proxy will use new values; plugin reloads independently"
