@@ -508,6 +508,8 @@ def _transform_tool_result(
         ccr = _compress_via_proxy(result, target, headers=_headroom_context or None)
         if ccr:
             h, sz = ccr
+            # fetch → put: mirror into inline store for guaranteed local retrieval
+            _inline_store_put(h, result)
             # Bridge hash formats: map full SHA-256 → canonical proxy hash
             # so _compress_handler can find inline-cached content (#51)
             full_sha = hashlib.sha256(result.encode("utf-8")).hexdigest()
@@ -1340,6 +1342,8 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
                 ccr = _compress_via_proxy(output, target, headers=_headroom_context or None)
                 if ccr:
                     h, _ = ccr
+                    # fetch → put: mirror into inline store for guaranteed local retrieval
+                    _inline_store_put(h, output)
                     # Bridge hash formats for _compress_handler cache hits (#51)
                     full_sha = hashlib.sha256(output.encode("utf-8")).hexdigest()
                     _hash_alias[full_sha] = h
@@ -1368,6 +1372,8 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
         ccr = _compress_via_proxy(output, target)
         if ccr:
             h, _ = ccr
+            # fetch → put: mirror into inline store for guaranteed local retrieval
+            _inline_store_put(h, output)
             # Bridge hash formats for _compress_handler cache hits (#51)
             full_sha = hashlib.sha256(output.encode("utf-8")).hexdigest()
             _hash_alias[full_sha] = h
