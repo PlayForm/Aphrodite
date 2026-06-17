@@ -8,9 +8,9 @@ import subprocess
 import time
 from pathlib import Path
 
-from .._core import _DEV, BINARY, BINARY_DIR, DEBUG_LOGGING, PLUGIN_VERSION, PORTS
+from .._core import _DEV, BINARY, BINARY_DIR, BIN_VERSION, DEBUG_LOGGING, PLUGIN_VERSION, PORTS
 from .env import _PROXY_ENV_KEYS, _inject_expand_guidance, _load_env
-from .health import _alive, _alive_cache, _headroom_context
+from .health import _alive, _alive_cache, _headroom_context, _query_proxy_version
 from .markers import _restore_markers
 from .startup import _write_startup_log
 
@@ -146,12 +146,34 @@ def on_start(**kw) -> str | None:
     if not env.get("APHRODITE_API_KEY"):
         _log.warning("APHRODITE_API_KEY not found in environment - proxy won't start")
         return None
-    # Launch both proxies concurrently (skip if already alive)
+    # Launch both proxies — skip if alive AND version matches expected.
+    # If a running proxy's version is stale, kill it and launch the new binary.
+    # SQLite CCR store survives restarts (disk-backed), in-memory cache is rebuilt.
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         start_futs = {}
         for name in ("cache", "token"):
-            if not _alive(PORTS[name]):
-                start_futs[name] = pool.submit(_start, name, env)
+            port = PORTS[name]
+            if _alive(port):
+                running_ver = _query_proxy_version(port)
+                if running_ver and BIN_VERSION in running_ver:
+                    _log.debug("proxy %s already running expected version %s", name, running_ver)
+                    continue
+                _log.info(
+                    "proxy %s version mismatch (running=%s, expected=%s) — restarting",
+                    name, running_ver or "?", BIN_VERSION,
+                )
+                # Kill stale proxy
+                try:
+                    r = subprocess.run(
+                        ["lsof", "-ti", f":{port}"],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    if r.stdout.strip():
+                        for pid in r.stdout.strip().split("\n"):
+                            _kill(pid)
+                except Exception as exc:
+                    _log.warning("kill stale proxy %s failed: %s", name, exc)
+            start_futs[name] = pool.submit(_start, name, env)
         for name, fut in start_futs.items():
             try:
                 fut.result()
