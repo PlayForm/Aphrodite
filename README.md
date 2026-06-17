@@ -4,7 +4,7 @@
 
 ---
 
-# [Aphrodite] 💋 (`aphrodite`)
+# [Aphrodite] 💋 (`aphrodite`)
 
 [Aphrodite]: https://github.com/PlayForm/Aphrodite
 
