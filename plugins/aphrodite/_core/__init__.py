@@ -164,4 +164,5 @@ __all__ = [
     "_set_session_model",
     "_state",
     "_toml_section",
+    "reload_config",
 ]
