@@ -57,7 +57,7 @@ Every compressed tool output gets a **content‑aware, LLM‑native preview** in
 | Browser snapshot | raw accessibility tree | `[dom:342 elements 500 total]` |
 | Console log | raw log array | `[log:42 entries 3E 5W 100L]` |
 | File write | raw confirmation JSON | `[file:src/main.rs 1234B]` |
-| Code (Rust) | raw file content | `[code_rust:3fns|2structs|1impl fn format(...); fn build(...) 200L]` |
+| Code (Rust) | raw file content | `[code_rust:3fns, 2structs, 1impl] fn format(...); fn build(...) 200L` |
 | Image gen | raw prompt + URL | `[image:a photorealistic cat...]` |
 | Todo list | raw task array | `[todo:5 items 3 pending]` |
 | Memory ops | raw memory store | `[memory:3 entries]` |
