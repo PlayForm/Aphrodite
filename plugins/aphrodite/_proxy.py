@@ -48,6 +48,29 @@ _PROXY_ENV_KEYS = {"PATH", "HOME", "APHRODITE_API_KEY", "DYLD_LIBRARY_PATH", "DY
 # ── Auto-expand guidance (set by on_start after proxy launch) ──
 _expand_guidance: str = ""
 
+# ── Proxy version (queried from /health after launch/rebuild) ──
+_proxy_version: str = ""  # "v0.5.115" from binary
+
+
+def _query_proxy_version(port: int, timeout: float = 2.0) -> str:
+    """Query proxy /health for binary version. Caches in _proxy_version."""
+    global _proxy_version
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+        conn.request("GET", "/health", headers={"Connection": "close"})
+        resp = conn.getresponse()
+        body = resp.read().decode().strip()
+        conn.close()
+        if body:
+            data = json.loads(body)
+            ver = data.get("version", "")
+            if ver:
+                _proxy_version = ver
+                return ver
+    except Exception as exc:
+        _log.debug("proxy version query failed on :%d: %s", port, exc)
+    return _proxy_version
+
 # ── Headroom session context (tracked at session start, refreshed per-turn) ──
 _headroom_context: dict[str, str] = {}  # {"x-headroom-budget": "...", "x-headroom-fill": "..."}
 
