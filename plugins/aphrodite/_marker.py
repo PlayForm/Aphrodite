@@ -183,6 +183,36 @@ def _classify_content(content: str) -> dict:
                         if "query" in data:
                             meta["q"] = str(data["query"])[:40]
                         return meta
+                    # write_file confirmation
+                    if data.get("status") == "written" or ("path" in data and "bytes" in data):
+                        meta = {"type": "write_file", "ln": str(ln)}
+                        meta["fn"] = str(data.get("path", ""))
+                        if "bytes" in data:
+                            meta["size"] = str(data["bytes"])
+                        if "syntax_errors" in data:
+                            errs = data["syntax_errors"]
+                            meta["errors"] = str(len(errs)) if isinstance(errs, list) else str(errs)
+                        return meta
+                    # log entries (browser_console, structured logs)
+                    if "level" in data or ("entries" in data and isinstance(data.get("entries"), list)):
+                        meta = {"type": "log", "ln": str(ln)}
+                        entries = data.get("entries", [data])
+                        if isinstance(entries, list):
+                            meta["entries"] = str(len(entries))
+                            errs = sum(1 for e in entries if isinstance(e, dict) and e.get("level") == "error")
+                            warns = sum(1 for e in entries if isinstance(e, dict) and e.get("level") == "warn")
+                            if errs:
+                                meta["errors"] = str(errs)
+                            if warns:
+                                meta["warnings"] = str(warns)
+                        return meta
+                    # browser_snapshot / accessibility tree
+                    if "elements" in data and isinstance(data.get("elements"), list):
+                        meta = {"type": "browser_snapshot"}
+                        meta["elements"] = str(len(data["elements"]))
+                        if "total_elements" in data:
+                            meta["total"] = str(data["total_elements"])
+                        return meta
                     # Fallback JSON: extract top-level keys
                     keys = list(data.keys())[:8]
                     meta = {"type": "json", "ln": str(ln)}
@@ -290,6 +320,11 @@ def _make_ccr_preview(content: str, klass: dict | None = None, model_family: str
         "classes": "0",
         "types": "0",
         "sigs": "",
+        "size": str(klass.get("size", "?")),
+        "entries": str(klass.get("entries", "0")),
+        "elements": str(klass.get("elements", "0")),
+        "total": str(klass.get("total", "0")),
+        "errors": str(klass.get("errors", "0")),
     }
 
     # ── Code structure-map enrichment ────────────────────────────────
