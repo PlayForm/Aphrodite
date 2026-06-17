@@ -23,11 +23,11 @@ This is the most commonly confused boundary.
 |--------|--------------------------|-------------------|
 | Who triggers | LLM calls it explicitly | Plugin's `_pre_llm_hook` runs automatically |
 | When | On demand, any turn | Before each LLM turn |
-| Controlled by | N/A (always works) | `AUTO_EXPAND_LIMIT` from TOML `auto_expand_limit` (default 5 = effectively OFF). Set `APHRODITE_AUTO_EXPAND=1` to enable (limit=51200). |
+| Controlled by | N/A (always works) | `AUTO_EXPAND_LIMIT` from TOML `auto_expand_limit` (default 0 = OFF). Set `APHRODITE_AUTO_EXPAND=1` to enable (limit=51200). |
 | Returns | Full expanded content | Full content inlined into context |
 | Marker removal | Marker stays in conversation | Small markers (< limit) resolved in-place |
 
-**Source**: `_hooks/session.py:155-189`, `_core/config.py:161-163`. `APHRODITE_NO_AUTO_EXPAND` does NOT exist in source — it was fictional in old skills.
+**Source**: `_hooks/session.py:155-189`, `_core/config.py`. `APHRODITE_NO_AUTO_EXPAND` does NOT exist in source — it was fictional in old skills.
 
 **Testing rule**: Auto-expand is effectively OFF by default (limit=5 bytes). Calling `aphrodite_retrieve` always returns full content. To test auto-expand behavior, examine what the LLM sees in its context (raw markers vs expanded).
 
@@ -97,4 +97,3 @@ aphrodite_retrieve(hash="<hash>")
 
 - `aphrodite-tool-guide` — tool reference, master-worker pattern, common pitfalls
 - `aphrodite-dev-workflow` — release pipeline, profile switching, build monitor
-- `aphrodite-auto-expand-testing` — full auto-expand test protocol

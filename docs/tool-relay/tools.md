@@ -2,7 +2,7 @@
 
 Origin: Aphrodite exposes 9 tools to the Hermes agent for compression, retrieval, stats, and session management. Tools are registered by the Python plugin and executed via the proxy's `handle_tool_relay` endpoint.
 
-Source of truth: `plugins/aphrodite/plugin.yaml` (lines 13-22), `plugins/aphrodite/_tools.py`, `plugins/aphrodite/_hooks.py` (lines 399, 1176, 1250, 1273, 1291, 1318, 1419), `crates/aphrodite/src/proxy.rs:execute_tool_relay()` (line 1561)
+Source of truth: `plugins/aphrodite/plugin.yaml` (lines 13-22), `plugins/aphrodite/_tools.py`, `plugins/aphrodite/_hooks/transform.py` (lines 399, 1176, 1250, 1273, 1291, 1318, 1419), `crates/aphrodite/src/proxy.rs:execute_tool_relay()` (line 1561)
 
 ## Tool Registry
 
@@ -10,13 +10,13 @@ Source of truth: `plugins/aphrodite/plugin.yaml` (lines 13-22), `plugins/aphrodi
 |---|------|--------|---------------|
 | 1 | `aphrodite_retrieve` | _tools.py:22 | Yes (execute_tool_relay) |
 | 2 | `aphrodite_compress` | _tools.py:68 | Yes (execute_tool_relay) |
-| 3 | `aphrodite_stats` | _hooks.py:1176 | No (Python only) |
-| 4 | `aphrodite_rebuild` | _hooks.py:399 | No (Python only) |
-| 5 | `aphrodite_files` | _hooks.py:1250 | No (Python only) |
-| 6 | `aphrodite_diff` | _hooks.py:1273 | No (Python only) |
-| 7 | `aphrodite_search` | _hooks.py:1318 | No (Python only) |
-| 8 | `aphrodite_test` | _hooks.py:1419 | No (Python only) |
-| 9 | `aphrodite_catalog` | _hooks.py:1291 | No (Python only) |
+| 3 | `aphrodite_stats` | _hooks/transform.py:1176 | No (Python only) |
+| 4 | `aphrodite_rebuild` | _hooks/transform.py:399 | No (Python only) |
+| 5 | `aphrodite_files` | _hooks/transform.py:1250 | No (Python only) |
+| 6 | `aphrodite_diff` | _hooks/transform.py:1273 | No (Python only) |
+| 7 | `aphrodite_search` | _hooks/transform.py:1318 | No (Python only) |
+| 8 | `aphrodite_test` | _hooks/transform.py:1419 | No (Python only) |
+| 9 | `aphrodite_catalog` | _hooks/transform.py:1291 | No (Python only) |
 
 ## 1. aphrodite_retrieve
 
@@ -87,7 +87,7 @@ Compress flow:
 
 ## 3. aphrodite_stats
 
-### Schema (_hooks.py:1228)
+### Schema (_hooks/transform.py:1228)
 ```json
 {
     "name": "aphrodite_stats",
@@ -96,7 +96,7 @@ Compress flow:
 }
 ```
 
-### Handler (_hooks.py:1176)
+### Handler (_hooks/transform.py:1176)
 ```
 Returns:
 {
@@ -116,7 +116,7 @@ Queries both proxy ports via HTTP `/stats`.
 
 ## 4. aphrodite_rebuild
 
-### Schema (_hooks.py:423)
+### Schema (_hooks/transform.py:423)
 ```json
 {
     "name": "aphrodite_rebuild",
@@ -125,7 +125,7 @@ Queries both proxy ports via HTTP `/stats`.
 }
 ```
 
-### Handler (_hooks.py:399)
+### Handler (_hooks/transform.py:399)
 ```
 Executes: cargo build --release -p aphrodite
 Copies: target/release/aphrodite → ~/.hermes/aphrodite/aphrodite
@@ -133,7 +133,7 @@ Copies: target/release/aphrodite → ~/.hermes/aphrodite/aphrodite
 
 ## 5. aphrodite_files
 
-### Schema (_hooks.py:1266)
+### Schema (_hooks/transform.py:1266)
 ```json
 {
     "name": "aphrodite_files",
@@ -142,7 +142,7 @@ Copies: target/release/aphrodite → ~/.hermes/aphrodite/aphrodite
 }
 ```
 
-### Handler (_hooks.py:1250)
+### Handler (_hooks/transform.py:1250)
 ```
 Returns: {count, by_tool: {tool_name: [paths]}, all: [sorted paths]}
 ```
@@ -150,7 +150,7 @@ Tracks files touched by `read_file`, `write_file`, `patch`, `search_files`.
 
 ## 6. aphrodite_diff
 
-### Schema (_hooks.py:1284)
+### Schema (_hooks/transform.py:1284)
 ```json
 {
     "name": "aphrodite_diff",
@@ -159,7 +159,7 @@ Tracks files touched by `read_file`, `write_file`, `patch`, `search_files`.
 }
 ```
 
-### Handler (_hooks.py:1273)
+### Handler (_hooks/transform.py:1273)
 ```
 Returns: {turns: N, recent: [{turn, hash, summary, size}]}
 ```
@@ -167,7 +167,7 @@ Last 10 turns from `_conv_index`.
 
 ## 7. aphrodite_search
 
-### Schema (_hooks.py:1408)
+### Schema (_hooks/transform.py:1408)
 ```json
 {
     "name": "aphrodite_search",
@@ -182,7 +182,7 @@ Last 10 turns from `_conv_index`.
 }
 ```
 
-### Handler (_hooks.py:1318)
+### Handler (_hooks/transform.py:1318)
 ```
 Searches:
 1. _conv_index (turn summaries)  -  linear scan
@@ -193,7 +193,7 @@ Results deduplicated by hash, max 20.
 
 ## 8. aphrodite_test
 
-### Schema (_hooks.py:1495+)
+### Schema (_hooks/transform.py:1495+)
 ```json
 {
     "name": "aphrodite_test",
@@ -207,7 +207,7 @@ Results deduplicated by hash, max 20.
 }
 ```
 
-### Handler (_hooks.py:1419)
+### Handler (_hooks/transform.py:1419)
 ```
 Modes:
 - quick: compress, retrieve, stats, files, diff, proxy health
@@ -218,7 +218,7 @@ Modes:
 
 ## 9. aphrodite_catalog
 
-### Schema (_hooks.py:1311)
+### Schema (_hooks/transform.py:1311)
 ```json
 {
     "name": "aphrodite_catalog",
@@ -227,7 +227,7 @@ Modes:
 }
 ```
 
-### Handler (_hooks.py:1291)
+### Handler (_hooks/transform.py:1291)
 ```
 Returns:
 {

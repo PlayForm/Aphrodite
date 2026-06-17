@@ -181,7 +181,7 @@ pub async fn handle_ccr_delete(
 
 The Python plugin uses these endpoints extensively:
 
-### _compress_via_proxy (_marker.py:228)
+### _compress_via_proxy (_marker/marker.py:228)
 ```
 POST /ccr/create with Content-Type: application/octet-stream
 ```
@@ -191,7 +191,7 @@ POST /ccr/create with Content-Type: application/octet-stream
 POST /ccr/create → get hash → mirror in inline store
 ```
 
-### _store_conversation_turn (_hooks.py:476)
+### _store_conversation_turn (_hooks/transform.py:476)
 ```
 POST /ccr/create with turn data → store in _conv_index
 ```
