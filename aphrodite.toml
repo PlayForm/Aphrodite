@@ -1,0 +1,251 @@
+# ── Aphrodite Configuration ────────────────────────────────────────────────
+# TOML-driven feature toggles, thresholds, preview templates, and prompt styles.
+# Env vars (APHRODITE_*) override TOML values at runtime.
+# See README.md for full documentation.
+
+[[proxies]]
+name = "cache"
+listen = "0.0.0.0:9797"
+mode = "cache"
+tool_relay = true
+timeout = 120
+
+[[proxies]]
+name = "token"
+listen = "0.0.0.0:9798"
+mode = "token"
+tool_relay = true
+timeout = 300
+retry_attempts = 3
+retry_base_ms = 2000
+
+# ── Shared defaults (applied to all proxies unless overridden) ──────────────
+[defaults]
+api_url = "https://api.deepseek.com"
+model = "deepseek-v4-pro"
+ccr_ttl_seconds = 3600
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  COMPRESSION  —  thresholds, engine, auto-expand, classifier poll
+# ══════════════════════════════════════════════════════════════════════════════
+[compression]
+engine_threshold_pct = 45          # compress at 45% context
+engine_protect_first = 2           # messages to keep at start
+engine_protect_last = 5            # messages to keep at end
+engine_min_msgs = 8                # minimum messages before activating
+tool_threshold_token = 512         # token proxy threshold (bytes)
+tool_threshold_cache = 4096        # cache proxy threshold (bytes)
+terminal_threshold = 1024          # terminal output threshold (bytes)
+inline_threshold = 2048            # inline zlib fallback threshold (bytes)
+auto_expand = false                # off: markers stay raw
+auto_expand_limit = 0              # 0 = disabled
+catalog_mode = "tool"           # compact | full | tool
+classifier_poll = true             # skip CCR for clean outputs
+code_multiplier = 3.0              # multiply threshold for code types
+context_engine = true              # default-on, no env var needed
+live_container = true              # intercept read_file → CCR marker
+live_container_threshold = 2048    # min bytes to intercept
+prefetch = true                    # enable aphrodite_prefetch tool
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PREVIEWS  —  model-aware templates, code structure maps
+# ══════════════════════════════════════════════════════════════════════════════
+[previews]
+model_family = "code_first"        # compact | code_first | balance
+code_structure_map = true          # show fn/struct/class sigs
+preview_max_chars = 120            # max chars per preview line
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PROMPTS  —  how the system instructs the LLM about CCR
+# ══════════════════════════════════════════════════════════════════════════════
+[prompts]
+retrieve_guidance = "verbose"      # minimal | standard | verbose
+ccr_marker_hint = true            # append "…(use aphrodite_retrieve)"?
+catalog_intent_hints = true       # show intent=read with hashes?
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  TEMPLATES  —  per-content-type preview/marker/prompt format strings
+#
+#  Variables available in templates:
+#    {type}     — content type (diff, build_output, code_rust, ...)
+#    {ln}       — line count
+#    {size}     — byte size
+#    {hash}     — short hash (12 chars)
+#    {err}      — error count
+#    {warn}     — warning count
+#    {exit}     — terminal exit code
+#    {cmd}      — terminal command
+#    {files}    — file count (diff)
+#    {fn}       — filename (diff)
+#    {plus}     — lines added (diff)
+#    {minus}    — lines removed (diff)
+#    {keys}     — JSON top-level keys
+#    {items}    — item count (JSON list, table rows)
+#    {msg}      — error message
+#    {commit}   — commit short hash
+#    {subject}  — commit subject
+#    {pid}      — process ID
+#    {uptime}   — process uptime
+#    {fns}      — function count (code structure map)
+#    {structs}  — struct count (Rust)
+#    {impls}    — impl count (Rust)
+#    {classes}  — class count (Python/JS)
+#    {sigs}     — first 2 signatures inline
+#    {first}    — first 110 chars of content
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Preview templates: [type:...] format per content type ────────────────────
+# compact family (Claude): metadata-only, pure structured format
+[templates.preview.compact]
+
+diff           = "[diff:{files}f +{plus}/-{minus} {ln}L{fx}{fn}]"
+# {fx} resolves to " " + {fn}[:40] if fn is set, else ""
+build_output   = "[build:{err}E {warn}W {ln}L]"
+build_error    = "[error:{code} {loc} {ln}L]"
+error          = "[error:{msg}]"
+terminal       = "[terminal:{cmx} exit={exit}]"
+# {cmx} resolves to cmd[:40] stripped of leading $/>, or "?"
+commit         = "[commit:{commit} {subject}]"
+search_files   = "[grep:{files} matches {ln}L]"
+search_results = "[grep:{files} matches {ln}L]"
+tabular        = "[table:{items} rows {ln}L]"
+json           = "[json:{keys} {ln}L]"
+json_list      = "[json:{items} items {ln}L]"
+process_output = "[process:pid={pid} up={uptime} {ln}L]"
+write_file     = "[file:{fn} {size}B {ln}L]"
+log            = "[log:{entries}E {errors}E {warnings}W {ln}L]"
+browser_snapshot = "[dom:{elements} elements {total} {ln}L]"
+code           = "[{type}:{fns}fns|{structs}structs {ln}L]"
+code_rust      = "[{type}:{fns}fns|{structs}structs|{impls}impls {ln}L]"
+code_python    = "[{type}:{fns}fns|{classes}classes {ln}L]"
+code_go        = "[{type}:{fns}fns|{types}types {ln}L]"
+code_js        = "[{type}:{fns}fns|{classes}classes {ln}L]"
+_default       = "[{type}:{first}]"
+
+# ── Preview templates: code_first family (DeepSeek, Qwen) ────────────────────
+# Code signatures before metadata, shows actual code the LLM can reason about
+[templates.preview.code_first]
+
+diff           = "[diff:{files}f +{plus}/-{minus} {ln}L{fx}{fn}]"
+build_output   = "[build:{err}E {warn}W {ln}L]"
+build_error    = "[error:{code} {loc} {ln}L]"
+error          = "[error:{msg}]"
+terminal       = "[terminal:{cmx} exit={exit}]"
+commit         = "[commit:{commit} {subject}]"
+search_files   = "[grep:{files} matches {ln}L]"
+search_results = "[grep:{files} matches {ln}L]"
+tabular        = "[table:{items} rows {ln}L]"
+json           = "[json:{keys} {ln}L]"
+json_list      = "[json:{items} items {ln}L]"
+process_output = "[process:pid={pid} up={uptime} {ln}L]"
+write_file     = "[file:{fn} {size}B {ln}L]"
+log            = "[log:{entries}E {errors}E {warnings}W {ln}L]"
+browser_snapshot = "[dom:{elements} elements {total} {ln}L]"
+web_search     = "[search:{total} results '{q}' {ln}L]"
+image_generate = "[image:{msg} {ln}L]"
+todo           = "[todo:{items} items {total} pending {ln}L]"
+memory         = "[memory:{items} entries {ln}L]"
+cronjob        = "[cron:{msg} {ln}L]"
+code           = "[{type}:{fns}fns|{structs}structs {sigs} {ln}L]"
+code_rust      = "[{type}:{fns}fns|{structs}structs|{impls}impls {sigs} {ln}L]"
+code_python    = "[{type}:{fns}fns|{classes}classes {sigs} {ln}L]"
+code_go        = "[{type}:{fns}fns|{types}types {sigs} {ln}L]"
+code_js        = "[{type}:{fns}fns|{classes}classes {sigs} {ln}L]"
+code_ts        = "[{type}:{fns}fns|{classes}classes {sigs} {ln}L]"
+code_sh        = "[{type}:{fns}fns {sigs} {ln}L]"
+_default       = "[{type}:{first}]"
+
+# ── Preview templates: balance family (GPT, Gemini) ──────────────────────────
+# Metadata + first signature — enough context to decide, not full code dump
+[templates.preview.balance]
+
+diff           = "[diff:{files}f +{plus}/-{minus} {ln}L{fx}{fn}]"
+build_output   = "[build:{err}E {warn}W {ln}L]"
+build_error    = "[error:{code} {loc} {ln}L]"
+error          = "[error:{msg}]"
+terminal       = "[terminal:{cmx} exit={exit}]"
+commit         = "[commit:{commit} {subject}]"
+search_files   = "[grep:{files} matches {ln}L]"
+search_results = "[grep:{files} matches {ln}L]"
+tabular        = "[table:{items} rows {ln}L]"
+json           = "[json:{keys} {ln}L]"
+json_list      = "[json:{items} items {ln}L]"
+process_output = "[process:pid={pid} up={uptime} {ln}L]"
+write_file     = "[file:{fn} {size}B {ln}L]"
+log            = "[log:{entries}E {errors}E {warnings}W {ln}L]"
+browser_snapshot = "[dom:{elements} elements {total} {ln}L]"
+code           = "[{type}:{fns}fns|{structs}structs {sig1} {ln}L]"
+code_rust      = "[{type}:{fns}fns|{structs}structs|{impls}impls {sig1} {ln}L]"
+code_python    = "[{type}:{fns}fns|{classes}classes {sig1} {ln}L]"
+code_go        = "[{type}:{fns}fns|{types}types {sig1} {ln}L]"
+code_js        = "[{type}:{fns}fns|{classes}classes {sig1} {ln}L]"
+_default       = "[{type}:{first}]"
+
+
+# ── CCR marker templates: the three-line output block ────────────────────────
+[templates.marker]
+# {preview}  = rendered preview string
+# {type}     = content/marker type
+# {meta}     = metadata string (key=val;key=val)
+# {center}   = center annotation
+# {hash}     = full hash
+# {size}     = byte size
+# {hint}     = optional retrieve hint ("" when disabled)
+format = "{preview}\n[{type}: {meta}{center_seg}]\n<<<CCR:{hash}|{type}|{size}>>>"
+hint   = "…(use aphrodite_retrieve)"
+
+
+# ── Prompt guidance templates ────────────────────────────────────────────────
+[templates.prompts]
+
+# Session injection: shown once at session start (Layer 1 instruction)
+session_inject = "CCR markers (<<<CCR:hash|type|size>>>) point to compressed content. Retrieve if the preview doesn't tell you enough; aphrodite_catalog lists available entries."
+
+# Context engine: shown when messages are offloaded to CCR
+engine_offload = "These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} messages below are your active context."
+
+# Auto-expand guidance: shown when auto-expand is active
+auto_expand_guidance = "💋 Tool outputs are auto-expanded — you see full content inline, no <<<CCR:...>>> markers for tool results. If you see a CCR marker, retrieve only if the preview hints at useful content."
+
+# Catalog context warning: shown when context exceeds threshold
+catalog_context_warn = "⚠ context={ctx} msgs — prefer catalog over scanning history"
+
+# Search hint: shown in aphrodite_search results
+search_hint = "Use aphrodite_retrieve(hash) to expand any result hash."
+
+
+# ── Reverse key map: type aliases for template resolution ────────────────────
+# Maps classifier output types to template keys. Allows granular routing.
+[templates.reverse]
+build_output    = "build_output"
+build_error     = "build_error"
+error           = "error"
+diff            = "diff"
+terminal        = "terminal"
+commit          = "commit"
+search_files    = "search_files"
+search_results  = "search_results"
+tabular         = "tabular"
+json            = "json"
+json_list       = "json_list"
+process_output  = "process_output"
+write_file      = "write_file"
+log             = "log"
+browser_snapshot = "browser_snapshot"
+web_search      = "web_search"
+image_generate  = "image_generate"
+todo            = "todo"
+memory          = "memory"
+cronjob         = "cronjob"
+code            = "code"
+code_rust       = "code_rust"
+code_python     = "code_python"
+code_go         = "code_go"
+code_js         = "code_js"
+code_ts         = "code_ts"
+code_sh         = "code_sh"
+text            = "_default"
