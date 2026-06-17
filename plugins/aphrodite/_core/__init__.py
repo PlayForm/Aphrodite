@@ -44,6 +44,7 @@ from .config import (
     _recent_markers,
     _set_session_model,
     _toml_section,
+    reload_config,
 )
 
 # ── state.py ───────────────────────────────────────────────────

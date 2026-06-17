@@ -24,7 +24,11 @@ _CONFIG: dict | None = None
 
 
 def _load_toml_config() -> dict:
-    """Load aphrodite.toml from disk; returns {} on any failure."""
+    """Load aphrodite.toml from disk; returns {} on any failure.
+
+    Cached after first load. Call _reload_config() to clear the cache
+    and re-evaluate all module-level config constants.
+    """
     global _CONFIG
     if _CONFIG is not None:
         return _CONFIG
@@ -138,73 +142,135 @@ def _cfg_float(name: str, default: float, toml_key: tuple[str, str] | None = Non
 
 
 # ── Compression knobs ───────────────────────────────────────────
+# All config values are set by _init_config() at import time and
+# can be hot-reloaded via reload_config() (called by on_start).
 
-# Engine (aggressive defaults — compress sooner, keep less)
-ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 45, ("compression", "engine_threshold_pct"))
-ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 2, ("compression", "engine_protect_first"))
-ENGINE_PROTECT_LAST = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 5, ("compression", "engine_protect_last"))
-ENGINE_MIN_MSGS = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 8, ("compression", "engine_min_msgs"))
+ENGINE_THRESHOLD_PCT: int = 45
+ENGINE_PROTECT_FIRST: int = 2
+ENGINE_PROTECT_LAST: int = 5
+ENGINE_MIN_MSGS: int = 8
+TOOL_THRESHOLD_TOKEN: int = 512
+TOOL_THRESHOLD_CACHE: int = 4096
+TERMINAL_THRESHOLD: int = 1024
+INLINE_THRESHOLD: int = 2048
+RECURSIVE_DEPTH: int = 3
+AUTO_EXPAND_LIMIT: int = 0
+CATALOG_MODE: str = "compact"
+CLASSIFIER_POLL: bool = True
+CODE_MULTIPLIER: float = 3.0
+CONTEXT_ENGINE: bool = True
+MAX_REQUEST_BODY_SIZE: int = 104_857_600
+MODEL_FAMILY: str = "code_first"
+CODE_STRUCTURE_MAP: bool = True
+PREVIEW_MAX_CHARS: int = 120
+RETRIEVE_GUIDANCE: str = "minimal"
+CCR_MARKER_HINT: bool = False
+CATALOG_INTENT_HINTS: bool = False
+DEBUG_LOGGING: bool = False
+_recent_markers: deque = deque(maxlen=500)
 
-# Thresholds (aggressive — compress smaller outputs)
-TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 512, ("compression", "tool_threshold_token"))
-TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 4096, ("compression", "tool_threshold_cache"))
-TERMINAL_THRESHOLD = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 1024, ("compression", "terminal_threshold"))
-INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 2048, ("compression", "inline_threshold"))
 
-# HEADROOM_SSE_BUFFER_MAX_BYTES check
-if os.environ.get("HEADROOM_SSE_BUFFER_MAX_BYTES"):
-    INLINE_THRESHOLD = max(INLINE_THRESHOLD, 1_048_576)
+def _init_config() -> None:
+    """Evaluate all config values from env → TOML → defaults.
 
-RECURSIVE_DEPTH = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
+    Called at import time (module level) and on hot-reload.
+    """
+    global ENGINE_THRESHOLD_PCT, ENGINE_PROTECT_FIRST, ENGINE_PROTECT_LAST
+    global ENGINE_MIN_MSGS, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE
+    global TERMINAL_THRESHOLD, INLINE_THRESHOLD, AUTO_EXPAND_LIMIT
+    global CATALOG_MODE, CLASSIFIER_POLL, CODE_MULTIPLIER, CONTEXT_ENGINE
+    global MAX_REQUEST_BODY_SIZE, MODEL_FAMILY, CODE_STRUCTURE_MAP
+    global PREVIEW_MAX_CHARS, RETRIEVE_GUIDANCE, CCR_MARKER_HINT
+    global CATALOG_INTENT_HINTS, RECURSIVE_DEPTH, DEBUG_LOGGING, _recent_markers
 
-# Auto-expand (off by default)
-AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 0, ("compression", "auto_expand_limit"))
-if os.environ.get("APHRODITE_AUTO_EXPAND") == "1":
-    AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 51200)
+    _log.debug("config: (re)loading from %s", "env/TOML/defaults")
 
-DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
-CATALOG_MODE = _cfg_str("APHRODITE_CATALOG", "compact", ("compression", "catalog_mode"))
-CLASSIFIER_POLL = _cfg_bool("APHRODITE_CLASSIFIER_POLL", True, ("compression", "classifier_poll"))
-CODE_MULTIPLIER = _cfg_float("APHRODITE_CODE_MULTIPLIER", 3.0, ("compression", "code_multiplier"))
-CONTEXT_ENGINE = _cfg_bool("APHRODITE_CONTEXT_ENGINE", True, ("compression", "context_engine"))
+    # Engine
+    ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 45, ("compression", "engine_threshold_pct"))
+    ENGINE_PROTECT_FIRST = _cfg_int("APHRODITE_ENGINE_PROTECT_FIRST", 2, ("compression", "engine_protect_first"))
+    ENGINE_PROTECT_LAST = _cfg_int("APHRODITE_ENGINE_PROTECT_LAST", 5, ("compression", "engine_protect_last"))
+    ENGINE_MIN_MSGS = _cfg_int("APHRODITE_ENGINE_MIN_MSGS", 8, ("compression", "engine_min_msgs"))
 
-# Big-payload guard
-MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)
+    # Thresholds
+    TOOL_THRESHOLD_TOKEN = _cfg_int("APHRODITE_TOOL_THRESHOLD_TOKEN", 512, ("compression", "tool_threshold_token"))
+    TOOL_THRESHOLD_CACHE = _cfg_int("APHRODITE_TOOL_THRESHOLD_CACHE", 4096, ("compression", "tool_threshold_cache"))
+    TERMINAL_THRESHOLD = _cfg_int("APHRODITE_TERMINAL_THRESHOLD", 1024, ("compression", "terminal_threshold"))
+    INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 2048, ("compression", "inline_threshold"))
+    RECURSIVE_DEPTH = _cfg_int("APHRODITE_RECURSIVE_DEPTH", 3)
 
-# ── Session state with config-driven defaults ──────────────────
+    # HEADROOM_SSE_BUFFER_MAX_BYTES check
+    if os.environ.get("HEADROOM_SSE_BUFFER_MAX_BYTES"):
+        INLINE_THRESHOLD = max(INLINE_THRESHOLD, 1_048_576)
 
-# recent markers deque — maxlen driven by env/TOML, falls back to 500
-_recent_markers: deque = deque(maxlen=_cfg_int("APHRODITE_RECENT_MARKERS_MAX", 500))
+    # Auto-expand (off by default)
+    AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 0, ("compression", "auto_expand_limit"))
+    if os.environ.get("APHRODITE_AUTO_EXPAND") == "1":
+        AUTO_EXPAND_LIMIT = _cfg_int("APHRODITE_AUTO_EXPAND_LIMIT", 51200)
 
-# ── Preview knobs ───────────────────────────────────────────────
-MODEL_FAMILY = _cfg_str("APHRODITE_MODEL_FAMILY", "code_first", ("previews", "model_family"))
-CODE_STRUCTURE_MAP = _cfg_bool("APHRODITE_CODE_STRUCTURE_MAP", True, ("previews", "code_structure_map"))
-PREVIEW_MAX_CHARS = _cfg_int("APHRODITE_PREVIEW_MAX_CHARS", 120, ("previews", "preview_max_chars"))
+    CATALOG_MODE = _cfg_str("APHRODITE_CATALOG", "compact", ("compression", "catalog_mode"))
+    CLASSIFIER_POLL = _cfg_bool("APHRODITE_CLASSIFIER_POLL", True, ("compression", "classifier_poll"))
+    CODE_MULTIPLIER = _cfg_float("APHRODITE_CODE_MULTIPLIER", 3.0, ("compression", "code_multiplier"))
+    CONTEXT_ENGINE = _cfg_bool("APHRODITE_CONTEXT_ENGINE", True, ("compression", "context_engine"))
 
-# ── Prompt knobs ────────────────────────────────────────────────
-RETRIEVE_GUIDANCE = _cfg_str("APHRODITE_RETRIEVE_GUIDANCE", "minimal", ("prompts", "retrieve_guidance"))
-CCR_MARKER_HINT = _cfg_bool("APHRODITE_CCR_MARKER_HINT", False, ("prompts", "ccr_marker_hint"))
-CATALOG_INTENT_HINTS = _cfg_bool("APHRODITE_CATALOG_INTENT_HINTS", False, ("prompts", "catalog_intent_hints"))
+    # Big-payload guard
+    MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)
+
+    # Previews
+    MODEL_FAMILY = _cfg_str("APHRODITE_MODEL_FAMILY", "code_first", ("previews", "model_family"))
+    CODE_STRUCTURE_MAP = _cfg_bool("APHRODITE_CODE_STRUCTURE_MAP", True, ("previews", "code_structure_map"))
+    PREVIEW_MAX_CHARS = _cfg_int("APHRODITE_PREVIEW_MAX_CHARS", 120, ("previews", "preview_max_chars"))
+
+    # Prompts
+    RETRIEVE_GUIDANCE = _cfg_str("APHRODITE_RETRIEVE_GUIDANCE", "minimal", ("prompts", "retrieve_guidance"))
+    CCR_MARKER_HINT = _cfg_bool("APHRODITE_CCR_MARKER_HINT", False, ("prompts", "ccr_marker_hint"))
+    CATALOG_INTENT_HINTS = _cfg_bool("APHRODITE_CATALOG_INTENT_HINTS", False, ("prompts", "catalog_intent_hints"))
+
+    # Recent markers deque
+    _recent_markers = deque(maxlen=_cfg_int("APHRODITE_RECENT_MARKERS_MAX", 500))
+
+    # Debug logging (env-only, no TOML key)
+    DEBUG_LOGGING = os.environ.get("APHRODITE_DEBUG", "") == "1"
+
+    if DEBUG_LOGGING:
+        _log.setLevel(logging.DEBUG)
+        _log.debug(
+            "aphrodite v%s debug logging enabled | engine_threshold=%s protect_first=%s protect_last=%s "
+            "min_msgs=%s tool_token=%s tool_cache=%s term=%s inline=%s",
+            PLUGIN_VERSION,
+            ENGINE_THRESHOLD_PCT,
+            ENGINE_PROTECT_FIRST,
+            ENGINE_PROTECT_LAST,
+            ENGINE_MIN_MSGS,
+            TOOL_THRESHOLD_TOKEN,
+            TOOL_THRESHOLD_CACHE,
+            TERMINAL_THRESHOLD,
+            INLINE_THRESHOLD,
+        )
+
+
+def reload_config() -> None:
+    """Hot-reload TOML config — clear cache and re-evaluate all constants.
+
+    Called by on_start() at session start so aphrodite.toml edits take
+    effect without a full Hermes restart.
+    """
+    global _CONFIG
+    _CONFIG = None
+    _init_config()
+    _log.info(
+        "config hot-reloaded: auto_expand_limit=%d engine_threshold=%d "
+        "catalog=%s context_engine=%s",
+        AUTO_EXPAND_LIMIT, ENGINE_THRESHOLD_PCT, CATALOG_MODE, CONTEXT_ENGINE,
+    )
+
+
+# Evaluate at import time
+_init_config()
 
 _DEV = os.environ.get("APHRODITE_PASSTHROUGH", "") == "1" or os.environ.get("HERMES_DEV", "") == "1"
 
 if _DEV:
     _log.warning("aphrodite PASSTHROUGH MODE - plugin disabled, use cargo watch for proxies")
-if DEBUG_LOGGING:
-    _log.setLevel(logging.DEBUG)
-    _log.debug(
-        "aphrodite v%s debug logging enabled | engine_threshold=%s protect_first=%s protect_last=%s "
-        "min_msgs=%s tool_token=%s tool_cache=%s term=%s inline=%s",
-        PLUGIN_VERSION,
-        ENGINE_THRESHOLD_PCT,
-        ENGINE_PROTECT_FIRST,
-        ENGINE_PROTECT_LAST,
-        ENGINE_MIN_MSGS,
-        TOOL_THRESHOLD_TOKEN,
-        TOOL_THRESHOLD_CACHE,
-        TERMINAL_THRESHOLD,
-        INLINE_THRESHOLD,
-    )
 
 # ── Model-aware template dispatch ──────────────────────────────────────────
 # Different LLM families process structured vs code-excerpt previews
