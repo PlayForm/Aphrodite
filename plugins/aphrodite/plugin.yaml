@@ -30,7 +30,7 @@ provides_context_engine: true
 # Engine threshold: -1=always compress, 0=disabled, >0=fill% (see _core.py, APHRODITE_ENGINE_THRESHOLD_PCT)
 # Ships 9 skills: compression architecture, proxy lifecycle, tool guide, context engine, coding defaults, context efficiency, boundary behaviors, output formatting, presentation
 install_message: |
-    aphrodite v1.62.23  —  CCR compression plugin for Hermes Agent.
+    aphrodite v1.62.24  —  CCR compression plugin for Hermes Agent.
     Proxies: token (:9798, SQLite, >1KB), cache (:9797, in-memory, >8KB).
     Engine: context_engine=true in aphrodite.toml (default-on).
     Debug: APHRODITE_DEBUG=1 hermes ...
