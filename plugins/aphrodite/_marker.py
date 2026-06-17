@@ -10,14 +10,10 @@ import time
 
 from ._core import (
     _CCR_RE,
-    _extract_code_structure,
-    _render_template,
-    _render_marker_tmpl,
-    _render_prompt_tmpl,
     PREVIEW_MAX_CHARS,
-    MODEL_FAMILY,
-    CLASSIFIER_POLL,
-    CCR_MARKER_HINT,
+    _extract_code_structure,
+    _render_marker_tmpl,
+    _render_template,
 )
 
 _log = logging.getLogger("aphrodite")

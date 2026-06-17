@@ -19,8 +19,6 @@ _log = logging.getLogger("aphrodite")
 # Priority: env var > aphrodite.toml > hardcoded default
 # aphrodite.toml is searched in: cwd, ~/.hermes/aphrodite/, REPO_ROOT
 
-import sys as _sys
-import importlib.util as _importlib_util
 
 _CONFIG: dict | None = None
 

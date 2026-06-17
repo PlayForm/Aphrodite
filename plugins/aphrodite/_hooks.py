@@ -8,6 +8,7 @@ import re
 import subprocess
 import time
 import urllib.request
+from contextlib import contextmanager
 
 from ._core import (
     _CCR_RE,
@@ -15,7 +16,10 @@ from ._core import (
     _FILE_TOOLS,
     AUTO_EXPAND_LIMIT,
     BINARY,
+    CATALOG_INTENT_HINTS,
     CATALOG_MODE,
+    CLASSIFIER_POLL,
+    CONTEXT_ENGINE,
     DEBUG_LOGGING,
     ENGINE_MIN_MSGS,
     ENGINE_PROTECT_FIRST,
@@ -23,12 +27,14 @@ from ._core import (
     ENGINE_THRESHOLD_PCT,
     INLINE_THRESHOLD,
     MAX_REQUEST_BODY_SIZE,
+    MODEL_FAMILY,
     PLUGIN_VERSION,
     PORTS,
     TERMINAL_THRESHOLD,
     TOOL_THRESHOLD_CACHE,
     TOOL_THRESHOLD_TOKEN,
     _conv_index,
+    _detect_model_family,
     _fmt_size,
     _git_cache,
     _hash_alias,
@@ -36,23 +42,26 @@ from ._core import (
     _init_trigram_index,
     _inline_bytes,
     _inline_index,
-    _inline_bytes,
+    _inline_index_enabled,
     _inline_store,
     _inline_store_put,
     _recent_markers,
+    _referenced_files,
+    _render_prompt_tmpl,
     _reset_scanned_msg_idx,
     _scanned_msg_idx,
     _state,
-    _detect_model_family,
-    _render_prompt_tmpl,
-    CLASSIFIER_POLL,
-    MODEL_FAMILY,
-    CATALOG_INTENT_HINTS,
-    CONTEXT_ENGINE,
 )
 from ._engine import get_engine
 from ._inline import _inline_compress, _inline_retrieve
-from ._marker import _ccr_marker, _classify_content, _compress_via_proxy, _make_ccr_preview, _parse_ccr_markers, _parse_errors
+from ._marker import (
+    _ccr_marker,
+    _classify_content,
+    _compress_via_proxy,
+    _make_ccr_preview,
+    _parse_ccr_markers,
+    _parse_errors,
+)
 from ._proxy import (
     _alive,
     _alive_cache,
@@ -622,7 +631,8 @@ def _rebuild_handler(args=None, **kwargs):
     import time as _time
     _time.sleep(0.3)  # let ports release
     restarted = []
-    from ._proxy import _start as _proxy_start, _query_proxy_version
+    from ._proxy import _query_proxy_version
+    from ._proxy import _start as _proxy_start
     for name in ("cache", "token"):
         try:
             _proxy_start(name, os.environ.copy())
@@ -1576,11 +1586,7 @@ def _build_toc() -> str:
             preview_lower = p.lower()
             if "0e" not in preview_lower and "0w" not in preview_lower:
                 retrieve = "YES"
-        elif t == "terminal" and "exit=0" not in p:
-            retrieve = "YES"
-        elif t in ("grep", "search_files", "search_results") and "0 matches" not in p and "0m" not in p:
-            retrieve = "YES"
-        elif t not in ("build_output", "build_error", "terminal") and "0E 0W" not in p:
+        elif t == "terminal" and "exit=0" not in p or t in ("grep", "search_files", "search_results") and "0 matches" not in p and "0m" not in p or t not in ("build_output", "build_error", "terminal") and "0E 0W" not in p:
             retrieve = "YES"
 
         lines.append(f"| {h:<7} | {t:<14} | {s:>5} | {p:<45} | {retrieve:<9} |")
@@ -1991,7 +1997,7 @@ def _prefetch_handler(args=None, **kwargs):
 
     def _read_and_compress(path: str):
         try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 content = f.read()
         except FileNotFoundError:
             with lock: markers.append({"path": path, "error": "file not found"})

@@ -29,7 +29,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from ._core import _DEV, BINARY, BINARY_DIR, DEBUG_LOGGING, ENV_FILE, PORTS
+from ._core import _DEV, BINARY, BINARY_DIR, DEBUG_LOGGING, ENV_FILE, PLUGIN_VERSION, PORTS
 
 _log = logging.getLogger("aphrodite")
 
@@ -422,6 +422,7 @@ _MARKERS_PATH = os.path.join(BINARY_DIR, "recent-markers.json")
 
 # Register save on process exit
 import atexit as _atexit
+
 _atexit.register(_save_markers)
 
 
