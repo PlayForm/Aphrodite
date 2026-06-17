@@ -69,3 +69,4 @@ id_rsa*
 **/.update_check
 **/__pycache__/
 **/.DS_Store
+*.bak
