@@ -5,6 +5,7 @@ import logging
 import os
 import signal
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -130,6 +131,37 @@ def _wait_alive(port: int, retries: int = 10, delay: float = 0.3) -> bool:
     return False
 
 
+_watcher_started = False
+
+
+def _start_settings_watcher() -> None:
+    """Poll runtime-settings.json for changes and reload config."""
+    global _watcher_started
+    if _watcher_started:
+        return
+    _watcher_started = True
+    from .._core import settings as _settings
+
+    def _watch():
+        import os
+        import time as _time
+
+        _path = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite", "runtime-settings.json")
+        _last_mtime = 0.0
+        while True:
+            try:
+                mtime = os.path.getmtime(_path)
+                if mtime != _last_mtime:
+                    _last_mtime = mtime
+                    _settings.reload_from_file()
+                    _log.info("settings watcher: reloaded from %s", _path)
+            except OSError:
+                pass
+            _time.sleep(2)
+
+    threading.Thread(target=_watch, daemon=True, name="settings-watcher").start()
+
+
 def on_start(**kw) -> str | None:
     """Hermes session_start hook - ensure binary + launch proxy + auto-setup."""
     from .._binary import _ensure_binary
@@ -139,6 +171,8 @@ def on_start(**kw) -> str | None:
         return None
     # Hot-reload TOML config — picks up aphrodite.toml edits without restart
     reload_config()
+    # ── Start settings file watcher (polls runtime-settings.json) ─
+    _start_settings_watcher()
     # Clear stale cache before checking (fixes stale state across session restarts)
     _alive_cache.clear()
     # Reset headroom context for the new session

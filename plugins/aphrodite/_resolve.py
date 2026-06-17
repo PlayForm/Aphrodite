@@ -29,7 +29,7 @@ def _filter_lines(content: str, query: str) -> str:
     """
     if not query:
         return content
-    lines = [l for l in content.splitlines() if query.lower() in l.lower()]
+    lines = [ln for ln in content.splitlines() if query.lower() in ln.lower()]
     if not lines:
         return f"[aphrodite: no lines matched {query!r} \u2014 returning full content]\n{content}"
     return "\n".join(lines)
