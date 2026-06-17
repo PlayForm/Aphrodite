@@ -39,14 +39,21 @@ def _restore_bak(bak):
 
 
 def _detect_platform() -> str:
-    """Return platform tag for download URL."""
+    """Return Rust target triple for download URL."""
     system = platform.system().lower()
     machine = platform.machine().lower()
+
+    # Map common machine names to Rust target arch
+    arch = {"arm64": "aarch64", "aarch64": "aarch64", "x86_64": "x86_64", "amd64": "x86_64"}.get(machine, machine)
+
     if system == "darwin":
-        return "macos-arm64" if machine in ("arm64", "aarch64") else "macos-x64"
+        return f"{arch}-apple-darwin"
     elif system == "linux":
-        return "linux-x64" if machine == "x86_64" else "linux-arm64"
-    return f"{system}-{machine}"
+        libc = "gnu"  # default; musl detection would need ldd check
+        return f"{arch}-unknown-linux-{libc}"
+    elif system == "windows":
+        return f"{arch}-pc-windows-msvc"
+    return f"{arch}-unknown-{system}"
 
 
 def _download_binary() -> bool:
@@ -61,6 +68,8 @@ def _download_binary() -> bool:
             pass
     plat = _detect_platform()
     download_url = f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite-{plat}"
+    if platform.system().lower() == "windows":
+        download_url += ".exe"
     _log.info("downloading aphrodite %s from %s", BIN_VERSION, download_url)
     try:
         ctx = ssl.create_default_context(cafile=certifi.where())
