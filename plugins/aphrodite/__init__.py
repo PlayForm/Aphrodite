@@ -162,9 +162,7 @@ def register(ctx):
     # -- Bundle skills (namespaced as aphrodite:*) -----------------------------
     _skills_dir = Path(__file__).parent / "skills"
     _skills = [
-        ("aphrodite-auto-expand-testing", "Protocol for testing APHRODITE_NO_AUTO_EXPAND behavior"),
         ("aphrodite-benchmarking", "Performance benchmarking for proxy + compression pipeline"),
-        ("aphrodite-boundary-behaviors", "Boundaries between compression layers: retrieve thresholds, cross-store visibility"),
         ("aphrodite-center-testing", "Test center features end-to-end — call site audit, persistence, composition"),
         ("aphrodite-coding-defaults", "Coding-optimized compression defaults, centers, and auto-expand"),
         ("aphrodite-compression-architecture", "Compression architecture reference — semantic layers, token savings"),
@@ -182,7 +180,7 @@ def register(ctx):
     for _name, _desc in _skills:
         ctx.register_skill(_name, _skills_dir / _name / "SKILL.md", _desc)
 
-    _log.info("aphrodite v%s registered - 10 tools + 15 skills + hooks", PLUGIN_VERSION)
+    _log.info("aphrodite v%s registered - 10 tools + 13 skills + hooks", PLUGIN_VERSION)
 
     if DEBUG_LOGGING:
         lines = [
