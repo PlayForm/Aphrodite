@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from .._core import _DEV, BINARY, BINARY_DIR, BIN_VERSION, DEBUG_LOGGING, PLUGIN_VERSION, PORTS
+from .._core import reload_config
 from .env import _PROXY_ENV_KEYS, _inject_expand_guidance, _load_env
 from .health import _alive, _alive_cache, _headroom_context, _query_proxy_version
 from .markers import _restore_markers
@@ -137,6 +138,8 @@ def on_start(**kw) -> str | None:
     if not _ensure_binary():
         _log.error("cannot start - binary not available")
         return None
+    # Hot-reload TOML config — picks up aphrodite.toml edits without restart
+    reload_config()
     # Clear stale cache before checking (fixes stale state across session restarts)
     _alive_cache.clear()
     # Reset headroom context for the new session
