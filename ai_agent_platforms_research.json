@@ -1,0 +1,200 @@
+[
+  {
+    "platform": "Claude Code (Anthropic)",
+    "type": "CLI coding agent",
+    "llm_interface": "Direct Anthropic API (REST). Models: Claude 3.5/3.7 Sonnet, Opus. Uses Anthropic Messages API with tool_use content blocks. No user-configurable proxy or middleware layer. OAuth or API key auth.",
+    "proxy_compatible": false,
+    "tool_output_format": "Structured JSON tool-use blocks (Anthropic tool_use content type). Bash command outputs, file edits in diff/patch/search-replace format. Terminal and file system operations.",
+    "compression_potential": "Low \u2014 Closed Anthropic product controlling its own API pipeline. No extension points for middleware. Would require intercepting Anthropic API calls at the network level (MITM proxy), which breaks their security model. Only viable through official Anthropic partnership.",
+    "market_position": "Growing rapidly (launched 2025). Anthropic's flagship coding agent. Integrated into VS Code, JetBrains, and terminal. Strong mindshare among professional developers doing complex refactors and codebase exploration."
+  },
+  {
+    "platform": "Codex CLI (OpenAI)",
+    "type": "Open-source CLI coding agent",
+    "llm_interface": "Direct OpenAI API (REST) \u2014 Chat Completions with tools. Also supports other model providers via a config system (provider: openai, anthropic, google, etc.). Open source (Apache 2.0). Model configuration is user-visible and modifiable.",
+    "proxy_compatible": true,
+    "tool_output_format": "Standard OpenAI function-calling JSON (tool_calls array with function name and arguments). Terminal command outputs, file read/write operations, git diff displays. Structured chat message format with role/content/tool_call_id.",
+    "compression_potential": "Medium-High \u2014 Open source with pluggable model providers. Aphrodite could be added as a provider adapter or as a proxy wrapping existing providers. The tool output format (standard OpenAI JSON) is highly compressible. Codex's agent loop is inspectable and modifiable.",
+    "market_position": "New but fast-growing (2025). OpenAI's open-source answer to Claude Code. Benefits from OpenAI brand recognition. Apache 2.0 license encourages community contributions and forks."
+  },
+  {
+    "platform": "Aider",
+    "type": "Open-source CLI coding agent",
+    "llm_interface": "Multi-provider direct API calls via LiteLLM-style routing. Supports: OpenAI, Anthropic, Google Gemini, DeepSeek, Ollama, OpenRouter, Azure, AWS Bedrock, Groq, and custom OpenAI-compatible endpoints. Configurable via --model and --openai-api-base flags. Architect/editor two-phase mode for complex edits.",
+    "proxy_compatible": true,
+    "tool_output_format": "Unified diff format (SEARCH/REPLACE blocks) for code edits. Plain text tool outputs with structured markers. File path tracking and repo map generation. Incremental diff-based rendering.",
+    "compression_potential": "High \u2014 Strongest candidate among open-source tools. Already has multi-provider routing with custom endpoint support. Aphrodite could integrate as an OpenAI-compatible endpoint (--openai-api-base http://aphrodite:port/v1) providing transparent compression. Its architect/editor split mode could benefit from context compression. Repo map generation is a compression-adjacent feature.",
+    "market_position": "One of the most popular open-source AI coding tools (~30k+ GitHub stars). Established community. Frequently used in SWE-bench evaluations. Known for innovative map-reduce repository context approach. Broad model support drives adoption."
+  },
+  {
+    "platform": "Cline / Roo Code",
+    "type": "VS Code extension coding agent",
+    "llm_interface": "Direct API calls from VS Code extension runtime. Supports OpenAI, Anthropic, Google Gemini, Ollama, OpenRouter, LM Studio, DeepSeek, and custom OpenAI-compatible endpoints. MCP (Model Context Protocol) support for tool extensions. Optional VS Code Language Model API for Copilot models.",
+    "proxy_compatible": true,
+    "tool_output_format": "MCP tool protocol (JSON-RPC) for extended tools. VS Code workspace edits via editor API. Terminal command execution with output streaming. File operations through VS Code workspace. Structured tool_use following provider-specific function-calling formats.",
+    "compression_potential": "Medium-High \u2014 Open source (Apache 2.0) with MCP-native architecture. Two integration paths: (1) Aphrodite as a custom API endpoint for model calls, (2) Aphrodite as an MCP server providing context compression services. The MCP path is ideal because it's the standard extension protocol, not a hack. Context window management is a known pain point for Cline users \u2014 compression directly addresses this.",
+    "market_position": "Popular VS Code-native autonomous agent. Cline and Roo Code (community fork) together have significant user base. Known for aggressive autonomous coding capabilities (full project scaffolding, multi-file edits). Strong in VS Code ecosystem."
+  },
+  {
+    "platform": "Continue.dev",
+    "type": "IDE extension (VS Code + JetBrains)",
+    "llm_interface": "Configurable model providers via config YAML/JSON. Supports OpenAI, Anthropic, Google, Ollama, LM Studio, together.ai, Replicate, Mistral, and custom API endpoints. Built-in model roster with provider abstraction. Local model support for privacy-sensitive use cases.",
+    "proxy_compatible": true,
+    "tool_output_format": "IDE-embedded inline edits with diff views. Chat panel with markdown + code blocks. Slash commands for tool invocation. Context menu (@file, @folder, @codebase) for context selection. JSON configuration format for providers and tools.",
+    "compression_potential": "Medium \u2014 Continue is model-agnostic with provider configs. Aphrodite could register as a custom model provider. Less agentic than Cline/Aider \u2014 focused on inline editing and chat rather than autonomous multi-step agents. The @codebase context feature could be enhanced by compression. However, the simpler tool chain means fewer compressible interactions.",
+    "market_position": "Widely used open-source AI IDE extension (~20k+ GitHub stars). Strong presence in both VS Code and JetBrains. Focused on user-controlled inline editing rather than autonomous agents. Appeals to developers who want AI assistance without giving up control."
+  },
+  {
+    "platform": "Cursor",
+    "type": "AI-native IDE (VS Code fork)",
+    "llm_interface": "Proprietary backend. All model requests route through Cursor's servers regardless of model selection. Users select models (GPT-4o, Claude, Cursor-small) but traffic goes through Cursor infrastructure. Cursor acts as an API proxy itself, handling rate limiting, caching, and custom context assembly. Some local model support via Ollama but limited.",
+    "proxy_compatible": false,
+    "tool_output_format": "Inline code generation with diff-based apply. Terminal commands executed through IDE integration. Multi-file refactors via Composer agent. Proprietary agent protocol (not publicly documented). Tab completions use custom ghost text format.",
+    "compression_potential": "Low \u2014 Cursor is a closed-source commercial product controlling its entire infrastructure stack. All requests are TLS-encrypted to Cursor servers. Cannot inject a compression layer without: (a) official partnership/integration, (b) reverse-engineering the client-server protocol, or (c) OS-level TLS interception, none of which are practical.",
+    "market_position": "Market leader in AI-native IDEs. Millions of users. Primary competitor to GitHub Copilot in the IDE space. Dominates the 'AI-first IDE' category. Strong enterprise adoption with team pricing. Premium product positioning ($20/user/month)."
+  },
+  {
+    "platform": "Windsurf (Codeium)",
+    "type": "AI-native IDE",
+    "llm_interface": "Proprietary backend via Codeium servers. Models: proprietary Cascade model + GPT-4o, Claude Sonnet. All traffic goes through Codeium infrastructure. No direct API access for end users. Cascade agent uses multi-model orchestration internally.",
+    "proxy_compatible": false,
+    "tool_output_format": "IDE-integrated edits with multi-file awareness. Terminal command execution through Cascade agent flow. Proprietary agent protocol. Multi-step reasoning displayed in IDE panel but protocol is internal.",
+    "compression_potential": "Low \u2014 Fully closed commercial system. All traffic is encrypted to Codeium servers. Same constraints as Cursor. Would require Codeium partnership for any integration.",
+    "market_position": "Strong competitor to Cursor in AI-native IDE space. Known for Cascade agent's multi-file reasoning. Freemium model with generous free tier driving adoption. Growing user base, particularly among developers wanting an alternative to Cursor."
+  },
+  {
+    "platform": "Cloudflare Agents SDK",
+    "type": "Agent framework / SDK",
+    "llm_interface": "HTTP + WebSocket-based agent protocol running on Cloudflare Workers (Durable Objects). Model calls via Workers AI (Cloudflare-hosted models) or external API fetches (OpenAI, Anthropic) from within Workers. Cloudflare AI Gateway for unified routing. Serverless execution model with stateful sessions.",
+    "proxy_compatible": true,
+    "tool_output_format": "JSON state updates persisted via Durable Objects storage. Standard function-calling schemas for tool definitions. HTTP responses with structured JSON bodies. WebSocket messages for streaming agent state. SQLite storage via Durable Objects for agent memory.",
+    "compression_potential": "Medium \u2014 Aphrodite could deploy as a Cloudflare Worker or external service sitting between the agent and LLM. Cloudflare's AI Gateway provides a natural interception point. However, serverless cold starts and latency sensitivity make compression overhead challenging. The Durable Objects state model means state compression could be useful.",
+    "market_position": "Emerging platform (2025). Cloudflare's answer to Vercel AI SDK for AI agents. Benefits from Cloudflare's global edge network. Appeals to Cloudflare ecosystem developers. Early stage but backed by Cloudflare's significant resources."
+  },
+  {
+    "platform": "Vercel AI SDK / Agents SDK",
+    "type": "Agent framework / SDK",
+    "llm_interface": "Provider-agnostic via @ai-sdk/provider interface. Built-in providers: OpenAI, Anthropic, Google, Mistral, Groq, xAI, DeepSeek, and more. Custom provider API for third-party models. Streaming via Server-Sent Events (SSE). Middleware/plugin architecture for request/response transformation. Agents SDK adds tool management, multi-step execution, and state persistence.",
+    "proxy_compatible": true,
+    "tool_output_format": "Streamed text deltas with tool call chunks (tool-call and tool-result stream parts). UI message format for frontend rendering (useChat). Standard OpenAI-compatible tool calling internally. Multi-modal content blocks (text, image, file).",
+    "compression_potential": "High \u2014 The Vercel AI SDK has a well-designed custom provider API. Aphrodite could be implemented as a custom AI SDK provider that transparently compresses context and decompresses responses. The middleware model (wrapLanguageModel) allows transformation of prompts and responses. Streaming support means compression overhead must be minimal, but context compression (pre-request) is viable.",
+    "market_position": "Dominant AI SDK for Next.js/Vercel ecosystem. Extremely popular among web developers building AI features. Agents SDK is newer (2025) but rapidly growing. Thousands of production applications depend on it. Default choice for Vercel/Next.js AI projects."
+  },
+  {
+    "platform": "GitHub Copilot",
+    "type": "IDE-integrated coding assistant + agent",
+    "llm_interface": "Proprietary backend via GitHub/Microsoft servers. Authentication via GitHub account. Model selection (GPT-4o, Claude 3.5, o1, o3) is server-side with user preferences. Recently introduced Copilot Extensions SDK for third-party tool integration. Copilot Chat API available to other extensions. Agent mode (2025) adds terminal and workspace capabilities.",
+    "proxy_compatible": false,
+    "tool_output_format": "Inline completions (Ghost Text in editor). Chat panel with markdown + code blocks + interactive buttons. Workspace edits via VS Code API. Agent mode uses diagnostics + terminal output. Copilot Chat API uses JSON with markdown content blocks and code references.",
+    "compression_potential": "Low \u2014 Microsoft-controlled infrastructure. Copilot Extensions API might allow some tool-level integration but doesn't expose the model call pipeline. Enterprise customers can configure data filtering proxies but not for compression. The sheer scale of Copilot means partnerships are the only realistic path.",
+    "market_position": "Absolute market leader in AI coding tools. Most widely deployed \u2014 integrated into VS Code, Visual Studio, JetBrains, GitHub.com, GitHub Mobile. Millions of daily active users. Enterprise plans with IP indemnity drive corporate adoption. Deep GitHub ecosystem integration is a moat."
+  },
+  {
+    "platform": "Amazon Q Developer",
+    "type": "IDE extension + CLI agent",
+    "llm_interface": "AWS backend exclusively. All requests route through Amazon Q service. Uses Bedrock models internally (Claude, Llama, Amazon Titan). CLI agent (`q chat` and `q dev`) can execute terminal commands and manage AWS resources. No user-configurable model routing.",
+    "proxy_compatible": false,
+    "tool_output_format": "Inline code suggestions in IDE. Chat responses with code blocks. Terminal command execution with AWS CLI integration. Security scanning outputs in structured format. AWS-specific tool responses for infrastructure management.",
+    "compression_potential": "Low \u2014 AWS-controlled managed service. No public API for custom routing or middleware. Enterprise customers might have VPC endpoint options but not designed for third-party compression. AWS partnership would be required.",
+    "market_position": "Growing rapidly in AWS ecosystem. Free tier for individual developers drives broad adoption. Enterprise features (security scanning, code transformation, customizations) differentiate from Copilot. Strong position in AWS-heavy organizations. Java upgrade automation is a unique capability."
+  },
+  {
+    "platform": "Tabnine",
+    "type": "IDE extension (code completion focused)",
+    "llm_interface": "Proprietary backend. Models run on Tabnine cloud servers or on-premise (enterprise deployment). Primarily uses Tabnine's own models with limited third-party support. Enterprise on-prem option runs a local Tabnine server.",
+    "proxy_compatible": false,
+    "tool_output_format": "Inline code completions (single-line and full-function). Chat panel for code questions. Not a multi-turn agent \u2014 limited tool use. Focus on completion quality and latency.",
+    "compression_potential": "Low \u2014 Primarily a completion engine, not an agent. The interaction pattern (single completions) doesn't benefit meaningfully from context compression. Enterprise on-prem could theoretically allow proxy insertion but with minimal gain.",
+    "market_position": "Established player (founded 2018). Lost significant market share to GitHub Copilot. Retains enterprise customers wanting on-premise AI deployments and IP protection. Niche in privacy-conscious organizations (finance, defense)."
+  },
+  {
+    "platform": "Sourcegraph Cody",
+    "type": "IDE extension + web app coding agent",
+    "llm_interface": "Sourcegraph backend with configurable LLM providers. Supports Anthropic Claude, OpenAI GPT-4o, and via Sourcegraph Enterprise, custom model endpoints. Differentiated by Sourcegraph's code intelligence layer (code graph, embeddings, search indexes) providing rich context. Enterprise self-hosted deployment option.",
+    "proxy_compatible": true,
+    "tool_output_format": "Chat responses with code blocks and sourcegraph file references. Inline edits via IDE integration. Context-aware suggestions using code graph results. Custom context format including symbol definitions, references, and embeddings.",
+    "compression_potential": "Medium \u2014 Enterprise self-hosted deployment allows proxy insertion. Sourcegraph already does significant context optimization (selective file inclusion via code graph), so Aphrodite compression would complement rather than replace. Combined code graph + compression could be powerful for large repositories.",
+    "market_position": "Strong in enterprise code intelligence + AI. Differentiated by deep code understanding (not just LLM context stuffing). Used by engineering organizations for codebase-wide questions and migrations. Smaller user base than Copilot/Cursor but high-value enterprise customers."
+  },
+  {
+    "platform": "PostHog Code",
+    "type": "Analytics-focused AI coding assistant",
+    "llm_interface": "Open source. Direct API calls to LLM providers. Configurable model selection. Built specifically for PostHog analytics implementation (event tracking, feature flags, etc.). Uses OpenAI-compatible API format.",
+    "proxy_compatible": true,
+    "tool_output_format": "Code generation with PostHog analytics context. Standard API tool calls. Specialized for PostHog SDK implementation code. Event tracking snippets and analytics instrumentation.",
+    "compression_potential": "Low-Medium \u2014 Open source and configurable, so technically integrable. However, it's a niche tool for PostHog-specific code generation, not a general coding agent. Compression benefits would be minimal given the narrow use case.",
+    "market_position": "Niche \u2014 PostHog ecosystem tool. Not a general-purpose coding agent. Used by PostHog customers for analytics instrumentation. Small user base relative to general coding agents."
+  },
+  {
+    "platform": "OpenHands (formerly OpenDevin)",
+    "type": "Open-source autonomous coding agent",
+    "llm_interface": "Fully configurable LLM backend. Supports all major providers (OpenAI, Anthropic, Google, Ollama, etc.) via LiteLLM integration. Runs as a sandboxed agent (Docker) with web UI. Custom model endpoint configuration supported. Agent loop is inspectable and modifiable.",
+    "proxy_compatible": true,
+    "tool_output_format": "Web UI with streaming agent actions. Docker sandbox execution outputs. Standard function-calling format for tools. File operations within sandbox. Structured action/observation loop format. Jupyter-style code execution cells.",
+    "compression_potential": "High \u2014 Fully open source (MIT license). Clean agent loop architecture with well-defined action/observation interfaces. Aphrodite could integrate at multiple levels: (1) as a custom LLM provider, (2) as a tool in the agent loop for context management, (3) as middleware compressing observations before they enter the context window. Ideal for research and experimentation.",
+    "market_position": "40k+ GitHub stars. Leading open-source autonomous agent platform. Popular in AI/ML research community. Strong contributor base. Less production deployment than commercial tools but widely used for experimentation and benchmarking."
+  },
+  {
+    "platform": "Devin (Cognition AI)",
+    "type": "Autonomous coding agent (SaaS)",
+    "llm_interface": "Fully proprietary. All agent execution happens on Cognition's infrastructure. Uses custom fine-tuned models and multi-model orchestration. No public API for model configuration or routing. Agent interactions go through Cognition's web platform.",
+    "proxy_compatible": false,
+    "tool_output_format": "Web UI with full IDE-in-browser. PR-based workflow (agent creates pull requests). Terminal, browser, and file operations displayed in UI. Proprietary agent protocol (not publicly documented).",
+    "compression_potential": "Low \u2014 Fully closed system. No public integration points. Would require a business partnership with Cognition, which is unlikely given their competitive moat is their proprietary agent infrastructure.",
+    "market_position": "First-mover in autonomous coding agents. High-profile launch (March 2024) with significant media attention. Enterprise-focused with $500/seat pricing. Smaller user base than mass-market tools but high-value engineering team customers. Proven on SWE-bench benchmarks."
+  },
+  {
+    "platform": "Replit Agent",
+    "type": "Browser-based AI coding agent",
+    "llm_interface": "Proprietary Replit backend. Model calls go through Replit's infrastructure. Uses a combination of models (Claude, GPT-4o, Replit-specific). Integrated deeply with Replit's online IDE and deployment platform.",
+    "proxy_compatible": false,
+    "tool_output_format": "Browser-based IDE with real-time code generation. Full-stack app creation from natural language. Replit's proprietary agent format integrated with their IDE, database, and deployment primitives.",
+    "compression_potential": "Low \u2014 Closed platform. All execution happens on Replit servers. No external integration points. Would require Replit partnership.",
+    "market_position": "Growing in the browser-based development market. Appeals to beginners and rapid prototyping. Integrated with Replit's deployment platform. Differentiated by full-stack capability from prompt to deployed app."
+  },
+  {
+    "platform": "Supermaven (acquired by Cursor)",
+    "type": "IDE extension (code completion)",
+    "llm_interface": "Proprietary backend (now part of Cursor). Known for extremely low-latency completions (sub-100ms). Uses custom models optimized for speed. Now integrated into Cursor as their completion engine.",
+    "proxy_compatible": false,
+    "tool_output_format": "Inline completions with extremely low latency. Triple-tab interface for cycling completions. Not agentic \u2014 pure completion engine.",
+    "compression_potential": "Low \u2014 Acquired and integrated into Cursor. Same constraints as Cursor. Completion-focused with no multi-turn interactions to compress.",
+    "market_position": "Acquired by Cursor (2024). Was an independent competitor known for speed. Now powers Cursor's tab completion. No longer a standalone platform."
+  },
+  {
+    "platform": "Augment Code",
+    "type": "IDE extension coding agent",
+    "llm_interface": "Proprietary backend. Augment Code's own infrastructure with fine-tuned models. VS Code and JetBrains extensions. Focus on large-scale codebase understanding with proprietary context assembly.",
+    "proxy_compatible": false,
+    "tool_output_format": "IDE-integrated edits and chat. Multi-file awareness with codebase-level context. Proprietary agent protocol. Terminal command execution.",
+    "compression_potential": "Low \u2014 Closed commercial product. Proprietary infrastructure. Would require Augment Code partnership.",
+    "market_position": "Enterprise-focused. Positioned for large engineering teams. Differentiated by context window management for massive codebases. VC-backed with significant funding ($252M raised)."
+  },
+  {
+    "platform": "PearAI",
+    "type": "AI-native IDE (VS Code fork)",
+    "llm_interface": "Proprietary backend routing to multiple LLM providers. VS Code fork with AI-native features. Supports model selection via UI but backend is controlled. Controversial launch due to licensing issues.",
+    "proxy_compatible": false,
+    "tool_output_format": "Inline edits, agent mode, terminal integration. Similar to Cursor's output format. Proprietary agent protocol.",
+    "compression_potential": "Low \u2014 Same constraints as Cursor/Windsurf. Closed-source IDE fork controlling its own infrastructure.",
+    "market_position": "Smaller player in AI-native IDE space. Limited adoption compared to Cursor/Windsurf. YC-backed but community trust issues from launch."
+  },
+  {
+    "platform": "Qodo (formerly Codium)",
+    "type": "IDE extension + PR agent",
+    "llm_interface": "Proprietary backend with configurable models. Focused on code review, testing, and PR workflows. Supports custom model endpoints for enterprise.",
+    "proxy_compatible": true,
+    "tool_output_format": "PR comments, test generation code, code review suggestions. Standard diff format for PR interactions. IDE inline suggestions.",
+    "compression_potential": "Medium \u2014 Enterprise deployment allows proxy insertion. Focused on PR/code review workflows rather than open-ended agent tasks. Compression could help with large PR contexts.",
+    "market_position": "Growing in code review AI space. Differentiated by test generation and PR review quality. Enterprise customers. Smaller than Copilot/Cursor but growing."
+  },
+  {
+    "platform": "Bloop",
+    "type": "Code understanding + agent",
+    "llm_interface": "Hybrid \u2014 uses semantic code search + LLM. On-premise or cloud deployment. Configurable LLM backends for enterprise. Focused on legacy code understanding and migrations.",
+    "proxy_compatible": true,
+    "tool_output_format": "Code explanations, migration plans, code search results. Structured output for code transformations. Enterprise deployment with custom endpoints.",
+    "compression_potential": "Medium \u2014 Enterprise on-prem allows proxy insertion. Already does heavy context optimization via semantic search. Compression could enhance their code-to-LLM pipeline.",
+    "market_position": "Niche in legacy code modernization. Smaller than mainstream tools. Specific use case (COBOL/Java migrations, code understanding). YC-backed."
+  }
+]
