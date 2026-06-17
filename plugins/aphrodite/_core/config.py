@@ -9,7 +9,7 @@ from .state import _state
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
 REPO = "PlayForm/Aphrodite"
-BIN_VERSION = "v0.8.0"  # binary download version (must match Cargo.toml)
+BIN_VERSION = "v0.8.1"  # binary download version (must match Cargo.toml)
 PLUGIN_VERSION = "1.62.15"  # plugin version
 BINARY_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "aphrodite")
 BINARY = os.path.join(BINARY_DIR, "aphrodite")
