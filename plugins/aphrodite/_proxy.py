@@ -398,6 +398,9 @@ def on_start(**kw):
 
     _log.info("aphrodite: cache=%s token=%s", "UP" if cache_ok else "DOWN", "UP" if token_ok else "DOWN")
 
+    # ── Restore recent markers from previous session ─────────────
+    _restore_markers()
+
     # Startup observability log
     _write_startup_log(cache_ok, token_ok, auto_summary)
 
@@ -411,3 +414,46 @@ def _wait_alive(port, retries=10, delay=0.3):
             return True
         time.sleep(delay)
     return False
+
+
+# ── Recent markers persistence ───────────────────────────────────
+
+_MARKERS_PATH = os.path.join(BINARY_DIR, "recent-markers.json")
+
+# Register save on process exit
+import atexit as _atexit
+_atexit.register(_save_markers)
+
+
+def _save_markers():
+    """Persist _recent_markers to disk for session resume. Called on shutdown."""
+    try:
+        from .._hooks import _recent_markers  # late import to avoid circular
+    except ImportError:
+        from ._core import _recent_markers
+    try:
+        data = list(_recent_markers)
+        with open(_MARKERS_PATH, "w") as f:
+            json.dump(data[-100:], f)  # keep last 100 entries
+        _log.debug("saved %d markers to %s", min(len(data), 100), _MARKERS_PATH)
+    except Exception as e:
+        _log.debug("failed to save markers: %s", e)
+
+
+def _restore_markers():
+    """Load recent markers from disk into session state. Called by on_start()."""
+    try:
+        from .._hooks import _recent_markers
+    except ImportError:
+        from ._core import _recent_markers
+    try:
+        if os.path.exists(_MARKERS_PATH):
+            with open(_MARKERS_PATH) as f:
+                data = json.load(f)
+            _recent_markers.clear()
+            for entry in data:
+                if isinstance(entry, dict) and "hash" in entry:
+                    _recent_markers.append(entry)
+            _log.info("restored %d markers from previous session", len(_recent_markers))
+    except Exception as e:
+        _log.debug("no markers to restore: %s", e)
