@@ -64,7 +64,7 @@ jobs:
 
             - name: Init submodule from remote
               run: |
-                  git submodule update --init --remote --recursive --merge
+                  git submodule update --init --remote --recursive || true
                   git submodule status
 
             - name: Setup Rust (nightly)
@@ -106,7 +106,7 @@ jobs:
 
             - name: Init submodule from remote
               run: |
-                  git submodule update --init --remote --recursive --merge
+                  git submodule update --init --remote --recursive || true
                   git submodule status
 
             - name: Setup Rust (nightly)

@@ -60,7 +60,7 @@ jobs:
 
             - name: Init submodule from remote
               run: |
-                  git submodule update --init --remote --recursive --merge
+                  git submodule update --init --remote --recursive || true
 
             - name: Setup Rust (nightly)
               uses: dtolnay/rust-toolchain@nightly

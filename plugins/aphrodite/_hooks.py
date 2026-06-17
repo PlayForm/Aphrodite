@@ -2112,7 +2112,8 @@ import threading as _live_threading
 _live_containers = {}  # {hash: {status, chunks, command, pid}}
 
 def _create_live_container(command, env=None):
-    import hashlib, subprocess
+    import hashlib
+    import subprocess
     hash_val = hashlib.sha256(command.encode()).hexdigest()[:16]
     chunks = []
     def _run():
