@@ -1,106 +1,71 @@
-"""aphrodite — live container: async tool result via CCR markers.
+"""aphrodite — live container bubble.
 
-When a read_file (or similar file-reading tool) produces output above
-threshold, we return a CCR marker instead of full content. The LLM sees
-a tiny marker and continues reasoning. When it actually needs the content,
-it polls via aphrodite_retrieve(hash).
+Self-contained, zero-dependency module. Invisible until activated.
+When APHRODITE_LIVE_CONTAINER=1, wraps read_file results in CCR markers.
+Communicates directly with the aphrodite proxy at :9798.
+No imports from the aphrodite plugin — works as a standalone patch.
 
-Pattern: same as terminal(background=true) — return handle immediately,
-content loads behind the scenes.
+Apply to Hermes core by adding to file_tools.py:
+    from live_container import wrap_read_result
+    return wrap_read_result(result_json)
 """
 
 import json
-import logging
+import os
+import urllib.request
 
-from .._core import (
-    INLINE_THRESHOLD,
-    PORTS,
-    _detect_model_family,
-    _inline_store_put,
-    _recent_markers,
-    _state,
-)
-from .._marker import (
-    _ccr_marker,
-    _classify_content,
-    _compress_via_proxy,
-    _make_ccr_preview,
-)
-from .._proxy import _alive_cached, _headroom_context
-
-_log = logging.getLogger("aphrodite.hooks.live")
-
-# Tools that get live container treatment
-_LIVE_TOOLS: frozenset = frozenset({
-    "read_file",
-    "search_files",
-})
+# ── Bubble config (self-contained, no TOML) ──────────────────────
+_PROXY_URL = "http://127.0.0.1:9798"
+_MIN_BYTES = 2048  # Only wrap results above this size
+_TIMEOUT = 3       # Proxy request timeout
 
 
-def _is_live_tool(tool_name: str) -> bool:
-    """Check if this tool should get live container treatment."""
-    return tool_name in _LIVE_TOOLS
+def _is_active() -> bool:
+    """Check if live container mode is enabled."""
+    return os.environ.get("APHRODITE_LIVE_CONTAINER") == "1"
 
 
-def _wrap_as_live_container(
-    tool_name: str,
-    result: str,
-    args: dict | None = None,
-) -> str | None:
-    """Wrap tool result in a live container CCR marker.
+def _store(content: str) -> str | None:
+    """Store content in CCR proxy, return hash or None."""
+    try:
+        data = content.encode()
+        req = urllib.request.Request(
+            f"{_PROXY_URL}/ccr/create",
+            data=data,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:
+            ccr = json.loads(r.read())
+        return ccr.get("hash")
+    except Exception:
+        return None
 
-    Returns None if result is too small or tool shouldn't be intercepted.
-    Returns the CCR marker string if live container applied.
+
+def wrap_read_result(result_json: str) -> str:
+    """Wrap a read_file result in a live container CCR marker.
+
+    Call this right before returning from read_file_tool.
+    If live container is inactive or content is too small,
+    returns the original result unchanged.
+
+    Usage in file_tools.py:
+        result_json = json.dumps(result_dict, ensure_ascii=False)
+        return wrap_read_result(result_json)
     """
-    if not result or not isinstance(result, str) or not result.strip():
-        return None
+    if not _is_active():
+        return result_json
 
-    token_alive = _alive_cached(PORTS["token"])
-    cache_alive = _alive_cached(PORTS["cache"])
-    proxy_available = token_alive or cache_alive
-    if not proxy_available:
-        return None
+    if len(result_json) <= _MIN_BYTES:
+        return result_json
 
-    result_len = len(result)
-    if result_len < INLINE_THRESHOLD:
-        return None
+    h = _store(result_json)
+    if not h:
+        return result_json
 
-    # Already a CCR marker — don't double-wrap
-    if result.startswith("<<<CCR:") or "<<<CCR:" in result[:100]:
-        return None
-
-    target = PORTS["token"] if token_alive else PORTS["cache"]
-    label = "token" if token_alive else "cache"
-
-    klass = _classify_content(result)
-    preview = _make_ccr_preview(result, klass=klass, model_family=_detect_model_family())
-
-    ccr = _compress_via_proxy(result, target, headers=_headroom_context or None)
-    if not ccr:
-        return None
-
-    h, _sz = ccr
-    _inline_store_put(h, result)
-
-    path_hint = ""
-    if args and isinstance(args, dict):
-        p = args.get("path", args.get("paths", ""))
-        if p:
-            path_hint = f";path={str(p)[:80]}"
-
-    marker = _ccr_marker(
-        h, "live", result_len, label, preview,
-        headroom_budget=_headroom_context.get("x-headroom-budget"),
+    size = len(result_json)
+    return (
+        f"<<<CCR:{h}|live|{size}>>>\n"
+        f"Live container — content stored. "
+        f"Use aphrodite_retrieve({h}) to fetch when needed. "
+        f"Continue reasoning without waiting."
     )
-
-    _recent_markers.append({
-        "hash": h, "type": "live", "size": result_len,
-        "preview": preview, "turn": _state.get("turn_counter", 0),
-    })
-
-    _log.info(
-        "live_container: %s → CCR:%s size=%s %s",
-        tool_name, h, result_len, path_hint,
-    )
-
-    return marker

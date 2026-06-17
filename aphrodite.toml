@@ -44,8 +44,6 @@ catalog_mode = "tool"           # compact | full | tool
 classifier_poll = true             # skip CCR for clean outputs
 code_multiplier = 3.0              # multiply threshold for code types
 context_engine = true              # default-on, no env var needed
-live_container = true              # intercept read_file → CCR marker
-live_container_threshold = 2048    # min bytes to intercept
 prefetch = true                    # enable aphrodite_prefetch tool
 
 

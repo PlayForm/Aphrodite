@@ -179,8 +179,7 @@ def _init_config() -> None:
     global ENGINE_MIN_MSGS, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE
     global TERMINAL_THRESHOLD, INLINE_THRESHOLD, AUTO_EXPAND_LIMIT
     global CATALOG_MODE, CLASSIFIER_POLL, CODE_MULTIPLIER, CONTEXT_ENGINE
-    global LIVE_CONTAINER, LIVE_CONTAINER_THRESHOLD
-    global MAX_REQUEST_BODY_SIZE, MODEL_FAMILY, CODE_STRUCTURE_MAP
+        global MAX_REQUEST_BODY_SIZE, MODEL_FAMILY, CODE_STRUCTURE_MAP
     global PREVIEW_MAX_CHARS, RETRIEVE_GUIDANCE, CCR_MARKER_HINT
     global CATALOG_INTENT_HINTS, RECURSIVE_DEPTH, DEBUG_LOGGING, _recent_markers
 
@@ -212,8 +211,6 @@ def _init_config() -> None:
     CLASSIFIER_POLL = _cfg_bool("APHRODITE_CLASSIFIER_POLL", True, ("compression", "classifier_poll"))
     CODE_MULTIPLIER = _cfg_float("APHRODITE_CODE_MULTIPLIER", 3.0, ("compression", "code_multiplier"))
     CONTEXT_ENGINE = _cfg_bool("APHRODITE_CONTEXT_ENGINE", True, ("compression", "context_engine"))
-LIVE_CONTAINER = _cfg_bool("APHRODITE_LIVE_CONTAINER", True, ("compression", "live_container"))
-LIVE_CONTAINER_THRESHOLD = _cfg_int("APHRODITE_LIVE_CONTAINER_THRESHOLD", 2048, ("compression", "live_container_threshold"))
 
     # Big-payload guard
     MAX_REQUEST_BODY_SIZE = _cfg_int("APHRODITE_MAX_REQUEST_BODY_SIZE", 104_857_600)

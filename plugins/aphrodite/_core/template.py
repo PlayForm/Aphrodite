@@ -112,7 +112,7 @@ def _render_prompt_tmpl(name: str, vars: dict | None = None) -> str:
         # Hardcoded fallbacks
         fallbacks = {
             "session_inject": "CCR markers (<<<CCR:hash|type|size>>>) point to compressed content. Retrieve if the preview doesn't tell you enough; aphrodite_catalog lists available entries.",
-            "engine_offload": "These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} messages below are your active context.",
+            "engine_offload": "These messages were offloaded to reduce context. Use aphrodite_retrieveif needed. The {tail} messages below are your active context.",
             "auto_expand_guidance": "Tool outputs are auto-expanded — you see full content inline. If you see a CCR marker, retrieve only if the preview hints at useful content.",
             "live_container_guidance": (
                 "NEVER use read_file. ALWAYS use aphrodite_prefetch for ALL file reads. "
