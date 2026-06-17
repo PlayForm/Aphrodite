@@ -78,7 +78,12 @@ jobs:
 
             - name: Install onnxruntime (Linux)
               if: runner.os == 'Linux'
-              run: sudo apt-get install -y libonnxruntime-dev
+              run: |
+                  wget -q https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz -O /tmp/ort.tgz
+                  tar xzf /tmp/ort.tgz -C /tmp
+                  echo "LD_LIBRARY_PATH=/tmp/onnxruntime-linux-x64-1.21.0/lib" >> $GITHUB_ENV
+                  echo "/tmp/onnxruntime-linux-x64-1.21.0/lib" | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
+                  sudo ldconfig
 
             - name: Setup Rust (nightly)
               uses: dtolnay/rust-toolchain@nightly
