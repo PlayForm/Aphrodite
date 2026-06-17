@@ -1,0 +1,135 @@
+name: Build
+
+on:
+  push:
+    branches: [Current]
+    tags: ["v*"]
+  pull_request:
+    branches: [Current]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Init submodule from remote
+        run: |
+          git submodule update --init --remote --recursive --merge
+          git submodule status
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Test
+        run: cargo test -p aphrodite --release
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: linux-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: macos-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            suffix: macos-amd64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Init submodule from remote
+        run: |
+          git submodule update --init --remote --recursive --merge
+          git submodule status
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Build
+        run: cargo build --release -p aphrodite --target ${{ matrix.target }}
+
+      - name: Rename binary
+        run: |
+          BIN="aphrodite"
+          SUFFIX="${{ matrix.suffix }}"
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
+            SRC="target/${{ matrix.target }}/release/$BIN"
+          elif [ "${{ matrix.target }}" = "aarch64-apple-darwin" ]; then
+            SRC="target/${{ matrix.target }}/release/$BIN"
+          else
+            SRC="target/${{ matrix.target }}/release/$BIN"
+          fi
+          cp "$SRC" "${BIN}-${SUFFIX}"
+          ls -lh "${BIN}-${SUFFIX}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aphrodite-${{ matrix.suffix }}
+          path: aphrodite-${{ matrix.suffix }}
+          retention-days: 30
+
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Display artifacts
+        run: find artifacts/ -type f -exec ls -lh {} \;
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/aphrodite-*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
