@@ -9,7 +9,7 @@ dependencies = []
 dev = [
     "ruff==0.15.17",
     "pyright==1.1.410",
-    "pytest==8.4.2",
+    "pytest==9.0.3",
     "pytest-asyncio==1.2.0",
     "pytest-xdist==3.8.0",
     "pytest-cov==7.1.0",
