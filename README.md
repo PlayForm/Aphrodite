@@ -389,23 +389,18 @@ Covers: requests, compression, CCR hits/misses, cache, tool relay, notifications
 
 ## MCP Integration 🔌
 
+Aphrodite works with any MCP server. Add servers to your Hermes config:
+
 ```yaml
 # ~/.hermes/config.yaml
 mcp:
   servers:
-    wezterm:
-      command: REDACTED/.local/bin/wezterm-mcp
+    your-server:
+      command: /path/to/mcp-server
       enabled: true
 ```
 
-Add `mcp` to `toolsets` and `platform_toolsets`. Tools auto‑discovered on restart:
-
-| MCP Tool | Description |
-| :------- | :---------- |
-| `mcp_wezterm_list_panes` | List all WezTerm panes with IDs, titles, CWDs |
-| `mcp_wezterm_send_text` | Send text to any pane |
-| `mcp_wezterm_get_buffer` | Read N lines of scrollback |
-| `mcp_wezterm_capture_snapshot` | Dump all pane buffers |
+Then add `mcp` to your `toolsets` and `platform_toolsets`. Tools are auto‑discovered on Hermes restart.
 
 ---
 
