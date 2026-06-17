@@ -6,9 +6,9 @@ Aphrodite is a reverse proxy with CCR (Compress-Cache-Retrieve) compression for 
 
 ### CCR (Compress-Cache-Retrieve)
 
-- [Marker Format](ccr/marker-format.md)  -  `<<<CCR:hash|type|size|mode|preview=PREVIEW|KEY=VALUE|...>>>` schema with exact hash format (BLAKE3, 24 hex), type enum (20 types), mode values, preview truncation by headroom budget, and metadata encoding rules
-- [Lifecycle](ccr/lifecycle.md)  -  Full 6-phase flow: compress (detect→threshold→hash→cache→store→marker), retrieve (inline→CCR→zstd→filter→paginate), expire (TTL+LRU+debounce). Includes all threshold tables per type and mode
-- [Content Types](ccr/content-types.md)  -  Complete taxonomy of 25 content types with detection order, threshold groups (×8, ×4, ×2, ×1, ÷2), and examples from both Rust (`detect_content_type`) and Python (`_classify_content`)
+- [Marker Format](ccr/marker-format.md)  -  `<<<CCR:hash|type|size>>>` schema with SHA-256 hash, 28 content types, TOML‑driven preview templates, and metadata encoding rules
+- [Lifecycle](ccr/lifecycle.md)  -  Full 6-phase flow: compress (detect→threshold→hash→cache→store→marker), retrieve (inline→CCR→resolve→filter→paginate), expire (TTL+LRU+debounce). Includes all threshold tables per type and mode
+- [Content Types](ccr/content-types.md)  -  Complete taxonomy of 28 content types with detection order, threshold groups, and examples from both Rust (`detect_content_type`) and Python (`_classify_content`)
 - **Backends**
   - [SQLite](ccr/backends/sqlite.md)  -  Schema (`ccr_entries` table), WAL mode, upsert semantics, lazy TTL purge (debounced 60s), poison resilience, stats_db schema
   - [In-Memory](ccr/backends/in-memory.md)  -  DashMap + VecDeque architecture, capacity 10,000, lazy TTL + capacity eviction, queue compaction, TOCTOU-safe `remove_if`, soft-cap race documentation
