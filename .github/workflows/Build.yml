@@ -56,20 +56,12 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            suffix: linux-amd64
-            ext: ""
           - os: macos-latest
             target: aarch64-apple-darwin
-            suffix: macos-arm64
-            ext: ""
           - os: macos-13
             target: x86_64-apple-darwin
-            suffix: macos-amd64
-            ext: ""
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            suffix: windows-amd64
-            ext: ".exe"
 
     steps:
       - uses: actions/checkout@v4
@@ -99,20 +91,25 @@ jobs:
       - name: Build
         run: cargo build --release -p aphrodite --target ${{ matrix.target }}
 
-      - name: Rename binary
+      - name: Rename binary (full triple)
+        shell: bash
         run: |
-          BIN="aphrodite"
-          EXT="${{ matrix.ext }}"
-          SRC="target/${{ matrix.target }}/release/${BIN}${EXT}"
-          DST="${BIN}-${{ matrix.suffix }}${EXT}"
+          TARGET="${{ matrix.target }}"
+          SRC="target/${TARGET}/release/aphrodite"
+          if [[ "$TARGET" == *windows* ]]; then
+            SRC="${SRC}.exe"
+            DST="aphrodite-${TARGET}.exe"
+          else
+            DST="aphrodite-${TARGET}"
+          fi
           cp "$SRC" "$DST"
           ls -lh "$DST"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aphrodite-${{ matrix.suffix }}
-          path: aphrodite-${{ matrix.suffix }}
+          name: aphrodite-${{ matrix.target }}
+          path: aphrodite-${{ matrix.target }}
           retention-days: 30
 
   release:
