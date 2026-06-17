@@ -1,7 +1,6 @@
 """aphrodite - proxy environment loading and guidance."""
 
 import logging
-import os
 
 from .._core import ENV_FILE
 

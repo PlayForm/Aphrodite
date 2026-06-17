@@ -70,6 +70,7 @@ def _toml_section(section: str) -> dict:
 
 # ── Config value resolution: env var → TOML → hardcoded default ─
 
+
 def _cfg_int(name: str, default: int, toml_key: tuple[str, str] | None = None) -> int:
     """Resolve int config: env var → toml[section][key] → default."""
     env_val = os.environ.get(name)
