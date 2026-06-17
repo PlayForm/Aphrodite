@@ -26,7 +26,6 @@ from .files import FILES_SCHEMA, _files_handler, _fmt_files, _track_file_refs
 from .git import _git_summary
 
 # ── Live: streaming terminal containers ──────────────────────────
-from .live import LIVE_CONTAINER_SCHEMA, _create_live_container, _live_container_handler
 
 # ── Prefetch: background file load + compress ────────────────────
 from .prefetch import (
@@ -75,7 +74,6 @@ __all__ = [
     "CATALOG_SCHEMA",
     "DIFF_SCHEMA",
     "FILES_SCHEMA",
-    "LIVE_CONTAINER_SCHEMA",
     "PREFETCH_SCHEMA",
     "PREFETCH_STATUS_SCHEMA",
     "REBUILD_SCHEMA",
@@ -87,7 +85,6 @@ __all__ = [
     "_build_toc",
     "_catalog_handler",
     "_classifier_says_skip",
-    "_create_live_container",
     "_diff_handler",
     "_extract_preview",
     "_extract_tool_metadata",
@@ -100,7 +97,6 @@ __all__ = [
     "_git_summary",
     "_group_into_turns",
     "_inject_session_instruction",
-    "_live_container_handler",
     "_pre_llm_hook",
     "_prefetch_handler",
     "_prefetch_registry",
