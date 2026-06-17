@@ -48,7 +48,7 @@ sed -i '' "s/version = \"$CURRENT\"/version = \"$NEW\"/" "$CARGO_TOML"
 sed -i '' "s/BIN_VERSION = \"v$CURRENT\"/BIN_VERSION = \"v$NEW\"/" plugins/aphrodite/_core/config.py
 
 # Bump plugin version (patch increment on 1.x.x scheme)
-PLUGIN_CURRENT=$(grep 'PLUGIN_VERSION' plugins/aphrodite/_core/config.py | head -1 | sed 's/.*"\(.*\)"/\1/')
+PLUGIN_CURRENT=$(grep 'PLUGIN_VERSION' plugins/aphrodite/_core/config.py | head -1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
 PLUGIN_NEW=$(echo "$PLUGIN_CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
 sed -i '' "s/PLUGIN_VERSION = \"$PLUGIN_CURRENT\"/PLUGIN_VERSION = \"$PLUGIN_NEW\"/" plugins/aphrodite/_core/config.py
 # Sync pyproject.toml
