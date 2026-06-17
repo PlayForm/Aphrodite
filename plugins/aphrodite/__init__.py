@@ -119,7 +119,7 @@ from ._tools import (
 _log = logging.getLogger("aphrodite")
 
 # Sync docstring version with PLUGIN_VERSION
-__doc__ = (__doc__ or "").replace("v1.62.22", f"v{PLUGIN_VERSION}")
+__doc__ = (__doc__ or "").replace("v1.62.23", f"v{PLUGIN_VERSION}")
 
 
 # ── Plugin registration ───────────────────────────────────────────
