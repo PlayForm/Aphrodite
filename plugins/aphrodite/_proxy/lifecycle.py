@@ -8,8 +8,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from .._core import _DEV, BINARY, BINARY_DIR, BIN_VERSION, DEBUG_LOGGING, PLUGIN_VERSION, PORTS
-from .._core import reload_config
+from .._core import _DEV, BIN_VERSION, BINARY, BINARY_DIR, DEBUG_LOGGING, PLUGIN_VERSION, PORTS, reload_config
 from .env import _PROXY_ENV_KEYS, _inject_expand_guidance, _load_env
 from .health import _alive, _alive_cache, _headroom_context, _query_proxy_version
 from .markers import _restore_markers
