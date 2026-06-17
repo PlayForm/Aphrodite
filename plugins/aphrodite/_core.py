@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import re as _re
 from collections import OrderedDict, deque
 
 # ── Pre-baked constants ───────────────────────────────────────
@@ -371,8 +372,6 @@ def _set_session_model(model_name: str) -> None:
 
 
 # ── Code structure extractor (regex-based, no tree-sitter) ─────────────────
-
-import re as _re
 
 _CODE_PATTERNS: dict[str, dict[str, _re.Pattern]] = {
     "rust": {

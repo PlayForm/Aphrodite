@@ -8,15 +8,13 @@ import re
 import subprocess
 import time
 import urllib.request
-from contextlib import contextmanager
-
+import contextlib
 from ._core import (
     _CCR_RE,
     _DEV,
     _FILE_TOOLS,
     AUTO_EXPAND_LIMIT,
     BINARY,
-    CATALOG_INTENT_HINTS,
     CATALOG_MODE,
     CLASSIFIER_POLL,
     CONTEXT_ENGINE,
@@ -27,7 +25,6 @@ from ._core import (
     ENGINE_THRESHOLD_PCT,
     INLINE_THRESHOLD,
     MAX_REQUEST_BODY_SIZE,
-    MODEL_FAMILY,
     PLUGIN_VERSION,
     PORTS,
     TERMINAL_THRESHOLD,
@@ -48,7 +45,6 @@ from ._core import (
     _recent_markers,
     _referenced_files,
     _render_prompt_tmpl,
-    _reset_scanned_msg_idx,
     _scanned_msg_idx,
     _state,
 )
@@ -147,10 +143,7 @@ def _fmt_catalog(data: dict) -> str:
     conv_turns = data.get("conv_turns", 0)
     ref_files = data.get("referenced_files", 0)
 
-    if total_saved >= 1024:
-        saved_str = f"{total_saved / 1024:.1f}KB"
-    else:
-        saved_str = f"{total_saved}B"
+    saved_str = f"{total_saved / 1024:.1f}KB" if total_saved >= 1024 else f"{total_saved}B"
 
     lines = [
         f"Catalog: {len(items)} items {saved_str} saved {conv_turns} turns {ref_files} files"
@@ -212,10 +205,7 @@ def _fmt_stats(data: dict) -> str:
     inline = data.get("inline_store", {})
     entries = inline.get("entries", 0)
     total_bytes = inline.get("total_bytes", 0)
-    if total_bytes >= 1024:
-        bytes_str = f"{total_bytes / 1024:.1f}KB"
-    else:
-        bytes_str = f"{total_bytes}B"
+    bytes_str = f"{total_bytes / 1024:.1f}KB" if total_bytes >= 1024 else f"{total_bytes}B"
     lines.append(f"inline: {entries} entries {bytes_str}")
 
     return "\n".join(lines)
@@ -417,9 +407,7 @@ def _classifier_says_skip(klass: dict) -> bool:
             return True
     if ctype == "terminal" and klass.get("exit") == "0":
         return True
-    if ctype in ("search_files", "search_results") and klass.get("total", "0") in ("0", ""):
-        return True
-    return False
+    return bool(ctype in ("search_files", "search_results") and klass.get("total", "0") in ("0", ""))
 
 
 def _transform_tool_result(
