@@ -77,8 +77,8 @@ jobs:
                       ~/.cargo/registry/
                       ~/.cargo/git/
                       target/
-                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: ${{ runner.os }}-cargo-
+                  key: cargo-check-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: cargo-check-${{ runner.os }}-
 
             - name: Test
               run: cargo test -p aphrodite --release
@@ -121,8 +121,8 @@ jobs:
                       ~/.cargo/registry/
                       ~/.cargo/git/
                       target/
-                  key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
+                  key: cargo-check-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: cargo-check-${{ runner.os }}-${{ matrix.target }}-
 
             - name: Build
               run: cargo build --release -p aphrodite --target ${{ matrix.target }}
