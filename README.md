@@ -74,6 +74,45 @@ Both modes share the same classifier, template engine, and preview pipeline. The
 
 ---
 
+## Agent Compatibility 🤝
+
+Aphrodite sits as an OpenAI-compatible proxy — any agent that speaks the OpenAI API can route through it. Below are the agents we've verified or that have clean integration paths.
+
+### Direct Integration (OpenAI-compatible proxy)
+
+| Agent | Type | Integration | Compression |
+|-------|------|-------------|-------------|
+| **Hermes Agent** | Native | Built-in plugin; `on_start()` auto-launches | Full pipeline |
+| **Aider** | Open source | `--openai-api-base http://127.0.0.1:9798/v1` | High — context-heavy diffs |
+| **OpenHands** | Open source (MIT) | Custom provider config; clean agent loop | High — multi-level compression |
+| **Codex CLI** | Open source (Apache 2.0) | Pluggable provider; `--model` + `--base-url` | Medium-high |
+| **Cline / Roo Code** | Open source (VS Code) | MCP server or custom API endpoint | Medium-high — MCP protocol |
+| **Continue.dev** | Open source (VS Code/JB) | Custom provider config; model-agnostic | Medium |
+| **Sourcegraph Cody** | Enterprise | Self-host; custom endpoint config | Medium |
+| **PostHog Code** | Analytics | Configurable endpoint | Low-medium — niche |
+| **Qodo** | Enterprise | Proxy insertion in deployment pipeline | Medium |
+
+### MCP-Native Integration
+
+| Agent | Type | Integration |
+|-------|------|-------------|
+| **Cline / Roo Code** | VS Code extension | Aphrodite as MCP server for context services |
+| **Cloudflare Agents SDK** | Edge platform | AI Gateway interception; worker-based |
+| **Vercel AI SDK** | Framework | `wrapLanguageModel` middleware; custom provider |
+
+### Future SDK Targets
+
+| SDK | Potential | Path |
+|-----|-----------|------|
+| **Vercel AI SDK** | High | Custom provider + middleware wrapping |
+| **Cloudflare Agents SDK** | Medium | AI Gateway + Durable Objects compression |
+| **MCP Protocol** | High | Standardized context compression service |
+| **OpenAI Agents SDK** | Medium | Custom provider via `base_url` override |
+
+> **Context window management is the #1 cost bottleneck across ALL coding agents.** Aphrodite's compression addresses this universally — any agent that makes tool calls benefits from 23× median token savings on tool output.
+
+---
+
 ## Absorptive CCR Previews 🧠
 
 > **"Absorptive" means the classifier learns from every output it sees. New content of the same type automatically gets the same structured treatment — no manual template writing needed.**
