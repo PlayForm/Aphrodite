@@ -14,8 +14,8 @@
 > Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.  
 > *One binary. Zero dependencies. 12.5M tokens saved.*
 
-[![release](https://img.shields.io/badge/release-v0.8.5-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![plugin](https://img.shields.io/badge/plugin-v1.62.20-purple)](plugins/aphrodite/plugin.yaml)
+[![release](https://img.shields.io/badge/release-v0.8.6-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![plugin](https://img.shields.io/badge/plugin-v1.62.21-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -559,19 +559,23 @@ The agent can issue `aphrodite_prefetch()` and immediately call other tools — 
 
 ```
 plugins/aphrodite/
-  __init__.py      — version, exports, proxy auto‑launch
-  _core.py         — constants, TOML loader, config resolvers, code structure extractor
-  _inline.py       — zlib fallback (works without proxy)
-  _marker.py       — 28-type classifier, template renderer, CCR markers
-  _binary.py       — binary download + platform detection
-  _proxy.py        — lifecycle (env, health, launch, version query)
-  _tools.py        — 11 tool handlers + JSON schemas
-  _hooks.py        — transform_tool_result, terminal hook, pre/post LLM, rebuild
-  _engine.py       — ContextEngine (default-on, TOML toggle, 45% threshold)
-  _resolve.py      — recursive marker expansion (3 levels deep)
+  __init__.py          — entry point, version, proxy auto‑launch
+  plugin.yaml          — Hermes plugin manifest (12 tools, 5 hooks)
+  _core/               — constants, TOML loader, config resolvers, code structure extractor
+  _engine.py           — ContextEngine (default-on, TOML toggle, 45% threshold)
+  _hooks/              — Hermes hook handlers: transform_tool_result, terminal, pre/post LLM, rebuild
+  _marker/             — 28‑type classifier, template renderer, CCR marker parse
+  _proxy/              — proxy lifecycle: env, health, launch, version query
+  _resolve.py          — recursive CCR marker expansion (3 levels deep)
+  _binary.py           — binary auto‑download + platform detection
+  _tools.py            — 12 tool handlers + JSON schemas
+  _inline.py           — zlib fallback compression (works without proxy)
+  _automation.py       — Rhai scripting engine
+  pyproject.toml       — Python ≥3.11, no runtime deps
+  skills/              — 9 bundled skills for agents (compression, proxy, tools, …)
 ```
 
-**Single Rust binary.** 10 Python modules. Zero forced dependencies. CC0‑1.0 — public domain.
+**44 Python files across 5 packages.** Zero forced dependencies. CC0‑1.0 — public domain.
 
 ---
 

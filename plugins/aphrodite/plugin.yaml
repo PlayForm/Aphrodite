@@ -1,6 +1,6 @@
 name: aphrodite
 version: 1.62.21
-description: "CCR compression plugin - smoke test suite, feature toggles, regression tracking, 9 tools, catalog mode toggle."
+description: "CCR compression plugin — 28-type classifier, 13 tools, context engine, TOML-driven templates."
 kind: standalone
 min_hermes_version: '0.16.0'
 requires_hooks: true
@@ -26,12 +26,11 @@ provides_tools:
   - aphrodite_poll_container
 provides_context_engine: true
 # Engine threshold: -1=always compress, 0=disabled, >0=fill% (see _core.py, APHRODITE_ENGINE_THRESHOLD_PCT)
-# Ships skills: aphrodite-dev-workflow, aphrodite-hook-reference, aphrodite-iterate-release
+# Ships 9 skills: compression architecture, proxy lifecycle, tool guide, context engine, coding defaults, context efficiency, boundary behaviors, output formatting, presentation
 install_message: |
-  aphrodite v1.62.14  -  CCR compression plugin for Hermes Agent.
+  aphrodite v1.62.21  —  CCR compression plugin for Hermes Agent.
   Proxies: token (:9798, SQLite, >1KB), cache (:9797, in-memory, >8KB).
-  Engine: APHRODITE_CONTEXT_ENGINE=1 to enable context engine.
+  Engine: context_engine=true in aphrodite.toml (default-on).
   Debug: APHRODITE_DEBUG=1 hermes ...
   Catalog: APHRODITE_CATALOG=full|compact|tool (default: compact)
-  Scripting: APHRODITE_SCRIPTING=1 + --features scripting for Rhai hooks
-  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog
+  Tools: retrieve, compress, stats, rebuild, files, diff, search, test, catalog, reclassify, prefetch, prefetch_status, poll_container
