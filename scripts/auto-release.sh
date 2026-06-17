@@ -33,9 +33,14 @@ else
     echo "[skip] nothing to commit"
 fi
 
-# Read current version, bump patch
+# Read current version, bump patch (or minor with --minor flag)
 CURRENT=$(grep '^version' "$CARGO_TOML" | head -1 | sed 's/.*"\(.*\)"/\1/')
-NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
+if [ "${1:-}" = "--minor" ]; then
+    NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2+1".0"}')
+    shift
+else
+    NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
+fi
 
 # Bump Cargo.toml
 sed -i '' "s/version = \"$CURRENT\"/version = \"$NEW\"/" "$CARGO_TOML"
