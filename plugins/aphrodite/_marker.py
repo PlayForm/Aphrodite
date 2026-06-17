@@ -213,6 +213,55 @@ def _classify_content(content: str) -> dict:
                         if "total_elements" in data:
                             meta["total"] = str(data["total_elements"])
                         return meta
+                    # web_search results
+                    if "title" in data and "url" in data or ("results" in data and isinstance(data.get("results"), list)):
+                        meta = {"type": "web_search", "ln": str(ln)}
+                        results = data.get("results", [data] if "title" in data else [])
+                        if isinstance(results, list):
+                            meta["total"] = str(len(results))
+                        if "query" in data:
+                            meta["q"] = str(data["query"])[:40]
+                        return meta
+                    # image_generate
+                    if "image" in data or "prompt" in data:
+                        meta = {"type": "image_generate", "ln": str(ln)}
+                        if "prompt" in data:
+                            meta["msg"] = str(data["prompt"])[:80]
+                        return meta
+                    # todo list
+                    if "todos" in data or ("id" in data and "content" in data and "status" in data):
+                        meta = {"type": "todo", "ln": str(ln)}
+                        todos = data.get("todos", [])
+                        if isinstance(todos, list):
+                            meta["items"] = str(len(todos))
+                            meta["total"] = str(sum(1 for t in todos if isinstance(t, dict) and t.get("status") != "completed"))
+                        elif "status" in data:
+                            meta["items"] = "1"
+                        return meta
+                    # memory operations
+                    if "success" in data and ("target" in data or "entries" in data):
+                        meta = {"type": "memory", "ln": str(ln)}
+                        entries = data.get("entries", [])
+                        if isinstance(entries, list):
+                            meta["items"] = str(len(entries))
+                        return meta
+                    # cronjob management
+                    if "schedule" in data and ("id" in data or "job_id" in data):
+                        meta = {"type": "cronjob", "ln": str(ln)}
+                        if "status" in data:
+                            meta["msg"] = str(data["status"])
+                        return meta
+                    # session_search
+                    if "results" in data and ("query" in data or "total_count" in data):
+                        meta = {"type": "search_results"}
+                        if "total_count" in data:
+                            meta["total"] = str(data["total_count"])
+                        if "query" in data:
+                            meta["q"] = str(data["query"])[:40]
+                        results = data.get("results", [])
+                        if isinstance(results, list):
+                            meta["files"] = str(len(results))
+                        return meta
                     # Fallback JSON: extract top-level keys
                     keys = list(data.keys())[:8]
                     meta = {"type": "json", "ln": str(ln)}
@@ -328,9 +377,10 @@ def _make_ccr_preview(content: str, klass: dict | None = None, model_family: str
     }
 
     # ── Code structure-map enrichment ────────────────────────────────
-    if ctype in ("code", "code_rust", "code_python", "code_go", "code_js"):
+    if ctype in ("code", "code_rust", "code_python", "code_go", "code_js", "code_ts", "code_sh"):
         lang = {"code_rust": "rust", "code_python": "python",
-                "code_go": "go", "code_js": "js"}.get(ctype, "")
+                "code_go": "go", "code_js": "js", "code_ts": "js",
+                "code_sh": "sh"}.get(ctype, "")
         struct = _extract_code_structure(content, lang)
         if struct:
             sigs = struct.get("fns", [])

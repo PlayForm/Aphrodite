@@ -1469,7 +1469,7 @@ fn format_ccr_output(preview: &str, ct: &str, metadata: &str, center: Option<&st
 /// - Default: first line, ~250 chars
 fn build_preview(content: &str, ct: &str) -> String {
 	match ct {
-		"code_rust" | "code_python" | "code_go" | "code_js" | "code" => {
+				"code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
 			// Code: structure-map preview — extract fn/def/class/struct sigs
 			let mut fns: Vec<&str> = Vec::new();
 			let mut structs: Vec<&str> = Vec::new();

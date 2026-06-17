@@ -426,8 +426,10 @@ def _extract_code_structure(content: str, language: str = "") -> dict:
             language = "python"
         elif "func " in content[:500] and "{" in content[:500]:
             language = "go"
-        elif "function " in content[:500] or "=>" in content[:500]:
-            language = "js"
+        elif "function " in content[:500] or "=>" in content[:500] or "interface " in content[:500]:
+            language = "js"  # TS also matches JS patterns
+        elif content[:500].strip().startswith("#!/") or "echo " in content[:200]:
+            language = "sh"
         else:
             return {}
 
