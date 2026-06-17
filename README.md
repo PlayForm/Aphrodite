@@ -32,25 +32,28 @@ Every time your agent runs a tool — `cargo build`, `search_files`, `read_file`
 ## How It Works ⚙️
 
 ```
-Your Agent                  Aphrodite Proxy              LLM API
-    │                            │                          │
-    │──── tool call ────────────►│                          │
-    │                            │── forward to API ───────►│
-    │                            │◄── API response ────────│
-    │                            │                          │
-    │                    ┌───────┴───────┐                  │
-    │                    │ 28-type       │                  │
-    │                    │ classifier    │                  │
-    │                    │    ↓          │                  │
-    │                    │ TOML template │                  │
-    │                    │    ↓          │                  │
-    │                    │ CCR store     │                  │
-    │                    └───────┬───────┘                  │
-    │                            │                          │
-    │◄── [build:0E 0W 1L] ─────│  15 tokens, not 500       │
-    │                            │                          │
-    │── aphrodite_retrieve() ──►│  only when needed        │
-    │◄── full content ──────────│                          │
+| Your Agent                  Aphrodite Proxy              LLM API
+|    │                            │                          │
+|    │──── tool call ────────────►│                          │
+|    │                            │── forward to API ───────►│
+|    │                            │◄── API response ────────│
+|    │                            │                          │
+|    │                    ┌───────┴───────┐                  │
+|    │                    │ 28-type       │                  │
+|    │                    │ classifier    │                  │
+|    │                    │    ↓          │                  │
+|    │                    │ TOML template │                  │
+|    │                    │    ↓          │                  │
+|    │                    │ CCR store     │                  │
+|    │                    └───────┬───────┘                  │
+|    │                            │                          │
+|    │◄── [build:0E 0W 1L] ─────│  15 tokens, not 500       │
+|    │                            │                          │
+|    │── aphrodite_retrieve() ──►│  only when needed        │
+|    │◄── full content ──────────│                          │
+|    │                            │                          │
+|    │── aphrodite_prefetch() ──►│  background reads        │
+|    │◄── markers instantly ─────│  files load concurrently │
 ```
 
 Three steps, all under 1ms:
@@ -208,6 +211,8 @@ Aphrodite's own tools (`catalog`, `stats`, `diff`, `files`) return structured ou
 |---------|-------------|-------------------|
 | Classifier poll | Suppresses CCR for clean outputs (0E/0W, exit=0) | Silent builds don't waste a single token |
 | Code structure‑map | LLM sees fn/struct/class sigs, not raw code | Agent navigates 500‑line files without retrieving them |
+| Batch tool calls | Multiple independent tools execute concurrently in one turn | 2–3× faster task completion without extra round-trips |
+| Background prefetch | File read + compress runs in daemon threads | Large files load concurrently; agent continues reasoning immediately |
 | Model‑aware templates | Preview style adapts to model family | Claude gets compact metadata, DeepSeek gets code excerpts |
 | TOML‑driven config | All thresholds + templates in one file, no recompile | Tune aggressiveness in 30 seconds |
 | Context engine | Compresses middle conversation turns to CCR | Long sessions stay within context window automatically |
@@ -330,6 +335,34 @@ ccr_marker_hint = false      # clean CCR markers
 
 ---
 
+### Prefetch Workflow ⚡
+
+> **Read many files in parallel. The agent gets CCR markers instantly and continues reasoning while files load in background threads.**
+
+```bash
+# Batch-read files concurrently — markers return immediately
+aphrodite_prefetch(paths=["src/main.rs", "src/lib.rs", "Cargo.toml"])
+
+# Response (instant):
+# {
+#   "prefetching": 3,
+#   "markers": [
+#     {"hash": "a1b2c3d4e5f6", "path": "src/main.rs", "type": "code_rust", "size": 12450},
+#     {"hash": "b2c3d4e5f6a7", "path": "src/lib.rs", "type": "code_rust", "size": 8320},
+#     {"hash": "c3d4e5f6a7b8", "path": "Cargo.toml", "type": "text", "size": 420}
+#   ],
+#   "note": "Files loading in background. Use TOC to check, aphrodite_retrieve(hash) to fetch."
+# }
+
+# Later, when the agent needs the content:
+# aphrodite_retrieve(hash="a1b2c3d4e5f6")
+# → full file content (already loaded by then)
+```
+
+The agent can issue `aphrodite_prefetch()` and immediately call other tools — the reads proceed on daemon threads. Use `aphrodite_catalog(mode='toc')` to check which files are done loading, then retrieve when ready.
+
+---
+
 ## Tools 🔧
 
 | Tool                   | Description                                          |
@@ -344,6 +377,7 @@ ccr_marker_hint = false      # clean CCR markers
 | `aphrodite_test`       | Smoke test suite: quick, full, matrix, pipeline       |
 | `aphrodite_catalog`    | Full CCR catalog with hashes, types, sizes, previews  |
 | `aphrodite_reclassify` | Retroactive metadata enrichment for unclassified CCR  |
+| `aphrodite_prefetch`   | Background file read + compress — returns markers instantly; files load concurrently via daemon threads |
 
 ---
 
@@ -357,7 +391,7 @@ plugins/aphrodite/
   _marker.py       — 28-type classifier, template renderer, CCR markers
   _binary.py       — binary download + platform detection
   _proxy.py        — lifecycle (env, health, launch, version query)
-  _tools.py        — 10 tool handlers + JSON schemas
+  _tools.py        — 11 tool handlers + JSON schemas
   _hooks.py        — transform_tool_result, terminal hook, pre/post LLM, rebuild
   _engine.py       — ContextEngine (default-on, TOML toggle, 45% threshold)
   _resolve.py      — recursive marker expansion (3 levels deep)
