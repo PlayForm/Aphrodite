@@ -57,12 +57,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             suffix: linux-amd64
+            ext: ""
           - os: macos-latest
             target: aarch64-apple-darwin
             suffix: macos-arm64
+            ext: ""
           - os: macos-13
             target: x86_64-apple-darwin
             suffix: macos-amd64
+            ext: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: windows-amd64
+            ext: ".exe"
 
     steps:
       - uses: actions/checkout@v4
@@ -95,16 +102,11 @@ jobs:
       - name: Rename binary
         run: |
           BIN="aphrodite"
-          SUFFIX="${{ matrix.suffix }}"
-          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
-            SRC="target/${{ matrix.target }}/release/$BIN"
-          elif [ "${{ matrix.target }}" = "aarch64-apple-darwin" ]; then
-            SRC="target/${{ matrix.target }}/release/$BIN"
-          else
-            SRC="target/${{ matrix.target }}/release/$BIN"
-          fi
-          cp "$SRC" "${BIN}-${SUFFIX}"
-          ls -lh "${BIN}-${SUFFIX}"
+          EXT="${{ matrix.ext }}"
+          SRC="target/${{ matrix.target }}/release/${BIN}${EXT}"
+          DST="${BIN}-${{ matrix.suffix }}${EXT}"
+          cp "$SRC" "$DST"
+          ls -lh "$DST"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
