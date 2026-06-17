@@ -25,6 +25,31 @@ def _is_active() -> bool:
     return os.environ.get("APHRODITE_LIVE_CONTAINER") == "1"
 
 
+def _is_live_tool(tool_name: str) -> bool:
+    """Check if a tool supports live container wrapping."""
+    if not _is_active():
+        return False
+    return tool_name in ("read_file",)
+
+
+def _wrap_as_live_container(content: str, tool_name: str) -> str:
+    """Wrap tool output in a live container CCR marker."""
+    if not _is_live_tool(tool_name):
+        return content
+    if len(content) <= _MIN_BYTES:
+        return content
+    h = _store(content)
+    if not h:
+        return content
+    size = len(content)
+    return (
+        f"<<<CCR:{h}|live|{size}>>>\n"
+        f"Live container — content stored. "
+        f"Use aphrodite_retrieve({h}) to fetch when needed. "
+        f"Continue reasoning without waiting."
+    )
+
+
 def _store(content: str) -> str | None:
     """Store content in CCR proxy, return hash or None."""
     try:
