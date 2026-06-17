@@ -9,8 +9,7 @@
 [Aphrodite]: https://github.com/PlayForm/Aphrodite
 
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.  
-> Sub‑ms compress, 10× ratio, dual‑mode, LLM‑native output formatting.  
-> **28‑type classifier** — model‑aware templates — code structure‑maps — TOML‑driven.
+> Sub‑ms compress, 1,280× median ratio, 28‑type classifier, TOML‑driven.
 
 [![release](https://img.shields.io/badge/release-v0.5.119-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![plugin](https://img.shields.io/badge/plugin-v1.62.14-purple)](plugins/aphrodite/plugin.yaml)
