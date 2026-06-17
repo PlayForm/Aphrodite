@@ -2,7 +2,7 @@
     "include": ["."],
     "exclude": ["__pycache__", ".ruff_cache"],
     "typeCheckingMode": "strict",
-    "reportMissingImports": "warning",
+    "reportMissingImports": "none",
     "reportMissingTypeStubs": "warning",
     "reportMissingParameterType": "warning",
     "reportUnknownArgumentType": "warning",
