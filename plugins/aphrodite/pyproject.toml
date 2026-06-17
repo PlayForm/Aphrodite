@@ -1,6 +1,6 @@
 [project]
 name = "aphrodite-plugin"
-version = "1.61.0"
+version = "1.62.14"
 description = "CCR compression plugin for Hermes Agent  -  context compression via proxy"
 requires-python = ">=3.11"
 dependencies = []
