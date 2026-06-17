@@ -1,5 +1,5 @@
 """
-aphrodite v1.62.15 — CCR compression plugin for Hermes Agent.
+aphrodite v1.62.16 — CCR compression plugin for Hermes Agent.
 
 Auto-install + launch aphrodite proxies:
 - Cache (:9797): in-memory CCR, >8KB threshold
