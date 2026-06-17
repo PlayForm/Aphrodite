@@ -115,7 +115,7 @@ def _render_prompt_tmpl(name: str, vars: dict | None = None) -> str:
             "engine_offload": "These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} messages below are your active context.",
             "auto_expand_guidance": "Tool outputs are auto-expanded — you see full content inline. If you see a CCR marker, retrieve only if the preview hints at useful content.",
             "live_container_guidance": (
-                "PREFER aphrodite_prefetch over read_file for file reads. "
+                "NEVER use read_file. ALWAYS use aphrodite_prefetch for ALL file reads. "
                 "Prefetch returns CCR markers instantly — files load in background concurrently. "
                 "Poll with aphrodite_prefetch_status, retrieve with aphrodite_retrieve(hash). "
                 "Continue reasoning immediately — NEVER wait for file content you may not need."
