@@ -1,7 +1,6 @@
-# Rust
-/target/
-**/*.rs.bk
-*.pdb
+# Aphrodite proxy binary (auto-downloaded by _binary.py)
+aphrodite
+aphrodite.exe
 
 # Python
 __pycache__/
@@ -17,26 +16,20 @@ build/
 venv/
 env/
 
-# Hermes / dev artifacts
-.hermes/
-.headroom/
-.DS_Store
-*.log
-*.lock
-*.tar.gz
+# Local config — never commit your API keys
+aphrodite.toml
+aphrodite.local.toml
 
-# Profiles — keep local, ship only examples
-profiles/
-!profiles/example/
+# Secrets — never commit
+.env
+.env.sh
+*.pem
+*.key
+id_rsa*
+*.bak
 
 # Test artifacts
-plugins/aphrodite/.test-results.json
-
-# Aphrodite proxy binary (copied to profile/plugin dirs at build)
-plugins/aphrodite/aphrodite
-
-# Local config (not committed)
-aphrodite.toml
+.test-results.json
 
 # IDE
 .idea/
@@ -44,30 +37,25 @@ aphrodite.toml
 *.swp
 *.swo
 *~
+pyrightconfig.json
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Build
-target/
+# Profiles (if used as Hermes plugin root)
+profiles/
+!profiles/example/
 
-# Secrets (never commit)
-.env
-.env.sh
-aphrodite.local.toml
-*.pem
-*.key
-id_rsa*
-
-# Catch-all leaks
-**/state.db*
-**/auth.json
-**/auth.lock
-**/.hermes_*
-**/.skills_*
-**/.update_check
-**/__pycache__/
-**/.DS_Store
-*.bak
-vendor/headroom/Cargo.lock
+# Hermes runtime artifacts
+.hermes/
+.headroom/
+*.log
+*.lock
+*.tar.gz
+state.db*
+auth.json
+auth.lock
+.hermes_*
+.skills_*
+.update_check
