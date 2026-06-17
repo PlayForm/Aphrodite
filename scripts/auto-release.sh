@@ -55,6 +55,8 @@ sed -i '' "s/PLUGIN_VERSION = \"$PLUGIN_CURRENT\"/PLUGIN_VERSION = \"$PLUGIN_NEW
 sed -i '' "s/version = \"$PLUGIN_CURRENT\"/version = \"$PLUGIN_NEW\"/" plugins/aphrodite/pyproject.toml
 # Sync __init__.py docstring
 sed -i '' "s/aphrodite v$PLUGIN_CURRENT —/aphrodite v$PLUGIN_NEW —/" plugins/aphrodite/__init__.py
+# Sync plugin.yaml
+sed -i '' "s/version: $PLUGIN_CURRENT/version: $PLUGIN_NEW/" plugins/aphrodite/plugin.yaml
 echo "[bump] bin $CURRENT → $NEW | plugin $PLUGIN_CURRENT → $PLUGIN_NEW"
 
 # Build
