@@ -2046,6 +2046,40 @@ pub async fn handle_ccr_delete(
 	}
 }
 
+// ── Config reload ──────────────────────────────────────────────────
+
+/// Hot-reload aphrodite.toml and apply compression config changes.
+/// POST /reload — returns the newly loaded compression settings.
+pub async fn handle_ccr_reload() -> impl IntoResponse {
+    let config_path = std::env::var("APHRODITE_CONFIG_PATH")
+        .unwrap_or_else(|_| "aphrodite.toml".to_string());
+    match crate::config::MultiConfig::load(&config_path) {
+        Ok(config) => {
+            let comp = config.compression.as_ref();
+            let body = serde_json::json!({
+                "reloaded": true,
+                "config": config_path,
+                "compression": {
+                    "auto_expand": comp.and_then(|c| c.auto_expand),
+                    "auto_expand_limit": comp.and_then(|c| c.auto_expand_limit),
+                    "tool_threshold_token": comp.and_then(|c| c.tool_threshold_token),
+                    "tool_threshold_cache": comp.and_then(|c| c.tool_threshold_cache),
+                    "terminal_threshold": comp.and_then(|c| c.terminal_threshold),
+                    "inline_threshold": comp.and_then(|c| c.inline_threshold),
+                    "engine_threshold_pct": comp.and_then(|c| c.engine_threshold_pct),
+                    "catalog_mode": comp.and_then(|c| c.catalog_mode.clone()),
+                }
+            });
+            tracing::info!(%config_path, "config hot-reloaded");
+            (StatusCode::OK, Json(body)).into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("failed to reload: {e}")})),
+        ).into_response(),
+    }
+}
+
 // ── Health check ────────────────────────────────────────────────────
 
 pub async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {

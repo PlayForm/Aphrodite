@@ -19,7 +19,7 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use aphrodite::config::{Cli, MultiConfig, ProxyMode};
-use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, handle_ccr_delete, health_check};
+use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, handle_ccr_delete, handle_ccr_reload, health_check};
 use aphrodite::retrieve;
 
 fn main() -> anyhow::Result<()> {
@@ -84,7 +84,57 @@ async fn run() -> anyhow::Result<()> {
 
 	tracing::info!("starting {} proxy listener(s)", proxies.len());
 
-	// Shared shutdown watch channel - single signal source propagates to all proxies.
+	// ── Spawn config file watcher for hot-reload ──────────────────
+	let watch_path = config_path.clone();
+	tokio::spawn(async move {
+		use notify::{Event, EventKind, RecursiveMode, Watcher};
+		let (tx, mut rx) = tokio::sync::mpsc::channel(16);
+		let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+			if let Ok(event) = res {
+				let is_modify = matches!(event.kind, EventKind::Modify(_));
+				if is_modify && event.paths.iter().any(|p| p.to_string_lossy().contains("aphrodite.toml")) {
+					let _ = tx.try_send(());
+				}
+			}
+		}) {
+			Ok(w) => w,
+			Err(e) => {
+				tracing::warn!("failed to create config watcher: {e}");
+				return;
+			}
+		};
+		let watch_dir = std::path::Path::new(&watch_path).parent()
+			.unwrap_or(std::path::Path::new("."));
+		if let Err(e) = watcher.watch(watch_dir, RecursiveMode::NonRecursive) {
+			tracing::warn!("failed to start config watcher: {e}");
+			return;
+		}
+		tracing::info!(path = %watch_path, "config file watcher active");
+		loop {
+			if rx.recv().await.is_some() {
+				// Debounce: wait 500ms for writes to settle
+				tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+				// Drain any additional events accumulated during debounce
+				while rx.try_recv().is_ok() {}
+				match aphrodite::config::MultiConfig::load(&watch_path) {
+					Ok(config) => {
+						let comp = config.compression.as_ref();
+						tracing::info!(
+							path = %watch_path,
+							auto_expand_limit = comp.and_then(|c| c.auto_expand_limit).unwrap_or(0),
+							engine_threshold = comp.and_then(|c| c.engine_threshold_pct).unwrap_or(0),
+							"? config reloaded — proxy will use new values; plugin reloads independently"
+						);
+					}
+					Err(e) => {
+						tracing::warn!(error = %e, "failed to reload config on file change");
+					}
+				}
+			}
+		}
+	});
+
+	// ── Shared shutdown watch channel ────────────────────────────────
 	// Initial value false; main() sets true on first Ctrl+C/SIGTERM,
 	// each run_single() task waits on the receiver for graceful_shutdown.
 	let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
@@ -334,6 +384,7 @@ async fn run_single(
         .route("/ccr/create", post(handle_ccr_create))
         .route("/ccr/list", get(handle_ccr_list))
         .route("/ccr/{hash}", delete(handle_ccr_delete))
+        .route("/reload", post(handle_ccr_reload))
         .route("/favicon.ico", get(|| async { StatusCode::NOT_FOUND }))
         .route("/robots.txt", get(|| async { "User-agent: *\nDisallow: /\n" }))
         .route("/", get(|| async {

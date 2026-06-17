@@ -5,6 +5,7 @@ import os
 from collections import deque
 
 from .state import _state
+from . import settings as _settings
 
 # ── Pre-baked constants ───────────────────────────────────────
 PORTS = {"cache": 9797, "token": 9798}
@@ -76,7 +77,15 @@ def _toml_section(section: str) -> dict:
 
 
 def _cfg_int(name: str, default: int, toml_key: tuple[str, str] | None = None) -> int:
-    """Resolve int config: env var → toml[section][key] → default."""
+    """Resolve int config: runtime-settings → env var → toml[section][key] → default."""
+    # Check dynamic settings store first (API-driven overrides)
+    if toml_key:
+        setting_val = _settings.get(toml_key[1])
+        if setting_val is not None:
+            try:
+                return int(setting_val)
+            except (ValueError, TypeError):
+                pass
     env_val = os.environ.get(name)
     if env_val is not None:
         try:
@@ -95,7 +104,13 @@ def _cfg_int(name: str, default: int, toml_key: tuple[str, str] | None = None) -
 
 
 def _cfg_bool(name: str, default: bool, toml_key: tuple[str, str] | None = None) -> bool:
-    """Resolve bool config: env var → toml[section][key] → default."""
+    """Resolve bool config: runtime-settings → env var → toml[section][key] → default."""
+    if toml_key:
+        setting_val = _settings.get(toml_key[1])
+        if setting_val is not None:
+            if isinstance(setting_val, bool):
+                return setting_val
+            return str(setting_val).lower() in ("1", "true", "yes", "on")
     env_val = os.environ.get(name)
     if env_val is not None:
         return env_val.lower() in ("1", "true", "yes", "on")
@@ -110,7 +125,11 @@ def _cfg_bool(name: str, default: bool, toml_key: tuple[str, str] | None = None)
 
 
 def _cfg_str(name: str, default: str, toml_key: tuple[str, str] | None = None) -> str:
-    """Resolve str config: env var → toml[section][key] → default."""
+    """Resolve str config: runtime-settings → env var → toml[section][key] → default."""
+    if toml_key:
+        setting_val = _settings.get(toml_key[1])
+        if setting_val is not None:
+            return str(setting_val)
     env_val = os.environ.get(name)
     if env_val is not None:
         return env_val
@@ -123,7 +142,14 @@ def _cfg_str(name: str, default: str, toml_key: tuple[str, str] | None = None) -
 
 
 def _cfg_float(name: str, default: float, toml_key: tuple[str, str] | None = None) -> float:
-    """Resolve float config: env var → toml[section][key] → default."""
+    """Resolve float config: runtime-settings → env var → toml[section][key] → default."""
+    if toml_key:
+        setting_val = _settings.get(toml_key[1])
+        if setting_val is not None:
+            try:
+                return float(setting_val)
+            except (ValueError, TypeError):
+                pass
     env_val = os.environ.get(name)
     if env_val is not None:
         try:
@@ -179,11 +205,14 @@ def _init_config() -> None:
     global ENGINE_MIN_MSGS, TOOL_THRESHOLD_TOKEN, TOOL_THRESHOLD_CACHE
     global TERMINAL_THRESHOLD, INLINE_THRESHOLD, AUTO_EXPAND_LIMIT
     global CATALOG_MODE, CLASSIFIER_POLL, CODE_MULTIPLIER, CONTEXT_ENGINE
-        global MAX_REQUEST_BODY_SIZE, MODEL_FAMILY, CODE_STRUCTURE_MAP
+    global MAX_REQUEST_BODY_SIZE, MODEL_FAMILY, CODE_STRUCTURE_MAP
     global PREVIEW_MAX_CHARS, RETRIEVE_GUIDANCE, CCR_MARKER_HINT
     global CATALOG_INTENT_HINTS, RECURSIVE_DEPTH, DEBUG_LOGGING, _recent_markers
 
     _log.debug("config: (re)loading from %s", "env/TOML/defaults")
+
+    # Populate in-memory settings store from TOML (runtime overrides preserved)
+    _settings.reload_from_toml(_load_toml_config())
 
     # Engine
     ENGINE_THRESHOLD_PCT = _cfg_int("APHRODITE_ENGINE_THRESHOLD_PCT", 45, ("compression", "engine_threshold_pct"))
