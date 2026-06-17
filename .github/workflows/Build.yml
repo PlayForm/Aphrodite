@@ -125,9 +125,16 @@ jobs:
                   path: aphrodite-${{ matrix.target }}
                   retention-days: 30
 
+            - name: Upload to release
+              if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
+              uses: softprops/action-gh-release@v3
+              with:
+                  files: aphrodite-${{ matrix.target }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     Release:
         name: Release
-        needs: Build
         if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
         runs-on: ubuntu-latest
         environment: Release
@@ -136,18 +143,9 @@ jobs:
             id-token: write
 
         steps:
-            - uses: actions/download-artifact@v8
-              with:
-                  path: artifacts/
-
-            - name: Display artifacts
-              run: find artifacts/ -type f -exec ls -lh {} \;
-
             - name: Create GitHub Release
-              continue-on-error: true
               uses: softprops/action-gh-release@v3
               with:
-                  files: artifacts/**/aphrodite-*
                   generate_release_notes: true
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
