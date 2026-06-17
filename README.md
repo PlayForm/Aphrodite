@@ -4,7 +4,7 @@
 
 ---
 
-# [Aphrodite] 💋 (`aphrodite`)
+# [Aphrodite] 💋 (`aphrodite`)
 
 [Aphrodite]: https://github.com/PlayForm/Aphrodite
 
@@ -29,7 +29,7 @@ Every time your agent runs a tool — `cargo build`, `search_files`, `read_file`
 
 ---
 
-## How It Works ⚙️
+## How It Works ⚙️
 
 ```
 | Your Agent                  Aphrodite Proxy              LLM API
@@ -63,26 +63,128 @@ Three steps, all under 1ms:
 
 ---
 
-## Architecture 🏗️
+## Architecture 🏗️
 
 | Mode  | Port  | Backend | Threshold | Best for |
 | :---- | :---: | :------ | :-------: | :------- |
-| Cache | :9797 | In‑memory | >8 KB | Speed, transient sessions |
-| Token | :9798 | SQLite | >1 KB | Durability, tool relay |
+| Cache | :9797 | In‑memory | >8 KB | Speed, transient sessions |
+| Token | :9798 | SQLite | >1 KB | Durability, tool relay |
 
 Both modes share the same classifier, template engine, and preview pipeline. The difference is persistence — cache mode is ephemeral, token mode survives restarts.
 
 ---
 
-## Agent Compatibility 🤝
+## Agent Compatibility 🤝
 
-Aphrodite sits as an OpenAI-compatible proxy — any agent that speaks the OpenAI API can route through it. Below are the agents we've verified or that have clean integration paths.
+Aphrodite is a drop-in **OpenAI-compatible proxy** — point any agent or LLM client at `http://127.0.0.1:9798/v1` and it compresses transparently. No SDK changes, no prompt edits, no wrappers.
+
+### Hermes Agent (Native)
+
+Hermes is Aphrodite's primary host. The plugin registers itself via `on_start()`, launches both proxy processes automatically, and wires every tool call through the compression pipeline. No configuration is needed — install the plugin and Hermes routes through Aphrodite by default.
+
+```python
+# plugins/aphrodite/plugin.yaml — already wired in
+proxy_port: 9798
+auto_launch: true
+hooks: [transform_tool_result, pre_llm, post_llm]
+```
+
+The plugin exposes all 11 `aphrodite_*` tools directly inside Hermes's tool namespace, so the agent can call `aphrodite_retrieve`, `aphrodite_stats`, `aphrodite_prefetch`, etc., just like any built-in tool.
+
+### OpenAI-Compatible Clients
+
+Any client that accepts a `base_url` / `--base-url` / `OPENAI_BASE_URL` override works without modification. Aphrodite speaks the full OpenAI chat completions API (`/v1/chat/completions`, `/v1/models`, streaming SSE) and forwards upstream after compressing tool-call responses.
+
+```bash
+# Environment variable — works for any OpenAI SDK client
+export OPENAI_BASE_URL=http://127.0.0.1:9798/v1
+export OPENAI_API_KEY=<your-key>   # forwarded as-is to upstream
+```
+
+```python
+# Python openai SDK
+from openai import OpenAI
+client = OpenAI(base_url="http://127.0.0.1:9798/v1", api_key="...")
+```
+
+```typescript
+// TypeScript / Node openai SDK
+import OpenAI from "openai";
+const client = new OpenAI({ baseURL: "http://127.0.0.1:9798/v1" });
+```
+
+### Claude Code
+
+Claude Code uses an OpenAI-compatible transport when pointed at a custom endpoint. Set the proxy URL via the `ANTHROPIC_BASE_URL` or the `--base-url` flag so all tool-call traffic flows through Aphrodite before reaching Anthropic's API (or any Claude-compatible proxy such as LiteLLM).
+
+```bash
+# Option A — environment variable
+export ANTHROPIC_BASE_URL=http://127.0.0.1:9798/v1
+
+# Option B — CLI flag
+claude --base-url http://127.0.0.1:9798/v1 "build and test"
+```
+
+Because Claude Code's agentic loop can issue dozens of `Bash`, `Read`, and `Write` tool calls per session, the browser-snapshot and build-output compressors deliver the highest savings here — 416× on DOM snapshots, 140× on build output.
+
+> **Recommended model_family for Claude:** `compact` — Claude's native instruction-following is strong enough that minimal metadata previews (`[diff:1f +12/-3]`) outperform verbose ones. Set `model_family = "compact"` in `aphrodite.toml`.
+
+### LLM Proxy Backends (Headroom, LiteLLM, Ollama, vLLM, …)
+
+Aphrodite sits at the **front** of any OpenAI-compatible LLM proxy chain. Route Aphrodite's upstream to whichever backend you run:
+
+| Backend | Upstream URL | Notes |
+| :------ | :----------- | :---- |
+| **[Headroom]** (:9799) | `http://127.0.0.1:9799/v1` | Default partner — semantic compression layer runs after CCR |
+| **LiteLLM** | `http://127.0.0.1:4000/v1` | Unified gateway for 100+ models; set `APHRODITE_UPSTREAM_URL` |
+| **Ollama** | `http://127.0.0.1:11434/v1` | Local models; Ollama's `/v1` endpoint is OpenAI-compatible |
+| **vLLM** | `http://127.0.0.1:8000/v1` | High-throughput local inference |
+| **llama.cpp server** | `http://127.0.0.1:8080/v1` | GGUF models; `--api-key` optional |
+| **LM Studio** | `http://127.0.0.1:1234/v1` | GUI-managed local models |
+| **Jan** | `http://127.0.0.1:1337/v1` | Desktop inference server |
+| **Mistral API** | `https://api.mistral.ai/v1` | Cloud; set `APHRODITE_UPSTREAM_URL` |
+| **Together AI** | `https://api.together.xyz/v1` | Cloud multi-model |
+| **Groq** | `https://api.groq.com/openai/v1` | Ultra-fast inference |
+
+```toml
+# aphrodite.toml — point upstream at any OpenAI-compatible backend
+[proxy]
+upstream_url = "http://127.0.0.1:9799/v1"   # default: Headroom
+# upstream_url = "http://127.0.0.1:11434/v1" # Ollama
+# upstream_url = "http://127.0.0.1:4000/v1"  # LiteLLM
+```
+
+Or override per-run with an env var:
+
+```bash
+APHRODITE_UPSTREAM_URL=http://127.0.0.1:11434/v1 aphrodite
+```
+
+### Headroom Defaults
+
+Headroom (`:9799`) is the **default upstream** — when you run `aphrodite` with no config, all requests flow `agent → Aphrodite (:9798) → Headroom (:9799) → LLM API`. This gives you both layers: CCR addressing from Aphrodite and semantic reduction from Headroom.
+
+```toml
+# aphrodite.toml — Headroom integration defaults
+[headroom]
+enabled = true
+port    = 9799
+url     = "http://127.0.0.1:9799/v1"
+
+# Headroom strategy overrides (optional — Headroom selects automatically)
+# strategy = "CODE_AWARE"   # force AST-level code compression
+# strategy = "LOG"          # force log extraction
+# strategy = "KOMPRESS"     # force ML semantic compression
+```
+
+Headroom auto-selects its compressor strategy based on content type. You can override per-content-family in `aphrodite.toml` if you want to force a strategy for a given classifier type.
 
 ### Direct Integration (OpenAI-compatible proxy)
 
 | Agent | Type | Integration | Compression |
 |-------|------|-------------|-------------|
 | **Hermes Agent** | Native | Built-in plugin; `on_start()` auto-launches | Full pipeline |
+| **Claude Code** | CLI | `ANTHROPIC_BASE_URL` or `--base-url` | Very high — tool-heavy agentic loop |
 | **Aider** | Open source | `--openai-api-base http://127.0.0.1:9798/v1` | High — context-heavy diffs |
 | **OpenHands** | Open source (MIT) | Custom provider config; clean agent loop | High — multi-level compression |
 | **Codex CLI** | Open source (Apache 2.0) | Pluggable provider; `--model` + `--base-url` | Medium-high |
@@ -113,7 +215,7 @@ Aphrodite sits as an OpenAI-compatible proxy — any agent that speaks the OpenA
 
 ---
 
-## Absorptive CCR Previews 🧠
+## Absorptive CCR Previews 🧠
 
 > **"Absorptive" means the classifier learns from every output it sees. New content of the same type automatically gets the same structured treatment — no manual template writing needed.**
 
@@ -198,7 +300,7 @@ _make_ccr_preview() → {family}:{template}  (≤120 chars, pipe‑safe)
 
 ---
 
-## LLM‑Native Output Formatting 📋
+## LLM‑Native Output Formatting 📋
 
 > **Your agent reads clean, machine‑parseable text instead of decorative human‑facing output with emojis and bold formatting. Every token counts.**
 
@@ -223,7 +325,7 @@ Aphrodite's own tools (`catalog`, `stats`, `diff`, `files`) return structured ou
 
 ---
 
-## What You Save 💰
+## What You Save 💰
 
 > **Every token of tool output you compress is a token your agent can use for reasoning, planning, and code generation. Context is the most expensive resource in LLM economics — we make it go further.**
 
@@ -258,7 +360,7 @@ Aphrodite's own tools (`catalog`, `stats`, `diff`, `files`) return structured ou
 
 ---
 
-## Performance ⚡
+## Performance ⚡
 
 > **Sub‑millisecond compression with zero API calls. The classifier runs in <0.1ms using pure regex — no model inference, no network round‑trip, no token cost.**
 
@@ -276,15 +378,15 @@ Aphrodite's own tools (`catalog`, `stats`, `diff`, `files`) return structured ou
 
 | Metric                       | Value          |
 | :--------------------------- | :------------: |
-| Compression latency (avg)    | 1.6 ms         |
-| Compression latency (min)    | 0.3 ms         |
-| Retrieval latency (avg)      | 0.7 ms         |
-| Retrieval p50                | 0.4 ms         |
+| Compression latency (avg)    | 1.6 ms         |
+| Compression latency (min)    | 0.3 ms         |
+| Retrieval latency (avg)      | 0.7 ms         |
+| Retrieval p50                | 0.4 ms         |
 | Benchmark pass rate          | 19/19 ✅        |
 | Smoke test pass rate         | 13/13 ✅        |
-| Classification latency       | <0.1 ms        |
-| Preview generation           | <0.05 ms       |
-| Worker threads (default)     | 4× CPU, min 32 |
+| Classification latency       | <0.1 ms        |
+| Preview generation           | <0.05 ms       |
+| Worker threads (default)     | 4× CPU, min 32 |
 
 ### Cumulative proxy savings *(running session)*
 
@@ -312,11 +414,11 @@ Aphrodite's own tools (`catalog`, `stats`, `diff`, `files`) return structured ou
 | JSON sub‑types          | 12             |
 | Code languages          | 6              |
 | Template families       | 3              |
-| Classification speed    | <0.1 ms        |
+| Classification speed    | <0.1 ms        |
 
 ---
 
-## Compression Strategies 🧬
+## Compression Strategies 🧬
 
 > **Aphrodite owns the *addressing* layer — where content lives and how to find it. Headroom owns the *reduction* layer — how to make content smaller while keeping it meaningful.**
 
@@ -357,7 +459,7 @@ Together: **content-addressed retrieval + semantic reduction + structure-aware p
 
 ---
 
-## Quick Start 🚀
+## Quick Start 🚀
 
 > **30 seconds from clone to compression.**
 
@@ -380,6 +482,9 @@ RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
 
 ```toml
 # aphrodite.toml — all features, no recompile needed
+[proxy]
+upstream_url = "http://127.0.0.1:9799/v1"  # default: Headroom; swap for Ollama/LiteLLM/vLLM
+
 [compression]
 engine_threshold_pct = 45    # compress at 45% context
 tool_threshold_token = 512   # token proxy threshold (bytes)
@@ -393,13 +498,18 @@ code_structure_map = true    # show fn/struct/class sigs
 [prompts]
 retrieve_guidance = "minimal" # no retrieval bait in markers
 ccr_marker_hint = false      # clean CCR markers
+
+[headroom]
+enabled = true
+port    = 9799
+url     = "http://127.0.0.1:9799/v1"
 ```
 
 7 TOML sections, 54 template strings, all overridable via `APHRODITE_*` env vars. No recompile. No restart. Just edit and go.
 
 ---
 
-### Prefetch Workflow ⚡
+### Prefetch Workflow ⚡
 
 > **Read many files in parallel. The agent gets CCR markers instantly and continues reasoning while files load in background threads.**
 
@@ -427,7 +537,7 @@ The agent can issue `aphrodite_prefetch()` and immediately call other tools — 
 
 ---
 
-## Tools 🔧
+## Tools 🔧
 
 | Tool                   | Description                                          |
 | :--------------------- | :--------------------------------------------------- |
@@ -445,7 +555,7 @@ The agent can issue `aphrodite_prefetch()` and immediately call other tools — 
 
 ---
 
-## Under the Hood 🧩
+## Under the Hood 🧩
 
 ```
 plugins/aphrodite/
