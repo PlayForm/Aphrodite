@@ -2,10 +2,9 @@
 
 import logging
 
-_log = logging.getLogger("aphrodite.hooks.classify")
-
-# Imported from plugin config
 from .._core import CLASSIFIER_POLL
+
+_log = logging.getLogger("aphrodite.hooks.classify")
 
 
 def _classifier_says_skip(klass: dict) -> bool:

@@ -5,10 +5,10 @@ import logging
 
 from .._core import (
     _conv_index,
+    _init_trigram_index,
     _inline_index,
     _inline_index_enabled,
     _inline_store,
-    _init_trigram_index,
     _recent_markers,
 )
 

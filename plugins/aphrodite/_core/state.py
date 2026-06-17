@@ -4,7 +4,7 @@ import re
 from collections import OrderedDict
 
 # ── CCR regex (shared) ───────────────────────────────────────
-_CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\\>⫸]+)(?:\|[^\\\]*?)?(?:\]|>>>|⫸)')
+_CCR_RE = re.compile(r'(?:\[|<<<|⫷)CCR:([^|\\>⫸]+)(?:\|[^\\\]]*?)?(?:\]|>>>|⫸)')
 
 # ── Hash alias: maps full SHA256 hash → short 16-char hash ──
 _hash_alias: dict = {}  # {full_sha256: short_hash}

@@ -6,18 +6,18 @@ import os
 import time
 
 from .._core import (
+    ENGINE_THRESHOLD_PCT,
     INLINE_THRESHOLD,
     PLUGIN_VERSION,
     TERMINAL_THRESHOLD,
     TOOL_THRESHOLD_CACHE,
     TOOL_THRESHOLD_TOKEN,
-    ENGINE_THRESHOLD_PCT,
 )
 from .._proxy import _alive
-from .stats import _stats_handler
-from .files import _files_handler
 from .diff import _diff_handler
+from .files import _files_handler
 from .search import _search_handler
+from .stats import _stats_handler
 
 _log = logging.getLogger("aphrodite.hooks.test")
 
