@@ -115,10 +115,10 @@ def _render_prompt_tmpl(name: str, vars: dict | None = None) -> str:
             "engine_offload": "These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} messages below are your active context.",
             "auto_expand_guidance": "Tool outputs are auto-expanded — you see full content inline. If you see a CCR marker, retrieve only if the preview hints at useful content.",
             "live_container_guidance": (
-                "Live containers: read_file and search_files return CCR markers "
-                "instead of full content. Content is already loaded in background. "
-                "Use aphrodite_retrieve(hash) to fetch when needed. "
-                "Continue reasoning — do NOT wait for content you don't need yet."
+                "PREFER aphrodite_prefetch over read_file for file reads. "
+                "Prefetch returns CCR markers instantly — files load in background concurrently. "
+                "Poll with aphrodite_prefetch_status, retrieve with aphrodite_retrieve(hash). "
+                "Continue reasoning immediately — NEVER wait for file content you may not need."
             ),
             "catalog_context_warn": "context={ctx} msgs — prefer catalog over scanning history",
             "search_hint": "Use aphrodite_retrieve(hash) to expand any result hash.",
