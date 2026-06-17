@@ -39,7 +39,7 @@ as a **custom fork** (`github.com/PlayForm/headroom`). Original upstream is
 |---|---|
 | **Branding** | PlayForm identity, 💋 em‑quad spacing, Aphrodite‑compatible naming |
 | **CCR hash** | BLAKE3 → SHA‑256 (24‑char hex) for Rust‑Python parity |
-| **CCR marker** | `<<CCR:hash\|type\|size>>>` format shared across Rust and Python |
+| **CCR marker** | `<<<CCR:hash\|type\|size>>>` format shared across Rust and Python |
 | **Compression pipeline** | Absorptive preview pipeline — new content types auto‑formatted |
 | **Tool relay** | Added Hermes‑specific tool relay protocol: `POST /tool/relay` with async callbacks |
 | **Content types** | Extended from generic to 28 typed categories with TOML‑driven templates |
