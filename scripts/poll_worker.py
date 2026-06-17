@@ -1,4 +1,4 @@
-#!REDACTED/.hermes/hermes-agent/venv/bin/python3
+#!/usr/bin/env python3
 """
 Hermes poll worker — oneshot agent that runs via the Save/prompt-file
 pattern WITHOUT polluting session history. Same architecture as the
