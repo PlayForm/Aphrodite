@@ -74,6 +74,46 @@ Scripts: `scripts/aphrodite/*.rhai` or `~/.hermes/aphrodite/scripts/*.rhai`
 3 hooks: `on_compress`, `on_marker`, `on_retrieve`
 Live-reload on file change.
 
+## GitHub Releases
+
+**CRITICAL: Never use inline backtick-quoted text with `gh release create --notes`.** The shell interprets backticks as command substitution, capturing Hermes TUI output into the release body. Always use `--notes-file` with a temp file.
+
+### Release notes format
+
+Every release MUST include:
+1. Compare link to previous tag
+2. Section headers (###) for each feature area
+3. Bullet points with specific changes
+4. Code examples where relevant
+5. Before/after comparisons where applicable
+
+### Creating a release
+
+```bash
+# Write notes to temp file (heredoc prevents shell interpretation)
+cat > /tmp/notes.md << 'EOF'
+**[Compare vX.Y.Z...vX.Y.Z](https://github.com/PlayForm/Aphrodite/compare/vX.Y.Z...vX.Y.Z)**
+
+### Feature
+
+- change one
+- change two
+EOF
+
+# Create release with binary
+gh release create vX.Y.Z --repo PlayForm/Aphrodite \
+  --title "vX.Y.Z — description" \
+  --notes-file /tmp/notes.md \
+  ~/.hermes/aphrodite/aphrodite
+```
+
+### Template helper
+
+```bash
+./scripts/release-notes.sh v0.5.122 "title" "body text" > /tmp/notes.md
+gh release create v0.5.122 -F /tmp/notes.md ~/.hermes/aphrodite/aphrodite
+```
+
 ## Code Structure Preview (v0.5.70+)
 
 On by default, no feature flag. `generate_metadata()` extracts:
