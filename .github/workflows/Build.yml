@@ -67,8 +67,8 @@ jobs:
                   git submodule update --init --remote --recursive --merge
                   git submodule status
 
-            - name: Setup Rust
-              uses: dtolnay/rust-toolchain@stable
+            - name: Setup Rust (nightly)
+              uses: dtolnay/rust-toolchain@nightly
 
             - name: Cache cargo
               uses: actions/cache@v4
@@ -109,8 +109,8 @@ jobs:
                   git submodule update --init --remote --recursive --merge
                   git submodule status
 
-            - name: Setup Rust
-              uses: dtolnay/rust-toolchain@stable
+            - name: Setup Rust (nightly)
+              uses: dtolnay/rust-toolchain@nightly
               with:
                   targets: ${{ matrix.target }}
 
