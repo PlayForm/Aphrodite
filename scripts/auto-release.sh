@@ -54,13 +54,13 @@ echo "[test] OK"
 # Commit version bump + tag (no editor prompts)
 git add -u
 git commit -m "release(aphrodite): v$NEW — $MSG"
-git tag -d "v$NEW" 2>/dev/null || true
-GIT_EDITOR=true git tag -a "v$NEW" -m "v$NEW" 2>/dev/null || git tag "v$NEW"
-echo "[release] v$NEW tagged"
+git tag -d "Aphrodite/v$NEW" 2>/dev/null || true
+GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2>/dev/null || git tag "Aphrodite/v$NEW"
+echo "[release] Aphrodite/v$NEW tagged"
 
 # Push — always sync with remote
 git push Source Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
-git push Source "v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
+git push Source "Aphrodite/v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
 echo "[push] done"
 
 echo ""
