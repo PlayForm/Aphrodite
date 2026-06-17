@@ -57,6 +57,7 @@ ignore = [
 "_resolve.py" = ["E741"]
 "_engine.py" = ["E701"]
 "_core.py" = ["E701"]
+"skills/*/scripts/*.py" = ["E702"]
 
 [tool.ruff.format]
 quote-style = "double"

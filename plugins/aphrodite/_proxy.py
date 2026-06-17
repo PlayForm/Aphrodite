@@ -456,6 +456,6 @@ def _restore_markers():
 
 
 # Register save on process exit (must be AFTER _save_markers is defined)
-import atexit as _atexit
+import atexit as _atexit  # noqa: E402 — must be after _save_markers definition
 
 _atexit.register(_save_markers)

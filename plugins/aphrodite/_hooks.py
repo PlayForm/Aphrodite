@@ -1,5 +1,6 @@
 """aphrodite - hook handlers for Hermes tool/terminal/LLM calls."""
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -8,7 +9,7 @@ import re
 import subprocess
 import time
 import urllib.request
-import contextlib
+
 from ._core import (
     _CCR_RE,
     _DEV,
@@ -402,8 +403,7 @@ def _classifier_says_skip(klass: dict) -> bool:
     if not CLASSIFIER_POLL:
         return False
     ctype = klass.get("type", "")
-    if ctype in ("build_output", "build_error"):
-        if klass.get("errors", "0") in ("0", "") and klass.get("warnings", "0") in ("0", ""):
+    if ctype in ("build_output", "build_error") and klass.get("errors", "0") in ("0", "") and klass.get("warnings", "0") in ("0", ""):
             return True
     if ctype == "terminal" and klass.get("exit") == "0":
         return True
