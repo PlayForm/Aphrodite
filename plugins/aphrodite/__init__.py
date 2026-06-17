@@ -76,6 +76,7 @@ from ._hooks import (
     CATALOG_SCHEMA,
     DIFF_SCHEMA,
     FILES_SCHEMA,
+    PREFETCH_SCHEMA,
     REBUILD_SCHEMA,
     RECLASSIFY_SCHEMA,
     SEARCH_SCHEMA,
@@ -89,6 +90,7 @@ from ._hooks import (
     _git_summary,
     _group_into_turns,
     _pre_llm_hook,
+    _prefetch_handler,
     _rebuild_handler,
     _search_handler,
     _stats_handler,
@@ -137,6 +139,7 @@ def register(ctx):
     ctx.register_tool(name="aphrodite_test", schema=TEST_SCHEMA, handler=_test_handler, toolset="aphrodite")
     ctx.register_tool(name="aphrodite_catalog", schema=CATALOG_SCHEMA, handler=_catalog_handler, toolset="aphrodite")
     ctx.register_tool(name="aphrodite_reclassify", schema=RECLASSIFY_SCHEMA, handler=_aphrodite_reclassify_handler, toolset="aphrodite")
+    ctx.register_tool(name="aphrodite_prefetch", schema=PREFETCH_SCHEMA, handler=_prefetch_handler, toolset="aphrodite")
 
     engine_configured = CONTEXT_ENGINE
     if engine_configured:
