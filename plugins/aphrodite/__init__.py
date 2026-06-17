@@ -162,14 +162,27 @@ def register(ctx):
     # -- Bundle skills (namespaced as aphrodite:*) -----------------------------
     _skills_dir = Path(__file__).parent / "skills"
     _skills = [
+        ("aphrodite-auto-expand-testing", "Protocol for testing APHRODITE_NO_AUTO_EXPAND behavior"),
+        ("aphrodite-benchmarking", "Performance benchmarking for proxy + compression pipeline"),
+        ("aphrodite-boundary-behaviors", "Boundaries between compression layers: retrieve thresholds, cross-store visibility"),
+        ("aphrodite-center-testing", "Test center features end-to-end — call site audit, persistence, composition"),
+        ("aphrodite-coding-defaults", "Coding-optimized compression defaults, centers, and auto-expand"),
+        ("aphrodite-compression-architecture", "Compression architecture reference — semantic layers, token savings"),
+        ("aphrodite-context-efficiency", "Techniques for minimizing token usage when working with compressed content"),
         ("aphrodite-dev-workflow", "End-to-end aphrodite development: cargo watch, proxy, smoke tests"),
-        ("aphrodite-hook-reference", "Complete Hermes hook API reference for the aphrodite plugin"),
-        ("aphrodite-iterate-release", "Iterative aphrodite development loop: fix, bump, build, test"),
+        ("aphrodite-hook-reference", "Complete Hermes hook API reference with parameter specs"),
+        ("aphrodite-iterate-release", "Iterative development loop: fix, bump, build, test, release"),
+        ("aphrodite-output-formatting", "LLM-native formatting rules for all output — previews, catalog, stats"),
+        ("aphrodite-presentation", "How to present features in README, docs, and user-facing content"),
+        ("aphrodite-release-workflow", "Release pipeline, version sync, budget tuning, worker config"),
+        ("aphrodite-session-patterns", "Session patterns: release pipeline, centers, worker config, metrics"),
+        ("aphrodite-tool-guide", "Full reference for CCR tools: retrieve, compress, stats, search, catalog"),
+        ("aphrodite-upgrade-breakpoints", "Cargo upgrade breakpoints checklist — axum 0.8, sha2 0.11 wildcards"),
     ]
     for _name, _desc in _skills:
         ctx.register_skill(_name, _skills_dir / _name / "SKILL.md", _desc)
 
-    _log.info("aphrodite v%s registered - 10 tools + 3 skills + hooks", PLUGIN_VERSION)
+    _log.info("aphrodite v%s registered - 10 tools + 15 skills + hooks", PLUGIN_VERSION)
 
     if DEBUG_LOGGING:
         lines = [
