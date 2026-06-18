@@ -40,4 +40,4 @@ git gc --prune=now --aggressive
 echo
 echo "=== DONE ==="
 echo "Push:  cd $MIRROR && git push --force --all && git push --force --tags"
-echo "Sync:  cd /Volumes/CORSAIR/Developer/macOS/Application/PlayForm/HermesCompress && git fetch origin && git reset --hard origin/Current"
+echo "Sync:  cd /Volumes/CORSAIR/Developer/macOS/Application/PlayForm/Aphrodite && git fetch origin && git reset --hard origin/Current"
