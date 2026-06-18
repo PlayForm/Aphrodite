@@ -1,23 +1,61 @@
-# aphrodite.toml
+# ── Aphrodite Configuration ────────────────────────────────────────────────
+# Copy this file to aphrodite.toml and edit to your needs.
+# Priority: env var > aphrodite.toml > hardcoded default.
+#
+# Search order: ./aphrodite.toml → ~/.hermes/aphrodite/aphrodite.toml → repo root
 
+# ── Proxies ─────────────────────────────────────────────────────────────────
+[[proxies]]
+name = "cache"
+listen = "0.0.0.0:9797"
+mode = "cache"
+tool_relay = true
+timeout = 120
+
+[[proxies]]
+name = "token"
+listen = "0.0.0.0:9798"
+mode = "token"
+tool_relay = true
+timeout = 300
+retry_attempts = 3
+retry_base_ms = 2000
+
+# ── Shared defaults (applied to all proxies unless overridden) ──────────────
 [defaults]
 api_url = "https://api.deepseek.com"
 model = "deepseek-v4-pro"
 ccr_ttl_seconds = 3600
-cache_port = 9798  # Cache proxy port (default: 9798)
-# api_key is read from APHRODITE_API_KEY env var by default.
-# Only set this if you cannot use the env var.
-api_key = ""
+# api_key is read from APHRODITE_API_KEY env var.
+# Only uncomment if you cannot use the env var:
+# api_key = "sk-..."
 
-[[proxies]]
-name = "cache"
-listen = "127.0.0.1:9797"
-mode = "cache"
-# dev = true  # set locally only - do not commit
+# ── Compression ─────────────────────────────────────────────────────────────
+[compression]
+engine_threshold_pct = 45          # compress at 45% context
+engine_protect_first = 2           # messages to keep at start
+engine_protect_last = 5            # messages to keep at end
+engine_min_msgs = 8                # minimum messages before activating
+tool_threshold_token = 512         # token proxy threshold (bytes)
+tool_threshold_cache = 4096        # cache proxy threshold (bytes)
+terminal_threshold = 1024          # terminal output threshold (bytes)
+inline_threshold = 2048            # inline zlib fallback threshold (bytes)
+auto_expand = false                # off: markers stay raw
+auto_expand_limit = 0              # 0 = disabled
+catalog_mode = "compact"           # compact | full | tool
+classifier_poll = true             # skip CCR for clean outputs
+code_multiplier = 3.0              # multiply threshold for code types
+context_engine = true              # default-on, no env var needed
+prefetch = true                    # enable aphrodite_prefetch tool
 
-[[proxies]]
-name = "token"
-listen = "127.0.0.1:9798"
-mode = "token"
-tool_relay = true
-# dev = true  # set locally only - do not commit
+# ── Previews ─────────────────────────────────────────────────────────────────
+[previews]
+model_family = "code_first"        # compact | code_first | balance
+code_structure_map = true          # show fn/struct/class sigs
+preview_max_chars = 120            # max chars per preview line
+
+# ── Prompts ──────────────────────────────────────────────────────────────────
+[prompts]
+retrieve_guidance = "verbose"      # minimal | standard | verbose
+ccr_marker_hint = true             # append "…(use aphrodite_retrieve)"?
+catalog_intent_hints = true        # show intent=read with hashes?
