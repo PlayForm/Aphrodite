@@ -1,11 +1,57 @@
 # Aphrodite Prettier ignore
-# Modeled after REPxREP/Repository convention
+# Modeled after REPxREP/Repository + Land conventions
+# Designed for VS Code `**/*` glob — excludes everything Prettier can't parse
 
-# Submodules / vendored deps
+# ═══════════════════════════════════════════════
+# Formatters that own their own file types
+# ═══════════════════════════════════════════════
+
+# Rust — rustfmt owns .rs formatting
+*.rs
+
+# TOML — taplo / even-better-toml owns .toml
+*.toml
+
+# Python — ruff/black owns .py
+*.py
+*.pyi
+*.pyc
+*.pyo
+__pycache__/
+**/__pycache__/
+.venv/
+venv/
+
+# Shell — shfmt owns .sh / .bash
+*.sh
+*.bash
+*.env.sh
+.env.sh
+
+# ═══════════════════════════════════════════════
+# Vendored / submodules / generated code
+# ═══════════════════════════════════════════════
+
 vendor/
-plugins/
+**/vendor/
+**/vendor/**
 
-# Rust build artifacts
+plugins/
+**/plugins/
+**/plugins/**
+
+# Generated / codegen
+**/Generated/
+**/Generated/**
+**/.generated/
+**/.generated/**
+**/gen/
+**/gen/**
+
+# ═══════════════════════════════════════════════
+# Rust / Cargo build artifacts
+# ═══════════════════════════════════════════════
+
 target/
 Target/
 **/target/
@@ -19,17 +65,15 @@ Target/
 **/deps
 **/deps/**
 .cargo/
+Cargo.lock
 
-# Shell / env — no built-in Prettier parser
-*.sh
-*.env.sh
-.env.sh
-
-# Python — no built-in Prettier parser (use ruff/black)
-*.py
-
+# ═══════════════════════════════════════════════
 # Node / package manager
+# ═══════════════════════════════════════════════
+
 node_modules/
+**/node_modules/
+**/node_modules/**
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
@@ -42,53 +86,219 @@ yarn-error.log*
 .turbo
 **/.turbo
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
+# ═══════════════════════════════════════════════
+# Hermes runtime data
+# ═══════════════════════════════════════════════
 
-# Hermes
 .hermes/
+**/.hermes/
+**/.hermes/**
 profiles/
+**/profiles/
+**/profiles/**
+*.session
+*.session.*
 
-# Git
+# ═══════════════════════════════════════════════
+# Git / VCS
+# ═══════════════════════════════════════════════
+
 .git/
+**/.git/
+**/.git/**
 .gitmodules
+.gitattributes
+.gitignore
 
-# Binary / generated
+# ═══════════════════════════════════════════════
+# Binary / generated / archive formats
+# ═══════════════════════════════════════════════
+
+# Images
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.ico
 *.svg
+*.webp
+*.bmp
+*.tiff
+*.avif
+
+# Fonts
 *.woff
 *.woff2
 *.ttf
 *.eot
+*.otf
+
+# Archives
+*.gz
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+*.bz2
+*.xz
+
+# Binaries / executables
 *.wasm
 *.bin
 *.exe
 *.dll
 *.so
 *.dylib
+*.dmg
+*.pkg
+*.app
 
-# Lockfiles
-Cargo.lock
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
 
-# IDE
-.idea/
+# Documents
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.odt
+*.ods
+
+# Audio / video
+*.mp3
+*.mp4
+*.wav
+*.ogg
+*.flac
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# ═══════════════════════════════════════════════
+# Cache / temp / lock files
+# ═══════════════════════════════════════════════
+
+*.cache
+*.tmp
+*.temp
+*.log
+*.lock
+*.bak
+*.backup
+*~
 *.swp
 *.swo
-*~
-
-# Build output
-dist/
-build/
-out/
-
-# OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# ═══════════════════════════════════════════════
+# Config / secrets (never format)
+# ═══════════════════════════════════════════════
+
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cert
+*.cer
+*.p12
+*.pfx
+*.token
+*credentials*
+*secret*
+
+# ═══════════════════════════════════════════════
+# Minified / bundled files
+# ═══════════════════════════════════════════════
+
+*.min.js
+*.min.css
+*.min.js.map
+*.bundle.js
+*.bundle.css
+**/dist/
+**/dist/**
+**/build/
+**/build/**
+**/out/
+**/out/**
+
+# ═══════════════════════════════════════════════
+# IDE / editor
+# ═══════════════════════════════════════════════
+
+.idea/
+**/.idea/
+**/.idea/**
+.vscode/
+**/.vscode/
+**/.vscode/**
+*.sublime-*
+.project
+.classpath
+.settings/
+
+# ═══════════════════════════════════════════════
+# CI / CD
+# ═══════════════════════════════════════════════
+
+.github/
+**/.github/
+**/.github/**
+.gitlab-ci.yml
+.jenkins
+.travis.yml
+.azure-pipelines
+.circleci
+
+# ═══════════════════════════════════════════════
+# Misc — files Prettier chokes on
+# ═══════════════════════════════════════════════
+
+# Compiled/bundled JS (not source)
+**/compiled/
+**/compiled/**
+**/transpiled/
+**/transpiled/**
+
+# Large data files
+*.csv
+*.tsv
+*.ndjson
+*.jsonl
+*.parquet
+*.arrow
+
+# Protocol buffers / schema
+*.proto
+*.pb
+*.graphqls
+*.graphql
+
+# Docker
+Dockerfile
+.dockerignore
+*.dockerfile
+
+# License files (formatting breaks legal text)
+LICENSE
+LICENSE-*
+COPYING
+NOTICE
+
+# Graphviz / diagram sources
+*.dot
+*.mmd
+*.puml
