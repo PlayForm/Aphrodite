@@ -8,26 +8,20 @@ sequenceDiagram
     participant Agent as Hermes Agent
     participant Proxy as Aphrodite Proxy
     participant CCR as CCR Store
-    participant API as DeepSeek API
 
-    Note over LLM,API: Turn 1  -  LLM reads a file
+    Note over LLM,CCR: Turn 1 - LLM reads a file
 
     LLM->>Agent: read_file("proxy.rs")
-    Agent->>Proxy: POST /v1/chat/completions
-    Proxy->>API: Forward to DeepSeek
-    API-->>Proxy: tool_calls: [read_file]
-    Proxy-->>Agent: tool_calls (uncompressed)
     Agent->>Agent: Execute read_file → 4832 bytes
-    Agent->>Proxy: Tool output flows through hooks
+    Agent->>Proxy: Tool output intercepted by hook
 
     Note over Proxy,CCR: Compression happens here
     Proxy->>Proxy: detect_content_type() → code_rust
     Proxy->>Proxy: threshold_for(code_rust) → 4KB (×4)
     Proxy->>Proxy: 4832 > 4096 → compress
     Proxy->>CCR: store(content, hash=abc123)
-    Proxy-->>Agent: Compressed marker
-
-    Agent->>LLM: What the LLM sees ↓
+    Proxy-->>Agent: Compressed preview marker
+    Agent-->>LLM: [code_rust:3fns 414L] <<<CCR:abc123>>>
 ```
 
 ## Scenario 1: Reading a Rust File
