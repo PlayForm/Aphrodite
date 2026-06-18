@@ -696,6 +696,28 @@ what we add, what we rewrote, how they ship together.
 
 ---
 
+## vs Headroom — Why Aphrodite Wins
+
+> **Headroom replaces output with a bare hash. Aphrodite replaces output with a structured preview.**  
+> That single design difference produces a **235× gap in net savings**.
+
+| Metric | Headroom | Aphrodite |
+|--------|----------|-----------|
+| Compression approach | Remove-and-retrieve | Preview-and-decide |
+| Agent sees | `<<ccr:HASH>>` (0 info) | `[build:0E 0W 1L]` |
+| Must retrieve? | ✅ Every time | ❌ Optional — preview enough |
+| Net effect | ❌ -19.2% (loses tokens!) | ✅ +79.7% (saves tokens) |
+| Best case | 58% (search_files JSON) | 100% (clean builds = 0 CCR) |
+| Compression rate | ~6% of traffic | 90% (live proxy) |
+| Classification | ML + regex (~100ms) | Pure regex (<0.1ms) |
+| Dependencies | Python + ML (heavy) | Zero (regex only) |
+
+**The Preview IS the Compression.** Headroom forces a retrieval roundtrip
+that burns more tokens than raw output. Aphrodite's 28-type classifier
+produces structured metadata giving the agent enough context to skip.
+
+---
+
 _Ready to save context?_ [Install now](#quick-start) • [Read the docs](docs/) •
 [Report an issue](https://github.com/PlayForm/Aphrodite/issues) •
 [Security policy](SECURITY.md)
