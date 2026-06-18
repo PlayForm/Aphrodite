@@ -42,8 +42,8 @@ else
 	NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
 fi
 
-# Bump Cargo.toml
-sed -i '' "s/version = \"$CURRENT\"/version = \"$NEW\"/" "$CARGO_TOML"
+# Bump Cargo.toml (line 3 only — avoid matching dependency versions)
+sed -i '' "3s/version = \"$CURRENT\"/version = \"$NEW\"/" "$CARGO_TOML"
 # Sync Python BIN_VERSION (now in _core/config.py package)
 sed -i '' "s/BIN_VERSION = \"v$CURRENT\"/BIN_VERSION = \"v$NEW\"/" plugins/aphrodite/_core/config.py
 
