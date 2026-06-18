@@ -8,8 +8,7 @@
 
 [Aphrodite]: https://github.com/PlayForm/Aphrodite
 
-> **Your LLM burns 90% of its context on tool output it never reads. We fix
-> that.**
+> **Your LLM burns 90% of its context on output it never reads. We fix that.**
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.  
 > Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.  
@@ -24,15 +23,15 @@
 
 ## The Problem
 
-Every time your agent runs a tool - `cargo build`, `search_files`, `read_file` -
-the raw output floods its context window. Thousands of tokens of compilation
-logs. Gigantic accessibility trees. Verbose JSON blobs. Your agent spends its
-precious context budget **reading noise** instead of reasoning.
+Every time your agent reads a file, runs a build, searches code, or opens a
+browser - the raw output floods its context window. Thousands of tokens of
+compilation logs. Gigantic accessibility trees. Verbose JSON blobs. Your agent
+spends its precious context budget **reading noise** instead of reasoning.
 
-**Aphrodite intercepts tool output before it reaches the LLM and replaces it
-with a compact, structured preview.** The agent sees 15 tokens of metadata
-instead of 500 tokens of raw text - and retrieves the full content only when it
-actually needs it.
+**Aphrodite intercepts output before it reaches the LLM and replaces it with a
+compact, structured preview.** The agent sees 15 tokens of metadata instead of
+500 tokens of raw text - and retrieves the full content only when it actually
+needs it.
 
 ---
 
@@ -415,7 +414,7 @@ decorated.
 
 ## What You Save 💰
 
-> **Every token of tool output you compress is a token your agent can use for
+> **Every token of output you compress is a token your agent can use for
 > reasoning, planning, and code generation. Context is the most expensive
 > resource in LLM economics - we make it go further.**
 
@@ -498,11 +497,10 @@ entire extra conversation turn of reasoning.
 
 ### Real‑world token savings
 
-> **2 MB of tool output compresses to ~960 bytes of CCR markers - a 3,000:1
-> effective ratio. In a typical coding session with 50+ tool calls, that's The
-> proxy has saved millions of tokens cumulatively - At current pricing, that's
-> $250+ in API costs saved. tokens cumulatively - that's $250+ in API costs at
-> current pricing alone.**
+> **2 MB of raw output compresses to ~960 bytes of CCR markers - a 2,000:1
+> effective ratio. In a typical coding session with 50+ operations, the proxy
+> saves millions of tokens cumulatively. At current pricing, that's $250+ in
+> API costs saved.**
 
 ### Classifier coverage
 
