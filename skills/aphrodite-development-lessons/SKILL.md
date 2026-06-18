@@ -38,7 +38,7 @@ alternative tools. They'll also produce CCR markers.
 The plugin must symlink directly to the repo for instant code updates:
 
 ```
-~/.hermes/profiles/dev-aphrodite/plugins/aphrodite → /path/to/HermesCompress/plugins/aphrodite
+~/.hermes/profiles/dev-aphrodite/plugins/aphrodite → /path/to/Aphrodite/plugins/aphrodite
 ```
 
 Without this, code changes in the repo don't reach the running plugin.

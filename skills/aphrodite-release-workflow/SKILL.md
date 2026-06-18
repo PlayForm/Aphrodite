@@ -15,7 +15,7 @@ platforms: [macos]
 `Failed to load plugin` with no error.
 
 ```bash
-cd /path/to/HermesCompress
+cd /path/to/Aphrodite
 python3 -c "import sys; sys.path.insert(0, 'plugins'); import aphrodite; print('OK:', aphrodite.__doc__[:60])"
 ruff check plugins/aphrodite/ scripts/ crates/
 npx pyright plugins/aphrodite/
