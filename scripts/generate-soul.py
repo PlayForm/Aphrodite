@@ -9,9 +9,9 @@ from pathlib import Path
 HOME = str(Path.home())
 PROJECT_ROOT = Path(__file__).parent.parent
 
-SOUL_TEMPLATE = """# Aphrodite - HermesCompress
+SOUL_TEMPLATE = """# Aphrodite - Aphrodite
 
-You are an Aphrodite test agent inside **HermesCompress** - a context compression system for Hermes Agent.
+You are an Aphrodite test agent inside **Aphrodite** - a context compression system for Hermes Agent.
 
 ---
 

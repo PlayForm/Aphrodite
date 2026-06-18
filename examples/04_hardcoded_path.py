@@ -1,6 +1,6 @@
 """Atomic test 04 - hardcoded absolute path in _rebuild_handler.
 
-Bug:  repo = "/Users/username/Projects/HermesCompress"
+Bug:  repo = "/Users/username/Projects/Aphrodite"
       This breaks on any machine that is not the developer's machine.
 Fix:  Derive the repo root from __file__ so it always points to the
       checked-out workspace regardless of where it lives.
@@ -13,7 +13,7 @@ import os
 # ---------- buggy version ----------
 
 def _rebuild_handler_buggy() -> str:
-    repo = "/Users/username/Projects/HermesCompress"
+    repo = "/Users/username/Projects/Aphrodite"
     return repo
 
 # ---------- fixed version ----------
