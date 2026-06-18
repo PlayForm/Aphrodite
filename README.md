@@ -86,36 +86,70 @@ restarts.
 
 ---
 
-## Agent Compatibility 🤝
+## Hermes Integration 🤝
 
-Aphrodite is a drop-in **OpenAI-compatible proxy** — point any agent or LLM
-client at `http://127.0.0.1:9798/v1` and it compresses transparently. No SDK
-changes, no prompt edits, no wrappers.
+Aphrodite has **two modes** — a generic OpenAI-compatible proxy, and a native
+Hermes plugin. The native integration gives Hermes deeper compression that
+other agents can't get.
 
-### Hermes Agent (Native)
+### Native Hermes (Full Pipeline)
 
-Hermes is Aphrodite's primary host. The plugin registers itself via
-`on_start()`, launches both proxy processes automatically, and wires every tool
-call through the compression pipeline. No configuration is needed — install the
-plugin and Hermes routes through Aphrodite by default.
+When installed as a Hermes plugin, Aphrodite intercepts tool output at the
+**hook level** — before it even reaches the LLM's context:
 
-```python
-# plugins/aphrodite/plugin.yaml — already wired in
-proxy_port: 9798
-auto_launch: true
-hooks: [transform_tool_result, pre_llm, post_llm]
+| Layer | What it does | Hermes-only? |
+|-------|-------------|:-----------:|
+| `on_session_start` | Auto-launches both proxy processes (:9797, :9798) | ✅ |
+| `transform_tool_result` | Intercepts every tool call return — compresses before the model sees it | ✅ |
+| `transform_terminal_output` | Compresses shell command output inline | ✅ |
+| `pre_llm_call` | Injects CCR catalog + retrieval guidance into system prompt | ✅ |
+| `post_llm_call` | Tracks compression metrics, updates proxy stats | ✅ |
+| `context_engine` | Offloads middle conversation turns to CCR when context fills up | ✅ |
+| `aphrodite_*` tools | 12 tools injected directly into Hermes's tool namespace | ✅ |
+| `skills/` | 9 bundled skills auto-loaded for agents | ✅ |
+
+**No Hermes core code is modified.** The plugin registers hooks in
+`plugin.yaml` and Hermes wires them automatically. Install, enable, restart —
+that's it.
+
+```yaml
+# plugins/aphrodite/plugin.yaml
+provides_hooks:
+  - on_session_start          # proxy launch
+  - transform_tool_result     # compress tool output
+  - pre_llm_call              # catalog injection
+  - transform_terminal_output # terminal compression
+  - post_llm_call             # metrics tracking
+provides_tools:               # 12 aphrodite_* tools
+provides_context_engine: true # long-session compression
 ```
 
-The plugin exposes all 11 `aphrodite_*` tools directly inside Hermes's tool
-namespace, so the agent can call `aphrodite_retrieve`, `aphrodite_stats`,
-`aphrodite_prefetch`, etc., just like any built-in tool.
+### Generic Proxy (Any Client)
 
-### OpenAI-Compatible Clients
+Any OpenAI-compatible client can route through the proxy at `:9798`:
 
-Any client that accepts a `base_url` / `--base-url` / `OPENAI_BASE_URL` override
-works without modification. Aphrodite speaks the full OpenAI chat completions
-API (`/v1/chat/completions`, `/v1/models`, streaming SSE) and forwards upstream
-after compressing tool-call responses.
+```
+Agent → http://127.0.0.1:9798/v1 → Aphrodite → LLM API
+```
+
+This gives you **CCR storage + retrieval** and the **classifier pipeline**, but
+misses the Hermes-only hooks: no auto-launch, no tool result interception, no
+context engine, no terminal compression, no skills.
+
+### Comparison
+
+| Feature | Native Hermes | Generic Proxy |
+|---------|:------------:|:------------:|
+| CCR compression | ✅ | ✅ |
+| Tool output interception | ✅ (hooks) | ❌ |
+| Terminal output compression | ✅ (hook) | ❌ |
+| Context engine | ✅ | ❌ |
+| Auto-launch proxies | ✅ | ❌ |
+| Agent tools (aphrodite_*) | ✅ (12 tools) | ❌ |
+| Bundled skills | ✅ (9 skills) | ❌ |
+| Prompt injection | ✅ | ❌ |
+| Works with any client | ❌ (Hermes only) | ✅ (OpenAI-compatible) |
+| Setup | `hermes plugins enable` | Set `base_url` |
 
 ```bash
 # Environment variable — works for any OpenAI SDK client
