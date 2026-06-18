@@ -732,24 +732,31 @@ what we add, what we rewrote, how they ship together.
 
 ## vs Headroom - Why Aphrodite Wins
 
-> **Headroom replaces output with a bare hash. Aphrodite replaces output with a
-> structured preview.**  
-> That single design difference produces a **235× gap in net savings**.
+> **Headroom compresses content. Aphrodite makes content optional.**
+> They solve different problems - and Aphrodite's approach produces far greater
+> savings in agent workflows.
 
-| Metric               | Headroom                  | Aphrodite                    |
-| -------------------- | ------------------------- | ---------------------------- |
-| Compression approach | Remove-and-retrieve       | Preview-and-decide           |
-| Agent sees           | `<<ccr:HASH>>` (0 info)   | `[build:0E 0W 1L]`           |
-| Must retrieve?       | ✅ Every time             | ❌ Optional - preview enough |
-| Net effect           | ❌ -19.2% (loses tokens!) | ✅ +79.7% (saves tokens)     |
-| Best case            | 58% (search_files JSON)   | 100% (clean builds = 0 CCR)  |
-| Compression rate     | ~6% of traffic            | 90% (live proxy)             |
-| Classification       | ML + regex (~100ms)       | Pure regex (<0.1ms)          |
-| Dependencies         | Python + ML (heavy)       | Zero (regex only)            |
+| Metric               | Headroom (stock)              | Aphrodite                         |
+| -------------------- | ----------------------------- | --------------------------------- |
+| What it does          | Semantic compression - makes content smaller while keeping it readable | Preview-first - replaces content with structured metadata, agent retrieves only if needed |
+| Agent sees            | Smaller but still-readable content | `[build:2E 0W 14L]` - 13 tokens of metadata |
+| Retrieval needed?     | No - content is already there, just smaller | Rarely - preview is usually enough |
+| How it compresses     | ML model (Kompress), tree-sitter AST reduction, log extraction | Pure regex classifier (<0.1ms) + TOML templates |
+| Hermes integration    | None - proxy or library only | Native plugin: hooks, context engine, 12 tools, 9 skills |
+| Dependencies           | Python + ML model (~100ms)    | Zero (Rust binary only)           |
+| Token savings          | 30–80% (semantic reduction)   | 84%+ (preview skips content entirely) |
+| Best for              | Long-form content that must be read | Agent workflows where most output is scanned, not read |
 
-**The Preview IS the Compression.** Headroom forces a retrieval roundtrip that
-burns more tokens than raw output. Aphrodite's 28-type classifier produces
-structured metadata giving the agent enough context to skip.
+**Headroom shrinks content. Aphrodite skips it.** Headroom's ML compression is
+powerful for content the agent must read - it keeps meaning while cutting size.
+Aphrodite's preview-first approach is better for agent workflows where 95% of
+output is noise the agent doesn't need. The structured preview
+(`[build:2E 0W]`, `[diff:1f +3/-2]`) gives the agent enough metadata to act
+without ever seeing the raw output.
+
+Together, they're complementary - Aphrodite addresses and previews, Headroom
+reduces what must be read. But for raw token savings in agent sessions,
+Aphrodite's "skip it entirely" beats Headroom's "make it smaller" by 2–10×.
 
 ---
 
