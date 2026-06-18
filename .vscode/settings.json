@@ -14,7 +14,7 @@
     "editor.tabSize": 4
   },
   "[python]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.tabSize": 4,
     "editor.insertSpaces": true
   },
