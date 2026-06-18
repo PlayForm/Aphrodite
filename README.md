@@ -13,10 +13,10 @@
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.  
 > Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.  
-> _One binary. Zero dependencies. 12.5M tokens saved._
+> _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v0.8.6-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![plugin](https://img.shields.io/badge/plugin-v1.62.21-purple)](plugins/aphrodite/plugin.yaml)
+[![release](https://img.shields.io/badge/release-v0.8.15-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![plugin](https://img.shields.io/badge/plugin-v1.62.30-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -448,7 +448,7 @@ entire extra conversation turn of reasoning.
 
 | Metric                    |     Value      |
 | :------------------------ | :------------: |
-| Total tokens saved        |   **12.5M**    |
+| Total tokens saved        |  **millions**   |
 | Requests compressed       |   165 / 412    |
 | Body bytes saved          |    **67%**     |
 | Request bytes             |    60.6 MB     |
@@ -462,7 +462,7 @@ entire extra conversation turn of reasoning.
 
 > **2 MB of tool output compresses to ~960 bytes of CCR markers — a 3,000:1
 > effective ratio. In a typical coding session with 50+ tool calls, that's
-> 15,000–500,000 tokens saved per session. The proxy has saved 12.5 million
+> The proxy has saved millions of tokens cumulatively — At current pricing, that's $250+ in API costs saved.
 > tokens cumulatively — that's $250+ in API costs at current pricing alone.**
 
 ### Classifier coverage
@@ -538,7 +538,7 @@ aphrodite
 
 # 3. Verify
 curl http://127.0.0.1:9798/health
-# → {"status":"ok","version":"v0.8.1"}
+# → {"status":"ok","version":"v0.8.15"}
 
 # Dev loop with auto-reload
 RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
