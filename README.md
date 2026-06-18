@@ -731,7 +731,27 @@ _Ready to save context?_ [Install now](#quick-start) • [Read the docs](docs/) 
 
 ---
 
-❤️ **Contributions welcome!** We love PRs, issues, ideas, and feedback.
-[Open a PR](https://github.com/PlayForm/Aphrodite/pulls) •
-[Start a discussion](https://github.com/PlayForm/Aphrodite/discussions) •
-[Report an issue](https://github.com/PlayForm/Aphrodite/issues)
+## Contributing 🤝
+
+We love contributions of every kind - code, docs, bug reports, ideas, or just
+saying hi.
+
+| Want to… | Start here |
+|---|---|
+| Report a bug | [Open an issue](https://github.com/PlayForm/Aphrodite/issues/new?template=bug_report.md) |
+| Suggest a feature | [Start a discussion](https://github.com/PlayForm/Aphrodite/discussions/new?category=ideas) |
+| Submit a PR | [Fork & open a PR](https://github.com/PlayForm/Aphrodite/pulls) - we review fast |
+| Ask a question | [Discussions Q&A](https://github.com/PlayForm/Aphrodite/discussions/new?category=q-a) |
+| Improve the docs | [Edit any page](docs/) and send a PR |
+
+No contribution is too small. Typo fix? Welcome. Idea? Welcome. First-time
+contributor? **Especially** welcome.
+
+---
+
+⭐ **Like Aphrodite?** [Star the repo](https://github.com/PlayForm/Aphrodite) -
+it helps others find it and makes our day.
+
+_Built with ❤️ by [PlayForm](https://github.com/PlayForm) - feedback always
+welcome at [issues](https://github.com/PlayForm/Aphrodite/issues) or
+[discussions](https://github.com/PlayForm/Aphrodite/discussions)._
