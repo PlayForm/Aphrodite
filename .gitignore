@@ -41,6 +41,7 @@ aphrodite.toml
 # IDE
 .idea/
 .vscode/
+!.vscode/settings.json
 *.swp
 *.swo
 *~
@@ -54,7 +55,7 @@ target/
 
 # JS / pnpm
 node_modules/
-pnpm-lock.yaml
+!pnpm-lock.yaml
 
 # Secrets (never commit)
 .env
