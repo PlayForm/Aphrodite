@@ -380,7 +380,7 @@ _make_ccr_preview() → {family}:{template}  (≤120 chars, pipe‑safe)
 
 ---
 
-## LLM‑Native Output Formatting 📋
+## LLM‑Native Output Formatting 📋
 
 > **Your agent reads clean, machine‑parseable text instead of decorative
 > human‑facing output with emojis and bold formatting. Every token counts.**
@@ -610,7 +610,7 @@ vars. No recompile. No restart. Just edit and go.
 
 ---
 
-### Prefetch Workflow ⚡
+### Prefetch Workflow ⚡
 
 > **Read many files in parallel. The agent gets CCR markers instantly and
 > continues reasoning while files load in background threads.**
