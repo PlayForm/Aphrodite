@@ -38,37 +38,42 @@ actually needs it.
 
 ## How It Works ⚙️
 
+Aphrodite intercepts **everything** before it hits the LLM context - tool output,
+terminal output, file reads, search results, build logs, browser snapshots, and
+more. Not just tool calls.
+
 ```
-Hermes Agent                     Aphrodite Plugin
-    │                                  │
-    │── run tool (cargo build) ───────►│
-    │                                  │── executes ──► 215 tok output
-    │                                  │
-    │                          ┌───────┴───────┐
-    │                          │ 28-type       │
-    │                          │ classifier    │
-    │                          │    ↓          │
-    │                          │ TOML template │
-    │                          │    ↓          │
-    │                          │ CCR store     │
-    │                          └───────┬───────┘
-    │                                  │
-    │◄── [build:2E 0W 14L] ────────────│  13 tokens, not 215
-    │                                  │
-    │── aphrodite_retrieve() ─────────►│  only when needed
-    │◄── full content ─────────────────│
-    │                                  │
-    │── aphrodite_prefetch() ─────────►│  background reads
-    │◄── markers instantly ────────────│  files load concurrently
+ ANY OUTPUT ──────► Aphrodite ──────► Agent (preview, not raw)
+                       │
+                       ├─ tool output    → [build:2E 0W 14L]
+                       ├─ terminal       → [terminal:cargo build exit=0]
+                       ├─ file read      → [code_rust:3fns 414L]
+                       ├─ search results → [search:10 results 5L]
+                       ├─ build logs     → [build:1E 2W 142L]
+                       ├─ browser snap   → [dom:342 elements]
+                       ├─ JSON blobs     → [json:total_items,by_type]
+                       └─ tracebacks     → [error:AttributeError]
+
+    Agent decides:
+    • Preview is enough → skip retrieval, keep reasoning
+    • Needs detail     → aphrodite_retrieve(hash) → full content
+
+    Context engine (automatic):
+    • Session hits 45K tokens → middle turns auto-compressed to CCR
+    • Agent never hits context window ceiling
+
+    Prefetch (background):
+    • aphrodite_prefetch(["main.rs", "lib.rs"]) → markers instant
+    • Files load concurrently on daemon threads
+    • Agent continues working while files load
 ```
 
-Three steps, all under 1ms:
+Four layers, all under 1ms:
 
-1. **Classify** - 28-type regex classifier identifies what the output is
-2. **Template** - TOML‑driven templates produce a compact `[type:key=val]`
-   preview
-3. **Store** - SHA-256 hash → SQLite/in‑memory → `<<<CCR:hash|type|size>>>`
-   marker
+1. **Classify** - 28-type regex classifier identifies content (<0.1ms)
+2. **Template** - TOML-driven templates produce `[type:key=val]` previews
+3. **Store** - SHA-256 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
+4. **Decide** - Agent reads preview, retrieves only when needed
 
 ---
 
