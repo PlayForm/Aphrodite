@@ -29,26 +29,26 @@ Source of truth: `plugins/aphrodite/plugin.yaml` (lines 13-22),
 
 ```json
 {
-    "name": "aphrodite_retrieve",
-    "description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query. Supports file path reads. Recursively resolves nested CCR markers up to 3 levels deep.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "hash": {
-                "type": "string",
-                "description": "CCR marker hash to retrieve."
-            },
-            "query": {
-                "type": "string",
-                "description": "Optional filter query"
-            },
-            "path": {
-                "type": "string",
-                "description": "Optional file path (bypasses CCR)"
-            }
-        },
-        "required": []
-    }
+	"name": "aphrodite_retrieve",
+	"description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query. Supports file path reads. Recursively resolves nested CCR markers up to 3 levels deep.",
+	"parameters": {
+		"type": "object",
+		"properties": {
+			"hash": {
+				"type": "string",
+				"description": "CCR marker hash to retrieve."
+			},
+			"query": {
+				"type": "string",
+				"description": "Optional filter query"
+			},
+			"path": {
+				"type": "string",
+				"description": "Optional file path (bypasses CCR)"
+			}
+		},
+		"required": []
+	}
 }
 ```
 
@@ -74,22 +74,22 @@ Same logic: inline_ccr → CCR store. Returns
 
 ```json
 {
-    "name": "aphrodite_compress",
-    "description": "Compress content into CCR via aphrodite proxy for later retrieval. Specify type for adaptive compression: code, log, diff, error, json, build_output.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "content": {
-                "type": "string",
-                "description": "Content to compress and store in CCR"
-            },
-            "type": {
-                "type": "string",
-                "description": "Content type hint: code, log, diff, error, json, build_output, text"
-            }
-        },
-        "required": ["content"]
-    }
+	"name": "aphrodite_compress",
+	"description": "Compress content into CCR via aphrodite proxy for later retrieval. Specify type for adaptive compression: code, log, diff, error, json, build_output.",
+	"parameters": {
+		"type": "object",
+		"properties": {
+			"content": {
+				"type": "string",
+				"description": "Content to compress and store in CCR"
+			},
+			"type": {
+				"type": "string",
+				"description": "Content type hint: code, log, diff, error, json, build_output, text"
+			}
+		},
+		"required": ["content"]
+	}
 }
 ```
 
@@ -118,9 +118,9 @@ Compress flow:
 
 ```json
 {
-    "name": "aphrodite_stats",
-    "description": "Check aphrodite proxy health, CCR stats, engine compression status.",
-    "parameters": { "type": "object", "properties": {} }
+	"name": "aphrodite_stats",
+	"description": "Check aphrodite proxy health, CCR stats, engine compression status.",
+	"parameters": { "type": "object", "properties": {} }
 }
 ```
 
@@ -149,9 +149,9 @@ Queries both proxy ports via HTTP `/stats`.
 
 ```json
 {
-    "name": "aphrodite_rebuild",
-    "description": "Rebuild aphrodite crate from source and install binary.",
-    "parameters": { "type": "object", "properties": {} }
+	"name": "aphrodite_rebuild",
+	"description": "Rebuild aphrodite crate from source and install binary.",
+	"parameters": { "type": "object", "properties": {} }
 }
 ```
 
@@ -168,9 +168,9 @@ Copies: target/release/aphrodite → ~/.hermes/aphrodite/aphrodite
 
 ```json
 {
-    "name": "aphrodite_files",
-    "description": "List all file paths referenced in the current session. Grouped by tool type.",
-    "parameters": { "type": "object", "properties": {} }
+	"name": "aphrodite_files",
+	"description": "List all file paths referenced in the current session. Grouped by tool type.",
+	"parameters": { "type": "object", "properties": {} }
 }
 ```
 
@@ -188,9 +188,9 @@ Tracks files touched by `read_file`, `write_file`, `patch`, `search_files`.
 
 ```json
 {
-    "name": "aphrodite_diff",
-    "description": "Show conversation turn history - what was discussed, compressed, and stored across turns.",
-    "parameters": { "type": "object", "properties": {} }
+	"name": "aphrodite_diff",
+	"description": "Show conversation turn history - what was discussed, compressed, and stored across turns.",
+	"parameters": { "type": "object", "properties": {} }
 }
 ```
 
@@ -208,21 +208,21 @@ Last 10 turns from `_conv_index`.
 
 ```json
 {
-    "name": "aphrodite_search",
-    "description": "Search across compressed items by type or content pattern (trigram-indexed).",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "description": "Search query (min 3 chars)"
-            },
-            "type": {
-                "type": "string",
-                "description": "Filter by content type"
-            }
-        }
-    }
+	"name": "aphrodite_search",
+	"description": "Search across compressed items by type or content pattern (trigram-indexed).",
+	"parameters": {
+		"type": "object",
+		"properties": {
+			"query": {
+				"type": "string",
+				"description": "Search query (min 3 chars)"
+			},
+			"type": {
+				"type": "string",
+				"description": "Filter by content type"
+			}
+		}
+	}
 }
 ```
 
@@ -242,17 +242,17 @@ Results deduplicated by hash, max 20.
 
 ```json
 {
-    "name": "aphrodite_test",
-    "description": "Full smoke test suite - exercises all tools, hooks, compression, search, retrieve.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "mode": {
-                "type": "string",
-                "description": "Test mode: quick, full, matrix, pipeline"
-            }
-        }
-    }
+	"name": "aphrodite_test",
+	"description": "Full smoke test suite - exercises all tools, hooks, compression, search, retrieve.",
+	"parameters": {
+		"type": "object",
+		"properties": {
+			"mode": {
+				"type": "string",
+				"description": "Test mode: quick, full, matrix, pipeline"
+			}
+		}
+	}
 }
 ```
 
@@ -272,9 +272,9 @@ Modes:
 
 ```json
 {
-    "name": "aphrodite_catalog",
-    "description": "Return full compression catalog - all CCR items with hashes, sizes, types, and previews.",
-    "parameters": { "type": "object", "properties": {} }
+	"name": "aphrodite_catalog",
+	"description": "Return full compression catalog - all CCR items with hashes, sizes, types, and previews.",
+	"parameters": { "type": "object", "properties": {} }
 }
 ```
 
