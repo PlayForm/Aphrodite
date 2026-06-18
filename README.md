@@ -127,7 +127,7 @@ provides_context_engine: true # long-session compression
 Any OpenAI-compatible client can route through the proxy at `:9798`:
 
 ```
-Agent → http://127.0.0.1:9798/v1 → Aphrodite → LLM API
+Agent → Aphrodite (:9798) → LLM API
 ```
 
 This gives you **CCR storage + retrieval** and the **classifier pipeline**, but
