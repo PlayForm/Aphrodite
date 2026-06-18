@@ -44,10 +44,10 @@ POST /tool/relay
 
 ```json
 {
-	"success": true,
-	"result": null,
-	"error": null,
-	"async_call": true
+    "success": true,
+    "result": null,
+    "error": null,
+    "async_call": true
 }
 ```
 

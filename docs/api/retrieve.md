@@ -20,10 +20,10 @@ Loopback only.
 
 ```json
 {
-	"hash": "abc123...",
-	"query": "optional filter string",
-	"offset": 0,
-	"limit": 100
+    "hash": "abc123...",
+    "query": "optional filter string",
+    "offset": 0,
+    "limit": 100
 }
 ```
 
@@ -46,10 +46,10 @@ pub struct RetrieveRequest {
 
 ```json
 {
-	"found": true,
-	"content": "original content...",
-	"source": "ccr",
-	"error": null
+    "found": true,
+    "content": "original content...",
+    "source": "ccr",
+    "error": null
 }
 ```
 
@@ -57,10 +57,10 @@ pub struct RetrieveRequest {
 
 ```json
 {
-	"found": false,
-	"content": null,
-	"source": "none",
-	"error": "CCR entry not found: abc123..."
+    "found": false,
+    "content": null,
+    "source": "none",
+    "error": "CCR entry not found: abc123..."
 }
 ```
 
@@ -68,10 +68,10 @@ pub struct RetrieveRequest {
 
 ```json
 {
-	"found": false,
-	"content": null,
-	"source": "none",
-	"error": "`hash` required"
+    "found": false,
+    "content": null,
+    "source": "none",
+    "error": "`hash` required"
 }
 ```
 
@@ -79,10 +79,10 @@ pub struct RetrieveRequest {
 
 ```json
 {
-	"found": false,
-	"content": "[offset 500 out of range; document has 42 lines]",
-	"source": "ccr",
-	"error": null
+    "found": false,
+    "content": "[offset 500 out of range; document has 42 lines]",
+    "source": "ccr",
+    "error": null
 }
 ```
 
@@ -90,10 +90,10 @@ pub struct RetrieveRequest {
 
 ```json
 {
-	"found": false,
-	"content": null,
-	"source": "ccr",
-	"error": "decompression failed"
+    "found": false,
+    "content": null,
+    "source": "ccr",
+    "error": "decompression failed"
 }
 ```
 

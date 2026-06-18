@@ -1,15 +1,53 @@
+# Aphrodite EditorConfig
+# Modeled after REPxREP/Repository convention
+
 root = true
 
 [*]
+charset = utf-8
 end_of_line = lf
 insert_final_newline = true
-tab_width = 4
-indent_size = 4
+trim_trailing_whitespace = true
 indent_style = tab
+indent_size = 4
+tab_width = 4
 
-[*.{yaml,yml}]
-indent_style = space
-
+# Rust owns its own formatting (rustfmt)
 [*.rs]
-end_of_line = unset
-insert_final_newline = unset
+indent_style = unset
+indent_size = unset
+tab_width = unset
+
+# YAML — 2 spaces, no tabs
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# TOML — tabs OK (project convention matches Markdown)
+[*.toml]
+indent_style = tab
+indent_size = 4
+
+# Python — 4 spaces (PEP-8)
+[*.py]
+indent_style = space
+indent_size = 4
+
+# JSON — 2 spaces
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown — tabs, 4-space
+[*.md]
+indent_style = tab
+indent_size = 4
+
+# Shell scripts — tabs
+[*.sh]
+indent_style = tab
+indent_size = 4
+
+# Makefile — tabs required
+[Makefile]
+indent_style = tab

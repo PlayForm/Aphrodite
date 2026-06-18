@@ -1,7 +1,6 @@
 ---
 name: aphrodite-auto-expand-testing
-description:
-    "Protocol for testing auto-expand behavior - controlled by AUTO_EXPAND_LIMIT
+description: "Protocol for testing auto-expand behavior - controlled by AUTO_EXPAND_LIMIT
     from TOML auto_expand_limit (default 5 → effectively OFF).
     APHRODITE_AUTO_EXPAND=1 enables aggressive. Context engine is the real async
     engine."

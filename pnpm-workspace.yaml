@@ -1,5 +1,5 @@
 packages:
-    - "!**/Target/**"
+  - "!**/Target/**"
 
 preferWorkspacePackages: true
 

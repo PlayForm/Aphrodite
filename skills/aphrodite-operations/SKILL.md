@@ -1,7 +1,6 @@
 ---
 name: aphrodite-operations
-description:
-    Operational patterns for working with aphrodite - engine compression
+description: Operational patterns for working with aphrodite - engine compression
     handling, prefetch workflow, dual-mode rebuild, standalone repo sync.
 version: 1.0.0
 ---

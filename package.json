@@ -1,20 +1,20 @@
 {
-	"name": "@playform/aphrodite",
-	"version": "0.0.1",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"Format": "sh Maintain/Format.sh"
-	},
-	"devDependencies": {
-		"@ianvs/prettier-plugin-sort-imports": "4.7.1",
-		"prettier": "3.8.4",
-		"prettier-plugin-astro": "0.14.1",
-		"prettier-plugin-organize-attributes": "1.0.0",
-		"prettier-plugin-packagejson": "3.0.2",
-		"prettier-plugin-sh": "0.18.1",
-		"prettier-plugin-tailwindcss": "0.8.0",
-		"prettier-plugin-toml": "2.0.6"
-	},
-	"packageManager": "pnpm@11.3.0"
+  "name": "@playform/aphrodite",
+  "version": "0.8.36",
+  "private": true,
+  "description": "CCR compression proxy + absorptive preview pipeline for Hermes Agent",
+  "license": "CC0-1.0",
+  "repository": "PlayForm/Aphrodite",
+  "scripts": {
+    "Format": "sh Maintain/Format.sh",
+    "FormatCheck": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.4"
 }

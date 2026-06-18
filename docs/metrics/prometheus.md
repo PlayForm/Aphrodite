@@ -223,10 +223,10 @@ Returns `ccr.stats_db()` - only available for SQLite backend:
 
 ```json
 {
-	"total_entries": 3056,
-	"total_bytes_original": 45234000,
-	"total_bytes_compressed": 73344,
-	"oldest_entry_age_seconds": 3421,
-	"database_size_bytes": 52428800
+    "total_entries": 3056,
+    "total_bytes_original": 45234000,
+    "total_bytes_compressed": 73344,
+    "oldest_entry_age_seconds": 3421,
+    "database_size_bytes": 52428800
 }
 ```
