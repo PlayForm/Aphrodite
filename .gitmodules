@@ -5,5 +5,5 @@ ignore = all
 
 [submodule "vendor/headroom"]
 path = vendor/headroom
-url = https://github.com/PlayForm/Headroom.git
+url = ssh://git@ithub.com/PlayForm/Headroom.git
 ignore = all
