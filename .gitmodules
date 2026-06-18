@@ -1,3 +1,8 @@
+[submodule "plugins/aphrodite"]
+path = plugins/aphrodite
+url = ssh://git@github.com/PlayForm/Aphrodite-Hermes.git
+ignore = all
+
 [submodule "vendor/headroom"]
 path = vendor/headroom
 url = https://github.com/PlayForm/Headroom.git
