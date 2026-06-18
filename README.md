@@ -36,7 +36,7 @@ actually needs it.
 
 ---
 
-## How It Works ⚙️
+## How It Works ⚙️
 
 ```
 | Your Agent                  Aphrodite Proxy              LLM API
@@ -73,7 +73,7 @@ Three steps, all under 1ms:
 
 ---
 
-## Architecture 🏗️
+## Architecture 🏗️
 
 | Mode  | Port  | Backend   | Threshold | Best for                  |
 | :---- | :---: | :-------- | :-------: | :------------------------ |
@@ -86,7 +86,7 @@ restarts.
 
 ---
 
-## Hermes Integration 🤝
+## Hermes Integration 🤝
 
 Aphrodite has **two modes** - a generic OpenAI-compatible proxy, and a native
 Hermes plugin. The native integration gives Hermes deeper compression that
@@ -288,7 +288,7 @@ for a given classifier type.
 
 ---
 
-## Absorptive CCR Previews 🧠
+## Absorptive CCR Previews 🧠
 
 > **"Absorptive" means the classifier learns from every output it sees. New
 > content of the same type automatically gets the same structured treatment - no
@@ -409,7 +409,7 @@ decorated.
 
 ---
 
-## What You Save 💰
+## What You Save 💰
 
 > **Every token of tool output you compress is a token your agent can use for
 > reasoning, planning, and code generation. Context is the most expensive
@@ -448,7 +448,7 @@ entire extra conversation turn of reasoning.
 
 ---
 
-## Performance ⚡
+## Performance ⚡
 
 > **Sub‑millisecond compression with zero API calls. The classifier runs in
 > <0.1ms using pure regex - no model inference, no network round‑trip, no token
@@ -511,7 +511,7 @@ entire extra conversation turn of reasoning.
 
 ---
 
-## Compression Strategies 🧬
+## Compression Strategies 🧬
 
 > **Aphrodite owns the _addressing_ layer - where content lives and how to find
 > it. Headroom owns the _reduction_ layer - how to make content smaller while
@@ -559,7 +559,7 @@ actually needs.
 
 ---
 
-## Quick Start 🚀
+## Quick Start 🚀
 
 > **30 seconds from clone to compression.**
 
@@ -641,7 +641,7 @@ check which files are done loading, then retrieve when ready.
 
 ---
 
-## Tools 🔧
+## Tools 🔧
 
 | Tool                   | Description                                                                                             |
 | :--------------------- | :------------------------------------------------------------------------------------------------------ |
@@ -659,7 +659,7 @@ check which files are done loading, then retrieve when ready.
 
 ---
 
-## Under the Hood 🧩
+## Under the Hood 🧩
 
 ```
 plugins/aphrodite/
