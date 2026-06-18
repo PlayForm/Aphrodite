@@ -12,11 +12,11 @@ cd "$REPO_ROOT"
 
 # Sync submodules to their remote tracking branches
 git submodule update --remote --recursive --merge
-git add --force vendor/headroom 2> /dev/null || true
+git add --force vendor/headroom 2>/dev/null || true
 
 # Stage all changes
 git add -u
-git add docs/ scripts/ plugins/aphrodite/ 2> /dev/null || true
+git add docs/ scripts/ plugins/aphrodite/ 2>/dev/null || true
 
 # Use provided message or auto-generate from last commit
 if [ -z "$MSG" ]; then
@@ -70,8 +70,8 @@ echo "[test] OK"
 # Commit version bump + tag (no editor prompts)
 git add -u
 git commit -m "release(aphrodite): v$NEW - $MSG"
-git tag -d "Aphrodite/v$NEW" 2> /dev/null || true
-GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2> /dev/null || git tag "Aphrodite/v$NEW"
+git tag -d "Aphrodite/v$NEW" 2>/dev/null || true
+GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2>/dev/null || git tag "Aphrodite/v$NEW"
 echo "[release] Aphrodite/v$NEW tagged"
 
 # Push - always sync with remote

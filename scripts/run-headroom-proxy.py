@@ -18,6 +18,7 @@ Worker guidance:
     --workers 1   → full traceability, single worker for debugging savings
     --workers 8   → cache saturation, benchmark mode (note CCR fragmentation warning)
 """
+
 import os
 import subprocess
 import sys
@@ -75,16 +76,24 @@ def main():
     print(f"  Workers:  {cfg['workers']}")
     if cfg["workers"] > 1:
         print()
-        print("[WARN] CCR fragmentation possible with >1 worker. Use 1 worker for deterministic CCR.")
+        print(
+            "[WARN] CCR fragmentation possible with >1 worker. Use 1 worker for deterministic CCR."
+        )
     print()
 
     cmd = [
-        HEADROOM_BIN, "proxy",
-        "--port", str(cfg["port"]),
-        "--host", "127.0.0.1",
-        "--openai-api-url", DEEPSEEK_URL,
-        "--mode", "token",
-        "--workers", str(cfg["workers"]),
+        HEADROOM_BIN,
+        "proxy",
+        "--port",
+        str(cfg["port"]),
+        "--host",
+        "127.0.0.1",
+        "--openai-api-url",
+        DEEPSEEK_URL,
+        "--mode",
+        "token",
+        "--workers",
+        str(cfg["workers"]),
         "--no-subscription-tracking",
         *cfg["flags"],
     ]

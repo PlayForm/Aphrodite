@@ -4,31 +4,43 @@
 //! 1. Single proxy: `aphrodite --mode cache --listen :9797 --api-key KEY`
 //! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
+
 use axum::{
+	Router,
 	extract::{ConnectInfo, DefaultBodyLimit, Request},
 	http::StatusCode,
 	middleware::{self, Next},
 	response::{IntoResponse, Json},
 	routing::{any, delete, get, post},
-	Router,
 };
 use clap::Parser;
-use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-
-use aphrodite::config::{Cli, MultiConfig, ProxyMode};
-use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_list, handle_ccr_delete, handle_ccr_reload, health_check};
-use aphrodite::retrieve;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use aphrodite::{
+	config::{Cli, MultiConfig, ProxyMode},
+	proxy::{
+		self,
+		handle_ccr_create,
+		handle_ccr_delete,
+		handle_ccr_list,
+		handle_ccr_reload,
+		handle_tool_relay,
+		health_check,
+	},
+	retrieve,
+};
 
 fn main() -> anyhow::Result<()> {
 	// Handle --version early - clap version attribute is only wired through
 	// Cli::parse() which is skipped when aphrodite.toml exists (multi-proxy path).
 	// This ensures --version always works regardless of config state.
-	let args: Vec<String> = std::env::args().collect();
+	let args:Vec<String> = std::env::args().collect();
 	if args.iter().any(|a| a == "--version" || a == "-V") {
-		println!("aphrodite v{}", option_env!("APHRODITE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")));
+		println!(
+			"aphrodite v{}",
+			option_env!("APHRODITE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+		);
 		return Ok(());
 	}
 
@@ -52,9 +64,9 @@ fn main() -> anyhow::Result<()> {
 async fn run() -> anyhow::Result<()> {
 	// Try multi-proxy config first, fall back to CLI
 	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
-	let (proxies, log_compact): (Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
+	let (proxies, log_compact):(Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
 		let config = MultiConfig::load(&config_path)?;
-		let proxies: Vec<(String, Cli)> = config
+		let proxies:Vec<(String, Cli)> = config
 			.proxies
 			.iter()
 			.map(|p| {
@@ -93,20 +105,20 @@ async fn run() -> anyhow::Result<()> {
 
 	tracing::info!("starting {} proxy listener(s)", proxies.len());
 
-		// ── Spawn config file watcher for hot-reload ──────────────────
-		let watch_path = {
-			let p = std::path::PathBuf::from(&config_path);
-			if p.is_relative() {
-				std::env::current_dir().unwrap_or_default().join(&p)
-			} else {
-				p
-			}
-		};
-		let watch_path_str = watch_path.to_string_lossy().to_string();
-		tokio::spawn(async move {
+	// ── Spawn config file watcher for hot-reload ──────────────────
+	let watch_path = {
+		let p = std::path::PathBuf::from(&config_path);
+		if p.is_relative() {
+			std::env::current_dir().unwrap_or_default().join(&p)
+		} else {
+			p
+		}
+	};
+	let watch_path_str = watch_path.to_string_lossy().to_string();
+	tokio::spawn(async move {
 		use notify::{Event, EventKind, RecursiveMode, Watcher};
 		let (tx, mut rx) = tokio::sync::mpsc::channel(16);
-		let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+		let mut watcher = match notify::recommended_watcher(move |res:Result<Event, notify::Error>| {
 			if let Ok(event) = res {
 				let is_modify = matches!(event.kind, EventKind::Modify(_));
 				if is_modify && event.paths.iter().any(|p| p.to_string_lossy().contains("aphrodite.toml")) {
@@ -118,10 +130,9 @@ async fn run() -> anyhow::Result<()> {
 			Err(e) => {
 				tracing::warn!("failed to create config watcher: {e}");
 				return;
-			}
+			},
 		};
-		let watch_dir = std::path::Path::new(&watch_path).parent()
-			.unwrap_or(std::path::Path::new("."));
+		let watch_dir = std::path::Path::new(&watch_path).parent().unwrap_or(std::path::Path::new("."));
 		if let Err(e) = watcher.watch(watch_dir, RecursiveMode::NonRecursive) {
 			tracing::warn!("failed to start config watcher: {e}");
 			return;
@@ -142,10 +153,10 @@ async fn run() -> anyhow::Result<()> {
 							engine_threshold = comp.and_then(|c| c.engine_threshold_pct).unwrap_or(0),
 							"? config reloaded - proxy will use new values; plugin reloads independently"
 						);
-					}
+					},
 					Err(e) => {
 						tracing::warn!(error = %e, "failed to reload config on file change");
-					}
+					},
 				}
 			}
 		}
@@ -175,8 +186,9 @@ async fn run() -> anyhow::Result<()> {
 	let _ = shutdown_tx.send(true);
 	tracing::info!("shutdown signal received, draining in-flight requests...");
 
-	// Clone abort handles so we can force-kill after handles are moved into join_all
-	let abort_handles: Vec<_> = handles.iter().map(|h| h.abort_handle()).collect();
+	// Clone abort handles so we can force-kill after handles are moved into
+	// join_all
+	let abort_handles:Vec<_> = handles.iter().map(|h| h.abort_handle()).collect();
 
 	// Listen for a second Ctrl+C to force immediate shutdown
 	let second_signal = async {
@@ -189,9 +201,10 @@ async fn run() -> anyhow::Result<()> {
 	let drain_timeout = tokio::time::sleep(std::time::Duration::from_secs(5));
 	tokio::pin!(drain_timeout);
 
-	// Wait for graceful drain (via axum's with_graceful_shutdown), second signal, or timeout.
-	// NOTE: do NOT re-await drain_fut after select! - it was polled by select! and
-	// re-awaiting would be double-poll UB. Abort handles handle the remaining tasks.
+	// Wait for graceful drain (via axum's with_graceful_shutdown), second signal,
+	// or timeout. NOTE: do NOT re-await drain_fut after select! - it was polled by
+	// select! and re-awaiting would be double-poll UB. Abort handles handle the
+	// remaining tasks.
 	let drain_fut = futures::future::join_all(handles);
 	tokio::pin!(drain_fut);
 
@@ -217,12 +230,13 @@ async fn run() -> anyhow::Result<()> {
 }
 
 async fn run_single(
-	name: String,
-	mut cli: Cli,
-	mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+	name:String,
+	mut cli:Cli,
+	mut shutdown_rx:tokio::sync::watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
 	// Resolve relative ccr_db_path against the binary directory, not CWD.
-	// This way the database path is stable regardless of where the process is launched from.
+	// This way the database path is stable regardless of where the process is
+	// launched from.
 	if !cli.ccr_db_path.as_os_str().is_empty() && !cli.ccr_db_path.is_absolute() {
 		if let Ok(exe_path) = std::env::current_exe() {
 			if let Some(exe_dir) = exe_path.parent() {
@@ -453,9 +467,9 @@ async fn run_single(
 /// Middleware that rejects non-loopback clients on all routes except /health.
 /// /health is intentionally exempt so external load-balancer probes work.
 async fn loopback_only(
-	ConnectInfo(addr): ConnectInfo<SocketAddr>,
-	request: Request,
-	next: Next,
+	ConnectInfo(addr):ConnectInfo<SocketAddr>,
+	request:Request,
+	next:Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
 	if !addr.ip().is_loopback() {
 		return Err((

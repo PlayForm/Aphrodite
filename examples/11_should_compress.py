@@ -11,6 +11,7 @@ Pass: prints OK
 
 # ---------- buggy implementation ----------
 
+
 class ContextEngineBuggy:
     def __init__(self, threshold_pct: float = 75.0, context_length: int = 128_000):
         self.threshold_percent = threshold_pct
@@ -19,7 +20,9 @@ class ContextEngineBuggy:
     def should_compress(self, prompt_tokens: int | None = None) -> bool:
         return True  # BUG: always True
 
+
 # ---------- fixed implementation ----------
+
 
 class ContextEngineFixed:
     def __init__(self, threshold_pct: float = 75.0, context_length: int = 128_000):
@@ -34,13 +37,14 @@ class ContextEngineFixed:
         pct = (prompt_tokens / self.context_length) * 100
         return pct >= self.threshold_percent
 
+
 # ---------- test cases ----------
 
 engine_b = ContextEngineBuggy(threshold_pct=75.0, context_length=128_000)
 engine_f = ContextEngineFixed(threshold_pct=75.0, context_length=128_000)
 
 # 10% fill - should NOT compress
-assert engine_b.should_compress(12_800) is True,  "Buggy always True"
+assert engine_b.should_compress(12_800) is True, "Buggy always True"
 assert engine_f.should_compress(12_800) is False, "Fixed: 10% < 75%, skip compress"
 
 # 80% fill - should compress

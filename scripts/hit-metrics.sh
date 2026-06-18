@@ -15,22 +15,22 @@ echo ""
 
 for i in $(seq 1 "$COUNT"); do
 	# Hit /metrics on both (these go through the router, not proxy_handler)
-	curl -s "$TOKEN/metrics" > /dev/null &
-	curl -s "$CACHE/metrics" > /dev/null &
+	curl -s "$TOKEN/metrics" >/dev/null &
+	curl -s "$CACHE/metrics" >/dev/null &
 
 	# Hit chat completions (through proxy_handler → increments requests_total)
 	curl -s -X POST "$TOKEN/v1/chat/completions" \
 		-H "Content-Type: application/json" \
 		-d '{"model":"test","messages":[{"role":"user","content":"ping"}]}' \
-		--connect-timeout 5 --max-time 10 > /dev/null 2>&1 || true &
+		--connect-timeout 5 --max-time 10 >/dev/null 2>&1 || true &
 	curl -s -X POST "$CACHE/v1/chat/completions" \
 		-H "Content-Type: application/json" \
 		-d '{"model":"test","messages":[{"role":"user","content":"ping"}]}' \
-		--connect-timeout 5 --max-time 10 > /dev/null 2>&1 || true &
+		--connect-timeout 5 --max-time 10 >/dev/null 2>&1 || true &
 
 	# Hit retrieve (exercises CCR path)
-	curl -s "$TOKEN/retrieve?hash=test$i" > /dev/null &
-	curl -s "$CACHE/retrieve?hash=test$i" > /dev/null &
+	curl -s "$TOKEN/retrieve?hash=test$i" >/dev/null &
+	curl -s "$CACHE/retrieve?hash=test$i" >/dev/null &
 
 	printf "  [%2d/%2d]" "$i" "$COUNT"
 	sleep "$DELAY"

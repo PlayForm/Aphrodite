@@ -11,6 +11,7 @@ Usage (from hermes-z-execution skill):
 
 Called by the Save binary or directly via shell.
 """
+
 import os
 import sys
 
@@ -42,7 +43,9 @@ from run_agent import AIAgent  # noqa: E402
 
 def run() -> int:
     if len(sys.argv) < 2:
-        sys.stderr.write("Usage: poll_worker.py <prompt_file> [--model M] [--provider P] [--toolsets T]\n")
+        sys.stderr.write(
+            "Usage: poll_worker.py <prompt_file> [--model M] [--provider P] [--toolsets T]\n"
+        )
         return 1
 
     prompt_file = sys.argv[1]
@@ -100,6 +103,7 @@ def run() -> int:
         if explicit_model:
             try:
                 from hermes_cli import model_switch as _ms
+
                 _ms._ensure_direct_aliases()
                 direct = _ms.DIRECT_ALIASES.get(explicit_model.strip().lower())
             except Exception:
@@ -147,8 +151,8 @@ def run() -> int:
         enabled_toolsets=toolsets_list,
         quiet_mode=True,
         platform="cli",
-        session_db=None,              # ← no session database = no history pollution
-        save_trajectories=False,      # ← explicit: don't save trajectories either
+        session_db=None,  # ← no session database = no history pollution
+        save_trajectories=False,  # ← explicit: don't save trajectories either
         credential_pool=runtime.get("credential_pool"),
         fallback_model=_fb or None,
         clarify_callback=_oneshot_clarify_callback,
@@ -167,6 +171,7 @@ def run() -> int:
     # Clean up any stray session files
     with suppress(Exception):
         import glob
+
         for f in glob.glob(os.path.expanduser("~/.hermes/data/*oneshot*")):
             with suppress(OSError):
                 os.remove(f)

@@ -9,21 +9,26 @@ Fix:  Cache the alive status with a short TTL (5 s).
 Run:  python examples/10_alive_double_call.py
 Pass: prints OK
 """
+
 import time
 
 # ---------- simulated network probe ----------
 
 probe_count = 0
 
+
 def _probe_port(port: int) -> bool:
     global probe_count
     probe_count += 1
     return True
 
+
 # ---------- buggy: no cache, every call probes the network ----------
+
 
 def _alive_buggy(port: int) -> bool:
     return _probe_port(port)
+
 
 def simulate_turn_buggy():
     # _transform_tool_result
@@ -33,10 +38,12 @@ def simulate_turn_buggy():
     _alive_buggy(9797)
     _alive_buggy(9798)
 
+
 # ---------- fixed: TTL cache ----------
 
 _cache: dict[int, tuple[bool, float]] = {}
 TTL = 5.0
+
 
 def _alive_fixed(port: int) -> bool:
     now = time.monotonic()
@@ -48,11 +55,13 @@ def _alive_fixed(port: int) -> bool:
     _cache[port] = (result, now)
     return result
 
+
 def simulate_turn_fixed():
     _alive_fixed(9797)
     _alive_fixed(9798)
     _alive_fixed(9797)
     _alive_fixed(9798)
+
 
 # ---------- test ----------
 

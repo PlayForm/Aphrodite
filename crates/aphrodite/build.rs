@@ -10,27 +10,28 @@
 
 //! # aphrodite build.rs
 //!
-//! Embeds version, git commit hash, build timestamp, target triple, rustc version,
-//! and build profile as compile-time environment variables (`APHRODITE_*`) for
-//! runtime display in startup logs, health checks, and version endpoints.
+//! Embeds version, git commit hash, build timestamp, target triple, rustc
+//! version, and build profile as compile-time environment variables
+//! (`APHRODITE_*`) for runtime display in startup logs, health checks, and
+//! version endpoints.
 //!
 //! CI builds rename the binary per target:
 //!   aphrodite-linux-amd64    (x86_64-unknown-linux-gnu)
 //!   aphrodite-macos-arm64    (aarch64-apple-darwin)
 //!   aphrodite-macos-amd64    (x86_64-apple-darwin)
 
+use std::{env, process::Command};
+
 use serde::Deserialize;
-use std::env;
-use std::process::Command;
 
 #[derive(Deserialize)]
 struct Toml {
-	package: Package,
+	package:Package,
 }
 
 #[derive(Deserialize)]
 struct Package {
-	version: String,
+	version:String,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,7 +39,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!("cargo:rerun-if-changed=build.rs");
 	println!("cargo:rerun-if-changed=src/");
 
-	// Version from Cargo.toml (explicit, supplementing Cargo's built-in CARGO_PKG_VERSION)
+	// Version from Cargo.toml (explicit, supplementing Cargo's built-in
+	// CARGO_PKG_VERSION)
 	println!(
 		"cargo:rustc-env=APHRODITE_VERSION={}",
 		toml::from_str::<Toml>(&std::fs::read_to_string("Cargo.toml").expect("Cannot read Cargo.toml"))

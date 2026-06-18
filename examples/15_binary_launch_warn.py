@@ -10,18 +10,22 @@ Fix:  Raise RuntimeError (or return a clear error string from register()) so
 Run:  python examples/15_binary_launch_warn.py
 Pass: prints OK
 """
+
 import os
 
 # ---------- buggy register ----------
+
 
 def register_buggy(binary_path: str) -> dict:
     if not os.path.isfile(binary_path):
         # BUG: logs silently, returns partial registration
         print(f"  [buggy] WARNING: binary not found at {binary_path} - continuing")
-        return {"tools": []}     # empty tools, no error surfaced
+        return {"tools": []}  # empty tools, no error surfaced
     return {"tools": ["headroom_retrieve", "headroom_store"]}
 
+
 # ---------- fixed register ----------
+
 
 def register_fixed(binary_path: str) -> dict:
     if not os.path.isfile(binary_path):
@@ -31,6 +35,7 @@ def register_fixed(binary_path: str) -> dict:
             "  or set APHRODITE_BIN_PATH to the correct location."
         )
     return {"tools": ["headroom_retrieve", "headroom_store"]}
+
 
 # ---------- test ----------
 

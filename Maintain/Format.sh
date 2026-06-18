@@ -18,7 +18,7 @@
 
 \set -e
 
-Current=$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1 && pwd)
+Current=$(cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd)
 
 Root="$Current/.."
 
@@ -34,7 +34,7 @@ FormatLineEndings() {
 	\echo "========================================"
 	\echo ""
 
-	if ! \command -v dos2unix > /dev/null 2>&1; then
+	if ! \command -v dos2unix >/dev/null 2>&1; then
 		\echo "Error: dos2unix is not installed."
 		\echo "  macOS:  brew install dos2unix"
 		\echo "  Linux:  apt install dos2unix  /  dnf install dos2unix"
@@ -55,8 +55,8 @@ FormatLineEndings() {
 		-not -path "*/target/*" \
 		-not -path "*/.fingerprint/*" \
 		-not -path "*/incremental/*" \
-		-not -path "*/deps/*" \
-		| \xargs \dos2unix -q
+		-not -path "*/deps/*" |
+		\xargs \dos2unix -q
 
 	\echo ""
 	\echo "Line ending conversion complete."
@@ -93,26 +93,26 @@ FormatPrettier() {
 #===============================================================================
 
 case "${1:-}" in
-	dos2unix)
-		FormatLineEndings
-		;;
-	prettier)
-		FormatPrettier
-		;;
-	"")
-		FormatLineEndings
-		FormatPrettier
-		;;
-	--help | -h)
-		\echo "Usage: $0 [dos2unix|prettier]"
-		\echo ""
-		\echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
-		\echo "  prettier  Format TS/JS/JSON/MD/TOML/YAML with Prettier"
-		\echo "  (no arg)  Run both in order"
-		;;
-	*)
-		\echo "Unknown target: $1"
-		\echo "Use --help for usage information"
-		\exit 1
-		;;
+dos2unix)
+	FormatLineEndings
+	;;
+prettier)
+	FormatPrettier
+	;;
+"")
+	FormatLineEndings
+	FormatPrettier
+	;;
+--help | -h)
+	\echo "Usage: $0 [dos2unix|prettier]"
+	\echo ""
+	\echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
+	\echo "  prettier  Format TS/JS/JSON/MD/TOML/YAML with Prettier"
+	\echo "  (no arg)  Run both in order"
+	;;
+*)
+	\echo "Unknown target: $1"
+	\echo "Use --help for usage information"
+	\exit 1
+	;;
 esac

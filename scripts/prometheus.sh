@@ -37,14 +37,14 @@ start() {
 
 stop() {
 	echo "Stopping Prometheus..."
-	docker stop "$CONTAINER" 2> /dev/null || true
-	docker rm "$CONTAINER" 2> /dev/null || true
+	docker stop "$CONTAINER" 2>/dev/null || true
+	docker rm "$CONTAINER" 2>/dev/null || true
 	echo "Stopped."
 }
 
 case "${1:-status}" in
-	start) start ;;
-	stop) stop ;;
-	status) status ;;
-	*) echo "Usage: $0 {start|stop|status}" ;;
+start) start ;;
+stop) stop ;;
+status) status ;;
+*) echo "Usage: $0 {start|stop|status}" ;;
 esac

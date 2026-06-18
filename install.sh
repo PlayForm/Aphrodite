@@ -71,13 +71,13 @@ for name in "${PROFILE_NAMES[@]}"; do
 	ln -sf "$src" "$dst"
 
 	# Ensure the plugin is listed in the profile's config
-	hermes plugins enable aphrodite --profile "$profile" 2> /dev/null || true
+	hermes plugins enable aphrodite --profile "$profile" 2>/dev/null || true
 
 	echo "  profile: $profile ✓"
 done
 
 # Also enable in the default (active) profile
-hermes plugins enable aphrodite 2> /dev/null || true
+hermes plugins enable aphrodite 2>/dev/null || true
 
 echo ""
 echo "=== done ==="

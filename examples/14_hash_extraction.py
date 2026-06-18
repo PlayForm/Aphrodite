@@ -18,27 +18,31 @@ STORE: dict[str, str] = {
 
 # ---------- buggy retrieve ----------
 
+
 def retrieve_buggy(hash_arg: str) -> str | None:
-    return STORE.get(hash_arg)    # BUG: passes raw arg, may include '|type|size'
+    return STORE.get(hash_arg)  # BUG: passes raw arg, may include '|type|size'
+
 
 # ---------- fixed retrieve ----------
 
+
 def retrieve_fixed(hash_arg: str) -> str | None:
-    clean = hash_arg.split("|")[0].strip()   # FIX: strip suffix before lookup
+    clean = hash_arg.split("|")[0].strip()  # FIX: strip suffix before lookup
     return STORE.get(clean)
+
 
 # ---------- test cases ----------
 
-BARE_HASH    = "abc123"
-SUFFIXED     = "abc123|tool|1024"
-WHITESPACED  = "  abc123  "
+BARE_HASH = "abc123"
+SUFFIXED = "abc123|tool|1024"
+WHITESPACED = "  abc123  "
 
-assert retrieve_buggy(BARE_HASH)   == "<the real content>",  "bare hash OK in buggy"
-assert retrieve_buggy(SUFFIXED)    is None,                  "BUG: suffix causes miss"
+assert retrieve_buggy(BARE_HASH) == "<the real content>", "bare hash OK in buggy"
+assert retrieve_buggy(SUFFIXED) is None, "BUG: suffix causes miss"
 
-assert retrieve_fixed(BARE_HASH)   == "<the real content>",  "bare hash OK in fixed"
-assert retrieve_fixed(SUFFIXED)    == "<the real content>",  "suffix stripped"
-assert retrieve_fixed(WHITESPACED) == "<the real content>",  "whitespace stripped"
+assert retrieve_fixed(BARE_HASH) == "<the real content>", "bare hash OK in fixed"
+assert retrieve_fixed(SUFFIXED) == "<the real content>", "suffix stripped"
+assert retrieve_fixed(WHITESPACED) == "<the real content>", "whitespace stripped"
 
 print("14 OK - pipe-suffix stripping verified")
 print(f"  buggy('{SUFFIXED}') -> {retrieve_buggy(SUFFIXED)!r}  (miss)")

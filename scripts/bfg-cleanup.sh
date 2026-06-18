@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "=== Aphrodite BFG History Cleanup ==="
 
-if ! command -v bfg &> /dev/null; then
+if ! command -v bfg &>/dev/null; then
 	echo "Installing BFG..."
 	brew install bfg || {
 		echo "ERROR: Install Java 11+ and BFG"

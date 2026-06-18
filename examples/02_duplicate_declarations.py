@@ -7,22 +7,25 @@ Fix:  Remove the duplicate block; keep only the _cfg_int call.
 Run:  python examples/02_duplicate_declarations.py
 Pass: prints OK
 """
+
 import os
 
 os.environ["APHRODITE_INLINE_THRESHOLD"] = "512"
 
 # ---------- simulates the buggy module-level sequence ----------
 
+
 def _cfg_int(key: str, default: int) -> int:
     return int(os.environ.get(key, default))
+
 
 # first declaration - correct
 _inline_store: dict = {}
 INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
 
 # ... many lines later, the duplicate ...
-_inline_store = {}          # BUG: resets the dict (harmless here but confusing)
-INLINE_THRESHOLD = 4096     # BUG: shadows the configured value
+_inline_store = {}  # BUG: resets the dict (harmless here but confusing)
+INLINE_THRESHOLD = 4096  # BUG: shadows the configured value
 
 buggy_threshold = INLINE_THRESHOLD  # will be 4096
 
