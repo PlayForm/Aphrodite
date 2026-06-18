@@ -19,13 +19,6 @@
 			}
 		},
 		{
-			"files": "*.py",
-			"options": {
-				"useTabs": false,
-				"tabWidth": 4
-			}
-		},
-		{
 			"files": "*.json",
 			"options": {
 				"useTabs": false,
@@ -35,7 +28,7 @@
 		{
 			"files": "*.md",
 			"options": {
-				"useTabs": false,
+				"useTabs": true,
 				"tabWidth": 4,
 				"proseWrap": "preserve"
 			}
