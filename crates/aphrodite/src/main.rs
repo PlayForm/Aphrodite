@@ -23,7 +23,7 @@ use aphrodite::proxy::{self, handle_tool_relay, handle_ccr_create, handle_ccr_li
 use aphrodite::retrieve;
 
 fn main() -> anyhow::Result<()> {
-	// Handle --version early — clap version attribute is only wired through
+	// Handle --version early - clap version attribute is only wired through
 	// Cli::parse() which is skipped when aphrodite.toml exists (multi-proxy path).
 	// This ensures --version always works regardless of config state.
 	let args: Vec<String> = std::env::args().collect();
@@ -140,7 +140,7 @@ async fn run() -> anyhow::Result<()> {
 							path = %watch_path_str,
 							auto_expand_limit = comp.and_then(|c| c.auto_expand_limit).unwrap_or(0),
 							engine_threshold = comp.and_then(|c| c.engine_threshold_pct).unwrap_or(0),
-							"? config reloaded — proxy will use new values; plugin reloads independently"
+							"? config reloaded - proxy will use new values; plugin reloads independently"
 						);
 					}
 					Err(e) => {

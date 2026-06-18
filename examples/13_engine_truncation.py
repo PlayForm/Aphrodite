@@ -1,4 +1,4 @@
-"""Atomic test 13 — engine compress() truncates content to 2000 chars.
+"""Atomic test 13 - engine compress() truncates content to 2000 chars.
 
 Bug:  The engine's compress() packs messages as str(content)[:2000].  A
       50 KB tool output is already CCR-marked (e.g. ⫷CCR:abc123|tool|51200⫸)
@@ -16,7 +16,7 @@ MARKER_RE = re.compile(r"\u2AB7CCR:[^\u2AB8]+\u2AB8")
 # ---------- a realistic already-compressed message ----------
 
 marker  = "\u2AB7CCR:deadbeef01234567|tool|51200\u2AB8"
-assert len(marker) < 50, "sanity — markers are short"
+assert len(marker) < 50, "sanity - markers are short"
 
 # Imagine the message content is large and already replaced by the marker
 message_content = marker  # in practice this is what _transform_tool_result leaves
@@ -46,7 +46,7 @@ fixed_valid = bool(MARKER_RE.search(fixed_packed))
 assert not buggy_valid, "Buggy: truncated marker cannot be parsed by retrieval"
 assert fixed_valid,     "Fixed: full marker preserved"
 
-print("13 OK — CCR marker truncation bug caught")
+print("13 OK - CCR marker truncation bug caught")
 print(f"  original marker   : {message_content!r}")
 print(f"  buggy (limit={SHORT_LIMIT:4d}) : {buggy_packed!r}  valid={buggy_valid}")
 print(f"  fixed (limit={SHORT_LIMIT:4d}) : {fixed_packed!r}  valid={fixed_valid}")

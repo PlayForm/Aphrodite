@@ -1,7 +1,7 @@
 ---
 name: aphrodite-benchmarking
 description:
-    "Comprehensive benchmark protocol for aphrodite proxy — compression
+    "Comprehensive benchmark protocol for aphrodite proxy - compression
     throughput, cache hit rates, cross-worker behavior, terminal threshold
     verification, and all-type coverage. Based on production testing across
     v0.5.124+."
@@ -43,7 +43,7 @@ Expected: 11/13 PASS (2 known `NameError` bugs in `aphrodite_files` and
 
 ## Compression Type Matrix
 
-Benchmark all 6 compression types. Issue them independently — no need to
+Benchmark all 6 compression types. Issue them independently - no need to
 retrieve results.
 
 | Type           | Example Content                                 | Center Example             |
@@ -52,9 +52,9 @@ retrieve results.
 | `log`          | Timestamped log lines, multi-line log output    | `debug`, `verbose`         |
 | `diff`         | Unified diff patches with context lines         | `compact`                  |
 | `error`        | Stack traces, error messages with tracebacks    | `debug`                    |
-| `json`         | Structured data objects, config payloads        | —                          |
-| `build_output` | Cargo/rustc compiler output, test runner output | —                          |
-| `text`         | Prose, paragraphs, documentation text           | —                          |
+| `json`         | Structured data objects, config payloads        | -                          |
+| `build_output` | Cargo/rustc compiler output, test runner output | -                          |
+| `text`         | Prose, paragraphs, documentation text           | -                          |
 
 Each call returns an instant hash. Verify types are correctly labelled in the
 response.
@@ -74,7 +74,7 @@ r2 = aphrodite_compress(content="fn test() {}", type="code")
 Expected: `source: "cache_hit"`, `compression_ratio: 1.0`,
 `note: "already in store"`.
 
-Cache hits also work when the center parameter varies — the hash is
+Cache hits also work when the center parameter varies - the hash is
 content-based, not center-based. Same content with different centers still
 produces a cache hit (and the center still travels with the marker on the first
 compression).
@@ -101,7 +101,7 @@ Content compressed in one worker session is not visible to another worker
 session. Cross-worker compressions of the same content produce fresh `stored`
 entries, not `cache_hit`.
 
-The token proxy cache (HTTP-level) IS shared across sessions — this is the
+The token proxy cache (HTTP-level) IS shared across sessions - this is the
 cross-session cache layer that saves token budget.
 
 To test:
@@ -109,7 +109,7 @@ To test:
 1. Worker A compresses content → gets hash `abc123`, `stored`
 2. Worker B compresses same content → gets same hash `abc123`, but `stored` not
    `cache_hit`
-3. Hashes are deterministic across workers — same content always produces same
+3. Hashes are deterministic across workers - same content always produces same
    hash
 
 ## Terminal Output Compression
@@ -148,7 +148,7 @@ threshold (default 450K tokens).
 
 ## References
 
-- `references/benchmark-session-results.md` — Concrete examples from the
+- `references/benchmark-session-results.md` - Concrete examples from the
   v0.5.124 production benchmark
 
 ## Pitfalls
@@ -159,7 +159,7 @@ threshold (default 450K tokens).
   files listing until fixed.
 - **aphrodite_catalog reports 0** when inline store has entries. Use
   `aphrodite_stats` for accurate inline counts.
-- **Don't retrieve to verify** — the CCR marker IS the proof. Retrieval wastes
+- **Don't retrieve to verify** - the CCR marker IS the proof. Retrieval wastes
   tokens and context.
-- **Cross-worker cache** is not shared for inline storage — this is by design.
+- **Cross-worker cache** is not shared for inline storage - this is by design.
   Only the token proxy cache is cross-session.

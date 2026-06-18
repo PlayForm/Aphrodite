@@ -1,13 +1,13 @@
 # Hermes Tool Output Schemas
 
 > **Every tool your agent runs produces output with a unique shape. This
-> document maps every single one — 43 tools, 28 classification types, 100+
+> document maps every single one - 43 tools, 28 classification types, 100+
 > extraction patterns. The absorptive classifier uses this as its playbook.**
 
 Comprehensive reference of ALL Hermes tool output formats, their classification
 types, and extraction patterns. The single source of truth for the absorptive
 CCR preview pipeline. When new tools or output shapes appear, they get
-documented here first — the classifier follows.
+documented here first - the classifier follows.
 
 ---
 
@@ -48,7 +48,7 @@ documented here first — the classifier follows.
 - **Classify:** `text` → reclassified to `code_*` if language detected, `json`
   if parseable
 - **Extract:** path (fn), extension, line_count, code structure
-- **Compress:** High — large files benefit from structure preview
+- **Compress:** High - large files benefit from structure preview
 - **Preview:** `[code_rust:3fns|2structs src/proxy.rs 414L]`
 
 ### write_file
@@ -56,7 +56,7 @@ documented here first — the classifier follows.
 - **Shape:** JSON `{status, path, bytes, syntax_errors}` or plain confirmation
 - **Classify:** `json` / `text` / `error` (if syntax errors)
 - **Extract:** path, status, bytes, syntax_errors count
-- **Compress:** Low — typically short
+- **Compress:** Low - typically short
 - **Preview:** `[text:File written successfully: /path/to/file.py]`
 
 ### patch
@@ -65,7 +65,7 @@ documented here first — the classifier follows.
   `--- a/path\n+++ b/path\n@@ ... @@\n context\n-removed\n+added`
 - **Classify:** `diff`
 - **Extract:** file_count, insertions, deletions, line_count, filename
-- **Compress:** Medium — diffs compress well
+- **Compress:** Medium - diffs compress well
 - **Preview:** `[diff:3f +12/-3 42L src/main.rs]`
 
 ### search_files
@@ -74,7 +74,7 @@ documented here first — the classifier follows.
 - **Classify:** `search_files` (file:line pattern), `search_results` (JSON with
   total_count)
 - **Extract:** query, match_count, file_count, line_count
-- **Compress:** Medium — large result sets benefit
+- **Compress:** Medium - large result sets benefit
 - **Preview:** `[grep:25 matches src/proxy.rs:841 30L]`
 
 ### terminal
@@ -82,17 +82,17 @@ documented here first — the classifier follows.
 - **Shape:** Raw stdout/stderr + optional `exit code: N`
 - **Classify:** `terminal` (exit code), `build_output`, `build_error`, `error`
 - **Extract:** command, exit_code, error_count, warning_count, last_line
-- **Compress:** Very high — verbose output with dramatic savings
+- **Compress:** Very high - verbose output with dramatic savings
 - **Preview:** `[terminal:cargo build exit=0]` or `[build:1E 2W 142L]`
 
 ### process
 
-- **Shape:** Varies — list (table/JSON), poll (delta text), log (paginated),
+- **Shape:** Varies - list (table/JSON), poll (delta text), log (paginated),
   kill/write (confirmation)
 - **Classify:** `process_output` (JSON with session_id), `terminal` (exit code),
   `json`, `text`
 - **Extract:** session_id, pid, uptime, state, action_result
-- **Compress:** Medium — log outputs verbose, poll deltas short
+- **Compress:** Medium - log outputs verbose, poll deltas short
 - **Preview:** `[process:pid=12345 up=2h 10L]`
 
 ### execute_code
@@ -101,7 +101,7 @@ documented here first — the classifier follows.
 - **Classify:** `error` (traceback), `terminal` (exit code), `code` (code-like
   output), `text`
 - **Extract:** result, error_message, trace_location, execution_time
-- **Compress:** Medium — errors need visibility, success is short
+- **Compress:** Medium - errors need visibility, success is short
 - **Preview:** `[error:NameError 'foo' is not defined 8L]` or `[text:42 1L]`
 
 ### cronjob
@@ -109,7 +109,7 @@ documented here first — the classifier follows.
 - **Shape:** JSON `{id, schedule, status, last_run, next_run}` or array
 - **Classify:** `json_list` / `json`
 - **Extract:** job_count, status_summary, schedule
-- **Compress:** Low — short scheduling info
+- **Compress:** Low - short scheduling info
 - **Preview:** `[json:5 items 3L]`
 
 ### delegate_task
@@ -117,7 +117,7 @@ documented here first — the classifier follows.
 - **Shape:** Narrative summary text with task results
 - **Classify:** `text` (may reclassify if JSON/error patterns)
 - **Extract:** summary, file_count, line_count
-- **Compress:** High — delegate outputs can be very verbose
+- **Compress:** High - delegate outputs can be very verbose
 - **Preview:** `[text:Task completed: analyzed 42 files, found 3 issues...]`
 
 ### session_search
@@ -125,7 +125,7 @@ documented here first — the classifier follows.
 - **Shape:** `{total_count, query, results: [{turn, content, score}]}`
 - **Classify:** `search_results`
 - **Extract:** query, total_count, turn_numbers
-- **Compress:** Medium — scales with session length
+- **Compress:** Medium - scales with session length
 - **Preview:** `[grep:8 matches compression 3L]`
 
 ### memory
@@ -133,7 +133,7 @@ documented here first — the classifier follows.
 - **Shape:** Confirmation text or `{memories: [{id, content}]}`
 - **Classify:** `json` / `text`
 - **Extract:** memory_count, content_preview, operation_type
-- **Compress:** Low — short snippets
+- **Compress:** Low - short snippets
 - **Preview:** `[text:Memory stored: 'prefers Rust for backend...']`
 
 ### skill_view
@@ -141,15 +141,15 @@ documented here first — the classifier follows.
 - **Shape:** Markdown with YAML frontmatter
 - **Classify:** `text`
 - **Extract:** skill_name, description, line_count
-- **Compress:** Medium — skills can be 100+ lines
-- **Preview:** `[text:Skill 'dev-workflow' loaded — 120L]`
+- **Compress:** Medium - skills can be 100+ lines
+- **Preview:** `[text:Skill 'dev-workflow' loaded - 120L]`
 
 ### skill_manage
 
 - **Shape:** Confirmation text or JSON `{action, name, version, path}`
 - **Classify:** `json` / `text`
 - **Extract:** action, skill_name, version, path
-- **Compress:** Low — short
+- **Compress:** Low - short
 - **Preview:** `[text:Skill 'my-skill' installed 2L]`
 
 ### skills_list
@@ -157,12 +157,12 @@ documented here first — the classifier follows.
 - **Shape:** Markdown table or JSON array
 - **Classify:** `tabular` (pipe table >3 rows), `json_list`
 - **Extract:** skill_count, names, line_count
-- **Compress:** Medium — many skills produce long tables
+- **Compress:** Medium - many skills produce long tables
 - **Preview:** `[table:12 rows 15L]`
 
 ### clarify
 
-- **Shape:** Question text — short string prompt
+- **Shape:** Question text - short string prompt
 - **Classify:** `text`
 - **Extract:** question_text, option_count
 - **Compress:** Very low
@@ -191,14 +191,14 @@ documented here first — the classifier follows.
 - **Classify:** `json` / `text`
 - **Extract:** url, title, status_code
 - **Compress:** Low
-- **Preview:** `[text:Navigated to https://example.com — Example Domain]`
+- **Preview:** `[text:Navigated to https://example.com - Example Domain]`
 
 ### browser_snapshot
 
 - **Shape:** Large accessibility tree / DOM array
 - **Classify:** `json_list` / `json` / `tabular`
 - **Extract:** element_count, page_title, interactive_count
-- **Compress:** Very high — can be 10KB+
+- **Compress:** Very high - can be 10KB+
 - **Preview:** `[json:342 items page=Example Domain 500L]`
 
 ### browser_click / browser_type / browser_scroll / browser_back / browser_press
@@ -206,7 +206,7 @@ documented here first — the classifier follows.
 - **Shape:** Short confirmation JSON/text
 - **Classify:** `json` / `text`
 - **Extract:** element, action_result
-- **Compress:** Low — short
+- **Compress:** Low - short
 - **Preview:** `[text:Clicked 'Submit button']`
 
 ### browser_console
@@ -214,7 +214,7 @@ documented here first — the classifier follows.
 - **Shape:** Array of log entries `[{level, message, timestamp}]`
 - **Classify:** `log` (new type) / `json_list`
 - **Extract:** entry_count, error_count, warning_count, first_message
-- **Compress:** High — console logs verbose
+- **Compress:** High - console logs verbose
 - **Preview:** `[log:42 entries 3E 5W 100L]`
 
 ### browser_vision
@@ -270,7 +270,7 @@ documented here first — the classifier follows.
 - **Shape:** Markdown table `| Hash | Type | Size | Preview |`
 - **Classify:** `tabular`
 - **Extract:** item_count, bytes_saved, turn_count, type_summary
-- **Compress:** Auto-formatted — always visible to LLM
+- **Compress:** Auto-formatted - always visible to LLM
 - **Preview:** Auto-expanded (no CCR marker)
 
 ### aphrodite_stats
@@ -294,7 +294,7 @@ documented here first — the classifier follows.
 - **Shape:** Original uncompressed content with CCR markers resolved
 - **Classify:** Whatever the original content type is
 - **Extract:** Depends on content
-- **Compress:** Medium — may be large if resolving nested markers
+- **Compress:** Medium - may be large if resolving nested markers
 - **Preview:** As classified from retrieved content
 
 ---

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hermes poll worker — oneshot agent that runs via the Save/prompt-file
+Hermes poll worker - oneshot agent that runs via the Save/prompt-file
 pattern WITHOUT polluting session history. Same architecture as the
 gcommit flow: prompt goes to a temp file, agent reads it, stdout only.
 
@@ -76,7 +76,7 @@ def run() -> int:
         else:
             i += 1
 
-    # ── Build agent (CLEAN — no session_db, no history pollution) ──
+    # ── Build agent (CLEAN - no session_db, no history pollution) ──
     os.environ["HERMES_YOLO_MODE"] = "1"
     os.environ["HERMES_ACCEPT_HOOKS"] = "1"
 
@@ -131,7 +131,7 @@ def run() -> int:
     toolsets_list = _normalize_toolsets(toolsets)
     if toolsets_list is None:
         toolsets_list = sorted(_get_platform_tools(cfg, "cli"))
-    # Always include aphrodite — workers need CCR compression hooks
+    # Always include aphrodite - workers need CCR compression hooks
     if "aphrodite" not in toolsets_list:
         toolsets_list = list(toolsets_list) + ["aphrodite"]
 

@@ -1,7 +1,7 @@
 ---
 name: aphrodite-v0.8.6-patterns
 description:
-    Development patterns learned across v0.8.5→v0.8.6 — Cargo.toml walk-up,
+    Development patterns learned across v0.8.5→v0.8.6 - Cargo.toml walk-up,
     --version early handling, dep pinning, standalone plugin repo,
     prefetch-first workflow.
 version: 1.0.0
@@ -18,7 +18,7 @@ related_skills:
 
 Techniques and pitfalls from the v0.8.6 development cycle.
 
-## Repo Path Resolution — `_find_cargo_toml()`
+## Repo Path Resolution - `_find_cargo_toml()`
 
 Brittle `os.path.dirname()` × N counting breaks when files move.
 `_hooks/rebuild.py` was 3 levels from `plugins/` but 4 from repo root.
@@ -40,7 +40,7 @@ def _find_cargo_toml():
 Use in `_rebuild_handler`, `_binary.py` local-build fallback, and anywhere that
 needs the Rust workspace root.
 
-## `--version` Flag — Early Handling
+## `--version` Flag - Early Handling
 
 Rust binary's `--version` only fires through `Cli::parse()`, skipped when
 `aphrodite.toml` exists (multi-proxy path). `_check_binary_version()` hangs.
@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
 
 ## Dep Pinning Convention
 
-All deps pinned to exact versions — no semver ranges:
+All deps pinned to exact versions - no semver ranges:
 
 | Lang   | Wrong           | Right                |
 | ------ | --------------- | -------------------- |
@@ -77,7 +77,7 @@ Check latest before bumping: `pip3 index versions <pkg>` /
 End users must NOT clone the `PlayForm/Aphrodite` monorepo. Created
 `PlayForm/Aphrodite-Hermes`:
 
-- **74 files, 317KB** — Python source, plugin.yaml, skills, no binary
+- **74 files, 317KB** - Python source, plugin.yaml, skills, no binary
 - Binary auto-downloaded via `_ensure_binary()` from GitHub Releases
 - `_rebuild_handler`: checks `Cargo.toml` → builds from source (dev) or
   downloads (user)
@@ -90,7 +90,7 @@ End users must NOT clone the `PlayForm/Aphrodite` monorepo. Created
 
 When tool output is compressed, use async tools instead of fighting:
 
-- `aphrodite_prefetch()` for files you'll need — reads in background
+- `aphrodite_prefetch()` for files you'll need - reads in background
 - `terminal(background=true, notify_on_complete=true)` for builds/tests
 - `process(action='poll')` to check progress, never `process(action='wait')`
-- Pre-plan calls — dispatch, work, retrieve when needed
+- Pre-plan calls - dispatch, work, retrieve when needed

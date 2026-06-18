@@ -1,4 +1,4 @@
-"""Atomic test 14 — pipe-suffix not stripped before hash lookup.
+"""Atomic test 14 - pipe-suffix not stripped before hash lookup.
 
 Bug:  The headroom_retrieve tool receives args["hash"] from the LLM.  The LLM
       sometimes copies the full marker token including the pipe-delimited
@@ -40,6 +40,6 @@ assert retrieve_fixed(BARE_HASH)   == "<the real content>",  "bare hash OK in fi
 assert retrieve_fixed(SUFFIXED)    == "<the real content>",  "suffix stripped"
 assert retrieve_fixed(WHITESPACED) == "<the real content>",  "whitespace stripped"
 
-print("14 OK — pipe-suffix stripping verified")
+print("14 OK - pipe-suffix stripping verified")
 print(f"  buggy('{SUFFIXED}') -> {retrieve_buggy(SUFFIXED)!r}  (miss)")
 print(f"  fixed('{SUFFIXED}') -> {retrieve_fixed(SUFFIXED)!r}  (hit)")

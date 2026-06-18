@@ -14,7 +14,7 @@
 			"code structure (fns, structs, classes)",
 			"first 3 lines preview"
 		],
-		"compression_benefit": "high — large files benefit from CCR marker + structure preview (e.g., 'fn=main structs=AppState ln=414')"
+		"compression_benefit": "high - large files benefit from CCR marker + structure preview (e.g., 'fn=main structs=AppState ln=414')"
 	},
 	{
 		"tool_name": "write_file",
@@ -32,7 +32,7 @@
 			"syntax_errors count",
 			"line count (ln)"
 		],
-		"compression_benefit": "low — typically short; only compress if syntax errors produce long output"
+		"compression_benefit": "low - typically short; only compress if syntax errors produce long output"
 	},
 	{
 		"tool_name": "patch",
@@ -49,7 +49,7 @@
 			"line count (ln)",
 			"filename (fn)"
 		],
-		"compression_benefit": "medium — diffs compress well; metadata like 'files=3 +12/-3' useful"
+		"compression_benefit": "medium - diffs compress well; metadata like 'files=3 +12/-3' useful"
 	},
 	{
 		"tool_name": "search_files",
@@ -66,7 +66,7 @@
 			"file count",
 			"line count (ln)"
 		],
-		"compression_benefit": "medium — large result sets benefit from count+query preview"
+		"compression_benefit": "medium - large result sets benefit from count+query preview"
 	},
 	{
 		"tool_name": "terminal",
@@ -85,11 +85,11 @@
 			"last line (last)",
 			"line count (ln)"
 		],
-		"compression_benefit": "very high — terminal output is often verbose; build output with '0E 2W 142L' preview saves dramatically"
+		"compression_benefit": "very high - terminal output is often verbose; build output with '0E 2W 142L' preview saves dramatically"
 	},
 	{
 		"tool_name": "process",
-		"output_shape": "Varies by action: (list) — table/JSON of process list with session_id, pid, state; (poll) — new output delta text; (log) — paginated output with offset/limit; (wait) — complete output; (kill/write/submit/close) — confirmation message. Background process notifications include session_id.",
+		"output_shape": "Varies by action: (list) - table/JSON of process list with session_id, pid, state; (poll) - new output delta text; (log) - paginated output with offset/limit; (wait) - complete output; (kill/write/submit/close) - confirmation message. Background process notifications include session_id.",
 		"examples": [
 			"{\"session_id\": \"abc123\", \"pid\": 12345, \"state\": \"running\", \"uptime\": 3600, \"output\": \"...\"}",
 			"Process abc123 killed (SIGTERM)",
@@ -105,7 +105,7 @@
 			"exit code",
 			"line count (ln)"
 		],
-		"compression_benefit": "medium — log output can be verbose; poll deltas usually short"
+		"compression_benefit": "medium - log output can be verbose; poll deltas usually short"
 	},
 	{
 		"tool_name": "execute_code",
@@ -122,7 +122,7 @@
 			"execution time",
 			"line count (ln)"
 		],
-		"compression_benefit": "medium — errors need visibility; successful outputs short"
+		"compression_benefit": "medium - errors need visibility; successful outputs short"
 	},
 	{
 		"tool_name": "cronjob",
@@ -138,7 +138,7 @@
 			"schedule",
 			"keys (top-level JSON keys)"
 		],
-		"compression_benefit": "low — typically short scheduling info"
+		"compression_benefit": "low - typically short scheduling info"
 	},
 	{
 		"tool_name": "delegate_task",
@@ -153,7 +153,7 @@
 			"line count (ln)",
 			"error/issue count"
 		],
-		"compression_benefit": "high — delegate outputs can be very verbose; summary preview valuable"
+		"compression_benefit": "high - delegate outputs can be very verbose; summary preview valuable"
 	},
 	{
 		"tool_name": "session_search",
@@ -168,7 +168,7 @@
 			"turn numbers",
 			"relevance scores"
 		],
-		"compression_benefit": "medium — result sets scale with session length"
+		"compression_benefit": "medium - result sets scale with session length"
 	},
 	{
 		"tool_name": "memory",
@@ -183,7 +183,7 @@
 			"content preview (first 110 chars)",
 			"operation type"
 		],
-		"compression_benefit": "low — usually short memory snippets"
+		"compression_benefit": "low - usually short memory snippets"
 	},
 	{
 		"tool_name": "skill_view",
@@ -198,7 +198,7 @@
 			"line count (ln)",
 			"heading structure"
 		],
-		"compression_benefit": "medium — skills can be 100+ lines; structure preview useful"
+		"compression_benefit": "medium - skills can be 100+ lines; structure preview useful"
 	},
 	{
 		"tool_name": "skill_manage",
@@ -209,7 +209,7 @@
 		],
 		"classification_type": "json (JSON response); text (plain confirmation)",
 		"key_extraction_fields": ["action", "skill name", "version", "path"],
-		"compression_benefit": "low — short confirmation messages"
+		"compression_benefit": "low - short confirmation messages"
 	},
 	{
 		"tool_name": "skills_list",
@@ -224,7 +224,7 @@
 			"names (comma-separated)",
 			"line count (ln)"
 		],
-		"compression_benefit": "medium — many skills produce long tables"
+		"compression_benefit": "medium - many skills produce long tables"
 	},
 	{
 		"tool_name": "clarify",
@@ -238,7 +238,7 @@
 			"question text (first 110 chars)",
 			"option count"
 		],
-		"compression_benefit": "very low — short prompts"
+		"compression_benefit": "very low - short prompts"
 	},
 	{
 		"tool_name": "vision_analyze",
@@ -254,7 +254,7 @@
 			"detected text",
 			"line count (ln)"
 		],
-		"compression_benefit": "medium — descriptions can be verbose but usually <2KB"
+		"compression_benefit": "medium - descriptions can be verbose but usually <2KB"
 	},
 	{
 		"tool_name": "computer_use",
@@ -271,22 +271,22 @@
 			"element",
 			"line count (ln)"
 		],
-		"compression_benefit": "low-medium — typically short action results"
+		"compression_benefit": "low-medium - typically short action results"
 	},
 	{
 		"tool_name": "browser_navigate",
 		"output_shape": "Page navigated confirmation with URL, title, and optional state info. JSON or text.",
 		"examples": [
-			"Navigated to https://example.com — Page title: Example Domain",
+			"Navigated to https://example.com - Page title: Example Domain",
 			"{\"url\": \"https://example.com\", \"title\": \"Example Domain\", \"status\": 200, \"state\": \"loaded\"}"
 		],
 		"classification_type": "json (structured); text (plain confirmation)",
 		"key_extraction_fields": ["url", "title", "status code", "page state"],
-		"compression_benefit": "low — short confirmation"
+		"compression_benefit": "low - short confirmation"
 	},
 	{
 		"tool_name": "browser_snapshot",
-		"output_shape": "Accessibility tree / DOM snapshot — large structured text showing page structure. Array of elements with roles, names, states. Can be very large.",
+		"output_shape": "Accessibility tree / DOM snapshot - large structured text showing page structure. Array of elements with roles, names, states. Can be very large.",
 		"examples": [
 			"{\"elements\": [{\"role\": \"heading\", \"name\": \"Title\", \"level\": 1}, {\"role\": \"link\", \"name\": \"Home\"}, ...], \"total\": 342}",
 			"[{\"role\": \"button\", \"name\": \"Submit\", \"state\": \"enabled\"}, ...]"
@@ -298,7 +298,7 @@
 			"interactive elements count",
 			"keys (top-level)"
 		],
-		"compression_benefit": "very high — accessibility trees can be 10KB+; element count + key stats as preview"
+		"compression_benefit": "very high - accessibility trees can be 10KB+; element count + key stats as preview"
 	},
 	{
 		"tool_name": "browser_click",
@@ -314,7 +314,7 @@
 			"new URL",
 			"page state change"
 		],
-		"compression_benefit": "low-medium — includes snapshot delta"
+		"compression_benefit": "low-medium - includes snapshot delta"
 	},
 	{
 		"tool_name": "browser_type",
@@ -325,7 +325,7 @@
 		],
 		"classification_type": "json (structured); text (plain confirmation)",
 		"key_extraction_fields": ["element", "typed text", "action result"],
-		"compression_benefit": "low — very short"
+		"compression_benefit": "low - very short"
 	},
 	{
 		"tool_name": "browser_scroll",
@@ -341,11 +341,11 @@
 			"new position",
 			"action result"
 		],
-		"compression_benefit": "low — very short"
+		"compression_benefit": "low - very short"
 	},
 	{
 		"tool_name": "browser_console",
-		"output_shape": "Console log output array — structured array of log entries with level, message, timestamp. Can be large.",
+		"output_shape": "Console log output array - structured array of log entries with level, message, timestamp. Can be large.",
 		"examples": [
 			"[{\"level\": \"error\", \"message\": \"Uncaught TypeError: ...\", \"timestamp\": \"...\", \"source\": \"app.js:42\"}, ...]",
 			"[{\"level\": \"log\", \"message\": \"Page loaded\"}, {\"level\": \"warn\", \"message\": \"Deprecated API\"}]"
@@ -358,18 +358,18 @@
 			"first message preview (msg)",
 			"line count (ln)"
 		],
-		"compression_benefit": "high — console logs can be very verbose; counts + message samples as preview"
+		"compression_benefit": "high - console logs can be very verbose; counts + message samples as preview"
 	},
 	{
 		"tool_name": "browser_back",
-		"output_shape": "Navigation confirmation — went back to previous page. Short text.",
+		"output_shape": "Navigation confirmation - went back to previous page. Short text.",
 		"examples": [
 			"Navigated back to https://previous-page.com",
 			"{\"action\": \"back\", \"url\": \"https://previous-page.com\", \"title\": \"Previous Page\"}"
 		],
 		"classification_type": "json (structured); text (plain)",
 		"key_extraction_fields": ["url", "title", "action result"],
-		"compression_benefit": "low — very short"
+		"compression_benefit": "low - very short"
 	},
 	{
 		"tool_name": "browser_vision",
@@ -385,7 +385,7 @@
 			"text found",
 			"error presence"
 		],
-		"compression_benefit": "medium — descriptions longer than standard vision_analyze"
+		"compression_benefit": "medium - descriptions longer than standard vision_analyze"
 	},
 	{
 		"tool_name": "browser_get_images",
@@ -399,7 +399,7 @@
 			"image count (len/items)",
 			"URL list preview"
 		],
-		"compression_benefit": "low-medium — image lists can be long but compressible"
+		"compression_benefit": "low-medium - image lists can be long but compressible"
 	},
 	{
 		"tool_name": "browser_press",
@@ -410,7 +410,7 @@
 		],
 		"classification_type": "json (structured); text (plain)",
 		"key_extraction_fields": ["key pressed", "action result"],
-		"compression_benefit": "low — very short"
+		"compression_benefit": "low - very short"
 	},
 	{
 		"tool_name": "image_generate",
@@ -426,7 +426,7 @@
 			"prompt summary",
 			"line count (ln)"
 		],
-		"compression_benefit": "low — typically short"
+		"compression_benefit": "low - typically short"
 	},
 	{
 		"tool_name": "text_to_speech",
@@ -437,7 +437,7 @@
 		],
 		"classification_type": "json (structured); text (plain)",
 		"key_extraction_fields": ["audio path", "duration", "text preview"],
-		"compression_benefit": "low — short result"
+		"compression_benefit": "low - short result"
 	},
 	{
 		"tool_name": "web_search",
@@ -453,7 +453,7 @@
 			"top snippets preview",
 			"search time"
 		],
-		"compression_benefit": "high — web results can be verbose with many snippets; query + count + top-3 preview"
+		"compression_benefit": "high - web results can be verbose with many snippets; query + count + top-3 preview"
 	},
 	{
 		"tool_name": "todo",
@@ -469,7 +469,7 @@
 			"pending count",
 			"line count (ln)"
 		],
-		"compression_benefit": "low-medium — todo lists are typically manageable"
+		"compression_benefit": "low-medium - todo lists are typically manageable"
 	},
 	{
 		"tool_name": "aphrodite_catalog",
@@ -477,7 +477,7 @@
 		"examples": [
 			"Catalog: 2 items 4.8KB saved 2 turns 0 files\nTypes: tool(2)\n\n| Hash | Type | Size | Preview |\n|------|------|------|---------|\n| 7204304c | tool | 3KB | skill description... |\n| b2f819a1 | code_rust | 1.8KB | [code_rust:fn=main] |"
 		],
-		"classification_type": "aphrodite (auto-expanded inline — NOT compressed); tabular (pipe-delimited table)",
+		"classification_type": "aphrodite (auto-expanded inline - NOT compressed); tabular (pipe-delimited table)",
 		"key_extraction_fields": [
 			"total_items",
 			"total_saved",
@@ -486,7 +486,7 @@
 			"by_type map",
 			"item hashes and previews"
 		],
-		"compression_benefit": "not applicable — aphrodite meta-tool output is auto-expanded inline, never compressed. Always visible to LLM."
+		"compression_benefit": "not applicable - aphrodite meta-tool output is auto-expanded inline, never compressed. Always visible to LLM."
 	},
 	{
 		"tool_name": "aphrodite_compress",
@@ -504,7 +504,7 @@
 			"compression_ratio",
 			"compressed marker text"
 		],
-		"compression_benefit": "not applicable — meta-tool, never double-compressed"
+		"compression_benefit": "not applicable - meta-tool, never double-compressed"
 	},
 	{
 		"tool_name": "aphrodite_diff",
@@ -518,7 +518,7 @@
 			"turn summaries",
 			"recent hashes"
 		],
-		"compression_benefit": "not applicable — meta-tool, auto-expanded"
+		"compression_benefit": "not applicable - meta-tool, auto-expanded"
 	},
 	{
 		"tool_name": "aphrodite_files",
@@ -532,7 +532,7 @@
 			"by_tool map",
 			"all sorted paths"
 		],
-		"compression_benefit": "not applicable — meta-tool, auto-expanded"
+		"compression_benefit": "not applicable - meta-tool, auto-expanded"
 	},
 	{
 		"tool_name": "aphrodite_rebuild",
@@ -549,7 +549,7 @@
 			"restarted proxies",
 			"binary path"
 		],
-		"compression_benefit": "medium — build output can be verbose; already auto-expanded but may flow through tool relay"
+		"compression_benefit": "medium - build output can be verbose; already auto-expanded but may flow through tool relay"
 	},
 	{
 		"tool_name": "aphrodite_retrieve",
@@ -568,7 +568,7 @@
 			"found status",
 			"error"
 		],
-		"compression_benefit": "not applicable — resolve tool; content returned inline"
+		"compression_benefit": "not applicable - resolve tool; content returned inline"
 	},
 	{
 		"tool_name": "aphrodite_search",
@@ -585,7 +585,7 @@
 			"types found",
 			"searched stores"
 		],
-		"compression_benefit": "not applicable — meta-tool, auto-expanded"
+		"compression_benefit": "not applicable - meta-tool, auto-expanded"
 	},
 	{
 		"tool_name": "aphrodite_stats",
@@ -604,7 +604,7 @@
 			"compressions",
 			"inline entries/bytes"
 		],
-		"compression_benefit": "not applicable — meta-tool, auto-expanded"
+		"compression_benefit": "not applicable - meta-tool, auto-expanded"
 	},
 	{
 		"tool_name": "aphrodite_test",
@@ -621,7 +621,7 @@
 			"per-test status",
 			"error messages"
 		],
-		"compression_benefit": "not applicable — meta-tool, auto-expanded"
+		"compression_benefit": "not applicable - meta-tool, auto-expanded"
 	},
 	{
 		"tool_name": "aphrodite_reclassify",
@@ -638,7 +638,7 @@
 			"confidence",
 			"analysis details"
 		],
-		"compression_benefit": "not applicable — meta-tool, auto-expanded"
+		"compression_benefit": "not applicable - meta-tool, auto-expanded"
 	},
 	{
 		"tool_name": "CCR_MARKER (compressed output)",
@@ -660,17 +660,17 @@
 			"preview",
 			"structured metadata (lang, fns, structs, classes, trace, msg, ln, keys, files, entries, adds, dels, exit, errors, warnings)"
 		],
-		"compression_benefit": "this IS the compressed form — token savings: 40-373× depending on original size"
+		"compression_benefit": "this IS the compressed form - token savings: 40-373× depending on original size"
 	},
 	{
 		"tool_name": "CLASSIFIER_SKIP (clean output)",
-		"output_shape": "When classifier determines content has nothing worth retrieving (clean build: 0E 0W, exit=0 terminal, 0-match search), the raw output is replaced with **only the preview** — no CCR marker. The LLM sees just: `[build_output:0E 0W 142L]` or `[terminal:cargo build exit=0]`. Content IS stored in CCR for search/history.",
+		"output_shape": "When classifier determines content has nothing worth retrieving (clean build: 0E 0W, exit=0 terminal, 0-match search), the raw output is replaced with **only the preview** - no CCR marker. The LLM sees just: `[build_output:0E 0W 142L]` or `[terminal:cargo build exit=0]`. Content IS stored in CCR for search/history.",
 		"examples": [
 			"[build_output:0E 0W 142L]",
 			"[terminal:cargo build exit=0]",
 			"[search_files:0 matches]"
 		],
-		"classification_type": "build_output (0E 0W), terminal (exit=0), search_files/search_results (0 matches) — clean/inert outputs",
+		"classification_type": "build_output (0E 0W), terminal (exit=0), search_files/search_results (0 matches) - clean/inert outputs",
 		"key_extraction_fields": [
 			"type tag",
 			"error count (0)",
@@ -678,6 +678,6 @@
 			"line count (ln)",
 			"command (cmd)"
 		],
-		"compression_benefit": "maximum — preview IS the complete story; no CCR marker baits unnecessary retrieval"
+		"compression_benefit": "maximum - preview IS the complete story; no CCR marker baits unnecessary retrieval"
 	}
 ]

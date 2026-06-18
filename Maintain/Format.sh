@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 #===============================================================================
-# Format.sh — Format Prettier (TS/JS/JSON/MD/TOML/YAML).
+# Format.sh - Format Prettier (TS/JS/JSON/MD/TOML/YAML).
 #===============================================================================
 #
 # Usage:
@@ -10,9 +10,9 @@
 #   sh Maintain/Format.sh prettier      # Format with Prettier only
 #
 # Configuration:
-#   .editorconfig      — Shared indent/newline rules
-#   prettier.config.js — Prettier options and plugins
-#   .prettierignore    — Paths excluded from Prettier formatting
+#   .editorconfig      - Shared indent/newline rules
+#   prettier.config.js - Prettier options and plugins
+#   .prettierignore    - Paths excluded from Prettier formatting
 #
 #===============================================================================
 
@@ -79,7 +79,7 @@ FormatPrettier() {
 		"$Root/node_modules/.bin/prettier" --write . \
 			--ignore-path ".prettierignore" || \true
 	else
-		\echo "Prettier not found in node_modules/.bin — skipping."
+		\echo "Prettier not found in node_modules/.bin - skipping."
 		\echo "Run: pnpm install"
 	fi
 

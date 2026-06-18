@@ -5,7 +5,7 @@ Discovered during aphrodite v1.4.0-1.5.0 development (2026-06-15).
 ## Registration Flow
 
 1. Plugin calls `ctx.register_context_engine(engine)` in register()
-2. Hermes checks `isinstance(engine, ContextEngine)` — CRITICAL gate
+2. Hermes checks `isinstance(engine, ContextEngine)` - CRITICAL gate
 3. If False: silently rejected with log warning, built-in compressor takes over
 4. If True: stored on plugin manager's `_context_engine`
 5. At session start, `agent_init.py` reads `context.engine` config
@@ -14,11 +14,11 @@ Discovered during aphrodite v1.4.0-1.5.0 development (2026-06-15).
 
 ## Key Files
 
-- `agent/context_engine.py` — ContextEngine ABC (8 abstract methods)
-- `agent/agent_init.py:1440-1500` — Engine selection logic
-- `hermes_cli/plugins.py:502-526` — register_context_engine + isinstance check
-- `agent/turn_context.py:280-314` — Preflight compression loop
-- `agent/context_compressor.py` — Built-in ContextCompressor (fallback)
+- `agent/context_engine.py` - ContextEngine ABC (8 abstract methods)
+- `agent/agent_init.py:1440-1500` - Engine selection logic
+- `hermes_cli/plugins.py:502-526` - register_context_engine + isinstance check
+- `agent/turn_context.py:280-314` - Preflight compression loop
+- `agent/context_compressor.py` - Built-in ContextCompressor (fallback)
 
 ## Required Interface
 
@@ -39,7 +39,7 @@ class MyEngine(ContextEngine):
     def should_compress(self, prompt_tokens=None) -> bool:
         return True  # always compress
 
-    # Compress messages — return new (shorter) message list
+    # Compress messages - return new (shorter) message list
     def compress(self, messages, current_tokens=None, focus_topic=None):
         head = messages[:2]
         tail = messages[-5:]
@@ -70,16 +70,16 @@ ctx.register_hook("aphrodite_engine_compressed", my_callback)
 
 ## Common Pitfalls
 
-1. **Not inheriting from ContextEngine**: Silent failure — no error, just
+1. **Not inheriting from ContextEngine**: Silent failure - no error, just
    ignored
 2. **name as class attr instead of @property**: isinstance still passes but
    property lookup fails
 3. **update_model signature mismatch**: Wrong param count causes TypeError at
    startup
 4. **Config set mid-session**: Engine only activates on NEW sessions
-5. **pre_api_request hook**: Exists in VALID_HOOKS but never invoked — don't
+5. **pre_api_request hook**: Exists in VALID_HOOKS but never invoked - don't
    rely on it
-6. **conversation_history in pre_llm_call**: It's a COPY — mutations are
+6. **conversation_history in pre_llm_call**: It's a COPY - mutations are
    discarded
 7. **Control chars in WezTerm MCP**: Send \x03 BEFORE new commands to avoid
    corruption

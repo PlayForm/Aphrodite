@@ -1,7 +1,7 @@
 ---
 name: aphrodite-operations
 description:
-    Operational patterns for working with aphrodite — engine compression
+    Operational patterns for working with aphrodite - engine compression
     handling, prefetch workflow, dual-mode rebuild, standalone repo sync.
 version: 1.0.0
 ---
@@ -17,14 +17,14 @@ When the context engine compresses tool output into CCR markers, do NOT fight it
 by re-reading the same file with different offsets or tools. The engine
 compresses every read. Instead:
 
-1. **Plan reads ahead** — use `aphrodite_prefetch(paths=[...])` to read files in
+1. **Plan reads ahead** - use `aphrodite_prefetch(paths=[...])` to read files in
    background. Markers return instantly; content loads concurrently.
-2. **Retrieve, don't re-read** — when you get `<<<CCR:hash|type|size>>>`, use
+2. **Retrieve, don't re-read** - when you get `<<<CCR:hash|type|size>>>`, use
    `aphrodite_retrieve(hash)`. Don't call `read_file` again with different
    offsets.
-3. **Write terminal output to files** — `command > /tmp/out.txt 2>&1` then
+3. **Write terminal output to files** - `command > /tmp/out.txt 2>&1` then
    prefetch/retrieve.
-4. **Do other work while waiting** — dispatch prefetches, proceed with
+4. **Do other work while waiting** - dispatch prefetches, proceed with
    independent tasks, check `aphrodite_prefetch_status` for readiness.
 
 **Anti-pattern**: calling `read_file` 3+ times on the same file with different
@@ -46,7 +46,7 @@ module to locate the workspace root.
 ## Standalone Plugin Repo
 
 End users install from
-[Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes) — a lightweight
+[Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes) - a lightweight
 repo containing only Python plugin files (no binary, no monorepo). The binary is
 auto-downloaded from
 [GitHub Releases](https://github.com/PlayForm/Aphrodite/releases) on first
@@ -75,7 +75,7 @@ of config state.
 - `_rebuild_handler` repo path: from `_hooks/rebuild.py`, use
   `_find_cargo_toml()` which walks up, not hardcoded `dirname()` chains that
   break when directory structure changes.
-- `_check_binary_version()` calls `[BINARY, "--version"]` — ensure the binary
+- `_check_binary_version()` calls `[BINARY, "--version"]` - ensure the binary
   actually supports it (fixed in v0.8.6).
-- Plugin-shipped skills are read-only via `skill_manage` — create profile-level
+- Plugin-shipped skills are read-only via `skill_manage` - create profile-level
   skills for operational patterns.

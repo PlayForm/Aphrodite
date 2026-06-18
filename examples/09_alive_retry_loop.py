@@ -1,4 +1,4 @@
-"""Atomic test 09 — fixed 0.5 s sleep with no retry loop after proxy launch.
+"""Atomic test 09 - fixed 0.5 s sleep with no retry loop after proxy launch.
 
 Bug:  on_start() does time.sleep(0.5) then calls _alive() once.  On a slow
       machine the proxy might not be up yet and the plugin logs "DOWN" even
@@ -23,7 +23,7 @@ def _alive_sim() -> bool:
 # ---------- buggy on_start ----------
 
 def on_start_buggy() -> bool:
-    time.sleep(0)          # simulating 0.5 s — zero here for speed
+    time.sleep(0)          # simulating 0.5 s - zero here for speed
     return _alive_sim()    # single attempt
 
 # ---------- fixed on_start with retry ----------
@@ -50,6 +50,6 @@ fixed_result = on_start_fixed()
 assert buggy_result is False, "Buggy: single poll before proxy is ready should fail"
 assert fixed_result is True,  "Fixed: retry loop should eventually succeed"
 
-print("09 OK — retry loop replaces fixed single-sleep")
+print("09 OK - retry loop replaces fixed single-sleep")
 print(f"  buggy result (1 attempt)  : {buggy_result}")
 print(f"  fixed result (retry loop) : {fixed_result}")

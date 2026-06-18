@@ -36,43 +36,43 @@ Config: `context.engine: my-engine` in config.yaml.
 
 ## Required Abstract Methods
 
-- `name` — short identifier string
-- `update_from_response(usage)` — called after each API response with token
+- `name` - short identifier string
+- `update_from_response(usage)` - called after each API response with token
   counts
-- `should_compress(prompt_tokens)` — return True to trigger compression
-- `compress(messages, current_tokens, focus_topic)` — main compression entry,
+- `should_compress(prompt_tokens)` - return True to trigger compression
+- `compress(messages, current_tokens, focus_topic)` - main compression entry,
   returns modified list
 
 ## Optional Methods
 
-- `should_compress_preflight(messages)` — quick pre-API check
-- `has_content_to_compress(messages)` — gateway /compress guard
-- `on_session_start(session_id, **kwargs)` — session lifecycle
-- `on_session_end(session_id, messages)` — flush state
-- `on_session_reset()` — reset counters
-- `get_tool_schemas()` — expose engine tools to agent
-- `handle_tool_call(name, args)` — handle engine tool calls
-- `get_status()` — display/logging status
-- `update_model(model, context_length, ...)` — model switch handling
+- `should_compress_preflight(messages)` - quick pre-API check
+- `has_content_to_compress(messages)` - gateway /compress guard
+- `on_session_start(session_id, **kwargs)` - session lifecycle
+- `on_session_end(session_id, messages)` - flush state
+- `on_session_reset()` - reset counters
+- `get_tool_schemas()` - expose engine tools to agent
+- `handle_tool_call(name, args)` - handle engine tool calls
+- `get_status()` - display/logging status
+- `update_model(model, context_length, ...)` - model switch handling
 
 ## Default Attributes (set on instance)
 
-- `last_prompt_tokens`, `last_completion_tokens`, `last_total_tokens` — token
+- `last_prompt_tokens`, `last_completion_tokens`, `last_total_tokens` - token
   tracking
-- `threshold_tokens`, `context_length` — compression thresholds
-- `compression_count` — counter
-- `threshold_percent: 0.75` — override for custom trigger ratio
-- `protect_first_n: 3` — head messages always preserved
-- `protect_last_n: 6` — tail messages always preserved
+- `threshold_tokens`, `context_length` - compression thresholds
+- `compression_count` - counter
+- `threshold_percent: 0.75` - override for custom trigger ratio
+- `protect_first_n: 3` - head messages always preserved
+- `protect_last_n: 6` - tail messages always preserved
 
 ## Discovery
 
 Source files:
 
-- `/agent/context_engine.py` — ContextEngine base class
-- `/agent/agent_init.py:1440-1500` — engine selection logic
-- `/hermes_cli/plugins.py:502` — `register_context_engine()`
-- `/hermes_cli/plugins.py:1920` — `get_plugin_context_engine()`
+- `/agent/context_engine.py` - ContextEngine base class
+- `/agent/agent_init.py:1440-1500` - engine selection logic
+- `/hermes_cli/plugins.py:502` - `register_context_engine()`
+- `/hermes_cli/plugins.py:1920` - `get_plugin_context_engine()`
 
 Selection order:
 
@@ -83,7 +83,7 @@ Selection order:
 
 ## Key Difference from pre_llm_call
 
-`pre_llm_call` hook receives `conversation_history=list(messages)` — a COPY.
+`pre_llm_call` hook receives `conversation_history=list(messages)` - a COPY.
 Mutations are discarded. The hook can only RETURN a context string.
 
 `compress()` receives the ACTUAL message list and can modify it in place. This

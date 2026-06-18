@@ -1,4 +1,4 @@
-//! bench_01_corpus — full content-type corpus run.
+//! bench_01_corpus - full content-type corpus run.
 //!
 //! Spawns cache (:49797) and token (:49798) proxies, pushes one sample
 //! per content-type through /ccr/create, then retrieves each via POST /retrieve.
@@ -26,7 +26,7 @@ fn spawn(mode: &'static str, port: u16) -> Proxy {
         .args(["--mode", mode, "--listen", &listen,
                "--api-url", "http://127.0.0.1:1", "--api-key", "bench"])
         .stdout(Stdio::null()).stderr(Stdio::null()).spawn()
-        .unwrap_or_else(|_| panic!("spawn failed — run `cargo build --release` first"));
+        .unwrap_or_else(|_| panic!("spawn failed - run `cargo build --release` first"));
     let dl = Instant::now() + Duration::from_secs(5);
     loop {
         if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() { break; }
@@ -71,9 +71,9 @@ struct Sample { label: &'static str, content: String }
 fn corpus() -> Vec<Sample> {
     vec![
         Sample { label: "tiny_text",
-            content: "ok ".repeat(40) },                                   // 120 B  — below all thresholds
+            content: "ok ".repeat(40) },                                   // 120 B  - below all thresholds
         Sample { label: "small_prose",
-            content: "The quick brown fox jumps. ".repeat(18) },            // ~468 B — inline zone
+            content: "The quick brown fox jumps. ".repeat(18) },            // ~468 B - inline zone
         Sample { label: "medium_prose",
             content: "Lorem ipsum dolor sit amet, consectetur adipiscing. ".repeat(30) }, // ~1.5 KB
         Sample { label: "large_prose",
@@ -202,7 +202,7 @@ fn main() {
     let misses: usize = cache_rows.iter().chain(token_rows.iter())
         .filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok).count();
     if misses > 0 {
-        eprintln!("\n[bench_01] FAILED — {} retrieve miss(es)", misses);
+        eprintln!("\n[bench_01] FAILED - {} retrieve miss(es)", misses);
         std::process::exit(1);
     }
     eprintln!("\n[bench_01] OK");

@@ -11,14 +11,14 @@ platform **Return**: ignored (fire-and-forget)
 turn_id, user_message, conversation_history (COPY), is_first_turn, model,
 platform, sender_id **Return**: string → injected into user message as context.
 Dict with "context" key also accepted. **CRITICAL**: conversation_history is
-`list(messages)` — in-place mutations are DISCARDED.
+`list(messages)` - in-place mutations are DISCARDED.
 
 ## post_llm_call
 
 **File**: agent/turn_finalizer.py:294-304 **Params**: session_id, task_id,
 turn_id, user_message, assistant_response, conversation_history (COPY), model,
 platform **Return**: ignored **NOTE**: turn_id is
-`{session_id}:{task_id}:{uuid}` — NOT sequential.
+`{session_id}:{task_id}:{uuid}` - NOT sequential.
 
 ## transform_terminal_output
 

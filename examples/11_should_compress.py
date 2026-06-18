@@ -1,4 +1,4 @@
-"""Atomic test 11 — should_compress() ignores threshold_percent.
+"""Atomic test 11 - should_compress() ignores threshold_percent.
 
 Bug:  AphroditeContextEngine.should_compress() always returns True regardless
       of prompt_tokens or ENGINE_THRESHOLD_PCT.  The env var is defined but
@@ -39,18 +39,18 @@ class ContextEngineFixed:
 engine_b = ContextEngineBuggy(threshold_pct=75.0, context_length=128_000)
 engine_f = ContextEngineFixed(threshold_pct=75.0, context_length=128_000)
 
-# 10% fill — should NOT compress
+# 10% fill - should NOT compress
 assert engine_b.should_compress(12_800) is True,  "Buggy always True"
 assert engine_f.should_compress(12_800) is False, "Fixed: 10% < 75%, skip compress"
 
-# 80% fill — should compress
+# 80% fill - should compress
 assert engine_b.should_compress(102_400) is True, "Buggy always True"
 assert engine_f.should_compress(102_400) is True, "Fixed: 80% >= 75%, do compress"
 
-# None tokens — safe default
+# None tokens - safe default
 assert engine_f.should_compress(None) is True, "Fixed: unknown fill → compress"
 
-print("11 OK — threshold_percent now gates compression")
+print("11 OK - threshold_percent now gates compression")
 print("  at 10% fill  → buggy=True  fixed=False")
 print("  at 80% fill  → buggy=True  fixed=True")
 print("  at None fill → buggy=True  fixed=True (safe default)")

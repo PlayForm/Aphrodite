@@ -1,4 +1,4 @@
-"""Atomic test 16 — integration smoke: full marker→compress→retrieve round-trip.
+"""Atomic test 16 - integration smoke: full marker→compress→retrieve round-trip.
 
 This test wires together the fixed versions of all key subsystems and runs a
 complete round-trip without a live proxy or API key:
@@ -101,10 +101,10 @@ proxy_body = '{"status": "healthy", "version": "0.2.0"}'  # note: space after co
 assert alive(proxy_body), "Fixed health check must accept serde_json response"
 
 # Step 5: threshold gate
-assert should_compress(10_000) is False, "10k/128k = 7.8% — below 75% threshold"
-assert should_compress(100_000) is True, "100k/128k = 78% — above threshold"
+assert should_compress(10_000) is False, "10k/128k = 7.8% - below 75% threshold"
+assert should_compress(100_000) is True, "100k/128k = 78% - above threshold"
 
-print("16 OK — full integration smoke test passed")
+print("16 OK - full integration smoke test passed")
 print(f"  original size  : {len(ORIGINAL):,} chars")
 print(f"  marker size    : {len(marker_str):,} chars")
 print(f"  retrieved size : {len(retrieved):,} chars  (exact match)")

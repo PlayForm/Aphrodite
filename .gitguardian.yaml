@@ -17,10 +17,10 @@ secret:
         - tests/parity/fixtures/
         - vendor/headroom/tests/
 
-        # Vendored third-party code — not scanned for Aphrodite secrets
+        # Vendored third-party code - not scanned for Aphrodite secrets
         - vendor/
 
-        # CCR payload cache — contains real conversation data
+        # CCR payload cache - contains real conversation data
         - "~/.hermes/memories/"
         - "~/.hermes/skills/"
         - "~/.hermes/plugins/"

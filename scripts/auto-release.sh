@@ -1,6 +1,6 @@
 #!/bin/bash
-# auto-release.sh — commit all changes, bump version, build, tag, release
-# auto-release.sh — commit, bump, build, tag, push — full pipeline
+# auto-release.sh - commit all changes, bump version, build, tag, release
+# auto-release.sh - commit, bump, build, tag, push - full pipeline
 # Usage: ./scripts/auto-release.sh ["commit message"]
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -42,7 +42,7 @@ else
 	NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
 fi
 
-# Bump Cargo.toml (line 3 only — avoid matching dependency versions)
+# Bump Cargo.toml (line 3 only - avoid matching dependency versions)
 sed -i '' "3s/version = \"$CURRENT\"/version = \"$NEW\"/" "$CARGO_TOML"
 # Sync Python BIN_VERSION (now in _core/config.py package)
 sed -i '' "s/BIN_VERSION = \"v$CURRENT\"/BIN_VERSION = \"v$NEW\"/" plugins/aphrodite/_core/config.py
@@ -54,7 +54,7 @@ sed -i '' "s/PLUGIN_VERSION = \"$PLUGIN_CURRENT\"/PLUGIN_VERSION = \"$PLUGIN_NEW
 # Sync pyproject.toml
 sed -i '' "s/version = \"$PLUGIN_CURRENT\"/version = \"$PLUGIN_NEW\"/" plugins/aphrodite/pyproject.toml
 # Sync __init__.py docstring
-sed -i '' "s/aphrodite v$PLUGIN_CURRENT —/aphrodite v$PLUGIN_NEW —/" plugins/aphrodite/__init__.py
+sed -i '' "s/aphrodite v$PLUGIN_CURRENT -/aphrodite v$PLUGIN_NEW -/" plugins/aphrodite/__init__.py
 # Sync plugin.yaml
 sed -i '' "s/version: $PLUGIN_CURRENT/version: $PLUGIN_NEW/" plugins/aphrodite/plugin.yaml
 echo "[bump] bin $CURRENT → $NEW | plugin $PLUGIN_CURRENT → $PLUGIN_NEW"
@@ -69,12 +69,12 @@ echo "[test] OK"
 
 # Commit version bump + tag (no editor prompts)
 git add -u
-git commit -m "release(aphrodite): v$NEW — $MSG"
+git commit -m "release(aphrodite): v$NEW - $MSG"
 git tag -d "Aphrodite/v$NEW" 2> /dev/null || true
 GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2> /dev/null || git tag "Aphrodite/v$NEW"
 echo "[release] Aphrodite/v$NEW tagged"
 
-# Push — always sync with remote
+# Push - always sync with remote
 git push Source Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
 git push Source "Aphrodite/v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
 echo "[push] done"
@@ -83,7 +83,7 @@ echo "[push] done"
 SUBMODULE_SHA=$(cd plugins/aphrodite && git rev-parse HEAD)
 git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2>/dev/null
 git add vendor/headroom 2>/dev/null || true
-git commit -m "chore: sync submodules — Aphrodite v$NEW" 2>/dev/null || echo "[sync] submodules already current"
+git commit -m "chore: sync submodules - Aphrodite v$NEW" 2>/dev/null || echo "[sync] submodules already current"
 git push Source Current 2>&1 | tail -1 || echo "[push] submodule sync skipped (auth?)"
 echo "[sync] submodules done"
 

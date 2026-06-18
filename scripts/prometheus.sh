@@ -1,5 +1,5 @@
 #!/bin/bash
-# prometheus.sh — start/stop Prometheus Docker for aphrodite metrics
+# prometheus.sh - start/stop Prometheus Docker for aphrodite metrics
 # Usage: ./scripts/prometheus.sh [start|stop|status]
 
 set -euo pipefail

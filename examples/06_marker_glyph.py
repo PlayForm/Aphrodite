@@ -1,4 +1,4 @@
-"""Atomic test 06 — Unicode marker glyph mismatch in injected tool description.
+"""Atomic test 06 - Unicode marker glyph mismatch in injected tool description.
 
 Bug:  The headroom_retrieve tool description uses ⭷ (U+2B77) / ⭸ (U+2B78)
       but smart_marker() and all compression code use ⫷ (U+2AB7) / ⫸ (U+2AB8).
@@ -13,9 +13,9 @@ import re
 
 # ---------- the two glyph pairs ----------
 
-GLYPH_WRONG_OPEN  = "\u2B77"   # ⭷  — used in description (BUG)
+GLYPH_WRONG_OPEN  = "\u2B77"   # ⭷  - used in description (BUG)
 GLYPH_WRONG_CLOSE = "\u2B78"   # ⭸
-GLYPH_RIGHT_OPEN  = "\u2AB7"   # ⫷  — used everywhere else
+GLYPH_RIGHT_OPEN  = "\u2AB7"   # ⫷  - used everywhere else
 GLYPH_RIGHT_CLOSE = "\u2AB8"   # ⫸
 
 # ---------- replica of smart_marker ----------
@@ -55,7 +55,7 @@ assert not glyph_in_description(DESCRIPTION_BUGGY, sample_marker), \
 assert glyph_in_description(DESCRIPTION_FIXED, sample_marker), \
     "Correct glyph MUST appear in a real marker"
 
-print("06 OK — Unicode glyph mismatch caught")
+print("06 OK - Unicode glyph mismatch caught")
 print(f"  wrong glyphs : {GLYPH_WRONG_OPEN!r} {GLYPH_WRONG_CLOSE!r}  (U+2B77/78)")
 print(f"  right glyphs : {GLYPH_RIGHT_OPEN!r} {GLYPH_RIGHT_CLOSE!r}  (U+2AB7/8)")
 print(f"  sample marker: {sample_marker}")

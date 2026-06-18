@@ -1,4 +1,4 @@
-"""Atomic test 08 — upstream API call on every /health request.
+"""Atomic test 08 - upstream API call on every /health request.
 
 Bug:  health_check() in proxy.rs pings the upstream /models endpoint on
       every GET /health.  Since _alive() is called before every tool output,
@@ -56,6 +56,6 @@ fixed_calls = upstream_calls
 assert buggy_calls == 10, f"Buggy: expected 10 upstream pings, got {buggy_calls}"
 assert fixed_calls == 1,  f"Fixed: expected 1 upstream ping (cache), got {fixed_calls}"
 
-print("08 OK — upstream health-check TTL cache verified")
+print("08 OK - upstream health-check TTL cache verified")
 print(f"  buggy upstream calls for 10 health checks : {buggy_calls}")
 print(f"  fixed upstream calls for 10 health checks : {fixed_calls}")

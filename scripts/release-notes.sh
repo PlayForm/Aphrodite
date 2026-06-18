@@ -1,7 +1,7 @@
 #!/bin/bash
-# release-notes.sh — standardized aphrodite release notes generator
+# release-notes.sh - standardized aphrodite release notes generator
 # Usage: ./scripts/release-notes.sh v0.5.122 "Short title" "Long description..."
-# Outputs to stdout — pipe to: gh release create v0.5.122 --notes-file <(./scripts/release-notes.sh ...)
+# Outputs to stdout - pipe to: gh release create v0.5.122 --notes-file <(./scripts/release-notes.sh ...)
 # Or: ./scripts/release-notes.sh v0.5.122 "title" "body..." > /tmp/notes.md && gh release create v0.5.122 -F /tmp/notes.md ~/.hermes/aphrodite/aphrodite
 set -euo pipefail
 

@@ -1,13 +1,13 @@
-//! bench_04_ema — EMA auto-tune drift and threshold feedback loop.
+//! bench_04_ema - EMA auto-tune drift and threshold feedback loop.
 //!
 //! Drives the compression_ratio_ema field (exposed on GET /stats as
 //! `compression_ratio_ema`) through three phases:
 //!
-//!   Phase A — warm-up: 10 high-ratio payloads (very repetitive text).
+//!   Phase A - warm-up: 10 high-ratio payloads (very repetitive text).
 //!             EMA should climb well above 10x.
-//!   Phase B — shock:   10 near-incompressible payloads (hex noise).
+//!   Phase B - shock:   10 near-incompressible payloads (hex noise).
 //!             EMA should decay toward 1x.
-//!   Phase C — recovery: 10 more high-ratio payloads.
+//!   Phase C - recovery: 10 more high-ratio payloads.
 //!             EMA should partially recover (not collapse permanently).
 //!
 //! After each phase, asserts EMA is within expected range.
@@ -166,7 +166,7 @@ fn main() {
             build_thresh <= 600,
             &mut failures);
     } else {
-        eprintln!("  EMA not high enough to trigger R-9 branch ({:.2}x < 20x) — skipping guard", ema_check);
+        eprintln!("  EMA not high enough to trigger R-9 branch ({:.2}x < 20x) - skipping guard", ema_check);
     }
 
     // ── summary ───────────────────────────────────────────────────────────

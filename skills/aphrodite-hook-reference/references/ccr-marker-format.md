@@ -2,7 +2,7 @@
 
 ## Marker Format
 
-**Standard ASCII markers** — universal compatibility, no Unicode issues:
+**Standard ASCII markers** - universal compatibility, no Unicode issues:
 
 ```
 <<<CCR:{hash}|{type}|{size}|{mode}>>> {preview}

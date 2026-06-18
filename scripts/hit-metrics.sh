@@ -1,5 +1,5 @@
 #!/bin/bash
-# hit-metrics.sh — generate traffic against both aphrodite proxies
+# hit-metrics.sh - generate traffic against both aphrodite proxies
 # Usage: ./scripts/hit-metrics.sh [count=10] [delay=2]
 
 COUNT="${1:-10}"
