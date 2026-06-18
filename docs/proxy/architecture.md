@@ -1,12 +1,20 @@
 # Proxy Architecture
 
-Origin: Aphrodite is a reverse proxy that sits between Hermes (the LLM agent)
-and the upstream LLM API (DeepSeek/OpenAI-compatible). It intercepts Chat
-Completions responses, compresses tool outputs via CCR, and provides tool relay
-for bidirectional communication.
+Origin: Aphrodite operates in **two modes** - as a reverse proxy between any
+client and an LLM API, and as a native Hermes plugin that intercepts output at
+the hook level before it reaches the LLM context.
+
+- **Proxy mode**: sits between client and upstream LLM, compresses Chat
+  Completions responses via CCR, provides tool relay for bidirectional
+  communication.
+- **Plugin mode**: Hermes hooks (`transform_tool_result`,
+  `transform_terminal_output`, context engine) intercept output directly - no API
+  round-trip needed. Broader coverage: file reads, terminal output, search
+  results, browser snapshots, and more.
 
 Source of truth: `crates/aphrodite/src/main.rs`,
-`crates/aphrodite/src/proxy.rs:build_state()` (line 426)
+`crates/aphrodite/src/proxy.rs:build_state()` (line 426),
+`plugins/aphrodite/_hooks/`
 
 ## Two-Listener Model
 
@@ -18,15 +26,22 @@ Source of truth: `crates/aphrodite/src/main.rs`,
 ## Data Flow
 
 ```
-Hermes Agent → aphrodite proxy (:9797/:9798) → Upstream LLM API
-                                                     ↓
-                                            Chat Completions response
-                                                     ↓
-                                            compress_chat_completion()
-                                                     ↓
-                                       CCR markers replace content
-                                                     ↓
-Hermes Agent ← compressed response ←───────────────┘
+PROXY MODE (any client):
+  Client → Aphrodite (:9797/:9798) → Upstream LLM API
+              ↓
+         compress Chat Completions response
+              ↓
+  Client ← CCR markers replace raw content
+
+PLUGIN MODE (Hermes only):
+  Tool executes → output intercepted by hook
+              ↓
+         classify → template → store
+              ↓
+  Agent ← [type:structured preview] (not raw output)
+              ↓
+         context engine auto-compresses middle turns
+         prefetch loads files in background
 ```
 
 ## AppState Structure

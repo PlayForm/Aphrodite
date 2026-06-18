@@ -1,9 +1,10 @@
 # Aphrodite Documentation
 
-Aphrodite is a reverse proxy with CCR (Compress-Cache-Retrieve) compression for
-LLM Chat Completions APIs. It sits between Hermes (the agent) and upstream LLM
-providers (DeepSeek, OpenAI-compatible), intercepting responses, compressing
-tool outputs, and providing a tool relay for bidirectional communication.
+Aphrodite compresses context before it hits the LLM - through a reverse proxy
+for any OpenAI-compatible client, or as a native Hermes plugin with hook-level
+interception. Covers tool output, terminal output, file reads, search results,
+browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
+28-type classifier, context engine, and prefetch pipeline - all under 1ms.
 
 ## Index
 
