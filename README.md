@@ -43,7 +43,7 @@ actually needs it.
 |    │                            │                          │
 |    │──── tool call ────────────►│                          │
 |    │                            │── forward to API ───────►│
-|    │                            │◄── API response ────────│
+|    │                            │◄── API response ─────────│
 |    │                            │                          │
 |    │                    ┌───────┴───────┐                  │
 |    │                    │ 28-type       │                  │
@@ -54,13 +54,13 @@ actually needs it.
 |    │                    │ CCR store     │                  │
 |    │                    └───────┬───────┘                  │
 |    │                            │                          │
-|    │◄── [build:0E 0W 1L] ─────│  15 tokens, not 500       │
+|    │◄── [build:0E 0W 1L] ───────│  15 tokens, not 500      |
 |    │                            │                          │
-|    │── aphrodite_retrieve() ──►│  only when needed        │
-|    │◄── full content ──────────│                          │
+|    │── aphrodite_retrieve() ───►│  only when needed        │
+|    │◄── full content ───────────│                          │
 |    │                            │                          │
-|    │── aphrodite_prefetch() ──►│  background reads        │
-|    │◄── markers instantly ─────│  files load concurrently │
+|    │── aphrodite_prefetch() ───►│  background reads        │
+|    │◄── markers instantly ──────│  files load concurrently │
 ```
 
 Three steps, all under 1ms:
@@ -89,38 +89,37 @@ restarts.
 ## Hermes Integration 🤝
 
 Aphrodite has **two modes** - a generic OpenAI-compatible proxy, and a native
-Hermes plugin. The native integration gives Hermes deeper compression that
-other agents can't get.
+Hermes plugin. The native integration gives Hermes deeper compression that other
+agents can't get.
 
 ### Native Hermes (Full Pipeline)
 
 When installed as a Hermes plugin, Aphrodite intercepts tool output at the
 **hook level** - before it even reaches the LLM's context:
 
-| Layer | What it does | Hermes-only? |
-|-------|-------------|:-----------:|
-| `on_session_start` | Auto-launches both proxy processes (:9797, :9798) | ✅ |
-| `transform_tool_result` | Intercepts every tool call return - compresses before the model sees it | ✅ |
-| `transform_terminal_output` | Compresses shell command output inline | ✅ |
-| `pre_llm_call` | Injects CCR catalog + retrieval guidance into system prompt | ✅ |
-| `post_llm_call` | Tracks compression metrics, updates proxy stats | ✅ |
-| `context_engine` | Offloads middle conversation turns to CCR when context fills up | ✅ |
-| `aphrodite_*` tools | 12 tools injected directly into Hermes's tool namespace | ✅ |
-| `skills/` | 9 bundled skills auto-loaded for agents | ✅ |
+| Layer                       | What it does                                                            | Hermes-only? |
+| --------------------------- | ----------------------------------------------------------------------- | :----------: |
+| `on_session_start`          | Auto-launches both proxy processes (:9797, :9798)                       |      ✅      |
+| `transform_tool_result`     | Intercepts every tool call return - compresses before the model sees it |      ✅      |
+| `transform_terminal_output` | Compresses shell command output inline                                  |      ✅      |
+| `pre_llm_call`              | Injects CCR catalog + retrieval guidance into system prompt             |      ✅      |
+| `post_llm_call`             | Tracks compression metrics, updates proxy stats                         |      ✅      |
+| `context_engine`            | Offloads middle conversation turns to CCR when context fills up         |      ✅      |
+| `aphrodite_*` tools         | 12 tools injected directly into Hermes's tool namespace                 |      ✅      |
+| `skills/`                   | 9 bundled skills auto-loaded for agents                                 |      ✅      |
 
-**No Hermes core code is modified.** The plugin registers hooks in
-`plugin.yaml` and Hermes wires them automatically. Install, enable, restart -
-that's it.
+**No Hermes core code is modified.** The plugin registers hooks in `plugin.yaml`
+and Hermes wires them automatically. Install, enable, restart - that's it.
 
 ```yaml
 # plugins/aphrodite/plugin.yaml
 provides_hooks:
-  - on_session_start          # proxy launch
-  - transform_tool_result     # compress tool output
-  - pre_llm_call              # catalog injection
-  - transform_terminal_output # terminal compression
-  - post_llm_call             # metrics tracking
-provides_tools:               # 12 aphrodite_* tools
+    - on_session_start # proxy launch
+    - transform_tool_result # compress tool output
+    - pre_llm_call # catalog injection
+    - transform_terminal_output # terminal compression
+    - post_llm_call # metrics tracking
+provides_tools: # 12 aphrodite_* tools
 provides_context_engine: true # long-session compression
 ```
 
@@ -138,18 +137,18 @@ context engine, no terminal compression, no skills.
 
 ### Comparison
 
-| Feature | Native Hermes | Generic Proxy |
-|---------|:------------:|:------------:|
-| CCR compression | ✅ | ✅ |
-| Tool output interception | ✅ (hooks) | ❌ |
-| Terminal output compression | ✅ (hook) | ❌ |
-| Context engine | ✅ | ❌ |
-| Auto-launch proxies | ✅ | ❌ |
-| Agent tools (aphrodite_*) | ✅ (12 tools) | ❌ |
-| Bundled skills | ✅ (9 skills) | ❌ |
-| Prompt injection | ✅ | ❌ |
-| Works with any client | ❌ (Hermes only) | ✅ (OpenAI-compatible) |
-| Setup | `hermes plugins enable` | Set `base_url` |
+| Feature                     |      Native Hermes      |     Generic Proxy      |
+| --------------------------- | :---------------------: | :--------------------: |
+| CCR compression             |           ✅            |           ✅           |
+| Tool output interception    |       ✅ (hooks)        |           ❌           |
+| Terminal output compression |        ✅ (hook)        |           ❌           |
+| Context engine              |           ✅            |           ❌           |
+| Auto-launch proxies         |           ✅            |           ❌           |
+| Agent tools (aphrodite\_\*) |      ✅ (12 tools)      |           ❌           |
+| Bundled skills              |      ✅ (9 skills)      |           ❌           |
+| Prompt injection            |           ✅            |           ❌           |
+| Works with any client       |    ❌ (Hermes only)     | ✅ (OpenAI-compatible) |
+| Setup                       | `hermes plugins enable` |     Set `base_url`     |
 
 ```bash
 # Environment variable - works for any OpenAI SDK client
@@ -166,6 +165,7 @@ client = OpenAI(base_url="http://127.0.0.1:9798/v1", api_key="...")
 ```typescript
 // TypeScript / Node openai SDK
 import OpenAI from "openai";
+
 const client = new OpenAI({ baseURL: "http://127.0.0.1:9798/v1" });
 ```
 
@@ -482,7 +482,7 @@ entire extra conversation turn of reasoning.
 
 | Metric                    |     Value      |
 | :------------------------ | :------------: |
-| Total tokens saved        |  **millions**   |
+| Total tokens saved        |  **millions**  |
 | Requests compressed       |   165 / 412    |
 | Body bytes saved          |    **67%**     |
 | Request bytes             |    60.6 MB     |
@@ -495,9 +495,10 @@ entire extra conversation turn of reasoning.
 ### Real‑world token savings
 
 > **2 MB of tool output compresses to ~960 bytes of CCR markers - a 3,000:1
-> effective ratio. In a typical coding session with 50+ tool calls, that's
-> The proxy has saved millions of tokens cumulatively - At current pricing, that's $250+ in API costs saved.
-> tokens cumulatively - that's $250+ in API costs at current pricing alone.**
+> effective ratio. In a typical coding session with 50+ tool calls, that's The
+> proxy has saved millions of tokens cumulatively - At current pricing, that's
+> $250+ in API costs saved. tokens cumulatively - that's $250+ in API costs at
+> current pricing alone.**
 
 ### Classifier coverage
 
@@ -698,23 +699,24 @@ what we add, what we rewrote, how they ship together.
 
 ## vs Headroom - Why Aphrodite Wins
 
-> **Headroom replaces output with a bare hash. Aphrodite replaces output with a structured preview.**  
+> **Headroom replaces output with a bare hash. Aphrodite replaces output with a
+> structured preview.**  
 > That single design difference produces a **235× gap in net savings**.
 
-| Metric | Headroom | Aphrodite |
-|--------|----------|-----------|
-| Compression approach | Remove-and-retrieve | Preview-and-decide |
-| Agent sees | `<<ccr:HASH>>` (0 info) | `[build:0E 0W 1L]` |
-| Must retrieve? | ✅ Every time | ❌ Optional - preview enough |
-| Net effect | ❌ -19.2% (loses tokens!) | ✅ +79.7% (saves tokens) |
-| Best case | 58% (search_files JSON) | 100% (clean builds = 0 CCR) |
-| Compression rate | ~6% of traffic | 90% (live proxy) |
-| Classification | ML + regex (~100ms) | Pure regex (<0.1ms) |
-| Dependencies | Python + ML (heavy) | Zero (regex only) |
+| Metric               | Headroom                  | Aphrodite                    |
+| -------------------- | ------------------------- | ---------------------------- |
+| Compression approach | Remove-and-retrieve       | Preview-and-decide           |
+| Agent sees           | `<<ccr:HASH>>` (0 info)   | `[build:0E 0W 1L]`           |
+| Must retrieve?       | ✅ Every time             | ❌ Optional - preview enough |
+| Net effect           | ❌ -19.2% (loses tokens!) | ✅ +79.7% (saves tokens)     |
+| Best case            | 58% (search_files JSON)   | 100% (clean builds = 0 CCR)  |
+| Compression rate     | ~6% of traffic            | 90% (live proxy)             |
+| Classification       | ML + regex (~100ms)       | Pure regex (<0.1ms)          |
+| Dependencies         | Python + ML (heavy)       | Zero (regex only)            |
 
-**The Preview IS the Compression.** Headroom forces a retrieval roundtrip
-that burns more tokens than raw output. Aphrodite's 28-type classifier
-produces structured metadata giving the agent enough context to skip.
+**The Preview IS the Compression.** Headroom forces a retrieval roundtrip that
+burns more tokens than raw output. Aphrodite's 28-type classifier produces
+structured metadata giving the agent enough context to skip.
 
 ---
 
