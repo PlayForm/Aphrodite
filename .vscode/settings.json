@@ -45,5 +45,34 @@
     "editor.insertSpaces": false
   },
   "prettier.requireConfig": true,
-  "prettier.ignorePath": ".prettierignore"
+  "prettier.ignorePath": ".prettierignore",
+
+  "files.exclude": {
+    "**/target": true,
+    "**/Target": true,
+    "**/node_modules": true,
+    "**/.fingerprint": true,
+    "**/incremental": true,
+    "**/deps": true,
+    "**/vendor": true
+  },
+  "search.exclude": {
+    "**/target": true,
+    "**/Target": true,
+    "**/node_modules": true,
+    "**/vendor": true,
+    "**/.hermes": true,
+    "**/profiles": true
+  },
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/Target/**": true,
+    "**/node_modules/**": true,
+    "**/.fingerprint/**": true,
+    "**/incremental/**": true,
+    "**/deps/**": true,
+    "**/vendor/**": true,
+    "**/.hermes/**": true,
+    "**/profiles/**": true
+  }
 }
