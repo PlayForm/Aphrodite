@@ -79,6 +79,14 @@ git push Source Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
 git push Source "Aphrodite/v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
 echo "[push] done"
 
+# Sync submodule pointer (ignore=all hides dirty state, must force)
+SUBMODULE_SHA=$(cd plugins/aphrodite && git rev-parse HEAD)
+git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2>/dev/null
+git add vendor/headroom 2>/dev/null || true
+git commit -m "chore: sync submodules — Aphrodite v$NEW" 2>/dev/null || echo "[sync] submodules already current"
+git push Source Current 2>&1 | tail -1 || echo "[push] submodule sync skipped (auth?)"
+echo "[sync] submodules done"
+
 echo ""
 echo "=== v$NEW released ==="
 echo "  $(git log --oneline -3 | paste -sd '|' -)"
