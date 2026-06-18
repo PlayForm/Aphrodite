@@ -662,7 +662,7 @@ check which files are done loading, then retrieve when ready.
 
 ## Under the Hood 🧩
 
-> **`./plugins/aphrodite/` is a separate repo** — it lives at
+> **`./plugins/aphrodite/` is a separate repo** - it lives at
 > [PlayForm/Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes), not
 > inside this monorepo. If you want to install the plugin, clone THAT repo, not
 > this one. This monorepo tracks it as a git submodule.
@@ -728,3 +728,10 @@ structured metadata giving the agent enough context to skip.
 _Ready to save context?_ [Install now](#quick-start) • [Read the docs](docs/) •
 [Report an issue](https://github.com/PlayForm/Aphrodite/issues) •
 [Security policy](SECURITY.md)
+
+---
+
+❤️ **Contributions welcome!** We love PRs, issues, ideas, and feedback.
+[Open a PR](https://github.com/PlayForm/Aphrodite/pulls) •
+[Start a discussion](https://github.com/PlayForm/Aphrodite/discussions) •
+[Report an issue](https://github.com/PlayForm/Aphrodite/issues)
