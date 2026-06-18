@@ -302,3 +302,22 @@ NOTICE
 *.dot
 *.mmd
 *.puml
+
+# ═══════════════════════════════════════════════
+# Test fixtures — intentionally invalid/malformed
+# ═══════════════════════════════════════════════
+
+*fixture*
+*fixtures*
+*test_data*
+*test-fixtures*
+**/fixtures/
+**/fixtures/**
+**/test-fixtures/
+**/test-fixtures/**
+**/test_data/
+**/test_data/**
+*invalid*.yml
+*invalid*.yaml
+*invalid*.json
+*malformed*
