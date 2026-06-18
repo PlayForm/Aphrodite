@@ -5,7 +5,7 @@ description:
     throughput, cache hit rates, cross-worker behavior, terminal threshold
     verification, and all-type coverage. Based on production testing across
     v0.5.124+."
-version: 1.0.0
+version: 1.1.0
 platforms: [macos]
 related_skills:
     [
@@ -38,8 +38,8 @@ structure encodes everything needed to prove compression worked.
 aphrodite_test(mode="full")
 ```
 
-Expected: 11/13 PASS (2 known `NameError` bugs in `aphrodite_files` and
-`aphrodite_search`). All compression, retrieval, and proxy health checks pass.
+Expected: 13/13 PASS (all tests pass as of v0.8.36). `aphrodite_search` and
+`aphrodite_files` are fixed - no `NameError` bugs remain.
 
 ## Compression Type Matrix
 
@@ -151,15 +151,36 @@ threshold (default 450K tokens).
 - `references/benchmark-session-results.md` - Concrete examples from the
   v0.5.124 production benchmark
 
+## All-Modes Comparison (v0.8.36)
+
+Full comparative benchmark: Stock Hermes → Stock + Headroom → Aphrodite.
+
+| Mode | 400K session | Savings | Reliable |
+|---|---|---|---|
+| Stock Hermes | 400,000 tok | baseline | ✓ |
+| Stock + HR cache | 400,000 tok | 0% | ✓ |
+| Stock + HR token | ~480,000 tok | −20% | ✗ |
+| Aphrodite cache | 400,000 tok | 0% | ✓ |
+| Aphrodite token | 80,000 tok | +80% | ✓ |
+| Aphrodite full max | 63,200 tok | +84% | ✓ |
+
+Headroom token mode is net-negative: TTL expiry destroys content, forces re-runs.
+Aphrodite token gives type+size metadata (agent skips ~80%).
+Aphrodite full max gives structured previews (agent skips ~95%).
+Benchmark CCR: `4b47d220c805679cc964f66f264896dbba76f51d`
+
 ## Pitfalls
 
-- **aphrodite_search is broken** (NameError: `_inline_index_enabled`). Do not
-  use search in benchmarks until fixed.
-- **aphrodite_files is broken** (NameError: `_referenced_files`). Do not use
-  files listing until fixed.
+- **aphrodite_search and aphrodite_files are fixed** (v0.8.36). Both pass in
+  the full smoke test suite. `NameError` bugs resolved.
 - **aphrodite_catalog reports 0** when inline store has entries. Use
   `aphrodite_stats` for accurate inline counts.
 - **Don't retrieve to verify** - the CCR marker IS the proof. Retrieval wastes
   tokens and context.
 - **Cross-worker cache** is not shared for inline storage - this is by design.
   Only the token proxy cache is cross-session.
+- **Stock Headroom token mode is broken** - never cite its "99% savings" as
+  real. TTL expiry destroys content, making savings fake. Only Aphrodite has
+  session-lifetime storage with no expiry.
+- **body_bytes is misleading** for compression rate. Use `tokens_saved`,
+  `requests.compressed/requests.total`, and `compression_ratio_ema` instead.
