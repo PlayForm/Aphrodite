@@ -7,6 +7,17 @@ plugins/
 
 # Rust build artifacts
 target/
+Target/
+**/target/
+**/target/**
+**/Target/
+**/Target/**
+**/.fingerprint
+**/.fingerprint/**
+**/incremental
+**/incremental/**
+**/deps
+**/deps/**
 .cargo/
 
 # Shell / env — no built-in Prettier parser
@@ -22,6 +33,14 @@ node_modules/
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+.pnpm-debug.log
+debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.turbo
+**/.turbo
 
 # Python
 __pycache__/
@@ -32,6 +51,7 @@ venv/
 
 # Hermes
 .hermes/
+profiles/
 
 # Git
 .git/
