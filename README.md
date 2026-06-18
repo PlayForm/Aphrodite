@@ -10,8 +10,8 @@
 
 > **Your LLM burns 90% of its context on output it never reads. We fix that.**
 >
-> CCR compression proxy + absorptive preview pipeline for Hermes Agent.  
-> Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.  
+> CCR compression proxy + absorptive preview pipeline for Hermes Agent.
+> Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
 [![release](https://img.shields.io/badge/release-v0.8.15-blue)](https://github.com/PlayForm/Aphrodite/releases)

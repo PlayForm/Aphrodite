@@ -15,21 +15,40 @@ const TOKEN_PORT: u16 = 49798;
 
 // ── proxy lifecycle ────────────────────────────────────────────────
 
-struct Proxy { child: std::process::Child, port: u16, mode: &'static str }
+struct Proxy {
+    child: std::process::Child,
+    port: u16,
+    mode: &'static str,
+}
 impl Drop for Proxy {
-    fn drop(&mut self) { let _ = self.child.kill(); let _ = self.child.wait(); }
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
 }
 
 fn spawn(mode: &'static str, port: u16) -> Proxy {
     let listen = format!("127.0.0.1:{}", port);
     let child = Command::new(BIN)
-        .args(["--mode", mode, "--listen", &listen,
-               "--api-url", "http://127.0.0.1:1", "--api-key", "bench"])
-        .stdout(Stdio::null()).stderr(Stdio::null()).spawn()
+        .args([
+            "--mode",
+            mode,
+            "--listen",
+            &listen,
+            "--api-url",
+            "http://127.0.0.1:1",
+            "--api-key",
+            "bench",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
         .unwrap_or_else(|_| panic!("spawn failed - run `cargo build --release` first"));
     let dl = Instant::now() + Duration::from_secs(5);
     loop {
-        if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() { break; }
+        if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            break;
+        }
         assert!(Instant::now() < dl, "proxy :{} did not start in time", port);
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -42,11 +61,18 @@ fn spawn(mode: &'static str, port: u16) -> Proxy {
 fn ccr_create(port: u16, content: &str) -> Option<serde_json::Value> {
     let body = serde_json::json!({"content": content}).to_string();
     let out = Command::new("curl")
-        .args(["-s", "-X", "POST",
-               &format!("http://127.0.0.1:{}/ccr/create", port),
-               "-H", "Content-Type: application/json",
-               "-d", &body])
-        .output().ok()?;
+        .args([
+            "-s",
+            "-X",
+            "POST",
+            &format!("http://127.0.0.1:{}/ccr/create", port),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+        ])
+        .output()
+        .ok()?;
     serde_json::from_slice(&out.stdout).ok()
 }
 
@@ -54,19 +80,29 @@ fn ccr_create(port: u16, content: &str) -> Option<serde_json::Value> {
 fn ccr_retrieve(port: u16, hash: &str) -> bool {
     let body = serde_json::json!({"hash": hash}).to_string();
     let out = Command::new("curl")
-        .args(["-s", "-X", "POST",
-               &format!("http://127.0.0.1:{}/retrieve", port),
-               "-H", "Content-Type: application/json",
-               "-d", &body])
+        .args([
+            "-s",
+            "-X",
+            "POST",
+            &format!("http://127.0.0.1:{}/retrieve", port),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+        ])
         .output()
         .ok()
         .and_then(|o| serde_json::from_slice::<serde_json::Value>(&o.stdout).ok());
-    out.and_then(|v| v.get("found").and_then(|f| f.as_bool())).unwrap_or(false)
+    out.and_then(|v| v.get("found").and_then(|f| f.as_bool()))
+        .unwrap_or(false)
 }
 
 // ── corpus ─────────────────────────────────────────────────────────
 
-struct Sample { label: &'static str, content: String }
+struct Sample {
+    label: &'static str,
+    content: String,
+}
 
 fn corpus() -> Vec<Sample> {
     vec![
@@ -115,7 +151,8 @@ fn corpus() -> Vec<Sample> {
 
 #[derive(Default)]
 struct Row {
-    orig: usize, marker: usize,
+    orig: usize,
+    marker: usize,
     compressed: bool,
     retrieve_ok: bool,
     retrieve_attempted: bool,
@@ -128,17 +165,32 @@ fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<(&'static str, Row)> {
         let t0 = Instant::now();
         let res = ccr_create(proxy.port, &s.content);
         let latency = t0.elapsed().as_millis();
-        let mut row = Row { orig: s.content.len(), latency_ms: latency, ..Default::default() };
+        let mut row = Row {
+            orig: s.content.len(),
+            latency_ms: latency,
+            ..Default::default()
+        };
         if let Some(v) = res {
-            let ratio = v.get("compression_ratio").and_then(|r| r.as_f64()).unwrap_or(1.0);
-            row.marker = v.get("compressed_size").and_then(|c| c.as_u64()).unwrap_or(row.orig as u64) as usize;
+            let ratio = v
+                .get("compression_ratio")
+                .and_then(|r| r.as_f64())
+                .unwrap_or(1.0);
+            row.marker = v
+                .get("compressed_size")
+                .and_then(|c| c.as_u64())
+                .unwrap_or(row.orig as u64) as usize;
             row.compressed = ratio > 1.05;
             if row.compressed {
                 if let Some(hash) = v.get("hash").and_then(|h| h.as_str()) {
                     row.retrieve_attempted = true;
                     row.retrieve_ok = ccr_retrieve(proxy.port, hash);
                     if !row.retrieve_ok {
-                        eprintln!("  MISS  [{}:{}] hash={}", proxy.mode, s.label, &hash[..8.min(hash.len())]);
+                        eprintln!(
+                            "  MISS  [{}:{}] hash={}",
+                            proxy.mode,
+                            s.label,
+                            &hash[..8.min(hash.len())]
+                        );
                     }
                 }
             }
@@ -147,11 +199,22 @@ fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<(&'static str, Row)> {
         }
         let ratio_str = if row.compressed {
             format!("{:.2}x", row.orig as f64 / row.marker.max(1) as f64)
-        } else { "  -   ".into() };
-        eprintln!("  [{mode}] {label:<20} {orig:>7}B {status:<12} {ratio:<8} {lat}ms",
-            mode=proxy.mode, label=s.label, orig=row.orig,
-            status=if row.compressed { "COMPRESSED" } else { "passthrough" },
-            ratio=ratio_str, lat=latency);
+        } else {
+            "  -   ".into()
+        };
+        eprintln!(
+            "  [{mode}] {label:<20} {orig:>7}B {status:<12} {ratio:<8} {lat}ms",
+            mode = proxy.mode,
+            label = s.label,
+            orig = row.orig,
+            status = if row.compressed {
+                "COMPRESSED"
+            } else {
+                "passthrough"
+            },
+            ratio = ratio_str,
+            lat = latency
+        );
         rows.push((s.label, row));
     }
     rows
@@ -160,33 +223,75 @@ fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<(&'static str, Row)> {
 fn print_report(mode: &str, rows: &[(&'static str, Row)]) {
     eprintln!("\n{}", "─".repeat(80));
     eprintln!("  mode={}  {} samples", mode, rows.len());
-    eprintln!("{:<22} {:>8} {:>8} {:>7} {:>8} {:>8}",
-        "label", "orig_B", "mark_B", "ratio", "retrieve", "lat_ms");
+    eprintln!(
+        "{:<22} {:>8} {:>8} {:>7} {:>8} {:>8}",
+        "label", "orig_B", "mark_B", "ratio", "retrieve", "lat_ms"
+    );
     eprintln!("{}", "─".repeat(80));
     for (label, r) in rows {
-        eprintln!("{:<22} {:>8} {:>8} {:>7} {:>8} {:>8}",
-            label, r.orig,
+        eprintln!(
+            "{:<22} {:>8} {:>8} {:>7} {:>8} {:>8}",
+            label,
+            r.orig,
             if r.compressed { r.marker } else { 0 },
-            if r.compressed { format!("{:.2}x", r.orig as f64 / r.marker.max(1) as f64) } else { "-".into() },
-            if r.retrieve_attempted { if r.retrieve_ok { "OK" } else { "MISS" } } else { "skip" },
-            r.latency_ms);
+            if r.compressed {
+                format!("{:.2}x", r.orig as f64 / r.marker.max(1) as f64)
+            } else {
+                "-".into()
+            },
+            if r.retrieve_attempted {
+                if r.retrieve_ok {
+                    "OK"
+                } else {
+                    "MISS"
+                }
+            } else {
+                "skip"
+            },
+            r.latency_ms
+        );
     }
-    let misses: usize = rows.iter().filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok).count();
-    let hits:   usize = rows.iter().filter(|(_, r)| r.retrieve_ok).count();
-    let compr:  usize = rows.iter().filter(|(_, r)| r.compressed).count();
-    let total_orig: usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.orig).sum();
-    let total_mark: usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.marker).sum();
+    let misses: usize = rows
+        .iter()
+        .filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok)
+        .count();
+    let hits: usize = rows.iter().filter(|(_, r)| r.retrieve_ok).count();
+    let compr: usize = rows.iter().filter(|(_, r)| r.compressed).count();
+    let total_orig: usize = rows
+        .iter()
+        .filter(|(_, r)| r.compressed)
+        .map(|(_, r)| r.orig)
+        .sum();
+    let total_mark: usize = rows
+        .iter()
+        .filter(|(_, r)| r.compressed)
+        .map(|(_, r)| r.marker)
+        .sum();
     eprintln!("{}", "─".repeat(80));
-    eprintln!("  compressed={} passthrough={}  retrieve hits={} misses={}", compr, rows.len()-compr, hits, misses);
+    eprintln!(
+        "  compressed={} passthrough={}  retrieve hits={} misses={}",
+        compr,
+        rows.len() - compr,
+        hits,
+        misses
+    );
     if total_mark > 0 {
-        eprintln!("  overall ratio: {:.2}x  ({} B -> {} B)", total_orig as f64/total_mark as f64, total_orig, total_mark);
+        eprintln!(
+            "  overall ratio: {:.2}x  ({} B -> {} B)",
+            total_orig as f64 / total_mark as f64,
+            total_orig,
+            total_mark
+        );
     }
 }
 
 fn main() {
     let samples = corpus();
-    eprintln!("[bench_01] corpus: {} samples, {} total bytes",
-        samples.len(), samples.iter().map(|s| s.content.len()).sum::<usize>());
+    eprintln!(
+        "[bench_01] corpus: {} samples, {} total bytes",
+        samples.len(),
+        samples.iter().map(|s| s.content.len()).sum::<usize>()
+    );
 
     let cache = spawn("cache", CACHE_PORT);
     let token = spawn("token", TOKEN_PORT);
@@ -199,8 +304,11 @@ fn main() {
     print_report("cache", &cache_rows);
     print_report("token", &token_rows);
 
-    let misses: usize = cache_rows.iter().chain(token_rows.iter())
-        .filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok).count();
+    let misses: usize = cache_rows
+        .iter()
+        .chain(token_rows.iter())
+        .filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok)
+        .count();
     if misses > 0 {
         eprintln!("\n[bench_01] FAILED - {} retrieve miss(es)", misses);
         std::process::exit(1);

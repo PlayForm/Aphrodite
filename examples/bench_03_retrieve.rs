@@ -22,19 +22,38 @@ const BIN: &str = env!("CARGO_BIN_EXE_aphrodite");
 const CACHE_PORT: u16 = 69797;
 const TOKEN_PORT: u16 = 69798;
 
-struct Proxy { child: std::process::Child, port: u16 }
+struct Proxy {
+    child: std::process::Child,
+    port: u16,
+}
 impl Drop for Proxy {
-    fn drop(&mut self) { let _ = self.child.kill(); let _ = self.child.wait(); }
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
 }
 fn spawn(mode: &str, port: u16) -> Proxy {
     let listen = format!("127.0.0.1:{}", port);
     let child = Command::new(BIN)
-        .args(["--mode", mode, "--listen", &listen,
-               "--api-url", "http://127.0.0.1:1", "--api-key", "bench"])
-        .stdout(Stdio::null()).stderr(Stdio::null()).spawn().expect("spawn");
+        .args([
+            "--mode",
+            mode,
+            "--listen",
+            &listen,
+            "--api-url",
+            "http://127.0.0.1:1",
+            "--api-key",
+            "bench",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn");
     let dl = Instant::now() + Duration::from_secs(5);
     loop {
-        if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() { break; }
+        if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            break;
+        }
         assert!(Instant::now() < dl);
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -44,22 +63,40 @@ fn spawn(mode: &str, port: u16) -> Proxy {
 fn store(port: u16, content: &str) -> Option<String> {
     let body = serde_json::json!({"content": content}).to_string();
     let out = Command::new("curl")
-        .args(["-s", "-X", "POST",
-               &format!("http://127.0.0.1:{}/ccr/create", port),
-               "-H", "Content-Type: application/json", "-d", &body])
-        .output().ok()?;
+        .args([
+            "-s",
+            "-X",
+            "POST",
+            &format!("http://127.0.0.1:{}/ccr/create", port),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+        ])
+        .output()
+        .ok()?;
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
-    v.get("hash").and_then(|h| h.as_str()).map(|s| s.to_string())
+    v.get("hash")
+        .and_then(|h| h.as_str())
+        .map(|s| s.to_string())
 }
 
 /// POST /retrieve  {"hash": "..."}  → {"found": bool, "content": ...}
 fn retrieve_raw(port: u16, hash: &str) -> Option<serde_json::Value> {
     let body = serde_json::json!({"hash": hash}).to_string();
     let out = Command::new("curl")
-        .args(["-s", "-X", "POST",
-               &format!("http://127.0.0.1:{}/retrieve", port),
-               "-H", "Content-Type: application/json", "-d", &body])
-        .output().ok()?;
+        .args([
+            "-s",
+            "-X",
+            "POST",
+            &format!("http://127.0.0.1:{}/retrieve", port),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+        ])
+        .output()
+        .ok()?;
     serde_json::from_slice(&out.stdout).ok()
 }
 
@@ -72,17 +109,29 @@ fn found(port: u16, hash: &str) -> bool {
 /// DELETE /ccr/{hash}
 fn delete(port: u16, hash: &str) -> bool {
     let out = Command::new("curl")
-        .args(["-s", "-X", "DELETE",
-               &format!("http://127.0.0.1:{}/ccr/{}", port, hash)])
-        .output().ok();
+        .args([
+            "-s",
+            "-X",
+            "DELETE",
+            &format!("http://127.0.0.1:{}/ccr/{}", port, hash),
+        ])
+        .output()
+        .ok();
     out.and_then(|o| serde_json::from_slice::<serde_json::Value>(&o.stdout).ok())
         .and_then(|v| v.get("deleted").and_then(|d| d.as_bool()))
         .unwrap_or(false)
 }
 
 fn check(id: u8, label: &str, pass: bool, failures: &mut usize) {
-    eprintln!("  {:02}  {:<52} {}", id, label, if pass { "PASS" } else { "FAIL ←" });
-    if !pass { *failures += 1; }
+    eprintln!(
+        "  {:02}  {:<52} {}",
+        id,
+        label,
+        if pass { "PASS" } else { "FAIL ←" }
+    );
+    if !pass {
+        *failures += 1;
+    }
 }
 
 fn main() {
@@ -94,58 +143,127 @@ fn main() {
     let large = "x".repeat(12_000);
     let hc = store(CACHE_PORT, &large).expect("cache store large");
     let ht = store(TOKEN_PORT, &large).expect("token store large");
-    check(1, "cache: store + retrieve large (12 KB)",  found(CACHE_PORT, &hc), &mut failures);
-    check(2, "token: store + retrieve large (12 KB)",  found(TOKEN_PORT, &ht), &mut failures);
+    check(
+        1,
+        "cache: store + retrieve large (12 KB)",
+        found(CACHE_PORT, &hc),
+        &mut failures,
+    );
+    check(
+        2,
+        "token: store + retrieve large (12 KB)",
+        found(TOKEN_PORT, &ht),
+        &mut failures,
+    );
 
     // ── 03 / 04  cross-port isolation ─────────────────────────────────────
-    check(3, "token hash on cache port = miss",  !found(CACHE_PORT, &ht), &mut failures);
-    check(4, "cache hash on token port = miss",  !found(TOKEN_PORT, &hc), &mut failures);
+    check(
+        3,
+        "token hash on cache port = miss",
+        !found(CACHE_PORT, &ht),
+        &mut failures,
+    );
+    check(
+        4,
+        "cache hash on token port = miss",
+        !found(TOKEN_PORT, &hc),
+        &mut failures,
+    );
 
     // ── 05  inline_ccr zone (257 B) retrievable ───────────────────────────
     // inline_ccr stores entries between INLINE_CCR_THRESHOLD (256 B) and
     // TOKEN_COMPRESS_THRESHOLD (1 KB).  /retrieve must check inline_ccr first.
-    let inline_content = "hello inline store ".repeat(14);  // 266 B
+    let inline_content = "hello inline store ".repeat(14); // 266 B
     let hi = store(TOKEN_PORT, &inline_content).expect("inline store");
-    check(5, "inline_ccr (266 B) retrievable via POST /retrieve",
-          found(TOKEN_PORT, &hi), &mut failures);
+    check(
+        5,
+        "inline_ccr (266 B) retrievable via POST /retrieve",
+        found(TOKEN_PORT, &hi),
+        &mut failures,
+    );
 
     // ── 06 / 07  UTF-8 round-trip ─────────────────────────────────────────
-    let utf8 = "日本語テスト привет мир 🦀🔥 ".repeat(80);  // ~2.8 KB
+    let utf8 = "日本語テスト привет мир 🦀🔥 ".repeat(80); // ~2.8 KB
     let hu = store(TOKEN_PORT, &utf8).expect("utf8 store");
     let raw = retrieve_raw(TOKEN_PORT, &hu);
-    let content_ok = raw.as_ref()
+    let content_ok = raw
+        .as_ref()
         .and_then(|v| v.get("content").and_then(|c| c.as_str()))
         .map(|c| c == utf8)
         .unwrap_or(false);
-    check(6, "utf-8 content: found=true",                      raw.and_then(|v| v.get("found").and_then(|f| f.as_bool())).unwrap_or(false), &mut failures);
-    check(7, "utf-8 content: byte-exact round-trip",           content_ok, &mut failures);
+    check(
+        6,
+        "utf-8 content: found=true",
+        raw.and_then(|v| v.get("found").and_then(|f| f.as_bool()))
+            .unwrap_or(false),
+        &mut failures,
+    );
+    check(
+        7,
+        "utf-8 content: byte-exact round-trip",
+        content_ok,
+        &mut failures,
+    );
 
     // ── 08  bulk storm: 50 entries ────────────────────────────────────────
     let hashes: Vec<String> = (0u32..50)
-        .filter_map(|i| store(TOKEN_PORT, &format!("bulk {:04} {}", i, "payload ".repeat(200))))
+        .filter_map(|i| {
+            store(
+                TOKEN_PORT,
+                &format!("bulk {:04} {}", i, "payload ".repeat(200)),
+            )
+        })
         .collect();
     let hits = hashes.iter().filter(|h| found(TOKEN_PORT, h)).count();
-    check(8, &format!("bulk storm: {}/50 retrieved (0 misses)", hits),
-          hits == hashes.len() && hashes.len() == 50, &mut failures);
+    check(
+        8,
+        &format!("bulk storm: {}/50 retrieved (0 misses)", hits),
+        hits == hashes.len() && hashes.len() == 50,
+        &mut failures,
+    );
 
     // ── 09  DELETE then miss ───────────────────────────────────────────────
-    let del_content = "to be deleted ".repeat(100);  // ~1.4 KB
+    let del_content = "to be deleted ".repeat(100); // ~1.4 KB
     let hd = store(TOKEN_PORT, &del_content).expect("store for delete");
     let deleted = delete(TOKEN_PORT, &hd);
-    let after   = found(TOKEN_PORT, &hd);
-    check(9, "DELETE /ccr/{hash}: deleted=true",             deleted, &mut failures);
-    check(9, "DELETE /ccr/{hash}: subsequent retrieve=miss", !after,  &mut failures);
+    let after = found(TOKEN_PORT, &hd);
+    check(
+        9,
+        "DELETE /ccr/{hash}: deleted=true",
+        deleted,
+        &mut failures,
+    );
+    check(
+        9,
+        "DELETE /ccr/{hash}: subsequent retrieve=miss",
+        !after,
+        &mut failures,
+    );
 
     // ── 10  double-store idempotency ──────────────────────────────────────
-    let dup = "duplicate content ".repeat(120);  // ~2.1 KB
+    let dup = "duplicate content ".repeat(120); // ~2.1 KB
     let h1 = store(TOKEN_PORT, &dup).expect("dup store 1");
     let h2 = store(TOKEN_PORT, &dup).expect("dup store 2");
-    check(10, "double-store: same hash returned",       h1 == h2,             &mut failures);
-    check(10, "double-store: still retrievable",        found(TOKEN_PORT, &h1), &mut failures);
+    check(
+        10,
+        "double-store: same hash returned",
+        h1 == h2,
+        &mut failures,
+    );
+    check(
+        10,
+        "double-store: still retrievable",
+        found(TOKEN_PORT, &h1),
+        &mut failures,
+    );
 
     // ── summary ───────────────────────────────────────────────────────────
-    let total = 12usize;  // total check() calls above
+    let total = 12usize; // total check() calls above
     eprintln!("\n[bench_03] {}/{} checks passed", total - failures, total);
-    if failures > 0 { eprintln!("[bench_03] FAILED"); std::process::exit(1); }
-    else { eprintln!("[bench_03] OK"); }
+    if failures > 0 {
+        eprintln!("[bench_03] FAILED");
+        std::process::exit(1);
+    } else {
+        eprintln!("[bench_03] OK");
+    }
 }
