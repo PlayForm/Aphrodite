@@ -1,82 +1,59 @@
 """
-Dynamic hook adapter — STABLE bridge between Hermes plugin system and Rust dylib.
+Dynamic hook adapter — STABLE runtime bootstrap.
 
-This file NEVER changes when you add hooks or logic.
-All real work lives in the Rust .dylib — rebuild + swap, no Python reload needed.
+This file initialises the Effect runtime with built-in services
+(dylib loading, hook dispatch) and registers Hermes hook pipelines.
 
-Contract:
-  - Dylib exports: aphrodite_hooks(), aphrodite_call_hook(name, json), aphrodite_version(), aphrodite_free_string(s)
-  - Adapter discovers hooks dynamically → registers with Hermes → forwards calls
-  - Mtime-based reload: dylib rebuilds are picked up mid-session without /new
+This file NEVER changes when hooks or logic are added.
+  - New hooks → added to dylib → discovered via aphrodite_hooks()
+  - New effects → registered by extensions via runtime.prepend()/append()
+  - New pipeline steps → extensions compose via Effect.map/flat_map
 """
 
 import ctypes
 import json
-import os
 import sys
 from pathlib import Path
+
+from effects import Effect, runtime
 
 
 # ── Paths ────────────────────────────────────────────────────────────────
 _HERE = Path(__file__).resolve().parent
-
-if sys.platform == "darwin":
-    _DYLIB_NAME = "libaphrodite_dynamic.dylib"
-else:
-    _DYLIB_NAME = "libaphrodite_dynamic.so"
-
+_DYLIB_NAME = "libaphrodite_dynamic.dylib" if sys.platform == "darwin" else "libaphrodite_dynamic.so"
 _DYLIB = (_HERE.parent / "rust" / "target" / "release" / _DYLIB_NAME).resolve()
 
 
-# ── State ─────────────────────────────────────────────────────────────────
-_lib: ctypes.CDLL | None = None
-_lib_mtime: float = 0.0
-_lib_hooks: list[str] = []
+# ── Built-in services ────────────────────────────────────────────────────
 
-
-# ── Reload-aware library access ───────────────────────────────────────────
-def _get_lib() -> ctypes.CDLL:
-    """Return the dylib handle, re-loading if the file was rebuilt."""
-    global _lib, _lib_mtime, _lib_hooks
-
-    try:
-        mtime = os.stat(_DYLIB).st_mtime
-    except FileNotFoundError:
+def _load_dylib() -> ctypes.CDLL:
+    """Load the Rust dylib with C ABI signatures."""
+    if not _DYLIB.is_file():
         raise FileNotFoundError(
             f"Dynamic library not found at {_DYLIB}\n"
             f"  Build it: cd tests/dynamic_hooks/rust && cargo build --release"
         )
 
-    if _lib is not None and mtime == _lib_mtime:
-        return _lib
+    lib = ctypes.CDLL(str(_DYLIB))
 
-    # ── (Re)load ──────────────────────────────────────────────────────
-    _lib = ctypes.CDLL(str(_DYLIB))
+    # ── C ABI signatures (stable — NEVER changes) ──────────────────────
+    lib.aphrodite_hooks.argtypes = []
+    lib.aphrodite_hooks.restype = ctypes.c_void_p
 
-    # Signatures — these NEVER change (the dylib adds hooks internally)
-    _lib.aphrodite_hooks.argtypes = []
-    _lib.aphrodite_hooks.restype = ctypes.c_void_p
+    lib.aphrodite_call_hook.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    lib.aphrodite_call_hook.restype = ctypes.c_void_p
 
-    _lib.aphrodite_call_hook.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-    _lib.aphrodite_call_hook.restype = ctypes.c_void_p
+    lib.aphrodite_version.argtypes = []
+    lib.aphrodite_version.restype = ctypes.c_void_p
 
-    _lib.aphrodite_version.argtypes = []
-    _lib.aphrodite_version.restype = ctypes.c_void_p
+    lib.aphrodite_free_string.argtypes = [ctypes.c_void_p]
+    lib.aphrodite_free_string.restype = None
 
-    _lib.aphrodite_free_string.argtypes = [ctypes.c_void_p]
-    _lib.aphrodite_free_string.restype = None
-
-    _lib_mtime = mtime
-
-    # Discover hooks dynamically
-    _lib_hooks = json.loads(_call("aphrodite_hooks"))
-
-    return _lib
+    return lib
 
 
-def _call(fn_name: str, *args: str) -> str:
-    """Call a dylib function that returns a string, free it, return Python str."""
-    lib = _get_lib()
+def _dylib_call(lib: ctypes.CDLL, fn_name: str, *args: str) -> str:
+    """Call a dylib string-returning function, free C string, return Python str."""
     raw_fn = getattr(lib, fn_name)
     c_args = [a.encode("utf-8") for a in args]
     raw = raw_fn(*c_args)
@@ -85,61 +62,101 @@ def _call(fn_name: str, *args: str) -> str:
     return result
 
 
-# ── Hermes plugin registration ────────────────────────────────────────────
+# ── Bootstrap ─────────────────────────────────────────────────────────────
+
+_BOOTSTRAPPED = False
+
+
+def bootstrap():
+    """Initialise the runtime. Idempotent — safe to call multiple times."""
+    global _BOOTSTRAPPED
+    if _BOOTSTRAPPED:
+        return
+    _BOOTSTRAPPED = True
+
+    try:
+        lib = _load_dylib()
+    except FileNotFoundError as e:
+        import logging
+        logging.getLogger("aphrodite").warning("dylib bootstrap failed: %s", e)
+        return
+
+    version = _dylib_call(lib, "aphrodite_version")
+    hooks = json.loads(_dylib_call(lib, "aphrodite_hooks"))
+
+    # ── Provide built-in services (available to all effects) ───────────
+    runtime.provide("dylib", lib)
+    runtime.provide("dylib_version", version)
+    runtime.provide("dylib_hooks", hooks)
+
+    # ── Register default pipeline: one dylib-call effect per hook ──────
+    # Only register if no pipeline exists yet (extensions may have pre-registered)
+    for hook_name in hooks:
+        if hook_name in runtime.list_pipelines():
+            continue
+
+        def make_pipeline_fn(name: str):
+            def pipeline_fn(args: dict) -> Effect:
+                def _call() -> dict:
+                    dylib = runtime.service("dylib")
+                    result_json = _dylib_call(dylib, "aphrodite_call_hook", name, json.dumps(args))
+                    return json.loads(result_json)
+                return Effect.try_(_call)
+            return pipeline_fn
+
+        runtime.pipeline(hook_name, [make_pipeline_fn(hook_name)])
+
+    import logging
+    logging.getLogger("aphrodite").info(
+        "aphrodite runtime bootstrapped — v%s hooks=%s", version, hooks,
+    )
+
+
+# ── Hermes plugin interface ──────────────────────────────────────────────
+
 def register(ctx):
     """
     Called by Hermes at session start.
-    Discovers hooks from the dylib and registers them dynamically.
-    THIS FUNCTION NEVER CHANGES — new hooks are added in Rust, not here.
-    """
-    try:
-        lib = _get_lib()
-    except FileNotFoundError as e:
-        import logging
-        logging.getLogger("aphrodite").warning("dylib not available: %s", e)
-        return
+    Bootstraps the runtime and registers hooks dynamically.
 
-    for hook_name in _lib_hooks:
-        # Create a closure that captures hook_name and forwards to the dylib
+    THIS FUNCTION NEVER CHANGES.
+    """
+    bootstrap()
+
+    hooks = runtime.service("dylib_hooks") if _has_service("dylib_hooks") else []
+
+    for hook_name in hooks:
         def make_handler(name: str):
             def handler(**kwargs):
-                try:
-                    # Re-load dylib on every call (mtime check is cheap — 1µs)
-                    _get_lib()
-                    args_json = json.dumps(kwargs)
-                    result_json = _call("aphrodite_call_hook", name, args_json)
-                    result = json.loads(result_json)
-                except Exception as exc:
-                    return None
-                return result
+                exit_result = runtime.run_exit(name, kwargs)
+                if exit_result["_tag"] == "Success":
+                    return exit_result["value"]
+                return None
             return handler
 
         ctx.hook(hook_name)(make_handler(hook_name))
 
-    # Also fire session_start immediately for the current session
-    from hermes_cli.plugins import invoke_hook as _invoke
+
+def _has_service(name: str) -> bool:
     try:
-        _invoke("on_session_start", session_id=ctx.session_id if hasattr(ctx, 'session_id') else "")
-    except Exception:
-        pass
-
-
-def version() -> str:
-    """Return dylib version string."""
-    return _call("aphrodite_version")
+        runtime.service(name)
+        return True
+    except KeyError:
+        return False
 
 
 # ── Quick smoke test ──────────────────────────────────────────────────────
 if __name__ == "__main__":
-    lib = _get_lib()
-    print(f"  version: {version()}")
-    print(f"  hooks:   {_lib_hooks}")
+    bootstrap()
+    print(f"  version: {runtime.service('dylib_version')}")
+    print(f"  hooks:   {runtime.service('dylib_hooks')}")
+    print(f"  pipelines: {runtime.list_pipelines()}")
 
-    r = _call("aphrodite_call_hook", "session_start", '{"session_id":"test"}')
+    r = runtime.run_exit("session_start", {"session_id": "test"})
     print(f"  session_start: {r}")
 
-    r = _call("aphrodite_call_hook", "transform_tool_result",
-              '{"content":"error: broke\\nline2","tool_name":"test"}')
+    r = runtime.run_exit("transform_tool_result",
+                         {"content": "error: broke\nline2", "tool_name": "test"})
     print(f"  transform:     {r}")
 
-    print("\n✓ adapter ready — add hooks in Rust, never touch this file")
+    print("\n✓ Effect runtime ready — extensions load via runtime.prepend()/append()")
