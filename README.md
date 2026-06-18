@@ -662,6 +662,11 @@ check which files are done loading, then retrieve when ready.
 
 ## Under the Hood 🧩
 
+> **`./plugins/aphrodite/` is a separate repo** — it lives at
+> [PlayForm/Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes),
+> not inside this monorepo. If you want to install the plugin, clone THAT
+> repo, not this one. This monorepo tracks it as a git submodule.
+
 ```
 plugins/aphrodite/
   __init__.py          - entry point, version, proxy auto‑launch
