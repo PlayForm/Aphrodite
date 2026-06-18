@@ -93,9 +93,9 @@ Registered at `main.rs:333`.
 
 ```json
 {
-    "tool": "aphrodite_retrieve",
-    "params": { "hash": "abc123..." },
-    "callback_url": "https://..." // optional
+	"tool": "aphrodite_retrieve",
+	"params": { "hash": "abc123..." },
+	"callback_url": "https://..." // optional
 }
 ```
 
@@ -149,10 +149,10 @@ Registered at `main.rs:334`.
 
 ```json
 {
-    "content": "string content to store",
-    "key": "optional_custom_hash",
-    "ttl_seconds": 3600,
-    "tags": ["tag1", "tag2"]
+	"content": "string content to store",
+	"key": "optional_custom_hash",
+	"ttl_seconds": 3600,
+	"tags": ["tag1", "tag2"]
 }
 ```
 
@@ -164,11 +164,11 @@ Raw bytes treated as content. Hash computed via `compute_key()` (BLAKE3).
 
 ```json
 {
-    "hash": "abc123...",
-    "token_savings_ratio": 2.5,
-    "original_size": 100,
-    "compressed_size": 40,
-    "marker_size": 40
+	"hash": "abc123...",
+	"token_savings_ratio": 2.5,
+	"original_size": 100,
+	"compressed_size": 40,
+	"marker_size": 40
 }
 ```
 
@@ -178,11 +178,11 @@ If `notify_url` configured: fires async POST with `CcrNotification`:
 
 ```json
 {
-    "event": "ccr_created",
-    "hash": "...",
-    "created_at": 1234567890,
-    "ttl": 3600,
-    "tags": ["tag1"]
+	"event": "ccr_created",
+	"hash": "...",
+	"created_at": 1234567890,
+	"ttl": 3600,
+	"tags": ["tag1"]
 }
 ```
 
@@ -202,9 +202,9 @@ GET /ccr/list
 
 ```json
 {
-    "entries": 42,
-    "backend": "sqlite",
-    "mode": "token"
+	"entries": 42,
+	"backend": "sqlite",
+	"mode": "token"
 }
 ```
 
@@ -252,11 +252,11 @@ Registered at `main.rs:357`. Public (no loopback enforcement).
 
 ```json
 {
-    "status": "healthy",
-    "ccr": true,
-    "mode": "token",
-    "version": "0.5.69",
-    "fill_pct": 90.0
+	"status": "healthy",
+	"ccr": true,
+	"mode": "token",
+	"version": "0.5.69",
+	"fill_pct": 90.0
 }
 ```
 
@@ -276,10 +276,10 @@ Registered at `main.rs:332`.
 
 ```json
 {
-    "hash": "abc123...",
-    "query": "optional filter string",
-    "offset": 0,
-    "limit": 0
+	"hash": "abc123...",
+	"query": "optional filter string",
+	"offset": 0,
+	"limit": 0
 }
 ```
 
@@ -287,10 +287,10 @@ Registered at `main.rs:332`.
 
 ```json
 {
-    "found": true,
-    "content": "original content...",
-    "source": "ccr",
-    "error": null
+	"found": true,
+	"content": "original content...",
+	"source": "ccr",
+	"error": null
 }
 ```
 

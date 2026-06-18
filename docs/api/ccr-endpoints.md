@@ -22,10 +22,10 @@ Loopback only.
 
 ```json
 {
-    "content": "string content to store",
-    "key": "optional_custom_hash",
-    "ttl_seconds": 3600,
-    "tags": ["tag1", "tag2"]
+	"content": "string content to store",
+	"key": "optional_custom_hash",
+	"ttl_seconds": 3600,
+	"tags": ["tag1", "tag2"]
 }
 ```
 
@@ -33,11 +33,11 @@ Loopback only.
 
 ```json
 {
-    "hash": "abc123def456...",
-    "token_savings_ratio": 2.5,
-    "original_size": 100,
-    "compressed_size": 40,
-    "marker_size": 40
+	"hash": "abc123def456...",
+	"token_savings_ratio": 2.5,
+	"original_size": 100,
+	"compressed_size": 40,
+	"marker_size": 40
 }
 ```
 
@@ -55,11 +55,11 @@ If `notify_url` configured: async POST with:
 
 ```json
 {
-    "event": "ccr_created",
-    "hash": "...",
-    "created_at": 1234567890,
-    "ttl": 3600,
-    "tags": ["tag1"]
+	"event": "ccr_created",
+	"hash": "...",
+	"created_at": 1234567890,
+	"ttl": 3600,
+	"tags": ["tag1"]
 }
 ```
 
@@ -115,9 +115,9 @@ Loopback only.
 
 ```json
 {
-    "entries": 42,
-    "backend": "sqlite",
-    "mode": "token"
+	"entries": 42,
+	"backend": "sqlite",
+	"mode": "token"
 }
 ```
 
@@ -125,8 +125,8 @@ Loopback only.
 
 ```json
 {
-    "entries": 0,
-    "message": "CCR not enabled"
+	"entries": 0,
+	"message": "CCR not enabled"
 }
 ```
 
@@ -150,8 +150,8 @@ Loopback only.
 
 ```json
 {
-    "deleted": true,
-    "hash": "abc123..."
+	"deleted": true,
+	"hash": "abc123..."
 }
 ```
 
@@ -159,9 +159,9 @@ Loopback only.
 
 ```json
 {
-    "deleted": false,
-    "hash": "abc123...",
-    "error": "not found"
+	"deleted": false,
+	"hash": "abc123...",
+	"error": "not found"
 }
 ```
 
@@ -169,7 +169,7 @@ Loopback only.
 
 ```json
 {
-    "error": "CCR not enabled"
+	"error": "CCR not enabled"
 }
 ```
 
