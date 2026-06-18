@@ -9,6 +9,7 @@ Adds two new providers:
 Usage:
     python3 scripts/setup-headroom-providers.py
 """
+
 import os
 
 import yaml

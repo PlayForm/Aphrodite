@@ -9,19 +9,22 @@ Fix:  Use the same glyph pair everywhere.
 Run:  python examples/06_marker_glyph.py
 Pass: prints OK
 """
+
 import re
 
 # ---------- the two glyph pairs ----------
 
-GLYPH_WRONG_OPEN  = "\u2B77"   # ⭷  - used in description (BUG)
-GLYPH_WRONG_CLOSE = "\u2B78"   # ⭸
-GLYPH_RIGHT_OPEN  = "\u2AB7"   # ⫷  - used everywhere else
-GLYPH_RIGHT_CLOSE = "\u2AB8"   # ⫸
+GLYPH_WRONG_OPEN = "\u2b77"  # ⭷  - used in description (BUG)
+GLYPH_WRONG_CLOSE = "\u2b78"  # ⭸
+GLYPH_RIGHT_OPEN = "\u2ab7"  # ⫷  - used everywhere else
+GLYPH_RIGHT_CLOSE = "\u2ab8"  # ⫸
 
 # ---------- replica of smart_marker ----------
 
+
 def smart_marker(hash_val: str, kind: str = "tool", size: int = 0) -> str:
     return f"{GLYPH_RIGHT_OPEN}CCR:{hash_val}|{kind}|{size}{GLYPH_RIGHT_CLOSE}"
+
 
 # ---------- buggy description ----------
 
@@ -42,6 +45,7 @@ DESCRIPTION_FIXED = (
 
 sample_marker = smart_marker("abc123", "tool", 1024)
 
+
 def glyph_in_description(desc: str, marker: str) -> bool:
     """Extract the open glyph from the description and check it's in the marker."""
     # find the first non-ASCII character in the description
@@ -50,10 +54,13 @@ def glyph_in_description(desc: str, marker: str) -> bool:
             return ch in marker
     return False
 
-assert not glyph_in_description(DESCRIPTION_BUGGY, sample_marker), \
+
+assert not glyph_in_description(DESCRIPTION_BUGGY, sample_marker), (
     "Wrong glyph should NOT appear in a real marker"
-assert glyph_in_description(DESCRIPTION_FIXED, sample_marker), \
+)
+assert glyph_in_description(DESCRIPTION_FIXED, sample_marker), (
     "Correct glyph MUST appear in a real marker"
+)
 
 print("06 OK - Unicode glyph mismatch caught")
 print(f"  wrong glyphs : {GLYPH_WRONG_OPEN!r} {GLYPH_WRONG_CLOSE!r}  (U+2B77/78)")

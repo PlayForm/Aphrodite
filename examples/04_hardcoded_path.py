@@ -8,22 +8,27 @@ Fix:  Derive the repo root from __file__ so it always points to the
 Run:  python examples/04_hardcoded_path.py
 Pass: prints OK + the computed path
 """
+
 import os
 
 # ---------- buggy version ----------
+
 
 def _rebuild_handler_buggy() -> str:
     repo = "/Users/username/Projects/Aphrodite"
     return repo
 
+
 # ---------- fixed version ----------
 # __file__ = .../aphrodite/examples/04_hardcoded_path.py
 # two dirname() calls  → .../aphrodite  (workspace root)
 
+
 def _rebuild_handler_fixed() -> str:
-    here = os.path.abspath(__file__)                   # this file
-    repo = os.path.dirname(os.path.dirname(here))      # workspace root
+    here = os.path.abspath(__file__)  # this file
+    repo = os.path.dirname(os.path.dirname(here))  # workspace root
     return repo
+
 
 # ---------- assertions ----------
 

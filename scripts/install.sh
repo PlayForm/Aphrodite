@@ -11,12 +11,12 @@ BIN="$INSTALL_DIR/aphrodite"
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 case "$ARCH" in
-	arm64 | aarch64) ARCH="arm64" ;;
-	x86_64 | amd64) ARCH="x64" ;;
-	*)
-		echo "Unsupported architecture: $ARCH"
-		exit 1
-		;;
+arm64 | aarch64) ARCH="arm64" ;;
+x86_64 | amd64) ARCH="x64" ;;
+*)
+	echo "Unsupported architecture: $ARCH"
+	exit 1
+	;;
 esac
 
 echo "Installing aphrodite $VERSION for $OS-$ARCH..."
@@ -35,7 +35,7 @@ chmod +x "$BIN"
 
 # Create default config
 if [ ! -f "$INSTALL_DIR/aphrodite.toml" ]; then
-	cat > "$INSTALL_DIR/aphrodite.toml" << 'EOF'
+	cat >"$INSTALL_DIR/aphrodite.toml" <<'EOF'
 [defaults]
 api_url = "https://api.example.com"
 model = "gpt-4o"

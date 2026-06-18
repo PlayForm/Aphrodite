@@ -13,35 +13,42 @@ complete round-trip without a live proxy or API key:
 Run:  python examples/16_integration_smoke.py
 Pass: prints OK
 """
+
 import hashlib
 import re
 import json
 
 # ── constants ───────────────────────────────────────────────────────────────
 
-GLYPH_OPEN  = "\u2AB7"   # ⫷
-GLYPH_CLOSE = "\u2AB8"   # ⫸
-MARKER_RE   = re.compile(rf"{GLYPH_OPEN}CCR:([^{GLYPH_CLOSE}]+){GLYPH_CLOSE}")
-INLINE_THRESHOLD = 512   # small for the test
+GLYPH_OPEN = "\u2ab7"  # ⫷
+GLYPH_CLOSE = "\u2ab8"  # ⫸
+MARKER_RE = re.compile(rf"{GLYPH_OPEN}CCR:([^{GLYPH_CLOSE}]+){GLYPH_CLOSE}")
+INLINE_THRESHOLD = 512  # small for the test
 
 # ── inline store (replaces the proxy for this test) ─────────────────────────
 
 _store: dict[str, str] = {}
+
 
 def _inline_store_put(content: str) -> str:
     h = hashlib.sha256(content.encode()).hexdigest()[:16]
     _store[h] = content
     return h
 
+
 def _inline_store_get(h: str) -> str | None:
     return _store.get(h)
 
+
 # ── smart_marker (fixed glyphs) ──────────────────────────────────────────────
+
 
 def smart_marker(hash_val: str, kind: str, size: int) -> str:
     return f"{GLYPH_OPEN}CCR:{hash_val}|{kind}|{size}{GLYPH_CLOSE}"
 
+
 # ── _transform_tool_result (fixed: no [:2000] truncation, correct glyphs) ───
+
 
 def transform_tool_result(message: dict) -> dict:
     content = message.get("content", "")
@@ -51,21 +58,28 @@ def transform_tool_result(message: dict) -> dict:
     marker = smart_marker(h, "tool", len(content))
     return {**message, "content": marker}
 
+
 # ── retrieve (fixed: strip pipe suffix, try inline cache first) ──────────────
 
+
 def resolve_one(hash_arg: str) -> str | None:
-    clean = hash_arg.split("|")[0].strip()   # fix 14
+    clean = hash_arg.split("|")[0].strip()  # fix 14
     return _inline_store_get(clean)
+
 
 # ── should_compress (fixed threshold check) ─────────────────────────────────
 
-def should_compress(prompt_tokens: int, context_length: int = 128_000,
-                    threshold_pct: float = 75.0) -> bool:
+
+def should_compress(
+    prompt_tokens: int, context_length: int = 128_000, threshold_pct: float = 75.0
+) -> bool:
     if not prompt_tokens:
         return True
     return (prompt_tokens / context_length * 100) >= threshold_pct
 
+
 # ── health check (fixed JSON parser) ─────────────────────────────────────────
+
 
 def alive(body: str) -> bool:
     if body.strip() == "ok":
@@ -75,9 +89,10 @@ def alive(body: str) -> bool:
     except Exception:
         return False
 
+
 # ── SMOKE TEST ───────────────────────────────────────────────────────────────
 
-ORIGINAL = "X" * 4096   # large tool output
+ORIGINAL = "X" * 4096  # large tool output
 
 # Step 1: compress
 msg = {"role": "tool", "content": ORIGINAL}
@@ -89,7 +104,7 @@ assert len(marker_str) < len(ORIGINAL), "Marker must be shorter than original"
 
 # Step 2: extract hash as the LLM would pass it (with pipe suffix)
 match = MARKER_RE.search(marker_str)
-full_token = match.group(1)          # e.g. "abc123|tool|4096"
+full_token = match.group(1)  # e.g. "abc123|tool|4096"
 assert "|" in full_token, "Token should include pipe-delimited metadata"
 
 # Step 3: retrieve with the suffixed token (simulates LLM passing full token)

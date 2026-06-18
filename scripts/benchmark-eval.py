@@ -4,16 +4,19 @@ Aphrodite compression evaluation report.
 Measures token savings per content type, estimates net savings
 accounting for whether the agent retrieves the content.
 """
+
 import json
 import subprocess
 import sys
 from pathlib import Path
+
 
 # Approximate token count (1 token ≈ 4 chars for code, 3 chars for text)
 def estimate_tokens(text: str, content_type: str = "text") -> int:
     if content_type in ("code_rust", "code_python", "code_go", "code_js", "code_ts"):
         return len(text) // 4
     return len(text) // 3
+
 
 # Sample tool outputs from real Hermes sessions
 SAMPLES = {
@@ -22,10 +25,10 @@ SAMPLES = {
         "running 42 tests\ntest result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s\n",
     ],
     "build_error": [
-        "error[E0308]: mismatched types\n --> src/main.rs:10:5\n  |\n10 |     let x: i32 = \"hello\";\n   |            ---   ^^^^^^^ expected `i32`, found `&str`\n",
+        'error[E0308]: mismatched types\n --> src/main.rs:10:5\n  |\n10 |     let x: i32 = "hello";\n   |            ---   ^^^^^^^ expected `i32`, found `&str`\n',
     ],
     "diff": [
-        "diff --git a/src/main.rs b/src/main.rs\nindex abc1234..def5678 100644\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,4 @@\n fn main() {\n+    println!(\"hello\");\n }\n",
+        'diff --git a/src/main.rs b/src/main.rs\nindex abc1234..def5678 100644\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,4 @@\n fn main() {\n+    println!("hello");\n }\n',
     ],
     "terminal": [
         "$ cargo build\nexit code: 0\n",
@@ -73,7 +76,7 @@ for ctype, samples in SAMPLES.items():
     type_after = 0
     for sample in samples[:3]:  # up to 3 samples per type
         before = estimate_tokens(sample, ctype)
-        
+
         # Run through aphrodite's classifier (simulated)
         # The classifier produces a dict with type and metadata
         # The template engine produces a compact preview
@@ -95,14 +98,14 @@ for ctype, samples in SAMPLES.items():
             "log_output": 35,
         }
         after = preview_sizes.get(ctype, 20)
-        
+
         type_before += before
         type_after += after
-    
+
     savings = type_before - type_after
     ratio = type_before / type_after if type_after else 999
     pct = (savings / type_before * 100) if type_before else 0
-    
+
     results.append((ctype, type_before, type_after, savings, ratio, pct))
     total_before += type_before
     total_after += type_after
@@ -119,7 +122,9 @@ total_saved = total_before - total_after
 total_ratio = total_before / total_after if total_after else 999
 total_pct = (total_saved / total_before * 100) if total_before else 0
 
-print(f"| {'**TOTAL**':13} | **{total_before:11,}** | **{total_after:10,}** | **{total_saved:5,}** | **{total_ratio:4.0f}×** | **{total_pct:5.1f}%** |")
+print(
+    f"| {'**TOTAL**':13} | **{total_before:11,}** | **{total_after:10,}** | **{total_saved:5,}** | **{total_ratio:4.0f}×** | **{total_pct:5.1f}%** |"
+)
 print()
 
 # Net savings analysis
@@ -150,10 +155,18 @@ print()
 print("## Key Findings")
 print()
 print(f"1. **Lossless compression alone**: {total_pct:.1f}% token reduction across all types")
-print(f"2. **Preview-based decision**: The structured preview gives the agent enough info to skip retrieval for ~60% of outputs")
-print(f"3. **Net-positive for clean outputs**: Build passes (0E/0W), terminal exits (exit=0), and classifier-polled outputs never generate CCR markers at all")
-print(f"4. **Net-neutral for actionable outputs**: Errors, tabular data, and code are retrieved when needed - no net loss")
-print(f"5. **No ML inference required**: All classification is regex-based (<0.1ms), no API calls, no token cost")
+print(
+    f"2. **Preview-based decision**: The structured preview gives the agent enough info to skip retrieval for ~60% of outputs"
+)
+print(
+    f"3. **Net-positive for clean outputs**: Build passes (0E/0W), terminal exits (exit=0), and classifier-polled outputs never generate CCR markers at all"
+)
+print(
+    f"4. **Net-neutral for actionable outputs**: Errors, tabular data, and code are retrieved when needed - no net loss"
+)
+print(
+    f"5. **No ML inference required**: All classification is regex-based (<0.1ms), no API calls, no token cost"
+)
 print()
 print("## Comparison to Headroom (from PR #47866)")
 print()

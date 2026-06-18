@@ -7,17 +7,21 @@ Fix:  key must be "APHRODITE_INLINE_THRESHOLD".
 Run:  python examples/01_env_var_typo.py
 Pass: prints OK
 """
+
 import os
 
 # ---------- minimal replica of the buggy helper ----------
+
 
 def _cfg_int_buggy(key: str, default: int) -> int:
     """Original - wrong env-var name."""
     return int(os.environ.get("APHRODITEINLINE_THRESHOLD", default))
 
+
 def _cfg_int_fixed(key: str, default: int) -> int:
     """Fixed - uses the key argument directly."""
     return int(os.environ.get(key, default))
+
 
 # ---------- test ----------
 

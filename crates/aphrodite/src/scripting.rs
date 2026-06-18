@@ -4,28 +4,27 @@
 
 #[cfg(feature = "scripting")]
 mod engine {
+	use std::{path::PathBuf, sync::Mutex, time::SystemTime};
+
 	use rhai::{Engine, Scope};
-	use std::path::PathBuf;
-	use std::sync::Mutex;
-	use std::time::SystemTime;
 
 	struct Script {
-		path: PathBuf,
-		mtime: SystemTime,
-		source: String,
+		path:PathBuf,
+		mtime:SystemTime,
+		source:String,
 	}
 
 	pub struct ScriptEngine {
-		scripts: Mutex<Vec<Script>>,
-		dirs: Vec<PathBuf>,
+		scripts:Mutex<Vec<Script>>,
+		dirs:Vec<PathBuf>,
 	}
 
 	impl ScriptEngine {
 		pub fn new() -> Self {
 			let home = dirs::home_dir().unwrap_or_default();
 			let se = ScriptEngine {
-				scripts: Mutex::new(Vec::new()),
-				dirs: vec![
+				scripts:Mutex::new(Vec::new()),
+				dirs:vec![
 					home.join(".hermes").join("aphrodite").join("scripts"),
 					PathBuf::from("scripts/aphrodite"),
 				],
@@ -41,9 +40,13 @@ mod engine {
 				let Ok(entries) = std::fs::read_dir(dir) else { continue };
 				for entry in entries.flatten() {
 					let path = entry.path();
-					if !path.extension().map(|e| e == "rhai").unwrap_or(false) { continue; }
+					if !path.extension().map(|e| e == "rhai").unwrap_or(false) {
+						continue;
+					}
 					let Ok(source) = std::fs::read_to_string(&path) else { continue };
-					let mtime = entry.metadata().ok()
+					let mtime = entry
+						.metadata()
+						.ok()
 						.and_then(|m| m.modified().ok())
 						.unwrap_or(SystemTime::UNIX_EPOCH);
 					// Validate compilation
@@ -57,16 +60,19 @@ mod engine {
 		}
 
 		fn check_reload(&self) {
-			let needs = self.scripts.lock().unwrap_or_else(|e| e.into_inner())
-				.iter().any(|s| {
-					std::fs::metadata(&s.path).ok()
-						.and_then(|m| m.modified().ok())
-						.map(|t| t > s.mtime).unwrap_or(false)
-				});
-			if needs { self.reload(); }
+			let needs = self.scripts.lock().unwrap_or_else(|e| e.into_inner()).iter().any(|s| {
+				std::fs::metadata(&s.path)
+					.ok()
+					.and_then(|m| m.modified().ok())
+					.map(|t| t > s.mtime)
+					.unwrap_or(false)
+			});
+			if needs {
+				self.reload();
+			}
 		}
 
-		pub fn on_compress(&self, content: &str, ct: &str, size: usize) -> String {
+		pub fn on_compress(&self, content:&str, ct:&str, size:usize) -> String {
 			self.check_reload();
 			let scripts = self.scripts.lock().unwrap_or_else(|e| e.into_inner());
 			let mut result = content.to_string();
@@ -84,7 +90,7 @@ mod engine {
 			result
 		}
 
-		pub fn on_marker(&self, hash: &str, ct: &str, meta: &str, preview: &str) -> String {
+		pub fn on_marker(&self, hash:&str, ct:&str, meta:&str, preview:&str) -> String {
 			self.check_reload();
 			let scripts = self.scripts.lock().unwrap_or_else(|e| e.into_inner());
 			let mut result = preview.to_string();
@@ -103,7 +109,7 @@ mod engine {
 			result
 		}
 
-		pub fn on_retrieve(&self, hash: &str, content: &str, ct: &str) -> String {
+		pub fn on_retrieve(&self, hash:&str, content:&str, ct:&str) -> String {
 			self.check_reload();
 			let scripts = self.scripts.lock().unwrap_or_else(|e| e.into_inner());
 			let mut result = content.to_string();
@@ -128,9 +134,9 @@ mod engine {
 	pub struct ScriptEngine;
 	impl ScriptEngine {
 		pub fn new() -> Self { ScriptEngine }
-		pub fn on_compress(&self, c: &str, _: &str, _: usize) -> String { c.to_string() }
-		pub fn on_marker(&self, _: &str, _: &str, _: &str, p: &str) -> String { p.to_string() }
-		pub fn on_retrieve(&self, _: &str, c: &str, _: &str) -> String { c.to_string() }
+		pub fn on_compress(&self, c:&str, _:&str, _:usize) -> String { c.to_string() }
+		pub fn on_marker(&self, _:&str, _:&str, _:&str, p:&str) -> String { p.to_string() }
+		pub fn on_retrieve(&self, _:&str, c:&str, _:&str) -> String { c.to_string() }
 	}
 }
 
