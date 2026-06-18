@@ -37,9 +37,9 @@ needs it.
 
 ## How It Works ⚙️
 
-Aphrodite intercepts **everything** before it hits the LLM context - tool output,
-terminal output, file reads, search results, build logs, browser snapshots, and
-more. Not just tool calls.
+Aphrodite intercepts **everything** before it hits the LLM context - tool
+output, terminal output, file reads, search results, build logs, browser
+snapshots, and more. Not just tool calls.
 
 ```
  ANY OUTPUT ──────► Aphrodite ──────► Agent (preview, not raw)
@@ -499,8 +499,8 @@ entire extra conversation turn of reasoning.
 
 > **2 MB of raw output compresses to ~960 bytes of CCR markers - a 2,000:1
 > effective ratio. In a typical coding session with 50+ operations, the proxy
-> saves millions of tokens cumulatively. At current pricing, that's $250+ in
-> API costs saved.**
+> saves millions of tokens cumulatively. At current pricing, that's $250+ in API
+> costs saved.**
 
 ### Classifier coverage
 
@@ -578,8 +578,9 @@ tool output
 ```
 
 Aphrodite owns **addressing + previews** (where content lives, what it means).
-Headroom owns **reduction** (making content smaller while keeping it meaningful).
-Each does what it does best. The agent pays only for what it actually needs.
+Headroom owns **reduction** (making content smaller while keeping it
+meaningful). Each does what it does best. The agent pays only for what it
+actually needs.
 
 ---
 
@@ -587,7 +588,8 @@ Each does what it does best. The agent pays only for what it actually needs.
 
 > **30 seconds from clone to compression.**
 
-> ⚠️ **Important:** This is the monorepo. To install the **Hermes plugin**, clone
+> ⚠️ **Important:** This is the monorepo. To install the **Hermes plugin**,
+> clone
 > [`PlayForm/Aphrodite-Hermes`](https://github.com/PlayForm/Aphrodite-Hermes)
 > instead - not this repo. The plugin lives in `./plugins/aphrodite/` as a git
 > submodule. This monorepo is for developing the proxy + plugin together.
@@ -732,27 +734,27 @@ what we add, what we rewrote, how they ship together.
 
 ## vs Headroom - Why Aphrodite Wins
 
-> **Headroom compresses content. Aphrodite makes content optional.**
-> They solve different problems - and Aphrodite's approach produces far greater
-> savings in agent workflows.
+> **Headroom compresses content. Aphrodite makes content optional.** They solve
+> different problems - and Aphrodite's approach produces far greater savings in
+> agent workflows.
 
-| Metric               | Headroom (stock)              | Aphrodite                         |
-| -------------------- | ----------------------------- | --------------------------------- |
-| What it does          | Semantic compression - makes content smaller while keeping it readable | Preview-first - replaces content with structured metadata, agent retrieves only if needed |
-| Agent sees            | Smaller but still-readable content | `[build:2E 0W 14L]` - 13 tokens of metadata |
-| Retrieval needed?     | No - content is already there, just smaller | Rarely - preview is usually enough |
-| How it compresses     | ML model (Kompress), tree-sitter AST reduction, log extraction | Pure regex classifier (<0.1ms) + TOML templates |
-| Hermes integration    | None - proxy or library only | Native plugin: hooks, context engine, 12 tools, 9 skills |
-| Dependencies           | Python + ML model (~100ms)    | Zero (Rust binary only)           |
-| Token savings          | 30–80% (semantic reduction)   | 84%+ (preview skips content entirely) |
-| Best for              | Long-form content that must be read | Agent workflows where most output is scanned, not read |
+| Metric             | Headroom (stock)                                                       | Aphrodite                                                                                 |
+| ------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| What it does       | Semantic compression - makes content smaller while keeping it readable | Preview-first - replaces content with structured metadata, agent retrieves only if needed |
+| Agent sees         | Smaller but still-readable content                                     | `[build:2E 0W 14L]` - 13 tokens of metadata                                               |
+| Retrieval needed?  | No - content is already there, just smaller                            | Rarely - preview is usually enough                                                        |
+| How it compresses  | ML model (Kompress), tree-sitter AST reduction, log extraction         | Pure regex classifier (<0.1ms) + TOML templates                                           |
+| Hermes integration | None - proxy or library only                                           | Native plugin: hooks, context engine, 12 tools, 9 skills                                  |
+| Dependencies       | Python + ML model (~100ms)                                             | Zero (Rust binary only)                                                                   |
+| Token savings      | 30–80% (semantic reduction)                                            | 84%+ (preview skips content entirely)                                                     |
+| Best for           | Long-form content that must be read                                    | Agent workflows where most output is scanned, not read                                    |
 
 **Headroom shrinks content. Aphrodite skips it.** Headroom's ML compression is
 powerful for content the agent must read - it keeps meaning while cutting size.
 Aphrodite's preview-first approach is better for agent workflows where 95% of
-output is noise the agent doesn't need. The structured preview
-(`[build:2E 0W]`, `[diff:1f +3/-2]`) gives the agent enough metadata to act
-without ever seeing the raw output.
+output is noise the agent doesn't need. The structured preview (`[build:2E 0W]`,
+`[diff:1f +3/-2]`) gives the agent enough metadata to act without ever seeing
+the raw output.
 
 Together, they're complementary - Aphrodite addresses and previews, Headroom
 reduces what must be read. But for raw token savings in agent sessions,
@@ -771,13 +773,13 @@ _Ready to save context?_ [Install now](#quick-start) • [Read the docs](docs/) 
 We love contributions of every kind - code, docs, bug reports, ideas, or just
 saying hi.
 
-| Want to… | Start here |
-|---|---|
-| Report a bug | [Open an issue](https://github.com/PlayForm/Aphrodite/issues/new?template=bug_report.md) |
+| Want to…          | Start here                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| Report a bug      | [Open an issue](https://github.com/PlayForm/Aphrodite/issues/new?template=bug_report.md)   |
 | Suggest a feature | [Start a discussion](https://github.com/PlayForm/Aphrodite/discussions/new?category=ideas) |
-| Submit a PR | [Fork & open a PR](https://github.com/PlayForm/Aphrodite/pulls) - we review fast |
-| Ask a question | [Discussions Q&A](https://github.com/PlayForm/Aphrodite/discussions/new?category=q-a) |
-| Improve the docs | [Edit any page](docs/) and send a PR |
+| Submit a PR       | [Fork & open a PR](https://github.com/PlayForm/Aphrodite/pulls) - we review fast           |
+| Ask a question    | [Discussions Q&A](https://github.com/PlayForm/Aphrodite/discussions/new?category=q-a)      |
+| Improve the docs  | [Edit any page](docs/) and send a PR                                                       |
 
 No contribution is too small. Typo fix? Welcome. Idea? Welcome. First-time
 contributor? **Especially** welcome.

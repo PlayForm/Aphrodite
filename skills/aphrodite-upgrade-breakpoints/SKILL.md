@@ -1,7 +1,6 @@
 ---
 name: aphrodite-upgrade-breakpoints
-description:
-    Cargo upgrade breakpoints for aphrodite + headroom - required by the
+description: Cargo upgrade breakpoints for aphrodite + headroom - required by the
     standalone plugin repo and release workflow.
 version: 1.0.1
 ---

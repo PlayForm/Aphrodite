@@ -29,11 +29,11 @@ let app = Router::new()
 
 ```json
 {
-	"status": "healthy",
-	"ccr": true,
-	"mode": "token",
-	"version": "0.5.69",
-	"fill_pct": 90.0
+    "status": "healthy",
+    "ccr": true,
+    "mode": "token",
+    "version": "0.5.69",
+    "fill_pct": 90.0
 }
 ```
 

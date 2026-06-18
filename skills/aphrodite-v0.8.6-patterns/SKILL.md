@@ -1,17 +1,12 @@
 ---
 name: aphrodite-v0.8.6-patterns
-description:
-    Development patterns learned across v0.8.5→v0.8.6 - Cargo.toml walk-up,
+description: Development patterns learned across v0.8.5→v0.8.6 - Cargo.toml walk-up,
     --version early handling, dep pinning, standalone plugin repo,
     prefetch-first workflow.
 version: 1.0.0
 platforms: [macos]
 related_skills:
-    [
-        aphrodite-dev-workflow,
-        aphrodite-development-lessons,
-        aphrodite-context-efficiency,
-    ]
+    [aphrodite-dev-workflow, aphrodite-development-lessons, aphrodite-context-efficiency]
 ---
 
 # Aphrodite v0.8.6 Patterns

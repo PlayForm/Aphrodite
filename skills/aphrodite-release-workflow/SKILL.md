@@ -1,7 +1,6 @@
 ---
 name: aphrodite-release-workflow
-description:
-    "Auto-release, version sync, pre-release verification, and release notes for
+description: "Auto-release, version sync, pre-release verification, and release notes for
     aphrodite."
 version: 1.2.0
 platforms: [macos]

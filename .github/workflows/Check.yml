@@ -1,94 +1,94 @@
 name: Check
 
 concurrency:
-    group: Check-${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: Check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-    contents: read
+  contents: read
 
 on:
-    push:
-        branches: [Current]
-    pull_request:
-        branches: [Current]
-    workflow_dispatch:
-    workflow_call:
+  push:
+    branches: [Current]
+  pull_request:
+    branches: [Current]
+  workflow_dispatch:
+  workflow_call:
 
 env:
-    ADBLOCK: true
-    ASTRO_TELEMETRY_DISABLED: 1
-    AUTOMATEDLAB_TELEMETRY_OPTOUT: 1
-    AZURE_CORE_COLLECT_TELEMETRY: 0
-    CARGO_TERM_COLOR: always
-    CHOOSENIM_NO_ANALYTICS: 1
-    DIEZ_DO_NOT_TRACK: 1
-    DO_NOT_TRACK: 1
-    DOTNET_CLI_TELEMETRY_OPTOUT: 1
-    DOTNET_INTERACTIVE_CLI_TELEMETRY_OPTOUT: 1
-    ET_NO_TELEMETRY: 1
-    GATSBY_TELEMETRY_DISABLED: 1
-    GATSBY_TELEMETRY_OPT_OUT: 1
-    GATSBY_TELEMETRY_OPTOUT: 1
-    GRIT_TELEMETRY_DISABLED: 1
-    HASURA_GRAPHQL_ENABLE_TELEMETRY: false
-    HINT_TELEMETRY: off
-    HOMEBREW_NO_ANALYTICS: 1
-    INFLUXD_REPORTING_DISABLED: true
-    ITERATIVE_DO_NOT_TRACK: 1
-    NEXT_TELEMETRY_DEBUG: 1
-    NEXT_TELEMETRY_DISABLED: 1
-    NG_CLI_ANALYTICS: false
-    NUXT_TELEMETRY_DISABLED: 1
-    PIN_DO_NOT_TRACK: 1
-    POWERSHELL_TELEMETRY_OPTOUT: 1
-    SAM_CLI_TELEMETRY: 0
-    STNOUPGRADE: 1
-    STRIPE_CLI_TELEMETRY_OPTOUT: 1
-    TELEMETRY_DISABLED: 1
-    TERRAFORM_TELEMETRY: 0
-    VCPKG_DISABLE_METRICS: 1
+  ADBLOCK: true
+  ASTRO_TELEMETRY_DISABLED: 1
+  AUTOMATEDLAB_TELEMETRY_OPTOUT: 1
+  AZURE_CORE_COLLECT_TELEMETRY: 0
+  CARGO_TERM_COLOR: always
+  CHOOSENIM_NO_ANALYTICS: 1
+  DIEZ_DO_NOT_TRACK: 1
+  DO_NOT_TRACK: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_INTERACTIVE_CLI_TELEMETRY_OPTOUT: 1
+  ET_NO_TELEMETRY: 1
+  GATSBY_TELEMETRY_DISABLED: 1
+  GATSBY_TELEMETRY_OPT_OUT: 1
+  GATSBY_TELEMETRY_OPTOUT: 1
+  GRIT_TELEMETRY_DISABLED: 1
+  HASURA_GRAPHQL_ENABLE_TELEMETRY: false
+  HINT_TELEMETRY: off
+  HOMEBREW_NO_ANALYTICS: 1
+  INFLUXD_REPORTING_DISABLED: true
+  ITERATIVE_DO_NOT_TRACK: 1
+  NEXT_TELEMETRY_DEBUG: 1
+  NEXT_TELEMETRY_DISABLED: 1
+  NG_CLI_ANALYTICS: false
+  NUXT_TELEMETRY_DISABLED: 1
+  PIN_DO_NOT_TRACK: 1
+  POWERSHELL_TELEMETRY_OPTOUT: 1
+  SAM_CLI_TELEMETRY: 0
+  STNOUPGRADE: 1
+  STRIPE_CLI_TELEMETRY_OPTOUT: 1
+  TELEMETRY_DISABLED: 1
+  TERRAFORM_TELEMETRY: 0
+  VCPKG_DISABLE_METRICS: 1
 
 jobs:
-    Rust:
-        name: cargo check
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v6.0.3
-              with:
-                  submodules: recursive
+  Rust:
+    name: cargo check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          submodules: recursive
 
-            - name: Init submodule from remote
-              run: |
-                  git submodule update --init --remote --recursive || true
+      - name: Init submodule from remote
+        run: |
+          git submodule update --init --remote --recursive || true
 
-            - name: Setup Rust (nightly)
-              uses: dtolnay/rust-toolchain@nightly
-              with:
-                  components: rustfmt, clippy
+      - name: Setup Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
 
-            - name: Cache cargo
-              uses: actions/cache@v5
-              with:
-                  path: |
-                      ~/.cargo/registry/
-                      ~/.cargo/git/
-                      target/
-                  key: cargo-check-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: cargo-check-${{ runner.os }}-
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: cargo-check-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-check-${{ runner.os }}-
 
-            - name: cargo check
-              run: cargo check -p aphrodite --release
+      - name: cargo check
+        run: cargo check -p aphrodite --release
 
-    Python:
-        name: ruff + pyright
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v6.0.3
+  Python:
+    name: ruff + pyright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.3
 
-            - uses: astral-sh/ruff-action@v3
-              with:
-                  src: plugins/aphrodite/
+      - uses: astral-sh/ruff-action@v3
+        with:
+          src: plugins/aphrodite/
 
-            - name: pyright
-              run: npx pyright plugins/aphrodite/
+      - name: pyright
+        run: npx pyright plugins/aphrodite/

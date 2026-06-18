@@ -1,7 +1,6 @@
 ---
 name: aphrodite-hook-reference
-description:
-    "Complete Hermes hook API reference for aphrodite plugin: exact invocation
+description: "Complete Hermes hook API reference for aphrodite plugin: exact invocation
     parameters vs plugin expectations, return semantics, known mismatches, hook
     registration rules. Includes ContextEngine registration pitfalls."
 version: 1.2.0

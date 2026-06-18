@@ -1,7 +1,6 @@
 ---
 name: aphrodite-cargo-upgrade
-description:
-    "Cargo upgrade breakpoints for aphrodite + headroom - reqwest features, axum
+description: "Cargo upgrade breakpoints for aphrodite + headroom - reqwest features, axum
     ConnectInfo+fallback, tokio-tungstenite Messages, pyo3 allow_threads,
     workspace pinning. What breaks and how to fix."
 version: 1.0.0

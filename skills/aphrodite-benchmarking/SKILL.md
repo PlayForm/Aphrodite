@@ -1,18 +1,13 @@
 ---
 name: aphrodite-benchmarking
-description:
-    "Comprehensive benchmark protocol for aphrodite proxy - compression
+description: "Comprehensive benchmark protocol for aphrodite proxy - compression
     throughput, cache hit rates, cross-worker behavior, terminal threshold
     verification, and all-type coverage. Based on production testing across
     v0.5.124+."
 version: 1.1.0
 platforms: [macos]
 related_skills:
-    [
-        aphrodite-context-efficiency,
-        aphrodite-center-testing,
-        aphrodite-auto-expand-testing,
-    ]
+    [aphrodite-context-efficiency, aphrodite-center-testing, aphrodite-auto-expand-testing]
 ---
 
 # Aphrodite Proxy Benchmarking
@@ -155,14 +150,14 @@ threshold (default 450K tokens).
 
 Full comparative benchmark: Stock Hermes → Stock + Headroom → Aphrodite.
 
-| Mode | 400K session | Savings | Reliable |
-|---|---|---|---|
-| Stock Hermes | 400,000 tok | baseline | ✓ |
-| Stock + HR cache | 400,000 tok | 0% | ✓ |
-| Stock + HR token | ~480,000 tok | −20% | ✗ |
-| Aphrodite cache | 400,000 tok | 0% | ✓ |
-| Aphrodite token | 80,000 tok | +80% | ✓ |
-| Aphrodite full max | 63,200 tok | +84% | ✓ |
+| Mode               | 400K session | Savings  | Reliable |
+| ------------------ | ------------ | -------- | -------- |
+| Stock Hermes       | 400,000 tok  | baseline | ✓        |
+| Stock + HR cache   | 400,000 tok  | 0%       | ✓        |
+| Stock + HR token   | ~480,000 tok | −20%     | ✗        |
+| Aphrodite cache    | 400,000 tok  | 0%       | ✓        |
+| Aphrodite token    | 80,000 tok   | +80%     | ✓        |
+| Aphrodite full max | 63,200 tok   | +84%     | ✓        |
 
 Headroom token mode is net-negative: TTL expiry destroys content, forces re-runs.
 Aphrodite token gives type+size metadata (agent skips ~80%).
