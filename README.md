@@ -39,28 +39,27 @@ actually needs it.
 ## How It Works ⚙️
 
 ```
-| Your Agent                  Aphrodite Proxy              LLM API
-|    │                            │                          │
-|    │──── tool call ────────────►│                          │
-|    │                            │── forward to API ───────►│
-|    │                            │◄── API response ─────────│
-|    │                            │                          │
-|    │                    ┌───────┴───────┐                  │
-|    │                    │ 28-type       │                  │
-|    │                    │ classifier    │                  │
-|    │                    │    ↓          │                  │
-|    │                    │ TOML template │                  │
-|    │                    │    ↓          │                  │
-|    │                    │ CCR store     │                  │
-|    │                    └───────┬───────┘                  │
-|    │                            │                          │
-|    │◄── [build:0E 0W 1L] ───────│  15 tokens, not 500      |
-|    │                            │                          │
-|    │── aphrodite_retrieve() ───►│  only when needed        │
-|    │◄── full content ───────────│                          │
-|    │                            │                          │
-|    │── aphrodite_prefetch() ───►│  background reads        │
-|    │◄── markers instantly ──────│  files load concurrently │
+Hermes Agent                     Aphrodite Plugin
+    │                                  │
+    │── run tool (cargo build) ───────►│
+    │                                  │── executes ──► 215 tok output
+    │                                  │
+    │                          ┌───────┴───────┐
+    │                          │ 28-type       │
+    │                          │ classifier    │
+    │                          │    ↓          │
+    │                          │ TOML template │
+    │                          │    ↓          │
+    │                          │ CCR store     │
+    │                          └───────┬───────┘
+    │                                  │
+    │◄── [build:2E 0W 14L] ────────────│  13 tokens, not 215
+    │                                  │
+    │── aphrodite_retrieve() ─────────►│  only when needed
+    │◄── full content ─────────────────│
+    │                                  │
+    │── aphrodite_prefetch() ─────────►│  background reads
+    │◄── markers instantly ────────────│  files load concurrently
 ```
 
 Three steps, all under 1ms:
@@ -544,19 +543,40 @@ compressors that understand _what_ the content is and reduce it intelligently.
 ### The full picture
 
 ```
-content → Aphrodite (address + store)
-            SHA-256 → cache check → store → <<<CCR:hash>>>
-              ↓
-          Headroom (understand + reduce)
-            classify → route → AST/log/ML compress → smaller content
-              ↓
-          Aphrodite (preview + retrieve)
-            structured template → [code:3fns|2structs] → LLM browses
+tool output
+    │
+    ▼
+┌─────────────────────────────────┐
+│           Aphrodite             │
+│                                 │
+│  classify → template → store    │
+│                                 │
+│  preview: [code:3fns|2structs]  │
+│  marker: <<<CCR:sha256|type>>>  │
+└───────────────┬─────────────────┘
+                │
+                │  preview → agent (13 tok, not 215)
+                ▼
+             Agent
+                │
+                │  retrieve if needed
+                ▼
+┌─────────────────────────────────┐
+│  Headroom (optional, :9799)     │
+│                                 │
+│  AST reduction / log extraction │
+│  ML semantic compression        │
+│  tree-sitter code-aware         │
+└─────────────────────────────────┘
+                │
+                │  reduced content
+                ▼
+             Agent
 ```
 
-Together: **content-addressed retrieval + semantic reduction + structure-aware
-previews.** Each layer does what it does best, and the LLM only pays for what it
-actually needs.
+Aphrodite owns **addressing + previews** (where content lives, what it means).
+Headroom owns **reduction** (making content smaller while keeping it meaningful).
+Each does what it does best. The agent pays only for what it actually needs.
 
 ---
 
