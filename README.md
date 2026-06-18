@@ -564,6 +564,11 @@ actually needs.
 
 > **30 seconds from clone to compression.**
 
+> ⚠️ **Important:** This is the monorepo. To install the **Hermes plugin**, clone
+> [`PlayForm/Aphrodite-Hermes`](https://github.com/PlayForm/Aphrodite-Hermes)
+> instead - not this repo. The plugin lives in `./plugins/aphrodite/` as a git
+> submodule. This monorepo is for developing the proxy + plugin together.
+
 ```bash
 # 1. Build (one command)
 cargo build --release -p aphrodite
