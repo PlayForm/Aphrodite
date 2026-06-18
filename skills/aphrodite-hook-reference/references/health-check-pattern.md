@@ -1,6 +1,6 @@
 # Proxy Health + Retry Patterns (v1.9.0+)
 
-## Python `_alive()` — 5-Second TTL Cache
+## Python `_alive()` - 5-Second TTL Cache
 
 ```python
 _alive_cache = {}  # {port: (result, timestamp)}
@@ -33,7 +33,7 @@ Key points:
 - Accepts "healthy", "ok", "degraded" as valid states
 - Falls back to `body.strip() == "ok"` for legacy proxies
 
-## Python `_wait_alive()` — Startup Retry Loop
+## Python `_wait_alive()` - Startup Retry Loop
 
 ```python
 def _wait_alive(port, retries=10, delay=0.3):
@@ -49,15 +49,15 @@ Replaces the old `time.sleep(0.5)` fixed wait. Parameters:
 - 10 retries × 0.3s = 3s max wait (vs fixed 0.5s that often failed)
 - Configurable for slow machines
 
-## Python `_resolve_one()` — Dual Proxy
+## Python `_resolve_one()` - Dual Proxy
 
 Tries BOTH proxy ports (9797 cache, 9798 token) sequentially, not just token.
 Content compressed via either proxy is retrievable from either since they share
 CCR stores.
 
-## Rust Health Check — Decoupled
+## Rust Health Check - Decoupled
 
-`/health` (GET) — local-only, no upstream API call:
+`/health` (GET) - local-only, no upstream API call:
 
 ```rust
 pub async fn health_check(State(state): ...) -> impl IntoResponse {
@@ -66,7 +66,7 @@ pub async fn health_check(State(state): ...) -> impl IntoResponse {
 }
 ```
 
-`/health/upstream` (GET) — separate diagnostic endpoint for DeepSeek probe.
+`/health/upstream` (GET) - separate diagnostic endpoint for DeepSeek probe.
 
 ## Rust Inline Retry Backoff
 

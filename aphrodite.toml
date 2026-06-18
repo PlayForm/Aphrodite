@@ -27,7 +27,7 @@ ccr_ttl_seconds = 3600
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  COMPRESSION  —  thresholds, engine, auto-expand, classifier poll
+#  COMPRESSION  -  thresholds, engine, auto-expand, classifier poll
 # ══════════════════════════════════════════════════════════════════════════════
 [compression]
 engine_threshold_pct = 45          # compress at 45% context
@@ -48,7 +48,7 @@ prefetch = true                    # enable aphrodite_prefetch tool
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  PREVIEWS  —  model-aware templates, code structure maps
+#  PREVIEWS  -  model-aware templates, code structure maps
 # ══════════════════════════════════════════════════════════════════════════════
 [previews]
 model_family = "code_first"        # compact | code_first | balance
@@ -57,7 +57,7 @@ preview_max_chars = 120            # max chars per preview line
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  PROMPTS  —  how the system instructs the LLM about CCR
+#  PROMPTS  -  how the system instructs the LLM about CCR
 # ══════════════════════════════════════════════════════════════════════════════
 [prompts]
 retrieve_guidance = "verbose"      # minimal | standard | verbose
@@ -66,34 +66,34 @@ catalog_intent_hints = true       # show intent=read with hashes?
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  TEMPLATES  —  per-content-type preview/marker/prompt format strings
+#  TEMPLATES  -  per-content-type preview/marker/prompt format strings
 #
 #  Variables available in templates:
-#    {type}     — content type (diff, build_output, code_rust, ...)
-#    {ln}       — line count
-#    {size}     — byte size
-#    {hash}     — short hash (12 chars)
-#    {err}      — error count
-#    {warn}     — warning count
-#    {exit}     — terminal exit code
-#    {cmd}      — terminal command
-#    {files}    — file count (diff)
-#    {fn}       — filename (diff)
-#    {plus}     — lines added (diff)
-#    {minus}    — lines removed (diff)
-#    {keys}     — JSON top-level keys
-#    {items}    — item count (JSON list, table rows)
-#    {msg}      — error message
-#    {commit}   — commit short hash
-#    {subject}  — commit subject
-#    {pid}      — process ID
-#    {uptime}   — process uptime
-#    {fns}      — function count (code structure map)
-#    {structs}  — struct count (Rust)
-#    {impls}    — impl count (Rust)
-#    {classes}  — class count (Python/JS)
-#    {sigs}     — first 2 signatures inline
-#    {first}    — first 110 chars of content
+#    {type}     - content type (diff, build_output, code_rust, ...)
+#    {ln}       - line count
+#    {size}     - byte size
+#    {hash}     - short hash (12 chars)
+#    {err}      - error count
+#    {warn}     - warning count
+#    {exit}     - terminal exit code
+#    {cmd}      - terminal command
+#    {files}    - file count (diff)
+#    {fn}       - filename (diff)
+#    {plus}     - lines added (diff)
+#    {minus}    - lines removed (diff)
+#    {keys}     - JSON top-level keys
+#    {items}    - item count (JSON list, table rows)
+#    {msg}      - error message
+#    {commit}   - commit short hash
+#    {subject}  - commit subject
+#    {pid}      - process ID
+#    {uptime}   - process uptime
+#    {fns}      - function count (code structure map)
+#    {structs}  - struct count (Rust)
+#    {impls}    - impl count (Rust)
+#    {classes}  - class count (Python/JS)
+#    {sigs}     - first 2 signatures inline
+#    {first}    - first 110 chars of content
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Preview templates: [type:...] format per content type ────────────────────
@@ -158,7 +158,7 @@ code_sh        = "[{type}:{fns}fns {sigs} {ln}L]"
 _default       = "[{type}:{first}]"
 
 # ── Preview templates: balance family (GPT, Gemini) ──────────────────────────
-# Metadata + first signature — enough context to decide, not full code dump
+# Metadata + first signature - enough context to decide, not full code dump
 [templates.preview.balance]
 
 diff           = "[diff:{files}f +{plus}/-{minus} {ln}L{fx}{fn}]"
@@ -207,10 +207,10 @@ session_inject = "CCR markers (<<<CCR:hash|type|size>>>) point to compressed con
 engine_offload = "These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} messages below are your active context."
 
 # Auto-expand guidance: shown when auto-expand is active
-auto_expand_guidance = "💋 Tool outputs are auto-expanded — you see full content inline, no <<<CCR:...>>> markers for tool results. If you see a CCR marker, retrieve only if the preview hints at useful content."
+auto_expand_guidance = "💋 Tool outputs are auto-expanded - you see full content inline, no <<<CCR:...>>> markers for tool results. If you see a CCR marker, retrieve only if the preview hints at useful content."
 
 # Catalog context warning: shown when context exceeds threshold
-catalog_context_warn = "⚠ context={ctx} msgs — prefer catalog over scanning history"
+catalog_context_warn = "⚠ context={ctx} msgs - prefer catalog over scanning history"
 
 # Search hint: shown in aphrodite_search results
 search_hint = "Use aphrodite_retrieve(hash) to expand any result hash."

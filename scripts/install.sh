@@ -1,5 +1,5 @@
 #!/bin/bash
-# aphrodite install script — downloads latest release binary
+# aphrodite install script - downloads latest release binary
 set -euo pipefail
 
 REPO="PlayForm/Aphrodite"

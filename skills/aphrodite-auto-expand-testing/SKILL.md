@@ -1,7 +1,7 @@
 ---
 name: aphrodite-auto-expand-testing
 description:
-    "Protocol for testing auto-expand behavior — controlled by AUTO_EXPAND_LIMIT
+    "Protocol for testing auto-expand behavior - controlled by AUTO_EXPAND_LIMIT
     from TOML auto_expand_limit (default 5 → effectively OFF).
     APHRODITE_AUTO_EXPAND=1 enables aggressive. Context engine is the real async
     engine."
@@ -36,15 +36,15 @@ fictional in old skills. Default (limit=5) already produces raw markers.
 
 ## The Three Layers
 
-1. **Proxy response compression** (Rust, :9798) — compresses provider RESPONSE
+1. **Proxy response compression** (Rust, :9798) - compresses provider RESPONSE
    messages. Produces `<<<CCR:...>>>` in model responses. Always active.
 
-2. **Context engine** (Python, `_engine.py`) — compresses MIDDLE messages in
+2. **Context engine** (Python, `_engine.py`) - compresses MIDDLE messages in
    conversation_history into a CCR marker. Fires on turn 2+ when threshold
-   reached. This is the "async engine" — tool call outputs get compressed into
+   reached. This is the "async engine" - tool call outputs get compressed into
    CCR memory containers, LLM sees markers and polls via `aphrodite_retrieve()`.
 
-3. **Auto-expand** (pre_llm hook) — resolves CCR markers to full content before
+3. **Auto-expand** (pre_llm hook) - resolves CCR markers to full content before
    LLM sees them. Controlled by `AUTO_EXPAND_LIMIT`.
 
 ## Protocol
@@ -74,7 +74,7 @@ APHRODITE_ENGINE_THRESHOLD_PCT=1 \
 ```
 
 Run several tool calls. After turn 2+, the context engine compresses tool
-results. LLM sees `<<<CCR:hash|context|N>>>` — must use
+results. LLM sees `<<<CCR:hash|context|N>>>` - must use
 `aphrodite_retrieve(hash)` to poll from the CCR memory container.
 
 ### Step 3: Test with auto-expand ON
@@ -83,7 +83,7 @@ results. LLM sees `<<<CCR:hash|context|N>>>` — must use
 APHRODITE_AUTO_EXPAND=1 hermes
 ```
 
-Markers under 50KB get auto-resolved — LLM sees full content instead of markers.
+Markers under 50KB get auto-resolved - LLM sees full content instead of markers.
 
 ### Step 4: Verify retrieval always works
 
@@ -104,7 +104,7 @@ setting.
 
 ## Pitfalls
 
-- **`APHRODITE_NO_AUTO_EXPAND` is fictional** — no such env var in source.
+- **`APHRODITE_NO_AUTO_EXPAND` is fictional** - no such env var in source.
   Default (limit=5) already means raw markers.
 - **Single-turn (`hermes -z`)**: context engine won't fire (needs turn 2+). Use
   multi-turn.

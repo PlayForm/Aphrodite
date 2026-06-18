@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# aphrodite cache mode — launch on :9797
+# aphrodite cache mode - launch on :9797
 #
 # Usage:
 #   ./scripts/proxy-9797.sh              # start

@@ -22,7 +22,7 @@ grep -n "transform_terminal_output" ~/.hermes/hermes-agent/tools/terminal_tool.p
 | post_llm_call             | agent/turn_finalizer.py    | ~294                  |
 | transform_terminal_output | tools/terminal_tool.py     | ~2390                 |
 | transform_tool_result     | model_tools.py             | ~1175                 |
-| pre_api_request           | NOT INVOKED                | —                     |
+| pre_api_request           | NOT INVOKED                | -                     |
 
 ## Common Pitfalls Discovered
 
@@ -53,5 +53,5 @@ grep -n "transform_terminal_output" ~/.hermes/hermes-agent/tools/terminal_tool.p
 3. Trigger the hook (send a message for pre_llm, run a command for terminal,
    etc.)
 4. Check logs for the debug message
-5. If no message appears, the hook is not firing — check hook name and Hermes
+5. If no message appears, the hook is not firing - check hook name and Hermes
    source

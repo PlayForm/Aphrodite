@@ -106,7 +106,7 @@ pub struct Defaults {
 	pub api_key: Option<String>,
 }
 
-/// Compression knobs — thresholds, engine, auto-expand, classifier poll.
+/// Compression knobs - thresholds, engine, auto-expand, classifier poll.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CompressionConfig {
 	pub engine_threshold_pct: Option<u32>,
@@ -124,7 +124,7 @@ pub struct CompressionConfig {
 	pub code_multiplier: Option<f64>,
 }
 
-/// Preview knobs — model-aware templates, code structure maps.
+/// Preview knobs - model-aware templates, code structure maps.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PreviewsConfig {
 	pub model_family: Option<String>,
@@ -133,7 +133,7 @@ pub struct PreviewsConfig {
 	pub rust_preview_lines: Option<u32>,
 }
 
-/// Prompt knobs — how the system instructs the LLM about CCR.
+/// Prompt knobs - how the system instructs the LLM about CCR.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PromptsConfig {
 	pub retrieve_guidance: Option<String>,

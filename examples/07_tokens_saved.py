@@ -1,7 +1,7 @@
-"""Atomic test 07 — tokens_saved counter never incremented.
+"""Atomic test 07 - tokens_saved counter never incremented.
 
 Bug:  AppState has tokens_saved: AtomicU64 exposed in /stats, but nowhere
-      in the compression path is .fetch_add() called — it always returns 0.
+      in the compression path is .fetch_add() called - it always returns 0.
 Fix:  After each compression, add (original_len - marker_len) to the counter.
       This file simulates the logic in Python to show the fix is correct.
 
@@ -65,6 +65,6 @@ expected = sum(max(0, len(c) - len(MARKER)) for c in contents)
 assert tokens_saved_fixed.load() == expected, \
     f"Fixed counter should be {expected}, got {tokens_saved_fixed.load()}"
 
-print("07 OK — tokens_saved counter fix verified")
+print("07 OK - tokens_saved counter fix verified")
 print(f"  buggy counter : {tokens_saved_buggy.load()}  (always 0)")
 print(f"  fixed counter : {tokens_saved_fixed.load()}  (total bytes saved)")

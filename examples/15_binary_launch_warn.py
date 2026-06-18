@@ -1,4 +1,4 @@
-"""Atomic test 15 — silent failure when binary is missing.
+"""Atomic test 15 - silent failure when binary is missing.
 
 Bug:  _ensure_binary() / register() logs an error but continues silently
       when neither the downloaded binary nor the cargo-built binary is found.
@@ -17,7 +17,7 @@ import os
 def register_buggy(binary_path: str) -> dict:
     if not os.path.isfile(binary_path):
         # BUG: logs silently, returns partial registration
-        print(f"  [buggy] WARNING: binary not found at {binary_path} — continuing")
+        print(f"  [buggy] WARNING: binary not found at {binary_path} - continuing")
         return {"tools": []}     # empty tools, no error surfaced
     return {"tools": ["headroom_retrieve", "headroom_store"]}
 
@@ -48,6 +48,6 @@ except RuntimeError as exc:
 
 assert error_raised, "Fixed: must raise RuntimeError when binary is missing"
 
-print("15 OK — missing binary surfaces RuntimeError instead of silent skip")
+print("15 OK - missing binary surfaces RuntimeError instead of silent skip")
 print(f"  buggy: tools={buggy_result['tools']!r}  (empty, no error)")
 print("  fixed: RuntimeError raised with actionable message")

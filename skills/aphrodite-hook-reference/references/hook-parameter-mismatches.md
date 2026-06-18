@@ -37,7 +37,7 @@ def handler(command="", stdout="", stderr="", exit_code=0, **kwargs):
 
 ```python
 invoke_hook("pre_llm_call",
-    conversation_history=list(messages),  # ← NOT 'api_messages' — AND it's a COPY
+    conversation_history=list(messages),  # ← NOT 'api_messages' - AND it's a COPY
     user_message=original_user_message,   # ← NOT 'response'
     ...
 )
@@ -53,9 +53,9 @@ or `pre_api_request` (if available).
 
 ```python
 invoke_hook("post_llm_call",
-    conversation_history=list(messages),  # ← NOT 'api_messages' — COPY
+    conversation_history=list(messages),  # ← NOT 'api_messages' - COPY
     assistant_response=final_response,    # ← NOT 'response'
-    turn_id=turn_id,                      # ← NOT 'turn_number' — UUID string, not int
+    turn_id=turn_id,                      # ← NOT 'turn_number' - UUID string, not int
     ...
 )
 ```

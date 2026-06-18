@@ -1,4 +1,4 @@
-//! bench_03_retrieve — retrieval correctness.
+//! bench_03_retrieve - retrieval correctness.
 //!
 //! Each test is atomic and labeled. Tests:
 //!   01  large content: store + same-port retrieve (cache)
@@ -6,7 +6,7 @@
 //!   03  cross-port isolation: token hash must miss on cache port
 //!   04  cross-port isolation: cache hash must miss on token port
 //!   05  inline_ccr zone (257–999 B): must be retrievable via POST /retrieve
-//!       — exercises R-10 fix (inline_ccr not checked in retrieve handler)
+//!       - exercises R-10 fix (inline_ccr not checked in retrieve handler)
 //!   06  UTF-8 content: found=true (exercises R-5 fix: byte-boundary panic)
 //!   07  UTF-8 content: retrieved content matches original byte-for-byte
 //!   08  bulk storm: 50 inserts then 50 retrieves, 0 misses

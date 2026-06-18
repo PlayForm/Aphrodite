@@ -1470,7 +1470,7 @@ fn format_ccr_output(preview: &str, ct: &str, metadata: &str, center: Option<&st
 fn build_preview(content: &str, ct: &str) -> String {
 	match ct {
 				"code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
-			// Code: structure-map preview — extract fn/def/class/struct sigs
+			// Code: structure-map preview - extract fn/def/class/struct sigs
 			let mut fns: Vec<&str> = Vec::new();
 			let mut structs: Vec<&str> = Vec::new();
 			let mut impls: Vec<&str> = Vec::new();
@@ -2049,7 +2049,7 @@ pub async fn handle_ccr_delete(
 // ── Config reload ──────────────────────────────────────────────────
 
 /// Hot-reload aphrodite.toml and apply compression config changes.
-/// POST /reload — returns the newly loaded compression settings.
+/// POST /reload - returns the newly loaded compression settings.
 pub async fn handle_ccr_reload() -> impl IntoResponse {
     let config_path = std::env::var("APHRODITE_CONFIG_PATH")
         .unwrap_or_else(|_| "aphrodite.toml".to_string());

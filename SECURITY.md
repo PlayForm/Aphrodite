@@ -88,7 +88,7 @@ machine, not on a remote server.
 
 ### Authorization
 
-- **Single-tenant** by design — no multi-user support
+- **Single-tenant** by design - no multi-user support
 - **API keys** for proxy authentication when enabled
 - **CORS** configurable via `aphrodite.toml`
 
@@ -106,7 +106,7 @@ machine, not on a remote server.
 
 ### CCR Store Privacy
 
-In **cache mode** (:9797), CCR entries live in memory only — process restart
+In **cache mode** (:9797), CCR entries live in memory only - process restart
 purges everything. In **token mode** (:9798), CCR entries persist in
 `~/Library/Application Support/aphrodite/ccr.db` (SQLite WAL). Consider enabling
 full-disk encryption or an encrypted APFS volume for sensitive environments.
@@ -144,22 +144,22 @@ export APHRODITE_UPSTREAM_API_KEY=sk-...
 
 ### Dependencies
 
-- **Workspace dependencies** in `Cargo.toml` — single source of truth for
+- **Workspace dependencies** in `Cargo.toml` - single source of truth for
   version pinning
-- **Pinned transitive deps** via `Cargo.lock` — committed to the repo
+- **Pinned transitive deps** via `Cargo.lock` - committed to the repo
 - **Audit**: `cargo audit` run regularly (CI gate)
 - **cargo-deny**: `deny.toml` at project root for license + advisory + duplicate
   checks
-- **No npm/PyPI deps** — pure Rust dependency tree (except headroom-core
+- **No npm/PyPI deps** - pure Rust dependency tree (except headroom-core
   vendored source)
 
 ### Build
 
-- **Reproducible builds** — same commit produces the same binary on the same
+- **Reproducible builds** - same commit produces the same binary on the same
   target
-- **Static linking** — single binary with no runtime system deps (rustls
+- **Static linking** - single binary with no runtime system deps (rustls
   everywhere, no openssl-sys)
-- **No vendored C libraries** — all dependencies are pure Rust or bundle their
+- **No vendored C libraries** - all dependencies are pure Rust or bundle their
   runtime (SQLite via `bundled` feature, ONNX Runtime via `ort`)
 
 ### Verifying releases

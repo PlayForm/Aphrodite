@@ -1,6 +1,6 @@
 # Aphrodite & Headroom
 
-Aphrodite is the primary product. Headroom is our fork — a custom, modified
+Aphrodite is the primary product. Headroom is our fork - a custom, modified
 dependency that Aphrodite extends.
 
 ---
@@ -9,9 +9,9 @@ dependency that Aphrodite extends.
 
 | Layer                     | Aphrodite                                                                               | Headroom (stock)         |
 | ------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| **Hermes plugin**         | ✅ Full Hermes Agent plugin — hooks, 13 tools, context engine, smoke tests              | ❌ No Hermes integration |
+| **Hermes plugin**         | ✅ Full Hermes Agent plugin - hooks, 13 tools, context engine, smoke tests              | ❌ No Hermes integration |
 | **Proxy binaries**        | ✅ Dual-proxy mode (:9797 cache + :9798 token) with TOML config                         | Single proxy, CLI only   |
-| **Tool relay**            | ✅ Bidirectional `/tool/relay` — LLM calls Hermes tools through proxy                   | ❌                       |
+| **Tool relay**            | ✅ Bidirectional `/tool/relay` - LLM calls Hermes tools through proxy                   | ❌                       |
 | **CCR endpoints**         | ✅ `/ccr/create`, `/ccr/list`, `/ccr/{hash}` REST API                                   | Basic CCR store          |
 | **Content classifier**    | ✅ 28‑type classifier (diff, build, terminal, code, JSON, table…)                       | Generic                  |
 | **Preview templates**     | ✅ TOML‑driven `[type:key=val]` format, 3 families (compact/balance/code_first)         | ❌                       |
@@ -40,7 +40,7 @@ Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
 | **Branding**             | PlayForm identity, 💋 em‑quad spacing, Aphrodite‑compatible naming                 |
 | **CCR hash**             | BLAKE3 → SHA‑256 (24‑char hex) for Rust‑Python parity                              |
 | **CCR marker**           | `<<<CCR:hash\|type\|size>>>` format shared across Rust and Python                  |
-| **Compression pipeline** | Absorptive preview pipeline — new content types auto‑formatted                     |
+| **Compression pipeline** | Absorptive preview pipeline - new content types auto‑formatted                     |
 | **Tool relay**           | Added Hermes‑specific tool relay protocol: `POST /tool/relay` with async callbacks |
 | **Content types**        | Extended from generic to 28 typed categories with TOML‑driven templates            |
 | **API surface**          | Added `/ccr/create`, `/ccr/list`, `/ccr/{hash}` programmatic endpoints             |
@@ -62,7 +62,7 @@ library dependency:
 
 ```
 crates/aphrodite/
-  ├── src/main.rs          # Proxy binary — spawns :9797 + :9798
+  ├── src/main.rs          # Proxy binary - spawns :9797 + :9798
   ├── src/proxy.rs         # Handler, compression, tool relay
   ├── src/retrieve.rs      # /retrieve endpoint
   └── src/config.rs        # MultiConfig from aphrodite.toml
@@ -99,7 +99,7 @@ running, verifies version, and wires the context engine.
 Session start
   → Hermes loads plugin (symlink resolve)
   → on_session_start hook fires
-    → _ensure_binary() — download or build
+    → _ensure_binary() - download or build
     → Launch :9797 cache proxy
     → Launch :9798 token proxy
     → Verify health

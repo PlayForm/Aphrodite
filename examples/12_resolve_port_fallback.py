@@ -1,4 +1,4 @@
-"""Atomic test 12 — _resolve_one() only tries the token port (9798).
+"""Atomic test 12 - _resolve_one() only tries the token port (9798).
 
 Bug:  _resolve_one() hard-codes the retrieve URL to 127.0.0.1:9798 (token
       proxy).  If the content was compressed via the cache proxy (9797) and
@@ -55,6 +55,6 @@ fixed_result = _resolve_one_fixed("abc123")
 assert buggy_result is None,                         "Buggy: token port is down → None"
 assert fixed_result == "<full tool output content>", "Fixed: fell back to cache port"
 
-print("12 OK — port fallback in _resolve_one verified")
+print("12 OK - port fallback in _resolve_one verified")
 print(f"  buggy result : {buggy_result!r}  (token port down, no fallback)")
 print(f"  fixed result : {fixed_result!r}  (fell back to cache port)")

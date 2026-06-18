@@ -1,7 +1,7 @@
 ---
 name: aphrodite-cargo-upgrade
 description:
-    "Cargo upgrade breakpoints for aphrodite + headroom — reqwest features, axum
+    "Cargo upgrade breakpoints for aphrodite + headroom - reqwest features, axum
     ConnectInfo+fallback, tokio-tungstenite Messages, pyo3 allow_threads,
     workspace pinning. What breaks and how to fix."
 version: 1.0.0
@@ -21,7 +21,7 @@ these before assuming clean build.
 `package depends on reqwest with feature rustls-tls but reqwest does not have that feature`
 
 **Fix**: Replace `rustls-tls` with `rustls` in all Cargo.toml files. Check both
-`[dependencies]` AND `[dev-dependencies]` — they can have different feature
+`[dependencies]` AND `[dev-dependencies]` - they can have different feature
 strings:
 
 ```toml
@@ -102,7 +102,7 @@ let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
 When a workspace-level dep upgrade breaks individual crates, pin at crate level:
 
 ```toml
-# headroom-proxy/Cargo.toml — pin locally, overrides workspace
+# headroom-proxy/Cargo.toml - pin locally, overrides workspace
 tokio-tungstenite = { version = "0.24", ... }
 ```
 

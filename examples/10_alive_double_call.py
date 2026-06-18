@@ -1,4 +1,4 @@
-"""Atomic test 10 — redundant _alive() calls per Hermes turn.
+"""Atomic test 10 - redundant _alive() calls per Hermes turn.
 
 Bug:  _transform_tool_result calls _alive(port) for both ports, then
       _pre_llm_hook calls _alive() again before each LLM request.  With a
@@ -68,6 +68,6 @@ fixed_probes = probe_count
 assert buggy_probes == 4, f"Buggy: expected 4 probes per turn, got {buggy_probes}"
 assert fixed_probes == 2, f"Fixed: expected 2 probes (one per port), got {fixed_probes}"
 
-print("10 OK — TTL cache halves network probes per turn")
+print("10 OK - TTL cache halves network probes per turn")
 print(f"  buggy probes / turn : {buggy_probes}")
 print(f"  fixed probes / turn : {fixed_probes}")

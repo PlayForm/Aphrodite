@@ -1,4 +1,4 @@
-//! bench_02_threshold — boundary sweep for every compression threshold.
+//! bench_02_threshold - boundary sweep for every compression threshold.
 //!
 //! Probes payload sizes at threshold-1, threshold, threshold+1 for:
 //!   INLINE_CCR_THRESHOLD  256 B  (stored inline, not CCR-marked)

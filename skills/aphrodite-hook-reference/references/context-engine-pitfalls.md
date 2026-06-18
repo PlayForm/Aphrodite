@@ -25,10 +25,10 @@ self._manager._context_engine = engine
    class attribute)
 3. `update_model` signature MUST match the ABC (7 params: model, context_length,
    base_url, api_key, provider, api_mode, \*\*kw)
-4. `should_compress(prompt_tokens)` — return bool
-5. `compress(messages, current_tokens, focus_topic)` — return modified message
+4. `should_compress(prompt_tokens)` - return bool
+5. `compress(messages, current_tokens, focus_topic)` - return modified message
    list
-6. `update_from_response(usage)` — track token usage
+6. `update_from_response(usage)` - track token usage
 
 ## Wrong (silently rejected):
 

@@ -9,7 +9,7 @@ tool outputs, and providing a tool relay for bidirectional communication.
 
 ### Aphrodite & Headroom
 
-- [Comparison: Aphrodite vs Headroom](APHRODITE-HEADROOM.md) — What Aphrodite
+- [Comparison: Aphrodite vs Headroom](APHRODITE-HEADROOM.md) - What Aphrodite
   adds on top of our Headroom fork, what we rewrote, how they ship together
 
 ### CCR (Compress-Cache-Retrieve)
@@ -102,37 +102,37 @@ tool outputs, and providing a tool relay for bidirectional communication.
 
 All schemas, formats, and values are extracted verbatim from:
 
-- `crates/aphrodite/src/proxy.rs` — proxy handler, compression pipeline, tool
+- `crates/aphrodite/src/proxy.rs` - proxy handler, compression pipeline, tool
   relay, CCR management, health check, AppState, content detection
-- `crates/aphrodite/src/retrieve.rs` — retrieve endpoint with zstd
+- `crates/aphrodite/src/retrieve.rs` - retrieve endpoint with zstd
   decompression, query filtering, pagination
-- `crates/aphrodite/src/config.rs` — CLI args, MultiConfig, ProxyConfig,
+- `crates/aphrodite/src/config.rs` - CLI args, MultiConfig, ProxyConfig,
   resolution chain
-- `crates/aphrodite/src/main.rs` — routing, middleware, metrics handler,
+- `crates/aphrodite/src/main.rs` - routing, middleware, metrics handler,
   multi-proxy spawning, shutdown
-- `vendor/headroom/crates/headroom-core/src/ccr/mod.rs` — CcrStore trait,
+- `vendor/headroom/crates/headroom-core/src/ccr/mod.rs` - CcrStore trait,
   compute_key (BLAKE3), marker_for
-- `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs` — SQLite
+- `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs` - SQLite
   schema, WAL, upsert, lazy purge, stats_db
-- `vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs` —
+- `vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs` -
   DashMap, FIFO eviction, queue compaction, TOCTOU safety
-- `plugins/aphrodite/_core/config.py` — constants, thresholds, CCR regex, inline
+- `plugins/aphrodite/_core/config.py` - constants, thresholds, CCR regex, inline
   store, trigram index, model family
-- `plugins/aphrodite/_core/settings.py` — in‑memory settings store, API‑driven
+- `plugins/aphrodite/_core/settings.py` - in‑memory settings store, API‑driven
   reload
-- `plugins/aphrodite/_core/state.py` — session state: turn counter, caches, CCR
+- `plugins/aphrodite/_core/state.py` - session state: turn counter, caches, CCR
   regex
-- `plugins/aphrodite/_marker/marker.py` — CCR marker generation, content
+- `plugins/aphrodite/_marker/marker.py` - CCR marker generation, content
   classification, proxy compression, marker parsing
-- `plugins/aphrodite/_tools.py` — retrieve/compress handlers with JSON schemas
-- `plugins/aphrodite/_hooks/transform.py` — tool result compression, formatting,
+- `plugins/aphrodite/_tools.py` - retrieve/compress handlers with JSON schemas
+- `plugins/aphrodite/_hooks/transform.py` - tool result compression, formatting,
   live container
-- `plugins/aphrodite/_hooks/session.py` — pre/post LLM hooks, catalog injection,
+- `plugins/aphrodite/_hooks/session.py` - pre/post LLM hooks, catalog injection,
   turn storage
-- `plugins/aphrodite/_hooks/terminal.py` — terminal output compression
-- `plugins/aphrodite/_engine.py` — AphroditeContextEngine: compress, editing
+- `plugins/aphrodite/_hooks/terminal.py` - terminal output compression
+- `plugins/aphrodite/_engine.py` - AphroditeContextEngine: compress, editing
   detection, orphan sweep
-- `plugins/aphrodite/plugin.yaml` — hook/tool/engine registration, install
+- `plugins/aphrodite/plugin.yaml` - hook/tool/engine registration, install
   message
 
 ## Conventions

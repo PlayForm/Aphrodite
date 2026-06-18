@@ -1,4 +1,4 @@
-"""Atomic test 03 — health-check body comparison: missing space in JSON key.
+"""Atomic test 03 - health-check body comparison: missing space in JSON key.
 
 Bug:  _alive() checks  '"status":"healthy"'  (no space after colon).
       serde_json serialises  '"status": "healthy"'  (space after colon).
@@ -44,6 +44,6 @@ assert _alive_fixed(RESPONSE_JSON)    is True,  "fixed: serde_json with space"
 assert _alive_fixed(RESPONSE_COMPACT) is True,  "fixed: compact JSON"
 assert _alive_fixed(RESPONSE_BAD)     is False, "fixed: starting is not healthy"
 
-print("03 OK — JSON health-check space bug demonstrated and fixed")
+print("03 OK - JSON health-check space bug demonstrated and fixed")
 print(f"  buggy(serde_json body)  : {_alive_buggy(RESPONSE_JSON)}   <- FALSE NEGATIVE")
 print(f"  fixed(serde_json body)  : {_alive_fixed(RESPONSE_JSON)}   <- correct")

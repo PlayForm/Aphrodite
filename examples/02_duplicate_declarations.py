@@ -1,4 +1,4 @@
-"""Atomic test 02 — duplicate module-level declarations shadow configured values.
+"""Atomic test 02 - duplicate module-level declarations shadow configured values.
 
 Bug:  _inline_store = {} and INLINE_THRESHOLD = 4096 appear twice at module
       level.  The second bare assignment overwrites whatever _cfg_int returned.
@@ -16,7 +16,7 @@ os.environ["APHRODITE_INLINE_THRESHOLD"] = "512"
 def _cfg_int(key: str, default: int) -> int:
     return int(os.environ.get(key, default))
 
-# first declaration — correct
+# first declaration - correct
 _inline_store: dict = {}
 INLINE_THRESHOLD = _cfg_int("APHRODITE_INLINE_THRESHOLD", 4096)
 
@@ -37,7 +37,7 @@ fixed_threshold = INLINE_THRESHOLD_F  # will be 512
 assert buggy_threshold == 4096, f"Expected 4096, got {buggy_threshold}"
 assert fixed_threshold == 512, f"Expected 512, got {fixed_threshold}"
 
-print("02 OK — duplicate declaration shadowing detected")
+print("02 OK - duplicate declaration shadowing detected")
 print(f"  buggy INLINE_THRESHOLD : {buggy_threshold}  (hardcoded, env var lost)")
 print(f"  fixed INLINE_THRESHOLD : {fixed_threshold}  (from environment)")
 

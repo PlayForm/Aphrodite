@@ -1,6 +1,6 @@
 # Hermes Integration
 
-How Aphrodite connects to Hermes Agent — and why it's different from a plain proxy.
+How Aphrodite connects to Hermes Agent - and why it's different from a plain proxy.
 
 ## Architecture
 
@@ -59,27 +59,27 @@ With native Hermes integration, `transform_tool_result` replaces it:
 ```
 
 The agent can retrieve the full output with `aphrodite_retrieve(hash)` only if
-it actually needs it — but for clean builds, exit=0 terminals, and small diffs,
+it actually needs it - but for clean builds, exit=0 terminals, and small diffs,
 the preview is enough.
 
 ## Why Not Just a Proxy?
 
 A generic proxy compresses HTTP response bodies. That helps, but:
 
-1. **Tool output never hits the wire** — Hermes tool calls run locally.
+1. **Tool output never hits the wire** - Hermes tool calls run locally.
    `transform_tool_result` intercepts the return value BEFORE it becomes part
    of the message history. A proxy can't see this.
 
-2. **Terminal output is local** — `transform_terminal_output` catches shell
+2. **Terminal output is local** - `transform_terminal_output` catches shell
    command stdout/stderr before Hermes even processes it. The proxy has no
    visibility.
 
-3. **Context engine needs message access** — The engine reads the conversation
+3. **Context engine needs message access** - The engine reads the conversation
    history to decide which messages to offload to CCR. A proxy sees individual
    HTTP requests, not the full context.
 
-4. **Agent augmentation** — The 12 `aphrodite_*` tools and 9 bundled skills
-   teach the agent HOW to use compression. A proxy is opaque — the agent
+4. **Agent augmentation** - The 12 `aphrodite_*` tools and 9 bundled skills
+   teach the agent HOW to use compression. A proxy is opaque - the agent
    doesn't know compression exists.
 
 ## Setup

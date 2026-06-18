@@ -45,5 +45,5 @@ the output is being re-compressed. Check:
 - `_transform_tool_result` in plugin: compresses tool outputs >1KB (token)
   or >8KB (cache)
 - `headroom_retrieve` tool: resolves CCR markers to original content
-- Skip list applies BEFORE threshold check — skip items are never compressed
+- Skip list applies BEFORE threshold check - skip items are never compressed
   regardless of size

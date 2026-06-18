@@ -53,7 +53,7 @@ invoke_hook("on_session_start",
 )
 ```
 
-**Plugin receives**: `on_start(**kw)` — uses catch-all kwargs.
+**Plugin receives**: `on_start(**kw)` - uses catch-all kwargs.
 
 **Return value**: Ignored (fire-and-forget hook).
 
@@ -86,7 +86,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 **Return semantics**: Return a STRING to inject it as context into user message.
 Hermes calls `"\n\n".join(_ctx_parts)` and appends as `plugin_user_context`.
 
-**CRITICAL**: conversation_history is `list(messages)` — a COPY. In-place
+**CRITICAL**: conversation_history is `list(messages)` - a COPY. In-place
 mutations (pop, insert) are DISCARDED. To modify messages, use
 ContextEngine.compress() instead.
 
@@ -127,7 +127,7 @@ sequential counter for human-readable memory entries.
 ```python
 invoke_hook("transform_terminal_output",
     command=command,
-    output=output,              # NOT 'stdout' — this was the terminal-output bug
+    output=output,              # NOT 'stdout' - this was the terminal-output bug
     returncode=returncode,      # NOT 'exit_code'
     task_id=effective_task_id or "",
     env_type=env_type,
@@ -141,7 +141,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
 ```
 
 **Return semantics**: Return a STRING to REPLACE the terminal output. First
-non-None string wins. Returning empty string REPLACES output with empty — MUST
+non-None string wins. Returning empty string REPLACES output with empty - MUST
 return `output` parameter for pass-through.
 
 ## Hook: transform_tool_result
@@ -178,7 +178,7 @@ string wins.
 
 ## CCR Marker Format
 
-Standard ASCII format — compatible across all terminals, shells, and LLM
+Standard ASCII format - compatible across all terminals, shells, and LLM
 tokenizers:
 
 ```
@@ -194,7 +194,7 @@ Parsed by regex: `r'<<<CCR:([^>]+)>>>'`
 
 **Why ASCII `<<<>>>` not Unicode `⫷⫸` or `[...]`:**
 
-- `<<<...>>>` is pure ASCII — works in every terminal, LLM tokenizer, and log
+- `<<<...>>>` is pure ASCII - works in every terminal, LLM tokenizer, and log
   viewer
 - `[CCR:...]` collides with JSON arrays and markdown link syntax, confusing LLM
   parsers
@@ -203,7 +203,7 @@ Parsed by regex: `r'<<<CCR:([^>]+)>>>'`
 - The triple-angle-bracket convention is widely recognized (here-docs, C++
   templates, etc.)
 - Rust source files use literal `<<<CCR:` and `>>>` characters directly in
-  string literals — no escape sequences needed **Rust format string**:
+  string literals - no escape sequences needed **Rust format string**:
   `format!("<<<CCR:{}|{}|{}>>> {}", hash, ct, size, oneliner)`
 
 ## Known Mismatches (Fixed)
@@ -217,7 +217,7 @@ Parsed by regex: `r'<<<CCR:([^>]+)>>>'`
 
 ## Hermes turn_id is NOT a sequential number
 
-Hermes `turn_id` is `{session_id}:{task_id}:{uuid}` — a UUID string, not a
+Hermes `turn_id` is `{session_id}:{task_id}:{uuid}` - a UUID string, not a
 counter. Use your own sequential `_turn_counter` for memory indexing. Do NOT use
 Hermes' turn_id as a dict key for conversation memory.
 
@@ -240,7 +240,7 @@ Fix: `class MyEngine(ContextEngine)` and use `@property` for `name`.
 
 `_transform_tool_result` compresses all tool outputs >1KB. If
 `aphrodite_retrieve` output gets compressed, the LLM sees another CCR marker
-instead of actual content — causing infinite recursion. Add headroom tools to
+instead of actual content - causing infinite recursion. Add headroom tools to
 the skip list:
 
 ```python
@@ -269,21 +269,21 @@ The master format is defined in `_ccr_marker()` (Python) and `smart_marker()`
 7. Update `_parse_ccr_markers` docstring
 8. Update tool injection description in `compress_chat_completion`
 9. Update docstrings referencing the marker format
-10. There are NO other places — if you find one, add it to this checklist
+10. There are NO other places - if you find one, add it to this checklist
 
-## Proxy Health Check — Decoupled Pattern
+## Proxy Health Check - Decoupled Pattern
 
-`/health` (GET) — local-only check, no upstream API call:
+`/health` (GET) - local-only check, no upstream API call:
 
 ```rust
-// Returns immediately — just checks CCR backend is alive
+// Returns immediately - just checks CCR backend is alive
 pub async fn health_check(State(state): ...) -> impl IntoResponse {
     let ccr_ok = state.ccr.is_some();
     Json(json!({"status": if ccr_ok { "healthy" } else { "degraded" }, ...}))
 }
 ```
 
-`/health/upstream` (GET) — separate endpoint for DeepSeek API probe:
+`/health/upstream` (GET) - separate endpoint for DeepSeek API probe:
 
 ```rust
 // Used for diagnostics, not hot-path health checks
@@ -300,7 +300,7 @@ Hermes has a pluggable context engine system via
 
 **As of v1.26.0**: Context engine is opt-in. The plugin only registers the
 engine when `APHRODITE_CONTEXT_ENGINE=1` is set. Default mode is hooks + proxy
-only — no engine.
+only - no engine.
 
 ```python
 engine_configured = os.environ.get("APHRODITE_CONTEXT_ENGINE", "") == "1"
@@ -332,7 +332,7 @@ if h in _inline_store:
 ```
 
 Applied in `_compress_handler` and `_transform_tool_result` CCR path. Also used
-in `_resolve_one` — retrieved content is cached in `_inline_store` for future
+in `_resolve_one` - retrieved content is cached in `_inline_store` for future
 searches.
 
 ## Bi-Directional Store
@@ -388,7 +388,7 @@ Other plugins: `ctx.register_hook("my_engine_compressed", callback)`
 
 `_transform_tool_result` compresses ALL tool outputs >1KB. If
 `aphrodite_retrieve` or `headroom_stats` are NOT in the skip list, their output
-gets re-compressed — creating an infinite loop where retrieve results are always
+gets re-compressed - creating an infinite loop where retrieve results are always
 CCR markers instead of content.
 
 **Skip list MUST include retrieval tools**:
@@ -415,7 +415,7 @@ while boundary < len(messages) and messages[boundary].get("role") == "tool":
     tail_n += 1
 ```
 
-## pre_api_request — NOT Invoked
+## pre_api_request - NOT Invoked
 
 Defined in VALID_HOOKS but has NO invocation sites in non-test code. Registering
 is a no-op. Use ContextEngine.compress() for message modification instead.
@@ -424,20 +424,20 @@ is a no-op. Use ContextEngine.compress() for message modification instead.
 
 Key files for verifying hook signatures:
 
-- agent/turn_context.py — pre_llm_call
-- agent/turn_finalizer.py — post_llm_call
-- agent/conversation_loop.py — on_session_start
-- tools/terminal_tool.py — transform_terminal_output (line 2390-2396)
-- model_tools.py — transform_tool_result
-- agent/agent_init.py — context engine selection (context.engine config, line
+- agent/turn_context.py - pre_llm_call
+- agent/turn_finalizer.py - post_llm_call
+- agent/conversation_loop.py - on_session_start
+- tools/terminal_tool.py - transform_terminal_output (line 2390-2396)
+- model_tools.py - transform_tool_result
+- agent/agent_init.py - context engine selection (context.engine config, line
   1440-1500)
-- agent/context_engine.py — ContextEngine ABC
-- hermes_cli/plugins.py — register_context_engine (isinstance check at line
+- agent/context_engine.py - ContextEngine ABC
+- hermes_cli/plugins.py - register_context_engine (isinstance check at line
   518-525)
 
 ## Reference Files
 
-- `references/ccr-marker-format.md` — CCR marker format, regex, pipeline flow,
+- `references/ccr-marker-format.md` - CCR marker format, regex, pipeline flow,
   thresholds
-- `references/health-check-pattern.md` — \_alive() 5s TTL cache, retry loop,
+- `references/health-check-pattern.md` - \_alive() 5s TTL cache, retry loop,
   Rust health decoupling

@@ -95,7 +95,7 @@ export default {
 			files: "*.md",
 			options: { parser: "markdown" },
 		},
-		// package.json — strict JSON (no trailing commas/comments)
+		// package.json - strict JSON (no trailing commas/comments)
 		{
 			files: "package.json",
 			options: {
@@ -103,7 +103,7 @@ export default {
 				trailingComma: "none",
 			},
 		},
-		// Other JSON — loose (allows comments)
+		// Other JSON - loose (allows comments)
 		{
 			files: "*.json",
 			excludeFiles: ["package.json"],

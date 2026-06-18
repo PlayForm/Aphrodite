@@ -1,5 +1,5 @@
 //! Rust source payload for bench_01_corpus.
-//! ~3.5 KB — above TOKEN_COMPRESS_THRESHOLD (1 KB), below CACHE_COMPRESS_THRESHOLD (8 KB).
+//! ~3.5 KB - above TOKEN_COMPRESS_THRESHOLD (1 KB), below CACHE_COMPRESS_THRESHOLD (8 KB).
 //! Expected: compressed in token mode, passthrough in cache mode.
 
 use std::collections::HashMap;

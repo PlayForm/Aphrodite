@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# aphrodite aphrodite mode — launch on :9798
+# aphrodite aphrodite mode - launch on :9798
 #
 # Usage:
 #   ./scripts/proxy-9798.sh              # start

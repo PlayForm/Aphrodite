@@ -1,7 +1,7 @@
 ---
 name: aphrodite-development-lessons
 description:
-    "Critical development pitfalls for Aphrodite — auto-expand, env_passthrough,
+    "Critical development pitfalls for Aphrodite - auto-expand, env_passthrough,
     plugin symlink, dual-store pattern, release notes, and session setup
     checklist. Learned across v0.5.104–v0.7.0."
 version: 1.0.0
@@ -30,7 +30,7 @@ auto_expand_limit = 51200
 
 Or per-session: `APHRODITE_AUTO_EXPAND=1 hermes --profile dev-aphrodite`
 
-**When you see a CCR marker:** use `aphrodite_retrieve(hash)` — DO NOT try
+**When you see a CCR marker:** use `aphrodite_retrieve(hash)` - DO NOT try
 alternative tools. They'll also produce CCR markers.
 
 ## Plugin Symlink → Repo
@@ -44,7 +44,7 @@ The plugin must symlink directly to the repo for instant code updates:
 Without this, code changes in the repo don't reach the running plugin.
 Background workers get stale code.
 
-## env_passthrough — API Key Blocking
+## env_passthrough - API Key Blocking
 
 Empty `env_passthrough: []` blocks `APHRODITE_API_KEY` from reaching proxy
 subprocesses. Proxies silently fail to start.
@@ -52,7 +52,7 @@ subprocesses. Proxies silently fail to start.
 **Fix:**
 `hermes config set terminal.env_passthrough '["APHRODITE_API_KEY","PATH","HOME"]' --profile dev-aphrodite`
 
-## Release Notes — Shell Injection
+## Release Notes - Shell Injection
 
 **NEVER** use inline backtick-quoted text with `gh release create --notes`. The
 shell interprets backticks as command substitution, capturing Hermes TUI output.
@@ -81,7 +81,7 @@ Pattern: after `_compress_via_proxy(content, ...)` succeeds with hash `h`, call
 After `_resolve_one` fetches from proxy, call
 `_inline_store_put(hash_val, result)` before returning.
 
-## Version Bump — 5 Locations (v0.7.0+)
+## Version Bump - 5 Locations (v0.7.0+)
 
 Atomization moved `_core.py` → `_core/config.py`. Auto-release now bumps:
 

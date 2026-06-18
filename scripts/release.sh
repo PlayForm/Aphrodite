@@ -1,5 +1,5 @@
 #!/bin/bash
-# release.sh — auto-bump, build, tag, and release aphrodite
+# release.sh - auto-bump, build, tag, and release aphrodite
 # Usage: ./scripts/release.sh [patch|minor|major] [--push]
 # Default: patch bump, no push
 

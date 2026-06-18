@@ -1,7 +1,7 @@
 ---
 name: aphrodite-upgrade-breakpoints
 description:
-    Cargo upgrade breakpoints for aphrodite + headroom — required by the
+    Cargo upgrade breakpoints for aphrodite + headroom - required by the
     standalone plugin repo and release workflow.
 version: 1.0.1
 ---
@@ -45,7 +45,7 @@ if args.iter().any(|a| a == "--version" || a == "-V") {
 
 ## Standalone Plugin Repo
 
-End users install from `PlayForm/Aphrodite-Hermes` — NO binary committed (74
+End users install from `PlayForm/Aphrodite-Hermes` - NO binary committed (74
 files, 317KB). Binary auto-downloaded from GitHub Releases on first `on_start()`
 via `_ensure_binary()`. The `_rebuild_handler` checks for Cargo.toml; if absent
 it re-downloads from releases.
@@ -53,6 +53,6 @@ it re-downloads from releases.
 ## Previous Breakpoints
 
 - axum 0.8 wildcards in route patterns
-- tracing `DisplayValue<T>` requiring `fmt::Display` — `PathBuf` uses
+- tracing `DisplayValue<T>` requiring `fmt::Display` - `PathBuf` uses
   `.display()` not `%` format
 - `_headroom_context` import from `.health` NOT `.env` (silent plugin kill)

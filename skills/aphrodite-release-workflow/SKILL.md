@@ -11,7 +11,7 @@ platforms: [macos]
 
 ## Pre-Release Verification
 
-**MANDATORY before every release.** Missing symbols silently kill the plugin —
+**MANDATORY before every release.** Missing symbols silently kill the plugin -
 `Failed to load plugin` with no error.
 
 ```bash
@@ -23,7 +23,7 @@ cargo check -p aphrodite
 ```
 
 If any step fails, fix BEFORE releasing. A broken plugin means zero tools, no
-compression, no context engine — a silent degradation users won't notice.
+compression, no context engine - a silent degradation users won't notice.
 
 ## Auto-Release
 
@@ -36,13 +36,13 @@ to `Source` remote.
 
 ## Version Sync
 
-5 locations must match — auto-release.sh bumps all via `sed`:
+5 locations must match - auto-release.sh bumps all via `sed`:
 
-1. `plugins/aphrodite/_core/config.py` — `BIN_VERSION` + `PLUGIN_VERSION`
-2. `plugins/aphrodite/plugin.yaml` — `version:`
-3. `plugins/aphrodite/pyproject.toml` — `version =`
-4. `plugins/aphrodite/__init__.py` — docstring `aphrodite vX.Y.Z`
-5. `crates/aphrodite/Cargo.toml` — `version =`
+1. `plugins/aphrodite/_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION`
+2. `plugins/aphrodite/plugin.yaml` - `version:`
+3. `plugins/aphrodite/pyproject.toml` - `version =`
+4. `plugins/aphrodite/__init__.py` - docstring `aphrodite vX.Y.Z`
+5. `crates/aphrodite/Cargo.toml` - `version =`
 
 ## Binary Symlink
 
@@ -50,7 +50,7 @@ to `Source` remote.
 ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/aphrodite
 ```
 
-## Release Notes — Shell Injection
+## Release Notes - Shell Injection
 
 Never use backticks with `gh release create --notes`. Use `--notes-file` with a
 heredoc:

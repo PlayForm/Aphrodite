@@ -1,4 +1,4 @@
-"""Atomic test 05 — _detect_platform() unused in binary download URL.
+"""Atomic test 05 - _detect_platform() unused in binary download URL.
 
 Bug:  _download_binary() builds the URL as
         .../releases/download/{version}/aphrodite
@@ -50,7 +50,7 @@ assert not buggy_url.endswith(("-arm64", "-x64", "-windows")), \
     "Buggy URL must have no platform suffix"
 assert plat in fixed_url, f"Fixed URL must embed platform '{plat}'"
 
-print("05 OK — platform tag integrated into download URL")
+print("05 OK - platform tag integrated into download URL")
 print(f"  current platform : {plat}")
 print(f"  buggy URL : {buggy_url}")
 print(f"  fixed URL : {fixed_url}")
