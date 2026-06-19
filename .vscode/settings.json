@@ -54,7 +54,7 @@
     "**/.fingerprint": true,
     "**/incremental": true,
     "**/deps": true,
-    "**/vendor": true
+    "**/vendor": false
   },
   "search.exclude": {
     "**/target": true,
