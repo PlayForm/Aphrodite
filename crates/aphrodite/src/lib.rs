@@ -25,7 +25,7 @@ static HANDLES: Mutex<Option<HashMap<usize, AphroditeState>>> = Mutex::new(None)
 static NEXT_ID: Mutex<usize> = Mutex::new(1);
 
 fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, AphroditeState>>> {
-    let mut g = HANDLES.lock().unwrap();
+    let mut g = HANDLES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if g.is_none() { *g = Some(HashMap::new()); }
     g
 }
