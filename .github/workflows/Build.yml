@@ -67,9 +67,9 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Init submodule from remote
+      - name: Init submodules
         run: |
-          git submodule update --init --recursive || true
+          git submodule update --init --recursive
           git submodule status
 
       - name: Install onnxruntime (Linux)
