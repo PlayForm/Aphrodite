@@ -1,5 +1,5 @@
 """
-Dynamic hook adapter — STABLE runtime bootstrap.
+Dynamic hook adapter - STABLE runtime bootstrap.
 
 This file initialises the Effect runtime with built-in services
 (dylib loading, hook dispatch) and registers Hermes hook pipelines.
@@ -36,7 +36,7 @@ def _load_dylib() -> ctypes.CDLL:
 
     lib = ctypes.CDLL(str(_DYLIB))
 
-    # ── C ABI signatures (stable — NEVER changes) ──────────────────────
+    # ── C ABI signatures (stable - NEVER changes) ──────────────────────
     lib.aphrodite_hooks.argtypes = []
     lib.aphrodite_hooks.restype = ctypes.c_void_p
 
@@ -68,7 +68,7 @@ _BOOTSTRAPPED = False
 
 
 def bootstrap():
-    """Initialise the runtime. Idempotent — safe to call multiple times."""
+    """Initialise the runtime. Idempotent - safe to call multiple times."""
     global _BOOTSTRAPPED
     if _BOOTSTRAPPED:
         return
@@ -108,7 +108,7 @@ def bootstrap():
 
     import logging
     logging.getLogger("aphrodite").info(
-        "aphrodite runtime bootstrapped — v%s hooks=%s", version, hooks,
+        "aphrodite runtime bootstrapped - v%s hooks=%s", version, hooks,
     )
 
 
@@ -159,4 +159,4 @@ if __name__ == "__main__":
                          {"content": "error: broke\nline2", "tool_name": "test"})
     print(f"  transform:     {r}")
 
-    print("\n✓ Effect runtime ready — extensions load via runtime.prepend()/append()")
+    print("\n✓ Effect runtime ready - extensions load via runtime.prepend()/append()")

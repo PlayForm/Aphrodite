@@ -1,5 +1,5 @@
 #!/bin/sh
-# Aphrodite Format — Prettier pass for Markdown, JSON, YAML
+# Aphrodite Format - Prettier pass for Markdown, JSON, YAML
 # TOML handled by taplo; Python by ruff; Rust by rustfmt
 # Usage: sh Maintain/Format.sh
 

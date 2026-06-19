@@ -108,3 +108,7 @@ Session start
   → Tools registered
   → Hooks wired
 ```
+
+---
+
+→ **[Complete fork divergence analysis](HEADROOM-FORK-DIFF.md)** - every commit, every deleted file, every modified subsystem between upstream Headroom and our PlayForm fork.
