@@ -4,8 +4,9 @@
 
 mod hooks;
 mod marker;
+mod prefetch;
+mod session;
 mod state;
-mod config_loader;
 mod session;
 
 // Proxy modules (used by main.rs binary)
