@@ -74,5 +74,6 @@
     "**/vendor/**": true,
     "**/.hermes/**": true,
     "**/profiles/**": true
-  }
+},
+"explorer.excludeGitIgnore": false
 }
