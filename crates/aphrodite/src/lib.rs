@@ -2,12 +2,13 @@
 //! 14 functions — init, destroy, classify, compress, retrieve, transform,
 //! terminal, session_start, catalog, stats, reload, config_get/set, search.
 
+mod catalog;
+mod config_loader;
 mod hooks;
 mod marker;
 mod prefetch;
 mod session;
 mod state;
-mod session;
 
 // Proxy modules (used by main.rs binary)
 pub mod center;
