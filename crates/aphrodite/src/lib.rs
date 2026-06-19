@@ -21,6 +21,10 @@ use std::sync::Mutex;
 use headroom_core::transforms;
 use state::AphroditeState;
 
+// ── Hardened primitives ──────────────────────────────────────────────
+
+const MAX_CONTENT: usize = 16 * 1024 * 1024; // 16MB cap
+
 static HANDLES: Mutex<Option<HashMap<usize, AphroditeState>>> = Mutex::new(None);
 static NEXT_ID: Mutex<usize> = Mutex::new(1);
 
@@ -31,26 +35,42 @@ fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, AphroditeSt
 }
 
 fn alloc_handle(state: AphroditeState) -> usize {
-    let mut id = NEXT_ID.lock().unwrap();
-    let hid = *id; *id += 1;
+    let mut id = NEXT_ID.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let hid = *id;
+    *id = id.wrapping_add(1);  // overflow-safe
     handles().as_mut().unwrap().insert(hid, state);
     hid
 }
 
-fn with_state<T>(hid: usize, f: impl FnOnce(&mut AphroditeState) -> T) -> Result<T, String> {
+fn with_state<T>(hid: usize, f: impl FnOnce(&mut AphroditeState) -> T + std::panic::UnwindSafe) -> Result<T, String> {
     let mut h = handles();
-    match h.as_mut().and_then(|m| m.get_mut(&hid)) {
-        Some(state) => Ok(f(state)),
-        None => Err(format!("invalid handle: {}", hid)),
-    }
+    let state = match h.as_mut().and_then(|m| m.get_mut(&hid)) {
+        Some(s) => s,
+        None => return Err(format!("invalid handle: {}", hid)),
+    };
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(state)))
+        .map_err(|_| "internal error: hook panicked".to_string())
 }
 
 fn to_json_error(msg: &str) -> *mut c_char {
-    CString::new(serde_json::json!({"error": msg}).to_string()).unwrap().into_raw()
+    let json = serde_json::json!({"error": msg}).to_string();
+    CString::new(json).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut())
 }
 
 fn to_json_ok(v: &serde_json::Value) -> *mut c_char {
-    CString::new(v.to_string()).unwrap().into_raw()
+    CString::new(v.to_string()).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut())
+}
+
+unsafe fn cstr(ptr: *const c_char) -> Option<String> {
+    if ptr.is_null() { return None; }
+    Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+}
+
+fn check_content(content: &str) -> Result<(), &'static str> {
+    if content.is_empty() { return Err("empty content"); }
+    if content.len() > MAX_CONTENT { return Err("content exceeds 16MB limit"); }
+    if content.contains('\0') { return Err("content contains null bytes"); }
+    Ok(())
 }
 
 // ── C ABI ────────────────────────────────────────────────────────────
@@ -95,7 +115,8 @@ fn to_json_ok(v: &serde_json::Value) -> *mut c_char {
 }
 
 #[no_mangle] pub extern "C" fn aphrodite_classify(content: *const c_char) -> *mut c_char {
-    let c = unsafe { CStr::from_ptr(content) }.to_string_lossy();
+    let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
+    if let Err(e) = check_content(&c) { return to_json_error(e); }
     let ct = transforms::detect(&c);
     to_json_ok(&serde_json::json!({"type":ct.as_str(),"lines":c.lines().count(),"bytes":c.len()}))
 }
