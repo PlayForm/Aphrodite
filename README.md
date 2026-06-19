@@ -527,7 +527,7 @@ deduplication (identical content = one hash) but not semantic reduction.
 [Headroom] (partner proxy at :9799) brings the semantic layer - specialized
 compressors that understand _what_ the content is and reduce it intelligently.
 
-[Headroom]: https://github.com/chopratejas/headroom
+[Headroom]: https://github.com/PlayForm/Headroom
 
 ### Headroom compressor roster
 
@@ -729,6 +729,9 @@ tool relay, and PlayForm branding.
 
 → **[Full comparison: Aphrodite vs Headroom](docs/APHRODITE-HEADROOM.md)** -
 what we add, what we rewrote, how they ship together.
+
+→ **[Complete fork divergence](docs/HEADROOM-FORK-DIFF.md)** - every commit,
+every deletion, every change between upstream Headroom and our fork.
 
 ---
 

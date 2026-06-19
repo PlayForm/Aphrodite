@@ -12,6 +12,8 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 - [Comparison: Aphrodite vs Headroom](APHRODITE-HEADROOM.md) - What Aphrodite
   adds on top of our Headroom fork, what we rewrote, how they ship together
+- [Fork Divergence Analysis](HEADROOM-FORK-DIFF.md) - Every commit, deletion,
+  and modification between upstream Headroom and the PlayForm fork
 
 ### CCR (Compress-Cache-Retrieve)
 

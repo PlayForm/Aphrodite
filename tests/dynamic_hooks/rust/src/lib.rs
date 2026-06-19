@@ -56,7 +56,7 @@ pub extern "C" fn aphrodite_free_string(s: *mut c_char) {
 
 fn on_session_start(_args: &str) -> String {
     format!(
-        r#"{{"status":"ok","msg":"💋 aphrodite v{} — dylib loaded"}}"#,
+        r#"{{"status":"ok","msg":"💋 aphrodite v{} - dylib loaded"}}"#,
         env!("CARGO_PKG_VERSION")
     )
 }

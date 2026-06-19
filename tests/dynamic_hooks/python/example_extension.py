@@ -2,7 +2,7 @@
 Example extension by a 3rd-party developer.
 
 Installs custom effects into the aphrodite runtime pipelines.
-NO adapter.py changes needed — just import runtime and register.
+NO adapter.py changes needed - just import runtime and register.
 
 Usage:
   from example_extension import install
@@ -13,7 +13,7 @@ from effects import Effect, runtime
 import time
 
 
-# ── Effect 1: sanitize (runs BEFORE dylib — cleans input) ────────────────
+# ── Effect 1: sanitize (runs BEFORE dylib - cleans input) ────────────────
 
 def make_sanitize(args: dict) -> Effect:
     """Strip whitespace from content fields."""
@@ -24,7 +24,7 @@ def make_sanitize(args: dict) -> Effect:
     return Effect.sync(_clean)
 
 
-# ── Effect 2: log (runs AFTER dylib — observes output) ───────────────────
+# ── Effect 2: log (runs AFTER dylib - observes output) ───────────────────
 
 def make_log(result: dict) -> Effect:
     """Log the hook result via Python logging."""
@@ -37,7 +37,7 @@ def make_log(result: dict) -> Effect:
     return Effect.sync(_log)
 
 
-# ── Effect 3: enrich (runs AFTER dylib — adds metadata) ──────────────────
+# ── Effect 3: enrich (runs AFTER dylib - adds metadata) ──────────────────
 
 def make_enrich(result: dict) -> Effect:
     """Add extension metadata to every result."""
@@ -62,7 +62,7 @@ def install():
         runtime.append(hook, make_log)
         runtime.append(hook, make_enrich)
 
-    print(f"[example-extension] installed — {runtime.list_pipelines()}")
+    print(f"[example-extension] installed - {runtime.list_pipelines()}")
 
 
 # ── Smoke test ────────────────────────────────────────────────────────────

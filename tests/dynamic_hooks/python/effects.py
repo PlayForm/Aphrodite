@@ -1,5 +1,5 @@
 """
-Aphrodite Effect Runtime — Effect-TS pattern for Python.
+Aphrodite Effect Runtime - Effect-TS pattern for Python.
 
 Core concepts (from Effect-TS):
   Effect<A, E, R>  = immutable description of a computation
@@ -9,7 +9,7 @@ Core concepts (from Effect-TS):
 
   An Effect is a VALUE, not a function. It doesn't run until Runtime.run().
   Extensions compose effects with .map() / .flatMap() / pipe().
-  The dylib is a SERVICE — effects declare it as a requirement.
+  The dylib is a SERVICE - effects declare it as a requirement.
 """
 
 from __future__ import annotations
@@ -62,11 +62,11 @@ class Effect(Generic[A]):
     An immutable description of a computation.
 
     Create effects with:
-      Effect.succeed(value)         — always succeeds
-      Effect.fail(error)            — always fails
-      Effect.sync(fn)               — sync computation that may throw
-      Effect.service("dylib")       — accesses a service
-      Effect.from_callable(fn)      — wraps a callable returning (result, error)
+      Effect.succeed(value)         - always succeeds
+      Effect.fail(error)            - always fails
+      Effect.sync(fn)               - sync computation that may throw
+      Effect.service("dylib")       - accesses a service
+      Effect.from_callable(fn)      - wraps a callable returning (result, error)
     """
 
     _run: Callable[[ServiceRegistry], tuple[Any, Any | None]] = field(repr=False)
@@ -237,8 +237,8 @@ class Runtime:
     Central registry for services and hook pipelines.
 
     Built-in services (provided at bootstrap):
-      "dylib"       — loaded dylib handle (via ctypes.CDLL)
-      "config"      — configuration dict
+      "dylib"       - loaded dylib handle (via ctypes.CDLL)
+      "config"      - configuration dict
 
     Extensions can register additional services and pipeline effects.
     """
@@ -250,7 +250,7 @@ class Runtime:
     # ── Services ────────────────────────────────────────────────────────
 
     def provide(self, name: str, value: Any) -> Runtime:
-        """Register a service. Fluent — returns self."""
+        """Register a service. Fluent - returns self."""
         self._services.provide(name, value)
         return self
 
