@@ -76,3 +76,5 @@ id_rsa*
 **/.DS_Store
 *.bak
 vendor/headroom/Cargo.lock
+.tmp_*.txt
+.cargo_check_output.txt

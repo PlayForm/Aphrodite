@@ -35,21 +35,21 @@ Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
 **custom fork** (`github.com/PlayForm/headroom`). Original upstream is
 `github.com/chopratejas/headroom`.
 
-| Area                     | Change                                                                             |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| **Branding**             | PlayForm identity, 💋 em‑quad spacing, Aphrodite‑compatible naming                 |
+| Area                     | Change                                                                                                                                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Branding**             | PlayForm identity, 💋 em‑quad spacing, Aphrodite‑compatible naming                                                                                                                                    |
 | **CCR hash**             | Length 24→40 hex chars for collision safety at scale (millions of entries). Algorithm remains BLAKE3. Python side uses SHA-256 independently — hashes differ but are consistent within each language. |
-| **CCR marker**           | `<<<CCR:hash\|type\|size>>>` format shared across Rust and Python                  |
-| **Compression pipeline** | Absorptive preview pipeline - new content types auto‑formatted                     |
-| **Tool relay**           | Added Hermes‑specific tool relay protocol: `POST /tool/relay` with async callbacks |
-| **Content types**        | Extended from generic to 28 typed categories with TOML‑driven templates            |
-| **API surface**          | Added `/ccr/create`, `/ccr/list`, `/ccr/{hash}` programmatic endpoints             |
-| **Retrieve**             | Full `POST /retrieve` with zstd decompression + query filtering + pagination       |
-| **Multi‑proxy**          | Dual‑proxy spawn from single TOML (`[[proxies]]` with name/mode/listen)            |
-| **Prometheus**           | 31 metrics, latency histogram, per‑type compression counters, EMAs                 |
-| **Build system**         | Version auto‑bump, release automation (`scripts/auto-release.sh`)                  |
-| **Testing**              | Smoke test suite, benchmark pipeline, verification checklist                       |
-| **Cargo deps**           | Upgraded to latest (axum 0.7+, reqwest 0.13+, notify 8+)                           |
+| **CCR marker**           | `<<<CCR:hash\|type\|size>>>` format shared across Rust and Python                                                                                                                                     |
+| **Compression pipeline** | Absorptive preview pipeline - new content types auto‑formatted                                                                                                                                        |
+| **Tool relay**           | Added Hermes‑specific tool relay protocol: `POST /tool/relay` with async callbacks                                                                                                                    |
+| **Content types**        | Extended from generic to 28 typed categories with TOML‑driven templates                                                                                                                               |
+| **API surface**          | Added `/ccr/create`, `/ccr/list`, `/ccr/{hash}` programmatic endpoints                                                                                                                                |
+| **Retrieve**             | Full `POST /retrieve` with zstd decompression + query filtering + pagination                                                                                                                          |
+| **Multi‑proxy**          | Dual‑proxy spawn from single TOML (`[[proxies]]` with name/mode/listen)                                                                                                                               |
+| **Prometheus**           | 31 metrics, latency histogram, per‑type compression counters, EMAs                                                                                                                                    |
+| **Build system**         | Version auto‑bump, release automation (`scripts/auto-release.sh`)                                                                                                                                     |
+| **Testing**              | Smoke test suite, benchmark pipeline, verification checklist                                                                                                                                          |
+| **Cargo deps**           | Upgraded to latest (axum 0.7+, reqwest 0.13+, notify 8+)                                                                                                                                              |
 
 ---
 
