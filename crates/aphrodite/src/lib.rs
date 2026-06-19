@@ -5,6 +5,8 @@
 mod hooks;
 mod marker;
 mod state;
+mod config_loader;
+mod session;
 
 // Proxy modules (used by main.rs binary)
 pub mod center;
@@ -193,7 +195,7 @@ stateful!(aphrodite_terminal, |s, content: *const c_char| {
 
 #[no_mangle] pub extern "C" fn aphrodite_session_start(handle: *const c_char) -> *mut c_char {
     let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() { Ok(id) => id, Err(_) => return to_json_error("invalid handle") };
-    match with_state(hid, |s| hooks::on_session_start(s)) {
+    match with_state(hid, |s| session::on_session_start(s)) {
         Ok(v) => to_json_ok(&v),
         Err(e) => to_json_error(&e),
     }
