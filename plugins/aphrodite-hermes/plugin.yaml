@@ -1,0 +1,19 @@
+name: aphrodite-hermes
+version: 1.63.0
+description: "Dynamic dylib plugin — loads headroom-ffi cdylib, hot-reloads on rebuild. All compression logic in Rust."
+kind: standalone
+min_hermes_version: "0.16.0"
+requires_hooks: true
+provides_hooks:
+  - on_session_start
+  - transform_tool_result
+  - transform_terminal_output
+  - pre_llm_call
+  - post_llm_call
+install_message: |
+  aphrodite-hermes v1.63.0  -  Dynamic Rust dylib for Hermes Agent.
+
+  Hot-reload: rebuild the dylib → plugin detects new mtime → auto-reloads.
+  Build: cd vendor/headroom && cargo build --release -p headroom-ffi
+
+  Debug: APHRODITE_DEBUG=1 hermes ...
