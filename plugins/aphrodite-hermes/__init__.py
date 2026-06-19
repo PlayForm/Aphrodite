@@ -28,11 +28,11 @@ _log = logging.getLogger("aphrodite")
 # ── Dylib paths ──────────────────────────────────────────────────────
 
 _HERE = Path(__file__).resolve().parent
-_DYLIB_NAME = "libheadroom_ffi.dylib" if sys.platform == "darwin" else "libheadroom_ffi.so"
+_DYLIB_NAME = "libaphrodite.dylib" if sys.platform == "darwin" else "libaphrodite.so"
 
 # Search paths in priority order
 _DYLIB_PATHS = [
-    _HERE.parent.parent / "vendor" / "headroom" / "target" / "release" / _DYLIB_NAME,
+    _HERE.parent.parent / "crates" / "aphrodite" / "target" / "release" / _DYLIB_NAME,
     Path.home() / ".hermes" / "aphrodite" / _DYLIB_NAME,
 ]
 

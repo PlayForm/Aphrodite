@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite"
-version = "0.8.40"
+version = "0.8.41"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -10,6 +10,10 @@ description = "aphrodite: Chat Completions proxy with CCR, tool relay, and progr
 [[bin]]
 name = "aphrodite"
 path = "src/main.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
 
 [dependencies]
 headroom-core = { path = "../../vendor/headroom/crates/headroom-core" }
@@ -31,7 +35,7 @@ reqwest = { version = "0.13", default-features = false, features = [
 	"stream",
 ] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.23", features = [
@@ -61,11 +65,12 @@ toml = "1.1"
 zstd = { version = "0.13.3", default-features = false }
 rhai = { version = "1.25.1", optional = true }
 notify = "8.2.0"
+regex = "1"
 
 [features]
 default = []
 scripting = ["rhai"]
 
 [build-dependencies]
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 toml = "1.1"
