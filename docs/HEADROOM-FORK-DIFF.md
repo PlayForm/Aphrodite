@@ -174,7 +174,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 
 | Area                   | Change Summary                                                                                                 |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **CCR hash**           | BLAKE3→SHA‑256, 24→40 hex chars (`compute_key`), for Rust‑Python parity                                        |
+| **CCR hash**           | Length 24→40 hex chars (collision safety at scale). Algorithm remains BLAKE3. Python uses SHA-256 independently. |
 | **CCR backends**       | Poison‑tolerant locks, debounced purge, queue compaction; in‑memory LRU, SQLite spawn_blocking, redis pipeline |
 | **SQLite**             | Overflow clamps, evict iteration caps                                                                          |
 | **Compression policy** | Coding‑tuned defaults: looser lossy caps, higher volatile thresholds                                           |
@@ -290,7 +290,7 @@ langchain, agno, asgi, liteLLM, Claude Code, Copilot, Cursor, aider, etc.) into 
 | ------------------- | -------------- | --------------------------------------------- |
 | Integration surface | 7+ frameworks  | Hermes only                                   |
 | Python lines        | ~35,000        | ~11,000 (net −24,000)                         |
-| Hash algorithm      | BLAKE3         | SHA‑256 (Rust‑Python parity)                  |
+| Hash algorithm      | BLAKE3           | BLAKE3 (length 24→40 hex). Python side uses SHA-256 — consistent internally, differs across languages. |
 | Hash length         | 24 hex chars   | 40 hex chars                                  |
 | CCR backends        | Basic          | Poison‑tolerant, debounced, pipelined         |
 | Proxy modes         | Single         | Dual (cache :9797 + token :9798 via TOML)     |

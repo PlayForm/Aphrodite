@@ -38,7 +38,7 @@ Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
 | Area                     | Change                                                                             |
 | ------------------------ | ---------------------------------------------------------------------------------- |
 | **Branding**             | PlayForm identity, 💋 em‑quad spacing, Aphrodite‑compatible naming                 |
-| **CCR hash**             | BLAKE3 → SHA‑256 (24‑char hex) for Rust‑Python parity                              |
+| **CCR hash**             | Length 24→40 hex chars for collision safety at scale (millions of entries). Algorithm remains BLAKE3. Python side uses SHA-256 independently — hashes differ but are consistent within each language. |
 | **CCR marker**           | `<<<CCR:hash\|type\|size>>>` format shared across Rust and Python                  |
 | **Compression pipeline** | Absorptive preview pipeline - new content types auto‑formatted                     |
 | **Tool relay**           | Added Hermes‑specific tool relay protocol: `POST /tool/relay` with async callbacks |
