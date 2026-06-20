@@ -109,7 +109,6 @@ pub fn prefetch_files(state: &mut AphroditeState, paths: &[String]) -> serde_jso
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
 
     #[test]
     fn test_prefetch_missing() {
@@ -122,17 +121,18 @@ mod tests {
     #[test]
     fn test_prefetch_real_file() {
         let mut s = AphroditeState::default();
-        // Use the test file itself
-        let r = prefetch_files(&mut s, &[file!().to_string()]);
-        assert_eq!(r["loaded"], 1);
+        let src = env!("CARGO_MANIFEST_DIR").to_string() + "/src/prefetch.rs";
+        let r = prefetch_files(&mut s, &[src.clone()]);
+        assert_eq!(r["loaded"], 1, "prefetch failed: {:?}", r);
         assert_eq!(s.recent_markers.len(), 1);
     }
 
     #[test]
     fn test_prefetch_multiple() {
         let mut s = AphroditeState::default();
+        let src = env!("CARGO_MANIFEST_DIR").to_string() + "/src/prefetch.rs";
         let r = prefetch_files(&mut s, &[
-            file!().to_string(),
+            src,
             "/nonexistent/abc".to_string(),
         ]);
         assert_eq!(r["loaded"], 1);

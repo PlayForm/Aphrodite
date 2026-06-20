@@ -140,3 +140,87 @@ impl AphroditeState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_inline_store_put_get() {
+        let mut s = AphroditeState::default();
+        s.inline_store_put("abc".into(), "hello world".into());
+        assert_eq!(s.inline_store_get("abc"), Some("hello world".into()));
+    }
+
+    #[test]
+    fn test_inline_store_missing() {
+        let mut s = AphroditeState::default();
+        assert_eq!(s.inline_store_get("nope"), None);
+    }
+
+    #[test]
+    fn test_inline_store_lru_promotion() {
+        let mut s = AphroditeState::default();
+        s.inline_store_put("a".into(), "first".into());
+        s.inline_store_put("b".into(), "second".into());
+        // Get "a" promotes it to front
+        let _ = s.inline_store_get("a");
+        // "a" should now be at front
+        let front = s.inline_store.pop_front();
+        assert_eq!(front, Some(("a".into(), "first".into())));
+    }
+
+    #[test]
+    fn test_inline_store_eviction() {
+        let mut s = AphroditeState::default();
+        // Fill beyond INLINE_MAX (500)
+        for i in 0..505 {
+            s.inline_store_put(format!("hash{}", i), format!("content{}", i));
+        }
+        assert!(s.inline_store.len() <= 500);
+        // Oldest should be evicted
+        assert_eq!(s.inline_store_get("hash0"), None);
+        // Newest should remain
+        assert_eq!(s.inline_store_get("hash504"), Some("content504".into()));
+    }
+
+    #[test]
+    fn test_record_marker_eviction() {
+        let mut s = AphroditeState::default();
+        for i in 0..250 {
+            s.record_marker(MarkerEntry {
+                hash: format!("h{}", i), ccr_type: "text".into(), size: 100,
+                preview: "[text]".into(), turn: i, center: None, meta: None,
+            });
+        }
+        assert!(s.recent_markers.len() <= 200);
+        assert_eq!(s.recent_markers[0].hash, "h50"); // First 50 evicted
+    }
+
+    #[test]
+    fn test_record_file_dedup() {
+        let mut s = AphroditeState::default();
+        s.record_file("/tmp/a".into(), "read".into());
+        s.record_file("/tmp/a".into(), "write".into());
+        assert_eq!(s.referenced_files.len(), 1);
+        assert_eq!(s.referenced_files[0].1, "write"); // Updated tool
+    }
+
+    #[test]
+    fn test_default_values() {
+        let s = AphroditeState::default();
+        assert_eq!(s.turn_counter, 0);
+        assert_eq!(s.tool_threshold, 4096);
+        assert_eq!(s.terminal_threshold, 1024);
+        assert!(s.context_engine_enabled);
+    }
+
+    #[test]
+    fn test_inline_store_put_overwrite() {
+        let mut s = AphroditeState::default();
+        s.inline_store_put("hash".into(), "v1".into());
+        s.inline_store_put("hash".into(), "v2".into());
+        assert_eq!(s.inline_store.len(), 1);
+        assert_eq!(s.inline_store_get("hash"), Some("v2".into()));
+    }
+}

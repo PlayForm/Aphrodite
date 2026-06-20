@@ -9,6 +9,11 @@ use crate::marker::ccr_marker;
 use crate::state::{AphroditeState, MarkerEntry};
 use headroom_core::transforms;
 
+/// Compute a CCR hash for content using BLAKE3 (40 hex chars).
+pub fn compute_hash(content: &str) -> String {
+    headroom_core::ccr::compute_key(content.as_bytes())
+}
+
 /// Essential tools that must NOT be compressed — agent needs raw output.
 const ESSENTIAL_TOOLS: &[&str] = &[
     "skill_view", "skills_list", "skill_manage", "memory",
@@ -191,7 +196,7 @@ mod tests {
         let mut s = AphroditeState::default();
         s.tool_threshold = 0; // always compress
         let content = "fn main() {\n    println!(\"hello world\");\n}\n";
-        let r = transform_tool_result(&mut s, content, "read_file");
+        let r = transform_tool_result(&mut s, content, "terminal");
         assert_eq!(r["compressed"], true);
         assert!(r["hash"].as_str().unwrap().len() >= 40);
     }

@@ -2,13 +2,16 @@
 //! 14 functions — init, destroy, classify, compress, retrieve, transform,
 //! terminal, session_start, catalog, stats, reload, config_get/set, search.
 
-mod catalog;
-mod config_loader;
-mod hooks;
-mod marker;
-mod prefetch;
-mod session;
-mod state;
+pub mod catalog;
+pub mod config_loader;
+pub mod hooks;
+pub mod marker;
+pub mod prefetch;
+pub mod resolve;
+pub mod session;
+pub mod stage2;
+pub mod state;
+pub mod struct_extract;
 
 // Proxy modules (used by main.rs binary)
 pub mod center;
@@ -296,7 +299,7 @@ stateful!(aphrodite_terminal, |s, content: *const c_char| {
 
 // ── Preview builder ──────────────────────────────────────────────────
 
-pub(crate) fn build_preview(type_str: &str, content: &str) -> String {
+pub fn build_preview(type_str: &str, content: &str) -> String {
     let lines = content.lines().count(); let bytes = content.len();
     match type_str {
         "build" | "build_output" | "build_error" => {
