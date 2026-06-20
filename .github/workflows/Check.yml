@@ -99,4 +99,4 @@ jobs:
           src: plugins/aphrodite/
 
       - name: pyright
-        run: npx pyright plugins/aphrodite/
+        run: cd plugins/aphrodite && npx pyright .
