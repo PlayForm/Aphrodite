@@ -100,6 +100,7 @@ crates/aphrodite-hermes/   ← Hermes-specific integration (cdylib)
 
 plugins/aphrodite/         ← Thin Python loader (~145 lines)
   └── __init__.py          ← loads dylib, registers hooks/tools/engine
+```
 
 | Mode  | Port  | Backend   | Threshold | Best for                  |
 | :---- | :---: | :-------- | :-------: | :------------------------ |
