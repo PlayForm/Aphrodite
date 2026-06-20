@@ -24,3 +24,11 @@ Documentation/Rust/
 # Vendor submodule paths (not resolvable as web URLs)
 vendor/headroom
 vendor/rtk
+
+# Test placeholder URLs in Rust source
+upstream-openai.com
+
+# API endpoints (not web pages, need auth headers)
+api.openai.com
+api.deepseek.com
+api.anthropic.com
