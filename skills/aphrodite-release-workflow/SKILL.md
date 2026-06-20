@@ -16,7 +16,7 @@ platforms: [macos]
 ```bash
 cd /path/to/Aphrodite
 python3 -c "import sys; sys.path.insert(0, 'plugins'); import aphrodite; print('OK:', aphrodite.__doc__[:60])"
-ruff check plugins/aphrodite/ scripts/ crates/
+ruff check plugins/aphrodite/ Maintain/scripts/ crates/
 npx pyright plugins/aphrodite/
 cargo check -p aphrodite
 ```
@@ -27,7 +27,7 @@ compression, no context engine - a silent degradation users won't notice.
 ## Auto-Release
 
 ```bash
-GIT_EDITOR=true scripts/auto-release.sh "descriptive message"
+GIT_EDITOR=true Maintain/scripts/release/auto-release.sh "descriptive message"
 ```
 
 Handles: stage → commit → bump version → cargo build → cargo test → tag → push
