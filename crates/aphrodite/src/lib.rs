@@ -520,6 +520,28 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		            .collect();
 		        serde_json::json!({"total":results.len(),"results":results})
 		    }
+		    "diff" => {
+		        let turns: Vec<serde_json::Value> = s.conv_index.iter().map(|(turn, (hash, summary, size))| {
+		            serde_json::json!({"turn":turn,"hash":hash,"summary":summary,"size":size})
+		        }).collect();
+		        serde_json::json!({"turns":turns,"total":turns.len()})
+		    }
+		    "files" => {
+		        let files: Vec<serde_json::Value> = s.referenced_files.iter().map(|(path, tool)| {
+		            serde_json::json!({"path":path,"tool":tool})
+		        }).collect();
+		        serde_json::json!({"files":files,"total":files.len()})
+		    }
+		    "classify" => {
+		        let ct = headroom_core::transforms::detect(content);
+		        serde_json::json!({"type":ct.as_str(),"lines":content.lines().count(),"bytes":content.len()})
+		    }
+		    "prefetch" => {
+		        let paths = args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+		        let path_strings: Vec<String> = paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+		        let r = crate::prefetch::prefetch_files(s, &path_strings);
+		        r
+		    }
 		    _ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
 		}) {
 		    Ok(v) => to_json_ok(&v),
