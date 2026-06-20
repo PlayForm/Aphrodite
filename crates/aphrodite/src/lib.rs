@@ -97,10 +97,10 @@ fn check_content(content:&str) -> Result<(), &'static str> {
 // ── C ABI ────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub extern fn aphrodite_version() -> *mut c_char { CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw() }
+pub extern "C" fn aphrodite_version() -> *mut c_char { CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw() }
 
 #[no_mangle]
-pub extern fn aphrodite_free_string(s:*mut c_char) {
+pub extern "C" fn aphrodite_free_string(s:*mut c_char) {
 	if !s.is_null() {
 		unsafe {
 			let _ = CString::from_raw(s);
@@ -109,7 +109,7 @@ pub extern fn aphrodite_free_string(s:*mut c_char) {
 }
 
 #[no_mangle]
-pub extern fn aphrodite_hooks() -> *mut c_char {
+pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 	CString::new(
 		serde_json::json!([
 			"session_start",
@@ -125,7 +125,7 @@ pub extern fn aphrodite_hooks() -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 	let path = unsafe { CStr::from_ptr(config_path) }.to_string_lossy();
 	let mut state = AphroditeState::default();
 	if !path.is_empty() {
@@ -152,14 +152,14 @@ pub extern fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern fn aphrodite_destroy(handle:*const c_char) {
+pub extern "C" fn aphrodite_destroy(handle:*const c_char) {
 	if let Ok(hid) = unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		handles().as_mut().map(|m| m.remove(&hid));
 	}
 }
 
 #[no_mangle]
-pub extern fn aphrodite_classify(content:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_classify(content:*const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
 		None => return to_json_error("null content"),
@@ -172,7 +172,7 @@ pub extern fn aphrodite_classify(content:*const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern fn aphrodite_call_hook(hook:*const c_char, args:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_call_hook(hook:*const c_char, args:*const c_char) -> *mut c_char {
 	let name = unsafe { CStr::from_ptr(hook) }.to_string_lossy();
 	let args_str = unsafe { CStr::from_ptr(args) }.to_string_lossy();
 	let a:serde_json::Value = match serde_json::from_str(&args_str) {
@@ -236,7 +236,7 @@ stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 
 // Override: retrieve returns raw content, not JSON-wrapped
 #[no_mangle]
-pub extern fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -263,7 +263,7 @@ stateful!(aphrodite_terminal, |s, content:*const c_char| {
 });
 
 #[no_mangle]
-pub extern fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -275,7 +275,7 @@ pub extern fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -302,7 +302,7 @@ pub extern fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) -> *mu
 }
 
 #[no_mangle]
-pub extern fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -322,7 +322,7 @@ pub extern fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -348,7 +348,7 @@ pub extern fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> *mut
 }
 
 #[no_mangle]
-pub extern fn aphrodite_search(handle:*const c_char, query:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -367,7 +367,7 @@ pub extern fn aphrodite_search(handle:*const c_char, query:*const c_char) -> *mu
 }
 
 #[no_mangle]
-pub extern fn aphrodite_config_get(handle:*const c_char, key:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -391,7 +391,7 @@ pub extern fn aphrodite_config_get(handle:*const c_char, key:*const c_char) -> *
 }
 
 #[no_mangle]
-pub extern fn aphrodite_config_set(handle:*const c_char, key:*const c_char, value:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_config_set(handle:*const c_char, key:*const c_char, value:*const c_char) -> *mut c_char {
 	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),

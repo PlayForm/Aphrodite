@@ -4,7 +4,6 @@
 //! scanned message index, marker-at-end-of-turn archive.
 
 use crate::state::AphroditeState;
-use std::collections::HashMap;
 
 /// Handle session start — reset all per-session state.
 pub fn on_session_start(state: &mut AphroditeState) -> serde_json::Value {
