@@ -792,7 +792,7 @@ Aphrodite's "skip it entirely" beats Headroom's "make it smaller" by 2–10×.
 
 _Ready to save context?_ [Install now](#quick-start) • [Read the docs](docs/) •
 [Report an issue](https://github.com/PlayForm/Aphrodite/issues) •
-[Security policy](SECURITY.md)
+[Security policy](Maintain/SECURITY.md)
 
 ---
 
