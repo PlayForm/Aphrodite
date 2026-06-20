@@ -451,5 +451,80 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 			format!("[json:{}items {}L]", i, lines)
 		},
 		_ => format!("[{}:{}L {}B]", type_str, lines, bytes),
-	}
-}
+		}
+		}
+
+		// ── Universal dispatch: all Python hooks route through here ──
+
+		/// Universal hook dispatcher. Python calls this for every hook handler.
+		/// Returns JSON-wrapped result or raw string if content-only.
+		#[no_mangle]
+		pub extern "C" fn aphrodite_dispatch(
+		handle: *const c_char,
+		hook_name: *const c_char,
+		args_json: *const c_char,
+		) -> *mut c_char {
+		let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+		    Ok(id) => id,
+		    Err(_) => return to_json_error("invalid handle"),
+		};
+		let name = unsafe { CStr::from_ptr(hook_name) }.to_string_lossy();
+		let args_str = unsafe { CStr::from_ptr(args_json) }.to_string_lossy();
+
+		let args: serde_json::Value =
+		    match serde_json::from_str(&args_str) {
+		        Ok(v) => v,
+		        Err(e) => return to_json_error(&format!("invalid args: {}", e)),
+		    };
+
+		let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+		let tool = args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+
+		let result = match with_state(hid, |s| match name.as_ref() {
+		    "session_start" => hooks::on_session_start(s),
+		    "transform_tool_result" => hooks::transform_tool_result(s, content, tool),
+		    "transform_terminal_output" => hooks::transform_terminal_output(s, content),
+		    "pre_llm_call" => hooks::pre_llm_call(s),
+		    "post_llm_call" => hooks::post_llm_call(s),
+		    "catalog" => {
+		        let mode = args.get("mode").and_then(|v| v.as_str()).unwrap_or("full");
+		        let items: Vec<serde_json::Value> = s.recent_markers.iter().map(|e| {
+		            if mode == "toc" {
+		                serde_json::json!({"hash":&e.hash[..12.min(e.hash.len())],"type":e.ccr_type,"size":e.size,"preview":e.preview})
+		            } else {
+		                serde_json::json!({"hash":e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview,"turn":e.turn})
+		            }
+		        }).collect();
+		        serde_json::json!({"total":items.len(),"items":items,"turn":s.turn_counter})
+		    }
+		    "stats" => serde_json::json!({
+		        "version": env!("CARGO_PKG_VERSION"),
+		        "inline_entries": s.inline_store.len(),
+		        "markers": s.recent_markers.len(),
+		        "turn": s.turn_counter,
+		        "engine_enabled": s.context_engine_enabled,
+		    }),
+		    "search" => {
+		        let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+		        let type_filter = args.get("type").and_then(|v| v.as_str());
+		        let results: Vec<serde_json::Value> = s.recent_markers.iter()
+		            .filter(|m| {
+		                let matches_query = query.is_empty()
+		                    || m.preview.to_lowercase().contains(&query)
+		                    || m.ccr_type.to_lowercase().contains(&query);
+		                let matches_type = type_filter.map_or(true, |t| m.ccr_type == t);
+		                matches_query && matches_type
+		            })
+		            .take(20)
+		            .map(|m| serde_json::json!({"hash":&m.hash[..12.min(m.hash.len())],"type":m.ccr_type,"size":m.size,"preview":m.preview}))
+		            .collect();
+		        serde_json::json!({"total":results.len(),"results":results})
+		    }
+		    _ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
+		}) {
+		    Ok(v) => to_json_ok(&v),
+		    Err(e) => to_json_error(&e),
+		};
+
+		result
+		}
