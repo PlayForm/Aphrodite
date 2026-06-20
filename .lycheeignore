@@ -1,0 +1,26 @@
+# Lychee ignore list for Aphrodite
+# Patterns: URLs containing these will be skipped
+
+# GitHub shields.io badges are dynamic and may fail randomly
+https://img.shields.io/
+
+# PlayForm URLs (may be flaky)
+https://PlayForm.Cloud
+
+# Generic email or non-http links
+mailto:
+
+# Placeholder domains
+example.com
+localhost
+
+# npmjs.com private packages return 403
+https://www.npmjs.com/package/@playform
+
+# Rust doc links that may be internal
+rust/doc/
+Documentation/Rust/
+
+# Vendor submodule paths (not resolvable as web URLs)
+vendor/headroom
+vendor/rtk

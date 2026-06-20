@@ -1,0 +1,61 @@
+# Lychee configuration for Aphrodite documentation
+
+# Files to check for links
+extensions = [
+	".md",
+	".rs",
+	".toml",
+	".json",
+	".yml",
+	".yaml",
+]
+
+# Exclude certain URL patterns
+exclude = [
+	# Local development links
+	"http://localhost:*",
+	"http://127.0.0.1:*",
+
+	# Email links
+	"mailto:*",
+
+	# Placeholder/example links
+	"example.com",
+
+	# GitHub shields.io badges (dynamic, may fail randomly)
+	"https://img.shields.io/",
+
+	# Internal/repo-local links
+	"./aphrodite.toml",
+	"./aphrodite.toml.example",
+]
+
+# Allow redirects
+scheme = ["https", "http"]
+
+# Request timeout in seconds
+timeout = 30
+
+# Max number of parallel network requests
+max_concurrency = 8
+
+# Exclude paths
+exclude_path = [
+	"node_modules",
+	"target",
+	".git",
+	"vendor",
+	"profiles",
+	"binaries",
+	"archives",
+	".hermes",
+]
+
+# Accepted status codes
+accept = [200, 204, 301, 302, 307, 308, 429]
+
+# Retry failed requests
+max_retries = 3
+
+# Output format
+format = "compact"

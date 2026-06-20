@@ -95,7 +95,7 @@ One paragraph. What this release is. 2–3 sentences.
 ### Links
 - **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/...
 - **CHANGELOG.md**: [CHANGELOG.md](CHANGELOG.md)
-- **Plugin**: https://github.com/PlayForm/HermesCompress/tree/Current/plugins/aphrodite
+- **Plugin**: https://github.com/PlayForm/Aphrodite-Hermes
 EOF
 gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md \
   target/release/aphrodite-aarch64-apple-darwin \
