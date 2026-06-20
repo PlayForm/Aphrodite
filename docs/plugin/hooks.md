@@ -1,12 +1,11 @@
 # Plugin Hooks
 
-Origin: The aphrodite Python plugin intercepts 5 Hermes lifecycle hooks to
-compress tool and terminal output, inject catalog information before LLM calls,
-and store conversation turns.
+Origin: The aphrodite Python plugin (thin loader) delegates to the Rust dylib
+(libaphrodite.dylib) for all compression logic. Hooks registered in plugin.yaml
+route through the dylib's C ABI functions.
 
-Source of truth: `plugins/aphrodite/plugin.yaml` (lines 7-12),
-`plugins/aphrodite/_hooks/transform.py`, `plugins/aphrodite/_marker/marker.py`,
-`plugins/aphrodite/_engine.py`
+Source of truth: `crates/aphrodite/src/hooks.rs`, `crates/aphrodite/src/lib.rs`,
+`plugins/aphrodite/plugin.yaml`, `plugins/aphrodite/__init__.py`
 
 ## Hook Registration
 

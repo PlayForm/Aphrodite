@@ -311,18 +311,12 @@ chopratejas/headroom (upstream)
     │
     └── forked ──→ PlayForm/Headroom (our fork)
                        │
-                       ├── main branch (= Source/main) - all fork changes live here
+                       ├── Current branch — all fork changes live here
                        │
-                       └── Current branch - main + 2 prettier commits
+                       └── tracked as submodule at vendor/headroom/
                               │
-                              └── tracked as submodule at vendor/headroom/
-                                     │
-                                     └── Aphrodite crate depends on headroom-core
+                              └── Aphrodite crate depends on headroom-core
 ```
-
-The `Current` branch in this submodule is 2 commits ahead of `Source/main` (two Prettier
-format passes). All substantive fork changes are in the 45 commits between the upstream
-merge base and the tip of `Source/main`.
 
 ---
 

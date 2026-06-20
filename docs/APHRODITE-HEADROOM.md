@@ -1,7 +1,8 @@
 # Aphrodite & Headroom
 
-Aphrodite is the primary product. Headroom is our fork - a custom, modified
-dependency that Aphrodite extends.
+Aphrodite is the primary product. Headroom is our fork — a custom, modified
+dependency that Aphrodite extends. The fork lives at
+[PlayForm/Headroom](https://github.com/PlayForm/Headroom).
 
 ---
 
@@ -9,7 +10,7 @@ dependency that Aphrodite extends.
 
 | Layer                     | Aphrodite                                                                               | Headroom (stock)         |
 | ------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| **Hermes plugin**         | ✅ Full Hermes Agent plugin - hooks, 13 tools, context engine, smoke tests              | ❌ No Hermes integration |
+| **Hermes plugin**         | ✅ Full Hermes Agent plugin — hooks, 12 tools, context engine, smoke tests              | ❌ No Hermes integration |
 | **Proxy binaries**        | ✅ Dual-proxy mode (:9797 cache + :9798 token) with TOML config                         | Single proxy, CLI only   |
 | **Tool relay**            | ✅ Bidirectional `/tool/relay` - LLM calls Hermes tools through proxy                   | ❌                       |
 | **CCR endpoints**         | ✅ `/ccr/create`, `/ccr/list`, `/ccr/{hash}` REST API                                   | Basic CCR store          |
@@ -20,7 +21,7 @@ dependency that Aphrodite extends.
 | **HEALTH + Prometheus**   | ✅ `/health` endpoint, `/metrics` → 31 Prometheus metrics                               | Basic only               |
 | **Python settings store** | ✅ In‑memory mutable store, API‑driven reload, hot‑reload from TOML                     | ❌                       |
 | **Config file watcher**   | ✅ Proxy + plugin auto‑detect `aphrodite.toml` changes                                  | ❌                       |
-| **Hermes skills**         | ✅ 13 bundled skills for agent operation                                                | ❌                       |
+| **Hermes skills**         | ✅ 14 bundled skills for agent operation                                                | ❌                       |
 | **Live container**        | ✅ `APHRODITE_LIVE_CONTAINER` mode for streaming `read_file` via CCR                    | ❌                       |
 | **Rhai scripting**        | ✅ Feature‑gated hook injection (`--features scripting`)                                | ❌                       |
 | **Auto‑download binary**  | ✅ Detects platform, downloads from GitHub releases, validates magic bytes              | ❌                       |
@@ -32,7 +33,7 @@ dependency that Aphrodite extends.
 ## Part 2: What We Rewrote in Headroom (PlayForm fork)
 
 Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
-**custom fork** (`github.com/PlayForm/headroom`). Original upstream is
+**custom fork** (`github.com/PlayForm/Headroom`). Original upstream is
 `github.com/chopratejas/headroom`.
 
 | Area                     | Change                                                                                                                                                                                                |
@@ -55,17 +56,27 @@ Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
 
 ## Part 3: How They Ship Together
 
-### Binary (Rust proxy)
+### Binary (Rust proxy + dylib)
 
-The Aphrodite binary is a single executable that embeds Headroom‑core as a
-library dependency:
+The Aphrodite crate produces BOTH a proxy binary and a cdylib from one build:
 
 ```
 crates/aphrodite/
-  ├── src/main.rs          # Proxy binary - spawns :9797 + :9798
+  ├── src/main.rs          # Proxy binary — spawns :9797 + :9798
+  ├── src/lib.rs           # 17 C ABI functions — cdylib for Python loading
   ├── src/proxy.rs         # Handler, compression, tool relay
+  ├── src/resolve.rs       # CCR marker resolution (nested, recursive)
+  ├── src/stage2.rs        # Semantic reduction (JSON, build, diff, code)
+  ├── src/struct_extract.rs # Code structure extraction
+  ├── src/hooks.rs         # transform_tool_result, transform_terminal_output
+  ├── src/state.rs         # Session state, inline store, LRU
   ├── src/retrieve.rs      # /retrieve endpoint
   └── src/config.rs        # MultiConfig from aphrodite.toml
+
+crates/aphrodite-hermes/   # Hermes-specific integration (cdylib)
+  ├── tools.rs             # 12 tool dispatch handlers
+  ├── schemas.rs           # JSON Schema definitions
+  └── skills.rs            # 14 bundled skills
 
 vendor/headroom/
   └── crates/headroom-core/  # Compression engine (PlayForm fork)

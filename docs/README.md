@@ -73,9 +73,9 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 ### Tool Relay
 
-- [Tools](tool-relay/tools.md) - 9 tools with full JSON schemas:
+- [Tools](tool-relay/tools.md) - 12 tools with full JSON schemas:
   aphrodite_retrieve, compress, stats, rebuild, files, diff, search, test,
-  catalog. Handlers, proxy support table, content-type hints
+  catalog, reclassify, prefetch, prefetch_status. Handlers, proxy support table
 - [Callbacks](tool-relay/callbacks.md) - Async tool relay + CCR create
   notifications. SSRF protection (https only), Bearer token auth, 5s timeout,
   TaskTracker lifecycle, metrics
@@ -105,38 +105,24 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 All schemas, formats, and values are extracted verbatim from:
 
-- `crates/aphrodite/src/proxy.rs` - proxy handler, compression pipeline, tool
-  relay, CCR management, health check, AppState, content detection
-- `crates/aphrodite/src/retrieve.rs` - retrieve endpoint with zstd
-  decompression, query filtering, pagination
-- `crates/aphrodite/src/config.rs` - CLI args, MultiConfig, ProxyConfig,
-  resolution chain
-- `crates/aphrodite/src/main.rs` - routing, middleware, metrics handler,
-  multi-proxy spawning, shutdown
-- `vendor/headroom/crates/headroom-core/src/ccr/mod.rs` - CcrStore trait,
-  compute_key (BLAKE3), marker_for
-- `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs` - SQLite
-  schema, WAL, upsert, lazy purge, stats_db
-- `vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs` -
-  DashMap, FIFO eviction, queue compaction, TOCTOU safety
-- `plugins/aphrodite/_core/config.py` - constants, thresholds, CCR regex, inline
-  store, trigram index, model family
-- `plugins/aphrodite/_core/settings.py` - in‑memory settings store, API‑driven
-  reload
-- `plugins/aphrodite/_core/state.py` - session state: turn counter, caches, CCR
-  regex
-- `plugins/aphrodite/_marker/marker.py` - CCR marker generation, content
-  classification, proxy compression, marker parsing
-- `plugins/aphrodite/_tools.py` - retrieve/compress handlers with JSON schemas
-- `plugins/aphrodite/_hooks/transform.py` - tool result compression, formatting,
-  live container
-- `plugins/aphrodite/_hooks/session.py` - pre/post LLM hooks, catalog injection,
-  turn storage
-- `plugins/aphrodite/_hooks/terminal.py` - terminal output compression
-- `plugins/aphrodite/_engine.py` - AphroditeContextEngine: compress, editing
-  detection, orphan sweep
-- `plugins/aphrodite/plugin.yaml` - hook/tool/engine registration, install
-  message
+### Rust (core compression engine — binary + dylib)
+- `crates/aphrodite/src/proxy.rs` — proxy handler, compression pipeline, tool relay
+- `crates/aphrodite/src/resolve.rs` — CCR marker resolution (nested, recursive, cycle-safe)
+- `crates/aphrodite/src/stage2.rs` — Semantic reduction (JSON, build, diff, code)
+- `crates/aphrodite/src/struct_extract.rs` — Code structure extraction (Rust, Python, Go, JS/TS)
+- `crates/aphrodite/src/hooks.rs` — transform_tool_result, transform_terminal_output
+- `crates/aphrodite/src/state.rs` — Session state, inline store, LRU eviction
+- `crates/aphrodite/src/marker.rs` — CCR marker generation, parsing
+- `crates/aphrodite/src/catalog.rs` — Full catalog with by-type grouping
+- `crates/aphrodite/src/session.rs` — Session lifecycle, turn tracking
+- `crates/aphrodite/src/prefetch.rs` — Background file loading
+- `crates/aphrodite/src/config_loader.rs` — TOML config with env override
+- `crates/aphrodite/src/lib.rs` — 17 C ABI functions for dylib loading
+- `crates/aphrodite-hermes/src/` — Hermes integration: tools, schemas, skills
+- `vendor/headroom/crates/headroom-core/src/` — Compression engine (PlayForm fork)
+
+### Python (thin loader — Hermes integration)
+- `plugins/aphrodite/__init__.py` — Thin loader: dylib loading, hook/tool registration
 
 ## Conventions
 
