@@ -2,7 +2,7 @@
 name: aphrodite-release-workflow
 description: "Auto-release, version sync, pre-release verification, and release notes for
     aphrodite."
-version: 1.2.0
+version: 1.3.0
 platforms: [macos]
 ---
 
@@ -49,7 +49,19 @@ to `Source` remote.
 ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/aphrodite
 ```
 
-## Release Notes - Shell Injection
+## Release Notes — Content Standards
+
+Every release MUST include: Summary, Changes, Infrastructure, What Ships, and Links.
+See `.hermes/RELEASE-TEMPLATE.md` for the canonical template.
+
+Anti-pattern (DO NOT): bare compare link with zero description.
+30+ releases (v0.8.13–v0.8.43) currently ship with only:
+
+```
+**Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/...
+```
+
+### Shell Injection
 
 Never use backticks with `gh release create --notes`. Use `--notes-file` with a
 heredoc:
@@ -57,10 +69,37 @@ heredoc:
 ```bash
 cat > /tmp/notes.md << 'EOF'
 **[Compare vX.Y.Z...vX.Y.Z](https://github.com/PlayForm/Aphrodite/compare/vX.Y.Z...vX.Y.Z)**
-### Feature
-- change
+
+## Aphrodite vX.Y.Z 💋 Plugin vA.B.C
+
+### Summary
+One paragraph. What this release is. 2–3 sentences.
+
+### Changes
+- **Feature**: description
+- **Fix**: description
+
+### Infrastructure
+- Build: `cargo build --release -p aphrodite` ✅
+- Tests: `cargo test -p aphrodite` ✅ (NNN passed)
+- Python: `ruff check` + `pyright` ✅
+- Lint: `cargo clippy` ✅
+
+### What Ships
+| Artifact | Platform |
+|----------|----------|
+| `aphrodite-aarch64-apple-darwin` | macOS ARM64 |
+| `aphrodite-x86_64-unknown-linux-gnu` | Linux x86_64 |
+| Plugin vA.B.C | Hermes (standalone repo) |
+
+### Links
+- **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/...
+- **CHANGELOG.md**: [CHANGELOG.md](CHANGELOG.md)
+- **Plugin**: https://github.com/PlayForm/HermesCompress/tree/Current/plugins/aphrodite
 EOF
-gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md ~/.hermes/aphrodite/aphrodite
+gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md \
+  target/release/aphrodite-aarch64-apple-darwin \
+  target/release/aphrodite-x86_64-unknown-linux-gnu
 ```
 
 ## Cross-Module Import Pitfall

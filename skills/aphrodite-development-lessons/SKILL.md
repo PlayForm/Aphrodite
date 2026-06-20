@@ -2,9 +2,9 @@
 name: aphrodite-development-lessons
 description: "Critical development pitfalls for Aphrodite - auto-expand, env_passthrough,
     plugin symlink, dual-store pattern, release notes, and session setup
-    checklist. Learned across v0.5.104–v0.7.0."
-version: 1.0.0
-platforms: [macos]
+    checklist. Current as of v0.8.43."
+version: 1.1.0
+related_skills: [aphrodite-dev-workflow, aphrodite-release-workflow, aphrodite-hook-reference]
 related_skills: [aphrodite-dev-workflow, aphrodite-release-workflow, aphrodite-tool-guide]
 ---
 
@@ -50,22 +50,45 @@ subprocesses. Proxies silently fail to start.
 **Fix:**
 `hermes config set terminal.env_passthrough '["APHRODITE_API_KEY","PATH","HOME"]' --profile dev-aphrodite`
 
-## Release Notes - Shell Injection
+## Release Notes — Use the Template
+
+See `.hermes/RELEASE-TEMPLATE.md` for the canonical template. Every release
+MUST include: Summary, Changes, Infrastructure, What Ships, and Links.
+
+Anti-pattern (DO NOT): bare compare link with zero description.
+30+ releases (v0.8.13–v0.8.43) ship with only a compare link.
 
 **NEVER** use inline backtick-quoted text with `gh release create --notes`. The
-shell interprets backticks as command substitution, capturing Hermes TUI output.
-
-**Fix:** use `--notes-file` with a heredoc:
+shell interprets backticks as command substitution. Use `--notes-file` with a
+heredoc:
 
 ```bash
 cat > /tmp/notes.md << 'EOF'
 **[Compare vX.Y.Z...vX.Y.Z](https://github.com/PlayForm/Aphrodite/compare/vX.Y.Z...vX.Y.Z)**
 
-### Feature
-- change
-EOF
+## Aphrodite vX.Y.Z 💋 Plugin vA.B.C
 
-gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md ~/.hermes/aphrodite/aphrodite
+### Summary
+...
+
+### Changes
+- ...
+
+### Infrastructure
+- Build: ✅ | Tests: ✅ | Lint: ✅
+
+### What Ships
+| Artifact | Platform |
+|----------|----------|
+| aphrodite-aarch64-apple-darwin | macOS ARM64 |
+| aphrodite-x86_64-unknown-linux-gnu | Linux x86_64 |
+
+### Links
+- **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/...
+EOF
+gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md \
+  target/release/aphrodite-aarch64-apple-darwin \
+  target/release/aphrodite-x86_64-unknown-linux-gnu
 ```
 
 ## Dual-Store Guarantee (CCR_UNRESOLVED Fix)

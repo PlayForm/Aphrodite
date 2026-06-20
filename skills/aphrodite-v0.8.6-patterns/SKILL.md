@@ -1,17 +1,23 @@
 ---
 name: aphrodite-v0.8.6-patterns
-description: Development patterns learned across v0.8.5→v0.8.6 - Cargo.toml walk-up,
-    --version early handling, dep pinning, standalone plugin repo,
-    prefetch-first workflow.
-version: 1.0.0
-platforms: [macos]
+description: "Historical development patterns from v0.8.5→v0.8.6 cycle. Most patterns
+    now live in aphrodite-dev-workflow, aphrodite-upgrade-breakpoints, and
+    aphrodite-development-lessons. Keep as reference snapshot."
+version: 1.1.0
 related_skills:
-    [aphrodite-dev-workflow, aphrodite-development-lessons, aphrodite-context-efficiency]
+    [aphrodite-dev-workflow, aphrodite-development-lessons, aphrodite-upgrade-breakpoints]
 ---
 
-# Aphrodite v0.8.6 Patterns
+# Aphrodite v0.8.6 Patterns (Historical Snapshot)
 
-Techniques and pitfalls from the v0.8.6 development cycle.
+Techniques and pitfalls from the v0.8.6 development cycle. These patterns are now
+canonicalized in:
+
+- **aphrodite-dev-workflow** — repo path resolution, dep pinning, prefetch workflow
+- **aphrodite-upgrade-breakpoints** — --version flag, standalone plugin repo
+- **aphrodite-development-lessons** — session setup, dual-store pattern
+
+This skill is retained as a historical reference for the v0.8.6 cycle context.
 
 ## Repo Path Resolution - `_find_cargo_toml()`
 

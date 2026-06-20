@@ -2,9 +2,8 @@
 name: aphrodite-benchmarking
 description: "Comprehensive benchmark protocol for aphrodite proxy - compression
     throughput, cache hit rates, cross-worker behavior, terminal threshold
-    verification, and all-type coverage. Based on production testing across
-    v0.5.124+."
-version: 1.1.0
+    verification, and all-type coverage. Current as of v0.8.43."
+version: 1.2.0
 platforms: [macos]
 related_skills:
     [aphrodite-context-efficiency, aphrodite-center-testing, aphrodite-auto-expand-testing]
@@ -33,7 +32,7 @@ structure encodes everything needed to prove compression worked.
 aphrodite_test(mode="full")
 ```
 
-Expected: 13/13 PASS (all tests pass as of v0.8.36). `aphrodite_search` and
+Expected: 13/13 PASS (all tests pass as of v0.8.43). `aphrodite_search` and
 `aphrodite_files` are fixed - no `NameError` bugs remain.
 
 ## Compression Type Matrix
@@ -146,7 +145,7 @@ threshold (default 450K tokens).
 - `references/benchmark-session-results.md` - Concrete examples from the
   v0.5.124 production benchmark
 
-## All-Modes Comparison (v0.8.36)
+## All-Modes Comparison (v0.8.43)
 
 Full comparative benchmark: Stock Hermes → Stock + Headroom → Aphrodite.
 
@@ -166,7 +165,7 @@ Benchmark CCR: `4b47d220c805679cc964f66f264896dbba76f51d`
 
 ## Pitfalls
 
-- **aphrodite_search and aphrodite_files are fixed** (v0.8.36). Both pass in
+- **aphrodite_search and aphrodite_files are fixed** (v0.8.43). Both pass in
   the full smoke test suite. `NameError` bugs resolved.
 - **aphrodite_catalog reports 0** when inline store has entries. Use
   `aphrodite_stats` for accurate inline counts.
