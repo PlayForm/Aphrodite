@@ -73,8 +73,5 @@ id_rsa*
 **/.skills_*
 **/.update_check
 **/__pycache__/
-**/.DS_Store
-*.bak
-vendor/headroom/Cargo.lock
-.tmp_*.txt
+**/.DS_Sccp_*.txt
 .cargo_check_output.txt

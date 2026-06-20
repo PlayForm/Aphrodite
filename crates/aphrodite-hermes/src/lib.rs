@@ -93,7 +93,7 @@ pub extern "C" fn aphrodite_hermes_free_string(s: *mut c_char) {
 /// Version of this crate.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_version() -> *mut c_char {
-    to_c_string(env!("CARGO_PKG_VERSION"))
+	to_c_string(&serde_json::json!({"version": env!("CARGO_PKG_VERSION")}).to_string())
 }
 
 // ── Hook dispatch C ABI ────────────────────────────────────
@@ -143,6 +143,43 @@ pub extern "C" fn aphrodite_hermes_call_hook(
     };
 
     to_c_string(&serde_json::to_string(&result).unwrap_or_default())
+}
+
+/// Return all tool schemas as a JSON array.
+#[no_mangle]
+pub extern "C" fn aphrodite_hermes_get_schemas() -> *mut c_char {
+	let schemas = schemas::all_schemas();
+	to_c_string(&serde_json::json!(schemas).to_string())
+}
+
+/// Return hook names as a JSON array.
+#[no_mangle]
+pub extern "C" fn aphrodite_hermes_get_hooks() -> *mut c_char {
+	to_c_string(&serde_json::json!([
+		"session_start",
+		"transform_tool_result",
+		"transform_terminal_output",
+		"pre_llm_call",
+		"post_llm_call"
+	]).to_string())
+}
+
+/// Probe proxy health via TCP connect.
+#[no_mangle]
+pub extern "C" fn aphrodite_hermes_proxy_health() -> *mut c_char {
+	use std::net::TcpStream;
+	use std::time::Duration;
+	let timeout = Duration::from_secs(1);
+	let token_alive = TcpStream::connect_timeout(
+		&"127.0.0.1:9798".parse().unwrap(), timeout
+	).is_ok();
+	let cache_alive = TcpStream::connect_timeout(
+		&"127.0.0.1:9797".parse().unwrap(), timeout
+	).is_ok();
+	to_c_string(&serde_json::json!({
+		"token": {"alive": token_alive},
+		"cache": {"alive": cache_alive},
+	}).to_string())
 }
 
 #[cfg(test)]
