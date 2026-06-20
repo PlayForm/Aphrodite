@@ -155,7 +155,7 @@ fn reduce_code(content:&str) -> Option<String> {
 	for sp in &patterns {
 		for line in content.lines() {
 			let trimmed = line.trim();
-			if let Some(caps) = regex_match(trimmed, sp.pattern) {
+			if let Some(_caps) = regex_match(trimmed, sp.pattern) {
 				let sig_line:String = trimmed.chars().take(120).collect();
 				sigs.push(format!("  [{}] {}", sp.kind, sig_line));
 			}
