@@ -550,3 +550,29 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 
 		result
 		}
+
+		/// Stage 2 semantic reduction — port of _stage2.py
+		#[no_mangle]
+		pub extern "C" fn aphrodite_stage2(
+		content: *const c_char,
+		ccr_type: *const c_char,
+		) -> *mut c_char {
+		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
+		let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
+		match crate::stage2::compress_stage2(&c, &t) {
+		    Some(reduced) => CString::new(reduced).unwrap().into_raw(),
+		    None => to_json_error("no reduction possible"),
+		}
+		}
+
+		/// Code structure extraction — port of _core/struct.py
+		#[no_mangle]
+		pub extern "C" fn aphrodite_struct_extract(
+		content: *const c_char,
+		language: *const c_char,
+		) -> *mut c_char {
+		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
+		let lang = unsafe { CStr::from_ptr(language) }.to_string_lossy();
+		let result = crate::struct_extract::extract_code_structure(&c, &lang);
+		to_json_ok(&serde_json::json!(result))
+		}
