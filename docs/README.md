@@ -75,7 +75,7 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 - [Tools](tool-relay/tools.md) - 12 tools with full JSON schemas:
   aphrodite_retrieve, compress, stats, rebuild, files, diff, search, test,
-  catalog, reclassify, prefetch, prefetch_status. Handlers, proxy support table
+  catalog, reclassify, prefetch, prefetch_status. All delegate to Rust dylib
 - [Callbacks](tool-relay/callbacks.md) - Async tool relay + CCR create
   notifications. SSRF protection (https only), Bearer token auth, 5s timeout,
   TaskTracker lifecycle, metrics
