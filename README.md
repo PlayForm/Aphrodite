@@ -14,8 +14,8 @@
 > Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v0.8.43-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![plugin](https://img.shields.io/badge/plugin-v1.62.56-purple)](plugins/aphrodite/plugin.yaml)
+[![release](https://img.shields.io/badge/release-v0.9.1-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![plugin](https://img.shields.io/badge/plugin-v1.62.58-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -329,7 +329,7 @@ for a given classifier type.
 | Build output     | raw compile lines + errors        | `[build:1E 2W 142L]`                                                   |
 | Traceback        | raw Python traceback              | `[error:AttributeError 'NoneType']`                                    |
 | Terminal         | raw stdout + exit code            | `[terminal:cargo build exit=0]`                                        |
-| Git log          | raw commit list                   | `[commit:afd634b release(v0.8.5)]`                                     |
+| Git log          | raw commit list                   | `[commit:e3bfa3d release(v0.9.1)]`                                     |
 | Rust error       | raw error[E] block                | `[error:E0308 src/main.rs:10:5 8L]`                                    |
 | Table output     | raw pipe-delimited text           | `[table:12 rows 15L]`                                                  |
 | JSON blob        | raw nested JSON                   | `[json:total_items,by_type 30L]`                                       |
@@ -627,7 +627,7 @@ aphrodite
 
 # 3. Verify
 curl http://127.0.0.1:9798/health
-# → {"status":"ok","version":"v0.8.43"}
+# → {"status":"ok","version":"v0.9.1"}
 
 # Dev loop with auto-reload
 RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
