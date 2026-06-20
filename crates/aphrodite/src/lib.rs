@@ -551,6 +551,51 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		result
 		}
 
+		/// Filter lines by query — port of _resolve.py _filter_lines
+		#[no_mangle]
+		pub extern "C" fn aphrodite_filter_lines(
+		content: *const c_char,
+		query: *const c_char,
+		) -> *mut c_char {
+		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
+		let q = unsafe { CStr::from_ptr(query) }.to_string_lossy();
+		let filtered = crate::resolve::filter_lines(&c, &q);
+		CString::new(filtered).unwrap().into_raw()
+		}
+
+		/// Resolve hash with full recursive expansion — port of _resolve.py
+		#[no_mangle]
+		pub extern "C" fn aphrodite_resolve(
+		handle: *const c_char,
+		hash: *const c_char,
+		) -> *mut c_char {
+		let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+		    Ok(id) => id, Err(_) => return to_json_error("invalid handle")
+		};
+		let h = unsafe { CStr::from_ptr(hash) }.to_string_lossy();
+		match with_state(hid, |s| {
+		    match crate::resolve::expand(s, &h) {
+		        Some(content) => serde_json::json!({"found":true,"content":content}),
+		        None => serde_json::json!({"found":false}),
+		    }
+		}) {
+		    Ok(v) => to_json_ok(&v),
+		    Err(e) => to_json_error(&e),
+		}
+		}
+
+		/// Generate preview for content — port of _marker/preview.py
+		#[no_mangle]
+		pub extern "C" fn aphrodite_preview(
+		content: *const c_char,
+		ccr_type: *const c_char,
+		) -> *mut c_char {
+		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
+		let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
+		let preview = crate::build_preview(&t, &c);
+		CString::new(preview).unwrap().into_raw()
+		}
+
 		/// Stage 2 semantic reduction — port of _stage2.py
 		#[no_mangle]
 		pub extern "C" fn aphrodite_stage2(
