@@ -140,6 +140,11 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
         })
     });
 
+    m.insert("context_engine_pre_llm", |_args| {
+        let state = aphrodite::state::AphroditeState::default();
+        aphrodite::hooks::pre_llm_call(&state)
+    });
+
     m.insert("aphrodite_retrieve", |args| {
         let hash = args.get("hash").and_then(|v| v.as_str()).unwrap_or("");
         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");

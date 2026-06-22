@@ -189,9 +189,11 @@ mod tests {
 
     #[test]
     fn test_version_is_semver() {
-        let v = unsafe { CStr::from_ptr(aphrodite_hermes_version()) }.to_string_lossy().into_owned();
-        assert!(v.starts_with("0."));
-        aphrodite_hermes_free_string(aphrodite_hermes_version());
+        let json_ptr = aphrodite_hermes_version();
+        let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(v["version"].as_str().unwrap().starts_with("0."));
+        aphrodite_hermes_free_string(json_ptr);
     }
 
     #[test]
