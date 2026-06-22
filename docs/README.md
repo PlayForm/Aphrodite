@@ -106,6 +106,7 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 All schemas, formats, and values are extracted verbatim from:
 
 ### Rust (core compression engine — binary + dylib)
+
 - `crates/aphrodite/src/proxy.rs` — proxy handler, compression pipeline, tool relay
 - `crates/aphrodite/src/resolve.rs` — CCR marker resolution (nested, recursive, cycle-safe)
 - `crates/aphrodite/src/stage2.rs` — Semantic reduction (JSON, build, diff, code)
@@ -122,6 +123,7 @@ All schemas, formats, and values are extracted verbatim from:
 - `vendor/headroom/crates/headroom-core/src/` — Compression engine (PlayForm fork)
 
 ### Python (thin loader — Hermes integration)
+
 - `plugins/aphrodite/__init__.py` — Thin loader: dylib loading, hook/tool registration
 
 ## Conventions

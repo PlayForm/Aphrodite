@@ -135,7 +135,7 @@ When installed as a Hermes plugin, Aphrodite intercepts tool output at the
 | `post_llm_call`             | Tracks compression metrics, updates proxy stats                         |      ✅      |
 | `context_engine`            | Offloads middle conversation turns to CCR when context fills up         |      ✅      |
 | `aphrodite_*` tools         | 12 tools injected directly into Hermes's tool namespace                 |      ✅      |
-| `skills/`                   | 14 bundled skills auto-loaded for agents                                 |      ✅      |
+| `skills/`                   | 14 bundled skills auto-loaded for agents                                |      ✅      |
 
 **No Hermes core code is modified.** The plugin registers hooks in `plugin.yaml`
 and Hermes wires them automatically. Install, enable, restart - that's it.
@@ -174,7 +174,7 @@ context engine, no terminal compression, no skills.
 | Context engine              |           ✅            |           ❌           |
 | Auto-launch proxies         |           ✅            |           ❌           |
 | Agent tools (aphrodite\_\*) |      ✅ (12 tools)      |           ❌           |
-| Bundled skills              |      ✅ (14 skills)     |           ❌           |
+| Bundled skills              |     ✅ (14 skills)      |           ❌           |
 | Prompt injection            |           ✅            |           ❌           |
 | Works with any client       |    ❌ (Hermes only)     | ✅ (OpenAI-compatible) |
 | Setup                       | `hermes plugins enable` |     Set `base_url`     |
@@ -622,12 +622,12 @@ APHRODITE_NO_AUTO_LAUNCH=1 cargo watch -x 'build -p aphrodite'
 hermes --profile dev-aphrodite
 ```
 
-| What changes          | What happens                                                    |
-|-----------------------|-----------------------------------------------------------------|
-| Any `.rs` file        | cargo watch rebuilds → dylib mtime changes                      |
-| Next hook call        | `headroom_ffi.py` detects new mtime → reloads dylib             |
-| Any `.py` file        | `/quit` + `hermes` restart (Hermes caches Python imports)       |
-| Proxy binary          | `aphrodite_rebuild` tool → kill + copy + restart                |
+| What changes   | What happens                                              |
+| -------------- | --------------------------------------------------------- |
+| Any `.rs` file | cargo watch rebuilds → dylib mtime changes                |
+| Next hook call | `headroom_ffi.py` detects new mtime → reloads dylib       |
+| Any `.py` file | `/quit` + `hermes` restart (Hermes caches Python imports) |
+| Proxy binary   | `aphrodite_rebuild` tool → kill + copy + restart          |
 
 ---
 
@@ -795,10 +795,10 @@ every deletion, every change between upstream Headroom and our fork.
 | Agent sees         | Smaller but still-readable content                                     | `[build:2E 0W 14L]` - 13 tokens of metadata                                               |
 | Retrieval needed?  | No - content is already there, just smaller                            | Rarely - preview is usually enough                                                        |
 | How it compresses  | ML model (Kompress), tree-sitter AST reduction, log extraction         | Pure regex classifier (<0.1ms) + TOML templates                                           |
-| Hermes integration | None — proxy or library only                                         | Native plugin: hooks, context engine, 12 tools, 14 skills                                  |
-| Dependencies       | Python + ML model (~100ms)                                           | Zero (Rust binary + cdylib)                                                               |
-| Hot-reload         | ❌                                                                    | ✅ Dylib mtime detection — rebuild, next call picks up new code                           |
-| Dev workflow       | pip install                                                           | cargo watch + APHRODITE_NO_AUTO_LAUNCH=1                                                  |
+| Hermes integration | None — proxy or library only                                           | Native plugin: hooks, context engine, 12 tools, 14 skills                                 |
+| Dependencies       | Python + ML model (~100ms)                                             | Zero (Rust binary + cdylib)                                                               |
+| Hot-reload         | ❌                                                                     | ✅ Dylib mtime detection — rebuild, next call picks up new code                           |
+| Dev workflow       | pip install                                                            | cargo watch + APHRODITE_NO_AUTO_LAUNCH=1                                                  |
 | Token savings      | 30–80% (semantic reduction)                                            | 84%+ (preview skips content entirely)                                                     |
 | Best for           | Long-form content that must be read                                    | Agent workflows where most output is scanned, not read                                    |
 
