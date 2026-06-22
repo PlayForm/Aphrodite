@@ -75,3 +75,5 @@ id_rsa*
 **/__pycache__/
 **/.DS_Sccp_*.txt
 .cargo_check_output.txt
+
+placeholder/
