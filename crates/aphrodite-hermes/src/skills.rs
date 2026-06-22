@@ -1,25 +1,21 @@
 //! Skill registration — bundled Hermes skills shipped with the plugin.
-//! These match the Python plugin's `register()` skill bundle exactly.
+//! Each entry must have a matching SKILL.md in the monorepo skills/ directory.
 
 use serde_json::json;
 
 /// Return all bundled skills as [(name, description)] pairs.
+/// Sync with: ls skills/ — every entry here must have skills/<name>/SKILL.md
 pub fn all_skills() -> Vec<serde_json::Value> {
     vec![
-        skill("aphrodite-benchmarking", "Performance benchmarking for proxy + compression pipeline"),
-        skill("aphrodite-center-testing", "Test center features end-to-end — call site audit, persistence, composition"),
-        skill("aphrodite-coding-defaults", "Coding-optimized compression defaults, centers, and auto-expand"),
-        skill("aphrodite-compression-architecture", "Compression architecture reference — semantic layers, token savings"),
-        skill("aphrodite-context-efficiency", "Techniques for minimizing token usage when working with compressed content"),
-        skill("aphrodite-dev-workflow", "End-to-end aphrodite development: cargo watch, proxy, smoke tests"),
-        skill("aphrodite-hook-reference", "Complete Hermes hook API reference with parameter specs"),
-        skill("aphrodite-iterate-release", "Iterative development loop: fix, bump, build, test, release"),
-        skill("aphrodite-output-formatting", "LLM-native formatting rules for all output — previews, catalog, stats"),
-        skill("aphrodite-presentation", "How to present features in README, docs, and user-facing content"),
-        skill("aphrodite-release-workflow", "Release pipeline, version sync, budget tuning, worker config"),
-        skill("aphrodite-session-patterns", "Session patterns: release pipeline, centers, worker config, metrics"),
-        skill("aphrodite-tool-guide", "Full reference for CCR tools: retrieve, compress, stats, search, catalog"),
-        skill("aphrodite-upgrade-breakpoints", "Cargo upgrade breakpoints checklist — axum 0.8, sha2 0.11 wildcards"),
+        skill("aphrodite-auto-expand-testing", "Protocol for testing auto-expand behavior — controlled by AUTO_EXPAND_LIMIT"),
+        skill("aphrodite-benchmarking", "Comprehensive benchmark protocol for aphrodite proxy — compression ratios, latency, token savings"),
+        skill("aphrodite-cargo-upgrade", "Cargo upgrade breakpoints for aphrodite + headroom — reqwest features, axum ConnectInfo, tokio-tungstenite"),
+        skill("aphrodite-development-lessons", "Critical development pitfalls for Aphrodite — auto-expand, env_passthrough, context engine dead spots"),
+        skill("aphrodite-hook-reference", "Complete Hermes hook API reference for aphrodite plugin — exact invocation signatures, parameter specs"),
+        skill("aphrodite-operations", "Operational patterns for working with aphrodite — engine compression, proxy lifecycle, health checks"),
+        skill("aphrodite-release-workflow", "Auto-release, version sync, pre-release verification, and release notes for Aphrodite"),
+        skill("aphrodite-upgrade-breakpoints", "Cargo upgrade breakpoints for aphrodite + headroom — required by standalone plugin repo and release workflow"),
+        skill("aphrodite-v0.8.6-patterns", "Historical development patterns from v0.8.5→v0.8.6 cycle — most patterns still current"),
     ]
 }
 
