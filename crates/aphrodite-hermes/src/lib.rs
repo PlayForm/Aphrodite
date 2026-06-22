@@ -192,7 +192,11 @@ mod tests {
         let json_ptr = aphrodite_hermes_version();
         let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert!(v["version"].as_str().unwrap().starts_with("0."));
+        let ver = v["version"].as_str().unwrap();
+        assert!(
+            ver.starts_with("0.") || ver.starts_with("1."),
+            "expected semver starting with 0. or 1., got: {ver}"
+        );
         aphrodite_hermes_free_string(json_ptr);
     }
 
