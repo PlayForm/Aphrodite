@@ -1,0 +1,122 @@
+name: Publish
+
+concurrency:
+  group: Publish-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags: ["Aphrodite/v*"]
+  workflow_dispatch:
+
+env:
+  ADBLOCK: true
+  ASTRO_TELEMETRY_DISABLED: 1
+  AUTOMATEDLAB_TELEMETRY_OPTOUT: 1
+  AZURE_CORE_COLLECT_TELEMETRY: 0
+  CARGO_TERM_COLOR: always
+  CHOOSENIM_NO_ANALYTICS: 1
+  DIEZ_DO_NOT_TRACK: 1
+  DO_NOT_TRACK: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_INTERACTIVE_CLI_TELEMETRY_OPTOUT: 1
+  ET_NO_TELEMETRY: 1
+  GATSBY_TELEMETRY_DISABLED: 1
+  GATSBY_TELEMETRY_OPT_OUT: 1
+  GATSBY_TELEMETRY_OPTOUT: 1
+  GRIT_TELEMETRY_DISABLED: 1
+  HASURA_GRAPHQL_ENABLE_TELEMETRY: false
+  HINT_TELEMETRY: off
+  HOMEBREW_NO_ANALYTICS: 1
+  INFLUXD_REPORTING_DISABLED: true
+  ITERATIVE_DO_NOT_TRACK: 1
+  NEXT_TELEMETRY_DEBUG: 1
+  NEXT_TELEMETRY_DISABLED: 1
+  NG_CLI_ANALYTICS: false
+  NUXT_TELEMETRY_DISABLED: 1
+  PIN_DO_NOT_TRACK: 1
+  POWERSHELL_TELEMETRY_OPTOUT: 1
+  SAM_CLI_TELEMETRY: 0
+  STNOUPGRADE: 1
+  STRIPE_CLI_TELEMETRY_OPTOUT: 1
+  TELEMETRY_DISABLED: 1
+  TERRAFORM_TELEMETRY: 0
+  VCPKG_DISABLE_METRICS: 1
+
+jobs:
+  Test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          submodules: recursive
+
+      - name: Init submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule status
+
+      - name: Setup Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: cargo-test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-test-${{ runner.os }}-
+
+      - name: Cargo test
+        run: cargo test --workspace
+
+  Publish:
+    name: Publish ${{ matrix.crate }}
+    needs: [Test]
+    runs-on: ubuntu-latest
+    environment: Release
+    strategy:
+      matrix:
+        include:
+          - crate: aphrodite
+            path: crates/aphrodite
+          - crate: aphrodite-hermes
+            path: crates/aphrodite-hermes
+
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          submodules: recursive
+
+      - name: Init submodules
+        run: |
+          git submodule update --init --recursive
+          git submodule status
+
+      - name: Setup Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: cargo-publish-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-publish-${{ runner.os }}-
+
+      - name: Build release
+        run: cargo build --release -p ${{ matrix.crate }}
+
+      - name: Publish to crates.io
+        if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
+        run: cargo publish -p ${{ matrix.crate }} --no-verify
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

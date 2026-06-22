@@ -19,6 +19,7 @@ pub mod config;
 pub mod proxy;
 pub mod retrieve;
 pub mod scripting;
+pub mod setup;
 
 use std::{
 	collections::HashMap,

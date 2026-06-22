@@ -458,15 +458,16 @@ pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 
 	let ccr:Option<Arc<dyn CcrStore>> = match cli.mode {
 		ProxyMode::Token if !cli.no_ccr_marker => {
-			let db_path = if cli.ccr_db_path.as_os_str().is_empty() {
+			let db_path = cli.ccr_db_path.as_ref().map_or_else(
+			|| {
 				dirs::home_dir()
 					.unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
 					.join(".hermes")
 					.join("aphrodite")
 					.join("ccr.db")
-			} else {
-				cli.ccr_db_path.clone()
-			};
+			},
+			|p| p.clone(),
+		);
 			let store = SqliteCcrStore::open(&db_path, cli.ccr_ttl_seconds)
 				.map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
 			Some(Arc::new(store))

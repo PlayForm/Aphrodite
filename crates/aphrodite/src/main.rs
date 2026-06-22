@@ -18,7 +18,7 @@ use clap::Parser;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use aphrodite::{
-	config::{Cli, MultiConfig, ProxyMode},
+	config::{Cli, Command, MultiConfig, ProxyMode, SetupArgs},
 	proxy::{
 		self,
 		handle_ccr_create,
@@ -29,12 +29,11 @@ use aphrodite::{
 		health_check,
 	},
 	retrieve,
+	setup,
 };
 
 fn main() -> anyhow::Result<()> {
-	// Handle --version early - clap version attribute is only wired through
-	// Cli::parse() which is skipped when aphrodite.toml exists (multi-proxy path).
-	// This ensures --version always works regardless of config state.
+	// Handle --version / --help early to avoid starting the runtime.
 	let args:Vec<String> = std::env::args().collect();
 	if args.iter().any(|a| a == "--version" || a == "-V") {
 		println!(
@@ -42,6 +41,37 @@ fn main() -> anyhow::Result<()> {
 			option_env!("APHRODITE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
 		);
 		return Ok(());
+	}
+	if args.iter().any(|a| a == "--help" || a == "-h") {
+		// Let clap print help — parse will exit the process
+		let _ = Cli::try_parse();
+		return Ok(());
+	}
+
+	// ── Handle `aphrodite setup` subcommand ──
+	// Parse early to check for setup before building the tokio runtime.
+	if args.iter().any(|a| a == "setup") {
+		let cli = Cli::parse();
+		match cli.command {
+			Some(Command::Setup { api_key, api_url, model, no_launch, force }) => {
+				let setup_args = SetupArgs { api_key, api_url, model, no_launch, force };
+				match setup::run(&setup_args) {
+					Ok(()) => {
+						if setup_args.no_launch {
+							// --no-launch: setup done, don't start proxy.
+							return Ok(());
+						}
+						// Default: setup complete, drop through to start proxy
+						println!("setup complete, starting proxy...");
+					}
+					Err(e) => {
+						eprintln!("setup failed: {e}");
+						std::process::exit(1);
+					}
+				}
+			}
+			_ => {}
+		}
 	}
 
 	// Worker thread count  -  I/O-bound proxy needs more than CPU cores.
@@ -237,17 +267,19 @@ async fn run_single(
 	// Resolve relative ccr_db_path against the binary directory, not CWD.
 	// This way the database path is stable regardless of where the process is
 	// launched from.
-	if !cli.ccr_db_path.as_os_str().is_empty() && !cli.ccr_db_path.is_absolute() {
-		if let Ok(exe_path) = std::env::current_exe() {
-			if let Some(exe_dir) = exe_path.parent() {
-				let old = cli.ccr_db_path.display().to_string();
-				cli.ccr_db_path = exe_dir.join(&cli.ccr_db_path);
-				tracing::info!("resolved relative ccr_db_path from {} to {}", old, cli.ccr_db_path.display());
+	if let Some(ref db_path) = cli.ccr_db_path {
+		if !db_path.as_os_str().is_empty() && !db_path.is_absolute() {
+			if let Ok(exe_path) = std::env::current_exe() {
+				if let Some(exe_dir) = exe_path.parent() {
+					let old = db_path.display().to_string();
+					cli.ccr_db_path = Some(exe_dir.join(db_path));
+					tracing::info!("resolved relative ccr_db_path from {} to {}", old, cli.ccr_db_path.as_ref().unwrap().display());
+				}
 			}
 		}
-	}
-	if let Some(parent) = cli.ccr_db_path.parent() {
-		std::fs::create_dir_all(parent)?;
+		if let Some(parent) = cli.ccr_db_path.as_ref().and_then(|p| p.parent()) {
+			std::fs::create_dir_all(parent)?;
+		}
 	}
 
 	let state = Arc::new(proxy::build_state(&cli).await?);

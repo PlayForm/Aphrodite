@@ -18,12 +18,76 @@ pub enum ProxyMode {
 	Token,
 }
 
+/// aphrodite subcommands.
+#[derive(clap::Subcommand, Debug, Clone)]
+pub enum Command {
+	/// Run the proxy server (default).
+	Run,
+	/// Bootstrap: copy binary, create config, register with hermes, launch proxy.
+	Setup {
+		/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
+		#[arg(long, env = "APHRODITE_API_KEY")]
+		api_key: Option<String>,
+
+		/// Upstream API base URL.
+		#[arg(long, env = "APHRODITE_API_URL", default_value = "https://api.deepseek.com")]
+		api_url: String,
+
+		/// Model name to forward.
+		#[arg(long, env = "APHRODITE_MODEL", default_value = "deepseek-v4-pro")]
+		model: String,
+
+		/// Skip launching the proxy after setup.
+		#[arg(long)]
+		no_launch: bool,
+
+		/// Force re-setup even if already installed.
+		#[arg(long)]
+		force: bool,
+	},
+}
+
+/// Arguments for the `setup` subcommand.
+#[derive(Debug, Clone)]
+pub struct SetupArgs {
+	/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
+	pub api_key: Option<String>,
+	/// Upstream API base URL.
+	pub api_url: String,
+	/// Model name to forward.
+	pub model: String,
+	/// Skip launching the proxy after setup.
+	pub no_launch: bool,
+	/// Force re-setup even if already installed.
+	pub force: bool,
+}
+
+impl From<Command> for SetupArgs {
+	fn from(cmd: Command) -> Self {
+		match cmd {
+			Command::Setup { api_key, api_url, model, no_launch, force } => {
+				Self { api_key, api_url, model, no_launch, force }
+			}
+			_ => Self {
+				api_key: None,
+				api_url: "https://api.deepseek.com".into(),
+				model: "deepseek-v4-pro".into(),
+				no_launch: false,
+				force: false,
+			},
+		}
+	}
+}
+
 /// aphrodite - generic LLM proxy with CCR, tool relay, and programmatic CCR.
 /// Works with any OpenAI-compatible API (DeepSeek, OpenAI, Anthropic via proxy,
 /// etc.)
 #[derive(Parser, Debug, Clone)]
 #[command(name = "aphrodite", version, about)]
 pub struct Cli {
+	/// Subcommand: `setup` to bootstrap, or omitted to run the proxy.
+	#[command(subcommand)]
+	pub command: Option<Command>,
 	/// Proxy mode: cache or token
 	#[arg(long, default_value = "token", env = "APHRODITE_MODE")]
 	pub mode:ProxyMode,
@@ -53,8 +117,8 @@ pub struct Cli {
 	pub max_output:usize,
 
 	/// SQLite database path for CCR storage
-	#[arg(long, env = "APHRODITE_DB", default_value = "")]
-	pub ccr_db_path:PathBuf,
+	#[arg(long, env = "APHRODITE_DB")]
+	pub ccr_db_path:Option<PathBuf>,
 
 	/// CCR TTL in seconds (default: 3600 = 1 hour)
 	#[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
@@ -200,6 +264,7 @@ impl MultiConfig {
 			anyhow::bail!("max_output ({max_output}) must be less than max_context ({max_context})");
 		}
 		Ok(Cli {
+			command: None,
 			mode:match cfg.mode.as_deref() {
 				Some("token") => ProxyMode::Token,
 				Some("cache") => ProxyMode::Cache,
@@ -226,19 +291,12 @@ impl MultiConfig {
 				.unwrap_or_else(|| "default-model".into()),
 			max_context,
 			max_output,
-			// Fall back to ~/.hermes/aphrodite/ if dirs::home_dir() returns None
+			// Resolve from toml — proxy.rs handles None default
 			ccr_db_path:cfg
 				.ccr_db_path
 				.clone()
 				.filter(|s| !s.is_empty())
-				.map(Into::into)
-				.unwrap_or_else(|| {
-					dirs::home_dir()
-						.unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-						.join(".hermes")
-						.join("aphrodite")
-						.join("ccr.db")
-				}),
+				.map(Into::into),
 			ccr_ttl_seconds:cfg
 				.ccr_ttl_seconds
 				.or_else(|| d.and_then(|d| d.ccr_ttl_seconds))
