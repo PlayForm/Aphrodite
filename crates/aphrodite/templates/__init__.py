@@ -13,12 +13,17 @@ _DYLIB_PATH = os.environ.get("APHRODITE_HERMES_DYLIB_PATH",
 _BINARY_NAME = "aphrodite.exe" if sys.platform == "win32" else "aphrodite"
 _BINARY_PATH = str(_PLUGIN_DIR / "binaries" / _BINARY_NAME)
 _dylib = None
+_dylib_mtime = 0.0
 
 def _load_dylib():
-    global _dylib
-    if _dylib is not None:
-        return _dylib
+    global _dylib, _dylib_mtime
     assert os.path.exists(_DYLIB_PATH), f"Dylib not found: {_DYLIB_PATH}"
+    # Hot-reload: check mtime, reload if changed
+    current_mtime = os.path.getmtime(_DYLIB_PATH)
+    if _dylib is not None and current_mtime == _dylib_mtime:
+        return _dylib
+    if _dylib is not None:
+        _log.info("dylib mtime changed — hot-reloading %s", _DYLIB_PATH)
     dylib = ctypes.CDLL(_DYLIB_PATH)
     dylib.aphrodite_hermes_get_schemas.restype = ctypes.c_void_p
     dylib.aphrodite_hermes_get_hooks.restype = ctypes.c_void_p
@@ -30,6 +35,7 @@ def _load_dylib():
     dylib.aphrodite_hermes_proxy_health.restype = ctypes.c_void_p
     dylib.aphrodite_hermes_free_string.argtypes = [ctypes.c_void_p]
     _dylib = dylib
+    _dylib_mtime = current_mtime
     return dylib
 
 def _read_str(ptr):

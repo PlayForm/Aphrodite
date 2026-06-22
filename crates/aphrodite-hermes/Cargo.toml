@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite-hermes"
-version = "0.1.5"
+version = "1.0.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
