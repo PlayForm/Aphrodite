@@ -10,7 +10,7 @@ Every line you write here directly makes LLMs cheaper, faster, and smarter. ✨
 - **Two crates**: `crates/aphrodite` (core engine) + `crates/aphrodite-hermes` (agent integration)
 - **Plugin**: `plugins/aphrodite` v2.0.1 - 12 tools, 9 skills, dylib hot-reload, dual-proxy architecture
 - **Config**: `aphrodite.toml` - all tuning in one file, env-overridable
-- **Binary**: `~/.hermes/aphrodite/aphrodite` v1.0.3 - auto-downloaded, auto-updated
+- **Binary**: `~/.hermes/aphrodite/aphrodite` v1.0.4 — auto-downloaded, auto-updated
 
 ## Dev Flow - The Joyful Loop
 
