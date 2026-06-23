@@ -18,7 +18,9 @@ venv/
 env/
 
 # Hermes / dev artifacts
-.hermes/
+!./.hermes/
+!./.hermes/**/*
+
 .headroom/
 .DS_Store
 *.log
