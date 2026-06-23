@@ -1,4 +1,4 @@
-//! CCR marker generation — 1:1 port of plugins/aphrodite/_marker/marker.py
+//! CCR marker generation - 1:1 port of plugins/aphrodite/_marker/marker.py
 //!
 //! Generates <<<CCR:hash|type|size>>> markers with TOML-driven templates.
 

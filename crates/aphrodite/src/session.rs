@@ -1,11 +1,11 @@
-//! Session lifecycle — port of plugins/aphrodite/_hooks/session.py
+//! Session lifecycle - port of plugins/aphrodite/_hooks/session.py
 //!
 //! Manages: turn counter, conversation index, git cache, referenced files,
 //! scanned message index, marker-at-end-of-turn archive.
 
 use crate::state::AphroditeState;
 
-/// Handle session start — reset all per-session state.
+/// Handle session start - reset all per-session state.
 pub fn on_session_start(state: &mut AphroditeState) -> serde_json::Value {
     state.turn_counter = 0;
     state.scanned_msg_idx = 0;

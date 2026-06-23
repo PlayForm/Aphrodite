@@ -1,7 +1,7 @@
 //! aphrodite-hermes: Hermes Agent-specific integration crate.
 //!
-//! This crate handles all Hermes-specific concerns — tool schemas,
-//! hook dispatch, skill registration — leaving the core `aphrodite`
+//! This crate handles all Hermes-specific concerns - tool schemas,
+//! hook dispatch, skill registration - leaving the core `aphrodite`
 //! crate as a pure, agent-agnostic compression engine.
 //!
 //! Architecture:

@@ -49,13 +49,13 @@ to `Source` remote.
 ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/aphrodite
 ```
 
-## Release Notes — Content Standards
+## Release Notes - Content Standards
 
 Every release MUST include: Summary, Changes, Infrastructure, What Ships, and Links.
 See `.hermes/RELEASE-TEMPLATE.md` for the canonical template.
 
 Anti-pattern (DO NOT): bare compare link with zero description.
-30+ releases (v0.8.13–v0.8.43) currently ship with only:
+30+ releases (v0.8.13-v0.8.43) currently ship with only:
 
 ```
 **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/...
@@ -73,7 +73,7 @@ cat > /tmp/notes.md << 'EOF'
 ## Aphrodite vX.Y.Z 💋 Plugin vA.B.C
 
 ### Summary
-One paragraph. What this release is. 2–3 sentences.
+One paragraph. What this release is. 2-3 sentences.
 
 ### Changes
 - **Feature**: description

@@ -1,4 +1,4 @@
-# Release Audit — v0.9.0 → v0.9.8
+# Release Audit - v0.9.0 → v0.9.8
 
 Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
@@ -6,13 +6,13 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 | Symbol | Meaning |
 |--------|---------|
-| ✅ | Verified — fix present in current code |
-| ⚠️ | Partial — fix exists but incomplete or stale |
-| ❌ | Missing/regressed — claimed fix no longer in code |
+| ✅ | Verified - fix present in current code |
+| ⚠️ | Partial - fix exists but incomplete or stale |
+| ❌ | Missing/regressed - claimed fix no longer in code |
 
 ---
 
-## v0.9.0 — Python→Rust Migration, Dylib Hot-Reload
+## v0.9.0 - Python→Rust Migration, Dylib Hot-Reload
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -21,11 +21,11 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 | 3 | APHRODITE_NO_AUTO_LAUNCH guard | ✅ | Present in `__init__.py:105` and `templates/__init__.py:65` |
 | 4 | 17 C ABI functions | ✅ | lib.rs has 20+ `#[no_mangle]` functions; all documented ones present |
 
-**Gap**: The dylib hot-reload claim in v0.9.0 release notes ("dylib C ABI fix + hot-reload") is inaccurate after the migration deleted `headroom_ffi.py`. The `__init__.py` shim calls `ctypes.CDLL(path)` once and caches the result — it never re-checks mtime or reloads. A dylib rebuild requires Hermes restart (`/quit` + re-launch).
+**Gap**: The dylib hot-reload claim in v0.9.0 release notes ("dylib C ABI fix + hot-reload") is inaccurate after the migration deleted `headroom_ffi.py`. The `__init__.py` shim calls `ctypes.CDLL(path)` once and caches the result - it never re-checks mtime or reloads. A dylib rebuild requires Hermes restart (`/quit` + re-launch).
 
 ---
 
-## v0.9.1 — Clippy + Badge Sync
+## v0.9.1 - Clippy + Badge Sync
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -34,20 +34,20 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 ---
 
-## v0.9.2 — Universal Dispatch, Pinned Deps, Lychee, CI
+## v0.9.2 - Universal Dispatch, Pinned Deps, Lychee, CI
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
 | 1 | Universal `aphrodite_dispatch` C ABI | ✅ | 1 instance in `lib.rs`; `dispatch_tool` called 4× in `__init__.py` |
 | 2 | Dependencies pinned (reqwest 0.13.4, etc.) | ✅ | `reqwest = "0.13.4"` in Cargo.toml; others verified |
-| 3 | Lychee link checker — 0 errors | ✅ | `.lychee.toml` + `.lycheeignore` exist |
+| 3 | Lychee link checker - 0 errors | ✅ | `.lychee.toml` + `.lycheeignore` exist |
 | 4 | CI pyright: cd to plugin dir | ✅ | Check.yml has `cd plugins/aphrodite && npx pyright .` |
 | 5 | Root cleanup: files to Maintain/ | ✅ | `Maintain/` directory exists with 10+ relocated files |
 | 6 | HermesCompress → Aphrodite-Hermes URL fix | ✅ | URLs in docs reference `Aphrodite-Hermes` not `HermesCompress` |
 
 ---
 
-## v0.9.3 — Housekeeping, stage2 C ABI, 12 Tools
+## v0.9.3 - Housekeeping, stage2 C ABI, 12 Tools
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -59,7 +59,7 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 ---
 
-## v0.9.4 — Final Cleanup, Version Sync
+## v0.9.4 - Final Cleanup, Version Sync
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -67,7 +67,7 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 ---
 
-## v0.9.5 — Critical Bug Fixes (Post-Migration Audit)
+## v0.9.5 - Critical Bug Fixes (Post-Migration Audit)
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -78,7 +78,7 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 ---
 
-## v0.9.6 — Skill System Sync
+## v0.9.6 - Skill System Sync
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -88,7 +88,7 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 ---
 
-## v0.9.7 — Headroom Fork Sync
+## v0.9.7 - Headroom Fork Sync
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -97,7 +97,7 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 ---
 
-## v0.9.8 — cargo install bootstrap, Publish.yml
+## v0.9.8 - cargo install bootstrap, Publish.yml
 
 | # | Claim | Status | Evidence |
 |---|-------|--------|----------|
@@ -131,10 +131,10 @@ Generated: 2026-06-22 | Auditor: dev-aphrodite agent | Target: v1.0.0 readiness
 
 ### ❌→✅ v0.9.0: Dylib hot-reload regressed → FIXED
 
-**Claim**: "dylib hot-reload via mtime" — dylib rebuilds are picked up without Hermes restart.
+**Claim**: "dylib hot-reload via mtime" - dylib rebuilds are picked up without Hermes restart.
 
-**Fix**: Added `_dylib_mtime` global + mtime check in `_load_dylib()`. On every call, `os.path.getmtime(path)` is compared against `_dylib_mtime`. If the dylib file changed on disk, it's reloaded via `ctypes.CDLL()` and all function signatures are re-registered. Logs `"dylib mtime changed — hot-reloading"` on reload.
+**Fix**: Added `_dylib_mtime` global + mtime check in `_load_dylib()`. On every call, `os.path.getmtime(path)` is compared against `_dylib_mtime`. If the dylib file changed on disk, it's reloaded via `ctypes.CDLL()` and all function signatures are re-registered. Logs `"dylib mtime changed - hot-reloading"` on reload.
 
 **Files changed**:
-- `plugins/aphrodite/__init__.py` — live Python shim
-- `crates/aphrodite/templates/__init__.py` — `cargo install` template
+- `plugins/aphrodite/__init__.py` - live Python shim
+- `crates/aphrodite/templates/__init__.py` - `cargo install` template

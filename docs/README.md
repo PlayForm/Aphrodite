@@ -18,7 +18,7 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 ### CCR (Compress-Cache-Retrieve)
 
 - [Marker Format](ccr/marker-format.md) - `<<<CCR:hash|type|size>>>` schema with
-  SHA-256 hash, 28 content types, TOML‑driven preview templates, and metadata
+  SHA-256 hash, 28 content types, TOML-driven preview templates, and metadata
   encoding rules
 - [Lifecycle](ccr/lifecycle.md) - Full 6-phase flow: compress
   (detect→threshold→hash→cache→store→marker), retrieve
@@ -48,7 +48,7 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
   handle_tool_relay, handle_ccr_create/list/delete, health_check,
   handle_retrieve. Full request/response schemas and flow
 - [Retry](proxy/retry.md) - 3 attempts, exponential backoff (100ms × 2^(n-1)),
-  jitter 0.75–1.25×, transport-only retries, 502 on final failure
+  jitter 0.75-1.25×, transport-only retries, 502 on final failure
 - [Compression](proxy/compression.md) - Full pipeline: detect→threshold
   (per-type × auto-tune × headroom budget)→hash→cache→marker→EMA→tokens_saved.
   Auto-tune state machine with fill_pct feedback loop
@@ -105,26 +105,26 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 All schemas, formats, and values are extracted verbatim from:
 
-### Rust (core compression engine — binary + dylib)
+### Rust (core compression engine - binary + dylib)
 
-- `crates/aphrodite/src/proxy.rs` — proxy handler, compression pipeline, tool relay
-- `crates/aphrodite/src/resolve.rs` — CCR marker resolution (nested, recursive, cycle-safe)
-- `crates/aphrodite/src/stage2.rs` — Semantic reduction (JSON, build, diff, code)
-- `crates/aphrodite/src/struct_extract.rs` — Code structure extraction (Rust, Python, Go, JS/TS)
-- `crates/aphrodite/src/hooks.rs` — transform_tool_result, transform_terminal_output
-- `crates/aphrodite/src/state.rs` — Session state, inline store, LRU eviction
-- `crates/aphrodite/src/marker.rs` — CCR marker generation, parsing
-- `crates/aphrodite/src/catalog.rs` — Full catalog with by-type grouping
-- `crates/aphrodite/src/session.rs` — Session lifecycle, turn tracking
-- `crates/aphrodite/src/prefetch.rs` — Background file loading
-- `crates/aphrodite/src/config_loader.rs` — TOML config with env override
-- `crates/aphrodite/src/lib.rs` — 17 C ABI functions for dylib loading
-- `crates/aphrodite-hermes/src/` — Hermes integration: tools, schemas, skills
-- `vendor/headroom/crates/headroom-core/src/` — Compression engine (PlayForm fork)
+- `crates/aphrodite/src/proxy.rs` - proxy handler, compression pipeline, tool relay
+- `crates/aphrodite/src/resolve.rs` - CCR marker resolution (nested, recursive, cycle-safe)
+- `crates/aphrodite/src/stage2.rs` - Semantic reduction (JSON, build, diff, code)
+- `crates/aphrodite/src/struct_extract.rs` - Code structure extraction (Rust, Python, Go, JS/TS)
+- `crates/aphrodite/src/hooks.rs` - transform_tool_result, transform_terminal_output
+- `crates/aphrodite/src/state.rs` - Session state, inline store, LRU eviction
+- `crates/aphrodite/src/marker.rs` - CCR marker generation, parsing
+- `crates/aphrodite/src/catalog.rs` - Full catalog with by-type grouping
+- `crates/aphrodite/src/session.rs` - Session lifecycle, turn tracking
+- `crates/aphrodite/src/prefetch.rs` - Background file loading
+- `crates/aphrodite/src/config_loader.rs` - TOML config with env override
+- `crates/aphrodite/src/lib.rs` - 17 C ABI functions for dylib loading
+- `crates/aphrodite-hermes/src/` - Hermes integration: tools, schemas, skills
+- `vendor/headroom/crates/headroom-core/src/` - Compression engine (PlayForm fork)
 
-### Python (thin loader — Hermes integration)
+### Python (thin loader - Hermes integration)
 
-- `plugins/aphrodite/__init__.py` — Thin loader: dylib loading, hook/tool registration
+- `plugins/aphrodite/__init__.py` - Thin loader: dylib loading, hook/tool registration
 
 ## Conventions
 

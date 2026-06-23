@@ -1,4 +1,4 @@
-//! headroom-ffi internal state — mirrors plugins/aphrodite/_core/state.py
+//! headroom-ffi internal state - mirrors plugins/aphrodite/_core/state.py
 //! All session-scoped state lives here: inline store, conv index, markers,
 //! counters.
 
@@ -7,7 +7,7 @@ use std::collections::{HashMap, VecDeque};
 /// Maximum inline store entries before LRU eviction.
 const INLINE_MAX:usize = 500;
 
-/// Session state — one per loaded dylib instance.
+/// Session state - one per loaded dylib instance.
 pub struct AphroditeState {
 	/// Inline content store: {hash: content}, LRU-ordered.
 	pub inline_store:VecDeque<(String, String)>,

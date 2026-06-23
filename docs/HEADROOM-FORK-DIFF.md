@@ -21,14 +21,14 @@ All commits are on the `Current` branch. Oldest first.
 | `7ba6e30b` | Jun 15 | **refactor: rip out non-coding integrations** - langchain, agno, litellm, asgi | −5,354 lines, 16 files       |
 | `126543f5` | Jun 15 | chore: remove liteLLM dependency - unused by aphrodite                         | −1 line (pyproject)          |
 | `6cebd79b` | Jun 15 | docs: add Hermes-agent integration recommendations                             | docs only                    |
-| `bf133795` | Jun 15 | feat: add `hermes_demo/` - full Hermes‑3 + Aphrodite proxy integration suite   | +1,653 lines (9 files added) |
+| `bf133795` | Jun 15 | feat: add `hermes_demo/` - full Hermes-3 + Aphrodite proxy integration suite   | +1,653 lines (9 files added) |
 
 ### Phase 2: Hardening (2026-06-16)
 
 | Commit     | Date   | Description                                                                                                                    | Impact              |
 | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
-| `9f9a3253` | Jun 15 | fix: add DeepSeek chat/r1/v4/v4‑pro tokenizer mappings                                                                         | Rust                |
-| `a15e6c3b` | Jun 15 | fix: preserve `x-headroom-workspace` header for CCR cross‑project scoping                                                      | proxy               |
+| `9f9a3253` | Jun 15 | fix: add DeepSeek chat/r1/v4/v4-pro tokenizer mappings                                                                         | Rust                |
+| `a15e6c3b` | Jun 15 | fix: preserve `x-headroom-workspace` header for CCR cross-project scoping                                                      | proxy               |
 | `76e448b0` | Jun 15 | fix: raise relevance threshold 0.3→0.5 + add coding stop words                                                                 | Rust                |
 | `57157225` | Jun 15 | perf: replace `list.pop(0)` with `deque.popleft()` in context_tracker LRU                                                      | Python              |
 | `a1396ff3` | Jun 16 | fix: CCR regex, loopback exempt, threshold invert, headers passthrough, savings accumulate, rate limit exempt, image auto mode | +235/−75 (9 files)  |
@@ -36,13 +36,13 @@ All commits are on the `Current` branch. Oldest first.
 | `d4a832cb` | Jun 16 | hardening: poison-tolerant locks, debounced purge, queue compaction                                                            | +213/−36 (2 files)  |
 | `e2cca08d` | Jun 16 | test: 8 regression tests for auth classification drift                                                                         | +145/−0             |
 | `6f284bb1` | Jun 16 | fix(build): sha2 0.11 hex format - LowerHex removed from Array output                                                          | +15/−13 (5 files)   |
-| `b2512027` | Jun 16 | tune: coding‑tuned policy defaults - looser lossy caps, higher volatile thresholds                                             | +174/−192 (2 files) |
+| `b2512027` | Jun 16 | tune: coding-tuned policy defaults - looser lossy caps, higher volatile thresholds                                             | +174/−192 (2 files) |
 
 ### Phase 3: Production Polish (2026-06-17)
 
 | Commit     | Date   | Description                                                                                  | Impact          |
 | ---------- | ------ | -------------------------------------------------------------------------------------------- | --------------- |
-| `1dc3dae0` | Jun 17 | fix: SQLite overflow clamps + in‑memory evict iteration cap                                  | +6/−7 (2 files) |
+| `1dc3dae0` | Jun 17 | fix: SQLite overflow clamps + in-memory evict iteration cap                                  | +6/−7 (2 files) |
 | `536ce886` | Jun 17 | **fix: compute_key 24→40 hex chars** - safe for persistent backends with millions of entries | +7/−9           |
 | `8823704a` | Jun 16 | ci: bump dtolnay/rust-toolchain                                                              | CI              |
 | `483a7681` | Jun 16 | ci: bump codecov/codecov-action 4→7                                                          | CI              |
@@ -57,7 +57,7 @@ All commits are on the `Current` branch. Oldest first.
 | `bb1847e9` | Jun 17 | ci: bump vite 8.0.10→8.0.16 (plugins/openclaw)                                               | deps            |
 | `fa50e5b6` | Jun 17 | ci: bump js-yaml 4.1.1→4.2.0 (docs)                                                          | deps            |
 
-### Phase 4: Merge / Finalize (2026-06-17–18)
+### Phase 4: Merge / Finalize (2026-06-17-18)
 
 | Commit     | Date   | Description                               |
 | ---------- | ------ | ----------------------------------------- |
@@ -88,7 +88,7 @@ Three interstitial "save" commits (`702bdfa5`, `6ee1747f`, `c97f135d`, `50644506
 
 | Module                                      | Files   | Lines  | Reason                                                |
 | ------------------------------------------- | ------- | ------ | ----------------------------------------------------- |
-| `headroom/integrations/langchain/`          | 7 files | ~3,500 | Aphrodite is Hermes‑only - no langchain/orchestration |
+| `headroom/integrations/langchain/`          | 7 files | ~3,500 | Aphrodite is Hermes-only - no langchain/orchestration |
 | `headroom/integrations/agno/`               | 4 files | ~1,400 | Same                                                  |
 | `headroom/integrations/asgi.py`             | 1 file  | 239    | No ASGI/FastAPI wrapping needed                       |
 | `headroom/integrations/litellm_callback.py` | 1 file  | 187    | LiteLLM removed entirely                              |
@@ -105,7 +105,7 @@ Three interstitial "save" commits (`702bdfa5`, `6ee1747f`, `c97f135d`, `50644506
 | `headroom/proxy/handlers/bedrock.py`     | 300     | Python Bedrock handler - moved to Rust (`crates/headroom-proxy/src/bedrock/`)  |
 | `headroom/learn/verbosity.py`            | 473     | Verbosity learning models                                                      |
 | `headroom/cli/doctor.py`                 | 412     | Diagnostic CLI                                                                 |
-| `headroom/cli/update.py`                 | 341     | Auto‑update checker                                                            |
+| `headroom/cli/update.py`                 | 341     | Auto-update checker                                                            |
 | `headroom/cli/audit.py`                  | 107     | Audit CLI                                                                      |
 | `headroom/cli/output_savings.py`         | 61      | Output savings CLI                                                             |
 | `headroom/audit/`                        | 4 files | 762                                                                            | Audit modules (reads, codex, maturation) |
@@ -148,7 +148,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 
 | File                                       | Lines | Purpose                                     |
 | ------------------------------------------ | ----- | ------------------------------------------- |
-| `hermes_via_proxy_demo.py`                 | 460   | End‑to‑end Aphrodite proxy integration demo |
+| `hermes_via_proxy_demo.py`                 | 460   | End-to-end Aphrodite proxy integration demo |
 | `hermes_agent_eval.py`                     | 396   | Agent evaluation harness                    |
 | `test_hermes_ccr.py`                       | 298   | CCR unit tests                              |
 | `hermes_mcp_client.py`                     | 226   | MCP client integration                      |
@@ -175,14 +175,14 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 | Area                   | Change Summary                                                                                                   |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | **CCR hash**           | Length 24→40 hex chars (collision safety at scale). Algorithm remains BLAKE3. Python uses SHA-256 independently. |
-| **CCR backends**       | Poison‑tolerant locks, debounced purge, queue compaction; in‑memory LRU, SQLite spawn_blocking, redis pipeline   |
+| **CCR backends**       | Poison-tolerant locks, debounced purge, queue compaction; in-memory LRU, SQLite spawn_blocking, redis pipeline   |
 | **SQLite**             | Overflow clamps, evict iteration caps                                                                            |
-| **Compression policy** | Coding‑tuned defaults: looser lossy caps, higher volatile thresholds                                             |
+| **Compression policy** | Coding-tuned defaults: looser lossy caps, higher volatile thresholds                                             |
 | **Relevance**          | Threshold 0.3→0.5, coding stop words added                                                                       |
 | **Live zone**          | Major rewrite (149 lines changed) - anthropic + openai + responses compression hooks                             |
 | **Smart crusher**      | Compaction classifier, formatter, walker, config, crusher, hashing - all tuned                                   |
 | **Search compressor**  | 33 lines changed                                                                                                 |
-| **Tokenizers**         | DeepSeek chat/r1/v4/v4‑pro mappings added                                                                        |
+| **Tokenizers**         | DeepSeek chat/r1/v4/v4-pro mappings added                                                                        |
 | **Build**              | sha2 0.11 hex format fix (LowerHex removed from Array)                                                           |
 
 ### Rust Proxy (`crates/headroom-proxy/`) - 13 files
@@ -193,7 +193,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 | **Cache stabilization** | Anthropic cache control, drift detector, openai cache key, volatile detector - all tuned                                          |
 | **SSE**                 | Anthropic + OpenAI responses + framing - 38 lines changed                                                                         |
 | **Vertex**              | Envelope, raw_predict - 38 lines changed                                                                                          |
-| **Headers**             | `x-headroom-workspace` preservation for cross‑project CCR scoping                                                                 |
+| **Headers**             | `x-headroom-workspace` preservation for cross-project CCR scoping                                                                 |
 | **Proxy core**          | 72 lines changed - loopback exempt, threshold invert, headers passthrough, savings accumulate, rate limit exempt, image auto mode |
 
 ### Python (`headroom/`) - ~40 files
@@ -259,7 +259,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 
 ---
 
-## Directory‑Level Impact 📊
+## Directory-Level Impact 📊
 
 Where the changes concentrate (by `git diff --dirstat`):
 
@@ -290,11 +290,11 @@ langchain, agno, asgi, liteLLM, Claude Code, Copilot, Cursor, aider, etc.) into 
 | ------------------- | -------------- | ------------------------------------------------------------------------------------------------------ |
 | Integration surface | 7+ frameworks  | Hermes only                                                                                            |
 | Python lines        | ~35,000        | ~11,000 (net −24,000)                                                                                  |
-| Hash algorithm      | BLAKE3         | BLAKE3 (length 24→40 hex). Python side uses SHA-256 — consistent internally, differs across languages. |
+| Hash algorithm      | BLAKE3         | BLAKE3 (length 24→40 hex). Python side uses SHA-256 - consistent internally, differs across languages. |
 | Hash length         | 24 hex chars   | 40 hex chars                                                                                           |
-| CCR backends        | Basic          | Poison‑tolerant, debounced, pipelined                                                                  |
+| CCR backends        | Basic          | Poison-tolerant, debounced, pipelined                                                                  |
 | Proxy modes         | Single         | Dual (cache :9797 + token :9798 via TOML)                                                              |
-| Compression policy  | Generic        | Coding‑tuned (looser lossy, higher volatile)                                                           |
+| Compression policy  | Generic        | Coding-tuned (looser lossy, higher volatile)                                                           |
 | Relevance           | 0.3 threshold  | 0.5 + coding stop words                                                                                |
 | Tokenizers          | Standard       | + DeepSeek v4 family                                                                                   |
 | Bedrock             | Python handler | Rust rewrite                                                                                           |
@@ -311,7 +311,7 @@ chopratejas/headroom (upstream)
     │
     └── forked ──→ PlayForm/Headroom (our fork)
                        │
-                       ├── Current branch — all fork changes live here
+                       ├── Current branch - all fork changes live here
                        │
                        └── tracked as submodule at vendor/headroom/
                               │

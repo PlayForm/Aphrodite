@@ -1,4 +1,4 @@
-//! Prefetch — background file loading into CCR.
+//! Prefetch - background file loading into CCR.
 //! Port of plugins/aphrodite/_hooks/prefetch.py
 //!
 //! Agent-agnostic: any agent can preload files into the compression store

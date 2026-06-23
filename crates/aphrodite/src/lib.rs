@@ -1,5 +1,5 @@
 //! headroom-ffi: Full Aphrodite plugin runtime as a C ABI cdylib.
-//! 14 functions — init, destroy, classify, compress, retrieve, transform,
+//! 14 functions - init, destroy, classify, compress, retrieve, transform,
 //! terminal, session_start, catalog, stats, reload, config_get/set, search.
 
 pub mod catalog;
@@ -233,7 +233,7 @@ stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 	serde_json::json!({"hash":hash,"type":t,"size":content.len(),"preview":preview,"marker":marker})
 });
 
-// aphrodite_retrieve is a manual override below — returns raw content, not JSON
+// aphrodite_retrieve is a manual override below - returns raw content, not JSON
 
 // Override: retrieve returns raw content, not JSON-wrapped
 #[no_mangle]
@@ -552,7 +552,7 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		result
 		}
 
-		/// Filter lines by query — port of _resolve.py _filter_lines
+		/// Filter lines by query - port of _resolve.py _filter_lines
 		#[no_mangle]
 		pub extern "C" fn aphrodite_filter_lines(
 		content: *const c_char,
@@ -564,7 +564,7 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		CString::new(filtered).unwrap().into_raw()
 		}
 
-		/// Resolve hash with full recursive expansion — port of _resolve.py
+		/// Resolve hash with full recursive expansion - port of _resolve.py
 		#[no_mangle]
 		pub extern "C" fn aphrodite_resolve(
 		handle: *const c_char,
@@ -585,7 +585,7 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		}
 		}
 
-		/// Generate preview for content — port of _marker/preview.py
+		/// Generate preview for content - port of _marker/preview.py
 		#[no_mangle]
 		pub extern "C" fn aphrodite_preview(
 		content: *const c_char,
@@ -597,7 +597,7 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		CString::new(preview).unwrap().into_raw()
 		}
 
-		/// Stage 2 semantic reduction — port of _stage2.py
+		/// Stage 2 semantic reduction - port of _stage2.py
 		#[no_mangle]
 		pub extern "C" fn aphrodite_stage2(
 		content: *const c_char,
@@ -611,7 +611,7 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		}
 		}
 
-		/// Code structure extraction — port of _core/struct.py
+		/// Code structure extraction - port of _core/struct.py
 		#[no_mangle]
 		pub extern "C" fn aphrodite_struct_extract(
 		content: *const c_char,

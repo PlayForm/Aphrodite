@@ -112,10 +112,10 @@ pub latency_buckets: [AtomicU64; 5],
 | Bucket Index | le value | Range        |
 | ------------ | -------- | ------------ |
 | 0            | 0.001    | < 1ms        |
-| 1            | 0.01     | 1ms – 10ms   |
-| 2            | 0.1      | 10ms – 100ms |
-| 3            | 1.0      | 100ms – 1s   |
-| 4            | 10.0     | 1s – 10s     |
+| 1            | 0.01     | 1ms - 10ms   |
+| 2            | 0.1      | 10ms - 100ms |
+| 3            | 1.0      | 100ms - 1s   |
+| 4            | 10.0     | 1s - 10s     |
 
 Buckets are cumulative in Prometheus output (line 277):
 

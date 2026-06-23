@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Comprehensive headroom-ffi dylib integration test — 18 tests."""
+"""Comprehensive headroom-ffi dylib integration test - 18 tests."""
 import ctypes, json, os, sys
 
 DYLIB = os.path.join(os.path.dirname(__file__), '..', 'vendor/headroom/target/release/libheadroom_ffi.dylib')

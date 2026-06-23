@@ -1,9 +1,9 @@
 # aphrodite-hermes 🔌 Hermes Bridge
 
-> **Hermes Agent integration layer — tool schemas, hook dispatch, skill registration.**
+> **Hermes Agent integration layer - tool schemas, hook dispatch, skill registration.**
 
 This crate is the bridge between the core `aphrodite` engine and the Hermes Agent
-plugin system. It produces `libaphrodite_hermes.dylib` — loaded by the Python
+plugin system. It produces `libaphrodite_hermes.dylib` - loaded by the Python
 plugin to register tools, hooks, and skills with Hermes.
 
 [crates.io](https://crates.io/crates/aphrodite-hermes) ·
@@ -43,10 +43,10 @@ libaphrodite.dylib         ← Core engine
 
 The bridge provides:
 
-1. **Tool schemas** — 12 JSON Schema definitions for `aphrodite_*` tools
-2. **Tool dispatch** — Routes Hermes tool calls to core engine functions
-3. **Skill registration** — Bundled skills exposed to Hermes agents
-4. **Hook dispatch** — Forwards hook calls (pre_llm, post_tool, etc.) to engine
+1. **Tool schemas** - 12 JSON Schema definitions for `aphrodite_*` tools
+2. **Tool dispatch** - Routes Hermes tool calls to core engine functions
+3. **Skill registration** - Bundled skills exposed to Hermes agents
+4. **Hook dispatch** - Forwards hook calls (pre_llm, post_tool, etc.) to engine
 
 ---
 
@@ -83,11 +83,11 @@ src/
 
 ## Dependencies
 
-- `aphrodite` — Core engine crate (path + version)
-- `serde` / `serde_json` — JSON Schema + serialization
+- `aphrodite` - Core engine crate (path + version)
+- `serde` / `serde_json` - JSON Schema + serialization
 
 ---
 
 ## License
 
-CC0-1.0 — public domain.
+CC0-1.0 - public domain.

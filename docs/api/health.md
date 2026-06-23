@@ -48,7 +48,7 @@ optional/opt-in).
 | `ccr`      | bool   | Whether CCR store is enabled        |
 | `mode`     | string | `"cache"` or `"token"`              |
 | `version`  | string | `CARGO_PKG_VERSION`                 |
-| `fill_pct` | float  | Context fill percentage (0.0–100.0) |
+| `fill_pct` | float  | Context fill percentage (0.0-100.0) |
 
 ## Note
 

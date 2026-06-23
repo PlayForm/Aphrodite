@@ -1,4 +1,4 @@
-"""aphrodite — CCR compression plugin for Hermes Agent.
+"""aphrodite - CCR compression plugin for Hermes Agent.
 Installed via `cargo install aphrodite`.
 """
 import ctypes, json, logging, os, subprocess, sys
@@ -23,7 +23,7 @@ def _load_dylib():
     if _dylib is not None and current_mtime == _dylib_mtime:
         return _dylib
     if _dylib is not None:
-        _log.info("dylib mtime changed — hot-reloading %s", _DYLIB_PATH)
+        _log.info("dylib mtime changed - hot-reloading %s", _DYLIB_PATH)
     dylib = ctypes.CDLL(_DYLIB_PATH)
     dylib.aphrodite_hermes_get_schemas.restype = ctypes.c_void_p
     dylib.aphrodite_hermes_get_hooks.restype = ctypes.c_void_p

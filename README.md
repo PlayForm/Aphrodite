@@ -11,7 +11,7 @@
 > **Your LLM burns 90% of its context on output it never reads. We fix that.**
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.
-> Sub‑ms compress, 12,800× max ratio, 28‑type classifier, TOML‑driven.
+> Sub-ms compress, 12,800× max ratio, 28-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
 [![release](https://img.shields.io/badge/release-v1.0.3-blue)](https://github.com/PlayForm/Aphrodite/releases)
@@ -60,7 +60,7 @@ cargo build --release -p aphrodite
         └── aphrodite → ~/.hermes/plugins/aphrodite
 ```
 
-The plugin registers **12 tools** (`aphrodite_*`), **5 hooks**, and a **context engine** —
+The plugin registers **12 tools** (`aphrodite_*`), **5 hooks**, and a **context engine** -
 all routed through the Rust dylib. Two proxies launch automatically on `:9797` (cache)
 and `:9798` (token).
 
@@ -69,13 +69,13 @@ and `:9798` (token).
 ## The Problem
 
 Every time your agent reads a file, runs a build, searches code, or opens a
-browser — the raw output floods its context window. Thousands of tokens of
+browser - the raw output floods its context window. Thousands of tokens of
 compilation logs. Gigantic accessibility trees. Verbose JSON blobs. Your agent
 spends its precious context budget **reading noise** instead of reasoning.
 
 **Aphrodite intercepts output before it reaches the LLM and replaces it with a
 compact, structured preview.** The agent sees 15 tokens of metadata instead of
-500 tokens of raw text — and retrieves the full content only when it actually
+500 tokens of raw text - and retrieves the full content only when it actually
 needs it.
 
 ---
@@ -105,10 +105,10 @@ needs it.
 
 Four layers, all under 1ms:
 
-1. **Classify** — 28-type regex classifier identifies content (<0.1ms)
-2. **Template** — TOML-driven templates produce `[type:key=val]` previews
-3. **Store** — SHA-256 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
-4. **Decide** — Agent reads preview, retrieves only when needed
+1. **Classify** - 28-type regex classifier identifies content (<0.1ms)
+2. **Template** - TOML-driven templates produce `[type:key=val]` previews
+3. **Store** - SHA-256 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
+4. **Decide** - Agent reads preview, retrieves only when needed
 
 ---
 
@@ -136,7 +136,7 @@ plugins/aphrodite/         ← Thin Python loader (~145 lines)
 
 | Mode  | Port  | Backend   | Threshold | Best for                  |
 | :---- | :---: | :-------- | :-------: | :------------------------ |
-| Cache | :9797 | In‑memory |   >8 KB   | Speed, transient sessions |
+| Cache | :9797 | In-memory |   >8 KB   | Speed, transient sessions |
 | Token | :9798 | SQLite    |   >1 KB   | Durability, tool relay    |
 
 All compression logic lives in the Rust dylib. Python is a thin FFI loader.
@@ -159,7 +159,7 @@ code automatically. 990 Rust tests + 116 Python tests, all passing.
 | Browser snapshot (342 el) |        ~5,000 tok |        ~12 tok | **416×** |
 
 **Median: 23× fewer tokens on tool output.** In a session with 50+ tool calls,
-that's 15,000–50,000 tokens saved — enough for an entire extra reasoning turn.
+that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 
 ---
 
@@ -183,7 +183,7 @@ that's 15,000–50,000 tokens saved — enough for an entire extra reasoning tur
 
 ## Under the Hood 🧩
 
-> **`./plugins/aphrodite/` is a separate repo** — it lives at
+> **`./plugins/aphrodite/` is a separate repo** - it lives at
 > [PlayForm/Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes).
 > This monorepo tracks it as a git submodule.
 
@@ -221,7 +221,7 @@ vendor/headroom/            ← Headroom fork (git submodule)
   crates/headroom-core/     ← Content transforms, tokenizer, smart crusher
 ```
 
-990 Rust tests (across 3 crates) + 116 Python tests. CC0‑1.0 — public domain.
+990 Rust tests (across 3 crates) + 116 Python tests. CC0-1.0 - public domain.
 
 ---
 
@@ -261,10 +261,10 @@ curl http://127.0.0.1:9798/health
 RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
 ```
 
-### Configuration — everything in one file
+### Configuration - everything in one file
 
 ```toml
-# aphrodite.toml — all features, no recompile needed
+# aphrodite.toml - all features, no recompile needed
 [compression]
 engine_threshold_pct = 45    # compress at 45% context
 tool_threshold_token = 512   # token proxy threshold (bytes)
@@ -306,7 +306,7 @@ ccr_marker_hint = false
 
 ## Relationship to Headroom
 
-Aphrodite embeds [Headroom](https://github.com/PlayForm/Headroom) — our custom
+Aphrodite embeds [Headroom](https://github.com/PlayForm/Headroom) - our custom
 fork tracked as a git submodule at `vendor/headroom/`. Headroom provides the
 content transforms (classifier, smart crusher, tokenizer); Aphrodite adds the
 preview pipeline, CCR storage, Hermes integration, and dual-proxy architecture.
@@ -328,7 +328,7 @@ No contribution is too small. First-time contributor? **Especially** welcome.
 
 ---
 
-⭐ **Like Aphrodite?** [Star the repo](https://github.com/PlayForm/Aphrodite) —
+⭐ **Like Aphrodite?** [Star the repo](https://github.com/PlayForm/Aphrodite) -
 it helps others find it and makes our day.
 
 _Built with ❤️ by [PlayForm](https://github.com/PlayForm)._

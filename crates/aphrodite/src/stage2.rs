@@ -1,4 +1,4 @@
-//! Stage 2 compression — semantic reduction of CCR-stored content.
+//! Stage 2 compression - semantic reduction of CCR-stored content.
 //! Port of plugins/aphrodite/_stage2.py
 //!
 //! Produces a denser version of content stored in CCR. When the agent

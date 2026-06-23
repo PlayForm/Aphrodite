@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "aphrodite-hermes: Hermes Agent-specific integration for Aphrodite compression engine — tool schemas, hook dispatch, skill registration"
+description = "aphrodite-hermes: Hermes Agent-specific integration for Aphrodite compression engine - tool schemas, hook dispatch, skill registration"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

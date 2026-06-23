@@ -1,4 +1,4 @@
-//! Catalog generation — port of plugins/aphrodite/_hooks/catalog.py
+//! Catalog generation - port of plugins/aphrodite/_hooks/catalog.py
 //!
 //! Builds compression catalog with by-type grouping, total savings,
 //! conversation turns, referenced files. Supports toc (compact) and full modes.
@@ -69,7 +69,7 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 			.recent_markers
 			.iter()
 			.take(10)
-			.map(|m| format!("{} ({}B) — {}", m.ccr_type, m.size, &m.preview[..60.min(m.preview.len())]))
+			.map(|m| format!("{} ({}B) - {}", m.ccr_type, m.size, &m.preview[..60.min(m.preview.len())]))
 			.collect();
 		result["recommendations"] = serde_json::json!(recommendations);
 		result["hint"] = serde_json::json!("Use aphrodite_retrieve(hash) to expand any entry.");

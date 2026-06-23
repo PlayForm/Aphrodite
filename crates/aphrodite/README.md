@@ -1,7 +1,7 @@
 # aphrodite 💋 Core Engine
 
-> **CCR compression proxy + cdylib — classify, compress, store, preview.**
-> **Sub‑ms, 28 content types, 12,800× max ratio.**
+> **CCR compression proxy + cdylib - classify, compress, store, preview.**
+> **Sub-ms, 28 content types, 12,800× max ratio.**
 
 The core compression engine. Produces both the `aphrodite` binary (HTTP proxy on
 `:9797`/`:9798`) and `libaphrodite.dylib` (loaded by the Hermes plugin via C ABI).
@@ -34,10 +34,10 @@ tool output → classify → template → store → <<<CCR:hash|type|size>>>
 
 Four pipeline stages, all under 1ms:
 
-1. **Classify** — 28-type regex classifier (`diff`, `build_output`, `code_rust`, …)
-2. **Template** — TOML-driven preview templates per content type
-3. **Store** — SHA-256 hash → SQLite or in-memory → CCR marker
-4. **Preview** — Structured `[type:metadata]` the LLM reads instantly
+1. **Classify** - 28-type regex classifier (`diff`, `build_output`, `code_rust`, …)
+2. **Template** - TOML-driven preview templates per content type
+3. **Store** - SHA-256 hash → SQLite or in-memory → CCR marker
+4. **Preview** - Structured `[type:metadata]` the LLM reads instantly
 
 ---
 
@@ -93,15 +93,15 @@ aphrodite_hermes_get_version
 
 ## Dependencies
 
-- `headroom-core` — Content transforms + classifier (vendored fork at `vendor/headroom/`)
-- `axum` / `tokio` / `tower` — HTTP proxy (optional, gated behind `proxy` feature)
-- `serde` / `serde_json` — Serialization
-- `blake3` — Content-addressed hashing
-- `rusqlite` — SQLite CCR backend (bundled)
-- `zstd` — Compression
+- `headroom-core` - Content transforms + classifier (vendored fork at `vendor/headroom/`)
+- `axum` / `tokio` / `tower` - HTTP proxy (optional, gated behind `proxy` feature)
+- `serde` / `serde_json` - Serialization
+- `blake3` - Content-addressed hashing
+- `rusqlite` - SQLite CCR backend (bundled)
+- `zstd` - Compression
 
 ---
 
 ## License
 
-CC0-1.0 — public domain.
+CC0-1.0 - public domain.

@@ -1,4 +1,4 @@
-//! Tool dispatch — routes Hermes tool calls to aphrodite core functions.
+//! Tool dispatch - routes Hermes tool calls to aphrodite core functions.
 //!
 //! Each Hermes tool (aphrodite_compress, aphrodite_retrieve, etc.) has a
 //! handler function here that parses args, calls into the core aphrodite
@@ -155,7 +155,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
             "hash": hash,
             "query": query,
             "found": false,
-            "note": "retrieve dispatched via aphrodite-hermes (stateless — use with stateful handle for resolution)"
+            "note": "retrieve dispatched via aphrodite-hermes (stateless - use with stateful handle for resolution)"
         })
     });
 

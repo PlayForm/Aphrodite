@@ -11,7 +11,7 @@ Replace `{PREV_VERSION}` with the prior release tag.
 
 ### Summary
 
-One paragraph. What this release is. Why it matters. 2–3 sentences max.
+One paragraph. What this release is. Why it matters. 2-3 sentences max.
 
 ### Changes
 
@@ -47,7 +47,7 @@ One paragraph. What this release is. Why it matters. 2–3 sentences max.
 
 ## Section Rules
 
-1. **Summary**: Always present. 1–3 sentences. Even a one-liner is better than empty.
+1. **Summary**: Always present. 1-3 sentences. Even a one-liner is better than empty.
 2. **Changes**: Bullet list per type (Feature/Fix/Chore/Docs). Omit empty categories.
 3. **Infrastructure**: Always present. Shows test counts, build status, lint results.
 4. **What Ships**: Always present. Lists every binary asset + plugin version.

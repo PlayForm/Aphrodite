@@ -1,4 +1,4 @@
-//! Code structure extractor — regex-based pattern matching per language.
+//! Code structure extractor - regex-based pattern matching per language.
 //! Port of plugins/aphrodite/_core/struct.py
 //!
 //! Extracts function/struct/class signatures from source code with

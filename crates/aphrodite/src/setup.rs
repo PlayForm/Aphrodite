@@ -1,11 +1,11 @@
-//! Bootstrap setup: `aphrodite setup` — one-shot install after `cargo install aphrodite`.
+//! Bootstrap setup: `aphrodite setup` - one-shot install after `cargo install aphrodite`.
 //!
 //! Creates ~/.hermes/aphrodite/ with binaries, config, and plugin manifest,
 //! then optionally launches the proxy. Maximum security: self-verification,
 //! permission hardening, no secrets in args.
 //!
 //! Templates live in `templates/` and are embedded at compile time via
-//! `include_str!` — no runtime file dependency for cargo-installed binaries.
+//! `include_str!` - no runtime file dependency for cargo-installed binaries.
 
 use std::{
 	fs,
@@ -16,8 +16,8 @@ use std::{
 
 use crate::config::SetupArgs;
 
-/// aphrodite.toml template — embedded at compile time.
-/// Placeholders: `{api_url}`, `{model}` — replaced with user-provided values.
+/// aphrodite.toml template - embedded at compile time.
+/// Placeholders: `{api_url}`, `{model}` - replaced with user-provided values.
 const CONFIG_TEMPLATE: &str = include_str!("../templates/aphrodite.toml");
 
 /// Errors that can occur during setup.
@@ -35,7 +35,7 @@ impl std::fmt::Display for SetupError {
 		match self {
 			Self::Io(e) => write!(f, "I/O error: {e}"),
 			Self::HermesNotFound(msg) => write!(f, "{msg}"),
-			Self::AlreadyInstalled => write!(f, "aphrodite already installed — use --force to re-setup"),
+			Self::AlreadyInstalled => write!(f, "aphrodite already installed - use --force to re-setup"),
 			Self::DylibNotFound(msg) => write!(f, "{msg}"),
 			Self::PluginRegistrationFailed(msg) => write!(f, "{msg}"),
 		}
@@ -150,7 +150,7 @@ fn verify_hermes() -> Result<(), SetupError> {
 			)))
 		},
 		Err(_) => Err(SetupError::HermesNotFound(
-			"hermes not found in PATH — install hermes agent first".into()
+			"hermes not found in PATH - install hermes agent first".into()
 		)),
 	}
 }
@@ -229,7 +229,7 @@ fn write_plugin_yaml(ctx: &SetupCtx) -> Result<(), SetupError> {
 	let yaml = format!(
 		r#"name: aphrodite
 version: {version}
-description: "CCR compression plugin — 12 tools, context engine, TOML-driven templates."
+description: "CCR compression plugin - 12 tools, context engine, TOML-driven templates."
 kind: standalone
 min_hermes_version: "0.16.0"
 requires_hooks: true
@@ -254,8 +254,8 @@ provides_tools:
   - aphrodite_prefetch_status
 provides_context_engine: true
 install_message: |
-  aphrodite v{version} — installed via `cargo install aphrodite` + `aphrodite setup`.
-  All logic in binaries/ — Rust-powered. Secure defaults.
+  aphrodite v{version} - installed via `cargo install aphrodite` + `aphrodite setup`.
+  All logic in binaries/ - Rust-powered. Secure defaults.
   Proxies: token (:9798, SQLite), cache (:9797, in-memory).
 "#,
 		version = env!("CARGO_PKG_VERSION"),
@@ -296,7 +296,7 @@ fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
 			fs::remove_file(&link)?;
 		} else {
 			return Err(SetupError::PluginRegistrationFailed(format!(
-				"{} exists and is not a symlink — manual cleanup required",
+				"{} exists and is not a symlink - manual cleanup required",
 				link.display()
 			)));
 		}

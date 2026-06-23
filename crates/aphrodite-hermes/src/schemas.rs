@@ -1,4 +1,4 @@
-//! Hermes tool schemas — JSON Schema definitions for all aphrodite tools.
+//! Hermes tool schemas - JSON Schema definitions for all aphrodite tools.
 //! These match exactly what the Python plugin's `_tools.py` and `_hooks/__init__.py` export.
 
 use serde_json::json;
@@ -83,7 +83,7 @@ fn schema_files() -> serde_json::Value {
 fn schema_diff() -> serde_json::Value {
     json!({
         "name": "aphrodite_diff",
-        "description": "Show conversation turn history — what was discussed, compressed, and stored across turns.",
+        "description": "Show conversation turn history - what was discussed, compressed, and stored across turns.",
         "parameters": {
             "type": "object",
             "properties": {}
@@ -94,7 +94,7 @@ fn schema_diff() -> serde_json::Value {
 fn schema_search() -> serde_json::Value {
     json!({
         "name": "aphrodite_search",
-        "description": "Search across CCR entries — find previously compressed content by keyword or type.",
+        "description": "Search across CCR entries - find previously compressed content by keyword or type.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -109,7 +109,7 @@ fn schema_search() -> serde_json::Value {
 fn schema_test() -> serde_json::Value {
     json!({
         "name": "aphrodite_test",
-        "description": "Run full smoke test suite — compress, retrieve, search, stats, files, diff, proxy health.",
+        "description": "Run full smoke test suite - compress, retrieve, search, stats, files, diff, proxy health.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -163,7 +163,7 @@ fn schema_prefetch() -> serde_json::Value {
 fn schema_prefetch_status() -> serde_json::Value {
     json!({
         "name": "aphrodite_prefetch_status",
-        "description": "Live prefetch schedule — what's loading, what's ready, ETAs per file.",
+        "description": "Live prefetch schedule - what's loading, what's ready, ETAs per file.",
         "parameters": {
             "type": "object",
             "properties": {}

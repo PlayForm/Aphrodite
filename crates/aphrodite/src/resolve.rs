@@ -1,4 +1,4 @@
-//! CCR marker resolution — port of plugins/aphrodite/_resolve.py
+//! CCR marker resolution - port of plugins/aphrodite/_resolve.py
 //!
 //! Resolves CCR markers to their original content. Supports:
 //! - Single hash resolution (inline store only)
@@ -44,7 +44,7 @@ fn find_markers(content:&str) -> Vec<(String, String)> {
 			}
 			search_from = abs_end;
 		} else {
-			// Unclosed marker — skip past this prefix
+			// Unclosed marker - skip past this prefix
 			search_from = after_prefix;
 		}
 	}
@@ -55,7 +55,7 @@ fn find_markers(content:&str) -> Vec<(String, String)> {
 /// Resolve a single CCR hash from the inline store.
 /// Does NOT unpack nested markers. Returns None if not found.
 pub fn resolve_one(state:&mut AphroditeState, hash_val:&str) -> Option<String> {
-	// i: prefix — inline-only hashes
+	// i: prefix - inline-only hashes
 	if hash_val.starts_with("i:") {
 		return state.inline_store_get(hash_val);
 	}
@@ -82,7 +82,7 @@ pub fn filter_lines(content:&str, query:&str) -> String {
 		.filter(|line| line.to_lowercase().contains(&query_lower))
 		.collect();
 	if matching.is_empty() {
-		format!("[aphrodite: no lines matched {query:?} — returning full content]\n{content}")
+		format!("[aphrodite: no lines matched {query:?} - returning full content]\n{content}")
 	} else {
 		matching.join("\n")
 	}
@@ -91,7 +91,7 @@ pub fn filter_lines(content:&str, query:&str) -> String {
 /// Recursively resolve a hash and all nested CCR markers.
 ///
 /// Cycle-safe via `visited` set. Uses `resolved` map as a persistent
-/// cache across the entire resolution tree — once a hash is resolved,
+/// cache across the entire resolution tree - once a hash is resolved,
 /// nested references to it reuse the cached result.
 ///
 /// Returns `Some(resolved_content)` on success, or `None` if the
@@ -147,7 +147,7 @@ pub fn resolve_recursive(
 				result = result.replace(marker.as_str(), repl.as_str());
 			},
 			None => {
-				// Unresolved — preserve as [CCR_UNRESOLVED:hash]
+				// Unresolved - preserve as [CCR_UNRESOLVED:hash]
 				let hash = parse_marker_hash(marker).unwrap_or_else(|| "unknown".into());
 				result = result.replace(marker.as_str(), &format!("[CCR_UNRESOLVED:{}]", hash));
 			},
@@ -284,7 +284,7 @@ mod tests {
 	#[test]
 	fn test_expand_deep_nesting_respects_limit() {
 		let mut s = AphroditeState::default();
-		// Chain of 10 nested markers — depth limit should stop at 5
+		// Chain of 10 nested markers - depth limit should stop at 5
 		s.inline_store_put("h0".into(), "<<<CCR:h1|t|1>>>".into());
 		s.inline_store_put("h1".into(), "<<<CCR:h2|t|1>>>".into());
 		s.inline_store_put("h2".into(), "<<<CCR:h3|t|1>>>".into());
@@ -303,7 +303,7 @@ mod tests {
 		s.inline_store_put("hA".into(), "<<<CCR:hB|t|1>>>".into());
 		s.inline_store_put("hB".into(), "<<<CCR:hA|t|1>>>".into());
 		let result = expand(&mut s, "hA");
-		// Should not infinite-loop — cycle is detected
+		// Should not infinite-loop - cycle is detected
 		assert!(result.is_some());
 	}
 }

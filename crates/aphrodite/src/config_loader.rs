@@ -1,4 +1,4 @@
-//! TOML config loader — port of plugins/aphrodite/_core/config.py
+//! TOML config loader - port of plugins/aphrodite/_core/config.py
 //!
 //! Priority: env var > aphrodite.toml > hardcoded default
 //! Search paths: cwd, ~/.hermes/aphrodite/, relative to binary

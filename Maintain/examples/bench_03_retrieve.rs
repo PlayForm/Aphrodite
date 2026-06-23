@@ -5,7 +5,7 @@
 //!   02  large content: store + same-port retrieve (token)
 //!   03  cross-port isolation: token hash must miss on cache port
 //!   04  cross-port isolation: cache hash must miss on token port
-//!   05  inline_ccr zone (257–999 B): must be retrievable via POST /retrieve
+//!   05  inline_ccr zone (257-999 B): must be retrievable via POST /retrieve
 //!       - exercises R-10 fix (inline_ccr not checked in retrieve handler)
 //!   06  UTF-8 content: found=true (exercises R-5 fix: byte-boundary panic)
 //!   07  UTF-8 content: retrieved content matches original byte-for-byte

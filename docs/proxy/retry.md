@@ -32,8 +32,8 @@ sleep_ms = base_ms × jitter
 
 | Attempt | Base (ms)                    | Range (ms) |
 | ------- | ---------------------------- | ---------- |
-| 1       | 100                          | 75 – 125   |
-| 2       | 200                          | 150 – 250  |
+| 1       | 100                          | 75 - 125   |
+| 2       | 200                          | 150 - 250  |
 | 3       | (not retried, final attempt) | -          |
 
 From proxy.rs line 667:

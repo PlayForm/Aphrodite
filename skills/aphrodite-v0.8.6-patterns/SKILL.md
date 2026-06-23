@@ -13,9 +13,9 @@ related_skills:
 Techniques and pitfalls from the v0.8.6 development cycle. These patterns are now
 canonicalized in:
 
-- **aphrodite-dev-workflow** — repo path resolution, dep pinning, prefetch workflow
-- **aphrodite-upgrade-breakpoints** — --version flag, standalone plugin repo
-- **aphrodite-development-lessons** — session setup, dual-store pattern
+- **aphrodite-dev-workflow** - repo path resolution, dep pinning, prefetch workflow
+- **aphrodite-upgrade-breakpoints** - --version flag, standalone plugin repo
+- **aphrodite-development-lessons** - session setup, dual-store pattern
 
 This skill is retained as a historical reference for the v0.8.6 cycle context.
 

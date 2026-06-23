@@ -1,5 +1,5 @@
 #!/bin/bash
-# Parallel worker smoke test — dispatches N workers via poll_worker.py
+# Parallel worker smoke test - dispatches N workers via poll_worker.py
 # Usage: bash Maintain/scripts/smoke-dispatch.sh
 
 PROJECT="/Volumes/CORSAIR/Developer/macOS/Application/PlayForm/Aphrodite"
@@ -28,7 +28,7 @@ PROMPT
   echo "Worker $i dispatched (PID $!)"
 done
 
-echo "ALL DISPATCHED — results in $RESULTS_DIR/"
+echo "ALL DISPATCHED - results in $RESULTS_DIR/"
 wait
 echo "ALL COMPLETE"
 echo ""

@@ -291,7 +291,7 @@ impl MultiConfig {
 				.unwrap_or_else(|| "default-model".into()),
 			max_context,
 			max_output,
-			// Resolve from toml — proxy.rs handles None default
+			// Resolve from toml - proxy.rs handles None default
 			ccr_db_path:cfg
 				.ccr_db_path
 				.clone()

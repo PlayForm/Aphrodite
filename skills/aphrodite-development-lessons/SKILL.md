@@ -50,13 +50,13 @@ subprocesses. Proxies silently fail to start.
 **Fix:**
 `hermes config set terminal.env_passthrough '["APHRODITE_API_KEY","PATH","HOME"]' --profile dev-aphrodite`
 
-## Release Notes — Use the Template
+## Release Notes - Use the Template
 
 See `.hermes/RELEASE-TEMPLATE.md` for the canonical template. Every release
 MUST include: Summary, Changes, Infrastructure, What Ships, and Links.
 
 Anti-pattern (DO NOT): bare compare link with zero description.
-30+ releases (v0.8.13–v0.8.43) ship with only a compare link.
+30+ releases (v0.8.13-v0.8.43) ship with only a compare link.
 
 **NEVER** use inline backtick-quoted text with `gh release create --notes`. The
 shell interprets backticks as command substitution. Use `--notes-file` with a

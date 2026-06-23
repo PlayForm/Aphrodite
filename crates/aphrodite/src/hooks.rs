@@ -1,4 +1,4 @@
-//! Full hook implementations — expanded from plugins/aphrodite/_hooks/
+//! Full hook implementations - expanded from plugins/aphrodite/_hooks/
 //!
 //! transform_tool_result: content-aware compression with essential tool skip,
 //!   file reference tracking, threshold gating, preview generation.
@@ -15,7 +15,7 @@ use crate::{
 /// Compute a CCR hash for content using BLAKE3 (40 hex chars).
 pub fn compute_hash(content:&str) -> String { headroom_core::ccr::compute_key(content.as_bytes()) }
 
-/// Essential tools that must NOT be compressed — agent needs raw output.
+/// Essential tools that must NOT be compressed - agent needs raw output.
 const ESSENTIAL_TOOLS:&[&str] = &[
 	"skill_view",
 	"skills_list",
@@ -26,7 +26,7 @@ const ESSENTIAL_TOOLS:&[&str] = &[
 	"read_terminal",
 ];
 
-/// Transform tool output — full compression pipeline.
+/// Transform tool output - full compression pipeline.
 pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:&str) -> serde_json::Value {
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
@@ -79,7 +79,7 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 	})
 }
 
-/// Transform terminal output — exit code aware.
+/// Transform terminal output - exit code aware.
 pub fn transform_terminal_output(state:&mut AphroditeState, content:&str) -> serde_json::Value {
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
@@ -123,10 +123,10 @@ pub fn transform_terminal_output(state:&mut AphroditeState, content:&str) -> ser
 	})
 }
 
-/// Session start hook — full reset.
+/// Session start hook - full reset.
 pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value { crate::session::on_session_start(state) }
 
-/// Pre-LLM call hook — inject catalog into context.
+/// Pre-LLM call hook - inject catalog into context.
 pub fn pre_llm_call(state:&AphroditeState) -> serde_json::Value {
 	let summary = crate::session::catalog_summary(state);
 	serde_json::json!({
@@ -136,13 +136,13 @@ pub fn pre_llm_call(state:&AphroditeState) -> serde_json::Value {
 	})
 }
 
-/// Post-LLM call hook — archive turn.
+/// Post-LLM call hook - archive turn.
 pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 	crate::session::next_turn(state);
 	serde_json::json!({"status": "ok", "turn": state.turn_counter})
 }
 
-/// Extract file path from tool output — heuristic.
+/// Extract file path from tool output - heuristic.
 fn extract_file_path(content:&str, tool:&str) -> Option<String> {
 	match tool {
 		"read_file" | "write_file" | "patch" => {

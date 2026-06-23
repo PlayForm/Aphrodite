@@ -136,17 +136,17 @@ print()
 print("| Content Type | Always Retrieved? | Net Effect |")
 print("|-------------|------------------|------------|")
 net_analysis = [
-    ("build_output", "No - 0E/0W = clean, skip", "+20–25 tok saved"),
+    ("build_output", "No - 0E/0W = clean, skip", "+20-25 tok saved"),
     ("build_error", "Yes - need error details to fix", "~0 (preview + retrieve = net neutral)"),
-    ("diff", "Sometimes - preview shows files/changes", "+15–20 tok when skipped"),
-    ("terminal", "No - exit=0 = pass, skip", "+15–20 tok saved"),
-    ("search_files", "Sometimes - preview shows match count", "+15–25 tok when skipped"),
-    ("json", "Depends - keys visible in preview", "+20–30 tok when skipped"),
+    ("diff", "Sometimes - preview shows files/changes", "+15-20 tok when skipped"),
+    ("terminal", "No - exit=0 = pass, skip", "+15-20 tok saved"),
+    ("search_files", "Sometimes - preview shows match count", "+15-25 tok when skipped"),
+    ("json", "Depends - keys visible in preview", "+20-30 tok when skipped"),
     ("tabular", "Yes - need all rows", "~0 (preview + retrieve = net neutral)"),
     ("code_rust", "Depends - signatures visible in preview", "+30 tok when skipped"),
     ("code_python", "Depends - signatures visible in preview", "+25 tok when skipped"),
     ("text", "No - preview shows first 110 chars", "+10 tok saved"),
-    ("log_output", "Depends - error/warn counts visible", "+15–25 tok when skipped"),
+    ("log_output", "Depends - error/warn counts visible", "+15-25 tok when skipped"),
 ]
 for ctype, decision, effect in net_analysis:
     print(f"| {ctype:13} | {decision:40} | {effect:45} |")
