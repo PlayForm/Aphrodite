@@ -10,10 +10,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/crates/aphrodite/target/release/aphrodite"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BINARY="$PROJECT_DIR/target/release/aphrodite"
 if [ ! -x "$BINARY" ]; then
-	BINARY="$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite"
+	BINARY="$PROJECT_DIR/target/debug/aphrodite"
 fi
 PID_FILE="/tmp/aphrodite-9798.pid"
 LOG_FILE="/tmp/aphrodite-9798.log"
@@ -26,10 +26,10 @@ if [ -f "$HOME/.hermes/.env" ]; then
 	set +a
 fi
 
-DB="${HEADROOM_PROXY_DB_9798:-$PROJECT_DIR/.headroom/proxy-token-ccr.db}"
-TTL="${HEADROOM_PROXY_CCR_TTL:-3600}"
-NOTIFY_URL="${HEADROOM_NOTIFY_URL:-}"
-NOTIFY_KEY="${HEADROOM_NOTIFY_KEY:-}"
+DB="${APHRODITE_DB_9798:-$PROJECT_DIR/.aphrodite/proxy-token-ccr.db}"
+TTL="${APHRODITE_CCR_TTL:-3600}"
+NOTIFY_URL="${APHRODITE_NOTIFY_URL:-}"
+NOTIFY_KEY="${APHRODITE_NOTIFY_KEY:-}"
 
 case "${1:-}" in
 --stop)
@@ -61,9 +61,9 @@ esac
 if [ ! -x "$BINARY" ]; then
 	echo "Building aphrodite (token)..."
 	source "$HOME/.cargo/env" 2>/dev/null || true
-	cargo build --manifest-path "$PROJECT_DIR/crates/aphrodite/Cargo.toml"
-	if [ -x "$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite" ]; then
-		BINARY="$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite"
+	(cd "$PROJECT_DIR" && cargo build -p aphrodite)
+	if [ -x "$PROJECT_DIR/target/debug/aphrodite" ]; then
+		BINARY="$PROJECT_DIR/target/debug/aphrodite"
 	fi
 fi
 

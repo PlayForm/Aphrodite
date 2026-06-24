@@ -9,6 +9,9 @@ setlocal enabledelayedexpansion
 
 set "REPO=%~dp0"
 set "REPO=%REPO:~0,-1%"
+REM Go up one level from Maintain/ to the repo root
+for %%A in ("%REPO%") do set "REPO=%%~dpA"
+set "REPO=%REPO:~0,-1%"
 if "%HERMES%"=="" set "HERMES=%USERPROFILE%\.hermes"
 
 set "BINARY=%HERMES%\aphrodite\aphrodite.exe"

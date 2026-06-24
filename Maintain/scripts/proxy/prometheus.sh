@@ -4,9 +4,9 @@
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 CONTAINER="aphrodite-prometheus"
-CONFIG="$REPO_ROOT/prometheus.yml"
+CONFIG="$REPO_ROOT/Maintain/prometheus.yml"
 
 status() {
 	if docker ps --filter "name=$CONTAINER" --format '{{.Status}}' | grep -q "Up"; then

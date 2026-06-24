@@ -8,7 +8,7 @@ set -euo pipefail
 #   plugins/aphrodite/             (the Hermes plugin)
 #   profiles/*/                    (7 profile directories)
 
-REPO="${REPO:-$(cd "$(dirname "$0")" && pwd)}"
+REPO="${REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
 HERMES="${HERMES:-$HOME/.hermes}"
 BINARY="${HERMES}/aphrodite/aphrodite"
 PLUGIN_SRC="${REPO}/plugins/aphrodite"

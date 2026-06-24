@@ -5,11 +5,12 @@
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 CARGO_TOML="$REPO_ROOT/crates/aphrodite/Cargo.toml"
 
 BUMP="${1:-patch}"
 PUSH="${2:-}"
+REMOTE="${GIT_REMOTE:-origin}"
 
 # Read current version
 CURRENT=$(grep '^version' "$CARGO_TOML" | head -1 | sed 's/.*"\(.*\)"/\1/')
@@ -58,8 +59,8 @@ echo "  Commit: $(git rev-parse --short HEAD)"
 if [ "$PUSH" = "--push" ]; then
 	echo ""
 	echo "Pushing..."
-	git push origin Current
-	git push origin "v$NEW"
+	git push "$REMOTE" Current
+	git push "$REMOTE" "v$NEW"
 	echo "Pushed."
 else
 	echo "  Push:   ./scripts/release.sh $BUMP --push"

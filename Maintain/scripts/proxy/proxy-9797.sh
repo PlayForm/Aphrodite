@@ -10,11 +10,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BINARY="$PROJECT_DIR/crates/aphrodite/target/release/aphrodite"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BINARY="$PROJECT_DIR/target/release/aphrodite"
 # Fall back to debug build
 if [ ! -x "$BINARY" ]; then
-	BINARY="$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite"
+	BINARY="$PROJECT_DIR/target/debug/aphrodite"
 fi
 PID_FILE="/tmp/aphrodite-9797.pid"
 LOG_FILE="/tmp/aphrodite-9797.log"
@@ -27,8 +27,8 @@ if [ -f "$HOME/.hermes/.env" ]; then
 	set +a
 fi
 
-DB="${HEADROOM_PROXY_DB_9797:-$PROJECT_DIR/.headroom/proxy-cache-ccr.db}"
-TTL="${HEADROOM_PROXY_CCR_TTL:-3600}"
+DB="${APHRODITE_DB_9797:-$PROJECT_DIR/.aphrodite/proxy-cache-ccr.db}"
+TTL="${APHRODITE_CCR_TTL:-3600}"
 
 case "${1:-}" in
 --stop)
@@ -60,9 +60,9 @@ esac
 if [ ! -x "$BINARY" ]; then
 	echo "Building aphrodite (cache)..."
 	source "$HOME/.cargo/env" 2>/dev/null || true
-	cargo build --manifest-path "$PROJECT_DIR/crates/aphrodite/Cargo.toml"
-	if [ -x "$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite" ]; then
-		BINARY="$PROJECT_DIR/crates/aphrodite/target/debug/aphrodite"
+	(cd "$PROJECT_DIR" && cargo build -p aphrodite)
+	if [ -x "$PROJECT_DIR/target/debug/aphrodite" ]; then
+		BINARY="$PROJECT_DIR/target/debug/aphrodite"
 	fi
 fi
 

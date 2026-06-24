@@ -4,15 +4,16 @@
 # Usage: ./scripts/auto-release.sh ["commit message"]
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 CARGO_TOML="$REPO_ROOT/crates/aphrodite/Cargo.toml"
 MSG="${1:-}"
+REMOTE="${GIT_REMOTE:-origin}"
 
 cd "$REPO_ROOT"
 
 # Sync submodules to their remote tracking branches
 git submodule update --remote --recursive --merge
-git add --force vendor/headroom 2>/dev/null || true
+# (vendor submodule handled by git submodule)
 
 # Stage all changes
 git add -u
@@ -92,16 +93,15 @@ GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2>/dev/null || git tag "
 echo "[release] Aphrodite/v$NEW tagged"
 
 # Push - always sync with remote
-git push Source Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
-git push Source "Aphrodite/v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
+git push "$REMOTE" Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
+git push "$REMOTE" "Aphrodite/v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
 echo "[push] done"
 
 # Sync submodule pointer (ignore=all hides dirty state, must force)
 SUBMODULE_SHA=$(cd plugins/aphrodite && git rev-parse HEAD)
 git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2>/dev/null
-git add vendor/headroom 2>/dev/null || true
 git commit -m "chore: sync submodules - Aphrodite v$NEW" 2>/dev/null || echo "[sync] submodules already current"
-git push Source Current 2>&1 | tail -1 || echo "[push] submodule sync skipped (auth?)"
+git push "$REMOTE" Current 2>&1 | tail -1 || echo "[push] submodule sync skipped (auth?)"
 echo "[sync] submodules done"
 
 echo ""
