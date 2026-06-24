@@ -14,8 +14,8 @@
 > Sub-ms compress, 12,800× max ratio, 28-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.0.4-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![plugin](https://img.shields.io/badge/plugin-v2.0.1-purple)](plugins/aphrodite/plugin.yaml)
+[![release](https://img.shields.io/badge/release-v1.0.5-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![plugin](https://img.shields.io/badge/plugin-v2.0.3-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -41,6 +41,7 @@ On first launch, the plugin auto-downloads the `aphrodite` binary from
 ```bash
 git clone https://github.com/PlayForm/Aphrodite.git
 cd Aphrodite
+git submodule update --init --recursive  # required — vendored deps live in submodules
 cargo build --release -p aphrodite
 # Binary: target/release/aphrodite
 # Dylib:  target/release/libaphrodite.dylib
