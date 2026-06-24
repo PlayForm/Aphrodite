@@ -36,7 +36,7 @@ BIN_VERSION = "v0.2.0"
 
 
 def _download_url_buggy() -> str:
-    return f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite"
+    return f"https://github.com/{REPO}/releases/download/Aphrodite/{BIN_VERSION}/aphrodite"
 
 
 # ---------- fixed URL builder ----------
@@ -44,7 +44,7 @@ def _download_url_buggy() -> str:
 
 def _download_url_fixed() -> str:
     plat = _detect_platform()
-    return f"https://github.com/{REPO}/releases/download/{BIN_VERSION}/aphrodite-{plat}"
+    return f"https://github.com/{REPO}/releases/download/Aphrodite/{BIN_VERSION}/aphrodite-{plat}"
 
 
 # ---------- assertions ----------

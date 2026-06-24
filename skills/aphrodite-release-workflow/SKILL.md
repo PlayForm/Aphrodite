@@ -35,13 +35,40 @@ to `Source` remote.
 
 ## Version Sync
 
-5 locations must match - auto-release.sh bumps all via `sed`:
+The Aphrodite project has two independent version tracks:
+- **Binary version** (`1.0.4`) — Rust crates, must match across Cargo.toml files
+- **Plugin version** (`2.0.1`) — Hermes plugin, lives in the `plugins/aphrodite` submodule
 
-1. `plugins/aphrodite/_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION`
-2. `plugins/aphrodite/plugin.yaml` - `version:`
-3. `plugins/aphrodite/pyproject.toml` - `version =`
-4. `plugins/aphrodite/__init__.py` - docstring `aphrodite vX.Y.Z`
-5. `crates/aphrodite/Cargo.toml` - `version =`
+**Binary version locations** (monorepo — bump these together):
+
+1. `crates/aphrodite/Cargo.toml` — `version = "1.0.4"` (line 3)
+2. `crates/aphrodite-hermes/Cargo.toml` — `version = "1.0.4"` (line 3, package)
+3. `crates/aphrodite-hermes/Cargo.toml` — `aphrodite = { ..., version = "1.0.4" }` (line 15, dependency)
+
+**Plugin version locations** (submodule `plugins/aphrodite/`):
+
+4. `plugin.yaml` — `version: 2.0.1` (line 2)
+5. `plugin.yaml` — `install_message:` block contains `aphrodite v2.0.1 -` (line 31)
+6. `pyproject.toml` — `version = "2.0.1"` (if file exists)
+7. `__init__.py` — docstring `aphrodite v2.0.1 - ...` (if version appears there)
+8. `_core/config.py` — `BIN_VERSION` + `PLUGIN_VERSION` constants (if file exists)
+
+**Documentation:**
+
+9. `README.md` — example output shows `"version":"v1.0.4"` (line ~258)
+
+**What `auto-release.sh` bumps** (complete list):
+
+- `crates/aphrodite/Cargo.toml` — binary version ✅
+- `crates/aphrodite-hermes/Cargo.toml` — package version + aphrodite dependency ✅
+- `plugins/aphrodite/plugin.yaml` — version field + install_message ✅
+- `plugins/aphrodite/pyproject.toml` — version (if file exists) ✅
+- `plugins/aphrodite/__init__.py` — docstring version (if present) ✅
+- `plugins/aphrodite/_core/config.py` — BIN_VERSION + PLUGIN_VERSION (if file exists) ✅
+
+**Manually verify after release:**
+
+- `README.md:~258` — example output version (non-critical, grep for `"version":"v`)
 
 ## Binary Symlink
 

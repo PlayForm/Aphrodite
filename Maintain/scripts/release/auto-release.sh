@@ -44,20 +44,37 @@ fi
 
 # Bump Cargo.toml (line 3 only - avoid matching dependency versions)
 sed -i '' "3s/version = \"$CURRENT\"/version = \"$NEW\"/" "$CARGO_TOML"
-# Sync Python BIN_VERSION (now in _core/config.py package)
-sed -i '' "s/BIN_VERSION = \"v$CURRENT\"/BIN_VERSION = \"v$NEW\"/" plugins/aphrodite/_core/config.py
-
-# Bump plugin version (patch increment on 1.x.x scheme)
-PLUGIN_CURRENT=$(grep 'PLUGIN_VERSION' plugins/aphrodite/_core/config.py | head -1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
-PLUGIN_NEW=$(echo "$PLUGIN_CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
-sed -i '' "s/PLUGIN_VERSION = \"$PLUGIN_CURRENT\"/PLUGIN_VERSION = \"$PLUGIN_NEW\"/" plugins/aphrodite/_core/config.py
-# Sync pyproject.toml
-sed -i '' "s/version = \"$PLUGIN_CURRENT\"/version = \"$PLUGIN_NEW\"/" plugins/aphrodite/pyproject.toml
-# Sync __init__.py docstring
-sed -i '' "s/aphrodite v$PLUGIN_CURRENT -/aphrodite v$PLUGIN_NEW -/" plugins/aphrodite/__init__.py
-# Sync plugin.yaml
-sed -i '' "s/version: $PLUGIN_CURRENT/version: $PLUGIN_NEW/" plugins/aphrodite/plugin.yaml
-echo "[bump] bin $CURRENT → $NEW | plugin $PLUGIN_CURRENT → $PLUGIN_NEW"
+# Bump aphrodite-hermes Cargo.toml — package version + dependency
+HERMES_TOML="$REPO_ROOT/crates/aphrodite-hermes/Cargo.toml"
+sed -i '' "3s/version = \"$CURRENT\"/version = \"$NEW\"/" "$HERMES_TOML"
+sed -i '' "s/aphrodite = { path = \"..\/aphrodite\", version = \"$CURRENT\"/aphrodite = { path = \"..\/aphrodite\", version = \"$NEW\"/" "$HERMES_TOML"
+echo "[bump] aphrodite-hermes Cargo.toml → $NEW"
+# ── Plugin version bump (submodule files — may not all exist) ──
+# Plugin version track is independent of binary version track
+PLUGIN_CURRENT=""
+# Prefer plugin.yaml as canonical source
+if [[ -f plugins/aphrodite/plugin.yaml ]]; then
+	PLUGIN_CURRENT=$(grep '^version:' plugins/aphrodite/plugin.yaml | head -1 | awk '{print $2}' | tr -d '"')
+elif [[ -f plugins/aphrodite/_core/config.py ]]; then
+	PLUGIN_CURRENT=$(grep 'PLUGIN_VERSION' plugins/aphrodite/_core/config.py | head -1 | sed 's/[^"]*"\([^"]*\)".*/\1/')
+elif [[ -f plugins/aphrodite/pyproject.toml ]]; then
+	PLUGIN_CURRENT=$(grep '^version' plugins/aphrodite/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+fi
+if [[ -n "$PLUGIN_CURRENT" ]]; then
+	PLUGIN_NEW=$(echo "$PLUGIN_CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
+	# Sync plugin.yaml — version field + install_message
+	sed -i '' "s/version: $PLUGIN_CURRENT/version: $PLUGIN_NEW/" plugins/aphrodite/plugin.yaml
+	sed -i '' "s/aphrodite v$PLUGIN_CURRENT -/aphrodite v$PLUGIN_NEW -/" plugins/aphrodite/plugin.yaml
+	# Optional submodule files — skip silently if absent
+	[[ -f plugins/aphrodite/pyproject.toml ]] && sed -i '' "s/version = \"$PLUGIN_CURRENT\"/version = \"$PLUGIN_NEW\"/" plugins/aphrodite/pyproject.toml
+	[[ -f plugins/aphrodite/__init__.py ]] && sed -i '' "s/aphrodite v$PLUGIN_CURRENT -/aphrodite v$PLUGIN_NEW -/" plugins/aphrodite/__init__.py
+	[[ -f plugins/aphrodite/_core/config.py ]] && sed -i '' "s/PLUGIN_VERSION = \"$PLUGIN_CURRENT\"/PLUGIN_VERSION = \"$PLUGIN_NEW\"/" plugins/aphrodite/_core/config.py
+	[[ -f plugins/aphrodite/_core/config.py ]] && sed -i '' "s/BIN_VERSION = \"v$CURRENT\"/BIN_VERSION = \"v$NEW\"/" plugins/aphrodite/_core/config.py
+	echo "[bump] plugin $PLUGIN_CURRENT → $PLUGIN_NEW"
+else
+	echo "[bump] plugin skipped — no version source found"
+fi
+echo "[bump] bin $CURRENT → $NEW"
 
 # Build
 cargo build --release -p aphrodite 2>&1 | tail -1
