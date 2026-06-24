@@ -11,8 +11,8 @@ REMOTE="${GIT_REMOTE:-origin}"
 
 cd "$REPO_ROOT"
 
-# Sync submodules to their remote tracking branches
-git submodule update --remote --recursive --merge
+# Sync submodules to their remote tracking branches (non-fatal — may fail offline)
+git submodule update --remote --recursive --merge || echo "[submodule] sync skipped (offline or no remote)"
 # (vendor submodule handled by git submodule)
 
 # Stage all changes
