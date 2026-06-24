@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-headroom-core = { path = "../../vendor/headroom/crates/headroom-core" }
+headroom-core = { path = "../../vendor/headroom/crates/headroom-core", version = "0.1.0" }
 axum = { version = "0.8.9", features = ["macros"], optional = true }
 tokio = { version = "1.52.3", features = [
 	"macros",

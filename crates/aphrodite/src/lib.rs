@@ -1,6 +1,12 @@
-//! headroom-ffi: Full Aphrodite plugin runtime as a C ABI cdylib.
-//! 14 functions - init, destroy, classify, compress, retrieve, transform,
-//! terminal, session_start, catalog, stats, reload, config_get/set, search.
+//! aphrodite: core compression engine exposed as both an rlib (for the
+//! `aphrodite` binary and the `aphrodite-hermes` bridge) and a C ABI cdylib.
+//!
+//! The C ABI is agent-agnostic and handle-based: `aphrodite_init` allocates a
+//! session handle, the `aphrodite_*` functions operate on it (classify,
+//! compress, retrieve, transform, terminal, session_start, catalog, stats,
+//! reload, config_get/set, search, dispatch, resolve, stage2, struct_extract),
+//! and `aphrodite_destroy` frees it. The Hermes plugin uses the higher-level,
+//! process-global `aphrodite_hermes_*` ABI in the `aphrodite-hermes` crate.
 
 pub mod catalog;
 pub mod config_loader;
@@ -424,6 +430,11 @@ pub extern "C" fn aphrodite_config_set(handle:*const c_char, key:*const c_char, 
 
 // ── Preview builder ──────────────────────────────────────────────────
 
+/// Detect the CCR content-type string for a blob (e.g. `source_code`, `build`,
+/// `json_array`). Thin wrapper over the Headroom classifier so downstream
+/// crates (aphrodite-hermes) don't need a direct headroom-core dependency.
+pub fn detect_type(content:&str) -> String { transforms::detect(content).as_str().to_string() }
+
 pub fn build_preview(type_str:&str, content:&str) -> String {
 	let lines = content.lines().count();
 	let bytes = content.len();
@@ -452,63 +463,69 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 			format!("[json:{}items {}L]", i, lines)
 		},
 		_ => format!("[{}:{}L {}B]", type_str, lines, bytes),
-		}
-		}
+	}
+}
 
-		// ── Universal dispatch: all Python hooks route through here ──
+// ── Universal dispatch: all Python hooks route through here ──
 
-		/// Universal hook dispatcher. Python calls this for every hook handler.
-		/// Returns JSON-wrapped result or raw string if content-only.
-		#[no_mangle]
-		pub extern "C" fn aphrodite_dispatch(
-		handle: *const c_char,
-		hook_name: *const c_char,
-		args_json: *const c_char,
-		) -> *mut c_char {
-		let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
-		    Ok(id) => id,
-		    Err(_) => return to_json_error("invalid handle"),
-		};
-		let name = unsafe { CStr::from_ptr(hook_name) }.to_string_lossy();
-		let args_str = unsafe { CStr::from_ptr(args_json) }.to_string_lossy();
+/// Universal hook dispatcher. Python calls this for every hook handler.
+/// Returns JSON-wrapped result or raw string if content-only.
+#[no_mangle]
+pub extern "C" fn aphrodite_dispatch(
+	handle:*const c_char,
+	hook_name:*const c_char,
+	args_json:*const c_char,
+) -> *mut c_char {
+	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+		Ok(id) => id,
+		Err(_) => return to_json_error("invalid handle"),
+	};
+	let name = unsafe { CStr::from_ptr(hook_name) }.to_string_lossy();
+	let args_str = unsafe { CStr::from_ptr(args_json) }.to_string_lossy();
 
-		let args: serde_json::Value =
-		    match serde_json::from_str(&args_str) {
-		        Ok(v) => v,
-		        Err(e) => return to_json_error(&format!("invalid args: {}", e)),
-		    };
+	let args:serde_json::Value = match serde_json::from_str(&args_str) {
+		Ok(v) => v,
+		Err(e) => return to_json_error(&format!("invalid args: {}", e)),
+	};
 
-		let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-		let tool = args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+	let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+	let tool = args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 
-		let result = match with_state(hid, |s| match name.as_ref() {
-		    "session_start" => hooks::on_session_start(s),
-		    "transform_tool_result" => hooks::transform_tool_result(s, content, tool),
-		    "transform_terminal_output" => hooks::transform_terminal_output(s, content),
-		    "pre_llm_call" => hooks::pre_llm_call(s),
-		    "post_llm_call" => hooks::post_llm_call(s),
-		    "catalog" => {
-		        let mode = args.get("mode").and_then(|v| v.as_str()).unwrap_or("full");
-		        let items: Vec<serde_json::Value> = s.recent_markers.iter().map(|e| {
-		            if mode == "toc" {
-		                serde_json::json!({"hash":&e.hash[..12.min(e.hash.len())],"type":e.ccr_type,"size":e.size,"preview":e.preview})
-		            } else {
-		                serde_json::json!({"hash":e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview,"turn":e.turn})
-		            }
-		        }).collect();
-		        serde_json::json!({"total":items.len(),"items":items,"turn":s.turn_counter})
-		    }
-		    "stats" => serde_json::json!({
-		        "version": env!("CARGO_PKG_VERSION"),
-		        "inline_entries": s.inline_store.len(),
-		        "markers": s.recent_markers.len(),
-		        "turn": s.turn_counter,
-		        "engine_enabled": s.context_engine_enabled,
-		    }),
-		    "search" => {
-		        let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
-		        let type_filter = args.get("type").and_then(|v| v.as_str());
-		        let results: Vec<serde_json::Value> = s.recent_markers.iter()
+	let result = match with_state(hid, |s| {
+		match name.as_ref() {
+			"session_start" => hooks::on_session_start(s),
+			"transform_tool_result" => hooks::transform_tool_result(s, content, tool),
+			"transform_terminal_output" => hooks::transform_terminal_output(s, content),
+			"pre_llm_call" => hooks::pre_llm_call(s),
+			"post_llm_call" => hooks::post_llm_call(s),
+			"catalog" => {
+				let mode = args.get("mode").and_then(|v| v.as_str()).unwrap_or("full");
+				let items:Vec<serde_json::Value> = s
+					.recent_markers
+					.iter()
+					.map(|e| {
+						if mode == "toc" {
+							serde_json::json!({"hash":&e.hash[..12.min(e.hash.len())],"type":e.ccr_type,"size":e.size,"preview":e.preview})
+						} else {
+							serde_json::json!({"hash":e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview,"turn":e.turn})
+						}
+					})
+					.collect();
+				serde_json::json!({"total":items.len(),"items":items,"turn":s.turn_counter})
+			},
+			"stats" => {
+				serde_json::json!({
+					"version": env!("CARGO_PKG_VERSION"),
+					"inline_entries": s.inline_store.len(),
+					"markers": s.recent_markers.len(),
+					"turn": s.turn_counter,
+					"engine_enabled": s.context_engine_enabled,
+				})
+			},
+			"search" => {
+				let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+				let type_filter = args.get("type").and_then(|v| v.as_str());
+				let results: Vec<serde_json::Value> = s.recent_markers.iter()
 		            .filter(|m| {
 		                let matches_query = query.is_empty()
 		                    || m.preview.to_lowercase().contains(&query)
@@ -519,106 +536,111 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		            .take(20)
 		            .map(|m| serde_json::json!({"hash":&m.hash[..12.min(m.hash.len())],"type":m.ccr_type,"size":m.size,"preview":m.preview}))
 		            .collect();
-		        serde_json::json!({"total":results.len(),"results":results})
-		    }
-		    "diff" => {
-		        let turns: Vec<serde_json::Value> = s.conv_index.iter().map(|(turn, (hash, summary, size))| {
-		            serde_json::json!({"turn":turn,"hash":hash,"summary":summary,"size":size})
-		        }).collect();
-		        serde_json::json!({"turns":turns,"total":turns.len()})
-		    }
-		    "files" => {
-		        let files: Vec<serde_json::Value> = s.referenced_files.iter().map(|(path, tool)| {
-		            serde_json::json!({"path":path,"tool":tool})
-		        }).collect();
-		        serde_json::json!({"files":files,"total":files.len()})
-		    }
-		    "classify" => {
-		        let ct = headroom_core::transforms::detect(content);
-		        serde_json::json!({"type":ct.as_str(),"lines":content.lines().count(),"bytes":content.len()})
-		    }
-		    "prefetch" => {
-		        let paths = args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-		        let path_strings: Vec<String> = paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
-		        let r = crate::prefetch::prefetch_files(s, &path_strings);
-		        r
-		    }
-		    _ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
-		}) {
-		    Ok(v) => to_json_ok(&v),
-		    Err(e) => to_json_error(&e),
-		};
+				serde_json::json!({"total":results.len(),"results":results})
+			},
+			"diff" => {
+				let turns:Vec<serde_json::Value> = s
+					.conv_index
+					.iter()
+					.map(
+						|(turn, (hash, summary, size))| serde_json::json!({"turn":turn,"hash":hash,"summary":summary,"size":size}),
+					)
+					.collect();
+				serde_json::json!({"turns":turns,"total":turns.len()})
+			},
+			"files" => {
+				let files:Vec<serde_json::Value> = s
+					.referenced_files
+					.iter()
+					.map(|(path, tool)| serde_json::json!({"path":path,"tool":tool}))
+					.collect();
+				serde_json::json!({"files":files,"total":files.len()})
+			},
+			"classify" => {
+				let ct = headroom_core::transforms::detect(content);
+				serde_json::json!({"type":ct.as_str(),"lines":content.lines().count(),"bytes":content.len()})
+			},
+			"prefetch" => {
+				let paths = args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+				let path_strings:Vec<String> = paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+				let r = crate::prefetch::prefetch_files(s, &path_strings);
+				r
+			},
+			_ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
+		}
+	}) {
+		Ok(v) => to_json_ok(&v),
+		Err(e) => to_json_error(&e),
+	};
 
-		result
-		}
+	result
+}
 
-		/// Filter lines by query - port of _resolve.py _filter_lines
-		#[no_mangle]
-		pub extern "C" fn aphrodite_filter_lines(
-		content: *const c_char,
-		query: *const c_char,
-		) -> *mut c_char {
-		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
-		let q = unsafe { CStr::from_ptr(query) }.to_string_lossy();
-		let filtered = crate::resolve::filter_lines(&c, &q);
-		CString::new(filtered).unwrap().into_raw()
-		}
+/// Filter lines by query - port of _resolve.py _filter_lines
+#[no_mangle]
+pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_char) -> *mut c_char {
+	let c = match unsafe { cstr(content) } {
+		Some(s) => s,
+		None => return to_json_error("null content"),
+	};
+	let q = unsafe { CStr::from_ptr(query) }.to_string_lossy();
+	let filtered = crate::resolve::filter_lines(&c, &q);
+	CString::new(filtered).unwrap().into_raw()
+}
 
-		/// Resolve hash with full recursive expansion - port of _resolve.py
-		#[no_mangle]
-		pub extern "C" fn aphrodite_resolve(
-		handle: *const c_char,
-		hash: *const c_char,
-		) -> *mut c_char {
-		let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
-		    Ok(id) => id, Err(_) => return to_json_error("invalid handle")
-		};
-		let h = unsafe { CStr::from_ptr(hash) }.to_string_lossy();
-		match with_state(hid, |s| {
-		    match crate::resolve::expand(s, &h) {
-		        Some(content) => serde_json::json!({"found":true,"content":content}),
-		        None => serde_json::json!({"found":false}),
-		    }
-		}) {
-		    Ok(v) => to_json_ok(&v),
-		    Err(e) => to_json_error(&e),
+/// Resolve hash with full recursive expansion - port of _resolve.py
+#[no_mangle]
+pub extern "C" fn aphrodite_resolve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
+	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+		Ok(id) => id,
+		Err(_) => return to_json_error("invalid handle"),
+	};
+	let h = unsafe { CStr::from_ptr(hash) }.to_string_lossy();
+	match with_state(hid, |s| {
+		match crate::resolve::expand(s, &h) {
+			Some(content) => serde_json::json!({"found":true,"content":content}),
+			None => serde_json::json!({"found":false}),
 		}
-		}
+	}) {
+		Ok(v) => to_json_ok(&v),
+		Err(e) => to_json_error(&e),
+	}
+}
 
-		/// Generate preview for content - port of _marker/preview.py
-		#[no_mangle]
-		pub extern "C" fn aphrodite_preview(
-		content: *const c_char,
-		ccr_type: *const c_char,
-		) -> *mut c_char {
-		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
-		let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
-		let preview = crate::build_preview(&t, &c);
-		CString::new(preview).unwrap().into_raw()
-		}
+/// Generate preview for content - port of _marker/preview.py
+#[no_mangle]
+pub extern "C" fn aphrodite_preview(content:*const c_char, ccr_type:*const c_char) -> *mut c_char {
+	let c = match unsafe { cstr(content) } {
+		Some(s) => s,
+		None => return to_json_error("null content"),
+	};
+	let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
+	let preview = crate::build_preview(&t, &c);
+	CString::new(preview).unwrap().into_raw()
+}
 
-		/// Stage 2 semantic reduction - port of _stage2.py
-		#[no_mangle]
-		pub extern "C" fn aphrodite_stage2(
-		content: *const c_char,
-		ccr_type: *const c_char,
-		) -> *mut c_char {
-		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
-		let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
-		match crate::stage2::compress_stage2(&c, &t) {
-		    Some(reduced) => CString::new(reduced).unwrap().into_raw(),
-		    None => to_json_error("no reduction possible"),
-		}
-		}
+/// Stage 2 semantic reduction - port of _stage2.py
+#[no_mangle]
+pub extern "C" fn aphrodite_stage2(content:*const c_char, ccr_type:*const c_char) -> *mut c_char {
+	let c = match unsafe { cstr(content) } {
+		Some(s) => s,
+		None => return to_json_error("null content"),
+	};
+	let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
+	match crate::stage2::compress_stage2(&c, &t) {
+		Some(reduced) => CString::new(reduced).unwrap().into_raw(),
+		None => to_json_error("no reduction possible"),
+	}
+}
 
-		/// Code structure extraction - port of _core/struct.py
-		#[no_mangle]
-		pub extern "C" fn aphrodite_struct_extract(
-		content: *const c_char,
-		language: *const c_char,
-		) -> *mut c_char {
-		let c = match unsafe { cstr(content) } { Some(s) => s, None => return to_json_error("null content") };
-		let lang = unsafe { CStr::from_ptr(language) }.to_string_lossy();
-		let result = crate::struct_extract::extract_code_structure(&c, &lang);
-		to_json_ok(&serde_json::json!(result))
-		}
+/// Code structure extraction - port of _core/struct.py
+#[no_mangle]
+pub extern "C" fn aphrodite_struct_extract(content:*const c_char, language:*const c_char) -> *mut c_char {
+	let c = match unsafe { cstr(content) } {
+		Some(s) => s,
+		None => return to_json_error("null content"),
+	};
+	let lang = unsafe { CStr::from_ptr(language) }.to_string_lossy();
+	let result = crate::struct_extract::extract_code_structure(&c, &lang);
+	to_json_ok(&serde_json::json!(result))
+}
