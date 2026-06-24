@@ -14,7 +14,7 @@
 > Sub-ms compress, 12,800× max ratio, 28-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.0.5-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/badge/release-v1.0.6-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![plugin](https://img.shields.io/badge/plugin-v2.0.3-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
@@ -41,7 +41,7 @@ On first launch, the plugin auto-downloads the `aphrodite` binary from
 ```bash
 git clone https://github.com/PlayForm/Aphrodite.git
 cd Aphrodite
-git submodule update --init --recursive  # required — vendored deps live in submodules
+git submodule update --init --recursive  # required - vendored deps live in submodules
 cargo build --release -p aphrodite
 # Binary: target/release/aphrodite
 # Dylib:  target/release/libaphrodite.dylib
@@ -108,7 +108,7 @@ Four layers, all under 1ms:
 
 1. **Classify** - 28-type regex classifier identifies content (<0.1ms)
 2. **Template** - TOML-driven templates produce `[type:key=val]` previews
-3. **Store** - SHA-256 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
+3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
 4. **Decide** - Agent reads preview, retrieves only when needed
 
 ---
@@ -124,7 +124,7 @@ crates/aphrodite/          ← Core compression engine (binary + cdylib)
   ├── struct_extract.rs    ← Code structure extraction (Rust, Python, Go, JS/TS)
   ├── state.rs             ← Session state, inline store, LRU
   ├── catalog.rs, session.rs, marker.rs, prefetch.rs, config_loader.rs
-  └── lib.rs               ← 17 C ABI functions for dylib loading
+  └── lib.rs               ← 22 C ABI functions for dylib loading
 
 crates/aphrodite-hermes/   ← Hermes-specific integration (cdylib)
   ├── tools.rs             ← 12 tool dispatch handlers
@@ -142,7 +142,8 @@ plugins/aphrodite/         ← Thin Python loader (~145 lines)
 
 All compression logic lives in the Rust dylib. Python is a thin FFI loader.
 Hot-reload: rebuild the dylib → mtime change detected → next call picks up new
-code automatically. 990 Rust tests + 116 Python tests, all passing.
+code automatically. 86 Rust tests in the Aphrodite crates (plus the full
+vendored Headroom suite), all passing.
 
 ---
 
@@ -179,6 +180,7 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 | `aphrodite_catalog`    | Full CCR catalog with hashes, types, sizes, previews  |
 | `aphrodite_reclassify` | Retroactive metadata enrichment for unclassified CCR  |
 | `aphrodite_prefetch`   | Background file read + compress; markers return instantly |
+| `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors      |
 
 ---
 
@@ -198,7 +200,7 @@ plugins/aphrodite/          ← Standalone Hermes plugin (git submodule)
 
 crates/aphrodite/           ← Core engine (binary + cdylib)
   src/
-    lib.rs                  ← 17 C ABI functions (session, hooks, catalog, …)
+    lib.rs                  ← 22 C ABI functions (session, hooks, catalog, …)
     proxy.rs                ← HTTP proxy server (:9797/:9798)
     hooks.rs                ← transform_tool_result, terminal, pre/post LLM
     session.rs              ← Turn lifecycle, conversation index, git cache
@@ -222,7 +224,8 @@ vendor/headroom/            ← Headroom fork (git submodule)
   crates/headroom-core/     ← Content transforms, tokenizer, smart crusher
 ```
 
-990 Rust tests (across 3 crates) + 116 Python tests. CC0-1.0 - public domain.
+86 Rust tests across the two Aphrodite crates (the vendored Headroom fork
+carries its own suite). CC0-1.0 - public domain.
 
 ---
 
@@ -256,7 +259,7 @@ aphrodite
 
 # Verify
 curl http://127.0.0.1:9798/health
-# -> {"status":"ok","version":"v1.0.4"}
+# -> {"status":"ok","version":"v1.0.5"}
 
 # Dev loop with auto-reload
 RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'

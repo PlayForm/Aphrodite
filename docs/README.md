@@ -18,7 +18,7 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 ### CCR (Compress-Cache-Retrieve)
 
 - [Marker Format](ccr/marker-format.md) - `<<<CCR:hash|type|size>>>` schema with
-  SHA-256 hash, 28 content types, TOML-driven preview templates, and metadata
+  BLAKE3 hash, 28 content types, TOML-driven preview templates, and metadata
   encoding rules
 - [Lifecycle](ccr/lifecycle.md) - Full 6-phase flow: compress
   (detect→threshold→hash→cache→store→marker), retrieve

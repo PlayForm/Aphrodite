@@ -37,6 +37,13 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "essential_tool"});
 	}
 
+	// Skip aphrodite's own tools (and headroom helpers): their output is already
+	// compact metadata, and compressing aphrodite_retrieve would replace the
+	// resolved content with another CCR marker - an infinite preview loop.
+	if tool_name.starts_with("aphrodite_") || tool_name.starts_with("headroom") {
+		return serde_json::json!({"status": "ok", "compressed": false, "reason": "self_tool"});
+	}
+
 	// Skip below threshold (0 = always compress)
 	if state.tool_threshold > 0 && content.len() < state.tool_threshold {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
