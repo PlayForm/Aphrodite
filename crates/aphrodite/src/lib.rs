@@ -450,9 +450,37 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 			let d = content.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
 			format!("[diff:{}F +{}/-{} {}L]", f, a, d, lines)
 		},
-		"source_code" => {
-			let f = content.matches("fn ").count() + content.matches("def ").count();
-			format!("[code:{}fns {}L]", f, lines)
+		"source_code" | "code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" => {
+			// Enrich with the structure map (fns/structs/traits/impls/classes/types
+			// + first signature) so the dylib/hook path matches the proxy's preview
+			// quality, instead of a bare substring count.
+			let st = crate::struct_extract::extract_code_structure(content, "");
+			let mut parts:Vec<String> = Vec::new();
+			for (key, label) in [
+				("fns", "fns"),
+				("structs", "structs"),
+				("traits", "traits"),
+				("impls", "impls"),
+				("classes", "classes"),
+				("types", "types"),
+			] {
+				if let Some(v) = st.get(key) {
+					if !v.is_empty() {
+						parts.push(format!("{}{}", v.len(), label));
+					}
+				}
+			}
+			let summary = if parts.is_empty() {
+				format!("{}fns", content.matches("fn ").count() + content.matches("def ").count())
+			} else {
+				parts.join("|")
+			};
+			let sig = st
+				.get("fns")
+				.and_then(|v| v.first())
+				.map(|s| format!(" {}", s.chars().take(48).collect::<String>().trim()))
+				.unwrap_or_default();
+			format!("[code:{}{} {}L]", summary, sig, lines)
 		},
 		"search" => {
 			let h = content.lines().filter(|l| l.contains(':')).count();

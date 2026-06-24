@@ -15,7 +15,7 @@
 > _One binary. Zero dependencies. Millions of tokens saved._
 
 [![release](https://img.shields.io/badge/release-v1.0.6-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![plugin](https://img.shields.io/badge/plugin-v2.0.3-purple)](plugins/aphrodite/plugin.yaml)
+[![plugin](https://img.shields.io/badge/plugin-v2.0.5-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -284,7 +284,8 @@ retrieve_guidance = "minimal"
 ccr_marker_hint = false
 ```
 
-7 TOML sections, 54 template strings, all overridable via `APHRODITE_*` env vars.
+The proxy and engine read these `[compression]` / `[previews]` / `[prompts]`
+settings from `aphrodite.toml`, each overridable via an `APHRODITE_*` env var.
 
 ---
 

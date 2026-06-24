@@ -47,9 +47,10 @@ echo "[4/5] Tests passed"
 
 # Commit + tag
 git add -u
+# Tag must be `Aphrodite/v*` - that is what Build.yml / Publish.yml trigger on.
 git commit -m "release(aphrodite): v$NEW"
-git tag "v$NEW"
-echo "[5/5] Committed + tagged v$NEW"
+git tag "Aphrodite/v$NEW"
+echo "[5/5] Committed + tagged Aphrodite/v$NEW"
 
 echo ""
 echo "=== Release v$NEW complete ==="
@@ -60,7 +61,7 @@ if [ "$PUSH" = "--push" ]; then
 	echo ""
 	echo "Pushing..."
 	git push "$REMOTE" Current
-	git push "$REMOTE" "v$NEW"
+	git push "$REMOTE" "Aphrodite/v$NEW"
 	echo "Pushed."
 else
 	echo "  Push:   ./scripts/release.sh $BUMP --push"

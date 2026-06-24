@@ -11,6 +11,11 @@ on:
   push:
     tags: ["Aphrodite/v*"]
   workflow_dispatch:
+    inputs:
+      publish_crates:
+        description: "Attempt `cargo publish` to crates.io (only works once headroom-core is published there)"
+        type: boolean
+        default: false
 
 env:
   ADBLOCK: true
@@ -99,16 +104,13 @@ jobs:
       - name: Build release
         run: cargo build --release -p aphrodite
 
-      # crates.io publishing is best-effort: `aphrodite` depends on the vendored
-      # Headroom fork (`headroom-core`) via a path-only dependency, which is not
-      # published to crates.io, so `cargo publish` cannot resolve it. The real
-      # distribution channel is the prebuilt binaries from Build.yml → GitHub
-      # Releases. This step stays in place (and goes green) so it begins working
-      # automatically if headroom-core is ever published; until then a failed
-      # publish must not fail the release pipeline.
-      - name: Publish to crates.io (best-effort)
-        if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
-        continue-on-error: true
+      # crates.io publishing is opt-in. `aphrodite` path-depends on the vendored
+      # Headroom fork (`headroom-core`), which is not on crates.io, so a tag-push
+      # release cannot publish it - and a failing publish step must not annotate
+      # every release as red. Run it only on an explicit `workflow_dispatch` with
+      # publish_crates=true (so it can fail loudly once headroom-core is published).
+      - name: Publish to crates.io (opt-in)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates }}
         run: cargo publish -p aphrodite --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -140,12 +142,11 @@ jobs:
       - name: Build release
         run: cargo build --release -p aphrodite-hermes
 
-      # Best-effort: aphrodite-hermes depends on `aphrodite`, which cannot be
-      # published while it carries a path dependency on the vendored Headroom
-      # fork (see the Publish-Aphrodite job). Kept in place but non-fatal.
-      - name: Publish to crates.io (best-effort)
-        if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
-        continue-on-error: true
+      # Opt-in (see the Publish-Aphrodite job): aphrodite-hermes depends on
+      # `aphrodite`, which cannot publish while it path-depends on the vendored
+      # Headroom fork. Runs only on explicit workflow_dispatch with publish_crates.
+      - name: Publish to crates.io (opt-in)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates }}
         run: cargo publish -p aphrodite-hermes --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

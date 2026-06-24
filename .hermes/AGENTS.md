@@ -8,9 +8,9 @@ Every line you write here directly makes LLMs cheaper, faster, and smarter. ✨
 
 - **Rust proxy** - LLM API with intelligent CCR compression
 - **Two crates**: `crates/aphrodite` (core engine) + `crates/aphrodite-hermes` (agent integration)
-- **Plugin**: `plugins/aphrodite` v2.0.1 - 12 tools, 9 skills, dylib hot-reload, dual-proxy architecture
+- **Plugin**: `plugins/aphrodite` v2.0.5 - 12 tools, 9 skills, dylib hot-reload, dual-proxy architecture
 - **Config**: `aphrodite.toml` - all tuning in one file, env-overridable
-- **Binary**: `~/.hermes/aphrodite/aphrodite` v1.0.4 — auto-downloaded, auto-updated
+- **Binary**: `~/.hermes/aphrodite/aphrodite` v1.0.6 - auto-downloaded, auto-updated
 
 ## Dev Flow - The Joyful Loop
 
@@ -26,7 +26,7 @@ it up without restarting Hermes. Pure magic. 🪄
 | What | Where |
 |------|-------|
 | Binary | `target/release/aphrodite` |
-| Plugin | `plugins/aphrodite/` (9 top-level + 5 subpackages, 53 Python files) |
+| Plugin | `plugins/aphrodite/` (thin Python ctypes loader → Rust dylib) |
 | Environment | `~/.hermes/.env` (`APHRODITE_API_KEY`) |
 | Plans | `.hermes/plans/` |
 | Templates | `.hermes/RELEASE-TEMPLATE.md` |

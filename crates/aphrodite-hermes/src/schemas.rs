@@ -51,8 +51,7 @@ fn schema_retrieve() -> serde_json::Value {
             "properties": {
                 "hash": {"type": "string", "description": "CCR marker hash to retrieve"},
                 "query": {"type": "string", "description": "Optional: filter content to lines containing this query"},
-                "path": {"type": "string", "description": "Optional: file path to read directly (bypasses CCR)"},
-                "depth": {"type": "integer", "description": "Optional: compression depth (1=raw, 2=headroom-reduced)"}
+                "path": {"type": "string", "description": "Optional: workspace file path to read directly (bypasses CCR)"}
             }
         }
     })

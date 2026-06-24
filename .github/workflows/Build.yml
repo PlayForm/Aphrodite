@@ -59,6 +59,8 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
+          - os: macos-13 # Intel host for x86_64 mac builds
+            target: x86_64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
 
@@ -91,36 +93,48 @@ jobs:
           key: cargo-check-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: cargo-check-${{ runner.os }}-${{ matrix.target }}-
 
+      # Build both the proxy binary (`aphrodite`) AND the plugin dylib
+      # (`libaphrodite_hermes`) - the Hermes plugin loads the dylib at runtime,
+      # so it must ship per-platform alongside the binary.
       - name: Build
-        run: cargo build --release -p aphrodite --target ${{ matrix.target }}
+        run: cargo build --release -p aphrodite -p aphrodite-hermes --target ${{ matrix.target }}
 
-      - name: Rename binary (full triple)
+      - name: Stage release artifacts (full triple)
         shell: bash
         run: |
           TARGET="${{ matrix.target }}"
-          SRC="target/${TARGET}/release/aphrodite"
+          DIR="target/${TARGET}/release"
           if [[ "$TARGET" == *windows* ]]; then
-              SRC="${SRC}.exe"
-              DST="aphrodite-${TARGET}.exe"
+              cp "$DIR/aphrodite.exe"             "aphrodite-${TARGET}.exe"
+              cp "$DIR/aphrodite_hermes.dll"      "libaphrodite_hermes-${TARGET}.dll"
+          elif [[ "$TARGET" == *apple* ]]; then
+              cp "$DIR/aphrodite"                 "aphrodite-${TARGET}"
+              cp "$DIR/libaphrodite_hermes.dylib" "libaphrodite_hermes-${TARGET}.dylib"
           else
-              DST="aphrodite-${TARGET}"
+              cp "$DIR/aphrodite"                 "aphrodite-${TARGET}"
+              cp "$DIR/libaphrodite_hermes.so"    "libaphrodite_hermes-${TARGET}.so"
           fi
-          cp "$SRC" "$DST"
-          ls -lh "$DST"
+          ls -lh aphrodite-${TARGET}* libaphrodite_hermes-${TARGET}*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: aphrodite-${{ matrix.target }}
-          path: aphrodite-${{ matrix.target }}
+          path: |
+            aphrodite-${{ matrix.target }}*
+            libaphrodite_hermes-${{ matrix.target }}*
           retention-days: 30
 
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
         uses: softprops/action-gh-release@v3
         with:
-          files: aphrodite-${{ matrix.target }}
+          # Trailing * catches the Windows `.exe`; fail loudly if a rename slips.
+          files: |
+            aphrodite-${{ matrix.target }}*
+            libaphrodite_hermes-${{ matrix.target }}*
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

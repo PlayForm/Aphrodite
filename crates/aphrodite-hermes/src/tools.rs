@@ -35,6 +35,34 @@ fn str_arg<'a>(args: &'a serde_json::Value, key: &str) -> &'a str {
     args.get(key).and_then(|v| v.as_str()).unwrap_or("")
 }
 
+/// Largest file `aphrodite_retrieve(path=…)` will read directly.
+const MAX_PATH_READ: u64 = 10 * 1024 * 1024;
+
+/// Read a file requested via `aphrodite_retrieve(path=…)`, confined to the
+/// current workspace and capped at [`MAX_PATH_READ`]. Returns `Err(reason)` if
+/// the path escapes the workspace, is too large, or can't be read - so the tool
+/// can't be coerced into exfiltrating arbitrary files (e.g. /etc/passwd, ~/.ssh).
+fn read_path_guarded(path: &str) -> Result<String, String> {
+    let root = std::env::current_dir().map_err(|e| format!("cwd: {e}"))?;
+    let root = root.canonicalize().unwrap_or(root);
+    let canon = std::path::Path::new(path)
+        .canonicalize()
+        .map_err(|e| format!("read {path}: {e}"))?;
+    if !canon.starts_with(&root) {
+        return Err(format!(
+            "path is outside the workspace ({}): {path}",
+            root.display()
+        ));
+    }
+    let size = std::fs::metadata(&canon).map(|m| m.len()).unwrap_or(0);
+    if size > MAX_PATH_READ {
+        return Err(format!(
+            "file exceeds {MAX_PATH_READ}-byte read cap: {path}"
+        ));
+    }
+    std::fs::read_to_string(&canon).map_err(|e| format!("read {path}: {e}"))
+}
+
 /// Store content in the session's inline store and record a catalog marker.
 /// Returns `{hash, type, size, preview, marker}`.
 fn compress_into(state: &mut AphroditeState, content: &str, hint: &str) -> serde_json::Value {
@@ -86,7 +114,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
     m.insert("aphrodite_retrieve", |args| {
         let path = str_arg(args, "path");
         if !path.is_empty() {
-            return match std::fs::read_to_string(path) {
+            return match read_path_guarded(path) {
                 Ok(content) => {
                     let query = str_arg(args, "query");
                     let body = if query.is_empty() {
@@ -96,7 +124,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
                     };
                     serde_json::json!({"found": true, "source": "path", "path": path, "content": body})
                 }
-                Err(e) => serde_json::json!({"found": false, "error": format!("read {}: {}", path, e)}),
+                Err(e) => serde_json::json!({"found": false, "error": e}),
             };
         }
 
@@ -403,6 +431,38 @@ mod tests {
         let body = r["content"].as_str().unwrap();
         assert!(body.contains("beta error here"));
         assert!(!body.contains("alpha line"));
+    }
+
+    #[test]
+    fn test_retrieve_path_outside_workspace_is_denied() {
+        // /etc/hosts exists and is outside any repo cwd → must be refused.
+        let r = dispatch(
+            "aphrodite_retrieve",
+            &serde_json::json!({"path": "/etc/hosts"}).to_string(),
+        );
+        assert_eq!(
+            r["found"], false,
+            "reads outside the workspace must be denied: {r:?}"
+        );
+        assert!(r["error"]
+            .as_str()
+            .unwrap()
+            .contains("outside the workspace"));
+    }
+
+    #[test]
+    fn test_retrieve_path_within_workspace_ok() {
+        // This source file is inside the crate (workspace) → allowed.
+        let r = dispatch(
+            "aphrodite_retrieve",
+            &serde_json::json!({"path": concat!(env!("CARGO_MANIFEST_DIR"), "/src/tools.rs")})
+                .to_string(),
+        );
+        assert_eq!(
+            r["found"], true,
+            "in-workspace path read should succeed: {r:?}"
+        );
+        assert!(r["content"].as_str().unwrap().contains("read_path_guarded"));
     }
 
     #[test]
