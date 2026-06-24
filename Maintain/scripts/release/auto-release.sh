@@ -78,11 +78,14 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 	# Version bumps above are in the submodule's working tree — they must
 	# be committed, tagged, and pushed in the submodule repo so the release
 	# is reproducible from a fresh clone.
+	# Also update BINARY_VERSION so download.sh can find the correct
+	# binary version without needing the monorepo or GitHub API.
+	echo "$NEW" > plugins/aphrodite/BINARY_VERSION
 	SUBMODULE_REMOTE="${SUBMODULE_REMOTE:-Source}"
 	SUBMODULE_BRANCH="${SUBMODULE_BRANCH:-Current}"
 	(
 		cd plugins/aphrodite
-		git add plugin.yaml
+		git add plugin.yaml BINARY_VERSION
 		[[ -f pyproject.toml ]] && git add pyproject.toml 2>/dev/null || true
 		[[ -f __init__.py ]] && git add __init__.py 2>/dev/null || true
 		[[ -f _core/config.py ]] && git add _core/config.py 2>/dev/null || true
