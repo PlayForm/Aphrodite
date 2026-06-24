@@ -72,6 +72,26 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 	[[ -f plugins/aphrodite/_core/config.py ]] && sed -i '' "s/PLUGIN_VERSION = \"$PLUGIN_CURRENT\"/PLUGIN_VERSION = \"$PLUGIN_NEW\"/" plugins/aphrodite/_core/config.py
 	[[ -f plugins/aphrodite/_core/config.py ]] && sed -i '' "s/BIN_VERSION = \"v$CURRENT\"/BIN_VERSION = \"v$NEW\"/" plugins/aphrodite/_core/config.py
 	echo "[bump] plugin $PLUGIN_CURRENT → $PLUGIN_NEW"
+
+	# ── Commit + tag + push submodule ──
+	# The plugin lives in a git submodule (Aphrodite-Hermes repo).
+	# Version bumps above are in the submodule's working tree — they must
+	# be committed, tagged, and pushed in the submodule repo so the release
+	# is reproducible from a fresh clone.
+	SUBMODULE_REMOTE="${SUBMODULE_REMOTE:-Source}"
+	SUBMODULE_BRANCH="${SUBMODULE_BRANCH:-Current}"
+	(
+		cd plugins/aphrodite
+		git add plugin.yaml
+		[[ -f pyproject.toml ]] && git add pyproject.toml 2>/dev/null || true
+		[[ -f __init__.py ]] && git add __init__.py 2>/dev/null || true
+		[[ -f _core/config.py ]] && git add _core/config.py 2>/dev/null || true
+		git commit -m "release: plugin v$PLUGIN_NEW" || echo "[submodule] nothing to commit"
+		git tag "v$PLUGIN_NEW" 2>/dev/null || echo "[submodule] tag v$PLUGIN_NEW already exists"
+		git push "$SUBMODULE_REMOTE" "$SUBMODULE_BRANCH" 2>&1 | tail -1 || echo "[submodule] push branch skipped (auth?)"
+		git push "$SUBMODULE_REMOTE" "v$PLUGIN_NEW" 2>&1 | tail -1 || echo "[submodule] push tag skipped (auth?)"
+	)
+	echo "[submodule] plugin v$PLUGIN_NEW committed + tagged + pushed"
 else
 	echo "[bump] plugin skipped — no version source found"
 fi
@@ -97,10 +117,10 @@ git push "$REMOTE" Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?
 git push "$REMOTE" "Aphrodite/v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
 echo "[push] done"
 
-# Sync submodule pointer (ignore=all hides dirty state, must force)
+# Sync submodule pointer — plugin v$PLUGIN_NEW is now committed + tagged in submodule
 SUBMODULE_SHA=$(cd plugins/aphrodite && git rev-parse HEAD)
 git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2>/dev/null
-git commit -m "chore: sync submodules - Aphrodite v$NEW" 2>/dev/null || echo "[sync] submodules already current"
+git commit -m "chore: sync aphrodite submodule → plugin v$PLUGIN_NEW" 2>/dev/null || echo "[sync] submodule pointer already current"
 git push "$REMOTE" Current 2>&1 | tail -1 || echo "[push] submodule sync skipped (auth?)"
 echo "[sync] submodules done"
 

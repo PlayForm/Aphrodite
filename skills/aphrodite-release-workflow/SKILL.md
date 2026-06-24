@@ -66,6 +66,19 @@ The Aphrodite project has two independent version tracks:
 - `plugins/aphrodite/__init__.py` — docstring version (if present) ✅
 - `plugins/aphrodite/_core/config.py` — BIN_VERSION + PLUGIN_VERSION (if file exists) ✅
 
+## Submodule Release Flow
+
+`plugins/aphrodite` is a git submodule → separate repo `PlayForm/Aphrodite-Hermes`.
+`auto-release.sh` handles the full cross-repo release:
+
+1. **Bump** `plugin.yaml` (and other submodule files) via `sed`
+2. **Commit** in submodule: `cd plugins/aphrodite && git commit -m "release: plugin vX.Y.Z"`
+3. **Tag** in submodule: `git tag "vX.Y.Z"`
+4. **Push** submodule branch + tag to `$SUBMODULE_REMOTE` (default: `Source`)
+5. **Update parent pointer**: `git update-index --cacheinfo` to track new submodule SHA
+   (needed because `.gitmodules` has `ignore = all`, which hides dirty submodules)
+6. **Commit** parent pointer update: `chore: sync aphrodite submodule → plugin vX.Y.Z`
+
 **Manually verify after release:**
 
 - `README.md:~258` — example output version (non-critical, grep for `"version":"v`)
