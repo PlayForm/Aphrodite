@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Monitor pane 17 cargo watch, write build-status.json every 5s."""
+
 import json
 import os
 import re
@@ -26,9 +27,10 @@ def log(msg: str) -> None:
 def get_pane_buffer(pane_id: int, lines: int = 8) -> str:
     try:
         result = subprocess.run(
-            ["wezterm", "cli", "get-text", "--pane-id", str(pane_id),
-             "--start-line", str(-lines)],
-            capture_output=True, text=True, timeout=5
+            ["wezterm", "cli", "get-text", "--pane-id", str(pane_id), "--start-line", str(-lines)],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return result.stdout
@@ -56,19 +58,19 @@ def parse_buffer(buffer: str) -> dict:
         line_stripped = line.strip()
 
         # Detect errors (but not INFO log lines mentioning "error")
-        if re.search(r'\berror\b', line_stripped, re.IGNORECASE):
+        if re.search(r"\berror\b", line_stripped, re.IGNORECASE):
             # Skip false positives like "listening" or INFO noise
-            if not re.search(r'(INFO|listening|address)', line_stripped, re.IGNORECASE):
+            if not re.search(r"(INFO|listening|address)", line_stripped, re.IGNORECASE):
                 errors.append(line_stripped)
 
-        if re.search(r'^\s*Compiling\s', line_stripped):
+        if re.search(r"^\s*Compiling\s", line_stripped):
             compiling = True
-        if re.search(r'^\s*Running\s', line_stripped):
+        if re.search(r"^\s*Running\s", line_stripped):
             # Only "Running `target/..." lines from cargo, not the "[Running 'cargo ...']" marker
-            if re.search(r'`[^`]+`', line_stripped):
+            if re.search(r"`[^`]+`", line_stripped):
                 running = True
-        if re.search(r'^\s*Finished\s', line_stripped):
-            if 'error' not in line_stripped.lower():
+        if re.search(r"^\s*Finished\s", line_stripped):
+            if "error" not in line_stripped.lower():
                 finished_ok = True
 
     # Determine composite status
@@ -103,14 +105,16 @@ def main():
     os.makedirs(STATE_DIR, exist_ok=True)
 
     # Initial write
-    write_status({
-        "status": STATUS_IDLE,
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "errors": [],
-        "compiling": False,
-        "running": False,
-        "finished_ok": False,
-    })
+    write_status(
+        {
+            "status": STATUS_IDLE,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "errors": [],
+            "compiling": False,
+            "running": False,
+            "finished_ok": False,
+        }
+    )
     log(f"Starting pane {PANE_ID} monitor → {OUTPUT_FILE} (every {POLL_INTERVAL}s)")
 
     consecutive_failures = 0
@@ -122,14 +126,16 @@ def main():
         if not buffer:
             consecutive_failures += 1
             if consecutive_failures > 6:  # 30s of failures -> idle
-                write_status({
-                    "status": STATUS_IDLE,
-                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "errors": [],
-                    "compiling": False,
-                    "running": False,
-                    "finished_ok": False,
-                })
+                write_status(
+                    {
+                        "status": STATUS_IDLE,
+                        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "errors": [],
+                        "compiling": False,
+                        "running": False,
+                        "finished_ok": False,
+                    }
+                )
             continue
 
         consecutive_failures = 0

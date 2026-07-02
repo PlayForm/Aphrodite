@@ -37,6 +37,16 @@ pub enum Command {
 		#[arg(long, env = "APHRODITE_MODEL", default_value = "deepseek-v4-pro")]
 		model: String,
 
+		/// Cache proxy listen port. Override per-instance to run multiple
+		/// concurrent Hermes Agents on the same machine.
+		#[arg(long, env = "APHRODITE_CACHE_PORT", default_value = "9797")]
+		cache_port: u16,
+
+		/// Token proxy listen port. Override per-instance to run multiple
+		/// concurrent Hermes Agents on the same machine.
+		#[arg(long, env = "APHRODITE_TOKEN_PORT", default_value = "9798")]
+		token_port: u16,
+
 		/// Skip launching the proxy after setup.
 		#[arg(long)]
 		no_launch: bool,
@@ -56,6 +66,10 @@ pub struct SetupArgs {
 	pub api_url: String,
 	/// Model name to forward.
 	pub model: String,
+	/// Cache proxy listen port.
+	pub cache_port: u16,
+	/// Token proxy listen port.
+	pub token_port: u16,
 	/// Skip launching the proxy after setup.
 	pub no_launch: bool,
 	/// Force re-setup even if already installed.
@@ -65,13 +79,15 @@ pub struct SetupArgs {
 impl From<Command> for SetupArgs {
 	fn from(cmd: Command) -> Self {
 		match cmd {
-			Command::Setup { api_key, api_url, model, no_launch, force } => {
-				Self { api_key, api_url, model, no_launch, force }
+			Command::Setup { api_key, api_url, model, cache_port, token_port, no_launch, force } => {
+				Self { api_key, api_url, model, cache_port, token_port, no_launch, force }
 			}
 			_ => Self {
 				api_key: None,
 				api_url: "https://api.deepseek.com".into(),
 				model: "deepseek-v4-pro".into(),
+				cache_port: 9797,
+				token_port: 9798,
 				no_launch: false,
 				force: false,
 			},

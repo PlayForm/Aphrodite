@@ -17,7 +17,8 @@ use std::{
 use crate::config::SetupArgs;
 
 /// aphrodite.toml template - embedded at compile time.
-/// Placeholders: `{api_url}`, `{model}` - replaced with user-provided values.
+/// Placeholders: `{api_url}`, `{model}`, `{cache_port}`, `{token_port}` -
+/// replaced with user-provided values.
 const CONFIG_TEMPLATE: &str = include_str!("../templates/aphrodite.toml");
 
 /// Errors that can occur during setup.
@@ -101,14 +102,16 @@ pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 	if !config_path.exists() || args.force {
 		let config = CONFIG_TEMPLATE
 			.replace("{api_url}", &args.api_url)
-			.replace("{model}", &args.model);
+			.replace("{model}", &args.model)
+			.replace("{cache_port}", &args.cache_port.to_string())
+			.replace("{token_port}", &args.token_port.to_string());
 		println!("writing config -> {}", config_path.display());
 		fs::write(&config_path, &config)?;
 		secure_perms(&config_path, 0o600)?;
 	}
 
 	// ── Step 7: Write plugin.yaml ──
-	write_plugin_yaml(&ctx)?;
+	write_plugin_yaml(&ctx, args)?;
 
 	// ── Step 8: Write __init__.py shim ──
 	write_init_py(&ctx)?;
@@ -222,7 +225,7 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Write plugin.yaml manifest.
-fn write_plugin_yaml(ctx: &SetupCtx) -> Result<(), SetupError> {
+fn write_plugin_yaml(ctx: &SetupCtx, args: &SetupArgs) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("plugin.yaml");
 	if path.exists() { return Ok(()); }
 
@@ -256,9 +259,11 @@ provides_context_engine: true
 install_message: |
   aphrodite v{version} - installed via `cargo install aphrodite` + `aphrodite setup`.
   All logic in binaries/ - Rust-powered. Secure defaults.
-  Proxies: token (:9798, SQLite), cache (:9797, in-memory).
+  Proxies: token (:{token_port}, SQLite), cache (:{cache_port}, in-memory).
 "#,
 		version = env!("CARGO_PKG_VERSION"),
+		token_port = args.token_port,
+		cache_port = args.cache_port,
 	);
 	println!("writing plugin manifest -> {}", path.display());
 	fs::write(&path, &yaml)?;

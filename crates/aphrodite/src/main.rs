@@ -53,8 +53,8 @@ fn main() -> anyhow::Result<()> {
 	if args.iter().any(|a| a == "setup") {
 		let cli = Cli::parse();
 		match cli.command {
-			Some(Command::Setup { api_key, api_url, model, no_launch, force }) => {
-				let setup_args = SetupArgs { api_key, api_url, model, no_launch, force };
+			Some(Command::Setup { api_key, api_url, model, cache_port, token_port, no_launch, force }) => {
+				let setup_args = SetupArgs { api_key, api_url, model, cache_port, token_port, no_launch, force };
 				match setup::run(&setup_args) {
 					Ok(()) => {
 						if setup_args.no_launch {

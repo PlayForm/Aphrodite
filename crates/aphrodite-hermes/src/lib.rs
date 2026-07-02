@@ -78,20 +78,45 @@ pub(crate) fn replacement_from(r: &serde_json::Value) -> serde_json::Value {
     serde_json::Value::Null
 }
 
-/// Probe whether the cache (:9797) and token (:9798) proxies are listening.
+/// Default cache proxy port, used when `APHRODITE_CACHE_PORT` is unset.
+const DEFAULT_CACHE_PORT: u16 = 9797;
+/// Default token proxy port, used when `APHRODITE_TOKEN_PORT` is unset.
+const DEFAULT_TOKEN_PORT: u16 = 9798;
+
+/// Resolve the cache/token proxy ports for this process.
+///
+/// Reads `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT` from the environment
+/// so that multiple concurrent Hermes Agent instances on the same machine can
+/// each be pointed at their own proxy pair (see `aphrodite setup --cache-port
+/// / --token-port`), falling back to the historical 9797/9798 defaults.
+fn configured_ports() -> (u16, u16) {
+    let port_from_env = |var: &str, default: u16| {
+        std::env::var(var)
+            .ok()
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(default)
+    };
+    (
+        port_from_env("APHRODITE_CACHE_PORT", DEFAULT_CACHE_PORT),
+        port_from_env("APHRODITE_TOKEN_PORT", DEFAULT_TOKEN_PORT),
+    )
+}
+
+/// Probe whether the cache and token proxies are listening.
 pub(crate) fn proxy_health() -> serde_json::Value {
     use std::net::TcpStream;
     use std::time::Duration;
     let timeout = Duration::from_millis(400);
-    let alive = |addr: &str| {
+    let alive = |addr: String| {
         addr.parse()
             .ok()
             .and_then(|a| TcpStream::connect_timeout(&a, timeout).ok())
             .is_some()
     };
+    let (cache_port, token_port) = configured_ports();
     serde_json::json!({
-        "token": {"port": 9798, "alive": alive("127.0.0.1:9798")},
-        "cache": {"port": 9797, "alive": alive("127.0.0.1:9797")},
+        "token": {"port": token_port, "alive": alive(format!("127.0.0.1:{token_port}"))},
+        "cache": {"port": cache_port, "alive": alive(format!("127.0.0.1:{cache_port}"))},
     })
 }
 
