@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.1.0 - Configurable Proxy Ports (2026-07-03)
+
+### Multi-Agent Port Configuration
+
+Resolves [#17](https://github.com/PlayForm/Aphrodite/issues/17) - running
+multiple concurrent Hermes Agents on one machine no longer requires patching
+and recompiling the source to avoid `:9797`/`:9798` port collisions:
+
+- `aphrodite setup --cache-port <port> --token-port <port>` (or
+  `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT` env vars) templates the
+  generated `aphrodite.toml` and `plugin.yaml` with the chosen ports instead
+  of hardcoding `9797`/`9798`.
+- `aphrodite_hermes_proxy_health` (the C ABI health probe the Hermes plugin
+  calls) now reads `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT` from the
+  environment at call time instead of hardcoding the default ports, so
+  liveness reporting stays accurate for non-default instances.
+- Verified end-to-end against a real Hermes v0.18.0 install: two independent
+  `aphrodite setup` installs running concurrently on distinct port pairs with
+  zero conflicts, plugin registration confirmed via `hermes plugins list`.
+
+### Chore
+
+- Synced `package.json` and `README.md` version references that had drifted
+  behind the `crates/aphrodite` / `crates/aphrodite-hermes` Cargo.toml version.
+
 ## v0.7.0 - Atomization + Live Containers (2026-06-17)
 
 ### Plugin Atomization - 29 Nested Modules
