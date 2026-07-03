@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_crates:
-        description: "Attempt `cargo publish` to crates.io (only works once headroom-core is published there)"
+        description: "Attempt `cargo publish` to crates.io (publishes aphrodite-headroom-core first, then aphrodite, then aphrodite-hermes)"
         type: boolean
         default: false
 
@@ -77,9 +77,64 @@ jobs:
       - name: Cargo test
         run: cargo test --workspace
 
+  Publish-Headroom-Core:
+    name: Publish aphrodite-headroom-core
+    needs: [Test]
+    runs-on: ubuntu-latest
+    environment: Release
+    steps:
+      - uses: actions/checkout@v6.0.3
+        with:
+          submodules: recursive
+
+      - name: Setup Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            vendor/headroom/target/
+          key: cargo-publish-headroom-${{ runner.os }}-${{ hashFiles('vendor/headroom/Cargo.lock') }}
+          restore-keys: cargo-publish-headroom-${{ runner.os }}-
+
+      # `aphrodite` path-depends on `headroom-core` (vendored via the Headroom
+      # submodule, which declares its own `[workspace]` and is therefore a
+      # separate Cargo workspace root, not a member of this one) using a
+      # `path + version` dependency, aliased to the published package name
+      # `aphrodite-headroom-core` (we publish under our own namespace rather
+      # than the upstream `headroom-core` name - see crates/aphrodite/Cargo.toml
+      # and vendor/headroom/crates/headroom-core/Cargo.toml). `cargo publish`
+      # strips the `path` key and keeps only `package`/`version`, so publishing
+      # aphrodite only succeeds once a matching aphrodite-headroom-core version
+      # actually exists on crates.io. crates.io versions are immutable -
+      # re-publishing one that's already live errors - so check first and skip
+      # if it's already there.
+      - name: Check if aphrodite-headroom-core version is already published
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates }}
+        id: check
+        working-directory: vendor/headroom
+        run: |
+          VERSION=$(grep '^version' crates/headroom-core/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if curl -sL "https://index.crates.io/ap/hr/aphrodite-headroom-core" | grep -q "\"vers\":\"$VERSION\""; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish aphrodite-headroom-core to crates.io (opt-in)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates && steps.check.outputs.published == 'false' }}
+        working-directory: vendor/headroom
+        run: cargo publish -p aphrodite-headroom-core --no-verify
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
   Publish-Aphrodite:
     name: Publish aphrodite
-    needs: [Test]
+    needs: [Test, Publish-Headroom-Core]
     runs-on: ubuntu-latest
     environment: Release
     steps:
@@ -104,11 +159,11 @@ jobs:
       - name: Build release
         run: cargo build --release -p aphrodite
 
-      # crates.io publishing is opt-in. `aphrodite` path-depends on the vendored
-      # Headroom fork (`headroom-core`), which is not on crates.io, so a tag-push
-      # release cannot publish it - and a failing publish step must not annotate
-      # every release as red. Run it only on an explicit `workflow_dispatch` with
-      # publish_crates=true (so it can fail loudly once headroom-core is published).
+      # crates.io publishing is opt-in - run it only on an explicit
+      # `workflow_dispatch` with publish_crates=true (so it can fail loudly
+      # rather than annotating every tag-push release as red). Once
+      # Publish-Headroom-Core has run, aphrodite-headroom-core is live on
+      # crates.io and this succeeds.
       - name: Publish to crates.io (opt-in)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates }}
         run: cargo publish -p aphrodite --no-verify
@@ -142,9 +197,10 @@ jobs:
       - name: Build release
         run: cargo build --release -p aphrodite-hermes
 
-      # Opt-in (see the Publish-Aphrodite job): aphrodite-hermes depends on
-      # `aphrodite`, which cannot publish while it path-depends on the vendored
-      # Headroom fork. Runs only on explicit workflow_dispatch with publish_crates.
+      # Opt-in (see the Publish-Aphrodite job): needs aphrodite published
+      # first, which needs aphrodite-headroom-core published first
+      # (Publish-Headroom-Core). Runs only on explicit workflow_dispatch with
+      # publish_crates.
       - name: Publish to crates.io (opt-in)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates }}
         run: cargo publish -p aphrodite-hermes --no-verify
