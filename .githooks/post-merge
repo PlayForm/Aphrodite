@@ -1,0 +1,5 @@
+#!/bin/sh
+# Keep vendored submodules (plugins/aphrodite, vendor/headroom, vendor/rtk)
+# tracking their remote branch tip after every pull/merge, so nobody has to
+# remember to run `git submodule update --remote --recursive --merge` by hand.
+git submodule update --init --remote --recursive --merge
