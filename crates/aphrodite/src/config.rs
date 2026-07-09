@@ -26,7 +26,7 @@ pub enum Command {
 	/// Bootstrap: copy binary, create config, register with hermes, launch proxy.
 	Setup {
 		/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
-		#[arg(long, env = "APHRODITE_API_KEY")]
+		#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true)]
 		api_key: Option<String>,
 
 		/// Upstream API base URL.
@@ -117,7 +117,7 @@ pub struct Cli {
 	pub api_url:String,
 
 	/// Upstream API key
-	#[arg(long, env = "APHRODITE_API_KEY")]
+	#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true)]
 	pub api_key:String,
 
 	/// Model name to forward (set via APHRODITE_MODEL env or --model)
@@ -153,7 +153,7 @@ pub struct Cli {
 	pub notify_url:Option<String>,
 
 	/// Hermes API key for callback auth
-	#[arg(long, env = "APHRODITE_NOTIFY_KEY")]
+	#[arg(long, env = "APHRODITE_NOTIFY_KEY", hide_env_values = true)]
 	pub notify_key:Option<String>,
 
 	/// Enable dev mode - verbose request/response logging

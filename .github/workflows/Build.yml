@@ -59,7 +59,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-13 # Intel host for x86_64 mac builds
+          - os: macos-latest # cross-compiled from arm64; macos-13 (real Intel host) queues indefinitely on GH-hosted runners
             target: x86_64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc

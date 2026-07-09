@@ -43,8 +43,8 @@ fn main() -> anyhow::Result<()> {
 		return Ok(());
 	}
 	if args.iter().any(|a| a == "--help" || a == "-h") {
-		// Let clap print help - parse will exit the process
-		let _ = Cli::try_parse();
+		// Cli::parse() prints help/errors and exits the process internally.
+		Cli::parse();
 		return Ok(());
 	}
 

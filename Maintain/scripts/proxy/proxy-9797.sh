@@ -54,6 +54,12 @@ case "${1:-}" in
 	echo "✗ aphrodite cache not running"
 	exit 1
 	;;
+"") ;;
+*)
+	echo "Unknown option: $1" >&2
+	echo "Usage: $0 [--stop|--status]" >&2
+	exit 1
+	;;
 esac
 
 # Build if binary doesn't exist

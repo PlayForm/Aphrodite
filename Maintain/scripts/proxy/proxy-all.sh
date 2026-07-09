@@ -26,6 +26,12 @@ case "${1:-}" in
 	bash "$SCRIPT_DIR/proxy-9798.sh" --status 2>/dev/null || echo "DOWN"
 	exit 0
 	;;
+"") ;;
+*)
+	echo "Unknown option: $1" >&2
+	echo "Usage: $0 [--stop|--status]" >&2
+	exit 1
+	;;
 esac
 
 echo "Launching all Aphrodite proxies..."

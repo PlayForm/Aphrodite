@@ -29,7 +29,7 @@ write_status "idle" ""
 log "Starting pane 17 monitor (every 5s)"
 
 while true; do
-	buffer=$(mcp_wezterm_get_buffer 2> /dev/null || true)
+	buffer=$(get_buffer 2> /dev/null || true)
 
 	if [ -z "$buffer" ]; then
 		sleep 5
