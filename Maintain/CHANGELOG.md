@@ -1,5 +1,47 @@
 # Changelog
 
+## v1.2.1 - Silent Startup Failures (2026-07-11)
+
+### Fix
+
+- **SQLite CCR directory auto-create** (`crates/aphrodite/src/proxy.rs`) - a
+  missing `~/.hermes/aphrodite/` directory previously failed the token
+  proxy's SQLite CCR store silently at startup while the cache proxy (in
+  memory) kept running - a partial failure invisible to the plugin, which
+  piped stderr to `/dev/null`. The binary now creates the parent directory
+  before opening the DB.
+- **Multi-instance port override finished** (`crates/aphrodite/src/config.rs`,
+  `plugins/aphrodite/__init__.py`) - `APHRODITE_CACHE_PORT`/
+  `APHRODITE_TOKEN_PORT` now actually override the TOML-configured listen
+  ports end-to-end, letting multiple concurrent Hermes Agent instances each
+  bind their own proxy pair without editing `aphrodite.toml`. The plugin's
+  health check reads the same env vars (previously hardcoded to 9797/9798),
+  and proxy startup stderr now logs to `~/.hermes/aphrodite/proxy-stderr.log`
+  instead of vanishing.
+- **Tracing subscriber initialized before config resolution**
+  (`crates/aphrodite/src/main.rs`) - found while verifying the port-override
+  fix above: `MultiConfig::resolve()` emits `tracing::info!`/`tracing::warn!`
+  diagnostics (mode fallback, port-override application, malformed
+  port-override warnings, timeout clamping), but the tracing subscriber
+  wasn't registered until after `resolve()` ran, so every one of those
+  diagnostics was silently dropped. A malformed `APHRODITE_CACHE_PORT` value
+  fell back to the default port with zero log output - indistinguishable
+  from not setting an override at all. Reordered startup so the subscriber
+  is live before any config resolution happens.
+
+### Verified
+
+- `cargo test --workspace`: 849+ passed, 0 failed.
+- Directly exercised both fixes against the built binary: deleted
+  `~/.hermes/aphrodite/` and confirmed auto-create + both proxies healthy
+  (twice, to confirm idempotency); ran two concurrent instances on default
+  vs. custom ports simultaneously with zero collisions; confirmed a
+  malformed port override now logs a `WARN` and a valid one logs an `INFO`
+  (neither did before the tracing-order fix).
+- Live end-to-end via `hermes -z` calling `aphrodite_test` (mode=full):
+  3/3 roundtrip checks passed, both proxies healthy, `proxy-stderr.log`
+  created and empty.
+
 ## v1.2.0 - Headroom Upstream Sync (2026-07-11)
 
 ### Headroom Fork Sync
