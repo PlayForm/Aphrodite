@@ -133,10 +133,10 @@ pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
-	let path = unsafe { CStr::from_ptr(config_path) }.to_string_lossy();
+	let path = unsafe { cstr(config_path) }.unwrap_or_default();
 	let mut state = AphroditeState::default();
 	if !path.is_empty() {
-		if let Ok(s) = std::fs::read_to_string(path.as_ref()) {
+		if let Ok(s) = std::fs::read_to_string(path.as_str()) {
 			if let Ok(t) = s.parse::<toml::Table>() {
 				if let Some(c) = t.get("compression").and_then(|v| v.as_table()) {
 					if let Some(v) = c.get("context_engine").and_then(|v| v.as_bool()) {
@@ -160,7 +160,7 @@ pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn aphrodite_destroy(handle:*const c_char) {
-	if let Ok(hid) = unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	if let Ok(hid) = unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		handles().as_mut().map(|m| m.remove(&hid));
 	}
 }
@@ -180,8 +180,8 @@ pub extern "C" fn aphrodite_classify(content:*const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn aphrodite_call_hook(hook:*const c_char, args:*const c_char) -> *mut c_char {
-	let name = unsafe { CStr::from_ptr(hook) }.to_string_lossy();
-	let args_str = unsafe { CStr::from_ptr(args) }.to_string_lossy();
+	let name = unsafe { cstr(hook) }.unwrap_or_default();
+	let args_str = unsafe { cstr(args) }.unwrap_or_default();
 	let a:serde_json::Value = match serde_json::from_str(&args_str) {
 		Ok(v) => v,
 		Err(e) => return to_json_error(&format!("invalid args: {}", e)),
@@ -203,8 +203,8 @@ pub extern "C" fn aphrodite_call_hook(hook:*const c_char, args:*const c_char) ->
 macro_rules! stateful {
     ($name:ident, |$s:ident, $($arg:ident : $ty:ty),*| $body:expr) => {
         #[no_mangle] pub extern "C" fn $name(handle: *const c_char, $($arg: *const c_char),*) -> *mut c_char {
-            let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() { Ok(id) => id, Err(_) => return to_json_error("invalid handle") };
-            $(let $arg = unsafe { CStr::from_ptr($arg) }.to_string_lossy();)*
+            let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() { Ok(id) => id, Err(_) => return to_json_error("invalid handle") };
+            $(let $arg = unsafe { cstr($arg) }.unwrap_or_default();)*
             match with_state(hid, |$s| $body) {
                 Ok(v) => to_json_ok(&v),
                 Err(e) => to_json_error(&e),
@@ -216,6 +216,9 @@ macro_rules! stateful {
 stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 	if content.is_empty() {
 		return serde_json::json!({"error":"empty"});
+	}
+	if content.len() > MAX_CONTENT {
+		return serde_json::json!({"error":"content exceeds 16MB limit"});
 	}
 	let ct = transforms::detect(&content);
 	let t = if hint.is_empty() || hint == "text" {
@@ -244,11 +247,11 @@ stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 // Override: retrieve returns raw content, not JSON-wrapped
 #[no_mangle]
 pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let hash = unsafe { CStr::from_ptr(hash) }.to_string_lossy();
+	let hash = unsafe { cstr(hash) }.unwrap_or_default();
 	let mut h = handles();
 	match h.as_mut().and_then(|m| m.get_mut(&hid)) {
 		Some(s) => {
@@ -262,16 +265,22 @@ pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -
 }
 
 stateful!(aphrodite_transform, |s, content:*const c_char, tool:*const c_char| {
+	if content.len() > MAX_CONTENT {
+		return serde_json::json!({"error":"content exceeds 16MB limit"});
+	}
 	hooks::transform_tool_result(s, &content, &tool)
 });
 
 stateful!(aphrodite_terminal, |s, content:*const c_char| {
+	if content.len() > MAX_CONTENT {
+		return serde_json::json!({"error":"content exceeds 16MB limit"});
+	}
 	hooks::transform_terminal_output(s, &content)
 });
 
 #[no_mangle]
 pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
@@ -283,11 +292,11 @@ pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let m = unsafe { CStr::from_ptr(mode) }.to_string_lossy();
+	let m = unsafe { cstr(mode) }.unwrap_or_default();
 	let h = handles();
 	match h.as_ref().and_then(|map| map.get(&hid)) {
 		Some(s) => {
@@ -310,7 +319,7 @@ pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) ->
 
 #[no_mangle]
 pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
@@ -330,14 +339,14 @@ pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 
 #[no_mangle]
 pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let p = unsafe { CStr::from_ptr(path) }.to_string_lossy();
+	let p = unsafe { cstr(path) }.unwrap_or_default();
 	match with_state(hid, |s| {
 		if !p.is_empty() {
-			if let Ok(t) = std::fs::read_to_string(p.as_ref()) {
+			if let Ok(t) = std::fs::read_to_string(p.as_str()) {
 				if let Ok(tbl) = t.parse::<toml::Table>() {
 					if let Some(c) = tbl.get("compression").and_then(|v| v.as_table()) {
 						if let Some(v) = c.get("context_engine").and_then(|v| v.as_bool()) {
@@ -356,11 +365,11 @@ pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> 
 
 #[no_mangle]
 pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let q = unsafe { CStr::from_ptr(query) }.to_string_lossy().to_lowercase();
+	let q = unsafe { cstr(query) }.unwrap_or_default().to_lowercase();
 	let h = handles();
 	match h.as_ref().and_then(|map| map.get(&hid)) {
 		Some(s) => {
@@ -375,11 +384,11 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 
 #[no_mangle]
 pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let k = unsafe { CStr::from_ptr(key) }.to_string_lossy();
+	let k = unsafe { cstr(key) }.unwrap_or_default();
 	let h = handles();
 	match h.as_ref().and_then(|map| map.get(&hid)) {
 		Some(s) => {
@@ -399,12 +408,12 @@ pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) 
 
 #[no_mangle]
 pub extern "C" fn aphrodite_config_set(handle:*const c_char, key:*const c_char, value:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let k = unsafe { CStr::from_ptr(key) }.to_string_lossy();
-	let v = unsafe { CStr::from_ptr(value) }.to_string_lossy();
+	let k = unsafe { cstr(key) }.unwrap_or_default();
+	let v = unsafe { cstr(value) }.unwrap_or_default();
 	match with_state(hid, |s| {
 		match k.as_ref() {
 			"model" => s.model = v.to_string(),
@@ -504,12 +513,12 @@ pub extern "C" fn aphrodite_dispatch(
 	hook_name:*const c_char,
 	args_json:*const c_char,
 ) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let name = unsafe { CStr::from_ptr(hook_name) }.to_string_lossy();
-	let args_str = unsafe { CStr::from_ptr(args_json) }.to_string_lossy();
+	let name = unsafe { cstr(hook_name) }.unwrap_or_default();
+	let args_str = unsafe { cstr(args_json) }.unwrap_or_default();
 
 	let args:serde_json::Value = match serde_json::from_str(&args_str) {
 		Ok(v) => v,
@@ -517,6 +526,9 @@ pub extern "C" fn aphrodite_dispatch(
 	};
 
 	let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+	if content.len() > MAX_CONTENT {
+		return to_json_error("content exceeds 16MB limit");
+	}
 	let tool = args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 
 	let result = match with_state(hid, |s| {
@@ -611,7 +623,7 @@ pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_c
 		Some(s) => s,
 		None => return to_json_error("null content"),
 	};
-	let q = unsafe { CStr::from_ptr(query) }.to_string_lossy();
+	let q = unsafe { cstr(query) }.unwrap_or_default();
 	let filtered = crate::resolve::filter_lines(&c, &q);
 	CString::new(filtered).unwrap().into_raw()
 }
@@ -619,11 +631,11 @@ pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_c
 /// Resolve hash with full recursive expansion - port of _resolve.py
 #[no_mangle]
 pub extern "C" fn aphrodite_resolve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
-	let hid = match unsafe { CStr::from_ptr(handle) }.to_string_lossy().parse::<usize>() {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let h = unsafe { CStr::from_ptr(hash) }.to_string_lossy();
+	let h = unsafe { cstr(hash) }.unwrap_or_default();
 	match with_state(hid, |s| {
 		match crate::resolve::expand(s, &h) {
 			Some(content) => serde_json::json!({"found":true,"content":content}),
@@ -642,7 +654,7 @@ pub extern "C" fn aphrodite_preview(content:*const c_char, ccr_type:*const c_cha
 		Some(s) => s,
 		None => return to_json_error("null content"),
 	};
-	let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
+	let t = unsafe { cstr(ccr_type) }.unwrap_or_default();
 	let preview = crate::build_preview(&t, &c);
 	CString::new(preview).unwrap().into_raw()
 }
@@ -654,7 +666,7 @@ pub extern "C" fn aphrodite_stage2(content:*const c_char, ccr_type:*const c_char
 		Some(s) => s,
 		None => return to_json_error("null content"),
 	};
-	let t = unsafe { CStr::from_ptr(ccr_type) }.to_string_lossy();
+	let t = unsafe { cstr(ccr_type) }.unwrap_or_default();
 	match crate::stage2::compress_stage2(&c, &t) {
 		Some(reduced) => CString::new(reduced).unwrap().into_raw(),
 		None => to_json_error("no reduction possible"),
@@ -668,7 +680,7 @@ pub extern "C" fn aphrodite_struct_extract(content:*const c_char, language:*cons
 		Some(s) => s,
 		None => return to_json_error("null content"),
 	};
-	let lang = unsafe { CStr::from_ptr(language) }.to_string_lossy();
+	let lang = unsafe { cstr(language) }.unwrap_or_default();
 	let result = crate::struct_extract::extract_code_structure(&c, &lang);
 	to_json_ok(&serde_json::json!(result))
 }
