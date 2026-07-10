@@ -268,7 +268,7 @@ impl MultiConfig {
 			anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml");
 		}
 		// Resolve listen: must parse or fail (no silent default when listen is
-		// explicitly set).  After parsing, override with env var if set — this
+		// explicitly set).  After parsing, override with env var if set - this
 		// lets multiple concurrent Hermes Agent instances each point at their
 		// own proxy pair without editing aphrodite.toml.
 		let listen:SocketAddr = match cfg.listen.as_deref() {
@@ -277,40 +277,10 @@ impl MultiConfig {
 		};
 		let listen = match (cfg.mode.as_deref(), cfg.name.as_deref()) {
 			(_, Some("cache")) | (Some("cache"), _) => {
-				if let Ok(p) = std::env::var("APHRODITE_CACHE_PORT") {
-					if let Ok(port) = p.parse::<u16>() {
-						let mut addr = listen;
-						addr.set_port(port);
-						tracing::info!(
-							"APHRODITE_CACHE_PORT={} overriding listen to {}",
-							port,
-							addr,
-						);
-						addr
-					} else {
-						listen
-					}
-				} else {
-					listen
-				}
+				Self::apply_port_override(listen, "APHRODITE_CACHE_PORT")
 			},
 			(_, Some("token")) | (Some("token"), _) => {
-				if let Ok(p) = std::env::var("APHRODITE_TOKEN_PORT") {
-					if let Ok(port) = p.parse::<u16>() {
-						let mut addr = listen;
-						addr.set_port(port);
-						tracing::info!(
-							"APHRODITE_TOKEN_PORT={} overriding listen to {}",
-							port,
-							addr,
-						);
-						addr
-					} else {
-						listen
-					}
-				} else {
-					listen
-				}
+				Self::apply_port_override(listen, "APHRODITE_TOKEN_PORT")
 			},
 			_ => listen,
 		};
