@@ -11,7 +11,7 @@
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
-    "prettier": "3.9.4"
+    "prettier": "3.9.5"
   },
   "engines": {
     "node": ">=20",
