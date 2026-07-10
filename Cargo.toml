@@ -11,7 +11,18 @@ repository = "https://github.com/PlayForm/Aphrodite"
 
 [workspace.dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.150", features = ["raw_value"] }
+# `preserve_order` and `arbitrary_precision` must match vendor/headroom's
+# workspace features exactly: headroom-core is a path dependency pulled into
+# this workspace, and Cargo unifies serde_json's feature set across the whole
+# build graph. Without preserve_order, headroom-core's smart_crusher anchor
+# matching silently diverges from Python's insertion-ordered dict repr
+# (BTreeMap sorts keys instead) - see vendor/headroom/Cargo.toml for the full
+# rationale.
+serde_json = { version = "1.0.150", features = [
+	"preserve_order",
+	"arbitrary_precision",
+	"raw_value",
+] }
 bytes = "1.12.0"
 thiserror = "2.0.18"
 tracing = "0.1.44"
