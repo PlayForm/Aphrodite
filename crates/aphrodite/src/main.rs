@@ -92,26 +92,23 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn run() -> anyhow::Result<()> {
-	// Try multi-proxy config first, fall back to CLI
+	// Try multi-proxy config first, fall back to CLI. `log_compact` is
+	// resolved WITHOUT touching `MultiConfig::resolve()` so the tracing
+	// subscriber can be initialized before that runs - `resolve()` emits
+	// `tracing::info!`/`tracing::warn!` diagnostics (mode fallback, port
+	// overrides, timeout clamping) that would otherwise fire against no
+	// registered subscriber and be silently dropped, defeating the whole
+	// point of adding them.
 	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
-	let (proxies, log_compact):(Vec<(String, Cli)>, bool) = if std::path::Path::new(&config_path).exists() {
+	let use_multi_config = std::path::Path::new(&config_path).exists();
+	let (multi_config, cli_fallback, log_compact) = if use_multi_config {
 		let config = MultiConfig::load(&config_path)?;
-		let proxies:Vec<(String, Cli)> = config
-			.proxies
-			.iter()
-			.map(|p| {
-				let cli = config.resolve(p)?;
-				let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
-				Ok((name, cli))
-			})
-			.collect::<anyhow::Result<Vec<_>>>()?;
 		let log_compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
-		(proxies, log_compact)
+		(Some(config), None, log_compact)
 	} else {
 		let cli = Cli::parse();
 		let log_compact = cli.log_compact || std::env::var("APHRODITE_LOG_COMPACT").is_ok();
-		let name = format!("{}", cli.listen);
-		(vec![(name, cli)], log_compact)
+		(None, Some(cli), log_compact)
 	};
 
 	let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -123,6 +120,22 @@ async fn run() -> anyhow::Result<()> {
 	} else {
 		subscriber.with(tracing_subscriber::fmt::layer()).try_init()?;
 	}
+
+	let proxies:Vec<(String, Cli)> = if let Some(config) = multi_config {
+		config
+			.proxies
+			.iter()
+			.map(|p| {
+				let cli = config.resolve(p)?;
+				let name = p.name.clone().unwrap_or_else(|| format!("{}", cli.listen));
+				Ok((name, cli))
+			})
+			.collect::<anyhow::Result<Vec<_>>>()?
+	} else {
+		let cli = cli_fallback.expect("cli_fallback set when use_multi_config is false");
+		let name = format!("{}", cli.listen);
+		vec![(name, cli)]
+	};
 
 	tracing::info!(
 		"aphrodite v{} ({}{}) • {} • {}",
