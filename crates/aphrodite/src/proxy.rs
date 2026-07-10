@@ -468,6 +468,20 @@ pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 			},
 			|p| p.clone(),
 		);
+			// Ensure parent directories exist before opening SQLite DB.
+			// Without this, a missing ~/.hermes/aphrodite/ directory causes
+			// the token proxy to fail silently at startup while the cache
+			// proxy continues running — a partial-failure that's invisible
+			// to the plugin because stderr is piped to DEVNULL.
+			if let Some(parent) = db_path.parent() {
+				std::fs::create_dir_all(parent).map_err(|e| {
+					anyhow::anyhow!(
+						"SQLite CCR: cannot create directory {}: {}",
+						parent.display(),
+						e
+					)
+				})?;
+			}
 			let store = SqliteCcrStore::open(&db_path, cli.ccr_ttl_seconds)
 				.map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
 			Some(Arc::new(store))
