@@ -345,4 +345,36 @@ impl MultiConfig {
 			},
 		})
 	}
+
+	/// Override `listen`'s port from the named env var, if set.
+	///
+	/// A missing env var is the common case and silently keeps `listen`
+	/// unchanged. A *present but malformed* value (non-numeric, or outside
+	/// the u16 port range) also keeps `listen` unchanged, but logs a
+	/// warning - silently ignoring a typo'd override left the operator with
+	/// no way to tell "my override didn't apply" from "I didn't set an
+	/// override", the same silent-failure class as the missing-CCR-
+	/// directory bug this override was added alongside.
+	fn apply_port_override(listen:SocketAddr, env_var:&str) -> SocketAddr {
+		match std::env::var(env_var) {
+			Ok(p) => match p.parse::<u16>() {
+				Ok(port) => {
+					let mut addr = listen;
+					addr.set_port(port);
+					tracing::info!("{}={} overriding listen to {}", env_var, port, addr);
+					addr
+				},
+				Err(_) => {
+					tracing::warn!(
+						"{}={:?} is not a valid port (1-65535); ignoring override, using {}",
+						env_var,
+						p,
+						listen,
+					);
+					listen
+				},
+			},
+			Err(_) => listen,
+		}
+	}
 }
