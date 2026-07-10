@@ -1,5 +1,54 @@
 # Changelog
 
+## v1.2.0 - Headroom Upstream Sync (2026-07-11)
+
+### Headroom Fork Sync
+
+`vendor/headroom` merged forward 313 upstream commits (`95b2333e` → `5e14b8c0`,
+2026-06-21 to 2026-07-10), bringing in CCR/TLS/output-shaping improvements while
+preserving every Aphrodite-specific customization. Full breakdown, including every
+silent merge regression found and fixed, in
+[`docs/HEADROOM-FORK-DIFF.md`](../docs/HEADROOM-FORK-DIFF.md#2026-07-11-merge-upstream-sync-to-5e14b8c0).
+
+Highlights:
+
+- CCR store TTL raised 300s → 1800s (session-scale); SQLite is now the default CCR
+  backend (was in-memory) - survives proxy worker restarts.
+- Additive `NODE_EXTRA_CA_CERTS` trust store (system roots + extra cert) instead of
+  outright replacement; new `HEADROOM_TLS_STRICT` toggle for corporate TLS-inspection
+  environments.
+- Output token reduction (`HEADROOM_OUTPUT_SHAPER`): proxy-side verbosity steering +
+  effort routing, learned-terseness mode, measured/estimated savings report.
+- `SearchCompressorConfig.group_by_file` grouped output (`rg --heading` style).
+- SmartCrusher `lossless_only` strict mode + `compaction_*` heuristic knobs;
+  `factor_out_constants` now fully wired end-to-end.
+- `headroom doctor`/`update`/`audit`/`output-savings` CLI subcommands restored.
+
+### Fix
+
+- Aphrodite's root `Cargo.toml` didn't request `serde_json/preserve_order`, so
+  `headroom-core` built through this workspace (a path dependency, unified feature
+  set) produced alphabetically-sorted JSON object keys instead of insertion order -
+  silently diverging from the Python dict-repr semantics SmartCrusher's anchor
+  matching relies on. Now matches `vendor/headroom`'s own workspace features.
+- ~15 silent merge regressions in `vendor/headroom` found via systematic post-merge
+  symbol-diffing against upstream: missing files still imported elsewhere, dropped
+  functions/constants still referenced, features wired everywhere except their final
+  consumption point, and stale test expectations left over from the fork's own
+  earlier commits. Full list in the fork-diff doc linked above.
+
+### Chore
+
+- `plugins/aphrodite` submodule bumped to `2.0.5` (type-hint cleanup, dead code
+  removal - no functional change).
+- CI hardening: pinned `github-push-action` to a specific SHA, macOS x86_64 runner
+  switched off the perpetually-queued `macos-13` host, crates.io publish pipeline now
+  publishes `aphrodite-headroom-core` before `aphrodite`/`aphrodite-hermes`.
+- `--allow-hidden` on `APHRODITE_API_KEY`/`APHRODITE_NOTIFY_KEY` CLI args so secrets
+  never leak into process listings or crash logs.
+- 16MB content-size guard added to the C ABI's `aphrodite_compress`/
+  `aphrodite_transform`/`aphrodite_terminal`/`aphrodite_dispatch` entry points.
+
 ## v1.1.0 - Configurable Proxy Ports (2026-07-03)
 
 ### Multi-Agent Port Configuration

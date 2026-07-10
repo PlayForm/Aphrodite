@@ -14,7 +14,7 @@
 > Sub-ms compress, 12,800× max ratio, 28-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.1.0-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/badge/release-v1.2.0-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![plugin](https://img.shields.io/badge/plugin-v2.0.5-purple)](plugins/aphrodite/plugin.yaml)
 [![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
@@ -259,7 +259,7 @@ aphrodite
 
 # Verify
 curl http://127.0.0.1:9798/health
-# -> {"status":"ok","version":"v1.1.0"}
+# -> {"status":"ok","version":"v1.2.0"}
 
 # Dev loop with auto-reload
 RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
