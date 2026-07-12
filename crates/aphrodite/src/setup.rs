@@ -309,11 +309,43 @@ fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
 
 	#[cfg(unix)]
 	std::os::unix::fs::symlink(&ctx.aphrodite_dir, &link)?;
-	#[cfg(not(unix))]
+	#[cfg(windows)]
+	{
+		// Real symlinks need elevated privileges on Windows; a directory
+		// junction doesn't. Try that first (mirrors Maintain/install.bat),
+		// falling back to a recursive copy if junctions are blocked too.
+		let status = Command::new("cmd")
+			.args(["/C", "mklink", "/J"])
+			.arg(&link)
+			.arg(&ctx.aphrodite_dir)
+			.status();
+		let junction_ok = matches!(status, Ok(s) if s.success());
+		if !junction_ok {
+			copy_dir_recursive(&ctx.aphrodite_dir, &link)?;
+		}
+	}
+	#[cfg(not(any(unix, windows)))]
 	{
 		let _ = (&ctx.aphrodite_dir, &link);
 	}
 	println!("symlinked plugin -> {}", link.display());
+	Ok(())
+}
+
+/// Recursively copy a directory tree - the Windows fallback when a junction
+/// can't be created (e.g. `mklink` disabled by policy).
+#[cfg(windows)]
+fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
+	fs::create_dir_all(dst)?;
+	for entry in fs::read_dir(src)? {
+		let entry = entry?;
+		let dest_path = dst.join(entry.file_name());
+		if entry.file_type()?.is_dir() {
+			copy_dir_recursive(&entry.path(), &dest_path)?;
+		} else {
+			fs::copy(entry.path(), &dest_path)?;
+		}
+	}
 	Ok(())
 }
 

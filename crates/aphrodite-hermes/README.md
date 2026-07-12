@@ -7,7 +7,7 @@ plugin system. It produces `libaphrodite_hermes.dylib` - loaded by the Python
 plugin to register tools, hooks, and skills with Hermes.
 
 [crates.io](https://crates.io/crates/aphrodite-hermes) ·
-[docs](https://github.com/PlayForm/Aphrodite)
+[docs](../../docs/README.md)
 
 ---
 
@@ -64,20 +64,28 @@ src/
 
 ## Tools
 
-| Tool                   | Dispatch target      |
-| :--------------------- | :------------------- |
-| `aphrodite_compress`   | `hooks::compress`    |
-| `aphrodite_retrieve`   | `hooks::retrieve`    |
-| `aphrodite_stats`      | `hooks::stats`       |
-| `aphrodite_catalog`    | `catalog::handler`   |
-| `aphrodite_search`     | `search::handler`    |
-| `aphrodite_diff`       | `diff::handler`      |
-| `aphrodite_files`      | `files::handler`     |
-| `aphrodite_test`       | `test::handler`      |
-| `aphrodite_rebuild`    | `rebuild::handler`   |
-| `aphrodite_reclassify` | `reclassify::handler`|
-| `aphrodite_prefetch`   | `prefetch::handler`  |
-| `context_engine_pre_llm`| `hooks::pre_llm`    |
+All 12 tools are registered as closures in one `tool_registry()` HashMap in
+`src/tools.rs` (not separate per-tool modules) - full schemas and handler
+behavior in [Tool Relay: Tools](../../docs/tool-relay/tools.md):
+
+| Tool                        |
+| :--------------------------- |
+| `aphrodite_compress`         |
+| `aphrodite_retrieve`         |
+| `aphrodite_stats`            |
+| `aphrodite_catalog`          |
+| `aphrodite_search`           |
+| `aphrodite_diff`             |
+| `aphrodite_files`            |
+| `aphrodite_test`             |
+| `aphrodite_rebuild`          |
+| `aphrodite_reclassify`       |
+| `aphrodite_prefetch`         |
+| `aphrodite_prefetch_status`  |
+
+`tool_registry()` also holds a 13th, internal-only entry -
+`context_engine_pre_llm` - the context engine's pre-LLM hook, not a
+Hermes-callable tool (it isn't in `plugin.yaml`'s `provides_tools`).
 
 ---
 
@@ -87,6 +95,15 @@ src/
 - `serde` / `serde_json` - JSON Schema + serialization
 
 ---
+
+## See Also
+
+- [Installing Aphrodite](../../docs/install/README.md) - which artifact you
+  need, per-platform install guides, troubleshooting
+- [Tool Relay: Tools](../../docs/tool-relay/tools.md) - full schema +
+  handler behavior for all 12 tools this crate dispatches
+- [Hermes Integration](../../docs/hermes-integration.md) - why a native
+  plugin sees things a generic HTTP proxy can't
 
 ## License
 

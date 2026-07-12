@@ -7,7 +7,7 @@ The core compression engine. Produces both the `aphrodite` binary (HTTP proxy on
 `:9797`/`:9798`) and `libaphrodite.dylib` (loaded by the Hermes plugin via C ABI).
 
 [crates.io](https://crates.io/crates/aphrodite) ·
-[docs](https://github.com/PlayForm/Aphrodite)
+[docs](../../docs/README.md)
 
 ---
 
@@ -101,6 +101,15 @@ aphrodite_hermes_get_version
 - `zstd` - Compression
 
 ---
+
+## See Also
+
+- [Installing Aphrodite](../../docs/install/README.md) - which artifact you
+  need, per-platform install guides, troubleshooting
+- [aphrodite.toml Configuration](../../docs/config/aphrodite-toml.md) - full
+  TOML schema this crate's `config.rs` deserializes
+- [Hermes Integration](../../docs/hermes-integration.md) - how this binary's
+  sibling dylib crate (`aphrodite-hermes`) plugs into Hermes Agent
 
 ## License
 
