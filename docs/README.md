@@ -8,6 +8,19 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 ## Index
 
+### Installation
+
+- [Installing Aphrodite](install/README.md) - which of the two build
+  artifacts (proxy binary vs. Hermes dylib) you need, and a decision tree
+  across the three supported install paths
+- [Windows Install](install/windows.md) - fast path with `download.ps1` /
+  `install.ps1` (native PowerShell, no `bash` needed), plus a fully manual
+  walkthrough
+- [macOS/Linux Install](install/macos-linux.md) - `download.sh`,
+  `aphrodite setup`, `Maintain/install.sh`, building from source
+- [Troubleshooting](install/troubleshooting.md) - proxy not auto-launching,
+  verifying the proxy without a full Hermes session, the two-config-files trap
+
 ### Aphrodite & Headroom
 
 - [Comparison: Aphrodite vs Headroom](APHRODITE-HEADROOM.md) - What Aphrodite
@@ -89,6 +102,12 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 - [Context Engine](plugin/context-engine.md) - AphroditeContextEngine: compress
   middle messages→CCR, protect head/tail, editing detection, orphan sweep.
   Threshold semantics (-1/0/>0), mutual exclusion, hooks, session lifecycle
+- [Hermes Integration](hermes-integration.md) - Narrative walkthrough of why
+  a native plugin sees things a generic HTTP proxy can't; proxy-vs-plugin
+  comparison table
+- [Hermes Tool Output Schemas](hermes-tool-output-schemas.md) - Every Hermes
+  tool's output shape, its classification type, and extraction pattern - the
+  classifier's playbook
 
 ### API
 
@@ -101,36 +120,25 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 - [CCR Endpoints](api/ccr-endpoints.md) - POST /ccr/create, GET /ccr/list,
   DELETE /ccr/:hash
 
-## Source of Truth
+### Roadmap & Examples
 
-All schemas, formats, and values are extracted verbatim from:
+- [Centers](centers.md) - Roadmap for AI-conversation memory annotations
+  traveling with CCR markers. Only the current design is implemented; later
+  stages are sketches, clearly marked as such
+- [CCR Examples: What the LLM Sees](examples/llm-view.md) - Illustrated
+  before/after scenarios (file read, build error, hint-driven compression,
+  multi-turn memory) with token-economics tables
 
-### Rust (core compression engine - binary + dylib)
+## Style Guide
 
-- `crates/aphrodite/src/proxy.rs` - proxy handler, compression pipeline, tool relay
-- `crates/aphrodite/src/resolve.rs` - CCR marker resolution (nested, recursive, cycle-safe)
-- `crates/aphrodite/src/stage2.rs` - Semantic reduction (JSON, build, diff, code)
-- `crates/aphrodite/src/struct_extract.rs` - Code structure extraction (Rust, Python, Go, JS/TS)
-- `crates/aphrodite/src/hooks.rs` - transform_tool_result, transform_terminal_output
-- `crates/aphrodite/src/state.rs` - Session state, inline store, LRU eviction
-- `crates/aphrodite/src/marker.rs` - CCR marker generation, parsing
-- `crates/aphrodite/src/catalog.rs` - Full catalog with by-type grouping
-- `crates/aphrodite/src/session.rs` - Session lifecycle, turn tracking
-- `crates/aphrodite/src/prefetch.rs` - Background file loading
-- `crates/aphrodite/src/config_loader.rs` - TOML config with env override
-- `crates/aphrodite/src/lib.rs` - 17 C ABI functions for dylib loading
-- `crates/aphrodite-hermes/src/` - Hermes integration: tools, schemas, skills
-- `vendor/headroom/crates/headroom-core/src/` - Compression engine (PlayForm fork)
+Every doc in this tree follows one style, the same one this page and the
+root `README.md` use:
 
-### Python (thin loader - Hermes integration)
-
-- `plugins/aphrodite/__init__.py` - Thin loader: dylib loading, hook/tool registration
-
-## Conventions
-
-- Every file includes "Source of truth:" pointing to the specific file and line
-  number
-- Every file includes "Origin:" explaining the design rationale
-- Schemas use tables, not prose
-- No placeholder content - every schema is verified against the actual source
-  code
+| Rule | What it means |
+| --- | --- |
+| Explain, then detail | Open with one or two plain sentences on what the thing is and why it exists, then drop into tables/code |
+| Tables over prose | Fields, flags, options, comparisons - anything with more than two rows of structured data - are a table, not a bulleted wall of text |
+| No file/line citations | Docs describe behavior directly; they don't cite exact source files or line numbers as proof - accuracy is a writing standard, not a footnote |
+| No placeholder content | If a documented setting or feature isn't confirmed to do anything, the doc says so plainly instead of presenting it as working |
+| Minimal external links | Link out only when the reader needs to click through to do something (download a release, read an upstream project's own docs) - not for attribution or "see also" padding |
+| Roadmap ideas are labeled | Forward-looking or unimplemented designs (see [Centers](centers.md)) say clearly which parts are shipped and which are sketches |

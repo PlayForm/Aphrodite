@@ -1,15 +1,11 @@
 # Plugin Hooks
 
-Origin: The aphrodite Python plugin (thin loader) delegates to the Rust dylib
-(libaphrodite.dylib) for all compression logic. Hooks registered in plugin.yaml
-route through the dylib's C ABI functions.
-
-Source of truth: `crates/aphrodite/src/hooks.rs`, `crates/aphrodite/src/lib.rs`,
-`plugins/aphrodite/plugin.yaml`, `plugins/aphrodite/__init__.py`
+The aphrodite Python plugin is a thin loader that delegates to the Rust dylib
+(`libaphrodite.dylib`) for all compression logic. Hooks registered in
+`plugin.yaml` route through the dylib's C ABI functions to five hook handlers
+covering session start, tool results, terminal output, and LLM calls.
 
 ## Hook Registration
-
-From `plugin.yaml`:
 
 ```yaml
 provides_hooks:
@@ -68,7 +64,7 @@ Not directly implemented as a hook handler - instead,
 `_inject_session_instruction()` fires on the _first_ `pre_llm_call` invocation
 (guarded by `_session_instruction_injected` flag).
 
-### Injected Message (Line 115)
+### Injected Message
 
 ```
 [APHRODITE] v{PLUGIN_VERSION} active.
@@ -83,7 +79,7 @@ Ephemeral: true - not persisted in conversation.
 
 ## 2. transform_tool_result
 
-### Signature (Line 235)
+### Signature
 
 ```python
 def _transform_tool_result(
@@ -104,7 +100,7 @@ def _transform_tool_result(
 | Result > MAX_REQUEST_BODY_SIZE | Above 100MB guard             |
 | Existing CCR marker in result  | Already compressed            |
 
-### Skip Set (Lines 271-285)
+### Skip Set
 
 **When token proxy alive:**
 
@@ -124,7 +120,7 @@ _ESSENTIAL_TOOLS | {"execute_code", "patch", "write_file", "search_files", "todo
 
 More tools pass through raw to reduce cache proxy load on frequent operations.
 
-### Compression Threshold (Line 293)
+### Compression Threshold
 
 ```python
 threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cache_alive else INLINE_THRESHOLD
@@ -136,7 +132,7 @@ threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cac
 | TOOL_THRESHOLD_CACHE | 8,192   | Only cache proxy alive    |
 | INLINE_THRESHOLD     | 4,096   | No proxy, inline fallback |
 
-### Compression Priority (Lines 328-388)
+### Compression Priority
 
 1. **Proxy compression**: token (:9798) preferred, cache (:9797) fallback
 2. **Inline fallback**: Python-side inline store
@@ -144,12 +140,14 @@ threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cac
 
 ### Metadata Extraction
 
-`_extract_tool_metadata(tool_name, args, result)` at line 148 extracts:
+`_extract_tool_metadata(tool_name, args, result)` extracts:
 
-- **read_file**: `fn`, `ext`, `lines`, `names` (def/class/fn/struct/trait names)
-- **search_files**: `q` (pattern), `files` (count)
-- **terminal**: `exit` (exit code), `last` (last line)
-- Returns `None` for other tools
+| Tool           | Extracted fields                                          |
+| -------------- | ----------------------------------------------------------- |
+| `read_file`    | `fn`, `ext`, `lines`, `names` (def/class/fn/struct/trait names) |
+| `search_files` | `q` (pattern), `files` (count)                              |
+| `terminal`     | `exit` (exit code), `last` (last line)                      |
+| Other tools    | Returns `None`                                              |
 
 ### Marker Type
 
@@ -162,7 +160,7 @@ markers.
 
 ## 3. pre_llm_call
 
-### Signature (Line 514)
+### Signature
 
 ```python
 def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
@@ -201,7 +199,7 @@ def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
 | `compact` | By-type summary: `{N} items ({size} saved) - {n} [code_rust] {n} [error]...` |
 | `tool`    | Minimal: `{N} items compressed`. Early-returns when no markers               |
 
-### Read-Intent Detection (Line 944)
+### Read-Intent Detection
 
 ```python
 _READ_KEYWORDS = {"read", "show", "view", "get", "cat", "display", "retrieve",
@@ -212,26 +210,27 @@ _READ_KEYWORDS = {"read", "show", "view", "get", "cat", "display", "retrieve",
 If user message contains any keyword + markers exist → inject recent CCR hashes
 for direct retrieval.
 
-### Headroom Feedback Loop (Line 554)
+### Headroom Feedback Loop
 
 ```
 pre_llm_hook → query proxy /stats → read fill_pct →
   set x-headroom-budget on outbound headers → proxy uses budget to adjust thresholds
 
-Fill calculation (proxy.rs:319):
+Fill calculation:
   ratio_ema = compression_ratio_ema
   pct = 100 - (ratio_ema / 20), clamped [1..99]
-
-Budget mapping (proxy.rs:1358):
-  < 25  → 0.25× (aggressive compression)
-  < 50  → 0.50×
-  < 75  → 0.75×
-  ≥ 75  → 1.00× (default)
 ```
+
+| Fill (`pct`) | Budget multiplier             |
+| ------------ | ------------------------------ |
+| < 25         | 0.25× (aggressive compression) |
+| < 50         | 0.50×                          |
+| < 75         | 0.75×                          |
+| ≥ 75         | 1.00× (default)                |
 
 ## 4. transform_terminal_output
 
-### Signature (Line 1026)
+### Signature
 
 ```python
 def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
@@ -243,7 +242,7 @@ def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
 TERMINAL_THRESHOLD = 2_048  # from APHRODITE_TERMINAL_THRESHOLD env var
 ```
 
-### Build Output Detection (Line 1061)
+### Build Output Detection
 
 If first line starts with `Compiling`, `Finished`, `error:`, `warning:`,
 `Running`, `PASSED`, `FAILED`, `test result:`:
@@ -266,7 +265,7 @@ Same compression priority as tool results: proxy → inline → passthrough.
 
 ## 5. post_llm_call
 
-### Signature (Line 433)
+### Signature
 
 ```python
 def _store_conversation_turn(conversation_history=None, assistant_response=None, turn_id=0, **kwargs):

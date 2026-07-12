@@ -1,11 +1,8 @@
 # Metrics Endpoint
 
-Origin: Prometheus-compatible metrics exposition for monitoring and
-dashboarding. Always available on loopback without authentication (intentional
-for local-only deployments).
-
-Source of truth: `crates/aphrodite/src/main.rs` `/metrics` handler (lines
-251-325)
+Exposes Prometheus-compatible metrics for monitoring and dashboarding. It's
+always available on loopback without authentication, which is intentional for
+local-only deployments.
 
 ## Endpoint
 
@@ -79,12 +76,10 @@ aphrodite_latency_seconds_count               total count
 aphrodite_latency_seconds_sum                 total seconds (float)
 ```
 
-Source: `proxy.rs:latency_buckets` - 5-element AtomicU64 array with ranges <1ms,
-<10ms, <100ms, <1s, <10s.
+The buckets are backed by a 5-element atomic counter array covering ranges
+<1ms, <10ms, <100ms, <1s, <10s.
 
 ## Build Logic
-
-From main.rs:254-325:
 
 ```rust
 let stats = s.stats_json();
@@ -93,8 +88,8 @@ let mut out = String::new();
 return (StatusCode::OK, [(CONTENT_TYPE, "text/plain; version=0.0.4")], out)
 ```
 
-Values from `AppState` AtomicU64 counters read with `Ordering::Relaxed` - no
-locking.
+Values come from atomic counters read with relaxed ordering, so there's no
+locking involved.
 
 ## Security Note
 

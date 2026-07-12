@@ -1,12 +1,9 @@
 # Callbacks
 
-Origin: Tool relay and CCR create operations can optionally notify the Hermes
-agent via HTTP callback when done, enabling asynchronous patterns. The callback
-fires on the proxy's TaskTracker, ensuring graceful shutdown waits for in-flight
-callbacks.
-
-Source of truth: `crates/aphrodite/src/proxy.rs:handle_tool_relay()` (line
-1522), `handle_ccr_create()` (line 1659)
+Tool relay and CCR create operations can optionally notify the Hermes agent
+via HTTP callback when done, enabling asynchronous patterns. Callbacks run on
+the proxy's task tracker, so graceful shutdown always waits for any in-flight
+callback to finish before the process exits.
 
 ## Architecture
 
@@ -70,8 +67,7 @@ Content-Type: application/json
 
 ## CCR Create Notification
 
-Fires when `handle_ccr_create` creates a new entry AND `notify_url` is
-configured.
+Fires when a new CCR entry is created and a notification URL is configured.
 
 ### Notification Payload
 
@@ -93,69 +89,35 @@ Content-Type: application/json
 
 ### SSRF Protection
 
-From `proxy.rs:1522`:
-
-```rust
-let parsed_url = match url::Url::parse(cb) {
-    Ok(u) if u.scheme() == "https" => u,
-    _ => {
-        tracing::warn!("callback_url rejected: only https scheme allowed");
-        return Json(ToolRelayResponse { success: true, result: None, error: None, async_call: false });
-    }
-};
-```
-
-Only `https://` URLs accepted. HTTP, file, and other schemes silently dropped.
+Only `https://` URLs are accepted for `callback_url`; HTTP, file, and other
+schemes are rejected and the callback is silently dropped (a warning is
+logged, and the proxy still returns a normal synchronous-style response).
 
 ### Authentication
 
-```rust
-if let Some(k) = &key {
-    req = req.header("Authorization", format!("Bearer {k}"));
-}
-```
-
-Both callback and notification use Bearer token auth via `notify_key`.
+Both the callback and the notification request are sent with Bearer token
+auth using `notify_key`, when one is configured.
 
 ## Timeouts
 
-| Operation         | Timeout   | Source        |
-| ----------------- | --------- | ------------- |
-| Callback POST     | 5 seconds | proxy.rs:1542 |
-| Notification POST | 5 seconds | proxy.rs:1680 |
+| Operation         | Timeout   |
+| ------------------ | ----------- |
+| Callback POST     | 5 seconds |
+| Notification POST | 5 seconds |
 
-No retries - fire-and-forget. Success/failure tracked via `notify_success` /
-`notify_failure` counters.
+There are no retries - delivery is fire-and-forget. Success and failure are
+tracked via the `notify_success` / `notify_failure` counters.
 
 ## Task Tracker
 
-All callback/notification tasks spawn on `task_tracker`:
-
-```rust
-let tracker = state.task_tracker.clone();
-tracker.spawn(async move {
-    let result = execute_tool_relay(&state, &tool, &params).await;
-    let _ = state.client
-        .post(&cb)
-        .json(&result)
-        .timeout(Duration::from_secs(5))
-        .send()
-        .await;
-});
-```
-
-On shutdown:
-
-```rust
-task_tracker.close();    // stop accepting new tasks
-task_tracker.wait().await;  // wait for in-flight tasks
-```
-
-Ensures no callback is lost during graceful shutdown.
+All callback and notification requests are spawned as tracked background
+tasks. On shutdown, the tracker stops accepting new tasks and then waits for
+any in-flight callback or notification to complete, ensuring none are lost
+during a graceful shutdown.
 
 ## Configuration
 
-From `config.rs:ProxyConfig`:
+Callbacks are configured per-proxy in `aphrodite.toml`:
 
 ```toml
 [[proxies]]
@@ -163,15 +125,16 @@ notify_url = "https://hermes.internal/aphrodite/callback"
 notify_key = "hermes-api-key-123"
 ```
 
-Both must be set for callbacks to fire. If `notify_url` is `None` (default), no
-callbacks are sent.
+Both `notify_url` and `notify_key` must be set for callbacks to fire. If
+`notify_url` is unset (the default), no callbacks are sent.
 
 ## Metrics
 
 | Counter          | Description                                                        |
-| ---------------- | ------------------------------------------------------------------ |
-| `notify_success` | Incremented when callback/notification POST returns success status |
-| `notify_failure` | Incremented on timeout, connection error, or non-success status    |
+| ------------------ | --------------------------------------------------------------------- |
+| `notify_success` | Incremented when a callback/notification POST returns success status |
+| `notify_failure` | Incremented on timeout, connection error, or non-success status      |
 
 Exposed at `/metrics` as `aphrodite_notify_success` and
-`aphrodite_notify_failure`.
+`aphrodite_notify_failure`. See [Prometheus Metrics](../metrics/prometheus.md)
+for the full metrics reference.

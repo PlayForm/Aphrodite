@@ -1,10 +1,7 @@
 # CCR Management Endpoints
 
-Origin: Programmatic CCR create, list, and delete - allowing the Python plugin,
-Hermes agent, and external tools to manage compressed content entries directly.
-
-Source of truth: `crates/aphrodite/src/proxy.rs:handle_ccr_create()` (line
-1635), `handle_ccr_list()` (line 1751), `handle_ccr_delete()` (line 1771)
+These endpoints let the Python plugin, Hermes agent, and external tools
+create, list, and delete compressed content entries directly.
 
 ## POST /ccr/create
 
@@ -63,8 +60,11 @@ If `notify_url` configured: async POST with:
 }
 ```
 
-Auth: Bearer token via `notify_key`. Timeout: 5s. Tracked via
-`notify_success`/`notify_failure`.
+| Property | Value                                          |
+| -------- | ----------------------------------------------- |
+| Auth     | Bearer token via `notify_key`                  |
+| Timeout  | 5s                                              |
+| Tracking | `notify_success` / `notify_failure` counters   |
 
 ### Errors
 
@@ -196,28 +196,11 @@ pub async fn handle_ccr_delete(
 
 ## Python Plugin Usage
 
-The Python plugin uses these endpoints extensively:
+The Python plugin uses `POST /ccr/create` extensively:
 
-### \_compress_via_proxy (\_marker/marker.py:228)
-
-```
-POST /ccr/create with Content-Type: application/octet-stream
-```
-
-### \_compress_handler (\_tools.py:98)
-
-```
-POST /ccr/create → get hash → mirror in inline store
-```
-
-### \_store_conversation_turn (\_hooks/transform.py:476)
-
-```
-POST /ccr/create with turn data → store in _conv_index
-```
-
-### Context engine (\_engine.py:210)
-
-```
-POST /ccr/create with packed messages → get hash → build marker
-```
+| Caller                     | Usage                                                       |
+| -------------------------- | ------------------------------------------------------------ |
+| `_compress_via_proxy`      | Sends `Content-Type: application/octet-stream`              |
+| `_compress_handler`        | Gets a hash back and mirrors it in the inline store          |
+| `_store_conversation_turn` | Sends turn data and stores the result in `_conv_index`       |
+| Context engine             | Sends packed messages, gets a hash, and builds a marker      |

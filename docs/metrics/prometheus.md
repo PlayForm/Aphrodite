@@ -1,12 +1,7 @@
 # Prometheus Metrics
 
-Origin: All proxy operations expose counters, gauges, and histograms at
-`/metrics` in Prometheus text format for monitoring, alerting, and dashboard
-visualization.
-
-Source of truth: `crates/aphrodite/src/main.rs` `/metrics` handler (lines
-251-325), `crates/aphrodite/src/proxy.rs:AppState` fields (lines 117-196),
-`stats_json()` (line 199)
+All proxy operations expose counters, gauges, and histograms at `/metrics` in
+Prometheus text format for monitoring, alerting, and dashboard visualization.
 
 ## Endpoint
 
@@ -23,20 +18,20 @@ or reverse-proxy auth layer recommended for production.
 ### Request Counters
 
 | Metric                          | Type    | Labels               | Description                          |
-| ------------------------------- | ------- | -------------------- | ------------------------------------ |
+| ---------------------------------- | --------- | ----------------------- | ---------------------------------------- |
 | `aphrodite_requests_total`      | counter | `mode` (cache/token) | Total requests received              |
 | `aphrodite_requests_compressed` | counter | `mode` (cache/token) | Requests that had content compressed |
 
 ### Token Savings
 
 | Metric                   | Type    | Labels | Description                        |
-| ------------------------ | ------- | ------ | ---------------------------------- |
+| --------------------------- | --------- | -------- | -------------------------------------- |
 | `aphrodite_tokens_saved` | counter | -      | Total tokens saved via compression |
 
 ### CCR Operations
 
 | Metric                        | Type    | Labels | Description                  |
-| ----------------------------- | ------- | ------ | ---------------------------- |
+| -------------------------------- | --------- | -------- | -------------------------------- |
 | `aphrodite_ccr_hits`          | counter | -      | CCR cache hits               |
 | `aphrodite_ccr_misses`        | counter | -      | CCR cache misses             |
 | `aphrodite_ccr_created`       | counter | -      | New CCR entries created      |
@@ -46,7 +41,7 @@ or reverse-proxy auth layer recommended for production.
 ### Tool Relay
 
 | Metric                         | Type    | Labels | Description                  |
-| ------------------------------ | ------- | ------ | ---------------------------- |
+| --------------------------------- | --------- | -------- | -------------------------------- |
 | `aphrodite_tool_relay_calls`   | counter | -      | Total tool relay invocations |
 | `aphrodite_tool_relay_success` | counter | -      | Successful tool executions   |
 | `aphrodite_tool_relay_failure` | counter | -      | Failed tool executions       |
@@ -54,42 +49,44 @@ or reverse-proxy auth layer recommended for production.
 ### Response Cache
 
 | Metric                   | Type    | Labels | Description               |
-| ------------------------ | ------- | ------ | ------------------------- |
+| --------------------------- | --------- | -------- | --------------------------- |
 | `aphrodite_cache_hits`   | counter | -      | LLM response cache hits   |
 | `aphrodite_cache_misses` | counter | -      | LLM response cache misses |
 
 ### Inline CCR
 
 | Metric                        | Type    | Labels | Description            |
-| ----------------------------- | ------- | ------ | ---------------------- |
+| -------------------------------- | --------- | -------- | ------------------------ |
 | `aphrodite_inline_ccr_hits`   | counter | -      | Inline LruCache hits   |
 | `aphrodite_inline_ccr_misses` | counter | -      | Inline LruCache misses |
 
 ### Notification Callbacks
 
 | Metric                     | Type    | Labels | Description                       |
-| -------------------------- | ------- | ------ | --------------------------------- |
+| ----------------------------- | --------- | -------- | ------------------------------------ |
 | `aphrodite_notify_success` | counter | -      | Successful callback notifications |
 | `aphrodite_notify_failure` | counter | -      | Failed callback notifications     |
+
+See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 
 ### Upstream Errors
 
 | Metric                              | Type    | Labels           | Description                   |
-| ----------------------------------- | ------- | ---------------- | ----------------------------- |
+| --------------------------------------- | --------- | ------------------ | ---------------------------------- |
 | `aphrodite_upstream_errors_total`   | counter | `code` (4xx/5xx) | Upstream HTTP error responses |
 | `aphrodite_upstream_timeouts_total` | counter | -                | Upstream connection timeouts  |
 
 ### Body Bytes
 
 | Metric                                | Type    | Labels | Description                       |
-| ------------------------------------- | ------- | ------ | --------------------------------- |
+| ------------------------------------------ | --------- | -------- | -------------------------------------- |
 | `aphrodite_request_body_bytes_total`  | counter | -      | Total request body bytes received |
 | `aphrodite_response_body_bytes_total` | counter | -      | Total response body bytes sent    |
 
 ### Latency
 
 | Metric                                   | Type      | Labels                         | Description                             |
-| ---------------------------------------- | --------- | ------------------------------ | --------------------------------------- |
+| --------------------------------------------- | ----------- | --------------------------------- | ------------------------------------------ |
 | `aphrodite_latency_seconds`              | histogram | `le` (0.001/0.01/0.1/1.0/10.0) | End-to-end request latency distribution |
 | `aphrodite_latency_seconds_count`        | counter   | -                              | Total latency observations              |
 | `aphrodite_latency_seconds_sum`          | counter   | -                              | Total latency in seconds                |
@@ -98,41 +95,23 @@ or reverse-proxy auth layer recommended for production.
 ### Compression Ratio
 
 | Metric                            | Type  | Labels | Description                                     |
-| --------------------------------- | ----- | ------ | ----------------------------------------------- |
+| -------------------------------------- | ------- | -------- | ---------------------------------------------------- |
 | `aphrodite_compression_ratio_ema` | gauge | -      | Exponential moving average of compression ratio |
 
 ## Latency Bucket Boundaries
 
-From `proxy.rs:AppState` (line 144):
-
-```rust
-pub latency_buckets: [AtomicU64; 5],
-```
+Latency is tracked in 5 fixed buckets, each holding a cumulative count:
 
 | Bucket Index | le value | Range        |
-| ------------ | -------- | ------------ |
+| -------------- | ---------- | -------------- |
 | 0            | 0.001    | < 1ms        |
 | 1            | 0.01     | 1ms - 10ms   |
 | 2            | 0.1      | 10ms - 100ms |
 | 3            | 1.0      | 100ms - 1s   |
 | 4            | 10.0     | 1s - 10s     |
 
-Buckets are cumulative in Prometheus output (line 277):
-
-```rust
-let mut total_count: u64 = 0;
-for (i, v) in buckets.iter().enumerate() {
-    total_count += count;
-    out.push_str(&format!("...{{le=\"{le}\"}} {total_count}\n"));
-}
-```
-
-## metrics_handler Code Location
-
-`main.rs` lines 251-325 - builds Prometheus text from `stats_json()` values.
-
-Internal: `stats_json()` at `proxy.rs:199` - returns the same JSON used by
-`/stats` endpoint.
+Buckets are cumulative in the Prometheus output, as required by the format:
+each bucket's count includes all observations from lower buckets.
 
 ## Example Output
 
@@ -172,7 +151,8 @@ aphrodite_upstream_latency_seconds_sum 180.000000
 
 ## stats_json() Schema
 
-Full JSON schema from `proxy.rs:stats_json()` (line 199):
+`/metrics` is built from the same underlying stats as `/stats`. Full JSON
+schema:
 
 ```json
 {
@@ -215,11 +195,11 @@ Full JSON schema from `proxy.rs:stats_json()` (line 199):
 
 ## Endpoint: /stats
 
-Returns `stats_json()` directly as JSON. Loopback only.
+Returns the JSON above directly. Loopback only.
 
 ## Endpoint: /stats/db
 
-Returns `ccr.stats_db()` - only available for SQLite backend:
+Returns database-level stats, only available for the SQLite backend:
 
 ```json
 {

@@ -1,12 +1,9 @@
 # Proxy Handlers
 
-Origin: Aphrodite exposes HTTP endpoints for proxying LLM API requests, managing
-CCR entries, executing tool relay calls, and health checks.
+Aphrodite exposes HTTP endpoints for proxying LLM API requests, managing CCR
+entries, executing tool relay calls, and health checks.
 
-Source of truth: `crates/aphrodite/src/proxy.rs` (lines 563, 1497, 1635, 1751,
-1771, 1796), `crates/aphrodite/src/retrieve.rs` (line 33)
-
-## proxy_handler (line 563)
+## proxy_handler
 
 Catch-all handler. Forwards any request to the upstream LLM API.
 
@@ -16,7 +13,7 @@ Catch-all handler. Forwards any request to the upstream LLM API.
 ANY /{*path}  (e.g., POST /v1/chat/completions)
 ```
 
-Registered at `main.rs:349` as fallback route.
+Registered as the fallback route.
 
 ### Signature
 
@@ -61,22 +58,24 @@ pub async fn proxy_handler(
 ### Response Headers
 
 | Header                   | Value                           | When                                 |
-| ------------------------ | ------------------------------- | ------------------------------------ |
-| `Content-Type`           | application/json; charset=utf-8 | Always                               |
-| `X-Aphrodite-Cache`      | HIT or MISS                     | Chat Completions                     |
-| `X-Aphrodite-Compressed` | true                            | When compression occurred            |
-| `X-Aphrodite-Fill-Pct`   | float (0.0-99.0)                | Chat Completions (from fill_pct/100) |
+| ------------------------ | -------------------------------- | ------------------------------------- |
+| `Content-Type`           | application/json; charset=utf-8  | Always                                 |
+| `X-Aphrodite-Cache`      | HIT or MISS                      | Chat Completions                       |
+| `X-Aphrodite-Compressed` | true                              | When compression occurred              |
+| `X-Aphrodite-Fill-Pct`   | float (0.0-99.0)                  | Chat Completions (from fill_pct/100)   |
 
 ### Forwarded Headers
 
-Strip before forwarding:
+Stripped before forwarding:
 
-- `host`
-- `authorization` (replaced with configured API key)
-- `content-length` (recalculated from body)
-- `x-aphrodite-*` (internal)
+| Header               | Reason                              |
+| --------------------- | -------------------------------------- |
+| `host`                 |                                          |
+| `authorization`        | Replaced with configured API key         |
+| `content-length`       | Recalculated from body                   |
+| `x-aphrodite-*`        | Internal                                 |
 
-## handle_tool_relay (line 1497)
+## handle_tool_relay
 
 Executes aphrodite tools (retrieve, compress, list) with optional async
 callback.
@@ -86,8 +85,6 @@ callback.
 ```
 POST /tool/relay
 ```
-
-Registered at `main.rs:333`.
 
 ### Request
 
@@ -112,9 +109,11 @@ Registered at `main.rs:333`.
 
 ### Tools Handled
 
-- `aphrodite_retrieve`: inline_ccr → CCR store
-- `aphrodite_compress`: inline (<256B) or CCR store
-- `aphrodite_list`: ccr.len()
+| Tool                    | Behavior                            |
+| ------------------------ | -------------------------------------- |
+| `aphrodite_retrieve`      | inline_ccr → CCR store                  |
+| `aphrodite_compress`      | inline (<256B) or CCR store              |
+| `aphrodite_list`          | ccr.len()                                |
 
 ### Validation
 
@@ -133,7 +132,7 @@ When `callback_url` is provided:
 
 Callback uses Bearer token via `notify_key` (from config).
 
-## handle_ccr_create (line 1635)
+## handle_ccr_create
 
 Programmatic CCR entry creation. Accepts JSON or raw octet-stream.
 
@@ -142,8 +141,6 @@ Programmatic CCR entry creation. Accepts JSON or raw octet-stream.
 ```
 POST /ccr/create
 ```
-
-Registered at `main.rs:334`.
 
 ### JSON Mode (Content-Type: application/json)
 
@@ -188,7 +185,7 @@ If `notify_url` configured: fires async POST with `CcrNotification`:
 
 Auth: Bearer token via `notify_key`. Timeout: 5s.
 
-## handle_ccr_list (line 1751)
+## handle_ccr_list
 
 List CCR entry count.
 
@@ -208,7 +205,7 @@ GET /ccr/list
 }
 ```
 
-## handle_ccr_delete (line 1771)
+## handle_ccr_delete
 
 Delete a CCR entry by hash.
 
@@ -236,7 +233,7 @@ DELETE /ccr/{hash}
 { "error": "CCR not enabled" }
 ```
 
-## health_check (line 1796)
+## health_check
 
 Health check endpoint. Always returns 200 - capability state conveyed in body.
 
@@ -246,7 +243,7 @@ Health check endpoint. Always returns 200 - capability state conveyed in body.
 GET /health
 ```
 
-Registered at `main.rs:357`. Public (no loopback enforcement).
+Public (no loopback enforcement).
 
 ### Response
 
@@ -260,7 +257,7 @@ Registered at `main.rs:357`. Public (no loopback enforcement).
 }
 ```
 
-## handle_retrieve (retrieve.rs:33)
+## handle_retrieve
 
 Resolve CCR markers to original content.
 
@@ -269,8 +266,6 @@ Resolve CCR markers to original content.
 ```
 POST /retrieve
 ```
-
-Registered at `main.rs:332`.
 
 ### Request
 

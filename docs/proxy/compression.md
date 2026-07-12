@@ -1,13 +1,9 @@
 # Compression Pipeline
 
-Origin: The proxy must decide whether to compress each piece of Chat Completions
-response content, and if so, how. The pipeline detects content type, computes
-adaptive thresholds, checks cache, compresses with zstd, computes rolling EMA
-for auto-tuning, and tracks token savings.
-
-Source of truth: `crates/aphrodite/src/proxy.rs:compress_chat_completion()`
-(line 1348), `detect_content_type()` (line 841), `threshold_for()` (line 273),
-`update_compression_ratio()` (line 303), `smart_marker()` (line 1342)
+The proxy decides whether to compress each piece of Chat Completions response
+content, and if so, how. The pipeline detects content type, computes adaptive
+thresholds, checks cache, compresses with zstd, computes a rolling EMA for
+auto-tuning, and tracks token savings.
 
 ## Full Pipeline
 
@@ -79,9 +75,8 @@ Source of truth: `crates/aphrodite/src/proxy.rs:compress_chat_completion()`
 
 ## 1. Content Type Detection
 
-`detect_content_type(content: &str) -> &'static str` (proxy.rs:841)
-
-Full type taxonomy documented in
+`detect_content_type(content: &str) -> &'static str` classifies the content
+into one of the supported types. The full type taxonomy is documented in
 [../ccr/content-types.md](../ccr/content-types.md).
 
 ## 2. Threshold Computation
@@ -119,7 +114,7 @@ fn threshold_for(&self, ct: &str) -> usize {
 
 ### Headroom Budget Adjustment
 
-From `x-headroom-budget` header (proxy.rs:1358):
+The `x-headroom-budget` header adjusts the threshold further:
 
 ```rust
 let budget_mult = match budget_value {
@@ -145,51 +140,27 @@ pub fn compute_key(payload: &[u8]) -> String {
 ```
 
 BLAKE3, first 24 hex chars (96 bits). Deterministic - same content always yields
-same hash.
-
-From `vendor/headroom/crates/headroom-core/src/ccr/mod.rs:86`.
+the same hash.
 
 ## 4. CCR Cache
 
-### Hit Path
-
-- `ccr_hits` incremented
-- Marker generated, content replaced
-- No store operation
-
-### Miss Path
-
-- `ccr_misses` incremented
-- `ccr.put(hash, content)` - stored
-- `ccr_created` incremented
-- `tokens_saved` += content.len() - hash.len()
-- Marker generated, content replaced
+| Path | Steps |
+| ---- | ----- |
+| Hit  | `ccr_hits` incremented; marker generated, content replaced; no store operation |
+| Miss | `ccr_misses` incremented; `ccr.put(hash, content)` stored; `ccr_created` incremented; `tokens_saved` += content.len() - hash.len(); marker generated, content replaced |
 
 ### Compression (zstd)
 
 CCR backends compress content with zstd before storage (magic bytes:
 `0x28, 0xB5, 0x2F, 0xFD`). On retrieval, `zstd::decode_all()` decompresses
-transparently (retrieve.rs:101).
+transparently.
 
 ## 5. Marker Generation
 
-### Cache Mode (proxy.rs:1399)
-
-```
-<<<CCR:{hash}|{type}|{size}>>>
-{first 512 bytes of content}
-```
-
-Preview appended after marker - simpler format, no structured metadata.
-
-### Token Mode (proxy.rs:1408 → smart_marker)
-
-```
-<<<CCR:{hash}|{type}|{size}|{metadata_flat}>>
-```
-
-Metadata includes type-specific keys: `lang=rs`, `fns=main,init`, `ln=42`,
-`keys=status,error`, etc.
+| Mode | Format |
+| ---- | ------ |
+| Cache | `<<<CCR:{hash}\|{type}\|{size}>>>` followed by the first 512 bytes of content as a preview - simpler format, no structured metadata |
+| Token | `<<<CCR:{hash}\|{type}\|{size}\|{metadata_flat}>>` via `smart_marker`, where metadata includes type-specific keys: `lang=rs`, `fns=main,init`, `ln=42`, `keys=status,error`, etc. |
 
 ## 6. EMA Update
 
@@ -284,5 +255,7 @@ if map.contains(&hash) {
 
 Initial values at startup:
 
-- `compression_ratio_ema`: 200 (2.0×)
-- `fill_pct`: 9000 (90.00%)
+| Field | Value |
+| ----- | ----- |
+| `compression_ratio_ema` | 200 (2.0×) |
+| `fill_pct` | 9000 (90.00%) |

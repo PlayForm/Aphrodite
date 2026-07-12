@@ -1,17 +1,14 @@
 # Content Type Taxonomy
 
-Origin: `detect_content_type()` in the proxy classifies every response payload
-so compression thresholds can adapt per-type (errors stay visible, verbose logs
-get compressed aggressively).
-
-Source of truth: `crates/aphrodite/src/proxy.rs:detect_content_type()` (line
-841), `crates/aphrodite/src/proxy.rs:threshold_for()` (line 273),
-`plugins/aphrodite/_marker/marker.py:_classify_content()` (line 53)
+Every response payload is classified into a content type so compression
+thresholds can adapt per-type - errors stay visible, while verbose logs get
+compressed aggressively. Both the Rust proxy and the Python plugin implement
+their own classifiers, each with a distinct type registry and detection order.
 
 ## Detection Order (Rust)
 
-`detect_content_type()` at proxy.rs:841 returns exactly one type per invocation.
-Order matters - first match wins:
+The Rust classifier returns exactly one type per invocation. Order matters -
+first match wins:
 
 ```
 1. JSON (starts with '{' or '[') → validate JSON
@@ -34,7 +31,7 @@ Order matters - first match wins:
 
 ## Detection Order (Python)
 
-`_classify_content()` at \_marker/marker.py:53 examines first 5,000 chars:
+The Python classifier examines the first 5,000 characters:
 
 ```
 1. Diff: starts with "diff --git" or "---"
@@ -54,36 +51,36 @@ Order matters - first match wins:
 
 ## Complete Type Registry
 
-| Type             | Detection Pattern                 | Threshold Group     | From                 |
-| ---------------- | --------------------------------- | ------------------- | -------------------- |
-| `code_rust`      | Rust syntax                       | Code (×4)           | proxy.rs             |
-| `code_python`    | Python syntax                     | Code (×4)           | proxy.rs             |
-| `code_go`        | Go syntax with imports            | Code (×4)           | proxy.rs             |
-| `code_js`        | JS/TS syntax with imports         | Code (×4)           | proxy.rs             |
-| `code`           | Generic programming               | Code (×4)           | proxy.rs             |
-| `error`          | First-line error keywords         | Error (×8)          | proxy.rs             |
-| `diff`           | diff --git / unified diff headers | Diff (×2)           | proxy.rs             |
-| `git`            | git commit/branch output          | Diff (×2)           | proxy.rs             |
-| `text`           | Unrecognized content              | Text (×2)           | proxy.rs             |
-| `tool_output`    | JSON + exit_code/status           | Default (×1)        | proxy.rs             |
-| `json`           | Valid JSON (object/array)         | Default (×1)        | proxy.rs             |
-| `build_output`   | cargo build/test output           | Noisy (÷2)          | proxy.rs             |
-| `log`            | Structured log lines              | Noisy (÷2)          | proxy.rs             |
-| `linter`         | Linter/compiler error output      | Noisy (÷2)          | proxy.rs             |
-| `build_error`    | Rust error[E…]                    | n/a (Python only)   | \_marker/marker.py   |
-| `search_results` | JSON + total_count                | n/a (Python only)   | \_marker/marker.py   |
-| `process_output` | JSON + session_id                 | n/a (Python only)   | \_marker/marker.py   |
-| `search_files`   | JSON + matches or file:line:      | n/a (Python only)   | \_marker/marker.py   |
-| `tabular`        | Pipe-delimited rows               | n/a (Python only)   | \_marker/marker.py   |
-| `json_list`      | JSON list (Python only)           | n/a (Python only)   | \_marker/marker.py   |
-| `tool`           | Python tool result                | v (Python plugin)   | \_hooks/transform.py |
-| `terminal`       | Python terminal output            | v (Python plugin)   | \_hooks/transform.py |
-| `aphrodite`      | Aphrodite meta-tool output        | v (Python plugin)   | \_hooks/transform.py |
-| `context`        | Context engine compression        | n/a (engine)        | \_engine.py          |
-| `build`          | Build output summary              | n/a (Python plugin) | \_hooks/transform.py |
-| `compress`       | Programmatic CCR create           | n/a (Python plugin) | \_tools.py           |
+| Type             | Detection Pattern                 | Threshold Group     | Implementation    |
+| ---------------- | --------------------------------- | ------------------- | ----------------- |
+| `code_rust`      | Rust syntax                       | Code (×4)           | Rust proxy        |
+| `code_python`    | Python syntax                     | Code (×4)           | Rust proxy        |
+| `code_go`        | Go syntax with imports            | Code (×4)           | Rust proxy        |
+| `code_js`        | JS/TS syntax with imports         | Code (×4)           | Rust proxy        |
+| `code`           | Generic programming               | Code (×4)           | Rust proxy        |
+| `error`          | First-line error keywords         | Error (×8)          | Rust proxy        |
+| `diff`           | diff --git / unified diff headers | Diff (×2)           | Rust proxy        |
+| `git`            | git commit/branch output          | Diff (×2)           | Rust proxy        |
+| `text`           | Unrecognized content              | Text (×2)           | Rust proxy        |
+| `tool_output`    | JSON + exit_code/status           | Default (×1)        | Rust proxy        |
+| `json`           | Valid JSON (object/array)         | Default (×1)        | Rust proxy        |
+| `build_output`   | cargo build/test output           | Noisy (÷2)          | Rust proxy        |
+| `log`            | Structured log lines              | Noisy (÷2)          | Rust proxy        |
+| `linter`         | Linter/compiler error output      | Noisy (÷2)          | Rust proxy        |
+| `build_error`    | Rust error[E…]                    | n/a (Python only)   | Python plugin     |
+| `search_results` | JSON + total_count                | n/a (Python only)   | Python plugin     |
+| `process_output` | JSON + session_id                 | n/a (Python only)   | Python plugin     |
+| `search_files`   | JSON + matches or file:line:      | n/a (Python only)   | Python plugin     |
+| `tabular`        | Pipe-delimited rows               | n/a (Python only)   | Python plugin     |
+| `json_list`      | JSON list (Python only)           | n/a (Python only)   | Python plugin     |
+| `tool`           | Python tool result                | v (Python plugin)   | Python plugin     |
+| `terminal`       | Python terminal output            | v (Python plugin)   | Python plugin     |
+| `aphrodite`      | Aphrodite meta-tool output        | v (Python plugin)   | Python plugin     |
+| `context`        | Context engine compression        | n/a (engine)         | Python plugin     |
+| `build`          | Build output summary              | n/a (Python plugin) | Python plugin     |
+| `compress`       | Programmatic CCR create           | n/a (Python plugin) | Python plugin     |
 
-## Threshold Groups (proxy.rs:273-301)
+## Threshold Groups
 
 ### Noisy Types (÷2, excluded from auto-tune)
 
@@ -171,7 +168,7 @@ error[E0308]: mismatched types
 
 → type=log, threshold ÷2
 
-## Python \_classify_content Examples
+## Python Classifier Examples
 
 ```python
 # Diff

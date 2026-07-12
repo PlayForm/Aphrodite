@@ -1,11 +1,8 @@
 # Proxy Retry
 
-Origin: Transient network failures to the upstream LLM API should not fail the
-entire request. A bounded retry loop with exponential backoff and jitter avoids
-both immediate failure and thundering-herd retry storms.
-
-Source of truth: `crates/aphrodite/src/proxy.rs:proxy_handler()` retry loop
-(lines 646-677)
+Transient network failures to the upstream LLM API don't fail the entire
+request. A bounded retry loop with exponential backoff and jitter avoids both
+immediate failure and thundering-herd retry storms.
 
 ## Algorithm
 
@@ -31,12 +28,12 @@ sleep_ms = base_ms × jitter
 ```
 
 | Attempt | Base (ms)                    | Range (ms) |
-| ------- | ---------------------------- | ---------- |
-| 1       | 100                          | 75 - 125   |
-| 2       | 200                          | 150 - 250  |
-| 3       | (not retried, final attempt) | -          |
+| ------- | ----------------------------- | ---------- |
+| 1       | 100                            | 75 - 125   |
+| 2       | 200                            | 150 - 250  |
+| 3       | (not retried, final attempt)   | -          |
 
-From proxy.rs line 667:
+As a Rust struct:
 
 ```rust
 let base_ms = 100 * 2u64.pow(attempt - 1);
@@ -51,8 +48,6 @@ handshake errors. NOT HTTP error status codes (4xx, 5xx). When the upstream
 responds with an error status, the response body is returned to the client
 without retries.
 
-From proxy.rs line 666:
-
 ```rust
 Err(e) => {
     if attempt < 3 {
@@ -65,19 +60,13 @@ Err(e) => {
 
 ## Error Classification
 
-### Retried
-
-- Connection refused
-- DNS resolution failure
-- TLS handshake error
-- Timeout (reqwest `send()` error - different from upstream HTTP timeout)
-- Connection reset
-
-### NOT Retried
-
-- HTTP 4xx (tracked as `upstream_errors_4xx`)
-- HTTP 5xx (tracked as `upstream_errors_5xx`)
-- These are returned to the client directly
+| Retried                                                   | Not Retried                                    |
+| ---------------------------------------------------------- | ------------------------------------------------ |
+| Connection refused                                          | HTTP 4xx (tracked as `upstream_errors_4xx`)      |
+| DNS resolution failure                                       | HTTP 5xx (tracked as `upstream_errors_5xx`)      |
+| TLS handshake error                                           | Returned to the client directly                  |
+| Timeout (reqwest `send()` error - different from upstream HTTP timeout) |                                            |
+| Connection reset                                              |                                                 |
 
 ## Final Failure
 
@@ -102,7 +91,7 @@ Separate from retry: the HTTP client has a global timeout:
 This timeout applies to each individual attempt. A single slow request can
 consume up to `timeout` seconds before the retry mechanism kicks in.
 
-Timeout clamping (config.rs:213):
+Timeout clamping:
 
 ```rust
 let t = cfg.timeout.unwrap_or(300);

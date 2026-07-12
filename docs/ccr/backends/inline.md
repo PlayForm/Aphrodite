@@ -1,14 +1,13 @@
 # Inline CCR (LruCache)
 
-Origin: Tiny entries (< 256 bytes) bypass the CCR backend round-trip. An
-`lru::LruCache` in `AppState` provides O(1) retrieval without I/O. Avoids
-spawning a blocking task for SQLite read or acquiring a DashMap shard lock for
-content that's trivially small.
-
-Source of truth: `crates/aphrodite/src/proxy.rs` (line 140: `inline_ccr` field,
-lines 1419-1431: store logic, lines 1423-1430: dedup check)
+Tiny entries (under 256 bytes) bypass the CCR backend round-trip entirely. An
+`lru::LruCache` held on `AppState` provides O(1) retrieval without any I/O,
+avoiding the cost of spawning a blocking task for a SQLite read or acquiring a
+DashMap shard lock for content that's trivially small.
 
 ## Struct
+
+As a Rust struct:
 
 ```rust
 pub inline_ccr: std::sync::Mutex<lru::LruCache<String, String>>
@@ -19,8 +18,6 @@ Constructed at startup:
 ```rust
 inline_ccr: Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap()))
 ```
-
-From `proxy.rs` line 482.
 
 ## Capacity
 
@@ -42,8 +39,6 @@ Content is stored in inline_ccr when:
 2. Content size ≤ compression threshold for its type
 3. (i.e., too big to ignore entirely, too small to compress to CCR backend)
 
-From `proxy.rs:compress_chat_completion()` (line 1419):
-
 ```rust
 } else if content.len() > INLINE_CCR_THRESHOLD {
     // Below compression threshold but above inline threshold
@@ -59,8 +54,7 @@ From `proxy.rs:compress_chat_completion()` (line 1419):
 }
 ```
 
-Same logic applies to tool call arguments (`compress_chat_completion` line
-1470).
+Same logic applies to tool call arguments.
 
 ## Dedup
 
@@ -69,13 +63,13 @@ tracked via `inline_ccr_hits` / `inline_ccr_misses` AtomicU64 counters.
 
 ## Retrieval Priority
 
-In `retrieve.rs:handle_retrieve()` (line 54):
+In the retrieve handler:
 
 1. Check inline_ccr first (lock dropped before any `.await`)
 2. If hit: return immediately, increment `inline_ccr_hits` + `ccr_hits`
 3. If miss: increment `inline_ccr_misses`, fall through to CCR backend
 
-In `proxy.rs:execute_tool_relay()` (line 1568):
+In the tool relay execution path:
 
 1. Check inline_ccr first for `aphrodite_retrieve`
 2. If miss: fallback to CCR store
@@ -88,12 +82,11 @@ to avoid `!Send` MutexGuard crossing await points.
 
 ## Python Plugin Inline Store (Separate)
 
-The Python plugin maintains its own inline store
-(`_core/config.py:_CappedStore`, max 500 entries) for when the proxy is down.
-This is NOT the same store - it lives in the Hermes Python process, not in the
-proxy Rust process.
+The Python plugin maintains its own inline store, `_CappedStore` (capped at
+500 entries), for when the proxy is down. This is NOT the same store - it
+lives in the Hermes Python process, not in the proxy Rust process.
 
-| Property    | Rust Inline (LruCache)          | Python Inline (\_CappedStore)   |
+| Property    | Rust Inline (LruCache)          | Python Inline (`_CappedStore`)  |
 | ----------- | ------------------------------- | ------------------------------- |
 | Type        | `lru::LruCache<String, String>` | `OrderedDict` (subclass)        |
 | Capacity    | 1,024                           | 500                             |

@@ -1,13 +1,13 @@
 # In-Memory CCR Backend
 
-Origin: Process-local, sharded concurrent CCR store for cache (:9797) mode.
-Lightweight - no persistence needed for the ephemeral cache proxy. Distinct keys
-never contend on reads; capacity-bound eviction is the only serialized step.
-
-Source of truth:
-`vendor/headroom/crates/headroom-core/src/ccr/backends/in_memory.rs`
+The in-memory backend is a process-local, sharded concurrent CCR store used
+for cache mode (`:9797`). It's lightweight by design - no persistence is
+needed for the ephemeral cache proxy. Distinct keys never contend on reads;
+capacity-bound eviction is the only serialized step.
 
 ## Struct
+
+As a Rust struct:
 
 ```rust
 pub struct InMemoryCcrStore {
@@ -25,19 +25,17 @@ struct Entry {
 
 ## Constants
 
-| Constant         | Value        | Source      |
-| ---------------- | ------------ | ----------- |
-| DEFAULT_CAPACITY | 1,000        | `mod.rs:77` |
-| DEFAULT_TTL      | 300s (5 min) | `mod.rs:79` |
+| Constant         | Value        |
+| ---------------- | ------------ |
+| DEFAULT_CAPACITY | 1,000        |
+| DEFAULT_TTL      | 300s (5 min) |
 
-Note: The proxy constructs with capacity=10,000 and TTL from
-`cli.ccr_ttl_seconds` (default 3600s):
+Note: The proxy actually constructs the store with capacity 10,000 and a TTL
+from `cli.ccr_ttl_seconds` (default 3600s):
 
 ```rust
 InMemoryCcrStore::with_capacity_and_ttl(10_000, Duration::from_secs(cli.ccr_ttl_seconds))
 ```
-
-From `proxy.rs:build_state()` (line 453).
 
 ## Constructors
 

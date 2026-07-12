@@ -1,10 +1,8 @@
 # Retrieve Endpoint
 
-Origin: Programmatic CCR retrieval - resolve a hash to its original content,
-with optional query filtering and pagination. Used by the LLM agent when
+Resolves a CCR hash back to its original content, with optional query
+filtering and pagination. It's used by the LLM agent whenever
 `aphrodite_retrieve` is called.
-
-Source of truth: `crates/aphrodite/src/retrieve.rs:handle_retrieve()` (line 33)
 
 ## Endpoint
 
@@ -27,7 +25,7 @@ Loopback only.
 }
 ```
 
-### Request Schema (retrieve.rs:16)
+### Request Schema
 
 ```rust
 pub struct RetrieveRequest {
@@ -97,7 +95,7 @@ pub struct RetrieveRequest {
 }
 ```
 
-### Response Schema (retrieve.rs:25)
+### Response Schema
 
 ```rust
 pub struct RetrieveResponse {
@@ -108,7 +106,7 @@ pub struct RetrieveResponse {
 }
 ```
 
-## Retrieve Flow (line 37)
+## Retrieve Flow
 
 ```
 1. Validate hash (required)
@@ -133,8 +131,6 @@ pub struct RetrieveResponse {
 
 ## Query Filter
 
-From `filter_content()` (retrieve.rs:153):
-
 ```rust
 fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
     match query {
@@ -155,13 +151,13 @@ fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
 }
 ```
 
-- Case-insensitive substring match per line
-- Query truncated to 512 chars
-- Unmatched: descriptive placeholder
+| Behavior     | Detail                                    |
+| ------------ | ------------------------------------------ |
+| Matching     | Case-insensitive substring match per line |
+| Query length | Truncated to 512 chars                    |
+| No matches   | Returns a descriptive placeholder          |
 
 ## Pagination
-
-From retrieve.rs:126:
 
 ```rust
 if req.limit > 0 {
@@ -177,8 +173,6 @@ if req.limit > 0 {
 ```
 
 ## Zstd Decompression
-
-From retrieve.rs:101:
 
 ```rust
 if content.as_bytes().starts_with(&[0x28, 0xB5, 0x2F, 0xFD]) {

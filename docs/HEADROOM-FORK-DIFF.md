@@ -1,9 +1,9 @@
 # Headroom Fork - Complete Divergence Analysis 🔬
 
 > PlayForm Aphrodite embeds **Headroom** as a git submodule at `vendor/headroom/`.
-> This is a **custom fork** (`github.com/PlayForm/Headroom`) of the original upstream
-> (`github.com/chopratejas/headroom`). This document catalogues every change -
-> what was ripped out, rewritten, hardened, and added.
+> This is a **custom fork** of the original upstream project. This document
+> catalogues every change - what was ripped out, rewritten, hardened, and
+> added.
 
 **Current baseline**: merged at upstream `5e14b8c0` (2026-07-10, "fix(memory/sync):
 don't clobber memories sharing a first line (#1976)"). See

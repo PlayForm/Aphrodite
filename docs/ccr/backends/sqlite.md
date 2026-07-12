@@ -1,11 +1,8 @@
 # SQLite CCR Backend
 
-Origin: Persistent, shareable CCR store for production (token mode) proxy
-deployments. Survives worker restarts. WAL-mode with lazy TTL purging - no
-background threads.
-
-Source of truth:
-`vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs`
+The SQLite backend is a persistent, shareable CCR store for production (token
+mode) proxy deployments. It survives worker restarts and runs in WAL mode
+with lazy TTL purging - there are no background threads.
 
 ## Schema
 
@@ -145,9 +142,7 @@ fn lock_conn(conn: &Mutex<Connection>) -> MutexGuard<'_, Connection> {
 
 ## Default Path
 
-When not specified: `~/.hermes/aphrodite/ccr.db`
-
-From `proxy.rs:build_state()` (line 438):
+When not specified: `~/.hermes/aphrodite/ccr.db`, constructed as:
 
 ```rust
 dirs::home_dir()

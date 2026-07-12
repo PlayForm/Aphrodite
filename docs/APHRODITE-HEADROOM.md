@@ -1,8 +1,7 @@
 # Aphrodite & Headroom
 
 Aphrodite is the primary product. Headroom is our fork - a custom, modified
-dependency that Aphrodite extends. The fork lives at
-[PlayForm/Headroom](https://github.com/PlayForm/Headroom).
+dependency that Aphrodite extends.
 
 ---
 

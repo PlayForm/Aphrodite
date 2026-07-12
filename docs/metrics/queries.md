@@ -1,9 +1,7 @@
 # Metrics Queries
 
-Origin: PromQL reference for monitoring and alerting on Aphrodite proxy metrics.
-
-Source of truth: `docs/metrics/prometheus.md` (metric names),
-`crates/aphrodite/src/main.rs` `/metrics` handler
+PromQL reference for monitoring and alerting on Aphrodite proxy metrics - see
+[Prometheus](prometheus.md) for the full metric catalog these queries draw on.
 
 ## CCR Cache Performance
 
@@ -145,4 +143,60 @@ rate(aphrodite_ccr_hits[5m]) / (rate(aphrodite_ccr_hits[5m]) + rate(aphrodite_cc
 
 # Tool relay failures
 rate(aphrodite_tool_relay_failure[5m]) > 0
+```
+
+## Quick curl (no Prometheus server needed)
+
+Every query above assumes a Prometheus server scraping `/metrics`. If you just
+want a number right now, hit the proxy directly:
+
+```bash
+# Full metrics dump (Prometheus text format)
+curl -s http://0.0.0.0:9798/metrics
+
+# Just CCR-related lines
+curl -s http://0.0.0.0:9798/metrics | grep ccr
+
+# Just latency lines
+curl -s http://0.0.0.0:9798/metrics | grep latency
+
+# Stats as JSON
+curl -s http://0.0.0.0:9798/stats | python3 -m json.tool
+```
+
+If you do have a Prometheus server, `PROM=http://localhost:9090/api/v1/query`
+and `curl -s "$PROM" --data-urlencode 'query=...'` runs any query from this
+page ad hoc, e.g.:
+
+```bash
+# CCR entries created, parsed out of the JSON response
+curl -s "$PROM" --data-urlencode 'query=aphrodite_ccr_created' | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+for r in d['data']['result']: print(f\"CCR created: {r['value'][1]}\")
+"
+
+# P95 latency in milliseconds
+curl -s "$PROM" --data-urlencode \
+	'query=histogram_quantile(0.95, rate(aphrodite_latency_seconds_bucket[5m]))' \
+	| python3 -c "import sys,json; d=json.load(sys.stdin); [print(f'P95: {float(r[\"value\"][1])*1000:.1f}ms') for r in d['data']['result']]"
+
+# Every aphrodite_* series in one sorted table
+curl -s "$PROM" --data-urlencode 'query={__name__=~"aphrodite_.*"}' | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+for r in sorted(d['data']['result'], key=lambda r: r['metric']['__name__']):
+    name = r['metric']['__name__']
+    labels = ','.join(f'{k}={v}' for k,v in r['metric'].items() if k != '__name__')
+    val = r['value'][1]
+    print(f'{name:45s} {labels:20s} {val}')
+"
+```
+
+## Prometheus UI
+
+```
+http://localhost:9090                    # Dashboard
+http://localhost:9090/targets            # Scrape targets
+http://localhost:9090/graph              # Query explorer
+http://localhost:9090/alerts             # Alert rules
 ```

@@ -1,7 +1,8 @@
 # Hermes Integration
 
 How Aphrodite connects to Hermes Agent - and why it's different from a plain
-proxy.
+proxy. See [Plugin: Hooks](plugin/hooks.md) for the full hook reference this
+page's table summarizes.
 
 ## Architecture
 
@@ -85,18 +86,15 @@ A generic proxy compresses HTTP response bodies. That helps, but:
 
 ## Setup
 
+See [Installing Aphrodite](install/README.md) for the full, per-platform
+walkthrough (three install paths, plus troubleshooting if the proxy doesn't
+auto-launch). Short version for macOS/Linux:
+
 ```bash
-# 1. Clone the standalone plugin repo
 git clone https://github.com/PlayForm/Aphrodite-Hermes.git
-
-# 2. Symlink into your Hermes profile
-ln -s "$(pwd)/Aphrodite-Hermes" ~/.hermes/profiles/ < profile > /plugins/aphrodite
-
-# 3. Enable
+ln -s "$(pwd)/Aphrodite-Hermes" ~/.hermes/plugins/aphrodite
 hermes plugins enable aphrodite
-
-# 4. Restart (plugin loads fresh)
-hermes
+hermes   # restart so the plugin loads fresh
 ```
 
 The binary auto-downloads from GitHub releases on first launch. No Rust

@@ -1,5 +1,11 @@
 # Hermes Tool Output Schemas
 
+This covers Hermes Agent's own tool surface rather than Aphrodite's code, so
+treat it as reference for the agent side; see
+[CCR: Content Types](ccr/content-types.md) for the classification taxonomy
+it documents. Its machine-readable companion is
+`Maintain/hermes_tool_output_formats.json`.
+
 > **Every tool your agent runs produces output with a unique shape. This
 > document maps every single one - 43 tools, 28 classification types, 100+
 > extraction patterns. The absorptive classifier uses this as its playbook.**

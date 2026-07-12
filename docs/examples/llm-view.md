@@ -1,5 +1,10 @@
 # CCR Examples - What the LLM Actually Sees
 
+Hashes, byte counts, and version tags below are representative, not live
+output. See [CCR: Lifecycle](../ccr/lifecycle.md) and
+[CCR: Marker Format](../ccr/marker-format.md) for the schema these examples
+illustrate.
+
 ## Conversation Flow with Mermaid
 
 ```mermaid

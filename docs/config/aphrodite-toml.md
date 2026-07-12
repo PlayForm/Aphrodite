@@ -1,21 +1,24 @@
 # aphrodite.toml Configuration
 
-Origin: Multi-proxy deployments configure multiple listeners (cache + token, or
-multiple token instances) via a TOML file. Configuration is resolved at startup:
-TOML → CLI → env vars → defaults.
+Multi-proxy deployments (cache + token, or multiple token instances) are
+configured through a single TOML file. Settings resolve in this order: TOML →
+CLI flags → environment variables → built-in defaults.
 
-Source of truth: `crates/aphrodite/src/config.rs` (lines 92-221),
-`crates/aphrodite/src/main.rs:run()` (line 45)
+This file is Aphrodite's own proxy/engine config - a **different file** from
+Hermes Agent's `config.yaml`. See
+[Troubleshooting: two separate config files](../install/troubleshooting.md#two-separate-config-files)
+if you came here looking for Hermes-side keys like `plugins.enabled` or
+`context.engine` instead.
 
-## File Location
+## File location
 
-Default: `aphrodite.toml` in current working directory.
+| | |
+| --- | --- |
+| Default | `aphrodite.toml` in the current working directory |
+| Override | `APHRODITE_CONFIG_PATH` environment variable |
+| If missing | Falls back to CLI-flag mode (single proxy, see [CLI Equivalents](#cli-equivalents)) |
 
-Override: `APHRODITE_CONFIG_PATH` env var (main.rs:45).
-
-If file doesn't exist: falls back to CLI parsing mode (single proxy).
-
-## Full Schema
+## Full schema
 
 ```toml
 [defaults]
@@ -49,55 +52,92 @@ mode = "token"
 tool_relay = true
 ```
 
-## Struct Definitions
+Also accepted at the top level: `[compression]`, `[previews]`, and
+`[prompts]` tables (see below) - omitted from this example because their
+defaults are almost always fine. The repo's own root `aphrodite.toml` sets
+them explicitly as a worked example.
 
-From `config.rs`:
+## `[[proxies]]` fields
 
-### MultiConfig (line 93)
+| Field | Meaning | Default |
+| --- | --- | --- |
+| `name` | Proxy label, also used for port-override matching | listen address |
+| `listen` | Bind address | `127.0.0.1:9797` |
+| `mode` | `"cache"` or `"token"` | `"token"` |
+| `api_key` | Upstream API key, overrides `[defaults]` | - |
+| `api_url` | Upstream API base URL, overrides `[defaults]` | - |
+| `model` | Model name, overrides `[defaults]` | - |
+| `tool_relay` | Enable the `/tool/relay` endpoint | `false` |
+| `dev` | Verbose request/response logging | `false` |
+| `ccr_ttl_seconds` | CCR entry time-to-live | `3600` |
+| `ccr_db_path` | SQLite path for the token proxy | `~/.hermes/aphrodite/ccr.db` |
+| `notify_url` / `notify_key` | Hermes callback URL + bearer token for CCR-create notifications | - |
+| `timeout` | Upstream request timeout, seconds (clamped to 600) | `300` |
+| `max_context` | Max context tokens | `1,000,000` |
+| `max_output` | Max output tokens (must be less than `max_context`) | `384,000` |
 
-```rust
-pub struct MultiConfig {
-    pub defaults: Option<Defaults>,
-    pub proxies: Vec<ProxyConfig>,
-}
-```
+`[defaults]` accepts `api_url`, `model`, `ccr_ttl_seconds`, and `api_key`, and
+applies to every `[[proxies]]` entry that doesn't override them.
 
-### Defaults (line 99)
+## `[compression]`
 
-```rust
-pub struct Defaults {
-    pub api_url: Option<String>,
-    pub model: Option<String>,
-    pub ccr_ttl_seconds: Option<u64>,
-    pub api_key: Option<String>,
-}
-```
+This section actually drives proxy behavior:
 
-### ProxyConfig (line 107)
+| Field | Meaning |
+| --- | --- |
+| `engine_threshold_pct` | Context engine activates once session fill reaches this % |
+| `engine_protect_first` | Messages kept untouched at the start of the conversation |
+| `engine_protect_last` | Messages kept untouched at the end of the conversation |
+| `engine_min_msgs` | Minimum message count before the engine may activate |
+| `tool_threshold_token` | Token-proxy (`:9798`) compression threshold, bytes |
+| `tool_threshold_cache` | Cache-proxy (`:9797`) compression threshold, bytes |
+| `terminal_threshold` | Terminal output compression threshold, bytes |
+| `inline_threshold` | Inline zlib-fallback threshold, bytes |
+| `auto_expand` | If `true`, tool output stays raw (no CCR markers) |
+| `auto_expand_limit` | Byte cap for auto-expand; `0` disables the cap |
+| `catalog_mode` | `"compact"` \| `"full"` \| `"tool"` |
+| `classifier_poll` | Skip CCR entirely for clean/short outputs |
+| `code_multiplier` | Multiplies the threshold for `code_*` content types (keeps code inline longer) |
+| `context_engine` | Turns the context engine on/off (default on) |
 
-```rust
-pub struct ProxyConfig {
-    pub name: Option<String>,          // defaults to listen address
-    pub listen: Option<String>,        // defaults to 127.0.0.1:9797
-    pub mode: Option<String>,          // "cache" or "token" (default: token)
-    pub api_key: Option<String>,
-    pub api_url: Option<String>,
-    pub model: Option<String>,
-    pub tool_relay: Option<bool>,      // default false
-    pub dev: Option<bool>,             // default false
-    pub ccr_ttl_seconds: Option<u64>,  // default 3600
-    pub ccr_db_path: Option<String>,   // default ~/.hermes/aphrodite/ccr.db
-    pub notify_url: Option<String>,
-    pub notify_key: Option<String>,
-    pub timeout: Option<u64>,          // default 300, clamped to 600
-    pub max_context: Option<usize>,    // default 1_000_000
-    pub max_output: Option<usize>,     // default 384_000
-}
-```
+The shipped root `aphrodite.toml` also sets `prefetch` in this section, but
+it doesn't currently appear to change proxy behavior - treat it as reserved
+rather than load-bearing.
 
-## API Key Resolution Chain
+## `[previews]` and `[prompts]`
 
-From `config.rs:resolve()` (line 137):
+| Section | Field | Meaning |
+| --- | --- | --- |
+| `[previews]` | `model_family` | `"compact"` \| `"code_first"` \| `"balance"` - which preview template family to render |
+| `[previews]` | `code_structure_map` | Include function/struct/class signatures in code previews |
+| `[previews]` | `preview_max_chars` | Max characters per rendered preview line |
+| `[previews]` | `rust_preview_lines` | Lines of Rust source to include in `code_first`-family previews |
+| `[prompts]` | `retrieve_guidance` | `"minimal"` \| `"standard"` \| `"verbose"` - how much the system prompt explains CCR retrieval |
+| `[prompts]` | `ccr_marker_hint` | Append a retrieval hint after markers |
+| `[prompts]` | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output |
+
+**Caveat**: unlike `[compression]`, these two sections don't currently
+appear to have any effect on proxy behavior - the values parse cleanly but
+nothing in the current codebase reads them back out. Don't assume changing
+these values changes preview or prompt output; treat them as reserved until
+that's confirmed.
+
+## `[templates.*]`
+
+The shipped root `aphrodite.toml` also ships a large
+`[templates.preview.*]` / `[templates.marker]` / `[templates.prompts]` /
+`[templates.reverse]` block of per-content-type format strings, with a
+variable reference (`{type}`, `{ln}`, `{size}`, `{hash}`, `{fns}`, `{sigs}`,
+etc.) in its header comment.
+
+**Caveat**: like `[previews]`/`[prompts]`, this section doesn't currently
+appear to be wired up to anything - preview strings are generated
+internally rather than rendered from these templates. If you're editing
+`[templates.*]` expecting it to change preview output, verify against your
+running version first; treat it as reserved/aspirational rather than
+functioning configuration.
+
+## API key resolution
 
 ```
 proxy.api_key
@@ -105,132 +145,72 @@ proxy.api_key
     → APHRODITE_API_KEY env var
       → DEEPSEEK_API_KEY env var
         → HEADROOM_DEEPSEEK_KEY env var
-          → Error: "no API key configured"
+          → error: no API key configured
 ```
 
-Stops at first non-empty value.
+Stops at the first non-empty value.
 
-## Default Value Chain
+## Default value chain
 
-| Field           | Resolution                                                                        |
-| --------------- | --------------------------------------------------------------------------------- |
-| listen          | proxy.listen → `"127.0.0.1:9797"`                                                 |
-| mode            | proxy.mode → `"token"` (with warn on unknown)                                     |
-| api_url         | proxy.api_url → defaults.api_url → `"https://api.openai.com"`                     |
-| model           | proxy.model → defaults.model → `"default-model"`                                  |
-| ccr_ttl_seconds | proxy.ccr_ttl_seconds → defaults.ccr_ttl_seconds → 3600                           |
-| ccr_db_path     | proxy.ccr_db_path (non-empty) → `~/.hermes/aphrodite/ccr.db` (or `/tmp` fallback) |
-| tool_relay      | proxy.tool_relay → false                                                          |
-| dev             | proxy.dev → false                                                                 |
-| timeout         | proxy.timeout → 300 (clamped: max 600)                                            |
-| max_context     | proxy.max_context → 1_000_000                                                     |
-| max_output      | proxy.max_output → 384_000                                                        |
+| Field | Resolution |
+| --- | --- |
+| `listen` | `proxy.listen` → `127.0.0.1:9797` |
+| `mode` | `proxy.mode` → `"token"` (warns on unknown values) |
+| `api_url` | `proxy.api_url` → `defaults.api_url` → `https://api.openai.com` |
+| `model` | `proxy.model` → `defaults.model` → `"default-model"` |
+| `ccr_ttl_seconds` | `proxy.ccr_ttl_seconds` → `defaults.ccr_ttl_seconds` → `3600` |
+| `ccr_db_path` | `proxy.ccr_db_path` (non-empty) → `~/.hermes/aphrodite/ccr.db` (or `/tmp` fallback) |
+| `tool_relay` | `proxy.tool_relay` → `false` |
+| `dev` | `proxy.dev` → `false` |
+| `timeout` | `proxy.timeout` → `300` (clamped to a max of `600`) |
+| `max_context` | `proxy.max_context` → `1,000,000` |
+| `max_output` | `proxy.max_output` → `384,000` |
 
 ## Validation
 
-### Max Output vs Max Context
+| Check | Behavior |
+| --- | --- |
+| `max_output` vs `max_context` | Refuses to start if `max_output >= max_context` |
+| `listen` address | Must parse as a valid socket address, or the proxy refuses to start |
+| API key | Must be non-empty after the full resolution chain, or the proxy refuses to start |
+| `timeout` | Clamped to a 600-second maximum, with a warning if the configured value exceeds it |
+| `mode` | Unknown values fall back to `"token"` with a warning; an unset `mode` also defaults to `"token"`, silently |
 
-From `config.rs:resolve()` (line 158):
+## Modes
 
-```rust
-if max_output >= max_context {
-    anyhow::bail!("max_output ({max_output}) must be less than max_context ({max_context})");
-}
-```
+| Mode | Backend | Threshold | Tool relay |
+| --- | --- | --- | --- |
+| `"token"` | SQLite | >1 KB | Yes, aggressive compression |
+| `"cache"` | In-memory | >8 KB | No |
 
-### Listen Address
+## Database path resolution
 
-Must parse as `SocketAddr` or the proxy fails to start:
+A relative `ccr_db_path` is resolved against the binary's own directory, not
+the current working directory - so a relative path behaves consistently
+regardless of where the proxy is launched from. Parent directories are
+created automatically if missing.
 
-```rust
-s.parse().map_err(|_| anyhow::anyhow!("invalid listen address: {s}"))?
-```
+## CLI equivalents
 
-### API Key
+When running without `aphrodite.toml`, CLI flags mirror these fields:
 
-Must be non-empty after all fallbacks:
+| TOML field | CLI flag | Env var |
+| --- | --- | --- |
+| `mode` | `--mode` | `APHRODITE_MODE` |
+| `listen` | `--listen` | `APHRODITE_LISTEN` |
+| `api_url` | `--api-url` | `APHRODITE_API_URL` |
+| `api_key` | `--api-key` | `APHRODITE_API_KEY` |
+| `model` | `--model` | `APHRODITE_MODEL` |
+| `ccr_db_path` | `--ccr-db-path` | `APHRODITE_DB` |
+| `ccr_ttl_seconds` | `--ccr-ttl` | `APHRODITE_CCR_TTL` |
+| `tool_relay` | `--tool-relay` | - |
+| `notify_url` | `--notify-url` | `APHRODITE_NOTIFY_URL` |
+| `notify_key` | `--notify-key` | `APHRODITE_NOTIFY_KEY` |
+| `dev` | `--dev` | - |
+| `log_compact` | `--log-compact` | `APHRODITE_LOG_COMPACT` |
+| `timeout` | `--timeout` | - |
 
-```rust
-if api_key.is_empty() {
-    anyhow::bail!("no API key configured");
-}
-```
-
-### Timeout
-
-Clamped to 600s max with warning:
-
-```rust
-let t = cfg.timeout.unwrap_or(300);
-if t > 600 {
-    tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
-    600
-}
-```
-
-## Mode
-
-### Valid Values
-
-- `"token"` - SQLite CCR, >1KB threshold, tool relay, aggressive compression
-- `"cache"` - In-memory CCR, >8KB threshold, no tool relay
-
-### Unknown Values
-
-```rust
-Some(other) => {
-    tracing::warn!("unknown mode {:?}, defaulting to token", other);
-    ProxyMode::Token
-}
-```
-
-### No Mode
-
-```rust
-None => {
-    tracing::info!("no mode specified, defaulting to token");
-    ProxyMode::Token
-}
-```
-
-## Database Path Resolution
-
-From `main.rs:run_single()` (line 159):
-
-```rust
-if !cli.ccr_db_path.as_os_str().is_empty() && !cli.ccr_db_path.is_absolute() {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            cli.ccr_db_path = exe_dir.join(&cli.ccr_db_path);
-        }
-    }
-}
-```
-
-Relative paths resolved against binary directory. Parent directories
-auto-created.
-
-## CLI Equivalents
-
-When running without aphrodite.toml, CLI args mirror these fields:
-
-| TOML Field      | CLI Flag        | Env Var                 |
-| --------------- | --------------- | ----------------------- |
-| mode            | `--mode`        | `APHRODITE_MODE`        |
-| listen          | `--listen`      | `APHRODITE_LISTEN`      |
-| api_url         | `--api-url`     | `APHRODITE_API_URL`     |
-| api_key         | `--api-key`     | `APHRODITE_API_KEY`     |
-| model           | `--model`       | `APHRODITE_MODEL`       |
-| ccr_db_path     | `--ccr-db-path` | `APHRODITE_DB`          |
-| ccr_ttl_seconds | `--ccr-ttl`     | `APHRODITE_CCR_TTL`     |
-| tool_relay      | `--tool-relay`  | -                       |
-| notify_url      | `--notify-url`  | `APHRODITE_NOTIFY_URL`  |
-| notify_key      | `--notify-key`  | `APHRODITE_NOTIFY_KEY`  |
-| dev             | `--dev`         | -                       |
-| log_compact     | `--log-compact` | `APHRODITE_LOG_COMPACT` |
-| timeout         | `--timeout`     | -                       |
-
-## Example: Full Multi-Proxy
+## Example: full multi-proxy
 
 ```toml
 [defaults]

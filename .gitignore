@@ -79,3 +79,4 @@ id_rsa*
 .cargo_check_output.txt
 
 placeholder/
+.plans

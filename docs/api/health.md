@@ -1,11 +1,8 @@
 # Health Endpoint
 
-Origin: External load-balancers and monitoring systems need a fast, public
-health check that doesn't require loopback access. The `/health` endpoint is
+Gives external load balancers and monitoring systems a fast, public health
+check that doesn't require loopback access. It's the only endpoint
 intentionally exempt from loopback enforcement.
-
-Source of truth: `crates/aphrodite/src/proxy.rs:health_check()` (line 1796),
-`crates/aphrodite/src/main.rs:357`
 
 ## Endpoint
 
@@ -16,7 +13,7 @@ GET /health
 ## Access
 
 **Public** - no loopback enforcement. The only endpoint exempt from the
-`loopback_only` middleware (main.rs:357):
+`loopback_only` middleware:
 
 ```rust
 // Public route (no loopback enforcement) merged with restricted routes

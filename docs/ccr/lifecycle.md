@@ -1,15 +1,12 @@
 # CCR Lifecycle
 
-Origin: CCR (Compress-Cache-Retrieve) provides lossless end-to-end compression
-for LLM proxy traffic. Content is hashed, compressed, stored, and replaced with
-a marker in the response. The LLM retrieves by hash if needed.
-
-Source of truth: `crates/aphrodite/src/proxy.rs:compress_chat_completion()`
-(line 1348), `crates/aphrodite/src/retrieve.rs:handle_retrieve()` (line 33)
+CCR (Compress-Cache-Retrieve) provides lossless end-to-end compression for LLM
+proxy traffic. Content is hashed, compressed, stored, and replaced with a
+marker in the response; the LLM retrieves the original by hash if it needs the
+full content. This doc walks through the six phases of that lifecycle, from
+initial compression to eventual expiry.
 
 ## Phase 1: Compress
-
-Flow from `proxy.rs:compress_chat_completion()`:
 
 ```
 1. Parse Chat Completions response JSON
@@ -31,29 +28,31 @@ Flow from `proxy.rs:compress_chat_completion()`:
 
 ## Phase 2: Cache
 
-### Cache Check (proxy.rs:1385)
+### Cache Check
 
 ```
 ccr.get(hash) → hit? ccr_hits++ : ccr_misses++ (then store)
 ```
 
-### Inline Cache Check (proxy.rs:1423)
+### Inline Cache Check
 
 ```
 inline_ccr.contains(hash)? inline_ccr_hits++ : inline_ccr_misses++ (then store)
 ```
 
-### LLM Response Cache (proxy.rs:610)
+### LLM Response Cache
 
 ```
 cache_key = FNV-1a(api_key + ":" + model + ":" + serialized_messages)
 response_cache.get(cache_key) → hit? return cached : proceed to upstream
 ```
 
-- FNV-1a 64-bit hash (deterministic across restarts)
-- LRU capacity: 128 entries
-- api_key included to prevent cross-user collision
-- Response header: `X-Aphrodite-Cache: HIT` or `MISS`
+| Property   | Detail                                          |
+| ---------- | ------------------------------------------------ |
+| Hash       | FNV-1a 64-bit (deterministic across restarts)   |
+| Capacity   | LRU, 128 entries                                |
+| Key scope  | Includes `api_key` to prevent cross-user collision |
+| Response header | `X-Aphrodite-Cache: HIT` or `MISS`          |
 
 ## Phase 3: Store
 
@@ -67,8 +66,8 @@ Three storage tiers by content size and mode:
 
 ### Python Plugin Inline Store
 
-Separate from Rust inline: `_CappedStore` (OrderedDict, max 500 entries) in
-`_core/config.py:75`. Used when proxy is down.
+Separate from the Rust inline store: `_CappedStore`, an `OrderedDict`-backed
+store capped at 500 entries. Used when the proxy is down.
 
 ## Phase 4: Return Marker
 
@@ -95,7 +94,7 @@ Includes structured metadata (language, functions, line count, etc.).
 
 ## Phase 5: Retrieve
 
-Flow from `retrieve.rs:handle_retrieve()`:
+Retrieval flow:
 
 ```
 1. Validate hash parameter (required)
@@ -113,9 +112,9 @@ Flow from `retrieve.rs:handle_retrieve()`:
 8. Return {found: true/false, content: "…", source: "ccr"/"none"}
 ```
 
-### Python Retrieve (tools.py:\_retrieve_handler)
+### Python Retrieve
 
-Same flow +:
+The Python plugin's retrieve handler follows the same flow, plus:
 
 - Recursive resolution up to 3 levels deep (nested CCR markers)
 - File path reads (workspace-bounded, 10MB cap)
@@ -123,33 +122,16 @@ Same flow +:
 
 ## Phase 6: Expire
 
-### SQLite (sqlite.rs:148)
-
-- Lazy purge on every `get()`:
-  `DELETE FROM ccr_entries WHERE created_at + ttl_seconds <= now`
-- Debounced: max once per 60 seconds (`PURGE_DEBOUNCE_SECS`)
-- No background thread
-
-### In-Memory (in_memory.rs:186)
-
-- Lazy TTL check on every `get()`: `entry.inserted.elapsed() > ttl` → evict
-- `remove_if()` atomic check-and-remove (prevents TOCTOU race with concurrent
-  `put`)
-- Queue compaction: when `order.len() > capacity * 2`, compact stale keys
-
-### Inline (proxy.rs inline_ccr)
-
-- LRU eviction when capacity (1024) exceeded
-- No TTL - pure LRU
-
-### Python Inline (\_core/config.py:\_CappedStore)
-
-- LRU eviction when > 500 entries
-- No TTL
+| Backend        | Expiry behavior                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| SQLite         | Lazy purge on every `get()`: `DELETE FROM ccr_entries WHERE created_at + ttl_seconds <= now`. Debounced to once per 60 seconds. No background thread. |
+| In-Memory      | Lazy TTL check on every `get()`: entries older than TTL are evicted via an atomic check-and-remove (prevents a TOCTOU race with a concurrent `put`). Queue compaction runs once the eviction queue grows past twice capacity, to clear stale keys. |
+| Inline         | LRU eviction once capacity (1,024) is exceeded. No TTL - pure LRU.                                                            |
+| Python Inline  | LRU eviction once the store exceeds 500 entries. No TTL.                                                                       |
 
 ## Threshold Tables
 
-### Base Thresholds (proxy.rs:75-80)
+### Base Thresholds
 
 | Constant                 | Bytes       | Mode  |
 | ------------------------ | ----------- | ----- |
@@ -157,7 +139,7 @@ Same flow +:
 | TOKEN_COMPRESS_THRESHOLD | 1,024 (1KB) | Token |
 | INLINE_CCR_THRESHOLD     | 256         | All   |
 
-### Per-Type Multipliers (proxy.rs:276-301)
+### Per-Type Multipliers
 
 | Type                        | Multiplier | Effective (Token, 1KB base) | Effective (Cache, 8KB base) |
 | --------------------------- | ---------- | --------------------------- | --------------------------- |
@@ -167,9 +149,9 @@ Same flow +:
 | tool_output, json           | ×1         | 1,024                       | 8,192                       |
 | linter, build_output, log   | ÷2         | 512                         | 4,096                       |
 
-### Auto-Tune (proxy.rs:282-290)
+### Auto-Tune
 
-Based on compression_ratio_ema (×100):
+Based on `compression_ratio_ema` (×100):
 
 | EMA Ratio   | Tune Factor | Effect                                          |
 | ----------- | ----------- | ----------------------------------------------- |
@@ -181,7 +163,7 @@ Based on compression_ratio_ema (×100):
 Note: `linter`, `build_output`, `log` types are excluded from auto-tune (always
 base/2).
 
-### Python Plugin Thresholds (from \_core/config.py)
+### Python Plugin Thresholds
 
 | Env Var               | Default             | Scope                                                                |
 | --------------------- | ------------------- | -------------------------------------------------------------------- |
@@ -192,7 +174,7 @@ base/2).
 | AUTO_EXPAND_LIMIT     | 51,200              | Max size for auto-expanding tool CCR markers                         |
 | MAX_REQUEST_BODY_SIZE | 104,857,600 (100MB) | Skip compression above this                                          |
 
-### Headroom Budget Multiplier (proxy.rs:1358-1371)
+### Headroom Budget Multiplier
 
 | Budget | Multiplier | Effect                 |
 | ------ | ---------- | ---------------------- |

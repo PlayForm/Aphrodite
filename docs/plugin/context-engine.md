@@ -1,12 +1,9 @@
 # Context Engine
 
-Origin: When the agent's conversation context fills beyond a threshold, the
-engine compresses middle messages into CCR markers, keeping only the head and
-tail raw. This avoids losing context entirely (like summarization-based
+When the agent's conversation context fills beyond a threshold, the engine
+compresses middle messages into CCR markers, keeping only the head and tail
+raw. This avoids losing context entirely (unlike summarization-based
 compressors) while saving significant token budget.
-
-Source of truth: `plugins/aphrodite/_engine.py` (lines 92-289),
-`plugins/aphrodite/plugin.yaml` (line 23)
 
 ## Activation
 
@@ -31,17 +28,15 @@ class AphroditeContextEngine(ContextEngine):
     min_messages_to_compress = ENGINE_MIN_MSGS    # default 4
 ```
 
-From `_engine.py:112`.
-
 ## Threshold Semantics
 
-| Value         | Behavior                                               | Source          |
-| ------------- | ------------------------------------------------------ | --------------- |
-| -1            | Always compress (any context fill triggers)            | \_engine.py:141 |
-| 0             | Disabled (never compress)                              | \_engine.py:141 |
-| >0 (e.g., 50) | Compress when prompt_tokens ≥ context_length × pct/100 | \_engine.py:150 |
+| Value         | Behavior                                                |
+| ------------- | -------------------------------------------------------- |
+| -1            | Always compress (any context fill triggers)             |
+| 0             | Disabled (never compress)                               |
+| >0 (e.g., 50) | Compress when prompt_tokens ≥ context_length × pct/100  |
 
-## Compress Algorithm (line 152)
+## Compress Algorithm
 
 ```
 compress(messages, current_tokens, focus_topic):
@@ -73,8 +68,6 @@ compress(messages, current_tokens, focus_topic):
 
 ## Message Packing
 
-From `_pack_msg()` at line 74:
-
 ```python
 def _pack_msg(messages):
     for m in messages:
@@ -88,7 +81,7 @@ Compact JSON - no whitespace.
 
 ## Editing Detection
 
-`_EDITING_RE` at line 45:
+The editing-detection regex:
 
 ```python
 re.compile(r"\b(?:wrote|patched|modified|created|deleted|successfully|written)\b", re.IGNORECASE)
@@ -99,7 +92,7 @@ protects more context to avoid losing the agent's editing momentum.
 
 ## Orphan Tool Message Sweep
 
-Lines 170-185 handle the case where compressing middle messages would break
+This handles the case where compressing middle messages would break
 tool_call → tool_result pairing:
 
 1. Forward sweep: include trailing tool messages (orphan without their owning
@@ -112,8 +105,7 @@ tool_call → tool_result pairing:
 
 The context engine and `compression.enabled` SHOULD NOT both be active - the
 engine provides a different strategy (compress middle, keep head/tail) vs.
-per-tool compression (compress individual tool outputs). From plugin.yaml
-description.
+per-tool compression (compress individual tool outputs).
 
 ## Hooks
 

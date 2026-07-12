@@ -1,8 +1,8 @@
 # Proxy Architecture
 
-Origin: Aphrodite operates in **two modes** - as a reverse proxy between any
-client and an LLM API, and as a native Hermes plugin that intercepts output at
-the hook level before it reaches the LLM context.
+Aphrodite operates in **two modes** - as a reverse proxy between any client and
+an LLM API, and as a native Hermes plugin that intercepts output at the hook
+level before it reaches the LLM context.
 
 - **Proxy mode**: sits between client and upstream LLM, compresses Chat
   Completions responses via CCR, provides tool relay for bidirectional
@@ -12,16 +12,12 @@ the hook level before it reaches the LLM context.
   round-trip needed. Broader coverage: file reads, terminal output, search
   results, browser snapshots, and more.
 
-Source of truth: `crates/aphrodite/src/main.rs`,
-`crates/aphrodite/src/proxy.rs:build_state()` (line 426),
-`plugins/aphrodite/_hooks/`
-
 ## Two-Listener Model
 
 | Listener | Port  | CCR Backend                             | Compression Threshold           | Tool Relay | Mode             |
-| -------- | ----- | --------------------------------------- | ------------------------------- | ---------- | ---------------- |
-| Cache    | :9797 | InMemoryCcrStore (DashMap, 10K entries) | >8KB (CACHE_COMPRESS_THRESHOLD) | No         | ProxyMode::Cache |
-| Token    | :9798 | SqliteCcrStore (SQLite, persistent)     | >1KB (TOKEN_COMPRESS_THRESHOLD) | Yes        | ProxyMode::Token |
+| -------- | ----- | ---------------------------------------- | -------------------------------- | ---------- | ----------------- |
+| Cache    | :9797 | InMemoryCcrStore (DashMap, 10K entries)  | >8KB (CACHE_COMPRESS_THRESHOLD)  | No         | ProxyMode::Cache  |
+| Token    | :9798 | SqliteCcrStore (SQLite, persistent)      | >1KB (TOKEN_COMPRESS_THRESHOLD)  | Yes        | ProxyMode::Token  |
 
 ## Data Flow
 
@@ -48,7 +44,7 @@ PLUGIN MODE (Hermes only):
 
 30+ AtomicU64 counters, 4 Mutex-protected structures, 1 TaskTracker.
 
-### Core Config (proxy.rs:117-129)
+### Core Config
 
 ```rust
 pub client: HttpClient,           // reqwest pool: 100 idle per host, 90s idle timeout, 60s keepalive
@@ -64,14 +60,14 @@ pub notify_key: Option<String>,    // Bearer token for callbacks
 pub dev: bool,                     // verbose request/response logging
 ```
 
-### Cache Structures (proxy.rs:136-140)
+### Cache Structures
 
 ```rust
 pub request_history: Mutex<VecDeque<serde_json::Value>>,  // last 50 requests
 pub inline_ccr: Mutex<lru::LruCache<String, String>>,      // 1024 entries, <256B threshold
 ```
 
-### Primary Counters (proxy.rs:157-170)
+### Primary Counters
 
 ```rust
 pub requests_total: AtomicU64,
@@ -86,26 +82,26 @@ pub cache_hits: AtomicU64,
 pub cache_misses: AtomicU64,
 ```
 
-### Latency Tracking (proxy.rs:144-146)
+### Latency Tracking
 
 ```rust
 pub latency_buckets: [AtomicU64; 5],    // <1ms, <10ms, <100ms, <1s, <10s
 pub total_latency_micros: AtomicU64,
 ```
 
-### Error Tracking (proxy.rs:151)
+### Error Tracking
 
 ```rust
 pub last_errors: Mutex<VecDeque<String>>,  // last 100 errors
 ```
 
-### Compression Tracking (proxy.rs:154)
+### Compression Tracking
 
 ```rust
 pub compressions_by_type: Mutex<HashMap<String, u64>>,
 ```
 
-### Extended Metrics (proxy.rs:182-195)
+### Extended Metrics
 
 ```rust
 pub inline_ccr_hits: AtomicU64,
@@ -130,7 +126,7 @@ pub upstream_latency_micros: AtomicU64,
 pub task_tracker: TaskTracker,    // tracks async callbacks for graceful shutdown
 ```
 
-### Adaptive State (proxy.rs:174-179)
+### Adaptive State
 
 ```rust
 pub fill_pct: AtomicU64,          // ×100, 0-10000. fill_pct = 100 - (ratio_ema/20), clamped [1..99]
@@ -139,38 +135,34 @@ pub response_cache: Mutex<lru::LruCache<u64, Vec<u8>>>,  // 128 entries, FNV-1a 
 
 ## Routing Table
 
-From `main.rs:run_single()` (lines 190-353):
-
 | Route              | Method | Handler                   | Access                           |
-| ------------------ | ------ | ------------------------- | -------------------------------- |
-| `/health`          | GET    | health_check              | Public (no loopback enforcement) |
-| `/health/upstream` | GET    | upstream probe            | Loopback only                    |
-| `/version`         | GET    | CARGO_PKG_VERSION         | Loopback only                    |
-| `/stats`           | GET    | stats_json()              | Loopback only                    |
-| `/stats/db`        | GET    | ccr.stats_db()            | Loopback only                    |
-| `/metrics`         | GET    | Prometheus text format    | Loopback only (no auth)          |
-| `/history`         | GET    | request_history           | Loopback only                    |
-| `/retrieve`        | POST   | retrieve::handle_retrieve | Loopback only                    |
-| `/tool/relay`      | POST   | handle_tool_relay         | Loopback only                    |
-| `/ccr/create`      | POST   | handle_ccr_create         | Loopback only                    |
-| `/ccr/list`        | GET    | handle_ccr_list           | Loopback only                    |
-| `/ccr/{hash}`      | DELETE | handle_ccr_delete         | Loopback only                    |
-| `/favicon.ico`     | GET    | 404                       | Loopback only                    |
-| `/robots.txt`      | GET    | `Disallow: /`             | Loopback only                    |
-| `/`                | GET    | version JSON              | Loopback only                    |
-| `/{*path}`         | ANY    | proxy_handler             | Loopback only                    |
+| ------------------ | ------ | -------------------------- | ---------------------------------- |
+| `/health`          | GET    | health_check               | Public (no loopback enforcement)   |
+| `/health/upstream` | GET    | upstream probe              | Loopback only                       |
+| `/version`         | GET    | CARGO_PKG_VERSION           | Loopback only                       |
+| `/stats`           | GET    | stats_json()                | Loopback only                       |
+| `/stats/db`        | GET    | ccr.stats_db()              | Loopback only                       |
+| `/metrics`         | GET    | Prometheus text format       | Loopback only (no auth)            |
+| `/history`         | GET    | request_history              | Loopback only                       |
+| `/retrieve`        | POST   | retrieve::handle_retrieve    | Loopback only                       |
+| `/tool/relay`      | POST   | handle_tool_relay             | Loopback only                       |
+| `/ccr/create`      | POST   | handle_ccr_create              | Loopback only                       |
+| `/ccr/list`        | GET    | handle_ccr_list                | Loopback only                       |
+| `/ccr/{hash}`      | DELETE | handle_ccr_delete               | Loopback only                       |
+| `/favicon.ico`     | GET    | 404                              | Loopback only                       |
+| `/robots.txt`      | GET    | `Disallow: /`                     | Loopback only                       |
+| `/`                | GET    | version JSON                       | Loopback only                       |
+| `/{*path}`         | ANY    | proxy_handler                       | Loopback only                       |
 
 ## Middleware Stack
 
 | Layer                | Config                                                             |
-| -------------------- | ------------------------------------------------------------------ |
-| CORS                 | `CorsLayer::permissive()`                                          |
-| Body limit           | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                        |
-| Loopback enforcement | `middleware::from_fn(loopback_only)` - all routes except `/health` |
+| --------------------- | -------------------------------------------------------------------- |
+| CORS                  | `CorsLayer::permissive()`                                             |
+| Body limit            | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                            |
+| Loopback enforcement  | `middleware::from_fn(loopback_only)` - all routes except `/health`     |
 
 ## HTTP Client Config
-
-From `proxy.rs:build_state()` (line 429):
 
 ```rust
 HttpClient::builder()
@@ -183,8 +175,6 @@ HttpClient::builder()
 
 ## Shutdown Sequence
 
-From `main.rs:run()` (lines 107-148):
-
 1. `shutdown_signal()`: wait for Ctrl+C or SIGTERM
 2. `shutdown_tx.send(true)`: broadcast to all proxy listeners
 3. `axum::serve.with_graceful_shutdown(shutdown_fut)`: drain connections
@@ -194,9 +184,7 @@ From `main.rs:run()` (lines 107-148):
 
 ## Multi-Proxy Mode
 
-From `main.rs:run()` (line 46):
-
-Priority: aphrodite.toml → CLI args
+Config resolution priority: `aphrodite.toml` → CLI args.
 
 Config path: `APHRODITE_CONFIG_PATH` env var or `aphrodite.toml` (CWD).
 
@@ -205,8 +193,6 @@ Each `[[proxies]]` entry spawns its own Tokio task with independent
 signal to all listeners.
 
 ## Worker Threads
-
-From `main.rs:main()` (line 28):
 
 ```rust
 let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
@@ -222,7 +208,7 @@ Default: 4× CPU cores, minimum 32. Override via `APHRODITE_WORKER_THREADS`.
 
 ## Build Info
 
-Version info from env vars set by `build.rs`:
+Version info comes from env vars set by the build script:
 
 ```rust
 env!("CARGO_PKG_VERSION")

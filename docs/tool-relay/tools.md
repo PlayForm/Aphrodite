@@ -1,313 +1,261 @@
 # Tool Relay Tools
 
-Origin: Aphrodite exposes 9 tools to the Hermes agent for compression,
-retrieval, stats, and session management. Tools are registered by the Python
-plugin and executed via the proxy's `handle_tool_relay` endpoint.
+Aphrodite exposes 12 tools to the Hermes agent for compression, retrieval,
+stats, and session management. All 12 dispatch entirely inside the Rust
+dylib - the Python plugin shim forwards tool calls in and returns the JSON
+result verbatim; there's no separate Python-side tool logic to know about.
 
-Source of truth: `plugins/aphrodite/plugin.yaml` (lines 13-22),
-`plugins/aphrodite/_tools.py`, `plugins/aphrodite/_hooks/transform.py` (lines
-399, 1176, 1250, 1273, 1291, 1318, 1419),
-`crates/aphrodite/src/proxy.rs:execute_tool_relay()` (line 1561)
+## Tool registry
 
-## Tool Registry
+| # | Tool | What it's for |
+| --- | --- | --- |
+| 1 | `aphrodite_compress` | Compress content into CCR for later retrieval |
+| 2 | `aphrodite_retrieve` | Resolve a CCR marker (or read a workspace file) back to content |
+| 3 | `aphrodite_stats` | Proxy health, engine status, session counters |
+| 4 | `aphrodite_files` | File paths referenced this session |
+| 5 | `aphrodite_diff` | Conversation turn history |
+| 6 | `aphrodite_search` | Search compressed entries by keyword or type |
+| 7 | `aphrodite_test` | In-process smoke test: compress → retrieve round trips |
+| 8 | `aphrodite_catalog` | Full or table-of-contents view of everything compressed |
+| 9 | `aphrodite_reclassify` | Re-detect type/preview for already-stored entries |
+| 10 | `aphrodite_prefetch` | Read + compress files ahead of time |
+| 11 | `aphrodite_prefetch_status` | What prefetch has loaded so far |
+| 12 | `aphrodite_rebuild` | Report binary/proxy version and rebuild instructions |
 
-| #   | Tool                 | Source                    | Proxy Support            |
-| --- | -------------------- | ------------------------- | ------------------------ |
-| 1   | `aphrodite_retrieve` | \_tools.py:22             | Yes (execute_tool_relay) |
-| 2   | `aphrodite_compress` | \_tools.py:68             | Yes (execute_tool_relay) |
-| 3   | `aphrodite_stats`    | \_hooks/transform.py:1176 | No (Python only)         |
-| 4   | `aphrodite_rebuild`  | \_hooks/transform.py:399  | No (Python only)         |
-| 5   | `aphrodite_files`    | \_hooks/transform.py:1250 | No (Python only)         |
-| 6   | `aphrodite_diff`     | \_hooks/transform.py:1273 | No (Python only)         |
-| 7   | `aphrodite_search`   | \_hooks/transform.py:1318 | No (Python only)         |
-| 8   | `aphrodite_test`     | \_hooks/transform.py:1419 | No (Python only)         |
-| 9   | `aphrodite_catalog`  | \_hooks/transform.py:1291 | No (Python only)         |
+All handlers share one session state, so content compressed by a hook or
+`aphrodite_compress` stays resolvable by `aphrodite_retrieve` for the life of
+the session. There's also an internal 13th entry, `context_engine_pre_llm` -
+the context engine's own pre-LLM hook, not a tool an agent calls directly.
 
-## 1. aphrodite_retrieve
-
-### Schema (\_tools.py:134)
-
-```json
-{
-	"name": "aphrodite_retrieve",
-	"description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query. Supports file path reads. Recursively resolves nested CCR markers up to 3 levels deep.",
-	"parameters": {
-		"type": "object",
-		"properties": {
-			"hash": {
-				"type": "string",
-				"description": "CCR marker hash to retrieve."
-			},
-			"query": {
-				"type": "string",
-				"description": "Optional filter query"
-			},
-			"path": {
-				"type": "string",
-				"description": "Optional file path (bypasses CCR)"
-			}
-		},
-		"required": []
-	}
-}
-```
-
-### Handler (\_tools.py:22)
-
-```
-Retrieve flow:
-1. Extract hash (strip <<<CCR: prefix >>> suffix if present)
-2. If path: read file (workspace-bounded, 10MB cap)
-3. If hash: resolve_recursive (inline store → proxy)
-4. If query: filter lines (case-insensitive)
-5. Return {content, hash/path, size} or {error}
-```
-
-### Proxy Support (proxy.rs:1567)
-
-Same logic: inline_ccr → CCR store. Returns
-`{found: true/false, content: "..."}`.
-
-## 2. aphrodite_compress
-
-### Schema (\_tools.py:119)
+## 1. aphrodite_compress
 
 ```json
 {
-	"name": "aphrodite_compress",
-	"description": "Compress content into CCR via aphrodite proxy for later retrieval. Specify type for adaptive compression: code, log, diff, error, json, build_output.",
-	"parameters": {
-		"type": "object",
-		"properties": {
-			"content": {
-				"type": "string",
-				"description": "Content to compress and store in CCR"
-			},
-			"type": {
-				"type": "string",
-				"description": "Content type hint: code, log, diff, error, json, build_output, text"
-			}
-		},
-		"required": ["content"]
-	}
+  "name": "aphrodite_compress",
+  "description": "Compress content into CCR via aphrodite proxy for later retrieval. Specify type for adaptive compression: code, log, diff, error, json, build_output.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "content": { "type": "string", "description": "Content to compress and store in CCR" },
+      "type": { "type": "string", "description": "Optional: content type hint - code, log, diff, error, json, build_output, text" },
+      "_ccr_center": { "type": "string", "description": "Optional: center string that travels with the marker" }
+    },
+    "required": ["content"]
+  }
 }
 ```
 
-### Handler (\_tools.py:68)
+Detects a content type automatically unless a `type` hint is given (a hint
+of `"text"` is treated as no hint). Hashes and stores the content, then
+returns `{hash, type, size, preview, marker}`.
 
-```
-Compress flow:
-1. Hash content: SHA-256 → first 24 hex chars
-2. Check inline_store (Python side)
-3. If miss: POST to proxy :9798/ccr/create (or :9797 fallback)
-4. If proxy fail: store inline as fallback
-5. Return {hash, type, size, compression_ratio}
+## 2. aphrodite_retrieve
+
+```json
+{
+  "name": "aphrodite_retrieve",
+  "description": "Resolve CCR markers to original content via aphrodite proxy. Optionally filter by query. Supports file path reads.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "hash": { "type": "string", "description": "CCR marker hash to retrieve" },
+      "query": { "type": "string", "description": "Optional: filter content to lines containing this query" },
+      "path": { "type": "string", "description": "Optional: workspace file path to read directly (bypasses CCR)" }
+    }
+  }
+}
 ```
 
-### Proxy Support (proxy.rs:1587)
+| Input | Behavior |
+| --- | --- |
+| `path` given | Reads the file directly - confined to the current workspace and capped at 10 MiB. Refuses reads outside the workspace (e.g. `/etc/passwd`, `~/.ssh`) |
+| `hash` given | Resolves the marker from the session's inline store / CCR backend |
+| `query` set | Filters the result to matching lines (case-insensitive) |
 
-```
-1. content < 256B: inline_ccr store
-2. content ≥ 256B: CCR store
-3. Return {compressed: "<<<CCR:hash|compress|size>>>", hash, original_size}
-```
+Returns `{found, source: "path"|"ccr", content}` or `{found: false, error}`.
 
 ## 3. aphrodite_stats
 
-### Schema (\_hooks/transform.py:1228)
-
 ```json
 {
-	"name": "aphrodite_stats",
-	"description": "Check aphrodite proxy health, CCR stats, engine compression status.",
-	"parameters": { "type": "object", "properties": {} }
+  "name": "aphrodite_stats",
+  "description": "Check aphrodite proxy health, CCR stats, engine compression status.",
+  "parameters": { "type": "object", "properties": {} }
 }
 ```
 
-### Handler (\_hooks/transform.py:1176)
+Returns session + proxy state in one call:
 
-```
-Returns:
+```json
 {
-    "proxy": {
-        "token": {"alive": true, "ccr_hits": 1234, "ccr_created": 567, ...},
-        "cache": {"alive": false}
+  "version": "1.2.1",
+  "engine": "aphrodite-hermes",
+  "inline_entries": 0,
+  "markers": 0,
+  "referenced_files": 0,
+  "archived_turns": 0,
+  "turn": 0,
+  "engine_enabled": true,
+  "threshold_pct": 45,
+  "tool_threshold": 512,
+  "terminal_threshold": 1024,
+  "proxies": { "cache": { "alive": false }, "token": { "alive": true } }
+}
+```
+
+`proxies` reflects a live HTTP poll of both configured proxy ports - see
+[Troubleshooting: verify the proxy without Hermes](../install/troubleshooting.md#verify-the-proxy-without-hermes).
+
+## 4. aphrodite_files
+
+```json
+{
+  "name": "aphrodite_files",
+  "description": "List all file paths referenced in the current session.",
+  "parameters": { "type": "object", "properties": {} }
+}
+```
+
+Returns `{total, files: [{path, tool}]}`, populated as tool hooks touch paths.
+
+## 5. aphrodite_diff
+
+```json
+{
+  "name": "aphrodite_diff",
+  "description": "Show conversation turn history - what was discussed, compressed, and stored across turns.",
+  "parameters": { "type": "object", "properties": {} }
+}
+```
+
+Returns `{total, turns: [...]}`.
+
+## 6. aphrodite_search
+
+```json
+{
+  "name": "aphrodite_search",
+  "description": "Search across CCR entries - find previously compressed content by keyword or type.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string", "description": "Search keyword or phrase" },
+      "type": { "type": "string", "description": "Optional: filter by CCR type" }
     },
-    "engine": {
-        "active": true, "compressions": 12,
-        "threshold_tokens": 500000, "last_prompt_tokens": 320000, ...
+    "required": ["query"]
+  }
+}
+```
+
+Case-insensitive match against preview text or type, newest first, capped at
+20 results. Returns `{query, total, results: [{hash, type, size, preview}]}`.
+
+## 7. aphrodite_test
+
+```json
+{
+  "name": "aphrodite_test",
+  "description": "Run full smoke test suite - compress, retrieve, search, stats, files, diff, proxy health.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "mode": { "type": "string", "description": "Test mode: quick (default), full, or matrix" }
+    }
+  }
+}
+```
+
+| Mode | Samples |
+| --- | --- |
+| `quick` | 1 sample (source code) - compress then round-trip retrieve |
+| anything else | 3 samples (source code, a build with errors/warnings, a JSON array) - each compressed then round-tripped |
+
+Returns `{mode, status: "ok"|"fail", passed, total, checks, proxies}`. This is
+the same tool [Troubleshooting](../install/troubleshooting.md#verify-the-proxy-without-hermes)
+points to for confirming things work without a full Hermes session.
+
+## 8. aphrodite_catalog
+
+```json
+{
+  "name": "aphrodite_catalog",
+  "description": "Return full compression catalog with hashes, sizes, types, previews. Mode 'toc' for compact table-of-contents.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "mode": { "type": "string", "description": "Optional: 'toc' for compact table-of-contents, default full catalog" }
+    }
+  }
+}
+```
+
+`mode: "toc"` returns a compact `{hash, type, size, preview}` per entry; the
+default full mode adds `{turn}`. Newest entries first.
+
+## 9. aphrodite_reclassify
+
+```json
+{
+  "name": "aphrodite_reclassify",
+  "description": "Retroactively classify/metadata-enrich all CCR entries lacking structured metadata.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "hash": { "type": "string", "description": "Optional: reclassify a single entry by hash" },
+      "action": { "type": "string", "description": "Set to 'all' to reclassify all entries lacking meta." }
+    }
+  }
+}
+```
+
+Re-runs type detection and preview generation against already-stored content
+(all entries, or one `hash`), updating the marker in place. Returns
+`{status: "ok", reclassified: <count>}`.
+
+## 10. aphrodite_prefetch
+
+```json
+{
+  "name": "aphrodite_prefetch",
+  "description": "Read files in background and compress to CCR. Returns markers instantly.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "paths": { "type": "array", "items": { "type": "string" }, "description": "List of file paths to prefetch" }
     },
-    "inline_store": {"entries": 42, "total_bytes": 50000}
+    "required": ["paths"]
+  }
 }
 ```
 
-Queries both proxy ports via HTTP `/stats`.
+Despite "background" in the description, prefetch currently runs
+synchronously - anything it reports is already resolvable by the time the
+tool call returns.
 
-## 4. aphrodite_rebuild
-
-### Schema (\_hooks/transform.py:423)
+## 11. aphrodite_prefetch_status
 
 ```json
 {
-	"name": "aphrodite_rebuild",
-	"description": "Rebuild aphrodite crate from source and install binary.",
-	"parameters": { "type": "object", "properties": {} }
+  "name": "aphrodite_prefetch_status",
+  "description": "Live prefetch schedule - what's loading, what's ready, ETAs per file.",
+  "parameters": { "type": "object", "properties": {} }
 }
 ```
 
-### Handler (\_hooks/transform.py:399)
+Returns `{loading: [], ready: [{path, hash, type, size}], errors: [], total_ready}`.
+`loading`/`errors` are always empty today since prefetch is synchronous -
+anything tracked is immediately `ready`.
 
-```
-Executes: cargo build --release -p aphrodite
-Copies: target/release/aphrodite → ~/.hermes/aphrodite/aphrodite
-```
+## 12. aphrodite_rebuild
 
-## 5. aphrodite_files
+Reports state rather than performing a rebuild - the dylib can't safely
+rebuild itself mid-session. Returns
+`{status: "ok", version, proxies, hint: "rebuild via cargo build --release -p aphrodite; dylib hot-reloads on mtime change"}`.
 
-### Schema (\_hooks/transform.py:1266)
+## Content-type hints for compress
 
-```json
-{
-	"name": "aphrodite_files",
-	"description": "List all file paths referenced in the current session. Grouped by tool type.",
-	"parameters": { "type": "object", "properties": {} }
-}
-```
-
-### Handler (\_hooks/transform.py:1250)
-
-```
-Returns: {count, by_tool: {tool_name: [paths]}, all: [sorted paths]}
-```
-
-Tracks files touched by `read_file`, `write_file`, `patch`, `search_files`.
-
-## 6. aphrodite_diff
-
-### Schema (\_hooks/transform.py:1284)
-
-```json
-{
-	"name": "aphrodite_diff",
-	"description": "Show conversation turn history - what was discussed, compressed, and stored across turns.",
-	"parameters": { "type": "object", "properties": {} }
-}
-```
-
-### Handler (\_hooks/transform.py:1273)
-
-```
-Returns: {turns: N, recent: [{turn, hash, summary, size}]}
-```
-
-Last 10 turns from `_conv_index`.
-
-## 7. aphrodite_search
-
-### Schema (\_hooks/transform.py:1408)
-
-```json
-{
-	"name": "aphrodite_search",
-	"description": "Search across compressed items by type or content pattern (trigram-indexed).",
-	"parameters": {
-		"type": "object",
-		"properties": {
-			"query": {
-				"type": "string",
-				"description": "Search query (min 3 chars)"
-			},
-			"type": {
-				"type": "string",
-				"description": "Filter by content type"
-			}
-		}
-	}
-}
-```
-
-### Handler (\_hooks/transform.py:1318)
-
-```
-Searches:
-1. _conv_index (turn summaries)  -  linear scan
-2. _inline_store  -  trigram-indexed (lazy init)
-3. _recent_markers  -  linear scan
-Results deduplicated by hash, max 20.
-```
-
-## 8. aphrodite_test
-
-### Schema (\_hooks/transform.py:1495+)
-
-```json
-{
-	"name": "aphrodite_test",
-	"description": "Full smoke test suite - exercises all tools, hooks, compression, search, retrieve.",
-	"parameters": {
-		"type": "object",
-		"properties": {
-			"mode": {
-				"type": "string",
-				"description": "Test mode: quick, full, matrix, pipeline"
-			}
-		}
-	}
-}
-```
-
-### Handler (\_hooks/transform.py:1419)
-
-```
-Modes:
-- quick: compress, retrieve, stats, files, diff, proxy health
-- full: quick + large payload compression, search, threshold checks
-- matrix: settings sweep (pct × protect_n combinations)
-- pipeline: full + feature toggles (debug, engine, catalog modes)
-```
-
-## 9. aphrodite_catalog
-
-### Schema (\_hooks/transform.py:1311)
-
-```json
-{
-	"name": "aphrodite_catalog",
-	"description": "Return full compression catalog - all CCR items with hashes, sizes, types, and previews.",
-	"parameters": { "type": "object", "properties": {} }
-}
-```
-
-### Handler (\_hooks/transform.py:1291)
-
-```
-Returns:
-{
-    "total_items": 42,
-    "total_saved": 500000,
-    "by_type": {"code_rust": {"count": 5, "hashes": [...]}, ...},
-    "items": [{"hash": "...", "type": "code_rust", "size": 1234, "preview": "..."}],
-    "conv_turns": 12,
-    "referenced_files": 8
-}
-```
-
-Full dump of `_recent_markers` deque.
-
-## Proxy Tool Relay
-
-Tools handled by `execute_tool_relay()` in proxy.rs:1561:
-
-| Tool                 | Proxy Handler               | Response                |
-| -------------------- | --------------------------- | ----------------------- |
-| `aphrodite_retrieve` | inline_ccr → CCR store      | `{found, content}`      |
-| `aphrodite_compress` | inline (<256B) or CCR store | `{hash, original_size}` |
-| `aphrodite_list`     | ccr.len()                   | `{entries, backend}`    |
-
-Other tool names → `"Unknown tool: {name}"` error.
-
-## Content-Type Hints for compress
-
-From schema description: `code`, `log`, `diff`, `error`, `json`, `build_output`,
-`text`. These map to the content type taxonomy used by `detect_content_type()`
-for adaptive threshold selection.
+`aphrodite_compress`'s `type` hint accepts `code`, `log`, `diff`, `error`,
+`json`, `build_output`, or `text`. These map to the same taxonomy used
+throughout - see [Content Types](../ccr/content-types.md). A hint of `"text"`
+(or an empty hint) is treated as "no hint" - the type is auto-detected
+instead.
