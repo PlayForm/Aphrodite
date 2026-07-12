@@ -4,9 +4,7 @@
 
 ---
 
-# [Aphrodite] 💋 (`aphrodite`)
-
-[Aphrodite]: https://github.com/PlayForm/Aphrodite
+# Aphrodite 💋 (`aphrodite`)
 
 > **Your LLM burns 90% of its context on output it never reads. We fix that.**
 >
@@ -16,12 +14,18 @@
 
 [![release](https://img.shields.io/badge/release-v1.2.1-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![plugin](https://img.shields.io/badge/plugin-v2.0.5-purple)](plugins/aphrodite/plugin.yaml)
-[![rust](https://img.shields.io/badge/rust-1.80+-orange)](https://rust-lang.org)
+![rust](https://img.shields.io/badge/rust-1.80+-orange)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
 ---
 
 ## Install ⚡
+
+Aphrodite ships two build artifacts from two crates: the `aphrodite` proxy
+binary (standalone HTTP proxy, `:9797`/`:9798`) and the
+`libaphrodite_hermes.{dylib,so,dll}` dylib (loaded in-process by the Hermes
+plugin, no CLI of its own). You don't need to know this for the common path
+below - it starts mattering the moment something needs installing by hand.
 
 ### As a Hermes plugin (recommended)
 
@@ -36,15 +40,36 @@ hermes
 On first launch, the plugin auto-downloads the `aphrodite` binary from
 [releases](https://github.com/PlayForm/Aphrodite/releases). No Rust toolchain needed.
 
+> **Windows**: `plugins/aphrodite/download.ps1` is a native PowerShell
+> equivalent of `download.sh` - no Git Bash/WSL needed. See
+> [Windows install](docs/install/windows.md) for the fast path plus a fully
+> manual walkthrough. Full per-platform guides (including which of
+> Aphrodite's two build artifacts you actually need) live under
+> [docs/install/](docs/install/README.md).
+
+### `cargo install` + one-shot bootstrap
+
+```bash
+cargo install aphrodite aphrodite-hermes
+aphrodite setup --api-key sk-... --api-url https://api.deepseek.com --model deepseek-v4-pro
+```
+
+`aphrodite setup` provisions `~/.hermes/aphrodite/` end to end - binaries,
+dylibs, `aphrodite.toml`, `plugin.yaml`, and `hermes plugins enable
+aphrodite` - in one command. **Its plugin-symlink step is currently a no-op
+on Windows** (Unix-only code path); see
+[docs/install/README.md](docs/install/README.md#the-aphrodite-setup-gap-on-windows)
+if you hit that.
+
 ### From source (monorepo)
 
 ```bash
 git clone https://github.com/PlayForm/Aphrodite.git
 cd Aphrodite
 git submodule update --init --recursive  # required - vendored deps live in submodules
-cargo build --release -p aphrodite
+cargo build --release -p aphrodite -p aphrodite-hermes
 # Binary: target/release/aphrodite
-# Dylib:  target/release/libaphrodite.dylib
+# Dylibs: target/release/libaphrodite.dylib, target/release/libaphrodite_hermes.dylib
 ```
 
 ### What changes after install
@@ -194,7 +219,8 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 plugins/aphrodite/          ← Standalone Hermes plugin (git submodule)
   __init__.py               ← 145-line Python loader (ctypes FFI)
   plugin.yaml               ← 12 tools, 5 hooks, context engine
-  download.sh               ← Binary auto-downloader
+  download.sh               ← Binary auto-downloader (macOS/Linux/Git Bash/WSL)
+  download.ps1              ← Binary auto-downloader (native Windows PowerShell)
   binaries/                 ← Platform-native dylib + proxy binary
   README.md                 ← Standalone install instructions
 
@@ -311,8 +337,8 @@ settings from `aphrodite.toml`, each overridable via an `APHRODITE_*` env var.
 
 ## Relationship to Headroom
 
-Aphrodite embeds [Headroom](https://github.com/PlayForm/Headroom) - our custom
-fork tracked as a git submodule at `vendor/headroom/`. Headroom provides the
+Aphrodite embeds Headroom - our custom fork tracked as a git submodule at
+`vendor/headroom/`. Headroom provides the
 content transforms (classifier, smart crusher, tokenizer); Aphrodite adds the
 preview pipeline, CCR storage, Hermes integration, and dual-proxy architecture.
 
@@ -333,7 +359,4 @@ No contribution is too small. First-time contributor? **Especially** welcome.
 
 ---
 
-⭐ **Like Aphrodite?** [Star the repo](https://github.com/PlayForm/Aphrodite) -
-it helps others find it and makes our day.
-
-_Built with ❤️ by [PlayForm](https://github.com/PlayForm)._
+_Built with ❤️ by PlayForm._
