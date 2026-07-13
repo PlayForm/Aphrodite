@@ -40,7 +40,7 @@ same 3-check `full` set.
 
 ## Compression Type Matrix
 
-Benchmark all 6 compression types. Issue them independently - no need to
+Benchmark all 28 content types. Issue them independently - no need to
 retrieve results.
 
 | Type           | Example Content                                 | Center Example             |
