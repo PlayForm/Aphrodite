@@ -12,7 +12,11 @@ first match wins:
 
 ```
 1. JSON (starts with '{' or '[') → validate JSON
-   1a. Contains "exit_code" or "status" → "tool_output"
+   1a. Contains the bare word `exit_code` OR the quoted JSON key `"status"`
+       (note the asymmetry: `exit_code` matches unquoted anywhere in the
+       text, `status` must appear as a quoted JSON key specifically -
+       `content.contains("exit_code") || content.contains("\"status\"")`)
+       → "tool_output"
    1b. Otherwise → "json"
 2. Code (lines > 3)
    2a. Rust: fn/pub fn/async fn/impl/struct/enum + (-> or & or use) → "code_rust"
@@ -64,9 +68,9 @@ The Python classifier examines the first 5,000 characters:
 | `text`           | Unrecognized content              | Text (×2)           | Rust proxy        |
 | `tool_output`    | JSON + exit_code/status           | Default (×1)        | Rust proxy        |
 | `json`           | Valid JSON (object/array)         | Default (×1)        | Rust proxy        |
-| `build_output`   | cargo build/test output           | Noisy (÷2)          | Rust proxy        |
-| `log`            | Structured log lines              | Noisy (÷2)          | Rust proxy        |
-| `linter`         | Linter/compiler error output      | Noisy (÷2)          | Rust proxy        |
+| `build_output`   | cargo build/test output           | Noisy (×1, BASE)    | Rust proxy        |
+| `log`            | Structured log lines              | Noisy (×1, BASE)    | Rust proxy        |
+| `linter`         | Linter/compiler error output      | Noisy (×1, BASE)    | Rust proxy        |
 | `build_error`    | Rust error[E…]                    | n/a (Python only)   | Python plugin     |
 | `search_results` | JSON + total_count                | n/a (Python only)   | Python plugin     |
 | `process_output` | JSON + session_id                 | n/a (Python only)   | Python plugin     |
@@ -82,13 +86,20 @@ The Python classifier examines the first 5,000 characters:
 
 ## Threshold Groups
 
-### Noisy Types (÷2, excluded from auto-tune)
+### Noisy Types (BASE, excluded from auto-tune)
 
 ```
 "linter", "build_output", "log"
 ```
 
-Always at `base / 2`, regardless of auto-tune state.
+Always at the unmodified `base` threshold, regardless of auto-tune state -
+NOT halved. `proxy.rs::threshold_for` returns `base` for these three types
+immediately, before the auto-tune multiplier or the per-type multiplier
+table is even consulted. An earlier draft of this doc claimed these types
+compress at `base / 2` ("noisy, so compress more aggressively"); the actual
+code keeps them fully visible at the same threshold as `tool_output`/`json`,
+specifically because build/lint/log output is exactly what a coding session
+needs to see.
 
 ### Error Types (×8)
 
@@ -149,7 +160,8 @@ pub fn main() -> Result<()> {
     Finished release [optimized] target(s) in 12.34s
 ```
 
-→ type=build_output, threshold ÷2 (more aggressive compression)
+→ type=build_output, threshold ×1 (BASE - kept fully visible, not halved;
+see the "Noisy Types" correction above)
 
 ### Linter Output
 
@@ -158,7 +170,7 @@ error[E0308]: mismatched types
   --> src/proxy.rs:841:5
 ```
 
-→ type=linter (matches `error[E` before generic `error`), threshold ÷2
+→ type=linter (matches `error[E` before generic `error`), threshold ×1 (BASE)
 
 ### Log Output
 
@@ -166,7 +178,7 @@ error[E0308]: mismatched types
 [2025-06-16T12:34:56Z INFO  aphrodite] proxy starting on :9798
 ```
 
-→ type=log, threshold ÷2
+→ type=log, threshold ×1 (BASE)
 
 ## Python Classifier Examples
 

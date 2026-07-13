@@ -14,7 +14,7 @@ initial compression to eventual expiry.
    a. detect_content_type() → ct (e.g., "code_rust", "error", "diff")
    b. threshold_for(ct) × budget_mult (from x-headroom-budget) → threshold
    c. If content.len() > threshold:
-      i.   compute_key(content) → hash (BLAKE3, 24 hex chars)
+      i.   compute_key(content) → hash (BLAKE3, 40 hex chars)
       ii.  Check CCR cache: ccr.get(hash) → hit or miss
       iii. If miss: ccr.put(hash, content), increment ccr_created
       iv.  Update tokens_saved counter
@@ -97,28 +97,49 @@ Includes structured metadata (language, functions, line count, etc.).
 Retrieval flow:
 
 ```
-1. Validate hash parameter (required)
+1. Validate hash parameter (required); normalize it (strip a trailing
+   `|type|size` marker-body suffix an LLM might echo back, trim whitespace -
+   marker::normalize_hash)
 2. Check inline_ccr (LruCache):
    a. Hit → return content immediately
    b. Miss → fall through to CCR backend
 3. Check CCR backend (SQLite or in-memory):
    a. ccr.get(hash) → hit or miss
-4. If hit: check for zstd magic bytes (0x28, 0xB5, 0x2F, 0xFD)
-   a. If zstd compressed: zstd::decode_all() → decompress
-   b. Otherwise: return as-is
-5. If miss: 404 NOT_FOUND
-6. Apply optional query filter (case-insensitive line grep, max 512 chars)
-7. Apply optional pagination (offset + limit)
-8. Return {found: true/false, content: "…", source: "ccr"/"none"}
+4. If miss: 404 NOT_FOUND
+5. Apply optional query filter (case-insensitive line grep, truncated to
+   512 chars, char-safe)
+6. Apply optional pagination (offset + limit, limit clamped to 10,000 lines)
+7. Return {found: true/false, content: "…", source: "ccr"/"none"}
 ```
 
-### Python Retrieve
+Earlier drafts of this doc (and of `retrieve.rs` itself) described a step
+that checked returned content for zstd magic bytes (`0x28 0xB5 0x2F 0xFD`)
+and decompressed it. That branch was dead code: `CcrStore::get` returns a
+`String`, and a `String` is guaranteed valid UTF-8 - it can never legally
+contain those non-UTF-8 magic bytes in the first place, since nothing in
+this codebase's `CcrStore` implementations ever zstd-compresses content
+before storing it. The branch has been removed; see
+`.plans/05-compression-pipeline.md` T12.
 
-The Python plugin's retrieve handler follows the same flow, plus:
+### Hermes Tool Retrieve (`aphrodite_retrieve`)
 
-- Recursive resolution up to 3 levels deep (nested CCR markers)
-- File path reads (workspace-bounded, 10MB cap)
-- Inline store fallback
+The Hermes MCP tool's retrieve handler (`aphrodite-hermes/src/tools.rs`) is a
+separate code path from the HTTP `/retrieve` endpoint above - it resolves
+against the session's in-process inline store via `resolve::expand`, not the
+CCR backend. It additionally supports:
+
+- Recursive resolution up to `RECURSIVE_DEPTH` (currently **5**) levels deep
+  for nested CCR markers (`resolve::resolve_recursive`) - an earlier version
+  of this doc said "3 levels"; the code has always used 5, this doc was
+  wrong. At the depth limit, the un-further-expanded raw content is returned
+  rather than an `[CCR_UNRESOLVED:...]` placeholder, so hitting the limit
+  never misreports content that genuinely exists in the store as missing.
+- File path reads (workspace-bounded, 10MB cap, `read_path_guarded`)
+- Inline store fallback via `resolve_one`
+- Never writes the expanded result back over the original hash's store entry
+  (a prior implementation did this and both destroyed literal
+  marker-shaped text the original content merely contained, and broke the
+  content-address invariant - see `.plans/05-compression-pipeline.md` F1)
 
 ## Phase 6: Expire
 
@@ -141,13 +162,20 @@ The Python plugin's retrieve handler follows the same flow, plus:
 
 ### Per-Type Multipliers
 
-| Type                        | Multiplier | Effective (Token, 1KB base) | Effective (Cache, 8KB base) |
-| --------------------------- | ---------- | --------------------------- | --------------------------- |
-| error                       | ×8         | 8,192                       | 65,536                      |
-| code_rust/python/go/js/code | ×4         | 4,096                       | 32,768                      |
-| diff, git, text             | ×2         | 2,048                       | 16,384                      |
-| tool_output, json           | ×1         | 1,024                       | 8,192                       |
-| linter, build_output, log   | ÷2         | 512                         | 4,096                       |
+| Type                        | Multiplier            | Effective (Token, 1KB base) | Effective (Cache, 8KB base) |
+| --------------------------- | ---------------------- | --------------------------- | --------------------------- |
+| error                       | ×8                     | 8,192                       | 65,536                      |
+| code_rust/python/go/js/code | ×4 (config, default)   | 4,096                       | 32,768                      |
+| diff, git, text             | ×2                     | 2,048                       | 16,384                      |
+| tool_output, json           | ×1                     | 1,024                       | 8,192                       |
+| linter, build_output, log   | ×1 (BASE, not halved)  | 1,024                       | 8,192                       |
+
+**Correction:** `linter`, `build_output`, and `log` are pinned at the BASE
+threshold, not halved. `proxy.rs::threshold_for` returns `base` for these
+three types immediately - before the auto-tune multiplier or the rest of
+this table is even consulted - because "coding sessions need build output
+visible" (the code's own comment). An earlier draft of this table showed a
+÷2 discount (effective 512B/4,096B); the real code has never halved these.
 
 ### Auto-Tune
 
@@ -160,8 +188,10 @@ Based on `compression_ratio_ema` (×100):
 | < 3.0       | 0.5         | Lower thresholds (compress more aggressively)   |
 | 0.0         | 1.0         | No history - default                            |
 
-Note: `linter`, `build_output`, `log` types are excluded from auto-tune (always
-base/2).
+Note: `linter`, `build_output`, `log` types are excluded from auto-tune -
+`threshold_for` returns their (unhalved) base threshold before the auto-tune
+multiplier is applied at all, not "always base/2" as an earlier draft of
+this doc claimed.
 
 ### Python Plugin Thresholds
 
@@ -176,9 +206,21 @@ base/2).
 
 ### Headroom Budget Multiplier
 
-| Budget | Multiplier | Effect                 |
-| ------ | ---------- | ---------------------- |
-| < 25   | 0.25       | Aggressive compression |
-| < 50   | 0.50       | Moderate compression   |
-| < 75   | 0.75       | Light compression      |
-| ≥ 75   | 1.00       | No adjustment          |
+`budget_mult` is a smooth linear function of the `x-headroom-budget` request
+header, NOT the discrete three-step table an earlier draft of this doc
+claimed:
+
+```
+budget_mult = clamp(0.50 + (headroom_budget% / 100) * 0.50, 0.50, 1.0)
+```
+
+| Budget (fill %) | Multiplier | Effect                              |
+| ---------------- | ---------- | ------------------------------------ |
+| 0%                | 0.50       | Most aggressive compression allowed  |
+| 50%               | 0.75       | Moderate compression                 |
+| 100% (or no header/unparseable) | 1.00 | No reduction (default when the header is absent) |
+
+The multiplier never drops below 0.50× regardless of how low the budget
+signal is - "semantics and tool chains are worth the tokens" per the code's
+own comment - and the default with no budget header supplied is 1.0
+(unmodified threshold), not the most aggressive setting.
