@@ -20,8 +20,24 @@ MSG="${1:-}"
 
 cd "$REPO_ROOT"
 
-# Sync submodules to their remote tracking branches (non-fatal - may fail offline)
-git submodule update --remote --recursive --merge || echo "[submodule] sync skipped (offline or no remote)"
+# Sync submodules to their remote tracking branches - OPT-IN ONLY
+# (report 08 F3/T4): floating all three submodules to their remote branch
+# tips at release time meant a release's actual contents (whatever landed
+# upstream by release day) could silently differ from anything anyone
+# reviewed. Default is now "release exactly what is pinned" - set
+# SYNC_SUBMODULES=1 to deliberately float pins as part of this release, and
+# the before/after `git submodule status` makes the pin bump visible in the
+# release log instead of riding along silently.
+if [ "${SYNC_SUBMODULES:-0}" = "1" ]; then
+	echo "[submodule] SYNC_SUBMODULES=1 - syncing to remote branch tips"
+	echo "[submodule] before:"
+	git submodule status
+	git submodule update --remote --recursive --merge || echo "[submodule] sync skipped (offline or no remote)"
+	echo "[submodule] after:"
+	git submodule status
+else
+	echo "[submodule] SYNC_SUBMODULES not set - releasing exactly what is pinned (no float)"
+fi
 # (vendor submodule handled by git submodule)
 
 # Stage all changes

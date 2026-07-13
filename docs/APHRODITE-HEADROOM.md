@@ -119,6 +119,41 @@ Session start
   → Hooks wired
 ```
 
+### Updating the vendored fork
+
+There is no dedicated tool for this - it's a checklist, followed in order,
+every time `vendor/headroom` gets a pin bump (report 08 F10/T7):
+
+1. **Merge upstream into the fork.** Inside `vendor/headroom` (a separate
+   git repo pointed at `PlayForm/Headroom`), merge `upstream/main` into the
+   fork's own `Current` branch. Resolve conflicts there, not in the
+   superproject - the fork is developed and reviewed independently.
+2. **Run the fork's own test suite** (`cargo test --workspace --all-features`
+   inside `vendor/headroom`, plus the Python suite if the merge touched
+   `headroom/`). Do this *before* touching the superproject at all - a
+   broken fork should never even become a pin-bump candidate.
+3. **Make a dedicated pin-bump commit** in the superproject: `git add
+   vendor/headroom && git commit`. One commit, one purpose - "bump
+   headroom-core to <sha>" - never bundled with unrelated Aphrodite changes,
+   so a bad bump is a one-line revert.
+4. **Run the serde_json feature-parity check**
+   (`cargo test -p aphrodite --test serde_json_features`, report 08 F2) -
+   this is the regression class that has already bitten this repo once (see
+   `HEADROOM-FORK-DIFF.md`'s 2026-07-11 merge section): losing
+   `preserve_order`/`arbitrary_precision` feature unification breaks
+   SmartCrusher anchor matching with no compile error.
+5. **Run `cargo test -p aphrodite`** (the full Aphrodite suite against the
+   newly-pinned headroom-core) to catch any API-surface drift the merge
+   introduced.
+6. **Refresh `HEADROOM-FORK-DIFF.md`'s baseline header** - update the
+   "Current baseline" commit SHA/date at the top of the file so the next
+   person diffing the fork knows where the last sync landed.
+
+Submodule pins are dependency versions - treat a bump like any other
+dependency upgrade: reviewed, isolated, tested before it ships. `git
+submodule update --remote` inside an unattended script (see report 08 F3)
+is exactly the anti-pattern this checklist exists to prevent.
+
 ---
 
 → **[Complete fork divergence analysis](HEADROOM-FORK-DIFF.md)** - every commit, every deleted file, every modified subsystem between upstream Headroom and our PlayForm fork.
