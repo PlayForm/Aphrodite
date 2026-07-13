@@ -77,8 +77,21 @@ fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 		obj.get("exit_code"),
 	) {
 		if output.is_empty() { return None; }
-		let ct = if output.contains("exit code:") || output.contains("Error:") {
-			"terminal".to_string()
+		// Terminal outputs are often short and don't trigger the headroom
+		// classifier's build_output pattern. Add explicit heuristics so
+		// cargo output, test runs, and shell traces get meaningful previews.
+		let ct: String = if output.contains("exit code:") || output.contains("Error:") {
+			"terminal".into()
+		} else if output.contains("   Compiling") || output.contains("    Finished")
+			|| output.contains("   Running") || output.contains("test result:")
+			|| output.contains("   Building") || output.contains("   Installing")
+			|| output.contains("warning:") || output.contains("error[")
+		{
+			if output.contains("error[") || output.contains("error: could not") {
+				"build_error".into()
+			} else {
+				"build_output".into()
+			}
 		} else {
 			aphrodite::detect_type(output)
 		};
@@ -112,10 +125,26 @@ fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 
 	// ── Search: {"total_count":N,"matches":[...],"truncated":bool} ──
 	if let Some(count) = obj.get("total_count").and_then(|c| c.as_u64()) {
-		let truncated = obj.get("truncated").and_then(|t| t.as_bool()).unwrap_or(false);
-		let label = if truncated { format!("{} results (truncated)", count) }
-					else { format!("{} results found", count) };
-		return Some((label, "search".to_string()));
+		// Build a grep-style content so the search preview shows real hits.
+		let mut lines = Vec::new();
+		if let Some(matches) = obj.get("matches").and_then(|m| m.as_array()) {
+			for m in matches.iter().take(20) {
+				if let (Some(p), Some(l)) = (
+					m.get("path").or(m.get("file")).and_then(|v| v.as_str()),
+					m.get("line"),
+				) {
+					let content = m.get("content").and_then(|c| c.as_str()).unwrap_or("");
+					lines.push(format!("{}:{}:{}", p, l, content));
+				}
+			}
+		}
+		if lines.is_empty() {
+			let truncated = obj.get("truncated").and_then(|t| t.as_bool()).unwrap_or(false);
+			let label = if truncated { format!("{} total (truncated)", count) }
+						else { format!("{} total", count) };
+			return Some((label, "search".to_string()));
+		}
+		return Some((lines.join("\n"), "search".to_string()));
 	}
 
 	// ── File read: {"content":"...","total_lines":N} ──

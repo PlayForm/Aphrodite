@@ -2,57 +2,20 @@
 # Detects secrets, API keys, tokens, and other sensitive data
 # in the git history before they reach a remote.
 #
-# Install: ggshield
+# Install: pip install ggshield
 # Run:     ggshield secret scan pre-commit
-#
-# Ignored paths are relative to repo root.
 
 version: 2
 
 secret:
-  # Paths to exclude entirely from secret scanning
-  ignored-paths:
-    # Test fixtures may contain example keys or tokens
+  ignored_paths:
     - tests/fixtures/
     - tests/parity/fixtures/
     - vendor/headroom/tests/
-
-    # Vendored third-party code - not scanned for Aphrodite secrets
     - vendor/
 
-    # CCR payload cache - contains real conversation data
-    - "~/.hermes/memories/"
-    - "~/.hermes/skills/"
-    - "~/.hermes/plugins/"
+  ignored_detectors:
+    - jwt
+    - generic-key
 
-  # Detectors to ignore for specific paths
-  ignored-detectors:
-    - detector: jwt
-      paths:
-        - tests/
-    - detector: generic-key
-      paths:
-        - tests/
-
-  # Allow specific known test/public keys (not secrets)
-  # These are example/demo keys used in documentation or test harnesses
-  allowed-paths:
-    # Public test keys in CCR test fixtures
-    - match: "sk-test-"
-      paths:
-        - tests/
-    # Example keys in documentation
-    - match: "YOUR_API_KEY"
-      paths:
-        - README.md
-
-  # GitGuardian uses heuristic detection; these are false-positive
-  # patterns that are known to trigger incorrectly in this repo.
-  ignore-known-secrets:
-    - "00112233445566778899aabbccddeeff" # example hex payload
-    - "0000000000000000000000000000000000000000" # zeroed-out hash
-
-  # Minimum entropy threshold for high-entropy string detection
-  # (SHA-256 / base64 / hex strings often have high entropy
-  # and may be false positives in a compression proxy)
-  high-entropy-threshold: 4.5
+  high_entropy_threshold: 4.5
