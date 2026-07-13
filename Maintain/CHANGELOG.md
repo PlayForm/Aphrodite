@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.2.2 - crates.io Publish + Doc Sync (2026-07-13)
+
+### Published
+
+- **First crates.io publish** — all three crates published in dependency order:
+  `aphrodite-headroom-core` (0.1.1) → `aphrodite` (1.2.2) → `aphrodite-hermes` (1.2.2)
+- `aphrodite` publish required moving the `include_str!("../../../plugins/aphrodite/__init__.py")`
+  into the crate's `templates/` directory so `cargo publish` could package it
+- Fixed `aphrodite`'s headroom-core version pin from `0.1.0` → `0.1.1` to match the published crate
+- Plugin submodule bumped from `v2.0.5` → `v2.0.6`; sync commit fixed after auto-release
+  script's `git update-index --cacheinfo` failed silently
+
+### Benchmarks (headroom-core, release profile, Apple M2 Max)
+
+| Benchmark | Result |
+|:----------|:-------|
+| Auth classify (empty) | 40.7 ns |
+| Auth classify (payg) | 80.4 ns |
+| Auth classify (oauth_jwt) | 122.8 ns |
+| Auth classify (subscription) | 50.5 ns |
+| CCR put (ST, new keys) | 453 ns |
+| CCR put (ST, overwrite) | 42.9 ns |
+| CCR get (ST, hit) | 119.4 ns |
+| CCR get (ST, miss) | 38.3 ns |
+| CCR mixed MT (8t, Dashmap) | 229 µs |
+| CCR mixed MT (8t, Mutex) | 1.15 ms |
+| Tokenizer (small/medium/large) | 32–50 MiB/s |
+
+### Verified
+
+- `cargo test --workspace`: 1,089+ passed, 0 failed (849 headroom-core + 240 aphrodite crates)
+- `cargo build --release -p aphrodite -p aphrodite-hermes`: clean (10.8s)
+- GitHub Release `Aphrodite/v1.2.2` auto-created by CI with all 9 cross-platform assets
+- All docs scanned and version badges synced to v1.2.2 / v2.0.6
+
 ## v1.2.1 - Silent Startup Failures (2026-07-11)
 
 ### Fix

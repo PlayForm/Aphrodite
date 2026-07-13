@@ -12,8 +12,8 @@
 > Sub-ms compress, 12,800× max ratio, 28-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.2.1-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![plugin](https://img.shields.io/badge/plugin-v2.0.5-purple)](plugins/aphrodite/plugin.yaml)
+[![release](https://img.shields.io/badge/release-v1.2.2-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![plugin](https://img.shields.io/badge/plugin-v2.0.6-purple)](plugins/aphrodite/plugin.yaml)
 ![rust](https://img.shields.io/badge/rust-1.88+-orange)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -156,7 +156,7 @@ crates/aphrodite-hermes/   ← Hermes-specific integration (cdylib)
   ├── schemas.rs           ← JSON Schema definitions
   └── skills.rs            ← Bundled Hermes skills
 
-plugins/aphrodite/         ← Thin Python loader (~145 lines)
+plugins/aphrodite/         ← Thin Python loader (423 lines)
   └── __init__.py          ← loads dylib, registers hooks/tools/engine via C ABI
 ```
 
@@ -298,7 +298,7 @@ aphrodite
 
 # Verify
 curl http://127.0.0.1:9798/health
-# -> {"status":"ok","version":"v1.2.1"}
+# -> {"status":"ok","version":"v1.2.2"}
 
 # Dev loop with auto-reload
 RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
