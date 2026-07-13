@@ -199,25 +199,13 @@ pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 	let path = unsafe { cstr(config_path) }.unwrap_or_default();
 	let mut state = AphroditeState::default();
+	// 01-F4/F9: delegate to `config_loader::Config` instead of hand-parsing
+	// four `[compression]` keys here - this hand-rolled copy had already
+	// drifted from `apply_compression`'s own key names (e.g. `tool_threshold`
+	// vs `tool_threshold_token`) and never honored env var overrides, unlike
+	// every other init path in the crate.
 	if !path.is_empty() {
-		if let Ok(s) = std::fs::read_to_string(path.as_str()) {
-			if let Ok(t) = s.parse::<toml::Table>() {
-				if let Some(c) = t.get("compression").and_then(|v| v.as_table()) {
-					if let Some(v) = c.get("context_engine").and_then(|v| v.as_bool()) {
-						state.context_engine_enabled = v;
-					}
-					if let Some(v) = c.get("engine_threshold_pct").and_then(|v| v.as_integer()) {
-						state.engine_threshold_pct = v as u64;
-					}
-					if let Some(v) = c.get("tool_threshold").and_then(|v| v.as_integer()) {
-						state.tool_threshold = v as usize;
-					}
-					if let Some(v) = c.get("terminal_threshold").and_then(|v| v.as_integer()) {
-						state.terminal_threshold = v as usize;
-					}
-				}
-			}
-		}
+		crate::config_loader::Config::load_from(&path).apply_compression(&mut state);
 	}
 	CString::new(alloc_handle(state).to_string()).unwrap().into_raw()
 }
@@ -449,38 +437,7 @@ pub extern "C" fn aphrodite_directive(handle:*const c_char, action:*const c_char
 	match get_handle(hid) {
 		Some(session) => {
 			let mut s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-			match act.as_ref() {
-				"list" => {
-					let all:Vec<String> = s.directives.keys().cloned().collect();
-					to_json_ok(&serde_json::json!({
-						"available": all,
-						"active": &s.active_directives,
-					}))
-				},
-				"swap" => {
-					if s.directives.contains_key(&nm.to_string()) {
-						s.active_directives = vec![nm.to_string()];
-						to_json_ok(&serde_json::json!({"swapped": nm, "active": &s.active_directives}))
-					} else {
-						to_json_error(&format!("unknown directive: {}", nm))
-					}
-				},
-				"add" => {
-					if s.directives.contains_key(&nm.to_string()) && !s.active_directives.contains(&nm.to_string()) {
-						s.active_directives.push(nm.to_string());
-					}
-					to_json_ok(&serde_json::json!({"active": &s.active_directives}))
-				},
-				"remove" => {
-					s.active_directives.retain(|d| d != &nm);
-					to_json_ok(&serde_json::json!({"active": &s.active_directives}))
-				},
-				"reset" => {
-					s.active_directives.clear();
-					to_json_ok(&serde_json::json!({"active": &s.active_directives}))
-				},
-				_ => to_json_error(&format!("unknown action: {} (use list|swap|add|remove|reset)", act)),
-			}
+			to_json_ok(&directives::handle_action(&mut s, &act, &nm))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
 	}
@@ -617,35 +574,7 @@ pub extern "C" fn aphrodite_dispatch(
 			"directive" => {
 				let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("list");
 				let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
-				match action {
-					"list" => serde_json::json!({
-						"available": s.directives.keys().collect::<Vec<&String>>(),
-						"active": &s.active_directives,
-					}),
-					"swap" => {
-						if s.directives.contains_key(name) {
-							s.active_directives = vec![name.to_string()];
-							serde_json::json!({"swapped": name, "active": &s.active_directives})
-						} else {
-							serde_json::json!({"error": format!("unknown directive: {}", name)})
-						}
-					},
-					"add" => {
-						if s.directives.contains_key(name) && !s.active_directives.contains(&name.to_string()) {
-							s.active_directives.push(name.to_string());
-						}
-						serde_json::json!({"active": &s.active_directives})
-					},
-					"remove" => {
-						s.active_directives.retain(|d| d != name);
-						serde_json::json!({"active": &s.active_directives})
-					},
-					"reset" => {
-						s.active_directives.clear();
-						serde_json::json!({"active": &s.active_directives})
-					},
-					_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|remove|reset)", action)}),
-				}
+				directives::handle_action(s, action, name)
 			},
 			"search" => {
 				let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();

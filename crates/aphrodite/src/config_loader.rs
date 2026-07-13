@@ -41,6 +41,21 @@ impl Config {
 	/// Reload from disk
 	pub fn reload(&mut self) { *self = Self::load(); }
 
+	/// Load from an explicit TOML file path, bypassing `load()`'s search
+	/// paths - used by `aphrodite_init` (01-F4/F9) so the handle-based C ABI
+	/// init path shares this type's parsing/section/env-override logic
+	/// instead of hand-parsing four `[compression]` keys directly (which had
+	/// silently drifted from `apply_compression`'s own key names and never
+	/// honored env var overrides at all).
+	pub fn load_from(path:&str) -> Self {
+		if let Ok(content) = std::fs::read_to_string(path) {
+			if let Ok(table) = content.parse::<toml::Table>() {
+				return Self { raw:table, overrides:HashMap::new() };
+			}
+		}
+		Self::default()
+	}
+
 	/// Set a runtime override (equivalent to Python's _settings store)
 	pub fn set_override(&mut self, key:&str, value:&str) { self.overrides.insert(key.to_string(), value.to_string()); }
 
@@ -130,24 +145,25 @@ impl Config {
 		state.api_url = self.get_string("APHRODITE_API_URL", "defaults", "api_url", "");
 
 		// ── Directives ──
-		let active = self.get_string_list("directives", "active");
-		if !active.is_empty() {
-			// Load directives from disk.
-			let dirs = vec![
-				std::path::PathBuf::from("directives"),
-				dirs::home_dir().unwrap_or_default().join(".hermes").join("directives"),
-			];
-			for dir in &dirs {
-				if dir.is_dir() {
-					state.directives = crate::directives::load_directives(dir);
-					break;
-				}
+		// 01-F4: load whenever a directives/ dir exists, not gated on `active`
+		// being non-empty - the shipped template default is `active = []`, so
+		// gating on it meant `state.directives` stayed empty forever on a cold
+		// start, making runtime discovery-then-activate
+		// (`aphrodite_directive("add"|"swap", name)`) impossible unless the
+		// user pre-activates at least one directive in TOML first. `active`
+		// now only seeds which loaded directives start active.
+		let dirs = vec![
+			std::path::PathBuf::from("directives"),
+			dirs::home_dir().unwrap_or_default().join(".hermes").join("directives"),
+		];
+		for dir in &dirs {
+			if dir.is_dir() {
+				state.directives = crate::directives::load_directives(dir);
+				break;
 			}
-			// Only activate directives that were actually loaded.
-			state.active_directives = active.into_iter()
-				.filter(|name| state.directives.contains_key(name))
-				.collect();
 		}
+		let active = self.get_string_list("directives", "active");
+		state.active_directives = active.into_iter().filter(|name| state.directives.contains_key(name)).collect();
 	}
 }
 
