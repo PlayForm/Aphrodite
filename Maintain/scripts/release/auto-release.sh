@@ -1,13 +1,22 @@
 #!/bin/bash
 # auto-release.sh - commit all changes, bump version, build, tag, release
 # auto-release.sh - commit, bump, build, tag, push - full pipeline
-# Usage: ./scripts/auto-release.sh ["commit message"]
+# Usage: ./scripts/auto-release.sh [--minor] ["commit message"]
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 CARGO_TOML="$REPO_ROOT/crates/aphrodite/Cargo.toml"
-MSG="${1:-}"
 REMOTE="${GIT_REMOTE:-origin}"
+FAILURES=()
+
+# Parse --minor before capturing the commit message, so `--minor` never gets
+# treated as the message itself.
+BUMP=patch
+if [ "${1:-}" = "--minor" ]; then
+	BUMP=minor
+	shift
+fi
+MSG="${1:-}"
 
 cd "$REPO_ROOT"
 
@@ -17,7 +26,7 @@ git submodule update --remote --recursive --merge || echo "[submodule] sync skip
 
 # Stage all changes
 git add -u
-git add docs/ scripts/ plugins/aphrodite/ 2>/dev/null || true
+git add docs/ Maintain/scripts/ plugins/aphrodite/ 2>/dev/null || true
 
 # Use provided message or auto-generate from last commit
 if [ -z "$MSG" ]; then
@@ -34,11 +43,10 @@ else
 	echo "[skip] nothing to commit"
 fi
 
-# Read current version, bump patch (or minor with --minor flag)
+# Read current version, bump patch (or minor if --minor was passed)
 CURRENT=$(grep '^version' "$CARGO_TOML" | head -1 | sed 's/.*"\(.*\)"/\1/')
-if [ "${1:-}" = "--minor" ]; then
+if [ "$BUMP" = "minor" ]; then
 	NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2+1".0"}')
-	shift
 else
 	NEW=$(echo "$CURRENT" | awk -F. '{print $1"."$2"."$3+1}')
 fi
@@ -50,6 +58,20 @@ HERMES_TOML="$REPO_ROOT/crates/aphrodite-hermes/Cargo.toml"
 sed -i '' "3s/version = \"$CURRENT\"/version = \"$NEW\"/" "$HERMES_TOML"
 sed -i '' "s/aphrodite = { path = \"..\/aphrodite\", version = \"$CURRENT\"/aphrodite = { path = \"..\/aphrodite\", version = \"$NEW\"/" "$HERMES_TOML"
 echo "[bump] aphrodite-hermes Cargo.toml → $NEW"
+
+# Sync the README release badge + example health output, and package.json,
+# to the new binary version. These track the binary version track (not the
+# plugin version track), so they're bumped unconditionally here rather than
+# inside the plugin-version block below.
+sed -i '' "s/release-v$CURRENT-blue/release-v$NEW-blue/" README.md
+sed -i '' "s/\"version\":\"v$CURRENT\"/\"version\":\"v$NEW\"/" README.md
+sed -i '' "3s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$REPO_ROOT/package.json"
+echo "[bump] README release badge + package.json → $NEW"
+
+# Always keep BINARY_VERSION tracking the binary version, regardless of
+# whether a plugin version source was found below.
+echo "$NEW" > plugins/aphrodite/BINARY_VERSION
+
 # ── Plugin version bump (submodule files - may not all exist) ──
 # Plugin version track is independent of binary version track
 PLUGIN_CURRENT=""
@@ -75,10 +97,9 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 	# The plugin lives in a git submodule (Aphrodite-Hermes repo).
 	# Version bumps above are in the submodule's working tree - they must
 	# be committed, tagged, and pushed in the submodule repo so the release
-	# is reproducible from a fresh clone.
-	# Also update BINARY_VERSION so download.sh can find the correct
-	# binary version without needing the monorepo or GitHub API.
-	echo "$NEW" > plugins/aphrodite/BINARY_VERSION
+	# is reproducible from a fresh clone. BINARY_VERSION was already written
+	# unconditionally above so download.sh always finds the correct binary
+	# version, whether or not a plugin version source exists.
 	SUBMODULE_REMOTE="${SUBMODULE_REMOTE:-Source}"
 	SUBMODULE_BRANCH="${SUBMODULE_BRANCH:-Current}"
 	(
@@ -88,9 +109,11 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 		[[ -f __init__.py ]] && git add __init__.py 2>/dev/null || true
 		git commit -m "release: plugin v$PLUGIN_NEW" || echo "[submodule] nothing to commit"
 		git tag "v$PLUGIN_NEW" 2>/dev/null || echo "[submodule] tag v$PLUGIN_NEW already exists"
-		git push "$SUBMODULE_REMOTE" "$SUBMODULE_BRANCH" 2>&1 | tail -1 || echo "[submodule] push branch skipped (auth?)"
-		git push "$SUBMODULE_REMOTE" "v$PLUGIN_NEW" 2>&1 | tail -1 || echo "[submodule] push tag skipped (auth?)"
 	)
+	git -C plugins/aphrodite push "$SUBMODULE_REMOTE" "$SUBMODULE_BRANCH" 2>&1 | tail -1 || true
+	[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("submodule push branch $SUBMODULE_BRANCH")
+	git -C plugins/aphrodite push "$SUBMODULE_REMOTE" "v$PLUGIN_NEW" 2>&1 | tail -1 || true
+	[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("submodule push tag v$PLUGIN_NEW")
 	echo "[submodule] plugin v$PLUGIN_NEW committed + tagged + pushed"
 else
 	echo "[bump] plugin skipped - no version source found"
@@ -113,17 +136,29 @@ GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2>/dev/null || git tag "
 echo "[release] Aphrodite/v$NEW tagged"
 
 # Push - always sync with remote
-git push "$REMOTE" Current 2>&1 | tail -1 || echo "[push] Current skipped (auth?)"
-git push "$REMOTE" "Aphrodite/v$NEW" 2>&1 | tail -1 || echo "[push] tag skipped (auth?)"
+git push "$REMOTE" Current 2>&1 | tail -1 || true
+[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push Current")
+git push "$REMOTE" "Aphrodite/v$NEW" 2>&1 | tail -1 || true
+[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push tag Aphrodite/v$NEW")
 echo "[push] done"
 
 # Sync submodule pointer - plugin v$PLUGIN_NEW is now committed + tagged in submodule
 SUBMODULE_SHA=$(cd plugins/aphrodite && git rev-parse HEAD)
 git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2>/dev/null
 git commit -m "chore: sync aphrodite submodule → plugin v$PLUGIN_NEW" 2>/dev/null || echo "[sync] submodule pointer already current"
-git push "$REMOTE" Current 2>&1 | tail -1 || echo "[push] submodule sync skipped (auth?)"
+git push "$REMOTE" Current 2>&1 | tail -1 || true
+[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push submodule sync")
 echo "[sync] submodules done"
 
 echo ""
 echo "=== v$NEW released ==="
 echo "  $(git log --oneline -3 | paste -sd '|' -)"
+
+if [ "${#FAILURES[@]}" -gt 0 ]; then
+	echo ""
+	echo "=== release completed with failures ==="
+	for f in "${FAILURES[@]}"; do
+		echo "  FAILED: $f"
+	done
+	exit 1
+fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # aphrodite - minimal one-command local install
-# curl -sSL https://raw.githubusercontent.com/PlayForm/Aphrodite/Current/install.sh | bash
+# curl -sSL https://raw.githubusercontent.com/PlayForm/Aphrodite/Current/Maintain/install.sh | bash
 #
 # Installs from a local clone or release build.  Expects:
 #   target/release/aphrodite      (the Rust binary)
