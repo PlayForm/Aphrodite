@@ -72,30 +72,35 @@ pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 	let obj = v.as_object()?;
 
 	// ── Terminal: {"output":"...","exit_code":N,"error":null} ──
+	// A non-empty `output` always wins (checked first, below); an empty one
+	// falls through to the `error`/`success` branches instead of aborting
+	// extraction entirely (F12) - a failed command with empty stdout is
+	// exactly the case where the error string IS the payload.
 	if let (Some(output), Some(_exit)) = (
 		obj.get("output").and_then(|o| o.as_str()),
 		obj.get("exit_code"),
 	) {
-		if output.is_empty() { return None; }
-		// Terminal outputs are often short and don't trigger the headroom
-		// classifier's build_output pattern. Add explicit heuristics so
-		// cargo output, test runs, and shell traces get meaningful previews.
-		let ct: String = if output.contains("exit code:") || output.contains("Error:") {
-			"terminal".into()
-		} else if output.contains("   Compiling") || output.contains("    Finished")
-			|| output.contains("   Running") || output.contains("test result:")
-			|| output.contains("   Building") || output.contains("   Installing")
-			|| output.contains("warning:") || output.contains("error[")
-		{
-			if output.contains("error[") || output.contains("error: could not") {
-				"build_error".into()
+		if !output.is_empty() {
+			// Terminal outputs are often short and don't trigger the headroom
+			// classifier's build_output pattern. Add explicit heuristics so
+			// cargo output, test runs, and shell traces get meaningful previews.
+			let ct: String = if output.contains("exit code:") || output.contains("Error:") {
+				"terminal".into()
+			} else if output.contains("   Compiling") || output.contains("    Finished")
+				|| output.contains("   Running") || output.contains("test result:")
+				|| output.contains("   Building") || output.contains("   Installing")
+				|| output.contains("warning:") || output.contains("error[")
+			{
+				if output.contains("error[") || output.contains("error: could not") {
+					"build_error".into()
+				} else {
+					"build_output".into()
+				}
 			} else {
-				"build_output".into()
-			}
-		} else {
-			aphrodite::detect_type(output)
-		};
-		return Some((output.to_string(), ct));
+				aphrodite::detect_type(output)
+			};
+			return Some((output.to_string(), ct));
+		}
 	}
 
 	// ── Patch / write_file: {"success":...,"diff":"...","error":"..."} ──
@@ -506,6 +511,79 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	// ── 01-F6/F12: table-driven coverage of every `unwrap_hermes_result`
+	// branch - this ~100-line heuristic had zero regression tests despite
+	// being rewritten three times (bf181d7 -> 9e52762 -> 8f138c1).
+	#[test]
+	fn test_unwrap_hermes_result_table() {
+		let cases:Vec<(&str, serde_json::Value, Option<(&str, &str)>)> = vec![
+			(
+				"terminal output+exit_code",
+				serde_json::json!({"output": "hello\n", "exit_code": 0}),
+				Some(("hello\n", "text")),
+			),
+			(
+				"terminal with exit code marker",
+				serde_json::json!({"output": "boom\nexit code: 1\n", "exit_code": 1}),
+				Some(("boom\nexit code: 1\n", "terminal")),
+			),
+			(
+				"empty output falls through to error (F12)",
+				serde_json::json!({"output": "", "exit_code": 1, "error": "command not found: cargp"}),
+				Some(("command not found: cargp", "text")),
+			),
+			(
+				"empty output, no error, no success -> None",
+				serde_json::json!({"output": "", "exit_code": 1}),
+				None,
+			),
+			("diff", serde_json::json!({"success": true, "diff": "-a\n+b\n"}), Some(("-a\n+b\n", "text"))),
+			(
+				"error string",
+				serde_json::json!({"error": "Found 3 matches"}),
+				Some(("Found 3 matches", "text")),
+			),
+			("success bool only", serde_json::json!({"success": true}), Some(("ok", "text"))),
+			(
+				"success string message",
+				serde_json::json!({"success": "wrote 3 files"}),
+				Some(("wrote 3 files", "text")),
+			),
+			(
+				"search with matches",
+				serde_json::json!({"total_count": 1, "matches": [{"path": "a.rs", "line": 3, "content": "fn x()"}]}),
+				Some(("a.rs:3:fn x()", "search")),
+			),
+			(
+				"search without matches",
+				serde_json::json!({"total_count": 5, "truncated": true}),
+				Some(("5 total (truncated)", "search")),
+			),
+			("file read content", serde_json::json!({"content": "hi", "total_lines": 1}), Some(("hi", "text"))),
+			(
+				"priority key fallback",
+				serde_json::json!({"name": "skill", "description": "does a thing"}),
+				Some(("does a thing", "text")),
+			),
+			("not an object", serde_json::json!(["a", "b"]), None),
+			("plain string, not JSON", serde_json::json!("hello"), None),
+			("no matching shape", serde_json::json!({"a": 1, "b": 2}), None),
+		];
+
+		for (label, input, expected) in cases {
+			let content = input.to_string();
+			let got = unwrap_hermes_result(&content);
+			match expected {
+				Some((c, t)) => {
+					let (gc, gt) = got.unwrap_or_else(|| panic!("{label}: expected Some, got None"));
+					assert_eq!(gc, c, "{label}: content mismatch");
+					assert_eq!(gt, t, "{label}: type mismatch");
+				},
+				None => assert!(got.is_none(), "{label}: expected None, got {got:?}"),
+			}
+		}
+	}
 
 	#[test]
 	fn test_compress_then_retrieve_roundtrip() {
