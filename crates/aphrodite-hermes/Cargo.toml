@@ -7,11 +7,14 @@ license.workspace = true
 repository.workspace = true
 description = "aphrodite-hermes: Hermes Agent-specific integration for Aphrodite compression engine - tool schemas, hook dispatch, skill registration"
 
+[[bin]]
+name = "aphrodite-hermes-setup"
+path = "src/bin/setup-helper.rs"
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
 aphrodite = { path = "../aphrodite", version = "1.3.0" }
-serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
