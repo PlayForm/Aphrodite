@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 STATE_DIR = os.path.expanduser("~/.hermes")
 OUTPUT_FILE = os.path.join(STATE_DIR, "build-status.json")
-PANE_ID = 17
+PANE_ID = int(os.environ.get("APHRODITE_BUILD_WATCHER_PANE_ID", "17"))
 POLL_INTERVAL = 5
 
 STATUS_IDLE = "idle"
