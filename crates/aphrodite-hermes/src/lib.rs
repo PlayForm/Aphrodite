@@ -309,11 +309,27 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 				// Accept both the canonical Hermes name and the legacy alias.
 				"on_session_start" | "session_start" => aphrodite::session::on_session_start(state),
 				"transform_tool_result" => {
-					let r = aphrodite::hooks::transform_tool_result(state, tool_content, tool);
+					// Hermes wraps every tool result in JSON (`{"output":...,
+					// "exit_code":...}`, `{"total_count":...,"matches":[...]}`,
+					// etc.) - unwrap it to classify/preview the real payload,
+					// but hand core the ORIGINAL content so it's what gets
+					// hashed and stored (retrieval must stay lossless).
+					let classify = crate::tools::unwrap_hermes_result(tool_content);
+					let r = aphrodite::hooks::transform_tool_result_classified(
+						state,
+						tool_content,
+						tool,
+						classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
+					);
 					replacement_from(&r)
 				},
 				"transform_terminal_output" => {
-					let r = aphrodite::hooks::transform_terminal_output(state, term_content);
+					let classify = crate::tools::unwrap_hermes_result(term_content);
+					let r = aphrodite::hooks::transform_terminal_output_classified(
+						state,
+						term_content,
+						classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
+					);
 					replacement_from(&r)
 				},
 				"pre_llm_call" => {
@@ -496,6 +512,46 @@ mod tests {
 		aphrodite_hermes_free_string(diff_ptr);
 
 		assert_eq!(v["total"], 1, "aphrodite_diff must report the archived turn: {v:?}");
+	}
+
+	// ── 01-F1: `transform_tool_result` is the hook Hermes fires on EVERY
+	// tool result, automatically - not the rarely-called `aphrodite_compress`
+	// tool. It must unwrap Hermes JSON wrappers just like the tool path does,
+	// or every automatic compression of a wrapped terminal/search/patch
+	// result regresses to a useless "[json:1items 1L]" preview.
+	#[test]
+	fn test_call_hook_transform_tool_result_unwraps_hermes_wrapper() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(CString::new("session_start").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+
+		let wrapped = serde_json::json!({"output": "x".repeat(5000), "exit_code": 1}).to_string();
+		let args = serde_json::json!({"tool_name": "terminal", "result": wrapped}).to_string();
+		let hook_ptr = aphrodite_hermes_call_hook(
+			CString::new("transform_tool_result").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		let hook_result = unsafe { CStr::from_ptr(hook_ptr) }.to_string_lossy().into_owned();
+		let marker_str:String = serde_json::from_str(&hook_result).expect("a marker string, not null");
+		aphrodite_hermes_free_string(hook_ptr);
+
+		assert!(
+			!marker_str.contains("[json:"),
+			"hook path must unwrap the Hermes wrapper for preview, got marker: {marker_str}"
+		);
+
+		let (hash, preview) = with_shared(|state| {
+			let last = state.recent_markers.last().expect("hook must record a marker");
+			(last.hash.clone(), last.preview.clone())
+		});
+		assert!(!preview.starts_with("[json:"), "recorded preview must reflect the unwrapped payload: {preview}");
+
+		let retrieved = crate::tools::dispatch("aphrodite_retrieve", &serde_json::json!({"hash": hash}).to_string());
+		assert_eq!(retrieved["found"], true);
+		assert_eq!(
+			retrieved["content"].as_str().unwrap(),
+			wrapped,
+			"retrieve must return the original wrapper losslessly, not just the extracted output"
+		);
 	}
 
 	#[test]

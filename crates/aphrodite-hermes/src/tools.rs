@@ -63,7 +63,7 @@ fn read_path_guarded(path:&str) -> Result<String, String> {
 /// {"total_count":N,"matches":[...]}, etc. The aphrodite classifier
 /// sees '{' and returns json_array - hiding the real content behind a
 /// useless preview. This extracts the meaningful content and reclassifies.
-fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
+pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 	// Only attempt unwrapping if the content looks like a JSON object.
 	if !content.trim_start().starts_with('{') {
 		return None;
@@ -175,10 +175,14 @@ fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 /// and the rendered marker.
 /// Returns `{hash, type, size, preview, marker}`.
 fn compress_into(state:&mut AphroditeState, content:&str, hint:&str, center:Option<&str>) -> serde_json::Value {
-	// Hermes wraps tool results in JSON. Unwrap before compression so
-	// previews show real content (terminal output, diffs, etc.) instead
-	// of a meaningless "[json:1items 1L]".
-	let (eff_content, eff_type) = if let Some((c, t)) = unwrap_hermes_result(content) {
+	// Hermes wraps tool results in JSON. Unwrap to find real content for
+	// classification/preview (terminal output, diffs, etc.) instead of a
+	// meaningless "[json:1items 1L]" - but always hash and store the
+	// ORIGINAL `content`, never the extracted piece: retrieval must return
+	// exactly what was passed in, including wrapper metadata like
+	// `exit_code`/`error`, and legitimate caller JSON that merely matches a
+	// wrapper shape (e.g. `{"content":"hi","id":42}`) must round-trip intact.
+	let (classify_content, eff_type) = if let Some((c, t)) = unwrap_hermes_result(content) {
 		(c, t)
 	} else {
 		let detected = aphrodite::detect_type(content);
@@ -186,15 +190,15 @@ fn compress_into(state:&mut AphroditeState, content:&str, hint:&str, center:Opti
 		(content.to_string(), ccr_type)
 	};
 
-	let hash = aphrodite::hooks::compute_hash(&eff_content);
-	let preview = aphrodite::build_preview(&eff_type, &eff_content);
-	let marker = aphrodite::marker::ccr_marker(&hash, &eff_type, eff_content.len(), &preview, None, None, center);
+	let hash = aphrodite::hooks::compute_hash(content);
+	let preview = aphrodite::build_preview(&eff_type, &classify_content);
+	let marker = aphrodite::marker::ccr_marker(&hash, &eff_type, content.len(), &preview, None, None, center);
 
-	state.inline_store_put(hash.clone(), eff_content.clone());
+	state.inline_store_put(hash.clone(), content.to_string());
 	state.record_marker(MarkerEntry {
 		hash:hash.clone(),
 		ccr_type:eff_type.clone(),
-		size:eff_content.len(),
+		size:content.len(),
 		preview:preview.clone(),
 		turn:state.turn_counter,
 		center:center.map(|c| c.to_string()),
@@ -204,7 +208,7 @@ fn compress_into(state:&mut AphroditeState, content:&str, hint:&str, center:Opti
 	serde_json::json!({
 		"hash": hash,
 		"type": eff_type,
-		"size": eff_content.len(),
+		"size": content.len(),
 		"preview": preview,
 		"marker": marker,
 	})
@@ -516,6 +520,45 @@ mod tests {
 		let retrieved = dispatch("aphrodite_retrieve", &serde_json::json!({"hash": hash}).to_string());
 		assert_eq!(retrieved["found"], true, "retrieve must resolve a just-compressed hash");
 		assert_eq!(retrieved["content"], content);
+	}
+
+	// ── 01-F2: `unwrap_hermes_result` is a heuristic used to pick a better
+	// type/preview - it must never change what a retrieve returns. Caller
+	// JSON that merely happens to match a wrapper shape (a "content" key)
+	// must still round-trip byte-for-byte, not collapse to the extracted
+	// field alone.
+	#[test]
+	fn test_compress_preserves_original_when_content_looks_like_a_wrapper() {
+		let _g = crate::test_guard();
+		let content = serde_json::json!({"content": "hi", "id": 42, "role": "assistant"}).to_string();
+		let compressed = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
+		let hash = compressed["hash"].as_str().expect("hash present").to_string();
+
+		let retrieved = dispatch("aphrodite_retrieve", &serde_json::json!({"hash": hash}).to_string());
+		assert_eq!(retrieved["found"], true);
+		assert_eq!(
+			retrieved["content"], content,
+			"retrieve must return the exact original JSON, not just the extracted \"content\" field"
+		);
+	}
+
+	// ── 01-F2: a genuine terminal wrapper must also round-trip losslessly -
+	// `exit_code`/`error` are exactly the fields most likely to matter for a
+	// failed command, and must still be recoverable after compression.
+	#[test]
+	fn test_compress_preserves_terminal_wrapper_metadata() {
+		let _g = crate::test_guard();
+		let content = serde_json::json!({"output": "error: broke\nexit code: 1\n", "exit_code": 1}).to_string();
+		let compressed = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
+		let hash = compressed["hash"].as_str().expect("hash present").to_string();
+		assert_eq!(compressed["type"], "terminal", "type should reflect the unwrapped payload");
+
+		let retrieved = dispatch("aphrodite_retrieve", &serde_json::json!({"hash": hash}).to_string());
+		assert_eq!(retrieved["found"], true);
+		assert_eq!(
+			retrieved["content"], content,
+			"retrieve must return the original wrapper, including exit_code, not just the extracted output"
+		);
 	}
 
 	// ── T5 (F3): the "aphrodite_retrieve" tool delegates to

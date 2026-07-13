@@ -28,6 +28,22 @@ const ESSENTIAL_TOOLS:&[&str] = &[
 
 /// Transform tool output - full compression pipeline.
 pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:&str) -> serde_json::Value {
+	transform_tool_result_classified(state, content, tool_name, None)
+}
+
+/// Same as [`transform_tool_result`], but a caller that has already found the
+/// "real" payload underneath a wrapper the core classifier can't see through
+/// (e.g. an agent-specific JSON envelope) may supply it via `classify` as
+/// `(content_to_classify, type)`. Core stays agnostic to what a wrapper looks
+/// like - it only ever hashes and stores the ORIGINAL `content`, so
+/// `aphrodite_retrieve` always returns exactly what was passed in; `classify`
+/// affects only the reported `type` and the generated preview.
+pub fn transform_tool_result_classified(
+	state:&mut AphroditeState,
+	content:&str,
+	tool_name:&str,
+	classify:Option<(&str, &str)>,
+) -> serde_json::Value {
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
 	}
@@ -64,18 +80,20 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let ct = transforms::detect(content);
-	let type_str = ct.as_str();
+	let (type_str, classify_content):(String, &str) = match classify {
+		Some((c, t)) => (t.to_string(), c),
+		None => (transforms::detect(content).as_str().to_string(), content),
+	};
 	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 
 	state.inline_store_put(hash.clone(), content.to_string());
 
-	let preview = crate::build_preview(type_str, content);
-	let marker = ccr_marker(&hash, type_str, content.len(), &preview, None, None, None);
+	let preview = crate::build_preview(&type_str, classify_content);
+	let marker = ccr_marker(&hash, &type_str, content.len(), &preview, None, None, None);
 
 	state.record_marker(MarkerEntry {
 		hash:hash.clone(),
-		ccr_type:type_str.to_string(),
+		ccr_type:type_str.clone(),
 		size:content.len(),
 		preview:preview.clone(),
 		turn:state.turn_counter,
@@ -96,6 +114,16 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 
 /// Transform terminal output - exit code aware.
 pub fn transform_terminal_output(state:&mut AphroditeState, content:&str) -> serde_json::Value {
+	transform_terminal_output_classified(state, content, None)
+}
+
+/// Same as [`transform_terminal_output`], with the same `classify` contract
+/// as [`transform_tool_result_classified`].
+pub fn transform_terminal_output_classified(
+	state:&mut AphroditeState,
+	content:&str,
+	classify:Option<(&str, &str)>,
+) -> serde_json::Value {
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
 	}
@@ -104,18 +132,24 @@ pub fn transform_terminal_output(state:&mut AphroditeState, content:&str) -> ser
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let ct = transforms::detect(content);
-	let type_str = if content.contains("exit code:") || content.contains("Error:") {
-		"terminal"
-	} else {
-		ct.as_str()
+	let (type_str, classify_content):(String, &str) = match classify {
+		Some((c, t)) => (t.to_string(), c),
+		None => {
+			let ct = transforms::detect(content);
+			let t = if content.contains("exit code:") || content.contains("Error:") {
+				"terminal".to_string()
+			} else {
+				ct.as_str().to_string()
+			};
+			(t, content)
+		},
 	};
 
 	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 	state.inline_store_put(hash.clone(), content.to_string());
 
-	let preview = crate::build_preview(type_str, content);
-	let marker = ccr_marker(&hash, type_str, content.len(), &preview, None, None, None);
+	let preview = crate::build_preview(&type_str, classify_content);
+	let marker = ccr_marker(&hash, &type_str, content.len(), &preview, None, None, None);
 
 	state.record_marker(MarkerEntry {
 		hash:hash.clone(),
