@@ -1,8 +1,11 @@
 # ── Aphrodite Configuration ────────────────────────────────────────────────
 # Copy this file to aphrodite.toml and edit to your needs.
-# Priority: env var > aphrodite.toml > hardcoded default.
+# Priority (a subset of fields only - see docs/config/env-vars.md):
+# env var > aphrodite.toml > hardcoded default.
 #
-# Search order: ./aphrodite.toml → ~/.hermes/aphrodite/aphrodite.toml → repo root
+# Search order: ./aphrodite.toml, then ~/.hermes/aphrodite/aphrodite.toml
+# (only when APHRODITE_CONFIG_PATH is NOT set - an explicit override that
+# doesn't exist falls through to single-proxy CLI-flag mode instead).
 
 # ── Proxies ─────────────────────────────────────────────────────────────────
 [[proxies]]
@@ -18,8 +21,6 @@ listen = "0.0.0.0:9798"
 mode = "token"
 tool_relay = true
 timeout = 300
-retry_attempts = 3
-retry_base_ms = 2000
 
 # ── Shared defaults (applied to all proxies unless overridden) ──────────────
 [defaults]
@@ -42,7 +43,7 @@ terminal_threshold = 1024          # terminal output threshold (bytes)
 inline_threshold = 2048            # inline zlib fallback threshold (bytes)
 auto_expand = false                # off: markers stay raw
 auto_expand_limit = 0              # 0 = disabled
-catalog_mode = "compact"           # compact | full | tool
+catalog_mode = "tool"              # compact | full | tool
 classifier_poll = true             # skip CCR for clean outputs
 code_multiplier = 3.0              # multiply threshold for code types
 context_engine = true              # default-on, no env var needed

@@ -307,24 +307,21 @@ RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
 ### Configuration - everything in one file
 
 ```toml
-# aphrodite.toml - all features, no recompile needed
+# aphrodite.toml - no recompile needed
 [compression]
-engine_threshold_pct = 45    # compress at 45% context
 tool_threshold_token = 512   # token proxy threshold (bytes)
-classifier_poll = true       # suppress CCR for clean outputs
-context_engine = true        # engine on by default
-
-[previews]
-model_family = "code_first"  # compact | code_first | balance
-code_structure_map = true    # show fn/struct/class sigs
-
-[prompts]
-retrieve_guidance = "minimal"
-ccr_marker_hint = false
+tool_threshold_cache = 4096  # cache proxy threshold (bytes)
+inline_threshold = 2048      # inline-vs-durable CCR storage cutoff (bytes)
+code_multiplier = 3.0        # multiply threshold for code_* content types
 ```
 
-The proxy and engine read these `[compression]` / `[previews]` / `[prompts]`
-settings from `aphrodite.toml`, each overridable via an `APHRODITE_*` env var.
+These four `[compression]` fields are live on the Rust proxy: each is
+overridable via an `APHRODITE_*` env var, and editing + saving the file (or
+`POST /reload`) applies the new value immediately, no restart. Other
+`[compression]`/`[previews]`/`[prompts]` keys exist in the schema but either
+only affect the separate Hermes-plugin dylib session or aren't consumed by
+anything yet - see [`docs/config/aphrodite-toml.md`](docs/config/aphrodite-toml.md)
+for the full, accurate breakdown of what's wired where.
 
 ---
 
