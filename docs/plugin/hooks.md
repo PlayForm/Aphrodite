@@ -1,7 +1,18 @@
 # Plugin Hooks
 
+> **Historical document.** Everything below describes the retired fat-Python
+> plugin implementation (functions like `_transform_tool_result`,
+> `_pre_llm_hook`, module-level constants like `TOOL_THRESHOLD_TOKEN`). That
+> code no longer exists: `plugins/aphrodite/__init__.py` is now a 300-line
+> thin ctypes loader, and all hook/compression logic lives in the Rust
+> crates. The five hook names and overall lifecycle order below are still
+> accurate; the per-function internals, thresholds, and code snippets are
+> not - see `crates/aphrodite-hermes/src/lib.rs` (hook dispatch C ABI) and
+> `crates/aphrodite/src/hooks.rs` (actual transform/threshold logic,
+> `state.rs` for current default thresholds) for the real implementation.
+
 The aphrodite Python plugin is a thin loader that delegates to the Rust dylib
-(`libaphrodite.dylib`) for all compression logic. Hooks registered in
+(`libaphrodite_hermes.dylib`) for all compression logic. Hooks registered in
 `plugin.yaml` route through the dylib's C ABI functions to five hook handlers
 covering session start, tool results, terminal output, and LLM calls.
 
