@@ -87,6 +87,11 @@ behavior in [Tool Relay: Tools](../../docs/tool-relay/tools.md):
 `context_engine_pre_llm` - the context engine's pre-LLM hook, not a
 Hermes-callable tool (it isn't in `plugin.yaml`'s `provides_tools`).
 
+`aphrodite_diff` returns each turn's last-archived marker (`conv_index`),
+populated by `hooks::post_llm_call` calling `session::archive_turn` at the
+end of every turn (report 06 F11/T13 - previously `archive_turn` was dead
+code with zero call sites, so this always returned `{"total": 0}`).
+
 ---
 
 ## Dependencies
