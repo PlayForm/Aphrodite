@@ -676,6 +676,11 @@ mod tests {
 	fn test_aphrodite_directive_tool_list_and_swap() {
 		let _g = crate::test_guard();
 		with_shared(|state| {
+			// `active_directives` is process-global and NOT reset between
+			// tests (deliberately - directives persist across a session
+			// reset just like the inline store); start from a known-empty
+			// state rather than assuming one.
+			state.active_directives.clear();
 			state.directives.insert(
 				"focus".into(),
 				aphrodite::directives::Directive { name:"focus".into(), content:"stay focused".into() },

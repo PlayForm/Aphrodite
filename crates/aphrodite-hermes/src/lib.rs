@@ -526,6 +526,11 @@ mod tests {
 		let context = v["context"].as_str().unwrap_or_default();
 		assert!(context.contains("[directives: focus]"), "context missing directive marker: {context}");
 		assert!(context.contains("stay concise"), "context missing directive body: {context}");
+
+		// `active_directives` is process-global and not reset by
+		// session_start (deliberately) - clean up so this test doesn't leak
+		// an active directive into whichever test runs next.
+		with_shared(|state| state.active_directives.clear());
 	}
 
 	// ── T13 (F11): the production hook-dispatch path Python actually calls

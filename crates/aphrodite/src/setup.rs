@@ -287,6 +287,7 @@ provides_tools:
   - aphrodite_files
   - aphrodite_diff
   - aphrodite_search
+  - aphrodite_directive
   - aphrodite_test
   - aphrodite_catalog
   - aphrodite_reclassify

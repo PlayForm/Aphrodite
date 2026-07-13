@@ -301,13 +301,32 @@ hermes --profile dev-aphrodite
 ### Git hooks
 
 `git config core.hooksPath .githooks` (set automatically by `pnpm install`
-via `package.json`'s `prepare` script) enables `.githooks/post-checkout` and
-`.githooks/post-merge`, which run `git submodule update --init --recursive`
-after every checkout/merge so the three vendored submodules
-(`plugins/aphrodite`, `vendor/headroom`, `vendor/rtk`) always match the
-commit pinned in this repo's index. This is deliberately pointer-respecting,
-not `--remote`-tracking - submodule pins only move via an explicit, reviewed
-action (e.g. `Maintain/scripts/release/auto-release.sh`).
+via `package.json`'s `prepare` script, which also runs an initial submodule
+sync - see below) enables `.githooks/post-checkout` and `.githooks/post-merge`.
+Both run `.githooks/lib/sync-submodules.sh`, which floats each of the three
+vendored submodules (`plugins/aphrodite`, `vendor/headroom`, `vendor/rtk`) to
+its configured tracking branch tip (`branch = Current` in `.gitmodules`)
+after every checkout/merge/pull, and auto-commits the resulting pin bump in
+this repo's index (scoped to just the submodule paths - never sweeps up any
+other staged work). The net effect: local checkouts never sit behind
+`Current`, and a fresh clone's plain `git submodule update --init
+--recursive` (no `--remote` needed) lands close to `Current`'s tip too,
+since the pin is kept continuously in sync rather than only moving via an
+explicit release action.
+
+Safety: a submodule with uncommitted changes, or with local commits not yet
+pushed to its tracking branch, is skipped (reported on stderr) rather than
+force-reset - the sync only ever performs a fast-forward-equivalent move.
+An in-progress rebase/merge/cherry-pick in this repo also skips the sync
+outright. The remote to fetch from is resolved by matching `.gitmodules`'
+own configured `url` against each submodule's local remotes, rather than
+assuming a remote named `origin` - `vendor/rtk`'s `origin` happens to be the
+upstream `rtk-ai/rtk` repo (no `Current` branch there); the fork this repo
+actually tracks is under a remote named `Source`.
+
+`Maintain/scripts/release/auto-release.sh`'s own `SYNC_SUBMODULES=1` opt-in
+float-at-release-time behavior is unaffected by this and still available for
+an explicit, reviewed pin bump as part of a release.
 
 ---
 
