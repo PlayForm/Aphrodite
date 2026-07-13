@@ -34,6 +34,8 @@
 - `cargo build --release -p aphrodite -p aphrodite-hermes`: clean (10.8s)
 - GitHub Release `Aphrodite/v1.2.2` auto-created by CI with all 9 cross-platform assets
 - All docs scanned and version badges synced to v1.2.2 / v2.0.6
+- Classification claim updated: <0.1ms → 40–123 ns (benchmark-verified)
+- Real-world savings example added: 216 KB → 12 markers, 54K→240 tokens (225×)
 
 ## v1.2.1 - Silent Startup Failures (2026-07-11)
 

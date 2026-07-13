@@ -131,7 +131,7 @@ needs it.
 
 Four layers, all under 1ms:
 
-1. **Classify** - 28-type regex classifier identifies content (<0.1ms)
+1. **Classify** - 28-type regex classifier identifies content (40–123 ns)
 2. **Template** - TOML-driven templates produce `[type:key=val]` previews
 3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
 4. **Decide** - Agent reads preview, retrieves only when needed
@@ -188,6 +188,10 @@ count and confirm they pass.
 
 **Median: 23× fewer tokens on tool output.** In a session with 50+ tool calls,
 that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
+
+**Real example:** a 6-turn dev session (builds, tests, docs, git) compressed
+216 KB of raw tool output into 12 markers — **~54,000 tokens → ~240 tokens**
+(225× reduction), leaving 99.6% of the context window free for reasoning.
 
 ---
 
@@ -338,7 +342,7 @@ for the full, accurate breakdown of what's wired where.
 | Metric                    |  Value   |
 | :------------------------ | :------: |
 | Compression latency (avg) |  1.6 ms  |
-| Classification latency    | <0.1 ms  |
+| Classification latency    | 40–123 ns |
 | Preview generation        | <0.05 ms |
 
 Benchmarks (`cargo run --release --example bench_0N_*`, see
