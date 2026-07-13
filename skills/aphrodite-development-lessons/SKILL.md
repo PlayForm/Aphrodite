@@ -1,11 +1,9 @@
 ---
 name: aphrodite-development-lessons
 description: "Critical development pitfalls for Aphrodite - auto-expand, env_passthrough,
-    plugin symlink, dual-store pattern, release notes, and session setup
-    checklist. Current as of v0.8.43."
+    plugin symlink, dual-store pattern, release notes, and session setup checklist."
 version: 1.1.0
-related_skills: [aphrodite-dev-workflow, aphrodite-release-workflow, aphrodite-hook-reference]
-related_skills: [aphrodite-dev-workflow, aphrodite-release-workflow, aphrodite-tool-guide]
+related_skills: [aphrodite-dev-workflow, aphrodite-release-workflow, aphrodite-hook-reference, aphrodite-tool-guide]
 ---
 
 # Aphrodite Development Lessons

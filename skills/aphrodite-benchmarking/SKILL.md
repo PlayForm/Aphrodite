@@ -12,7 +12,7 @@ related_skills:
 # Aphrodite Proxy Benchmarking
 
 Protocol for running comprehensive benchmarks of the aphrodite compression
-proxy. Covers smoke tests, all 6 compression types, center feature, cache hit
+proxy. Covers smoke tests, all 28 content types, center feature, cache hit
 rates, cross-worker behavior, and terminal output compression.
 
 ## The CCR Marker IS the Proof
