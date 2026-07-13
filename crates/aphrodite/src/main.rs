@@ -649,6 +649,21 @@ fn host_header_to_hostname(host:&str) -> String {
 	}
 }
 
+/// The actual allow/reject decision `loopback_only` enforces, pulled out as
+/// a pure function so it's directly unit-testable without constructing a
+/// real axum `Request`/`Next` - the middleware below is a thin wrapper that
+/// only translates this `Result` into an HTTP response.
+fn check_loopback_request(addr:SocketAddr, host_header:&str) -> Result<(), &'static str> {
+	if !addr.ip().is_loopback() {
+		return Err("only loopback clients allowed");
+	}
+	let hostname = host_header_to_hostname(host_header);
+	if !hostname.is_empty() && !ALLOWED_LOOPBACK_HOSTS.contains(&hostname.as_str()) {
+		return Err("Host header does not name a loopback address");
+	}
+	Ok(())
+}
+
 /// Middleware that rejects non-loopback clients on all routes except /health.
 /// /health is intentionally exempt so external load-balancer probes work.
 async fn loopback_only(
@@ -656,19 +671,9 @@ async fn loopback_only(
 	request:Request,
 	next:Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
-	if !addr.ip().is_loopback() {
-		return Err((
-			StatusCode::FORBIDDEN,
-			Json(serde_json::json!({"error": "only loopback clients allowed"})),
-		));
-	}
 	let host = request.headers().get(axum::http::header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("");
-	let hostname = host_header_to_hostname(host);
-	if !hostname.is_empty() && !ALLOWED_LOOPBACK_HOSTS.contains(&hostname.as_str()) {
-		return Err((
-			StatusCode::FORBIDDEN,
-			Json(serde_json::json!({"error": "Host header does not name a loopback address"})),
-		));
+	if let Err(msg) = check_loopback_request(addr, host) {
+		return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({"error": msg}))));
 	}
 	Ok(next.run(request).await)
 }
@@ -730,5 +735,69 @@ mod tests {
 		// attacker's own domain, not a loopback name.
 		let hostname = host_header_to_hostname("attacker.example:9797");
 		assert!(!ALLOWED_LOOPBACK_HOSTS.contains(&hostname.as_str()));
+	}
+
+	// ── End-to-end checks against `check_loopback_request` - the exact
+	// function the middleware calls, not a reimplementation - covering
+	// every real caller in this repo plus the attack the change closes. ──
+
+	fn loopback_v4(port:u16) -> SocketAddr {
+		use std::net::{Ipv4Addr, SocketAddrV4};
+		SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port))
+	}
+
+	fn lan_v4(port:u16) -> SocketAddr {
+		use std::net::{Ipv4Addr, SocketAddrV4};
+		SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 50), port))
+	}
+
+	#[test]
+	fn test_check_loopback_request_allows_real_client_host_headers() {
+		// The Python plugin's health check and every documented curl/OpenAI-
+		// client example in this repo address the proxy as `127.0.0.1:PORT`;
+		// a standard HTTP client sets `Host` to exactly that.
+		assert!(check_loopback_request(loopback_v4(9797), "127.0.0.1:9797").is_ok());
+		assert!(check_loopback_request(loopback_v4(9798), "127.0.0.1:9798").is_ok());
+		assert!(check_loopback_request(loopback_v4(9797), "localhost:9797").is_ok());
+		assert!(check_loopback_request(loopback_v4(9797), "127.0.0.1").is_ok(), "no-port Host must also pass");
+	}
+
+	#[test]
+	fn test_check_loopback_request_allows_missing_host_header() {
+		// A client that omits `Host` entirely (unusual for HTTP/1.1, but
+		// some minimal/raw clients or HTTP/1.0 requests do) must not be
+		// rejected by this check - the peer-IP check is still the primary
+		// gate for that case.
+		assert!(check_loopback_request(loopback_v4(9797), "").is_ok());
+	}
+
+	#[test]
+	fn test_check_loopback_request_allows_ipv6_loopback() {
+		use std::net::{Ipv6Addr, SocketAddrV6};
+		let addr = SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::LOCALHOST, 9797, 0, 0));
+		assert!(check_loopback_request(addr, "[::1]:9797").is_ok());
+	}
+
+	#[test]
+	fn test_check_loopback_request_rejects_dns_rebinding() {
+		// TCP peer genuinely is loopback (this is the scenario DNS
+		// rebinding produces - the attacker's hostname resolves to
+		// 127.0.0.1), but Host carries the attacker's own domain.
+		let result = check_loopback_request(loopback_v4(9797), "attacker.example:9797");
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_check_loopback_request_rejects_non_loopback_peer_regardless_of_host() {
+		// Pre-existing behavior must be unchanged: a non-loopback TCP peer
+		// is rejected even when it presents a "correct-looking" Host header.
+		let result = check_loopback_request(lan_v4(9797), "127.0.0.1:9797");
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_check_loopback_request_rejects_non_loopback_peer_with_no_host() {
+		let result = check_loopback_request(lan_v4(9797), "");
+		assert!(result.is_err());
 	}
 }

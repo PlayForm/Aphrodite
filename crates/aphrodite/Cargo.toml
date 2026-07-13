@@ -48,7 +48,6 @@ tokio = { version = "1.52.3", features = [
 	"time",
 	"tracing",
 ], optional = true }
-tower-http = { version = "0.7.0", features = ["trace", "request-id", "cors"], optional = true }
 reqwest = { version = "0.13.4", default-features = false, features = [
 	"json",
 	"rustls",
@@ -84,7 +83,7 @@ blake3 = "1.7"
 [features]
 default = ["proxy"]
 proxy = [
-	"axum", "tokio", "tower-http", "reqwest", "clap",
+	"axum", "tokio", "reqwest", "clap",
 	"tracing-subscriber", "anyhow",
 	"bytes", "futures", "rand", "tokio-util",
 	"url", "uuid", "lru",
