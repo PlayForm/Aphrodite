@@ -1189,7 +1189,7 @@ pub async fn proxy_handler(
 }
 
 /// Detect content type for adaptive compression strategy.
-fn detect_content_type(content:&str) -> &'static str {
+fn proxy_detect_content_type(content:&str) -> &'static str {
 	let first_line = content.lines().next().unwrap_or("");
 
 	// Structured output detection
@@ -1768,7 +1768,7 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 // ── CCR output template (editable) ────────────────────────────────
 /// Edit this function to change the layout the LLM sees when content
 /// is compressed. Three-line format by default: preview, structure, marker.
-fn format_ccr_output(preview:&str, ct:&str, metadata:&str, center:Option<&str>, hash:&str, size:usize) -> String {
+fn proxy_format_ccr_output(preview:&str, ct:&str, metadata:&str, center:Option<&str>, hash:&str, size:usize) -> String {
 	let center_seg = center.map(|c| format!(";center={c}")).unwrap_or_default();
 	format!("{preview}\n[{ct}: {metadata}{center_seg}]\n<<<CCR:{hash}|{ct}|{size}>>>")
 }
@@ -1781,7 +1781,7 @@ fn format_ccr_output(preview:&str, ct:&str, metadata:&str, center:Option<&str>, 
 /// - Diff: first file changed
 /// - JSON: key count summary
 /// - Default: first line, ~250 chars
-fn build_preview(content:&str, ct:&str) -> String {
+fn proxy_build_preview(content:&str, ct:&str) -> String {
 	match ct {
 		"code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
 			// Code: structure-map preview - extract fn/def/class/struct sigs
@@ -1911,15 +1911,15 @@ fn build_preview(content:&str, ct:&str) -> String {
 fn smart_marker(hash:&str, content:&str, ct:&str, center:Option<&str>) -> String {
 	let size = content.len();
 	let metadata = generate_metadata(content, ct);
-	let preview = build_preview(content, ct);
-	format_ccr_output(&preview, ct, &metadata, center, hash, size)
+	let preview = proxy_build_preview(content, ct);
+	proxy_format_ccr_output(&preview, ct, &metadata, center, hash, size)
 }
 
 /// Cache-mode CCR output - preview + marker, same template.
 fn cache_marker(hash:&str, content:&str, ct:&str, center:Option<&str>) -> String {
 	let size = content.len();
 	let preview:String = content.chars().take(512).collect();
-	format_ccr_output(&preview, ct, "", center, hash, size)
+	proxy_format_ccr_output(&preview, ct, "", center, hash, size)
 }
 
 /// Compress a Chat Completions API response with smart markers.
@@ -1950,7 +1950,7 @@ async fn compress_chat_completion(
 		// Compress text content with smart markers
 		if let Some(content_val) = message.get_mut("content") {
 			if let Some(content) = content_val.as_str() {
-				let ct = detect_content_type(content);
+				let ct = proxy_detect_content_type(content);
 				let threshold = (state.threshold_for(ct).max(base_threshold) as f64 * budget_mult) as usize;
 				if content.len() > threshold {
 					if let Some(ccr) = &state.ccr {
@@ -2025,7 +2025,7 @@ async fn compress_chat_completion(
 						if let Some(args) = func.get_mut("arguments") {
 							if let Some(args_str) = args.as_str() {
 								let args_owned = args_str.to_string(); // drop borrow before mutation
-								let ct = detect_content_type(&args_owned);
+								let ct = proxy_detect_content_type(&args_owned);
 								let threshold =
 									(state.threshold_for(ct).max(base_threshold) as f64 * budget_mult) as usize;
 								if args_owned.len() > threshold {
@@ -2834,48 +2834,48 @@ code_multiplier = 6.5
 	// ── T3: detect_content_type ─────────────────────────────────
 	#[test]
 	fn test_detect_content_type_json_tool_output() {
-		assert_eq!(detect_content_type(r#"{"exit_code": 0, "output": "ok"}"#), "tool_output");
+		assert_eq!(proxy_detect_content_type(r#"{"exit_code": 0, "output": "ok"}"#), "tool_output");
 	}
 
 	#[test]
 	fn test_detect_content_type_invalid_json_is_text() {
 		// Starts with '{' but isn't valid JSON - must not be misclassified.
-		assert_eq!(detect_content_type("{ not json at all"), "text");
+		assert_eq!(proxy_detect_content_type("{ not json at all"), "text");
 	}
 
 	#[test]
 	fn test_detect_content_type_json_array() {
-		assert_eq!(detect_content_type(r#"[{"a":1},{"a":2}]"#), "json");
+		assert_eq!(proxy_detect_content_type(r#"[{"a":1},{"a":2}]"#), "json");
 	}
 
 	#[test]
 	fn test_detect_content_type_rust_code() {
 		let src = "use std::fmt;\nfn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
-		assert_eq!(detect_content_type(src), "code_rust");
+		assert_eq!(proxy_detect_content_type(src), "code_rust");
 	}
 
 	#[test]
 	fn test_detect_content_type_python_code() {
 		let src = "import os\nclass Foo:\n    def bar(self):\n        pass\n";
-		assert_eq!(detect_content_type(src), "code_python");
+		assert_eq!(proxy_detect_content_type(src), "code_python");
 	}
 
 	#[test]
 	fn test_detect_content_type_go_code() {
 		let src = "package main\nimport (\n\t\"fmt\"\n)\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n";
-		assert_eq!(detect_content_type(src), "code_go");
+		assert_eq!(proxy_detect_content_type(src), "code_go");
 	}
 
 	#[test]
 	fn test_detect_content_type_js_code() {
 		let src = "import { foo } from 'bar';\nexport const add = (a, b) => a + b;\nconst x = 1;\nconst y = 2;\n";
-		assert_eq!(detect_content_type(src), "code_js");
+		assert_eq!(proxy_detect_content_type(src), "code_js");
 	}
 
 	#[test]
 	fn test_detect_content_type_error_first_line() {
 		assert_eq!(
-			detect_content_type("Traceback (most recent call last):\n  File \"x.py\", line 1\nValueError: bad\n"),
+			proxy_detect_content_type("Traceback (most recent call last):\n  File \"x.py\", line 1\nValueError: bad\n"),
 			"error"
 		);
 	}
@@ -2884,24 +2884,24 @@ code_multiplier = 6.5
 	fn test_detect_content_type_diff() {
 		let d = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,3 +1,4 @@\n+added a \
 		         line\n";
-		assert_eq!(detect_content_type(d), "diff");
+		assert_eq!(proxy_detect_content_type(d), "diff");
 	}
 
 	#[test]
 	fn test_detect_content_type_log_lines() {
 		// Must not start with '{'/'[' (that short-circuits to the JSON branch).
 		let log = "starting up\n[INFO] service ready\n[WARN] disk low\n[ERROR] connection lost\n";
-		assert_eq!(detect_content_type(log), "log");
+		assert_eq!(proxy_detect_content_type(log), "log");
 	}
 
 	#[test]
 	fn test_detect_content_type_empty_is_text() {
-		assert_eq!(detect_content_type(""), "text");
+		assert_eq!(proxy_detect_content_type(""), "text");
 	}
 
 	#[test]
 	fn test_detect_content_type_plain_text() {
-		assert_eq!(detect_content_type("just some plain text\nnothing special\n"), "text");
+		assert_eq!(proxy_detect_content_type("just some plain text\nnothing special\n"), "text");
 	}
 
 	// ── T3: generate_metadata ───────────────────────────────────
@@ -2949,28 +2949,28 @@ code_multiplier = 6.5
 	#[test]
 	fn test_build_preview_code_has_ct_prefix() {
 		let src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
-		let preview = build_preview(src, "code_rust");
+		let preview = proxy_build_preview(src, "code_rust");
 		assert!(preview.starts_with("[code_rust:"));
 	}
 
 	#[test]
 	fn test_build_preview_error_has_ct_prefix_via_error_line() {
 		let src = "some noise\nerror[E0308]: mismatched types\nmore noise\n";
-		let preview = build_preview(src, "error");
+		let preview = proxy_build_preview(src, "error");
 		assert!(preview.contains("error[E0308]"));
 	}
 
 	#[test]
 	fn test_build_preview_diff_has_ct_prefix() {
 		let src = "diff --git a/x b/x\n--- a/x\n+++ a/x\n";
-		let preview = build_preview(src, "diff");
+		let preview = proxy_build_preview(src, "diff");
 		assert!(preview.starts_with("diff --git"));
 	}
 
 	#[test]
 	fn test_build_preview_json_has_ct_prefix() {
 		let src = "{\"a\":1,\"b\":2}\n";
-		let preview = build_preview(src, "json");
+		let preview = proxy_build_preview(src, "json");
 		assert!(preview.contains("keys"));
 	}
 
@@ -3478,7 +3478,7 @@ code_multiplier = 6.5
 		let hash = "abc123def456abc123def456abc123def456";
 		let huge_preview = "x".repeat(10_000);
 		let huge_metadata = "y".repeat(10_000);
-		let out = format_ccr_output(&huge_preview, "text", &huge_metadata, None, hash, 123456);
+		let out = proxy_format_ccr_output(&huge_preview, "text", &huge_metadata, None, hash, 123456);
 		let expected_terminator = format!("<<<CCR:{hash}|text|123456>>>");
 		assert!(
 			out.contains(&expected_terminator),
@@ -3496,7 +3496,7 @@ code_multiplier = 6.5
 		/// respect its own documented invariants: no pipe/newline, <=400 chars.
 		#[test]
 		fn prop_classifier_and_metadata_never_panic(s in ".*") {
-			let ct = detect_content_type(&s);
+			let ct = proxy_detect_content_type(&s);
 			let meta = generate_metadata(&s, ct);
 			prop_assert!(!meta.contains('|'));
 			prop_assert!(!meta.contains('\n'));
