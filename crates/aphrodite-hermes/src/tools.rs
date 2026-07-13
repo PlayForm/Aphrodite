@@ -67,15 +67,17 @@ fn read_path_guarded(path:&str) -> Result<String, String> {
 fn compress_into(state:&mut AphroditeState, content:&str, hint:&str, center:Option<&str>) -> serde_json::Value {
 	let detected = aphrodite::detect_type(content);
 	let ccr_type = if hint.is_empty() || hint == "text" { detected } else { hint.to_string() };
-	let hash = aphrodite::hooks::compute_hash(content);
-	let preview = aphrodite::build_preview(&ccr_type, content);
-	let marker = aphrodite::marker::ccr_marker(&hash, &ccr_type, content.len(), &preview, None, None, center);
+	// Unwrap Hermes tool-result JSON wrappers so previews show real content.
+	let (eff_content, eff_type) = aphrodite::hooks::extract_hermes_result(content, &ccr_type);
+	let hash = aphrodite::hooks::compute_hash(&eff_content);
+	let preview = aphrodite::build_preview(&eff_type, &eff_content);
+	let marker = aphrodite::marker::ccr_marker(&hash, &eff_type, eff_content.len(), &preview, None, None, center);
 
-	state.inline_store_put(hash.clone(), content.to_string());
+	state.inline_store_put(hash.clone(), eff_content.clone());
 	state.record_marker(MarkerEntry {
 		hash:hash.clone(),
-		ccr_type:ccr_type.clone(),
-		size:content.len(),
+		ccr_type:eff_type.clone(),
+		size:eff_content.len(),
 		preview:preview.clone(),
 		turn:state.turn_counter,
 		center:center.map(|c| c.to_string()),
@@ -84,8 +86,8 @@ fn compress_into(state:&mut AphroditeState, content:&str, hint:&str, center:Opti
 
 	serde_json::json!({
 		"hash": hash,
-		"type": ccr_type,
-		"size": content.len(),
+		"type": eff_type,
+		"size": eff_content.len(),
 		"preview": preview,
 		"marker": marker,
 	})
