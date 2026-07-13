@@ -73,6 +73,16 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	let target_binary = ctx.binaries_dir.join(binary_name());
 	println!("copying binary -> {}", target_binary.display());
 	fs::copy(&ctx.own_path, &target_binary)?;
+	// Strip extended attributes: `fs::copy` preserves source xattrs
+	// (code signature, quarantine) which macOS Gatekeeper enforces
+	// at the source path — not the install path. Clearing them lets
+	// the binary run from the installed location.
+	#[cfg(target_os = "macos")]
+	{
+		let _ = std::process::Command::new("xattr")
+			.args(["-c", target_binary.to_str().unwrap_or("")])
+			.output();
+	}
 	secure_perms(&target_binary, 0o700)?;
 
 	// ── Step 5: Find and copy dylibs ──
@@ -176,6 +186,12 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 					let rpath = format!("@rpath/{}", name);
 					let _ = std::process::Command::new("install_name_tool")
 						.args(["-id", &rpath, dest.to_str().unwrap_or("")])
+						.output();
+					// Strip extended attributes: `fs::copy` preserves
+					// source-file xattrs (code signature, quarantine)
+					// which macOS Gatekeeper uses to kill copied binaries.
+					let _ = std::process::Command::new("xattr")
+						.args(["-c", dest.to_str().unwrap_or("")])
 						.output();
 				}
 				found = true;
