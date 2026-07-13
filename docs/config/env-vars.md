@@ -1,70 +1,119 @@
 # Environment Variables
 
-Both the Rust proxy and Python plugin are configured via environment variables
-for deployment flexibility. The API key chain allows multiple fallback env
-vars for different deployment contexts, and all defaults can also be set in
-`aphrodite.toml` under `[compression]` (priority: env var > `aphrodite.toml` >
-hardcoded default).
+This page lists every `APHRODITE_*` (and the few non-prefixed) env vars that
+have a live reader somewhere in this repo, with the exact file:line and what
+precedence rule applies. Vars with no reader are listed separately at the
+bottom under "Documented but currently unwired" - setting them has no effect.
 
-## Rust Proxy (Binary)
+Precedence, where it says "env > TOML > default": the env var wins if set
+and parses; otherwise the matching `aphrodite.toml` key wins if present;
+otherwise the compiled-in default applies. A present-but-malformed value
+(e.g. `APHRODITE_CCR_TTL=abc`) is never silently treated as absent - it logs
+a warning and falls through to the next precedence level, the same rule
+`MultiConfig::resolve`'s port overrides have always used
+(`crates/aphrodite/src/config.rs::apply_port_override`).
 
-### API & Connection
+## Rust proxy - multi-proxy mode (`aphrodite.toml` present)
 
-| Variable                | Default                  | Description                       |
-| ------------------------ | ------------------------- | ----------------------------------- |
-| `APHRODITE_API_KEY`     | (required)               | Primary API key for upstream LLM  |
-| `DEEPSEEK_API_KEY`      | -                        | Fallback #1                       |
-| `HEADROOM_DEEPSEEK_KEY` | -                        | Fallback #2                       |
-| `APHRODITE_API_URL`     | `https://api.openai.com` | Upstream API base URL             |
-| `APHRODITE_MODEL`       | `default-model`          | Model name to forward             |
+Config resolution lives in `MultiConfig::resolve()`
+(`crates/aphrodite/src/config.rs:270-360`).
 
-### Proxy Operation
+| Variable                         | Precedence                                                        | Default (no override)                             | Reader                                          |
+| -------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------- |
+| `APHRODITE_API_KEY`              | env > TOML > required                                             | (must resolve to something)                       | `config.rs:270-278` (fallback chain, see below) |
+| `DEEPSEEK_API_KEY`               | fallback #2                                                       | -                                                 | `config.rs:276`                                 |
+| `HEADROOM_DEEPSEEK_KEY`          | fallback #3                                                       | -                                                 | `config.rs:277`                                 |
+| `APHRODITE_API_URL`              | env > TOML > default                                              | `https://api.openai.com`                          | `config.rs:317-321`                             |
+| `APHRODITE_MODEL`                | env > TOML > default                                              | `default-model`                                   | `config.rs:322-326`                             |
+| `APHRODITE_CCR_TTL`              | env > TOML > default                                              | `3600`                                            | `config.rs:333-336`                             |
+| `APHRODITE_DB`                   | env > TOML                                                        | (none - proxy picks `~/.hermes/aphrodite/ccr.db`) | `config.rs:330-332`                             |
+| `APHRODITE_NOTIFY_URL`           | env > TOML                                                        | -                                                 | `config.rs:339`                                 |
+| `APHRODITE_NOTIFY_KEY`           | env > TOML                                                        | -                                                 | `config.rs:340`                                 |
+| `APHRODITE_CACHE_PORT`           | overrides the `listen` port on the proxy named/moded `cache` only | `9797`                                            | `config.rs:281-286`                             |
+| `APHRODITE_TOKEN_PORT`           | overrides the `listen` port on the proxy named/moded `token` only | `9798`                                            | `config.rs:281-286`                             |
+| `APHRODITE_TOOL_THRESHOLD_CACHE` | env > `[compression]` > const                                     | `8192` bytes                                      | `proxy.rs::resolve_thresholds`                  |
+| `APHRODITE_TOOL_THRESHOLD_TOKEN` | env > `[compression]` > const                                     | `1024` bytes                                      | `proxy.rs::resolve_thresholds`                  |
+| `APHRODITE_INLINE_THRESHOLD`     | env > `[compression]` > const                                     | `256` bytes                                       | `proxy.rs::resolve_thresholds`                  |
+| `APHRODITE_CODE_MULTIPLIER`      | env > `[compression]` > const                                     | `3.0`                                             | `proxy.rs::resolve_thresholds`                  |
 
-| Variable                   | Default                      | Description                                  |
-| ---------------------------- | ------------------------------ | ----------------------------------------------- |
-| `APHRODITE_MODE`           | `token`                      | `cache` or `token`                           |
-| `APHRODITE_LISTEN`         | `127.0.0.1:9797`             | Listen address                               |
-| `APHRODITE_DB`             | `~/.hermes/aphrodite/ccr.db` | SQLite database path                         |
-| `APHRODITE_CCR_TTL`        | `3600`                       | CCR entry TTL in seconds                     |
-| `APHRODITE_CONFIG_PATH`    | `aphrodite.toml`             | Multi-proxy config path                      |
-| `APHRODITE_WORKER_THREADS` | `4x CPU count` (max `32`)    | Tokio worker thread count                    |
-| `APHRODITE_LOG_COMPACT`    | false (flag)                 | Compact log format (no timestamps/targets)   |
+`APHRODITE_MODE`/`APHRODITE_LISTEN` are deliberately **not** honored here -
+a single process-wide value would incorrectly apply to every `[[proxies]]`
+entry at once and break the cache/token split; use TOML per-proxy
+`mode`/`listen` (or the two port vars above) instead.
 
-### Notification Callbacks
+The four threshold/multiplier vars are also what `POST /reload` and the
+config-file watcher re-resolve and apply live to a running proxy - see
+"Hot-reload" below.
 
-| Variable                | Default | Description                        |
-| ------------------------- | --------- | ------------------------------------- |
-| `APHRODITE_NOTIFY_URL` | -       | Hermes callback URL for CCR events  |
-| `APHRODITE_NOTIFY_KEY` | -       | Bearer token for callback auth     |
+## Rust proxy - either mode
 
-## Python Plugin (Hermes)
+| Variable                   | Default                                                                      | Reader                                                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `APHRODITE_CONFIG_PATH`    | `./aphrodite.toml`, else `~/.hermes/aphrodite/aphrodite.toml`, else CLI mode | `main.rs::run`                                                                                         |
+| `APHRODITE_WORKER_THREADS` | `4× CPU count` (min `32`)                                                    | `main.rs::main`                                                                                        |
+| `APHRODITE_LOG_COMPACT`    | off                                                                          | `main.rs::run` via `config::env_bool` (`"1"`/`"true"` case-insensitive; NOT presence-only)             |
+| `RUST_LOG`                 | `info`                                                                       | `main.rs::run` (`tracing_subscriber::EnvFilter`) - standard Rust convention, not `APHRODITE_`-prefixed |
 
-### Core
+## Rust proxy - CLI-fallback mode only (no `aphrodite.toml` present)
 
-| Variable                      | Default   | Description                                  |
-| -------------------------------- | ----------- | ----------------------------------------------- |
-| `APHRODITE_DEBUG`             | `0`       | Enable debug logging                         |
-| `APHRODITE_CONTEXT_ENGINE`    | (unset)   | Enable context engine (`=1` overrides TOML)  |
-| `APHRODITE_CATALOG`           | `compact` | Catalog mode: `full`, `compact`, `tool`      |
-| `APHRODITE_PASSTHROUGH`       | `0`       | Disable all compression (dev mode)           |
-| `HERMES_DEV`                  | `0`       | Alternative passthrough trigger              |
-| `APHRODITE_AUTO_EXPAND`       | `0`       | Enable aggressive auto-expand (`=1`)         |
-| `APHRODITE_AUTO_EXPAND_LIMIT` | `0`       | Byte limit for auto-expand (0=off)           |
-| `APHRODITE_LIVE_CONTAINER`    | `0`       | Wrap `read_file` results in CCR markers      |
+Every field on `Cli` (`config.rs:104-176`) is a clap arg with an `env = "..."`
+attribute, so all of the multi-proxy-mode vars above also work here via clap
+directly, PLUS:
 
-### Thresholds
+| Variable           | Default          |
+| ------------------ | ---------------- |
+| `APHRODITE_MODE`   | `token`          |
+| `APHRODITE_LISTEN` | `127.0.0.1:9797` |
 
-| Variable                          | Default       | Description                                                              |
-| ------------------------------------ | --------------- | ---------------------------------------------------------------------------- |
-| `APHRODITE_ENGINE_THRESHOLD_PCT`  | `45`          | Context fill % to trigger engine compression. `-1`=always, `0`=disabled  |
-| `APHRODITE_ENGINE_PROTECT_FIRST`  | `2`           | Messages to protect at head                                              |
-| `APHRODITE_ENGINE_PROTECT_LAST`   | `5`           | Messages to protect at tail                                              |
-| `APHRODITE_ENGINE_MIN_MSGS`       | `8`           | Minimum messages before engine compresses                                |
-| `APHRODITE_TOOL_THRESHOLD_TOKEN`  | `512`         | Tool output compression (token proxy)                                    |
-| `APHRODITE_TOOL_THRESHOLD_CACHE`  | `4096`        | Tool output compression (cache proxy)                                    |
-| `APHRODITE_TERMINAL_THRESHOLD`    | `1024`        | Terminal output threshold (bytes)                                        |
-| `APHRODITE_INLINE_THRESHOLD`      | `2048`        | Inline zlib fallback threshold (bytes)                                   |
-| `APHRODITE_CODE_MULTIPLIER`       | `3.0`         | Threshold multiplier for code types                                      |
-| `APHRODITE_RECURSIVE_DEPTH`       | `3`           | Max nesting depth for resolve                                            |
-| `APHRODITE_MAX_REQUEST_BODY_SIZE` | `104_857_600` | Max request body (bytes)                                                 |
-| `APHRODITE_RECENT_MARKERS_MAX`    | `500`         | Max recent markers deque size                                            |
+## Hot-reload
+
+`POST /reload` and the `aphrodite.toml` file watcher both call the same
+`resolve_thresholds()` used at startup and write the result into the live
+`AppState` - editing `[compression]`'s `tool_threshold_token`,
+`tool_threshold_cache`, `inline_threshold`, or `code_multiplier` and either
+saving the file or `curl -X POST :PORT/reload` takes effect immediately, no
+restart. Every other `[compression]` key (`engine_threshold_pct`,
+`catalog_mode`, `auto_expand*`, `terminal_threshold`) is parsed and echoed
+back by `/reload` for visibility but has no effect on the Rust proxy - see
+the Hermes-plugin section below for where `engine_*`/`terminal_threshold`
+actually apply.
+
+## Python plugin / `aphrodite-hermes` dylib
+
+The dylib initializes its session state from `aphrodite.toml` via
+`config_loader::Config` (`crates/aphrodite/src/config_loader.rs`), searching
+`./aphrodite.toml` then `~/.hermes/aphrodite/aphrodite.toml`. This is a
+**separate** resolution path from the Rust proxy above - it feeds
+`AphroditeState` (the Hermes hook/tool-dispatch session), not `AppState`
+(the HTTP proxy).
+
+| Variable                                        | Precedence                                         | Default                           | Reader                                                                                                                                                                                                                                                                                                                        | Actually gates behavior?                                                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `APHRODITE_TOOL_THRESHOLD_TOKEN`                | env > `compression.tool_threshold_token` > default | `4096` bytes                      | `config_loader.rs::apply_compression`                                                                                                                                                                                                                                                                                         | yes - `hooks::transform_tool_result`                                                                                                       |
+| `APHRODITE_TERMINAL_THRESHOLD`                  | env > `compression.terminal_threshold` > default   | `1024` bytes                      | `config_loader.rs::apply_compression`                                                                                                                                                                                                                                                                                         | yes - `hooks::transform_terminal_output`                                                                                                   |
+| `APHRODITE_ENGINE_THRESHOLD_PCT`                | env > `compression.engine_threshold_pct` > default | `45`                              | `config_loader.rs::apply_compression`                                                                                                                                                                                                                                                                                         | **no** - populates `AphroditeState.engine_threshold_pct`, exposed via `aphrodite_stats`/`aphrodite_config_get`, but no hook branches on it |
+| `APHRODITE_ENGINE_PROTECT_FIRST`                | same pattern                                       | `2`                               | `config_loader.rs::apply_compression`                                                                                                                                                                                                                                                                                         | **no** - same as above                                                                                                                     |
+| `APHRODITE_ENGINE_PROTECT_LAST`                 | same pattern                                       | `5`                               | `config_loader.rs::apply_compression`                                                                                                                                                                                                                                                                                         | **no** - same as above                                                                                                                     |
+| `APHRODITE_ENGINE_MIN_MSGS`                     | same pattern                                       | `8`                               | `config_loader.rs::apply_compression`                                                                                                                                                                                                                                                                                         | **no** - same as above                                                                                                                     |
+| `APHRODITE_CONTEXT_ENGINE`                      | `"1"`/`"true"` (case-insensitive) enables          | off                               | Two independent effects, both live: (1) `plugins/aphrodite/__init__.py::register` gates whether a Hermes `ContextEngine` subclass is registered at all (opt-in feature); (2) `config_loader.rs::apply_compression` also sets `AphroditeState.context_engine_enabled` from the same var name/TOML key - don't confuse the two. |
+| `APHRODITE_HERMES_DYLIB_PATH`                   | overrides the dylib search path                    | `<plugin dir>/binaries/<name>`    | `plugins/aphrodite/__init__.py::_load_dylib`                                                                                                                                                                                                                                                                                  |
+| `APHRODITE_BINARY_PATH`                         | overrides the proxy binary path                    | `<plugin dir>/binaries/aphrodite` | `plugins/aphrodite/__init__.py`                                                                                                                                                                                                                                                                                               |
+| `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT` | same as the Rust proxy table above                 | `9797`/`9798`                     | health-poll + dylib's own `configured_ports()` (`aphrodite-hermes/src/lib.rs`) - malformed values warn (Python: `_log.warning`; Rust: `eprintln!`, this dylib has no tracing subscriber) and fall back                                                                                                                        |
+| `APHRODITE_NO_AUTO_LAUNCH`                      | `"1"`/`"true"` skips proxy auto-launch             | off                               | `plugins/aphrodite/__init__.py::_start_proxy` (both the monorepo plugin and the `cargo install`-embedded copy - they're now the same file, see `setup.rs::HERMES_PLUGIN_SHIM`)                                                                                                                                                |
+
+## Documented but currently unwired
+
+These names appear in older docs/scripts but have **no reader anywhere in
+this repo** as of this writing - setting them is a silent no-op. Do not
+document them alongside the live vars above without this caveat; if you wire
+one up, move its row into the tables above.
+
+`APHRODITE_DEBUG`, `APHRODITE_PASSTHROUGH`, `HERMES_DEV`,
+`APHRODITE_AUTO_EXPAND`, `APHRODITE_AUTO_EXPAND_LIMIT`,
+`APHRODITE_LIVE_CONTAINER`, `APHRODITE_RECURSIVE_DEPTH`,
+`APHRODITE_MAX_REQUEST_BODY_SIZE`, `APHRODITE_RECENT_MARKERS_MAX`,
+`APHRODITE_CATALOG` (catalog mode is TOML-only, `compression.catalog_mode`,
+with no env override), `APHRODITE_TOOL_THRESHOLD` (no `_TOKEN`/`_CACHE`
+suffix - superseded by the two suffixed vars above),
+`HEADROOM_SSE_BUFFER_MAX_BYTES` (read only by the vendored `headroom`
+Python package this repo's binaries don't run).

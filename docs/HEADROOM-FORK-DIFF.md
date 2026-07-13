@@ -137,6 +137,28 @@ version. Categorized:
 
 ---
 
+## Aphrodite Fix-Pass Deltas (2026-07-13 execution, `.plans/` report 06)
+
+Surgical fork-side changes made while executing `.plans/06-state-concurrency-storage.md`'s
+task list (uncommitted as of this writing - the executor contract requires recording any
+vendor edit here regardless of commit status):
+
+- **T3 (F3, `ccr/backends/sqlite.rs::open`)**: added `conn.busy_timeout(Duration::from_secs(5))`
+  after the WAL/synchronous pragmas. Default busy timeout is 0 (fail-fast); with multiple
+  aphrodite processes sharing one `ccr.db` (two token proxies both defaulting to the same
+  path), a write colliding with another process's write/checkpoint returned `SQLITE_BUSY`
+  immediately, and the aphrodite proxy layer's `ccr_put` (now returning `bool`, see report 02's
+  F4 fix) would have nothing to retry against - it would just observe the failure. Blocking up
+  to 5s under normal cross-process contention turns a spurious permanent failure into a brief
+  stall.
+- **T12 (F10, `ccr/backends/sqlite.rs`)**: `put` now also runs the same debounced lazy-purge
+  sweep `get` already ran - a compress-heavy, retrieve-light workload (the common case: most
+  markers are never expanded) never purged anything on deployments whose only traffic is
+  `put`, so `ccr.db` only ever grew. Also added a `PRAGMA user_version` schema-version check
+  in `open()` (current schema is version 1) as the hook a future column change can branch on,
+  instead of relying solely on `CREATE TABLE IF NOT EXISTS` silently keeping whatever schema
+  an older binary left on disk.
+
 ## Commit Timeline 📅
 
 All commits are on the `Current` branch. Oldest first.

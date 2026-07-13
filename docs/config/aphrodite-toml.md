@@ -1,8 +1,17 @@
 # aphrodite.toml Configuration
 
 Multi-proxy deployments (cache + token, or multiple token instances) are
-configured through a single TOML file. Settings resolve in this order: TOML →
-CLI flags → environment variables → built-in defaults.
+configured through a single TOML file. For `api_url`, `model`,
+`ccr_ttl_seconds`, `ccr_db_path`, `notify_url`, `notify_key`, and the four
+`[compression]` threshold fields, the real resolution order is **env var →
+TOML → built-in default** - an env var wins if set (and parses), matching
+every shipped TOML's own header comment. `mode` and `listen` are the
+exception: they're TOML-only per `[[proxies]]` entry (plus the two
+port-specific env overrides below), since a single process-wide
+`APHRODITE_MODE`/`APHRODITE_LISTEN` would incorrectly apply to every proxy
+at once. CLI flags only apply in CLI-fallback mode (no `aphrodite.toml`
+present at all) - see [CLI Equivalents](#cli-equivalents). Full var-by-var
+detail: [`docs/config/env-vars.md`](env-vars.md).
 
 This file is Aphrodite's own proxy/engine config - a **different file** from
 Hermes Agent's `config.yaml`. See
@@ -15,8 +24,14 @@ if you came here looking for Hermes-side keys like `plugins.enabled` or
 | | |
 | --- | --- |
 | Default | `aphrodite.toml` in the current working directory |
+| Fallback (default path only) | `~/.hermes/aphrodite/aphrodite.toml` - where `aphrodite setup` writes its generated config |
 | Override | `APHRODITE_CONFIG_PATH` environment variable |
 | If missing | Falls back to CLI-flag mode (single proxy, see [CLI Equivalents](#cli-equivalents)) |
+
+The `~/.hermes/aphrodite/aphrodite.toml` fallback only applies when
+`APHRODITE_CONFIG_PATH` was **not** explicitly set - an explicit override
+that points at a nonexistent file still falls through to CLI-flag mode
+rather than silently redirecting elsewhere.
 
 ## Full schema
 
@@ -81,28 +96,42 @@ applies to every `[[proxies]]` entry that doesn't override them.
 
 ## `[compression]`
 
-This section actually drives proxy behavior:
+This one section feeds two independent consumers with different levels of
+"live":
+
+**Drives the Rust proxy (`AppState`), including hot-reload** (env var wins
+over these if set - see the precedence note above; editing these and
+saving, or `POST /reload`, applies immediately with no restart):
+
+| Field | Meaning | Env override |
+| --- | --- | --- |
+| `tool_threshold_token` | Token-proxy (`:9798`) compression threshold, bytes | `APHRODITE_TOOL_THRESHOLD_TOKEN` |
+| `tool_threshold_cache` | Cache-proxy (`:9797`) compression threshold, bytes | `APHRODITE_TOOL_THRESHOLD_CACHE` |
+| `inline_threshold` | Inline-vs-durable CCR storage cutoff, bytes | `APHRODITE_INLINE_THRESHOLD` |
+| `code_multiplier` | Multiplies the threshold for `code_*` content types (keeps code inline longer) | `APHRODITE_CODE_MULTIPLIER` |
+
+**Drives the Hermes-plugin dylib session** (`aphrodite-hermes`'s
+`AphroditeState` - a separate process/codepath from the Rust proxy above,
+read once at dylib load via `config_loader::Config`, not hot-reloaded):
 
 | Field | Meaning |
 | --- | --- |
-| `engine_threshold_pct` | Context engine activates once session fill reaches this % |
-| `engine_protect_first` | Messages kept untouched at the start of the conversation |
-| `engine_protect_last` | Messages kept untouched at the end of the conversation |
-| `engine_min_msgs` | Minimum message count before the engine may activate |
-| `tool_threshold_token` | Token-proxy (`:9798`) compression threshold, bytes |
-| `tool_threshold_cache` | Cache-proxy (`:9797`) compression threshold, bytes |
-| `terminal_threshold` | Terminal output compression threshold, bytes |
-| `inline_threshold` | Inline zlib-fallback threshold, bytes |
-| `auto_expand` | If `true`, tool output stays raw (no CCR markers) |
-| `auto_expand_limit` | Byte cap for auto-expand; `0` disables the cap |
-| `catalog_mode` | `"compact"` \| `"full"` \| `"tool"` |
-| `classifier_poll` | Skip CCR entirely for clean/short outputs |
-| `code_multiplier` | Multiplies the threshold for `code_*` content types (keeps code inline longer) |
-| `context_engine` | Turns the context engine on/off (default on) |
+| `terminal_threshold` | Terminal-output compression threshold, bytes - gates `hooks::transform_terminal_output` |
 
-The shipped root `aphrodite.toml` also sets `prefetch` in this section, but
-it doesn't currently appear to change proxy behavior - treat it as reserved
-rather than load-bearing.
+Also parsed into the Hermes-plugin session state and exposed via
+`aphrodite_stats`/`aphrodite_config_get`, but **not consulted by any
+compression decision** (populated, not load-bearing):
+`engine_threshold_pct`, `engine_protect_first`, `engine_protect_last`,
+`engine_min_msgs`.
+
+**Not read by anything** (parsed by the TOML schema, echoed by `/reload`
+for visibility, no consumer): `auto_expand`, `auto_expand_limit`,
+`catalog_mode` (catalog mode has no env or TOML wiring at all - it's
+whatever the caller passes per-request), `classifier_poll`, `context_engine`
+(a *different* `APHRODITE_CONTEXT_ENGINE` env var gates a real, unrelated
+feature - see [`env-vars.md`](env-vars.md) for the disambiguation), and
+`prefetch` (the shipped root `aphrodite.toml` sets it, but nothing reads it
+back).
 
 ## `[previews]` and `[prompts]`
 
@@ -154,17 +183,30 @@ Stops at the first non-empty value.
 
 | Field | Resolution |
 | --- | --- |
-| `listen` | `proxy.listen` → `127.0.0.1:9797` |
-| `mode` | `proxy.mode` → `"token"` (warns on unknown values) |
-| `api_url` | `proxy.api_url` → `defaults.api_url` → `https://api.openai.com` |
-| `model` | `proxy.model` → `defaults.model` → `"default-model"` |
-| `ccr_ttl_seconds` | `proxy.ccr_ttl_seconds` → `defaults.ccr_ttl_seconds` → `3600` |
-| `ccr_db_path` | `proxy.ccr_db_path` (non-empty) → `~/.hermes/aphrodite/ccr.db` (or `/tmp` fallback) |
+| `listen` | `proxy.listen` → `127.0.0.1:9797`, then `APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT` overrides just the port (name/mode-matched) |
+| `mode` | `proxy.mode` → `"token"` (warns on unknown values) - no env override in multi-proxy mode |
+| `api_url` | `APHRODITE_API_URL` → `proxy.api_url` → `defaults.api_url` → `https://api.openai.com` |
+| `model` | `APHRODITE_MODEL` → `proxy.model` → `defaults.model` → `"default-model"` |
+| `ccr_ttl_seconds` | `APHRODITE_CCR_TTL` → `proxy.ccr_ttl_seconds` → `defaults.ccr_ttl_seconds` → `3600` |
+| `ccr_db_path` | `APHRODITE_DB` → `proxy.ccr_db_path` (non-empty) → `~/.hermes/aphrodite/ccr.db` (or `/tmp` fallback) |
+| `notify_url` / `notify_key` | `APHRODITE_NOTIFY_URL`/`APHRODITE_NOTIFY_KEY` → `proxy.notify_url`/`notify_key` → unset |
 | `tool_relay` | `proxy.tool_relay` → `false` |
 | `dev` | `proxy.dev` → `false` |
 | `timeout` | `proxy.timeout` → `300` (clamped to a max of `600`) |
 | `max_context` | `proxy.max_context` → `1,000,000` |
 | `max_output` | `proxy.max_output` → `384,000` |
+
+## Hot-reload
+
+`POST /reload` (per-listener) and the `aphrodite.toml` file watcher (all
+listeners at once) both re-resolve the four live `[compression]` threshold
+fields from the section above and write them into the running proxy's
+state immediately - no restart needed. `/reload`'s JSON response has
+`"applied": true` and echoes the values that took effect, plus a
+`"parsed_only"` object for the fields that don't (see the `[compression]`
+breakdown above). Everything else about a proxy's config (`listen`,
+`api_url`, `model`, `mode`, ...) is fixed at startup; changing those
+requires a restart.
 
 ## Validation
 
