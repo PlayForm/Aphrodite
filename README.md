@@ -44,13 +44,21 @@ On first launch, the plugin auto-downloads the `aphrodite` binary from
 ### Via cargo install
 
 ```bash
-cargo install aphrodite          # proxy binary + libaphrodite.dylib
-cargo install aphrodite-hermes   # hermes bridge dylib + helper bin
+cargo install aphrodite          # proxy binary only - see note below
+cargo install aphrodite-hermes   # helper bin only - see note below
 aphrodite setup                  # plugin structure + config + symlink
 ```
 
-All three commands together: the proxy on `:9797/:9798`, the Hermes dylib
-for hook/tool integration, and the plugin registered with Hermes.
+`cargo install` only ever copies a crate's `[[bin]]` target into
+`~/.cargo/bin/` - it does not (and cannot) distribute the `libaphrodite.dylib`
+/ `libaphrodite_hermes.dylib` cdylib artifacts these two crates also build.
+`aphrodite setup` will fail loudly ("dylib not found") if it can't locate
+them, and it's honest about that failure - but the dylibs themselves still
+need to come from somewhere: either a full source checkout
+(`cargo build --release -p aphrodite -p aphrodite-hermes`) or the
+release-download flow the "Hermes plugin" method above already uses
+(`plugins/aphrodite/download.sh`). If you only need the proxy binary itself
+(no Hermes plugin), `cargo install aphrodite` alone is sufficient.
 
 > **Windows**: `plugins/aphrodite/download.ps1` is a native PowerShell
 > equivalent of `download.sh` - no Git Bash/WSL needed. See
@@ -143,7 +151,7 @@ needs it.
 
 Four layers, all under 1ms:
 
-1. **Classify** - 28-type regex classifier identifies content (40–123 ns)
+1. **Classify** - 28-type regex classifier identifies content (40-123 ns)
 2. **Template** - TOML-driven templates produce `[type:key=val]` previews
 3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
 4. **Decide** - Agent reads preview, retrieves only when needed
@@ -202,7 +210,7 @@ count and confirm they pass.
 that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 
 **Real example:** a 6-turn dev session (builds, tests, docs, git) compressed
-216 KB of raw tool output into 12 markers — **~54,000 tokens → ~240 tokens**
+216 KB of raw tool output into 12 markers - **~54,000 tokens → ~240 tokens**
 (225× reduction), leaving 99.6% of the context window free for reasoning.
 
 ---
@@ -354,7 +362,7 @@ for the full, accurate breakdown of what's wired where.
 | Metric                    |   Value   |
 | :------------------------ | :-------: |
 | Compression latency (avg) |  1.6 ms   |
-| Classification latency    | 40–123 ns |
+| Classification latency    | 40-123 ns |
 | Preview generation        | <0.05 ms  |
 
 Benchmarks (`cargo run --release --example bench_0N_*`, see
@@ -363,7 +371,7 @@ checks in `full` mode) are reproducible commands rather than fixed pass-rate
 
 ### Real-world savings (Hermes Agent, deepseek-v4-pro)
 
-Measured via `.bench/e2e/hermes_z_ab.sh` — 4 standardized coding prompts,
+Measured via `.bench/e2e/hermes_z_ab.sh` - 4 standardized coding prompts,
 A/B testing with aphrodite ON vs OFF, `focus` directive active:
 
 | Prompt               | OFF (tokens) | ON (tokens) | Saved  | API calls OFF/ON |
@@ -374,7 +382,7 @@ A/B testing with aphrodite ON vs OFF, `focus` directive active:
 | Read two docs        |       34,075 |      34,049 |  0%    | 2 → 2 |
 | **Total**            |  **575,943** | **272,088** | **53%** | 21 → 13 |
 
-Cost: $0.18 (OFF) → $0.15 (ON) — 18% cheaper, 38% fewer API calls.
+Cost: $0.18 (OFF) → $0.15 (ON) - 18% cheaper, 38% fewer API calls.
 numbers - run them directly to see current results.
 
 ---

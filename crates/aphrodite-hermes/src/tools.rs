@@ -61,7 +61,7 @@ fn read_path_guarded(path:&str) -> Result<String, String> {
 /// Hermes wraps all tool results in JSON wrappers like
 /// {"output":"...","exit_code":N}, {"success":true,"diff":"..."},
 /// {"total_count":N,"matches":[...]}, etc. The aphrodite classifier
-/// sees '{' and returns json_array — hiding the real content behind a
+/// sees '{' and returns json_array - hiding the real content behind a
 /// useless preview. This extracts the meaningful content and reclassifies.
 fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 	// Only attempt unwrapping if the content looks like a JSON object.
@@ -109,7 +109,7 @@ fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 			return Some((msg.to_string(), "text".to_string()));
 		}
 		if !msg.is_empty() && !msg.starts_with('{') && !msg.starts_with('[') {
-			return Some((format!("{}", msg), "text".to_string()));
+			return Some((msg.to_string(), "text".to_string()));
 		}
 	}
 	if let Some(ok) = obj.get("success") {

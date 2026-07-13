@@ -31,7 +31,7 @@ pub mod stage2;
 pub mod state;
 pub mod struct_extract;
 
-// Proxy modules (used by main.rs binary) — gated behind the `proxy`
+// Proxy modules (used by main.rs binary) - gated behind the `proxy`
 // feature (report 01-T2) so the cdylib built by `aphrodite-hermes` with
 // `default-features = false` doesn't link axum/tokio/reqwest into the
 // Hermes dylib unnecessarily.
@@ -99,8 +99,8 @@ fn alloc_handle(state:AphroditeState) -> usize {
 
 /// Torn-state contract (report 06 F12): `f` runs under `catch_unwind`, so a
 /// panicking hook returns an error instead of aborting the process, but any
-/// mutation `f` already made to `state` before panicking is NOT rolled back
-/// - a panic between two steps of a multi-step mutation (e.g. `retain` then
+/// mutation `f` already made to `state` before panicking is NOT rolled back.
+/// A panic between two steps of a multi-step mutation (e.g. `retain` then
 /// `push_front` in `inline_store_put`) leaves whatever partial state existed
 /// at the panic point for the next caller to observe. This crate's mutation
 /// sequences are ordered so an interruption degrades to "entry missing"

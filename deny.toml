@@ -12,7 +12,11 @@
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-ignore = []
+ignore = [
+	# paste is unmaintained (archived by author) with no safe upgrade
+	# available; it's a transitive compile-time dep of tokenizers/fastembed.
+	"RUSTSEC-2024-0436",
+]
 
 [licenses]
 # Aphrodite is CC0-1.0. Allowed licenses for dependencies. This list is a
@@ -30,11 +34,17 @@ allow = [
 	"Unicode-3.0",
 	"Unlicense",
 	"MPL-2.0",
+	# NCSA (libfuzzer-sys, via rav1e/ravif/image/fastembed): permissive,
+	# OSI-approved.
+	"NCSA",
+	# CDLA-Permissive-2.0 (webpki-root-certs / webpki-roots): permissive
+	# data license for root cert bundles.
+	"CDLA-Permissive-2.0",
+	# BSL-1.0 (xxhash-rust): permissive Boost license.
+	"BSL-1.0",
 ]
 confidence-threshold = 0.8
 exceptions = [
-	# ring uses a unique ISC variant that cargo-deny may flag as "OpenSSL"
-	{ crate = "ring", allow = ["OpenSSL"] },
 	# webpki / rustls-webpki uses ISC-like license
 	{ crate = "rustls-webpki", allow = ["ISC"] },
 	# unicode-ident uses Unicode-3.0
@@ -44,23 +54,7 @@ exceptions = [
 [bans]
 multiple-versions = "warn"
 deny = []
-skip = [
-	# proc-macro2 / quote / unicode-ident are ubiquitous transitive deps
-	# and may appear at different patch versions across the tree. Allow
-	# minor version drift.
-	{ name = "proc-macro2" },
-	{ name = "quote" },
-	{ name = "unicode-ident" },
-	# serde derive macros (serde_derive, etc.)
-	{ name = "serde_derive" },
-	# syn is a compile-time dep used by many derive crates
-	{ name = "syn" },
-	# FastEmbed and Magika both depend on ort-sys; they may pull slightly
-	# different patch versions. Allow minor differences.
-	{ name = "ort-sys" },
-	# zstd-sys and its vendored C source
-	{ name = "zstd-sys" },
-]
+skip = []
 skip-tree = [
 	# headroom-core is vendored; its dep tree is under our control, but
 	# cargo-deny doesn't track "vendored" as a source distinction. Skip
