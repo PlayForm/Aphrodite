@@ -6,6 +6,7 @@
 
 use std::{net::SocketAddr, sync::Arc};
 
+use anyhow::Context;
 use axum::{
 	Router,
 	extract::{ConnectInfo, DefaultBodyLimit, Request},
@@ -192,7 +193,12 @@ async fn run() -> anyhow::Result<()> {
 							path = %watch_path_str,
 							auto_expand_limit = comp.and_then(|c| c.auto_expand_limit).unwrap_or(0),
 							engine_threshold = comp.and_then(|c| c.engine_threshold_pct).unwrap_or(0),
-							"? config reloaded - proxy will use new values; plugin reloads independently"
+							// F15: this only re-parses and validates the file - `AppState`
+						// is built once in `run_single` and thresholds are consts, so
+						// nothing here is actually applied to the running proxy.
+						// The previous wording claimed otherwise, costing real
+						// debugging time when a changed threshold had no effect.
+						"config validated (file watch) - restart required for proxy-side values to take effect; the Python plugin reloads independently"
 						);
 					},
 					Err(e) => {
@@ -208,11 +214,26 @@ async fn run() -> anyhow::Result<()> {
 	// each run_single() task waits on the receiver for graceful_shutdown.
 	let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
-	let mut handles = Vec::new();
+	// F9: bind every listener BEFORE spawning any proxy task. Previously
+	// each `run_single` bound its own port deep inside its spawned task, so
+	// a bind failure (port already in use - a stale instance, a conflict
+	// between the cache/token pair) only logged an error and left that one
+	// listener silently dead while the other kept serving - the process
+	// exited 0 and looked healthy. Binding here means a failure aborts
+	// startup entirely, loudly, before any listener goes live.
+	let mut bound = Vec::with_capacity(proxies.len());
 	for (name, cli) in proxies {
+		let listener = tokio::net::TcpListener::bind(cli.listen)
+			.await
+			.with_context(|| format!("failed to bind listener \"{name}\" on {}", cli.listen))?;
+		bound.push((name, cli, listener));
+	}
+
+	let mut handles = Vec::new();
+	for (name, cli, listener) in bound {
 		let rx = shutdown_rx.clone();
 		let handle = tokio::spawn(async move {
-			if let Err(e) = run_single(name, cli, rx).await {
+			if let Err(e) = run_single(name, cli, listener, rx).await {
 				tracing::error!(%e, "proxy listener failed");
 			}
 		});
@@ -273,6 +294,7 @@ async fn run() -> anyhow::Result<()> {
 async fn run_single(
 	name:String,
 	mut cli:Cli,
+	listener:tokio::net::TcpListener,
 	mut shutdown_rx:tokio::sync::watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
 	// Resolve relative ccr_db_path against the binary directory, not CWD.
@@ -327,15 +349,28 @@ async fn run_single(
                             "error": "only loopback clients allowed"
                         }))).into_response();
                     }
+                    // F19: 60s TTL cache - see `upstream_health_cache`'s doc
+                    // comment for why an uncached probe here is the same
+                    // rate-limit-quota-burning cost class as the health
+                    // check this endpoint's sibling `/health` already fixed.
+                    const TTL: std::time::Duration = std::time::Duration::from_secs(60);
+                    if let Some((ok, at)) = *s.upstream_health_cache.lock().unwrap_or_else(|e| e.into_inner()) {
+                        if at.elapsed() < TTL {
+                            return Json(serde_json::json!({"upstream": ok, "cached": true})).into_response();
+                        }
+                    }
                     let ok = s.client
                         .get(format!("{}/models", s.api_url.trim_end_matches('/')))
-                        .header("Authorization", format!("Bearer {}", s.api_key))
+                        .header("Authorization", format!("Bearer {}", s.api_key.expose()))
                         .timeout(std::time::Duration::from_secs(5))
                         .send()
                         .await
                         .map(|r| r.status().is_success())
                         .unwrap_or(false);
-                    Json(serde_json::json!({"upstream": ok})).into_response()
+                    if let Ok(mut cache) = s.upstream_health_cache.lock() {
+                        *cache = Some((ok, std::time::Instant::now()));
+                    }
+                    Json(serde_json::json!({"upstream": ok, "cached": false})).into_response()
                 }
             }
         }))
@@ -399,8 +434,19 @@ async fn run_single(
                 // Latency buckets
                 if let Some(buckets) = stats["latency_buckets_us"].as_array() {
                     let mut total_count: u64 = 0;
+                    // F11: bucket 4 (`record_latency`'s last arm) has no
+                    // upper bound - it catches every sample >= 1s, including
+                    // 30s+ outliers - so labeling it "10.0" was actively
+                    // wrong (Prometheus consumers would assume everything in
+                    // it is <= 10s and mis-compute quantiles), and the
+                    // missing explicit "+Inf" bucket (required to equal
+                    // `_count`) broke `histogram_quantile()`. Relabeling
+                    // bucket 4 as "+Inf" is honest about its real bound and
+                    // satisfies the convention in one step - no new bucket
+                    // needed since it was already unbounded in practice.
+                    let le_labels = ["0.001", "0.01", "0.1", "1.0", "+Inf"];
                     for (i, v) in buckets.iter().enumerate() {
-                        let le = match i { 0=>"0.001", 1=>"0.01", 2=>"0.1", 3=>"1.0", 4=>"10.0", _=>"+Inf"};
+                        let le = le_labels.get(i).copied().unwrap_or("+Inf");
                         let count = v.as_u64().unwrap_or(0);
                         total_count += count;
                         out.push_str(&format!("aphrodite_latency_seconds_bucket{{le=\"{}\"}} {}\n", le, total_count));
@@ -433,6 +479,7 @@ async fn run_single(
                     if let Some(c) = ue["4xx"].as_u64() { out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"4xx\"}} {c}\n")); }
                     if let Some(c) = ue["5xx"].as_u64() { out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"5xx\"}} {c}\n")); }
                     if let Some(t) = ue["timeouts"].as_u64() { out.push_str(&format!("aphrodite_upstream_timeouts_total {t}\n")); }
+                    if let Some(c) = ue["connect_errors"].as_u64() { out.push_str(&format!("aphrodite_upstream_connect_errors_total {c}\n")); }
                 }
                 // CCR store info
                 if let Some(cs) = stats["ccr_store"].as_object() {
@@ -475,11 +522,23 @@ async fn run_single(
                 "profile": option_env!("APHRODITE_PROFILE"),
             }))
         }))
-        .route("/{*path}", any(proxy::proxy_handler))
-        // Loopback enforcement layer on all non-/health routes
-        .layer(middleware::from_fn(loopback_only))
-        // 1 MB body limit on restricted routes
+        // 1 MB body limit on management routes only (F7) - the catch-all
+        // proxy route gets its own, much larger limit below: config
+        // advertises max_context up to 1,000,000 tokens, and a chat request
+        // at even 200k tokens is easily >1 MB of JSON with tool schemas and
+        // history, so a blanket 1 MB cap on `/{*path}` rejected large agent
+        // conversations with 413 before `proxy_handler` ever ran.
         .layer(DefaultBodyLimit::max(1024 * 1024));
+
+	// Catch-all proxy route: its own, much larger body limit.
+	let catch_all = Router::new()
+		.route("/{*path}", any(proxy::proxy_handler))
+		.layer(DefaultBodyLimit::max(64 * 1024 * 1024));
+
+	let restricted = restricted
+        .merge(catch_all)
+        // Loopback enforcement layer on all non-/health routes
+        .layer(middleware::from_fn(loopback_only));
 
 	// Public route (no loopback enforcement) merged with restricted routes
 	let app = Router::new()
@@ -488,7 +547,8 @@ async fn run_single(
 		.layer(CorsLayer::permissive())
 		.with_state(state);
 
-	let listener = tokio::net::TcpListener::bind(cli.listen).await?;
+	// F9: `listener` was already bound in `run()` before any proxy task was
+	// spawned - see the call site for why.
 	tracing::info!(addr = %listener.local_addr()?, "listening");
 
 	// Graceful shutdown triggered by shared watch channel - fires when main()
