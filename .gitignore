@@ -18,6 +18,8 @@ venv/
 env/
 
 # Hermes / dev artifacts
+!./.hermes/
+!./.hermes/**/*
 
 .headroom/
 *.log
