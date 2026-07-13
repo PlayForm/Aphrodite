@@ -1,0 +1,44 @@
+# Example aphrodite profile for Hermes Agent.
+# Copy to ~/.hermes/profiles/my-profile/config.yaml and customize.
+
+# ── Agent ────────────────────────────────────────────────────────
+agent:
+  max_turns: 90
+  disabled_toolsets: []
+  tool_use_enforcement: auto
+
+# ── Model (routes through aphrodite token proxy :9798) ──────────
+model:
+  default: deepseek-v4-pro
+  provider: aphrodite-token
+
+# ── Providers ────────────────────────────────────────────────────
+providers:
+  aphrodite-token:
+    provider: deepseek
+    base_url: http://127.0.0.1:9798
+    api_key_env: APHRODITE_API_KEY
+    max_tokens: 65536
+  # Direct fallback if proxy is down
+  deepseek:
+    provider: deepseek
+    api_key_env: DEEPSEEK_API_KEY
+    max_tokens: 65536
+
+# ── Compression engine ───────────────────────────────────────────
+compression:
+  enabled: false # aphrodite plugin handles compression
+context:
+  engine: aphrodite
+
+# ── Toolsets ─────────────────────────────────────────────────────
+toolsets:
+  - hermes-cli
+  - aphrodite
+
+# ── Terminal (proxy subprocess needs API key) ────────────────────
+terminal:
+  env_passthrough:
+    - APHRODITE_API_KEY
+    - PATH
+    - HOME
