@@ -3,12 +3,11 @@
 Aphrodite compression evaluation report.
 Measures token savings per content type, estimates net savings
 accounting for whether the agent retrieves the content.
-"""
 
-import json
-import subprocess
-import sys
-from pathlib import Path
+NOTE: This is a SIMULATED benchmark — preview sizes are static assumptions,
+not runtime measurements. For live compression metrics, run the proxy bench
+suite (.bench/proxy/bench_proxy.sh) or cargo bench in .bench/compression/.
+"""
 
 
 # Approximate token count (1 token ≈ 4 chars for code, 3 chars for text)
@@ -64,6 +63,10 @@ SAMPLES = {
 }
 
 print("# Aphrodite Compression Evaluation Report")
+print()
+print("⚠️  SIMULATED — preview sizes are static assumptions, not runtime measurements.")
+print("    For live metrics: .bench/proxy/bench_proxy.sh or cargo bench in .bench/compression/")
+print()
 print(f"## Content Types Tested: {len(SAMPLES)}")
 print()
 
