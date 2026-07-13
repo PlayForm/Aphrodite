@@ -176,10 +176,16 @@ fn extract_file_path(content:&str, tool:&str) -> Option<String> {
 		// first `:` on the first result line (F10: this tool is listed in
 		// `state.file_tools` but was previously never actually matched here,
 		// so every search result silently went untracked).
-		"search_files" => content.lines().next().and_then(|line| {
-			let path = line.split(':').next().unwrap_or("").trim();
-			if path.starts_with('/') || path.starts_with("./") { Some(path.to_string()) } else { None }
-		}),
+		"search_files" => {
+			content.lines().next().and_then(|line| {
+				let path = line.split(':').next().unwrap_or("").trim();
+				if path.starts_with('/') || path.starts_with("./") {
+					Some(path.to_string())
+				} else {
+					None
+				}
+			})
+		},
 		_ => None,
 	}
 }
@@ -208,7 +214,11 @@ mod tests {
 		let r = transform_tool_result(&mut s, "/tmp/some/file.rs\nfn main() {}\n", "read_file");
 		assert_eq!(r["compressed"], false, "read_file must never be compressed");
 		assert_eq!(r["reason"], "essential_tool");
-		assert_eq!(s.referenced_files.len(), 1, "read_file must still be tracked as a file reference");
+		assert_eq!(
+			s.referenced_files.len(),
+			1,
+			"read_file must still be tracked as a file reference"
+		);
 		assert_eq!(s.referenced_files[0].0, "/tmp/some/file.rs");
 	}
 

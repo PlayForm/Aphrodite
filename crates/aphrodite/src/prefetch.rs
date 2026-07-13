@@ -186,7 +186,10 @@ mod tests {
 		let r = prefetch_files(&mut s, &[path.to_string_lossy().to_string()]);
 		assert_eq!(r["skipped_size"], 1);
 		let reason = r["results"][0]["reason"].as_str().unwrap();
-		assert!(reason.contains(&MAX_PREFETCH_SIZE.to_string()), "reason should surface the byte limit: {reason}");
+		assert!(
+			reason.contains(&MAX_PREFETCH_SIZE.to_string()),
+			"reason should surface the byte limit: {reason}"
+		);
 
 		let _ = std::fs::remove_file(&path);
 	}

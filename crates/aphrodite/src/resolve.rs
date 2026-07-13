@@ -366,7 +366,10 @@ mod tests {
 		s.inline_store_put("hA".into(), "<<<CCR:hB|t|1>>>".into());
 		s.inline_store_put("hB".into(), "<<<CCR:hA|t|1>>>".into());
 		let result = expand(&mut s, "hA").unwrap();
-		assert!(!result.contains("[CCR_UNRESOLVED"), "cycle must not surface as unresolved: {result}");
+		assert!(
+			!result.contains("[CCR_UNRESOLVED"),
+			"cycle must not surface as unresolved: {result}"
+		);
 		assert_eq!(result, "<<<CCR:hB|t|1>>>");
 	}
 

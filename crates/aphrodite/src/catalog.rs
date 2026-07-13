@@ -5,8 +5,7 @@
 
 use std::collections::HashMap;
 
-use crate::state::AphroditeState;
-use crate::struct_extract::floor_boundary;
+use crate::{state::AphroditeState, struct_extract::floor_boundary};
 
 /// Full catalog result with items, by_type grouping, stats.
 pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
@@ -63,7 +62,11 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 	// its small fixed template overhead) is the best available stand-in -
 	// this is still far closer to reality than reporting the full original
 	// size as "saved", which is what a 100%-compression ratio would claim.
-	let total_saved:usize = state.recent_markers.iter().map(|m| m.size.saturating_sub(m.preview.len())).sum();
+	let total_saved:usize = state
+		.recent_markers
+		.iter()
+		.map(|m| m.size.saturating_sub(m.preview.len()))
+		.sum();
 
 	let mut result = serde_json::json!({
 		"total_items": items.len(),

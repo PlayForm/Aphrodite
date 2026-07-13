@@ -145,7 +145,9 @@ mod tests {
 
 	// ── T5 (F3): normalize_hash ────────────────────────────────────
 	#[test]
-	fn test_normalize_hash_bare_is_unchanged() { assert_eq!(normalize_hash("abc123"), "abc123"); }
+	fn test_normalize_hash_bare_is_unchanged() {
+		assert_eq!(normalize_hash("abc123"), "abc123");
+	}
 
 	#[test]
 	fn test_normalize_hash_strips_pipe_suffix() {
@@ -153,7 +155,9 @@ mod tests {
 	}
 
 	#[test]
-	fn test_normalize_hash_trims_whitespace() { assert_eq!(normalize_hash("  abc123  "), "abc123"); }
+	fn test_normalize_hash_trims_whitespace() {
+		assert_eq!(normalize_hash("  abc123  "), "abc123");
+	}
 
 	#[test]
 	fn test_normalize_hash_is_idempotent() {

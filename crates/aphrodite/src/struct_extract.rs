@@ -345,7 +345,11 @@ fn extract_go(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mu
 			// used to report `func Start(s *Server)` instead of
 			// `func Start(addr string)`. Search for the params paren only
 			// after skipping past the receiver's closing `)`.
-			let receiver_end = if after_func.starts_with('(') { after_func.find(')').map(|i| i + 1) } else { None };
+			let receiver_end = if after_func.starts_with('(') {
+				after_func.find(')').map(|i| i + 1)
+			} else {
+				None
+			};
 			let name = match receiver_end {
 				Some(end) => after_func[end..].trim_start().split('(').next().unwrap_or("?"),
 				None => after_func.split('(').next().unwrap_or("?"),
@@ -441,7 +445,9 @@ fn extract_js(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mu
 			if let Some((before_eq, after_eq)) = code_part.split_once('=') {
 				let before_eq = before_eq.trim();
 				if after_eq.contains("=>")
-					&& (before_eq.starts_with("const ") || before_eq.starts_with("let ") || before_eq.starts_with("var "))
+					&& (before_eq.starts_with("const ")
+						|| before_eq.starts_with("let ")
+						|| before_eq.starts_with("var "))
 				{
 					let name = before_eq
 						.trim_start_matches("const ")
@@ -556,9 +562,15 @@ mod tests {
 		let code = "func (s *Server) Start(addr string) error {\n}\n";
 		let r = extract_code_structure(code, "go");
 		let fns = &r["fns"];
-		let sig = fns.iter().find(|s| s.contains("Start")).expect("Start method should be extracted");
+		let sig = fns
+			.iter()
+			.find(|s| s.contains("Start"))
+			.expect("Start method should be extracted");
 		assert!(sig.contains("addr"), "signature should show the real params: {sig}");
-		assert!(!sig.contains("*Server"), "signature should NOT show the receiver as if it were a param: {sig}");
+		assert!(
+			!sig.contains("*Server"),
+			"signature should NOT show the receiver as if it were a param: {sig}"
+		);
 	}
 
 	/// `const x = 5; // map => y` must not be recorded as an arrow function -
@@ -568,7 +580,10 @@ mod tests {
 		let code = "const x = 5; // map => y\n";
 		let r = extract_code_structure(code, "js");
 		if let Some(fns) = r.get("fns") {
-			assert!(!fns.iter().any(|s| s.contains('x')), "trailing-comment `=>` must not be mistaken for an arrow fn: {fns:?}");
+			assert!(
+				!fns.iter().any(|s| s.contains('x')),
+				"trailing-comment `=>` must not be mistaken for an arrow fn: {fns:?}"
+			);
 		}
 	}
 
@@ -578,7 +593,10 @@ mod tests {
 		let code = "const add = (a, b) => a + b;\n";
 		let r = extract_code_structure(code, "js");
 		let fns = &r["fns"];
-		assert!(fns.iter().any(|s| s.contains("add")), "real arrow fn should still be extracted: {fns:?}");
+		assert!(
+			fns.iter().any(|s| s.contains("add")),
+			"real arrow fn should still be extracted: {fns:?}"
+		);
 	}
 
 	/// `pub(crate) async fn` was previously invisible to the Rust extractor's
@@ -598,9 +616,11 @@ mod tests {
 	#[test]
 	fn test_auto_detect_rust_survives_long_leading_doc_comment() {
 		let mut content = String::new();
-        for i in 0..40 {
-            content.push_str(&format!("//! This is a long module doc comment line number {i} padding it out.\n"));
-        }
+		for i in 0..40 {
+			content.push_str(&format!(
+				"//! This is a long module doc comment line number {i} padding it out.\n"
+			));
+		}
 		content.push_str("fn real_function() -> i32 { 42 }\n");
 		assert_eq!(auto_detect(&content), "rust");
 	}

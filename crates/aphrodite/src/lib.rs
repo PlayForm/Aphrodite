@@ -427,9 +427,13 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 	let h = handles();
 	match h.as_ref().and_then(|map| map.get(&hid)) {
 		Some(s) => {
-			let results: Vec<serde_json::Value> = s.recent_markers.iter()
-                .filter(|m| m.preview.to_lowercase().contains(&q) || m.ccr_type.to_lowercase().contains(&q))
-                .take(20).map(|m| serde_json::json!({"hash":&m.hash,"type":m.ccr_type,"size":m.size,"preview":m.preview})).collect();
+			let results:Vec<serde_json::Value> = s
+				.recent_markers
+				.iter()
+				.filter(|m| m.preview.to_lowercase().contains(&q) || m.ccr_type.to_lowercase().contains(&q))
+				.take(20)
+				.map(|m| serde_json::json!({"hash":&m.hash,"type":m.ccr_type,"size":m.size,"preview":m.preview}))
+				.collect();
 			to_json_ok(&serde_json::json!({"total":results.len(),"results":results}))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
@@ -657,17 +661,19 @@ pub extern "C" fn aphrodite_dispatch(
 			"search" => {
 				let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
 				let type_filter = args.get("type").and_then(|v| v.as_str());
-				let results: Vec<serde_json::Value> = s.recent_markers.iter()
-		            .filter(|m| {
-		                let matches_query = query.is_empty()
-		                    || m.preview.to_lowercase().contains(&query)
-		                    || m.ccr_type.to_lowercase().contains(&query);
-		                let matches_type = type_filter.is_none_or(|t| m.ccr_type == t);
-		                matches_query && matches_type
-		            })
-		            .take(20)
-		            .map(|m| serde_json::json!({"hash":&m.hash,"type":m.ccr_type,"size":m.size,"preview":m.preview}))
-		            .collect();
+				let results:Vec<serde_json::Value> = s
+					.recent_markers
+					.iter()
+					.filter(|m| {
+						let matches_query = query.is_empty()
+							|| m.preview.to_lowercase().contains(&query)
+							|| m.ccr_type.to_lowercase().contains(&query);
+						let matches_type = type_filter.is_none_or(|t| m.ccr_type == t);
+						matches_query && matches_type
+					})
+					.take(20)
+					.map(|m| serde_json::json!({"hash":&m.hash,"type":m.ccr_type,"size":m.size,"preview":m.preview}))
+					.collect();
 				serde_json::json!({"total":results.len(),"results":results})
 			},
 			"diff" => {
@@ -802,14 +808,20 @@ mod ffi_tests {
 	fn test_build_preview_terminal_surfaces_exit_code() {
 		let preview = build_preview("terminal", "running tests\nall good\nexit code: 1\n");
 		assert!(preview.starts_with("[terminal:"));
-		assert!(preview.contains("exit code: 1"), "preview should surface the exit code line: {preview}");
+		assert!(
+			preview.contains("exit code: 1"),
+			"preview should surface the exit code line: {preview}"
+		);
 	}
 
 	#[test]
 	fn test_build_preview_terminal_falls_back_to_last_line() {
 		let preview = build_preview("terminal", "line one\nline two\nlast line here\n");
 		assert!(preview.starts_with("[terminal:"));
-		assert!(preview.contains("last line here"), "preview should fall back to the last non-empty line: {preview}");
+		assert!(
+			preview.contains("last line here"),
+			"preview should fall back to the last non-empty line: {preview}"
+		);
 	}
 
 	fn cs(s:&str) -> CString { CString::new(s).unwrap() }

@@ -1,4 +1,4 @@
-//! headroom-ffi internal state - mirrors plugins/aphrodite/_core/state.py
+//! Aphrodite internal state - mirrors plugins/aphrodite/_core/state.py
 //! All session-scoped state lives here: inline store, conv index, markers,
 //! counters.
 
@@ -7,10 +7,29 @@ use std::collections::{HashMap, VecDeque};
 /// Maximum inline store entries before LRU eviction.
 const INLINE_MAX:usize = 500;
 
+/// Default byte budget for the inline store (report 05 F11): entry-count
+/// alone (`INLINE_MAX`) doesn't bound memory - `aphrodite_prefetch` admits
+/// files up to 10MB each and the ABI admits blobs up to 16MB, so 500 entries
+/// at the large end is a multi-GB worst case with zero byte accounting.
+/// 256MB is a conservative default for a single agent session's compression
+/// cache; exposed via `AphroditeState::inline_store_byte_budget` so a config
+/// layer can override it.
+pub const DEFAULT_INLINE_BYTE_BUDGET:usize = 256 * 1024 * 1024;
+
 /// Session state - one per loaded dylib instance.
 pub struct AphroditeState {
 	/// Inline content store: {hash: content}, LRU-ordered.
 	pub inline_store:VecDeque<(String, String)>,
+	/// Running total of `content.len()` across every entry in `inline_store`,
+	/// maintained incrementally by `inline_store_put` so eviction doesn't
+	/// need an O(n) rescan on every insert (report 05 F11).
+	inline_store_bytes:usize,
+	/// Byte budget for `inline_store`; entries are evicted from the back
+	/// (oldest/least-recently-used) until the running total is at or under
+	/// this, in addition to the existing `INLINE_MAX` entry-count cap.
+	/// Defaults to [`DEFAULT_INLINE_BYTE_BUDGET`]; see
+	/// `inline_store_byte_budget`/`set_inline_store_byte_budget`.
+	inline_store_byte_budget:usize,
 	/// Hash alias map: {full_sha256: short_hash}
 	pub hash_alias:HashMap<String, String>,
 	/// Recent CCR markers for catalog: [{hash, type, size, preview, turn}]
@@ -19,15 +38,15 @@ pub struct AphroditeState {
 	pub conv_index:HashMap<usize, (String, String, usize)>,
 	/// Referenced files: {filepath: last_tool_name}
 	pub referenced_files:VecDeque<(String, String)>,
-	/// Turn counter
+	/// Turn counter.
 	pub turn_counter:usize,
-	/// Scanned message index for incremental marker scan
+	/// Scanned message index for incremental marker scan.
 	pub scanned_msg_idx:usize,
 	/// Git cache: {timestamp, summary}
 	pub git_cache:HashMap<String, String>,
-	/// File tools set
+	/// File tools set.
 	pub file_tools:Vec<String>,
-	/// Config values
+	// ── Config values (mirrored from aphrodite.toml) ──
 	pub api_url:String,
 	pub model:String,
 	pub engine_threshold_pct:u64,
@@ -57,6 +76,8 @@ impl Default for AphroditeState {
 	fn default() -> Self {
 		Self {
 			inline_store:VecDeque::with_capacity(INLINE_MAX),
+			inline_store_bytes:0,
+			inline_store_byte_budget:DEFAULT_INLINE_BYTE_BUDGET,
 			hash_alias:HashMap::new(),
 			recent_markers:Vec::new(),
 			conv_index:HashMap::new(),
@@ -82,15 +103,49 @@ impl Default for AphroditeState {
 }
 
 impl AphroditeState {
-	/// Insert into inline store with LRU eviction.
-	pub fn inline_store_put(&mut self, hash:String, content:String) {
-		// Remove existing entry if present (will be re-added at front)
-		self.inline_store.retain(|(h, _)| h != &hash);
-		self.inline_store.push_front((hash, content));
-		// Evict oldest
-		while self.inline_store.len() > INLINE_MAX {
-			self.inline_store.pop_back();
+	/// Current byte budget for the inline store (report 05 F11).
+	pub fn inline_store_byte_budget(&self) -> usize { self.inline_store_byte_budget }
+
+	/// Override the inline store's byte budget (e.g. from config); evicts
+	/// immediately if the new budget is lower than the current usage.
+	pub fn set_inline_store_byte_budget(&mut self, budget:usize) {
+		self.inline_store_byte_budget = budget;
+		self.evict_over_budget();
+	}
+
+	/// Current total bytes held across every entry in the inline store.
+	pub fn inline_store_bytes(&self) -> usize { self.inline_store_bytes }
+
+	/// Evict from the back (oldest/least-recently-used) until both the
+	/// entry-count cap (`INLINE_MAX`) and the byte budget
+	/// (`inline_store_byte_budget`) are satisfied.
+	fn evict_over_budget(&mut self) {
+		while self.inline_store.len() > INLINE_MAX
+			|| (self.inline_store_bytes > self.inline_store_byte_budget && !self.inline_store.is_empty())
+		{
+			if let Some((_, c)) = self.inline_store.pop_back() {
+				self.inline_store_bytes = self.inline_store_bytes.saturating_sub(c.len());
+			} else {
+				break;
+			}
 		}
+	}
+
+	/// Insert into inline store with LRU + byte-budget eviction (report 05
+	/// F11: previously bounded by entry count only - `aphrodite_prefetch`
+	/// admits files up to 10MB each and the ABI admits blobs up to 16MB, so
+	/// 500 entries at the large end is a multi-GB worst case).
+	pub fn inline_store_put(&mut self, hash:String, content:String) {
+		// Remove existing entry if present (will be re-added at front),
+		// keeping the running byte total in sync.
+		if let Some(pos) = self.inline_store.iter().position(|(h, _)| h == &hash) {
+			if let Some((_, old)) = self.inline_store.remove(pos) {
+				self.inline_store_bytes = self.inline_store_bytes.saturating_sub(old.len());
+			}
+		}
+		self.inline_store_bytes += content.len();
+		self.inline_store.push_front((hash, content));
+		self.evict_over_budget();
 	}
 
 	/// Retrieve from inline store with LRU promotion.
@@ -176,6 +231,55 @@ mod tests {
 		assert_eq!(s.inline_store_get("hash0"), None);
 		// Newest should remain
 		assert_eq!(s.inline_store_get("hash504"), Some("content504".into()));
+	}
+
+	// ── T11 (F11): byte-budget eviction ───────────────────────────
+	#[test]
+	fn test_inline_store_byte_budget_evicts_oldest_first() {
+		let mut s = AphroditeState::default();
+		s.set_inline_store_byte_budget(10 * 1024 * 1024); // 10MB budget
+		// 100 x 5MB entries (500MB total) - far beyond both the byte budget
+		// and, at this size, would also never be reached by the 500-entry
+		// cap, so this specifically exercises the byte accounting rather
+		// than the pre-existing entry-count cap.
+		let five_mb = "x".repeat(5 * 1024 * 1024);
+		for i in 0..100 {
+			s.inline_store_put(format!("hash{i}"), five_mb.clone());
+		}
+		assert!(
+			s.inline_store_bytes() <= 10 * 1024 * 1024,
+			"stored bytes ({}) must stay within the 10MB budget",
+			s.inline_store_bytes()
+		);
+		// Oldest entries must be the ones evicted.
+		assert_eq!(s.inline_store_get("hash0"), None);
+		// The newest entry must survive.
+		assert_eq!(s.inline_store_get("hash99"), Some(five_mb));
+	}
+
+	#[test]
+	fn test_inline_store_default_byte_budget_is_256mb() {
+		let s = AphroditeState::default();
+		assert_eq!(s.inline_store_byte_budget(), 256 * 1024 * 1024);
+	}
+
+	#[test]
+	fn test_inline_store_lowering_budget_evicts_immediately() {
+		let mut s = AphroditeState::default();
+		s.inline_store_put("a".into(), "x".repeat(1000));
+		s.inline_store_put("b".into(), "x".repeat(1000));
+		assert_eq!(s.inline_store_bytes(), 2000);
+		// Below current usage (2000B) but large enough for the single
+		// most-recent entry ("b", 1000B) to survive on its own.
+		s.set_inline_store_byte_budget(1500);
+		assert!(s.inline_store_bytes() <= 1500);
+		// The most recently inserted entry ("b") must be the one kept.
+		assert_eq!(s.inline_store_get("b"), Some("x".repeat(1000)));
+		assert_eq!(
+			s.inline_store_get("a"),
+			None,
+			"oldest entry must have been evicted to fit the new budget"
+		);
 	}
 
 	#[test]
