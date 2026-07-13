@@ -68,3 +68,9 @@ preview_max_chars = 120            # max chars per preview line
 retrieve_guidance = "verbose"      # minimal | standard | verbose
 ccr_marker_hint = true             # append "…(use aphrodite_retrieve)"?
 catalog_intent_hints = true        # show intent=read with hashes?
+
+# ── Directives ───────────────────────────────────────────────────────────────
+# Conversational behavioral context — short .md files injected into the LLM's
+# context via pre_llm_call. Swappable mid-conversation via aphrodite_directive().
+[directives]
+active = []                        # e.g. ["focus", "foresight"]

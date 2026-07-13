@@ -67,3 +67,11 @@ preview_max_chars = 120     # max chars per preview line
 retrieve_guidance = "verbose" # minimal | standard | verbose
 ccr_marker_hint = true        # append "…(use aphrodite_retrieve)"?
 catalog_intent_hints = true   # show intent=read with hashes?
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  DIRECTIVES  -  conversational behavioral context (swappable .md files)
+# ══════════════════════════════════════════════════════════════════════════════
+[directives]
+# Active directives loaded from directives/*.md at startup.
+# Swap mid-conversation via aphrodite_directive("swap", "explore").
+active = []  # e.g. ["focus", "foresight"]

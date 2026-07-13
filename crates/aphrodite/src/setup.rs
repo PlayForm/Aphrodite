@@ -29,8 +29,6 @@ pub enum SetupError {
 	Io(#[from] io::Error),
 	#[error("{0}")]
 	HermesNotFound(String),
-	#[error("aphrodite already installed - use --force to re-setup")]
-	AlreadyInstalled,
 	#[error("{0}")]
 	DylibNotFound(String),
 	#[error("{0}")]
@@ -66,17 +64,13 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// ── Step 1: Check prerequisites ──
 	verify_hermes()?;
 
-	// ── Step 2: Check if already installed ──
-	let target_binary = ctx.binaries_dir.join(binary_name());
-	if target_binary.exists() && !args.force {
-		return Err(SetupError::AlreadyInstalled);
-	}
-
-	// ── Step 3: Create directory structure ──
+	// ── Step 2: Create directory structure ──
 	fs::create_dir_all(&ctx.binaries_dir)?;
 	fs::create_dir_all(&ctx.aphrodite_dir)?;
 
-	// ── Step 4: Copy self to binaries dir ──
+	// ── Step 3: Copy self to binaries dir (always overwrite — the binary
+	// is the install payload; config is preserved unless --force) ──
+	let target_binary = ctx.binaries_dir.join(binary_name());
 	println!("copying binary -> {}", target_binary.display());
 	fs::copy(&ctx.own_path, &target_binary)?;
 	secure_perms(&target_binary, 0o700)?;
