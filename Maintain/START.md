@@ -7,8 +7,8 @@
 Before starting, verify ports are free:
 
 ```bash
-lsof -ti:9797 -ti:9798 -ti:9799 -ti:9800 | xargs kill -9 2> /dev/null
-echo "Ports free: $(lsof -i:9797 -i:9798 -i:9799 -i:9800 2> /dev/null | grep LISTEN || echo 'all clear')"
+lsof -ti:9797 -ti:9798 | xargs kill -9 2> /dev/null
+echo "Ports free: $(lsof -i:9797 -i:9798 2> /dev/null | grep LISTEN || echo 'all clear')"
 ```
 
 ## Bootstrap
@@ -20,16 +20,16 @@ echo "Ports free: $(lsof -i:9797 -i:9798 -i:9799 -i:9800 2> /dev/null | grep LIS
 aphrodite # reads aphrodite.toml → starts :9797 + :9798
 
 # Cache mode only
-aphrodite --mode cache --listen :9797 --api-key $APHRODITE_UPSTREAM_API_KEY
+aphrodite --mode cache --listen :9797 --api-key $APHRODITE_API_KEY
 
 # Token mode with tool relay
-aphrodite --mode token --listen :9798 --api-key $APHRODITE_UPSTREAM_API_KEY --tool-relay
+aphrodite --mode token --listen :9798 --api-key $APHRODITE_API_KEY --tool-relay
 ```
 
 ### Dev rebuild (auto-reload)
 
 ```bash
-APHRODITE_UPSTREAM_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
+APHRODITE_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
 ```
 
 ### Hermes config
@@ -37,11 +37,11 @@ APHRODITE_UPSTREAM_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
 ```yaml
 providers:
     aphrodite-cache:
-        api_key_env: APHRODITE_UPSTREAM_API_KEY
+        api_key_env: APHRODITE_API_KEY
         provider: deepseek
         base_url: http://127.0.0.1:9797
     aphrodite-token:
-        api_key_env: APHRODITE_UPSTREAM_API_KEY
+        api_key_env: APHRODITE_API_KEY
         provider: deepseek
         base_url: http://127.0.0.1:9798
 fallback_providers:
