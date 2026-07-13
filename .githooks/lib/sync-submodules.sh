@@ -64,18 +64,29 @@ sync_submodules() {
 			continue
 		fi
 
+		# Resolve the remote to fetch from by matching .gitmodules' own
+		# configured url, rather than assuming it's called "origin" - a
+		# submodule's "origin" remote can point somewhere else entirely
+		# (vendor/rtk's "origin" is the upstream rtk-ai/rtk repo, which has
+		# no `Current` branch at all; the fork .gitmodules actually points
+		# at is checked out under a remote named "Source"). Falls back to
+		# "origin" when no remote matches, preserving the common case.
+		sub_url=$(git config -f .gitmodules --get "submodule.$name.url" 2>/dev/null)
+		remote=$(git -C "$path" remote -v 2>/dev/null | awk -v u="$sub_url" '$2==u && $3=="(fetch)"{print $1; exit}')
+		[ -z "$remote" ] && remote="origin"
+
 		before=$(git -C "$path" rev-parse HEAD 2>/dev/null)
-		if ! git -C "$path" fetch --quiet origin "$branch" 2>/dev/null; then
+		if ! git -C "$path" fetch --quiet "$remote" "$branch" 2>/dev/null; then
 			skipped="$skipped $path(fetch-failed)"
 			continue
 		fi
 
-		if ! git -C "$path" merge-base --is-ancestor HEAD "origin/$branch" 2>/dev/null; then
+		if ! git -C "$path" merge-base --is-ancestor HEAD "$remote/$branch" 2>/dev/null; then
 			skipped="$skipped $path(local-commits-not-on-$branch)"
 			continue
 		fi
 
-		git -C "$path" checkout -B "$branch" "origin/$branch" --quiet 2>/dev/null
+		git -C "$path" checkout -B "$branch" "$remote/$branch" --quiet 2>/dev/null
 
 		after=$(git -C "$path" rev-parse HEAD 2>/dev/null)
 		if [ "$before" != "$after" ]; then

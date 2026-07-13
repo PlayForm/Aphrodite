@@ -668,6 +668,29 @@ mod tests {
 		}
 	}
 
+	// ── 01-F3: `aphrodite_directive` (the bridge tool, not the core C ABI
+	// export) must be dispatchable and delegate to the same
+	// `directives::handle_action` as everything else - list/swap round-trip
+	// through the shared session state. ──
+	#[test]
+	fn test_aphrodite_directive_tool_list_and_swap() {
+		let _g = crate::test_guard();
+		with_shared(|state| {
+			state.directives.insert(
+				"focus".into(),
+				aphrodite::directives::Directive { name:"focus".into(), content:"stay focused".into() },
+			);
+		});
+
+		let listed = dispatch("aphrodite_directive", "{}");
+		assert_eq!(listed["available"], serde_json::json!(["focus"]));
+		assert_eq!(listed["active"], serde_json::json!([]));
+
+		let swapped = dispatch("aphrodite_directive", &serde_json::json!({"action": "swap", "name": "focus"}).to_string());
+		assert_eq!(swapped["swapped"], "focus");
+		assert_eq!(swapped["active"], serde_json::json!(["focus"]));
+	}
+
 	// ── T9 (F11): `_ccr_center` was documented in the schema but silently
 	// dropped by compress_into; it must now travel with the recorded marker.
 	#[test]

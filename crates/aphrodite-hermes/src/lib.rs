@@ -498,6 +498,36 @@ mod tests {
 		aphrodite_hermes_free_string(result_ptr);
 	}
 
+	// ── 01-F3: the bridge's `pre_llm_call` arm - the only one Hermes calls
+	// in production - must actually inject active directive text, not just
+	// the catalog summary. Previously it called `session::catalog_summary`
+	// directly and never touched `directives::build_directive_context` at
+	// all, so the "wire directives into pre_llm_call" feature was dead
+	// end-to-end despite `hooks::pre_llm_call` (core, unreachable from this
+	// path) already building that context correctly. ──
+	#[test]
+	fn test_call_hook_pre_llm_call_injects_active_directive_context() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(CString::new("session_start").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		with_shared(|state| {
+			state.directives.insert(
+				"focus".into(),
+				aphrodite::directives::Directive { name:"focus".into(), content:"stay concise, 1-2 tools/turn".into() },
+			);
+			state.active_directives = vec!["focus".into()];
+		});
+
+		let hook_ptr =
+			aphrodite_hermes_call_hook(CString::new("pre_llm_call").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		let result = unsafe { CStr::from_ptr(hook_ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(hook_ptr);
+
+		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
+		let context = v["context"].as_str().unwrap_or_default();
+		assert!(context.contains("[directives: focus]"), "context missing directive marker: {context}");
+		assert!(context.contains("stay concise"), "context missing directive body: {context}");
+	}
+
 	// ── T13 (F11): the production hook-dispatch path Python actually calls
 	// (`aphrodite_hermes_call_hook("post_llm_call", ...)`) must archive the
 	// turn's marker, not just advance the counter - a prior fix routed
