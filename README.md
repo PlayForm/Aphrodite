@@ -218,7 +218,7 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 
 ```
 plugins/aphrodite/          ← Standalone Hermes plugin (git submodule)
-  __init__.py               ← 145-line Python loader (ctypes FFI)
+  __init__.py               ← Python loader (ctypes FFI, thin shim)
   plugin.yaml               ← 12 tools, 5 hooks, context engine
   download.sh               ← Binary auto-downloader (macOS/Linux/Git Bash/WSL)
   download.ps1              ← Binary auto-downloader (native Windows PowerShell)
@@ -234,7 +234,7 @@ crates/aphrodite/           ← Core engine (binary + cdylib)
     state.rs                ← AphroditeState, inline store, LRU, markers
     marker.rs               ← CCR marker generation + parse (<<<CCR:…>>>)
     catalog.rs              ← Full/compact/TOC catalog display
-    resolve.rs              ← Recursive CCR marker expansion (3 levels)
+    resolve.rs              ← Recursive CCR marker expansion (5 levels)
     stage2.rs               ← Semantic reduction for JSON, build, diff, code
     struct_extract.rs       ← Code structure maps (Rust, Python, Go, JS/TS)
     config_loader.rs        ← TOML + env var config loading
@@ -242,7 +242,7 @@ crates/aphrodite/           ← Core engine (binary + cdylib)
 
 crates/aphrodite-hermes/    ← Hermes bridge
   src/
-    lib.rs                  ← Universal dispatch (14 hooks → Rust functions)
+    lib.rs                  ← Universal dispatch (5 hooks → Rust functions)
     tools.rs                ← 12 tool handler implementations
     schemas.rs              ← JSON Schema for all tools
     skills.rs               ← Bundled skill registration for Hermes
