@@ -27,9 +27,13 @@ env/
 *.lock
 *.tar.gz
 
-# Profiles - keep local, ship only examples
-profiles/
+# Profiles - keep local, ship only examples.
+# `dir/` + `!dir/sub/` never re-includes anything below an excluded
+# directory (report 12 F7) - the correct shape is `dir/*` plus explicit
+# re-includes for both the subdirectory entry and its contents.
+profiles/*
 !profiles/example/
+!profiles/example/**
 
 # Test artifacts
 plugins/aphrodite/.test-results.json
