@@ -14,7 +14,7 @@
 
 [![release](https://img.shields.io/badge/release-v1.2.1-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![plugin](https://img.shields.io/badge/plugin-v2.0.5-purple)](plugins/aphrodite/plugin.yaml)
-![rust](https://img.shields.io/badge/rust-1.80+-orange)
+![rust](https://img.shields.io/badge/rust-1.88+-orange)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
 ---
@@ -167,8 +167,9 @@ plugins/aphrodite/         ← Thin Python loader (~145 lines)
 
 All compression logic lives in the Rust dylib. Python is a thin FFI loader.
 Hot-reload: rebuild the dylib → mtime change detected → next call picks up new
-code automatically. 86 Rust tests in the Aphrodite crates (plus the full
-vendored Headroom suite), all passing.
+code automatically. The two Aphrodite crates carry unit tests (plus the full
+vendored Headroom suite) - run `cargo test --workspace` to see the current
+count and confirm they pass.
 
 ---
 
@@ -201,7 +202,7 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 | `aphrodite_files`      | Tracked file references, grouped by tool              |
 | `aphrodite_diff`       | Conversation turn history with summaries              |
 | `aphrodite_search`     | Search CCR store by keyword or type                   |
-| `aphrodite_test`       | Smoke test suite: quick, full, matrix, pipeline       |
+| `aphrodite_test`       | Smoke test suite: quick (1 check), full (3 checks)    |
 | `aphrodite_catalog`    | Full CCR catalog with hashes, types, sizes, previews  |
 | `aphrodite_reclassify` | Retroactive metadata enrichment for unclassified CCR  |
 | `aphrodite_prefetch`   | Background file read + compress; markers return instantly |
@@ -250,8 +251,9 @@ vendor/headroom/            ← Headroom fork (git submodule)
   crates/headroom-core/     ← Content transforms, tokenizer, smart crusher
 ```
 
-86 Rust tests across the two Aphrodite crates (the vendored Headroom fork
-carries its own suite). CC0-1.0 - public domain.
+The two Aphrodite crates carry unit tests (the vendored Headroom fork carries
+its own suite) - run `cargo test --workspace` for the current count and
+pass/fail status. CC0-1.0 - public domain.
 
 ---
 
@@ -271,6 +273,17 @@ hermes --profile dev-aphrodite
 | Next hook call | Plugin detects new mtime → reloads dylib                  |
 | Any `.py` file | `/quit` + `hermes` restart (Hermes caches Python imports) |
 | Proxy binary   | `aphrodite_rebuild` tool → kill + copy + restart          |
+
+### Git hooks
+
+`git config core.hooksPath .githooks` (set automatically by `pnpm install`
+via `package.json`'s `prepare` script) enables `.githooks/post-checkout` and
+`.githooks/post-merge`, which run `git submodule update --init --recursive`
+after every checkout/merge so the three vendored submodules
+(`plugins/aphrodite`, `vendor/headroom`, `vendor/rtk`) always match the
+commit pinned in this repo's index. This is deliberately pointer-respecting,
+not `--remote`-tracking - submodule pins only move via an explicit, reviewed
+action (e.g. `Maintain/scripts/release/auto-release.sh`).
 
 ---
 
@@ -330,8 +343,11 @@ settings from `aphrodite.toml`, each overridable via an `APHRODITE_*` env var.
 | Compression latency (avg) |  1.6 ms  |
 | Classification latency    | <0.1 ms  |
 | Preview generation        | <0.05 ms |
-| Benchmark pass rate       | 19/19 ✅ |
-| Smoke test pass rate      | 13/13 ✅ |
+
+Benchmarks (`cargo run --release --example bench_0N_*`, see
+`Maintain/examples/`) and the in-process smoke suite (`aphrodite_test`, 3
+checks in `full` mode) are reproducible commands rather than fixed pass-rate
+numbers - run them directly to see current results.
 
 ---
 

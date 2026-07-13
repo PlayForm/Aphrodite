@@ -7,6 +7,10 @@
   "repository": "PlayForm/Aphrodite",
   "scripts": {
     "Format": "sh Maintain/Format.sh",
+    "Format:LineEndings": "sh Maintain/Format.sh dos2unix",
+    "Format:Shell": "sh Maintain/Format.sh shell",
+    "Format:Prettier": "sh Maintain/Format.sh prettier",
+    "Format:Rust": "sh Maintain/Format.sh rust",
     "FormatCheck": "prettier --check .",
     "prepare": "git config core.hooksPath .githooks"
   },

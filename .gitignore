@@ -27,7 +27,7 @@ env/
 *.lock
 *.tar.gz
 
-# Profiles — keep local, ship only examples
+# Profiles - keep local, ship only examples
 profiles/
 !profiles/example/
 

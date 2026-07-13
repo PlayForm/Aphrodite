@@ -12,14 +12,12 @@
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-vulnerability = "deny"
-unmaintained = "warn"
-yanked = "warn"
-notice = "warn"
 ignore = []
 
 [licenses]
-# Aphrodite is CC0-1.0. Allowed licenses for dependencies.
+# Aphrodite is CC0-1.0. Allowed licenses for dependencies. This list is a
+# strict allowlist: anything not listed here (including GPL/AGPL/LGPL
+# copyleft licenses, which are deliberately omitted) is denied by default.
 allow = [
 	"CC0-1.0",
 	"MIT",
@@ -33,24 +31,14 @@ allow = [
 	"Unlicense",
 	"MPL-2.0",
 ]
-deny = [
-	"GPL-2.0",
-	"GPL-3.0",
-	"AGPL-3.0",
-	"LGPL-3.0",
-	# OSL-3.0 and similar restrictive licenses that are incompatible with CC0
-]
-copyleft = "deny"
-allow-osi-fsf-free = "both"
-default = "deny"
 confidence-threshold = 0.8
 exceptions = [
 	# ring uses a unique ISC variant that cargo-deny may flag as "OpenSSL"
-	{ name = "ring", allow = ["OpenSSL"] },
+	{ crate = "ring", allow = ["OpenSSL"] },
 	# webpki / rustls-webpki uses ISC-like license
-	{ name = "rustls-webpki", allow = ["ISC"] },
+	{ crate = "rustls-webpki", allow = ["ISC"] },
 	# unicode-ident uses Unicode-3.0
-	{ name = "unicode-ident", allow = ["Unicode-3.0"] },
+	{ crate = "unicode-ident", allow = ["Unicode-3.0"] },
 ]
 
 [bans]
@@ -77,11 +65,13 @@ skip-tree = [
 	# headroom-core is vendored; its dep tree is under our control, but
 	# cargo-deny doesn't track "vendored" as a source distinction. Skip
 	# tree checks for it so we don't double-count its internal dev-deps.
-	{ name = "headroom-core", version = "*" },
+	# Published package name is aphrodite-headroom-core (see
+	# vendor/headroom/crates/headroom-core/Cargo.toml).
+	{ name = "aphrodite-headroom-core", version = "*" },
 ]
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-git = []
-allow-registry = ["https://github.com/rustsec/advisory-db"]
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
