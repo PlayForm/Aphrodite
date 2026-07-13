@@ -271,7 +271,7 @@ install_message: |
 /// and stderr piped to `DEVNULL` (silently re-introducing a startup-failure
 /// bug the live plugin had already fixed). `include_str!` of the real file
 /// means the two can never diverge again.
-const HERMES_PLUGIN_SHIM:&str = include_str!("../../../plugins/aphrodite/__init__.py");
+const HERMES_PLUGIN_SHIM:&str = include_str!("../templates/__init__.py");
 
 fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("__init__.py");
