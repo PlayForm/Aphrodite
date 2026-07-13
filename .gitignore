@@ -17,9 +17,14 @@ build/
 venv/
 env/
 
-# Hermes / dev artifacts
-!./.hermes/
-!./.hermes/**/*
+# Hermes / dev artifacts - re-include against a machine-global excludesFile
+# that ignores `.hermes` (verified via `git check-ignore -v`: the repo's
+# .gitignore is checked AFTER core.excludesFile, so a repo-level negation can
+# override it - but a leading `./` is not valid gitignore syntax and never
+# matched anything; a prior "restore" of this line kept the same dead
+# pattern under a mistaken diagnosis (see git log for the corrected version).
+!.hermes/
+!.hermes/**
 
 .headroom/
 *.log

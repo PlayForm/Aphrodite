@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
-# pre-commit - Run ggshield secret scan before each commit.
+# pre-commit - repo-guard + ggshield secret scan before each commit.
 # Installed via: git config core.hooksPath .githooks
 set -euo pipefail
 
-# Gate: skip entirely in CI or when ggshield is absent.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Gate: skip entirely in CI.
 if [ -n "${CI:-}" ]; then
 	exit 0
 fi
 
+# Always run the repo-specific guard (no external dependency, fast) -
+# runtime-state/profile tracking + credential-pattern content scan.
+"$REPO_ROOT/Maintain/scripts/ops/check-no-runtime-state.sh"
+
+# ggshield is a broader, optional secret scan on top - skip gracefully if
+# not installed rather than blocking every commit on it.
 if ! command -v ggshield &>/dev/null; then
 	echo "pre-commit: ggshield not found - install with: pip install ggshield"
-	echo "pre-commit: skipping secret scan (no ggshield binary)"
+	echo "pre-commit: skipping ggshield scan (repo-guard check above still ran)"
 	exit 0
 fi
 

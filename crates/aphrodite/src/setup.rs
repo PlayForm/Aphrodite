@@ -68,12 +68,12 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	fs::create_dir_all(&ctx.binaries_dir)?;
 	fs::create_dir_all(&ctx.aphrodite_dir)?;
 
-	// ── Step 3: Copy self to binaries dir (always overwrite — the binary
+	// ── Step 3: Copy self to binaries dir (always overwrite - the binary
 	// is the install payload; config is preserved unless --force) ──
 	let target_binary = ctx.binaries_dir.join(binary_name());
 	println!("copying binary -> {}", target_binary.display());
 	// macOS: `fs::copy` preserves extended attributes (code signature,
-	// quarantine) from the build directory — Gatekeeper kills the copied
+	// quarantine) from the build directory - Gatekeeper kills the copied
 	// binary at the install path. `ditto` strips xattrs; `xattr -c` is
 	// the fallback for when ditto is unavailable.
 	#[cfg(target_os = "macos")]
@@ -219,6 +219,13 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 						.args(["-c", dest.to_str().unwrap_or("")])
 						.output();
 				}
+				// Every other artifact this module writes (binary, config,
+				// plugin.yaml, the dylib-fallback path below) explicitly
+				// hardens its own permissions via `secure_perms` - this was
+				// the one copy path that didn't, relying on `ditto`/
+				// `fs::copy` to carry over whatever mode the build output
+				// happened to have.
+				secure_perms(&dest, 0o755)?;
 				found = true;
 				copied += 1;
 				break;
