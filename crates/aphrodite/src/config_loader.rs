@@ -96,6 +96,15 @@ impl Config {
 			.unwrap_or_else(|| default.to_string())
 	}
 
+	/// Resolve a TOML array of strings.
+	pub fn get_string_list(&self, section:&str, key:&str) -> Vec<String> {
+		self.section(section)
+			.and_then(|s| s.get(key))
+			.and_then(|v| v.as_array())
+			.map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+			.unwrap_or_default()
+	}
+
 	/// Load compression settings into an AphroditeState
 	pub fn apply_compression(&self, state:&mut crate::state::AphroditeState) {
 		state.context_engine_enabled = self.get_bool("APHRODITE_CONTEXT_ENGINE", "compression", "context_engine", true);
@@ -119,6 +128,26 @@ impl Config {
 			self.get_usize("APHRODITE_TERMINAL_THRESHOLD", "compression", "terminal_threshold", 1024);
 		state.model = self.get_string("APHRODITE_MODEL", "defaults", "model", "gpt-4o");
 		state.api_url = self.get_string("APHRODITE_API_URL", "defaults", "api_url", "");
+
+		// ── Directives ──
+		let active = self.get_string_list("directives", "active");
+		if !active.is_empty() {
+			// Load directives from disk.
+			let dirs = vec![
+				std::path::PathBuf::from("directives"),
+				dirs::home_dir().unwrap_or_default().join(".hermes").join("directives"),
+			];
+			for dir in &dirs {
+				if dir.is_dir() {
+					state.directives = crate::directives::load_directives(dir);
+					break;
+				}
+			}
+			// Only activate directives that were actually loaded.
+			state.active_directives = active.into_iter()
+				.filter(|name| state.directives.contains_key(name))
+				.collect();
+		}
 	}
 }
 

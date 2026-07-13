@@ -59,6 +59,11 @@ pub struct AphroditeState {
 	pub catalog_mode:String,
 	pub expand_guidance:bool,
 	pub dev_mode:bool,
+	// ── Conversational Directives ──
+	/// All loaded directives (name → content).
+	pub directives:std::collections::HashMap<String, crate::directives::Directive>,
+	/// Currently active directive names (the ones injected into context).
+	pub active_directives:Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -96,6 +101,8 @@ impl Default for AphroditeState {
 			catalog_mode:"tool".into(),
 			expand_guidance:false,
 			dev_mode:false,
+			directives:std::collections::HashMap::new(),
+			active_directives:Vec::new(),
 		}
 	}
 }
