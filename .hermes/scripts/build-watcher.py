@@ -58,10 +58,9 @@ def parse_buffer(buffer: str) -> dict:
         line_stripped = line.strip()
 
         # Detect errors (but not INFO log lines mentioning "error")
-        if re.search(r"\berror\b", line_stripped, re.IGNORECASE):
-            # Skip false positives like "listening" or INFO noise
-            if not re.search(r"(INFO|listening|address)", line_stripped, re.IGNORECASE):
-                errors.append(line_stripped)
+        if re.search(r"\berror\b", line_stripped, re.IGNORECASE) and \
+           not re.search(r"(INFO|listening|address)", line_stripped, re.IGNORECASE):
+            errors.append(line_stripped)
 
         if re.search(r"^\s*Compiling\s", line_stripped):
             compiling = True
