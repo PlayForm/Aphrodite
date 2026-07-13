@@ -92,7 +92,7 @@ const RESPONSE_CACHE_MAX_BODY_BYTES:usize = 1024 * 1024;
 /// Non-streaming response body cap (report 02-T10). A single buffered
 /// `.bytes().await` can exhaust memory if the upstream returns a huge body
 /// (e.g. a full codebase in a single completion). Streamed (SSE) responses
-/// bypass this limit entirely — they're chunked at the protocol level.
+/// bypass this limit entirely - they're chunked at the protocol level.
 const RESPONSE_MAX_BODY_BYTES:usize = 64 * 1024 * 1024; // 64 MB
 
 /// Live-resolved compression thresholds (report 07 F2/F4/T15): env var >
@@ -778,7 +778,7 @@ fn copy_upstream_headers(
 
 /// Accumulate the full response body with a byte cap (report 02-T10).
 /// Replaces the single unbounded `response.bytes().await` in the
-/// non-streaming branch — returns a 502 error if the upstream exceeds
+/// non-streaming branch - returns a 502 error if the upstream exceeds
 /// `max_bytes`, protecting the proxy's memory from a single huge response.
 async fn accumulate_body(
 	response: reqwest::Response,
@@ -1000,7 +1000,7 @@ pub async fn proxy_handler(
 			let upstream_headers = response.headers().clone();
 			let content_type = upstream_headers.get("content-type").cloned();
 
-			// T10 (F6): SSE streaming — text/event-stream responses must be
+			// T10 (F6): SSE streaming - text/event-stream responses must be
 			// forwarded chunk-by-chunk, not buffered into a single JSON blob
 			// (which an SSE client can't parse). Skip compression + cache
 			// entirely for this path.
@@ -2017,78 +2017,15 @@ async fn compress_chat_completion(
 			}
 		}
 
-		// Compress tool call outputs
-		if let Some(tool_calls_val) = message.get_mut("tool_calls") {
-			if let Some(arr) = tool_calls_val.as_array_mut() {
-				for tc in arr.iter_mut() {
-					if let Some(func) = tc.get_mut("function") {
-						if let Some(args) = func.get_mut("arguments") {
-							if let Some(args_str) = args.as_str() {
-								let args_owned = args_str.to_string(); // drop borrow before mutation
-								let ct = proxy_detect_content_type(&args_owned);
-								let threshold =
-									(state.threshold_for(ct).max(base_threshold) as f64 * budget_mult) as usize;
-								if args_owned.len() > threshold {
-									if let Some(ccr) = &state.ccr {
-										let hash = compute_key(args_owned.as_bytes());
-										// F4: same rule as the message.content branch
-										// above - only replace with a marker if the
-										// content is actually retrievable.
-										let stored = if ccr_get(ccr, &hash).await.is_some() {
-											state.ccr_hits.fetch_add(1, Ordering::Relaxed);
-											true
-										} else {
-											state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-											let ok = ccr_put(ccr, &hash, &args_owned).await;
-											if ok {
-												state.ccr_created.fetch_add(1, Ordering::Relaxed);
-											} else {
-												tracing::error!(hash = %hash, "ccr_put failed - leaving tool_call arguments uncompressed to avoid data loss");
-											}
-											ok
-										};
-										if stored {
-											let (compressed, orig_len) = {
-												let compressed = smart_marker(&hash, &args_owned, ct, None);
-												let len = args_owned.len();
-												state.record_compression(ct);
-												(compressed, len)
-											};
-											let marker_len = compressed.len();
-											// Savings = bytes removed by the marker
-											// replacement, not the bare hash length
-											// (report 05 F5) - see the sibling fix
-											// above for `message.content`.
-											state.tokens_saved.fetch_add(
-												orig_len.saturating_sub(marker_len) as u64,
-												Ordering::Relaxed,
-											);
-											*args = serde_json::Value::String(compressed);
-											did_compress = true;
-											state.update_compression_ratio(orig_len, marker_len);
-										}
-									}
-								} else if args_owned.len() > state.inline_ccr_threshold() {
-									let hash = compute_key(args_owned.as_bytes());
-									if let Ok(mut map) = state.inline_ccr.lock() {
-										if map.contains(&hash) {
-											state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
-										} else {
-											state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
-											map.put(hash, args_owned);
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-
-				// Tool injection removed - aphrodite_retrieve is registered by
-				// the Python plugin. Injecting into the response tool_calls
-				// array was incorrect (Bug 18).
-			}
-		}
+		// 02-F3: `tool_calls[].function.arguments` is JSON the CLIENT feeds
+		// straight into its own tool executor - it is not model-facing prose
+		// the model could choose to `aphrodite_retrieve`. A prior version of
+		// this function compressed it into a CCR marker like any other
+		// content, which meant the client tried to execute a tool call with
+		// `arguments = "<<<CCR:...>>>"` - unparseable JSON that breaks every
+		// real OpenAI-tools client. Tool call arguments now always pass
+		// through untouched; only `message.content` (model-facing text,
+		// handled above) is a legitimate compression target here.
 	}
 
 	if did_compress { Some(response) } else { None }
@@ -3247,13 +3184,21 @@ code_multiplier = 6.5
 	}
 
 	#[test]
-	fn test_compress_chat_completion_tool_call_arguments_compressed_independently() {
+	fn test_compress_chat_completion_tool_call_arguments_pass_through_untouched() {
+		// 02-F3: `tool_calls[].function.arguments` is JSON the client feeds
+		// straight into its own tool executor, not model-facing prose - it
+		// must never be replaced by an unresolvable-to-the-client CCR
+		// marker, no matter how large. `message.content` (real model-facing
+		// text) is the legitimate compression target and is large here too,
+		// to confirm compression still happens for it while leaving
+		// `arguments` completely alone.
 		let big_args = serde_json::json!({"data": "x".repeat(4000)}).to_string();
+		let big_content = "line of moderate length text content here.\n".repeat(200);
 		let body = serde_json::json!({
 			"choices": [{
 				"message": {
 					"role": "assistant",
-					"content": "ok",
+					"content": big_content,
 					"tool_calls": [{
 						"function": {"name": "f", "arguments": big_args}
 					}]
@@ -3268,16 +3213,13 @@ code_multiplier = 6.5
 			.unwrap()
 			.block_on(compress_chat_completion(&state, &body, None));
 
-		let response = result.expect("large tool-call arguments must be compressed");
-		// Message content ("ok") is short and must remain untouched.
-		assert_eq!(response["choices"][0]["message"]["content"], "ok");
+		let response = result.expect("large message content must still be compressed");
+		let new_content = response["choices"][0]["message"]["content"].as_str().unwrap();
+		assert!(new_content.contains("<<<CCR:"), "expected message content to be compressed: {new_content}");
 		let new_args = response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
 			.as_str()
 			.unwrap();
-		assert!(
-			new_args.contains("<<<CCR:"),
-			"expected tool-call arguments to be compressed: {new_args}"
-		);
+		assert_eq!(new_args, big_args, "tool-call arguments must pass through untouched, never marker-replaced");
 	}
 
 	#[test]
