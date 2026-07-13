@@ -22,15 +22,23 @@ pub extern "C" fn aphrodite_call_hook(
     hook_name: *const c_char,
     json_args: *const c_char,
 ) -> *mut c_char {
-    let name = unsafe { CStr::from_ptr(hook_name) }.to_string_lossy();
-    let args = unsafe { CStr::from_ptr(json_args) }.to_string_lossy();
+    // This fixture is the copy-paste template for third-party hook dylibs
+    // (see the header comment above) - both null-checking pointers and
+    // catch_unwind-guarding the call are load-bearing here: a template that
+    // omits them teaches every dylib built from it the same UB/abort hazard.
+    if hook_name.is_null() || json_args.is_null() {
+        return CString::new(r#"{"error":"null argument"}"#).unwrap().into_raw();
+    }
+    let name = unsafe { CStr::from_ptr(hook_name) }.to_string_lossy().into_owned();
+    let args = unsafe { CStr::from_ptr(json_args) }.to_string_lossy().into_owned();
 
-    let result = match name.as_ref() {
+    let result = std::panic::catch_unwind(|| match name.as_ref() {
         "session_start" => on_session_start(&args),
         "transform_tool_result" => transform_tool_result(&args),
         "transform_terminal_output" => transform_terminal_output(&args),
         other => format!(r#"{{"error":"unknown hook: {}"}}"#, other),
-    };
+    })
+    .unwrap_or_else(|_| r#"{"error":"panicked in aphrodite_call_hook"}"#.to_string());
 
     CString::new(result).unwrap().into_raw()
 }
@@ -97,6 +105,10 @@ fn classify(content: &str) -> String {
 
 // ── Tiny JSON helpers (zero-dependency, no serde) ──────────────────────────
 
+// NOTE: this stops at the first `"`, even an escaped one - `{"content":"say
+// \"hi\""}` truncates at the escaped quote instead of the real closing one,
+// silently corrupting content containing escaped quotes. Acceptable for a
+// zero-dependency test fixture; a real dylib should use serde_json.
 fn extract_field(json: &str, key: &str) -> Option<String> {
     let pat = format!(r#""{}""#, key);
     let start = json.find(&pat)? + pat.len();

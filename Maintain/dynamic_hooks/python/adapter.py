@@ -31,7 +31,7 @@ def _load_dylib() -> ctypes.CDLL:
     if not _DYLIB.is_file():
         raise FileNotFoundError(
             f"Dynamic library not found at {_DYLIB}\n"
-            f"  Build it: cd tests/dynamic_hooks/rust && cargo build --release"
+            f"  Build it: cd Maintain/dynamic_hooks/rust && cargo build --release"
         )
 
     lib = ctypes.CDLL(str(_DYLIB))
@@ -57,6 +57,13 @@ def _dylib_call(lib: ctypes.CDLL, fn_name: str, *args: str) -> str:
     raw_fn = getattr(lib, fn_name)
     c_args = [a.encode("utf-8") for a in args]
     raw = raw_fn(*c_args)
+    if not raw:
+        # The fixture's own null-check (aphrodite_call_hook rejects null
+        # args) always returns a JSON error string, never a null pointer -
+        # but a null return is possible in principle (e.g. a CString::new
+        # failure on the Rust side) and .value on a null c_char_p raises
+        # AttributeError with no context, so raise something diagnosable.
+        raise RuntimeError(f"{fn_name} returned a null pointer")
     result = ctypes.cast(raw, ctypes.c_char_p).value.decode("utf-8")
     lib.aphrodite_free_string(raw)
     return result
