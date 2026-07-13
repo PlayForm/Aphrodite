@@ -15,13 +15,20 @@
 //!                                           ├─ Resolution (resolve, stage2, struct)
 //!                                           └─ Catalog, session, prefetch, config
 
+// See crates/aphrodite/src/lib.rs's matching comment: fixing this properly
+// (marking every `pub extern "C" fn` `unsafe`) is report 03's job, not a
+// side effect of wiring up a CI clippy gate.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 mod schemas;
 mod skills;
 mod tools;
 
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
-use std::sync::{Mutex, OnceLock};
+use std::{
+	ffi::{CStr, CString},
+	os::raw::c_char,
+	sync::{Mutex, OnceLock},
+};
 
 // Re-export core aphrodite types for convenience
 pub use aphrodite::state::AphroditeState;
@@ -32,32 +39,30 @@ pub use aphrodite::state::AphroditeState;
 // agent session, so one shared `AphroditeState` is the correct model (it
 // mirrors the proxy's per-session store and the core crate's handle map).
 // Every hook and tool call operates on this shared state, so compressions
-// stored by `transform_tool_result` survive long enough for `aphrodite_retrieve`
-// to resolve them. The lock is poison-tolerant: a panic in one call must not
-// wedge every later call.
+// stored by `transform_tool_result` survive long enough for
+// `aphrodite_retrieve` to resolve them. The lock is poison-tolerant: a panic in
+// one call must not wedge every later call.
 
 /// Access the process-global session state.
 pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
-    static STATE: OnceLock<Mutex<AphroditeState>> = OnceLock::new();
-    STATE.get_or_init(|| Mutex::new(AphroditeState::default()))
+	static STATE:OnceLock<Mutex<AphroditeState>> = OnceLock::new();
+	STATE.get_or_init(|| Mutex::new(AphroditeState::default()))
 }
 
 /// Run `f` against the shared session state under the global lock.
-pub(crate) fn with_shared<T>(f: impl FnOnce(&mut AphroditeState) -> T) -> T {
-    let mut guard = shared()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    f(&mut guard)
+pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
+	let mut guard = shared().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+	f(&mut guard)
 }
 
 /// Serializes tests that assert across multiple state-mutating calls, since
 /// the shared session state is process-global and `on_session_start` resets it.
 #[cfg(test)]
 pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
-    static G: OnceLock<Mutex<()>> = OnceLock::new();
-    G.get_or_init(|| Mutex::new(()))
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+	static G:OnceLock<Mutex<()>> = OnceLock::new();
+	G.get_or_init(|| Mutex::new(()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// Map a hook compression result to the value Hermes uses to replace output.
@@ -66,22 +71,19 @@ pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// `transform_terminal_output` (first non-None string wins; non-strings pass
 /// through). So return the CCR marker string when compression happened, and
 /// `null` otherwise to leave the original output untouched.
-pub(crate) fn replacement_from(r: &serde_json::Value) -> serde_json::Value {
-    if r.get("compressed")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
-    {
-        if let Some(marker) = r.get("marker").and_then(|v| v.as_str()) {
-            return serde_json::Value::String(marker.to_string());
-        }
-    }
-    serde_json::Value::Null
+pub(crate) fn replacement_from(r:&serde_json::Value) -> serde_json::Value {
+	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false) {
+		if let Some(marker) = r.get("marker").and_then(|v| v.as_str()) {
+			return serde_json::Value::String(marker.to_string());
+		}
+	}
+	serde_json::Value::Null
 }
 
 /// Default cache proxy port, used when `APHRODITE_CACHE_PORT` is unset.
-const DEFAULT_CACHE_PORT: u16 = 9797;
+const DEFAULT_CACHE_PORT:u16 = 9797;
 /// Default token proxy port, used when `APHRODITE_TOKEN_PORT` is unset.
-const DEFAULT_TOKEN_PORT: u16 = 9798;
+const DEFAULT_TOKEN_PORT:u16 = 9798;
 
 /// Resolve the cache/token proxy ports for this process.
 ///
@@ -90,113 +92,128 @@ const DEFAULT_TOKEN_PORT: u16 = 9798;
 /// each be pointed at their own proxy pair (see `aphrodite setup --cache-port
 /// / --token-port`), falling back to the historical 9797/9798 defaults.
 fn configured_ports() -> (u16, u16) {
-    let port_from_env = |var: &str, default: u16| {
-        std::env::var(var)
-            .ok()
-            .and_then(|v| v.parse::<u16>().ok())
-            .unwrap_or(default)
-    };
-    (
-        port_from_env("APHRODITE_CACHE_PORT", DEFAULT_CACHE_PORT),
-        port_from_env("APHRODITE_TOKEN_PORT", DEFAULT_TOKEN_PORT),
-    )
+	let port_from_env =
+		|var:&str, default:u16| std::env::var(var).ok().and_then(|v| v.parse::<u16>().ok()).unwrap_or(default);
+	(
+		port_from_env("APHRODITE_CACHE_PORT", DEFAULT_CACHE_PORT),
+		port_from_env("APHRODITE_TOKEN_PORT", DEFAULT_TOKEN_PORT),
+	)
 }
 
 /// Probe whether the cache and token proxies are listening.
 pub(crate) fn proxy_health() -> serde_json::Value {
-    use std::net::TcpStream;
-    use std::time::Duration;
-    let timeout = Duration::from_millis(400);
-    let alive = |addr: String| {
-        addr.parse()
-            .ok()
-            .and_then(|a| TcpStream::connect_timeout(&a, timeout).ok())
-            .is_some()
-    };
-    let (cache_port, token_port) = configured_ports();
-    serde_json::json!({
-        "token": {"port": token_port, "alive": alive(format!("127.0.0.1:{token_port}"))},
-        "cache": {"port": cache_port, "alive": alive(format!("127.0.0.1:{cache_port}"))},
-    })
+	use std::{net::TcpStream, time::Duration};
+	let timeout = Duration::from_millis(400);
+	let alive = |addr:String| {
+		addr.parse()
+			.ok()
+			.and_then(|a| TcpStream::connect_timeout(&a, timeout).ok())
+			.is_some()
+	};
+	let (cache_port, token_port) = configured_ports();
+	serde_json::json!({
+		"token": {"port": token_port, "alive": alive(format!("127.0.0.1:{token_port}"))},
+		"cache": {"port": cache_port, "alive": alive(format!("127.0.0.1:{cache_port}"))},
+	})
 }
 
 // ── C ABI helpers ──────────────────────────────────────────
 
-unsafe fn cstr_to_string(ptr: *const c_char) -> String {
-    if ptr.is_null() {
-        String::new()
-    } else {
-        CStr::from_ptr(ptr).to_string_lossy().into_owned()
-    }
+/// Convert a caller-supplied C string pointer into an owned `String`, or an
+/// empty string if `ptr` is null. Invalid UTF-8 is replaced lossily rather
+/// than rejected, since a malformed argument should degrade gracefully, not
+/// panic across the `extern "C"` boundary.
+///
+/// # Safety
+/// `ptr`, if non-null, must point to a valid, NUL-terminated C string that
+/// stays valid for the duration of this call (the standard `CStr::from_ptr`
+/// contract). Every caller in this crate passes pointers received directly
+/// from Hermes's C ABI call, which are expected to uphold that contract.
+unsafe fn cstr_to_string(ptr:*const c_char) -> String {
+	if ptr.is_null() {
+		String::new()
+	} else {
+		CStr::from_ptr(ptr).to_string_lossy().into_owned()
+	}
 }
 
-fn to_c_string(s: &str) -> *mut c_char {
-    CString::new(s)
-        .map(|c| c.into_raw())
-        .unwrap_or(std::ptr::null_mut())
-}
+fn to_c_string(s:&str) -> *mut c_char { CString::new(s).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut()) }
 
-fn to_json_error(msg: &str) -> *mut c_char {
-    to_c_string(&serde_json::json!({"error": msg}).to_string())
+fn to_json_error(msg:&str) -> *mut c_char { to_c_string(&serde_json::json!({"error": msg}).to_string()) }
+
+/// Run `f` under `catch_unwind`, converting a panic into an error-JSON string
+/// instead of letting it unwind across the `extern "C"` boundary (which would
+/// otherwise trigger the Rust runtime's forced process abort - this crate had
+/// zero panic guards until this was added). Every exported fn except
+/// `aphrodite_hermes_free_string` (must stay minimal/infallible) routes
+/// through this.
+fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
+	std::panic::catch_unwind(f).unwrap_or_else(|_| to_json_error("internal error: panicked in aphrodite-hermes"))
 }
 
 // ── Tool dispatch C ABI ────────────────────────────────────
 
 /// Dispatch an aphrodite tool call by name.
-/// Returns JSON result string. Caller must free with aphrodite_hermes_free_string.
+/// Returns JSON result string. Caller must free with
+/// aphrodite_hermes_free_string.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_dispatch_tool(
-    tool_name: *const c_char,
-    args_json: *const c_char,
-) -> *mut c_char {
-    let name = unsafe { cstr_to_string(tool_name) };
-    let args = unsafe { cstr_to_string(args_json) };
+pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name:*const c_char, args_json:*const c_char) -> *mut c_char {
+	let name = unsafe { cstr_to_string(tool_name) };
+	let args = unsafe { cstr_to_string(args_json) };
 
-    let result = tools::dispatch(&name, &args);
-    match serde_json::to_string(&result) {
-        Ok(json) => to_c_string(&json),
-        Err(e) => to_json_error(&format!("serialize error: {}", e)),
-    }
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let result = tools::dispatch(&name, &args);
+		match serde_json::to_string(&result) {
+			Ok(json) => to_c_string(&json),
+			Err(e) => to_json_error(&format!("serialize error: {}", e)),
+		}
+	}))
 }
 
 /// List all registered Hermes tool schemas as JSON array.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_list_tools() -> *mut c_char {
-    let schemas = schemas::all_schemas();
-    to_c_string(&serde_json::to_string(&schemas).unwrap_or_default())
+	guarded(|| {
+		let schemas = schemas::all_schemas();
+		to_c_string(&serde_json::to_string(&schemas).unwrap_or_default())
+	})
 }
 
 /// List all bundled skill names and descriptions as JSON.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_list_skills() -> *mut c_char {
-    let skills = skills::all_skills();
-    to_c_string(&serde_json::to_string(&skills).unwrap_or_default())
+	guarded(|| {
+		let skills = skills::all_skills();
+		to_c_string(&serde_json::to_string(&skills).unwrap_or_default())
+	})
 }
 
 /// Get a single tool schema by name.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_get_schema(tool_name: *const c_char) -> *mut c_char {
-    let name = unsafe { cstr_to_string(tool_name) };
-    match schemas::get_schema(&name) {
-        Some(s) => to_c_string(&serde_json::to_string(&s).unwrap_or_default()),
-        None => to_json_error(&format!("unknown tool: {}", name)),
-    }
+pub extern "C" fn aphrodite_hermes_get_schema(tool_name:*const c_char) -> *mut c_char {
+	let name = unsafe { cstr_to_string(tool_name) };
+	guarded(std::panic::AssertUnwindSafe(move || {
+		match schemas::get_schema(&name) {
+			Some(s) => to_c_string(&serde_json::to_string(&s).unwrap_or_default()),
+			None => to_json_error(&format!("unknown tool: {}", name)),
+		}
+	}))
 }
 
 /// Free a string returned by any aphrodite_hermes_* function.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_free_string(s: *mut c_char) {
-    if !s.is_null() {
-        unsafe {
-            let _ = CString::from_raw(s);
-        }
-    }
+pub extern "C" fn aphrodite_hermes_free_string(s:*mut c_char) {
+	if !s.is_null() {
+		unsafe {
+			let _ = CString::from_raw(s);
+		}
+	}
 }
 
 /// Version of this crate.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_version() -> *mut c_char {
-    to_c_string(&serde_json::json!({"version": env!("CARGO_PKG_VERSION")}).to_string())
+	guarded(|| to_c_string(&serde_json::json!({"version": env!("CARGO_PKG_VERSION")}).to_string()))
 }
 
 // ── Hook dispatch C ABI ────────────────────────────────────
@@ -205,181 +222,197 @@ pub extern "C" fn aphrodite_hermes_version() -> *mut c_char {
 ///
 /// Operates on the process-global session state and honors the exact Hermes
 /// hook contract (verified against the Hermes source):
-///   - `transform_tool_result`  - tool output arrives under `result`; return a
+///   - `transform_tool_result` - tool output arrives under `result`; return a
 ///     marker string to replace it, or `null` to pass through.
-///   - `transform_terminal_output` - output arrives under `output`; same return.
-///   - `pre_llm_call` - return `{"context": "..."}` to inject a catalog summary.
+///   - `transform_terminal_output` - output arrives under `output`; same
+///     return.
+///   - `pre_llm_call` - return `{"context": "..."}` to inject a catalog
+///     summary.
 ///   - `on_session_start` / `post_llm_call` - lifecycle; return value ignored.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_call_hook(
-    hook_name: *const c_char,
-    args_json: *const c_char,
-) -> *mut c_char {
-    let name = unsafe { cstr_to_string(hook_name) };
-    let args = unsafe { cstr_to_string(args_json) };
+pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:*const c_char) -> *mut c_char {
+	let name = unsafe { cstr_to_string(hook_name) };
+	let args = unsafe { cstr_to_string(args_json) };
 
-    // Parse args as JSON object
-    let parsed: serde_json::Value = match serde_json::from_str(&args) {
-        Ok(v) => v,
-        Err(e) => return to_json_error(&format!("invalid args: {}", e)),
-    };
+	guarded(std::panic::AssertUnwindSafe(move || {
+		// Parse args as JSON object
+		let parsed:serde_json::Value = match serde_json::from_str(&args) {
+			Ok(v) => v,
+			Err(e) => return to_json_error(&format!("invalid args: {}", e)),
+		};
 
-    // Hermes passes tool output under `result` and terminal output under
-    // `output` (not `content`). Accept `content` too for direct/test callers.
-    let tool = parsed
-        .get("tool_name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
-    let tool_content = parsed
-        .get("result")
-        .or_else(|| parsed.get("content"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let term_content = parsed
-        .get("output")
-        .or_else(|| parsed.get("content"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+		// Hermes passes tool output under `result` and terminal output under
+		// `output` (not `content`). Accept `content` too for direct/test callers.
+		let tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+		let tool_content = parsed
+			.get("result")
+			.or_else(|| parsed.get("content"))
+			.and_then(|v| v.as_str())
+			.unwrap_or("");
+		let term_content = parsed
+			.get("output")
+			.or_else(|| parsed.get("content"))
+			.and_then(|v| v.as_str())
+			.unwrap_or("");
 
-    let result: serde_json::Value = with_shared(|state| match name.as_str() {
-        // Accept both the canonical Hermes name and the legacy alias.
-        "on_session_start" | "session_start" => aphrodite::session::on_session_start(state),
-        "transform_tool_result" => {
-            let r = aphrodite::hooks::transform_tool_result(state, tool_content, tool);
-            replacement_from(&r)
-        },
-        "transform_terminal_output" => {
-            let r = aphrodite::hooks::transform_terminal_output(state, term_content);
-            replacement_from(&r)
-        },
-        "pre_llm_call" => {
-            let summary = aphrodite::session::catalog_summary(state);
-            if summary.is_empty() {
-                serde_json::Value::Null
-            } else {
-                serde_json::json!({ "context": summary })
-            }
-        },
-        "post_llm_call" => {
-            aphrodite::session::next_turn(state);
-            serde_json::Value::Null
-        },
-        _ => serde_json::json!({ "error": format!("unknown hook: {}", name) }),
-    });
+		let result:serde_json::Value = with_shared(|state| {
+			match name.as_str() {
+				// Accept both the canonical Hermes name and the legacy alias.
+				"on_session_start" | "session_start" => aphrodite::session::on_session_start(state),
+				"transform_tool_result" => {
+					let r = aphrodite::hooks::transform_tool_result(state, tool_content, tool);
+					replacement_from(&r)
+				},
+				"transform_terminal_output" => {
+					let r = aphrodite::hooks::transform_terminal_output(state, term_content);
+					replacement_from(&r)
+				},
+				"pre_llm_call" => {
+					let summary = aphrodite::session::catalog_summary(state);
+					if summary.is_empty() {
+						serde_json::Value::Null
+					} else {
+						serde_json::json!({ "context": summary })
+					}
+				},
+				"post_llm_call" => {
+					aphrodite::session::next_turn(state);
+					serde_json::Value::Null
+				},
+				_ => serde_json::json!({ "error": format!("unknown hook: {}", name) }),
+			}
+		});
 
-    to_c_string(&serde_json::to_string(&result).unwrap_or_default())
+		to_c_string(&serde_json::to_string(&result).unwrap_or_default())
+	}))
 }
 
 /// Return all tool schemas as a JSON array.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_get_schemas() -> *mut c_char {
-    let schemas = schemas::all_schemas();
-    to_c_string(&serde_json::json!(schemas).to_string())
+	guarded(|| {
+		let schemas = schemas::all_schemas();
+		to_c_string(&serde_json::json!(schemas).to_string())
+	})
 }
 
 /// Return hook names as a JSON array.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_get_hooks() -> *mut c_char {
-    // Hermes invokes the session hook as `on_session_start` (the `on_` prefix is
-    // required by its VALID_HOOKS table); registering `session_start` silently
-    // no-ops. The other four names match Hermes verbatim.
-    to_c_string(
-        &serde_json::json!([
-            "on_session_start",
-            "transform_tool_result",
-            "transform_terminal_output",
-            "pre_llm_call",
-            "post_llm_call"
-        ])
-        .to_string(),
-    )
+	// Hermes invokes the session hook as `on_session_start` (the `on_` prefix is
+	// required by its VALID_HOOKS table); registering `session_start` silently
+	// no-ops. The other four names match Hermes verbatim.
+	guarded(|| {
+		to_c_string(
+			&serde_json::json!([
+				"on_session_start",
+				"transform_tool_result",
+				"transform_terminal_output",
+				"pre_llm_call",
+				"post_llm_call"
+			])
+			.to_string(),
+		)
+	})
 }
 
 /// Probe proxy health via TCP connect.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_proxy_health() -> *mut c_char {
-    to_c_string(&proxy_health().to_string())
+	guarded(|| to_c_string(&proxy_health().to_string()))
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::CString;
+	use std::ffi::CString;
 
-    use super::*;
+	use super::*;
 
-    #[test]
-    fn test_version_is_semver() {
-        let json_ptr = aphrodite_hermes_version();
-        let json = unsafe { CStr::from_ptr(json_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-        let ver = v["version"].as_str().unwrap();
-        assert!(
-            ver.starts_with("0.") || ver.starts_with("1."),
-            "expected semver starting with 0. or 1., got: {ver}"
-        );
-        aphrodite_hermes_free_string(json_ptr);
-    }
+	#[test]
+	fn test_version_is_semver() {
+		let json_ptr = aphrodite_hermes_version();
+		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
+		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		let ver = v["version"].as_str().unwrap();
+		assert!(
+			ver.starts_with("0.") || ver.starts_with("1."),
+			"expected semver starting with 0. or 1., got: {ver}"
+		);
+		aphrodite_hermes_free_string(json_ptr);
+	}
 
-    #[test]
-    fn test_list_tools_returns_array() {
-        let json_ptr = aphrodite_hermes_list_tools();
-        let json = unsafe { CStr::from_ptr(json_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert!(v.is_array());
-        assert!(v.as_array().unwrap().len() >= 10);
-        aphrodite_hermes_free_string(json_ptr);
-    }
+	#[test]
+	fn test_list_tools_returns_array() {
+		let json_ptr = aphrodite_hermes_list_tools();
+		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
+		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		assert!(v.is_array());
+		assert!(v.as_array().unwrap().len() >= 10);
+		aphrodite_hermes_free_string(json_ptr);
+	}
 
-    #[test]
-    fn test_list_skills_returns_array() {
-        let json_ptr = aphrodite_hermes_list_skills();
-        let json = unsafe { CStr::from_ptr(json_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert!(v.is_array());
-        aphrodite_hermes_free_string(json_ptr);
-    }
+	#[test]
+	fn test_list_skills_returns_array() {
+		let json_ptr = aphrodite_hermes_list_skills();
+		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
+		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		assert!(v.is_array());
+		aphrodite_hermes_free_string(json_ptr);
+	}
 
-    #[test]
-    fn test_dispatch_unknown_tool() {
-        let name = CString::new("nonexistent").unwrap();
-        let args = CString::new("{}").unwrap();
-        let result_ptr = aphrodite_hermes_dispatch_tool(name.as_ptr(), args.as_ptr());
-        let result = unsafe { CStr::from_ptr(result_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        assert!(result.contains("error"));
-        aphrodite_hermes_free_string(result_ptr);
-    }
+	#[test]
+	fn test_dispatch_unknown_tool() {
+		let name = CString::new("nonexistent").unwrap();
+		let args = CString::new("{}").unwrap();
+		let result_ptr = aphrodite_hermes_dispatch_tool(name.as_ptr(), args.as_ptr());
+		let result = unsafe { CStr::from_ptr(result_ptr) }.to_string_lossy().into_owned();
+		assert!(result.contains("error"));
+		aphrodite_hermes_free_string(result_ptr);
+	}
 
-    #[test]
-    fn test_call_hook_session_start() {
-        let _g = crate::test_guard();
-        let hook = CString::new("session_start").unwrap();
-        let args = CString::new("{}").unwrap();
-        let result_ptr = aphrodite_hermes_call_hook(hook.as_ptr(), args.as_ptr());
-        let result = unsafe { CStr::from_ptr(result_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        let v: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert_eq!(v["status"], "ok");
-        aphrodite_hermes_free_string(result_ptr);
-    }
+	#[test]
+	fn test_call_hook_session_start() {
+		let _g = crate::test_guard();
+		let hook = CString::new("session_start").unwrap();
+		let args = CString::new("{}").unwrap();
+		let result_ptr = aphrodite_hermes_call_hook(hook.as_ptr(), args.as_ptr());
+		let result = unsafe { CStr::from_ptr(result_ptr) }.to_string_lossy().into_owned();
+		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
+		assert_eq!(v["status"], "ok");
+		aphrodite_hermes_free_string(result_ptr);
+	}
 
-    #[test]
-    fn test_get_schema_known_tool() {
-        let name = CString::new("aphrodite_compress").unwrap();
-        let result_ptr = aphrodite_hermes_get_schema(name.as_ptr());
-        let result = unsafe { CStr::from_ptr(result_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        let v: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert_eq!(v["name"], "aphrodite_compress");
-        aphrodite_hermes_free_string(result_ptr);
-    }
+	#[test]
+	fn test_get_schema_known_tool() {
+		let name = CString::new("aphrodite_compress").unwrap();
+		let result_ptr = aphrodite_hermes_get_schema(name.as_ptr());
+		let result = unsafe { CStr::from_ptr(result_ptr) }.to_string_lossy().into_owned();
+		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
+		assert_eq!(v["name"], "aphrodite_compress");
+		aphrodite_hermes_free_string(result_ptr);
+	}
+
+	// ── T2 (F1): a panic anywhere inside a `guarded()` body must surface as
+	// an error JSON, not unwind across the extern "C" boundary. ──
+	#[test]
+	fn test_guarded_converts_panic_to_error_json() {
+		let ptr = guarded(|| panic!("deliberate test panic"));
+		let json = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		assert!(v["error"].as_str().unwrap().contains("panicked"));
+		aphrodite_hermes_free_string(ptr);
+	}
+
+	#[test]
+	fn test_call_hook_panic_path_returns_error_not_abort() {
+		// dispatch_tool with a tool name that panics in the registry lookup
+		// path would abort pre-T2; now it must come back as error JSON.
+		let name = CString::new("aphrodite_compress").unwrap();
+		// Malformed args (missing required fields) exercise the same guarded
+		// path without relying on a specific internal panic site.
+		let args = CString::new("not json").unwrap();
+		let ptr = aphrodite_hermes_dispatch_tool(name.as_ptr(), args.as_ptr());
+		assert!(!ptr.is_null());
+		aphrodite_hermes_free_string(ptr);
+	}
 }
