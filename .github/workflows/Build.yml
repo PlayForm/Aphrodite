@@ -49,8 +49,30 @@ env:
   VCPKG_DISABLE_METRICS: 1
 
 jobs:
+  Release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
+    runs-on: ubuntu-latest
+    environment: Release
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      # Creates the release exactly once, before any matrix job attaches
+      # files, so five concurrent `action-gh-release` invocations don't race
+      # to create it. Release notes are authored per
+      # `.hermes/RELEASE-TEMPLATE.md` by the release process (see SKILL.md),
+      # not auto-generated here.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   Build:
     name: Build ${{ matrix.target }}
+    needs: Release
+    if: always() && (needs.Release.result == 'success' || needs.Release.result == 'skipped')
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -65,7 +87,7 @@ jobs:
             target: x86_64-pc-windows-msvc
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
 
@@ -78,20 +100,21 @@ jobs:
           echo "/tmp/onnxruntime-linux-x64-1.21.0/lib" | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
           sudo ldconfig
 
-      - name: Setup Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Setup Rust (stable 1.96.0)
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
         with:
+          toolchain: 1.96.0
           targets: ${{ matrix.target }}
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry/
             ~/.cargo/git/
             target/
-          key: cargo-check-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: cargo-check-${{ runner.os }}-${{ matrix.target }}-
+          key: cargo-build-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-build-${{ runner.os }}-${{ matrix.target }}-
 
       # Build both the proxy binary (`aphrodite`) AND the plugin dylib
       # (`libaphrodite_hermes`) - the Hermes plugin loads the dylib at runtime,
@@ -116,42 +139,42 @@ jobs:
           fi
           ls -lh aphrodite-${TARGET}* libaphrodite_hermes-${TARGET}*
 
+      - name: Generate checksums
+        shell: bash
+        run: |
+          TARGET="${{ matrix.target }}"
+          if [[ "$TARGET" == *windows* ]]; then
+              certutil -hashfile "aphrodite-${TARGET}.exe" SHA256 | findstr /v "hash" | findstr /v "CertUtil" > sha_bin.txt
+              certutil -hashfile "libaphrodite_hermes-${TARGET}.dll" SHA256 | findstr /v "hash" | findstr /v "CertUtil" > sha_dll.txt
+              echo "$(cat sha_bin.txt | tr -d '\r\n')  aphrodite-${TARGET}.exe" > "SHA256SUMS-${TARGET}.txt"
+              echo "$(cat sha_dll.txt | tr -d '\r\n')  libaphrodite_hermes-${TARGET}.dll" >> "SHA256SUMS-${TARGET}.txt"
+              rm -f sha_bin.txt sha_dll.txt
+          else
+              shasum -a 256 aphrodite-${TARGET}* libaphrodite_hermes-${TARGET}* > "SHA256SUMS-${TARGET}.txt"
+          fi
+          cat "SHA256SUMS-${TARGET}.txt"
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: aphrodite-${{ matrix.target }}
           path: |
             aphrodite-${{ matrix.target }}*
             libaphrodite_hermes-${{ matrix.target }}*
+            SHA256SUMS-${{ matrix.target }}.txt
           retention-days: 30
 
+      # The Release job above already created the release (exactly once);
+      # each matrix job only attaches its own files here.
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           # Trailing * catches the Windows `.exe`; fail loudly if a rename slips.
           files: |
             aphrodite-${{ matrix.target }}*
             libaphrodite_hermes-${{ matrix.target }}*
+            SHA256SUMS-${{ matrix.target }}.txt
           fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  Release:
-    name: Release
-    if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
-    runs-on: ubuntu-latest
-    environment: Release
-    permissions:
-      contents: write
-      id-token: write
-
-    steps:
-      - name: Create GitHub Release
-        continue-on-error: true
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

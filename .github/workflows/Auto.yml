@@ -51,7 +51,7 @@ jobs:
       VCPKG_DISABLE_METRICS: 1
 
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - run: |
           echo "Update: $(date)" > .github/Update.md
@@ -59,8 +59,8 @@ jobs:
       - run: |
           git config user.name "Auto"
           git config user.email "Commit@PlayForm.Cloud"
-          git add .
-          git commit -a --allow-empty-message -m ""
+          git add .github/Update.md
+          git commit -m "chore: daily heartbeat $(date -u +%F)"
 
       - uses: ad-m/github-push-action@881a6320fdb16eb5318c5054f31c218aec2b324c # v1.3.0
         with:

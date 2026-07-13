@@ -56,21 +56,22 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
 
-      - name: Setup Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Setup Rust (stable 1.96.0)
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+        with:
+          toolchain: 1.96.0
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry/
             ~/.cargo/git/
             target/
-            Target/
           key: cargo-test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: cargo-test-${{ runner.os }}-
 
@@ -83,15 +84,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: Release
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
 
-      - name: Setup Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Setup Rust (stable 1.96.0)
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+        with:
+          toolchain: 1.96.0
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry/
@@ -138,21 +141,22 @@ jobs:
     runs-on: ubuntu-latest
     environment: Release
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
 
-      - name: Setup Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Setup Rust (stable 1.96.0)
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+        with:
+          toolchain: 1.96.0
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry/
             ~/.cargo/git/
             target/
-            Target/
           key: cargo-publish-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: cargo-publish-${{ runner.os }}-
 
@@ -176,21 +180,22 @@ jobs:
     runs-on: ubuntu-latest
     environment: Release
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
 
-      - name: Setup Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Setup Rust (stable 1.96.0)
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+        with:
+          toolchain: 1.96.0
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry/
             ~/.cargo/git/
             target/
-            Target/
           key: cargo-publish-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: cargo-publish-${{ runner.os }}-
 

@@ -10,6 +10,7 @@ permissions:
 on:
   push:
     branches: [Current]
+    paths-ignore: [".github/Update.md"]
   pull_request:
     branches: [Current]
   workflow_dispatch:
@@ -54,17 +55,18 @@ jobs:
     name: cargo check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
 
-      - name: Setup Rust (nightly)
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Setup Rust (stable 1.96.0)
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
         with:
+          toolchain: 1.96.0
           components: rustfmt, clippy
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry/
@@ -74,13 +76,78 @@ jobs:
           restore-keys: cargo-check-${{ runner.os }}-
 
       - name: cargo check
-        run: cargo check -p aphrodite --release
+        run: cargo check --workspace --release
+
+      - name: cargo clippy
+        # Scoped to the two actual workspace members, not `--workspace`:
+        # `headroom-core` is a path *dependency* (vendor/headroom, its own
+        # separate submodule/repo, out of scope per this report's §5), but
+        # `--workspace` picks it up as a lint target too since path deps
+        # aren't cap-lints-suppressed the way registry deps are - verified
+        # locally, `--workspace -D warnings` fails on 3 pre-existing
+        # vendor/headroom lints this repo doesn't own.
+        run: cargo clippy -p aphrodite -p aphrodite-hermes -- -D warnings
+
+      - name: Setup Rust (nightly, fmt only)
+        # rustfmt.toml sets `unstable_features = true` and relies on several
+        # nightly-only options (notably `space_after_colon = false`, the
+        # repo's established no-space type-annotation style). Under stable,
+        # rustfmt silently drops those settings instead of erroring, which
+        # makes `cargo fmt --check` want to reformat the entire existing
+        # codebase (1235 diff hunks, verified locally) - a false-positive
+        # gate, not a real regression. A pinned dated nightly is carried
+        # solely for this one step; every other job uses stable.
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07)
+        with:
+          toolchain: nightly-2026-05-01
+          components: rustfmt
+
+      - name: cargo fmt --check
+        run: cargo +nightly-2026-05-01 fmt --all -- --check
+
+  Test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+
+      - name: Setup Rust (stable 1.96.0)
+        uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: cargo-test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-test-${{ runner.os }}-
+
+      - name: cargo test
+        run: cargo test --workspace --release
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+
+      - name: Build aphrodite-hermes dylib for FFI tests
+        run: cargo build --release -p aphrodite-hermes
+
+      - name: Python FFI tests
+        env:
+          APHRODITE_REQUIRE_DYLIB: 1
+        run: uv run --with pytest pytest tests/ -q
 
   Python:
     name: ruff + pyright
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: recursive
 
@@ -89,9 +156,28 @@ jobs:
           git submodule status
           ls plugins/aphrodite/plugin.yaml || echo "MISSING: plugins/aphrodite not checked out"
 
-      - uses: astral-sh/ruff-action@v3
+      - uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
         with:
           src: plugins/aphrodite/
 
       - name: pyright
-        run: cd plugins/aphrodite && npx pyright .
+        run: cd plugins/aphrodite && npx pyright@1.1.411 .
+
+  Deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+
+      # NOTE: as of this job's introduction, `cargo deny check` genuinely
+      # fails: `paste` is flagged unmaintained (advisories), and two
+      # transitive deps carry NCSA / CDLA-Permissive-2.0 licenses not on the
+      # licenses.allow list (licenses). These are real findings, not schema
+      # errors - accepting/ignoring them is a policy decision for a human,
+      # not something this pass makes unilaterally. Until triaged, expect
+      # this job to be red.
+      - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
+        with:
+          command: check

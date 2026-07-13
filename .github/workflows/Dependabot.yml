@@ -20,7 +20,7 @@ jobs:
       'dependabot[bot]' }}
 
     steps:
-      - uses: dependabot/fetch-metadata@v3.1.0
+      - uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: "${{ secrets.DEPENDABOT_TOKEN }}"
 
@@ -38,11 +38,23 @@ jobs:
       'dependabot[bot]' }}
 
     steps:
-      - uses: dependabot/fetch-metadata@v3.1.0
+      - uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        id: metadata
         with:
           github-token: "${{ secrets.DEPENDABOT_TOKEN }}"
 
-      - run: gh pr merge --auto --merge "$PR_URL"
+      # Only automerge low-risk semver-patch bumps; minor/major updates still
+      # get approved above but require a human to merge.
+      - name: Wait for required checks to pass
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: gh pr checks "$PR_URL" --required --watch --fail-fast
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GITHUB_TOKEN: ${{secrets.DEPENDABOT_TOKEN}}
+
+      - name: Automerge
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.DEPENDABOT_TOKEN}}
