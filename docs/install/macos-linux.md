@@ -39,16 +39,16 @@ aphrodite setup --api-key sk-... --api-url https://api.deepseek.com --model deep
 
 What `aphrodite setup` does, in order:
 
-| Step | Action |
-| --- | --- |
-| 1 | Verifies `hermes` is on `PATH` - fails fast with a clear error if not |
-| 2 | Refuses to run twice unless you pass `--force` |
-| 3 | Copies itself into `~/.hermes/aphrodite/binaries/` with tightened permissions |
-| 4 | Finds and copies both dylibs from nearby build/install locations - errors out naming the missing one if none are found |
-| 5 | Writes `~/.hermes/aphrodite/aphrodite.toml` from a template (ports from `--cache-port`/`--token-port`, default `9797`/`9798`) |
-| 6 | Writes `plugin.yaml` and a thin plugin shim |
-| 7 | Links `~/.hermes/plugins/aphrodite` to `~/.hermes/aphrodite/` (symlink on Unix, junction with a copy fallback on Windows) |
-| 8 | Runs `hermes plugins enable aphrodite` |
+| Step | Action                                                                                                                        |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Verifies `hermes` is on `PATH` - fails fast with a clear error if not                                                         |
+| 2    | Refuses to run twice unless you pass `--force`                                                                                |
+| 3    | Copies itself into `~/.hermes/aphrodite/binaries/` with tightened permissions                                                 |
+| 4    | Finds and copies both dylibs from nearby build/install locations - errors out naming the missing one if none are found        |
+| 5    | Writes `~/.hermes/aphrodite/aphrodite.toml` from a template (ports from `--cache-port`/`--token-port`, default `9797`/`9798`) |
+| 6    | Writes `plugin.yaml` and a thin plugin shim                                                                                   |
+| 7    | Links `~/.hermes/plugins/aphrodite` to `~/.hermes/aphrodite/` (symlink on Unix, junction with a copy fallback on Windows)     |
+| 8    | Runs `hermes plugins enable aphrodite`                                                                                        |
 
 Useful flags: `--cache-port`/`--token-port` (run multiple concurrent Hermes
 Agents on one machine, each pointed at its own port pair), `--no-launch`
@@ -68,10 +68,10 @@ cargo build --release -p aphrodite -p aphrodite-hermes
 
 Then either:
 
-| Approach | What it does |
-| --- | --- |
+| Approach                                     | What it does                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Run `Maintain/install.sh` from the repo root | Copies the binary into `~/.hermes/aphrodite/`, symlinks the plugin and its skills into `~/.hermes/`, symlinks all 7 `profiles/aphrodite-*` directories into `~/.hermes/profiles/`, and enables the plugin per-profile. Expects `target/release/aphrodite` to already exist - it doesn't build or download anything itself |
-| Wire things up manually | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around |
+| Wire things up manually                      | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                    |
 
 ## What changes after any of these
 

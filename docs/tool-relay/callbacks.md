@@ -101,7 +101,7 @@ auth using `notify_key`, when one is configured.
 ## Timeouts
 
 | Operation         | Timeout   |
-| ------------------ | ----------- |
+| ----------------- | --------- |
 | Callback POST     | 5 seconds |
 | Notification POST | 5 seconds |
 
@@ -130,8 +130,8 @@ Both `notify_url` and `notify_key` must be set for callbacks to fire. If
 
 ## Metrics
 
-| Counter          | Description                                                        |
-| ------------------ | --------------------------------------------------------------------- |
+| Counter          | Description                                                          |
+| ---------------- | -------------------------------------------------------------------- |
 | `notify_success` | Incremented when a callback/notification POST returns success status |
 | `notify_failure` | Incremented on timeout, connection error, or non-success status      |
 

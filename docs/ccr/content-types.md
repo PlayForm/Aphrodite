@@ -55,34 +55,34 @@ The Python classifier examines the first 5,000 characters:
 
 ## Complete Type Registry
 
-| Type             | Detection Pattern                 | Threshold Group     | Implementation    |
-| ---------------- | --------------------------------- | ------------------- | ----------------- |
-| `code_rust`      | Rust syntax                       | Code (×4)           | Rust proxy        |
-| `code_python`    | Python syntax                     | Code (×4)           | Rust proxy        |
-| `code_go`        | Go syntax with imports            | Code (×4)           | Rust proxy        |
-| `code_js`        | JS/TS syntax with imports         | Code (×4)           | Rust proxy        |
-| `code`           | Generic programming               | Code (×4)           | Rust proxy        |
-| `error`          | First-line error keywords         | Error (×8)          | Rust proxy        |
-| `diff`           | diff --git / unified diff headers | Diff (×2)           | Rust proxy        |
-| `git`            | git commit/branch output          | Diff (×2)           | Rust proxy        |
-| `text`           | Unrecognized content              | Text (×2)           | Rust proxy        |
-| `tool_output`    | JSON + exit_code/status           | Default (×1)        | Rust proxy        |
-| `json`           | Valid JSON (object/array)         | Default (×1)        | Rust proxy        |
-| `build_output`   | cargo build/test output           | Noisy (×1, BASE)    | Rust proxy        |
-| `log`            | Structured log lines              | Noisy (×1, BASE)    | Rust proxy        |
-| `linter`         | Linter/compiler error output      | Noisy (×1, BASE)    | Rust proxy        |
-| `build_error`    | Rust error[E…]                    | n/a (Python only)   | Python plugin     |
-| `search_results` | JSON + total_count                | n/a (Python only)   | Python plugin     |
-| `process_output` | JSON + session_id                 | n/a (Python only)   | Python plugin     |
-| `search_files`   | JSON + matches or file:line:      | n/a (Python only)   | Python plugin     |
-| `tabular`        | Pipe-delimited rows               | n/a (Python only)   | Python plugin     |
-| `json_list`      | JSON list (Python only)           | n/a (Python only)   | Python plugin     |
-| `tool`           | Python tool result                | v (Python plugin)   | Python plugin     |
-| `terminal`       | Python terminal output            | v (Python plugin)   | Python plugin     |
-| `aphrodite`      | Aphrodite meta-tool output        | v (Python plugin)   | Python plugin     |
-| `context`        | Context engine compression        | n/a (engine)         | Python plugin     |
-| `build`          | Build output summary              | n/a (Python plugin) | Python plugin     |
-| `compress`       | Programmatic CCR create           | n/a (Python plugin) | Python plugin     |
+| Type             | Detection Pattern                 | Threshold Group     | Implementation |
+| ---------------- | --------------------------------- | ------------------- | -------------- |
+| `code_rust`      | Rust syntax                       | Code (×4)           | Rust proxy     |
+| `code_python`    | Python syntax                     | Code (×4)           | Rust proxy     |
+| `code_go`        | Go syntax with imports            | Code (×4)           | Rust proxy     |
+| `code_js`        | JS/TS syntax with imports         | Code (×4)           | Rust proxy     |
+| `code`           | Generic programming               | Code (×4)           | Rust proxy     |
+| `error`          | First-line error keywords         | Error (×8)          | Rust proxy     |
+| `diff`           | diff --git / unified diff headers | Diff (×2)           | Rust proxy     |
+| `git`            | git commit/branch output          | Diff (×2)           | Rust proxy     |
+| `text`           | Unrecognized content              | Text (×2)           | Rust proxy     |
+| `tool_output`    | JSON + exit_code/status           | Default (×1)        | Rust proxy     |
+| `json`           | Valid JSON (object/array)         | Default (×1)        | Rust proxy     |
+| `build_output`   | cargo build/test output           | Noisy (×1, BASE)    | Rust proxy     |
+| `log`            | Structured log lines              | Noisy (×1, BASE)    | Rust proxy     |
+| `linter`         | Linter/compiler error output      | Noisy (×1, BASE)    | Rust proxy     |
+| `build_error`    | Rust error[E…]                    | n/a (Python only)   | Python plugin  |
+| `search_results` | JSON + total_count                | n/a (Python only)   | Python plugin  |
+| `process_output` | JSON + session_id                 | n/a (Python only)   | Python plugin  |
+| `search_files`   | JSON + matches or file:line:      | n/a (Python only)   | Python plugin  |
+| `tabular`        | Pipe-delimited rows               | n/a (Python only)   | Python plugin  |
+| `json_list`      | JSON list (Python only)           | n/a (Python only)   | Python plugin  |
+| `tool`           | Python tool result                | v (Python plugin)   | Python plugin  |
+| `terminal`       | Python terminal output            | v (Python plugin)   | Python plugin  |
+| `aphrodite`      | Aphrodite meta-tool output        | v (Python plugin)   | Python plugin  |
+| `context`        | Context engine compression        | n/a (engine)        | Python plugin  |
+| `build`          | Build output summary              | n/a (Python plugin) | Python plugin  |
+| `compress`       | Programmatic CCR create           | n/a (Python plugin) | Python plugin  |
 
 ## Threshold Groups
 

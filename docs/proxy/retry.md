@@ -28,10 +28,10 @@ sleep_ms = base_ms × jitter
 ```
 
 | Attempt | Base (ms)                    | Range (ms) |
-| ------- | ----------------------------- | ---------- |
-| 1       | 100                            | 75 - 125   |
-| 2       | 200                            | 150 - 250  |
-| 3       | (not retried, final attempt)   | -          |
+| ------- | ---------------------------- | ---------- |
+| 1       | 100                          | 75 - 125   |
+| 2       | 200                          | 150 - 250  |
+| 3       | (not retried, final attempt) | -          |
 
 As a Rust struct:
 
@@ -60,13 +60,13 @@ Err(e) => {
 
 ## Error Classification
 
-| Retried                                                   | Not Retried                                    |
-| ---------------------------------------------------------- | ------------------------------------------------ |
-| Connection refused                                          | HTTP 4xx (tracked as `upstream_errors_4xx`)      |
-| DNS resolution failure                                       | HTTP 5xx (tracked as `upstream_errors_5xx`)      |
-| TLS handshake error                                           | Returned to the client directly                  |
-| Timeout (reqwest `send()` error - different from upstream HTTP timeout) |                                            |
-| Connection reset                                              |                                                 |
+| Retried                                                                 | Not Retried                                 |
+| ----------------------------------------------------------------------- | ------------------------------------------- |
+| Connection refused                                                      | HTTP 4xx (tracked as `upstream_errors_4xx`) |
+| DNS resolution failure                                                  | HTTP 5xx (tracked as `upstream_errors_5xx`) |
+| TLS handshake error                                                     | Returned to the client directly             |
+| Timeout (reqwest `send()` error - different from upstream HTTP timeout) |                                             |
+| Connection reset                                                        |                                             |
 
 ## Final Failure
 

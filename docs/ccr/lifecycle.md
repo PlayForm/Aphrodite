@@ -47,12 +47,12 @@ cache_key = FNV-1a(api_key + ":" + model + ":" + serialized_messages)
 response_cache.get(cache_key) → hit? return cached : proceed to upstream
 ```
 
-| Property   | Detail                                          |
-| ---------- | ------------------------------------------------ |
-| Hash       | FNV-1a 64-bit (deterministic across restarts)   |
-| Capacity   | LRU, 128 entries                                |
-| Key scope  | Includes `api_key` to prevent cross-user collision |
-| Response header | `X-Aphrodite-Cache: HIT` or `MISS`          |
+| Property        | Detail                                             |
+| --------------- | -------------------------------------------------- |
+| Hash            | FNV-1a 64-bit (deterministic across restarts)      |
+| Capacity        | LRU, 128 entries                                   |
+| Key scope       | Includes `api_key` to prevent cross-user collision |
+| Response header | `X-Aphrodite-Cache: HIT` or `MISS`                 |
 
 ## Phase 3: Store
 
@@ -143,12 +143,12 @@ CCR backend. It additionally supports:
 
 ## Phase 6: Expire
 
-| Backend        | Expiry behavior                                                                                                             |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| SQLite         | Lazy purge on every `get()`: `DELETE FROM ccr_entries WHERE created_at + ttl_seconds <= now`. Debounced to once per 60 seconds. No background thread. |
-| In-Memory      | Lazy TTL check on every `get()`: entries older than TTL are evicted via an atomic check-and-remove (prevents a TOCTOU race with a concurrent `put`). Queue compaction runs once the eviction queue grows past twice capacity, to clear stale keys. |
-| Inline         | LRU eviction once capacity (1,024) is exceeded. No TTL - pure LRU.                                                            |
-| Python Inline  | LRU eviction once the store exceeds 500 entries. No TTL.                                                                       |
+| Backend       | Expiry behavior                                                                                                                                                                                                                                    |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQLite        | Lazy purge on every `get()`: `DELETE FROM ccr_entries WHERE created_at + ttl_seconds <= now`. Debounced to once per 60 seconds. No background thread.                                                                                              |
+| In-Memory     | Lazy TTL check on every `get()`: entries older than TTL are evicted via an atomic check-and-remove (prevents a TOCTOU race with a concurrent `put`). Queue compaction runs once the eviction queue grows past twice capacity, to clear stale keys. |
+| Inline        | LRU eviction once capacity (1,024) is exceeded. No TTL - pure LRU.                                                                                                                                                                                 |
+| Python Inline | LRU eviction once the store exceeds 500 entries. No TTL.                                                                                                                                                                                           |
 
 ## Threshold Tables
 
@@ -163,12 +163,12 @@ CCR backend. It additionally supports:
 ### Per-Type Multipliers
 
 | Type                        | Multiplier            | Effective (Token, 1KB base) | Effective (Cache, 8KB base) |
-| --------------------------- | ---------------------- | --------------------------- | --------------------------- |
-| error                       | ×8                     | 8,192                       | 65,536                      |
-| code_rust/python/go/js/code | ×4 (config, default)   | 4,096                       | 32,768                      |
-| diff, git, text             | ×2                     | 2,048                       | 16,384                      |
-| tool_output, json           | ×1                     | 1,024                       | 8,192                       |
-| linter, build_output, log   | ×1 (BASE, not halved)  | 1,024                       | 8,192                       |
+| --------------------------- | --------------------- | --------------------------- | --------------------------- |
+| error                       | ×8                    | 8,192                       | 65,536                      |
+| code_rust/python/go/js/code | ×4 (config, default)  | 4,096                       | 32,768                      |
+| diff, git, text             | ×2                    | 2,048                       | 16,384                      |
+| tool_output, json           | ×1                    | 1,024                       | 8,192                       |
+| linter, build_output, log   | ×1 (BASE, not halved) | 1,024                       | 8,192                       |
 
 **Correction:** `linter`, `build_output`, and `log` are pinned at the BASE
 threshold, not halved. `proxy.rs::threshold_for` returns `base` for these
@@ -214,11 +214,11 @@ claimed:
 budget_mult = clamp(0.50 + (headroom_budget% / 100) * 0.50, 0.50, 1.0)
 ```
 
-| Budget (fill %) | Multiplier | Effect                              |
-| ---------------- | ---------- | ------------------------------------ |
-| 0%                | 0.50       | Most aggressive compression allowed  |
-| 50%               | 0.75       | Moderate compression                 |
-| 100% (or no header/unparseable) | 1.00 | No reduction (default when the header is absent) |
+| Budget (fill %)                 | Multiplier | Effect                                           |
+| ------------------------------- | ---------- | ------------------------------------------------ |
+| 0%                              | 0.50       | Most aggressive compression allowed              |
+| 50%                             | 0.75       | Moderate compression                             |
+| 100% (or no header/unparseable) | 1.00       | No reduction (default when the header is absent) |
 
 The multiplier never drops below 0.50× regardless of how low the budget
 signal is - "semantics and tool chains are worth the tokens" per the code's

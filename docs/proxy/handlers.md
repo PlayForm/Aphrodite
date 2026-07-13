@@ -58,22 +58,22 @@ pub async fn proxy_handler(
 ### Response Headers
 
 | Header                   | Value                           | When                                 |
-| ------------------------ | -------------------------------- | ------------------------------------- |
-| `Content-Type`           | application/json; charset=utf-8  | Always                                 |
-| `X-Aphrodite-Cache`      | HIT or MISS                      | Chat Completions                       |
-| `X-Aphrodite-Compressed` | true                              | When compression occurred              |
-| `X-Aphrodite-Fill-Pct`   | float (0.0-99.0)                  | Chat Completions (from fill_pct/100)   |
+| ------------------------ | ------------------------------- | ------------------------------------ |
+| `Content-Type`           | application/json; charset=utf-8 | Always                               |
+| `X-Aphrodite-Cache`      | HIT or MISS                     | Chat Completions                     |
+| `X-Aphrodite-Compressed` | true                            | When compression occurred            |
+| `X-Aphrodite-Fill-Pct`   | float (0.0-99.0)                | Chat Completions (from fill_pct/100) |
 
 ### Forwarded Headers
 
 Stripped before forwarding:
 
-| Header               | Reason                              |
-| --------------------- | -------------------------------------- |
-| `host`                 |                                          |
-| `authorization`        | Replaced with configured API key         |
-| `content-length`       | Recalculated from body                   |
-| `x-aphrodite-*`        | Internal                                 |
+| Header           | Reason                           |
+| ---------------- | -------------------------------- |
+| `host`           |                                  |
+| `authorization`  | Replaced with configured API key |
+| `content-length` | Recalculated from body           |
+| `x-aphrodite-*`  | Internal                         |
 
 ## handle_tool_relay
 
@@ -109,11 +109,11 @@ POST /tool/relay
 
 ### Tools Handled
 
-| Tool                    | Behavior                            |
-| ------------------------ | -------------------------------------- |
-| `aphrodite_retrieve`      | inline_ccr → CCR store                  |
-| `aphrodite_compress`      | inline (<256B) or CCR store              |
-| `aphrodite_list`          | ccr.len()                                |
+| Tool                 | Behavior                    |
+| -------------------- | --------------------------- |
+| `aphrodite_retrieve` | inline_ccr → CCR store      |
+| `aphrodite_compress` | inline (<256B) or CCR store |
+| `aphrodite_list`     | ccr.len()                   |
 
 ### Validation
 

@@ -62,7 +62,7 @@ pub fn load_directives(dir: &PathBuf) -> HashMap<String, Directive> {
 
 /// Build the context string injected into `pre_llm_call`.
 /// Format:
-/// ```
+/// ```text
 /// [directives: focus, foresight]
 /// focus: stay concise, 1-2 tools/turn
 /// foresight: anticipate next reads

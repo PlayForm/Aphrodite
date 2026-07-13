@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite-hermes"
-version = "1.2.5"
+version = "1.2.6"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -12,6 +12,6 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-aphrodite = { path = "../aphrodite", version = "1.2.5" }
+aphrodite = { path = "../aphrodite", version = "1.2.6" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

@@ -36,6 +36,7 @@ to `Source` remote.
 ## Version Sync
 
 The Aphrodite project has two independent version tracks:
+
 - **Binary version** (`1.0.4`) - Rust crates, must match across Cargo.toml files
 - **Plugin version** (`2.0.1`) - Hermes plugin, lives in the `plugins/aphrodite` submodule
 

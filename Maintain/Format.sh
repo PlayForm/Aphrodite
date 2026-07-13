@@ -73,8 +73,8 @@ FormatLineEndings() {
 		-not -path "*/Generated/*" \
 		-not -path "*/.generated/*" \
 		-not -path "*/gen/*" \
-		-not -path "*/bin/*" \
-		| xargs dos2unix -q
+		-not -path "*/bin/*" |
+		xargs dos2unix -q
 
 	echo ""
 	echo "Line ending conversion complete."
@@ -122,8 +122,8 @@ FormatShell() {
 		-not -path "*/Generated/*" \
 		-not -path "*/.generated/*" \
 		-not -path "*/gen/*" \
-		-not -path "*/bin/*" \
-		| xargs shfmt -w
+		-not -path "*/bin/*" |
+		xargs shfmt -w
 
 	echo ""
 	echo "Shell formatting complete."
@@ -204,8 +204,8 @@ FormatRust() {
 		-not -path "*/deps/*" \
 		-not -path "*/Generated/*" \
 		-not -path "*/.generated/*" \
-		-not -path "*/gen/*" \
-		| xargs -I {} sh -c \
+		-not -path "*/gen/*" |
+		xargs -I {} sh -c \
 			'rustup run nightly rustfmt --config-path rustfmt.toml "$1" 2>/dev/null || true' \
 			-- {}
 
@@ -219,37 +219,37 @@ FormatRust() {
 #===============================================================================
 
 case "${1:-}" in
-	dos2unix)
-		FormatLineEndings
-		;;
-	shell)
-		FormatShell
-		;;
-	prettier)
-		FormatPrettier
-		;;
-	rust)
-		FormatRust
-		;;
-	"")
-		FormatLineEndings
-		FormatShell
-		FormatPrettier
-		FormatRust
-		echo "→ Format complete."
-		;;
-	--help | -h)
-		echo "Usage: $0 [dos2unix|shell|prettier|rust]"
-		echo ""
-		echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
-		echo "  shell     Format shell scripts with shfmt"
-		echo "  prettier  Format Markdown/JSON/YAML with Prettier"
-		echo "  rust      Format Rust with rustfmt (nightly) + Rust.py"
-		echo "  (no arg)  Run all four in order"
-		;;
-	*)
-		echo "Unknown target: $1"
-		echo "Use --help for usage information"
-		exit 1
-		;;
+dos2unix)
+	FormatLineEndings
+	;;
+shell)
+	FormatShell
+	;;
+prettier)
+	FormatPrettier
+	;;
+rust)
+	FormatRust
+	;;
+"")
+	FormatLineEndings
+	FormatShell
+	FormatPrettier
+	FormatRust
+	echo "→ Format complete."
+	;;
+--help | -h)
+	echo "Usage: $0 [dos2unix|shell|prettier|rust]"
+	echo ""
+	echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
+	echo "  shell     Format shell scripts with shfmt"
+	echo "  prettier  Format Markdown/JSON/YAML with Prettier"
+	echo "  rust      Format Rust with rustfmt (nightly) + Rust.py"
+	echo "  (no arg)  Run all four in order"
+	;;
+*)
+	echo "Unknown target: $1"
+	echo "Use --help for usage information"
+	exit 1
+	;;
 esac

@@ -152,10 +152,10 @@ fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
 ```
 
 | Behavior     | Detail                                    |
-| ------------ | ------------------------------------------ |
+| ------------ | ----------------------------------------- |
 | Matching     | Case-insensitive substring match per line |
 | Query length | Truncated to 512 chars                    |
-| No matches   | Returns a descriptive placeholder          |
+| No matches   | Returns a descriptive placeholder         |
 
 ## Pagination
 

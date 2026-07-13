@@ -30,11 +30,11 @@ class AphroditeContextEngine(ContextEngine):
 
 ## Threshold Semantics
 
-| Value         | Behavior                                                |
-| ------------- | -------------------------------------------------------- |
-| -1            | Always compress (any context fill triggers)             |
-| 0             | Disabled (never compress)                               |
-| >0 (e.g., 50) | Compress when prompt_tokens ≥ context_length × pct/100  |
+| Value         | Behavior                                               |
+| ------------- | ------------------------------------------------------ |
+| -1            | Always compress (any context fill triggers)            |
+| 0             | Disabled (never compress)                              |
+| >0 (e.g., 50) | Compress when prompt_tokens ≥ context_length × pct/100 |
 
 ## Compress Algorithm
 

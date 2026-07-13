@@ -86,7 +86,7 @@ echo "[bump] README release badge + package.json → $NEW"
 
 # Always keep BINARY_VERSION tracking the binary version, regardless of
 # whether a plugin version source was found below.
-echo "$NEW" > plugins/aphrodite/BINARY_VERSION
+echo "$NEW" >plugins/aphrodite/BINARY_VERSION
 
 # ── Plugin version bump (submodule files - may not all exist) ──
 # Plugin version track is independent of binary version track

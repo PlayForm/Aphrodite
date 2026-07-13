@@ -60,11 +60,11 @@ If `notify_url` configured: async POST with:
 }
 ```
 
-| Property | Value                                          |
-| -------- | ----------------------------------------------- |
-| Auth     | Bearer token via `notify_key`                  |
-| Timeout  | 5s                                              |
-| Tracking | `notify_success` / `notify_failure` counters   |
+| Property | Value                                        |
+| -------- | -------------------------------------------- |
+| Auth     | Bearer token via `notify_key`                |
+| Timeout  | 5s                                           |
+| Tracking | `notify_success` / `notify_failure` counters |
 
 ### Errors
 
@@ -198,9 +198,9 @@ pub async fn handle_ccr_delete(
 
 The Python plugin uses `POST /ccr/create` extensively:
 
-| Caller                     | Usage                                                       |
-| -------------------------- | ------------------------------------------------------------ |
-| `_compress_via_proxy`      | Sends `Content-Type: application/octet-stream`              |
-| `_compress_handler`        | Gets a hash back and mirrors it in the inline store          |
-| `_store_conversation_turn` | Sends turn data and stores the result in `_conv_index`       |
-| Context engine             | Sends packed messages, gets a hash, and builds a marker      |
+| Caller                     | Usage                                                   |
+| -------------------------- | ------------------------------------------------------- |
+| `_compress_via_proxy`      | Sends `Content-Type: application/octet-stream`          |
+| `_compress_handler`        | Gets a hash back and mirrors it in the inline store     |
+| `_store_conversation_turn` | Sends turn data and stores the result in `_conv_index`  |
+| Context engine             | Sends packed messages, gets a hash, and builds a marker |

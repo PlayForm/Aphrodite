@@ -144,9 +144,9 @@ the same hash.
 
 ## 4. CCR Cache
 
-| Path | Steps |
-| ---- | ----- |
-| Hit  | `ccr_hits` incremented; marker generated, content replaced; no store operation |
+| Path | Steps                                                                                                                                                                  |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hit  | `ccr_hits` incremented; marker generated, content replaced; no store operation                                                                                         |
 | Miss | `ccr_misses` incremented; `ccr.put(hash, content)` stored; `ccr_created` incremented; `tokens_saved` += content.len() - hash.len(); marker generated, content replaced |
 
 ### Compression (zstd)
@@ -157,9 +157,9 @@ transparently.
 
 ## 5. Marker Generation
 
-| Mode | Format |
-| ---- | ------ |
-| Cache | `<<<CCR:{hash}\|{type}\|{size}>>>` followed by the first 512 bytes of content as a preview - simpler format, no structured metadata |
+| Mode  | Format                                                                                                                                                                            |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cache | `<<<CCR:{hash}\|{type}\|{size}>>>` followed by the first 512 bytes of content as a preview - simpler format, no structured metadata                                               |
 | Token | `<<<CCR:{hash}\|{type}\|{size}\|{metadata_flat}>>` via `smart_marker`, where metadata includes type-specific keys: `lang=rs`, `fns=main,init`, `ln=42`, `keys=status,error`, etc. |
 
 ## 6. EMA Update
@@ -255,7 +255,7 @@ if map.contains(&hash) {
 
 Initial values at startup:
 
-| Field | Value |
-| ----- | ----- |
-| `compression_ratio_ema` | 200 (2.0×) |
-| `fill_pct` | 9000 (90.00%) |
+| Field                   | Value         |
+| ----------------------- | ------------- |
+| `compression_ratio_ema` | 200 (2.0×)    |
+| `fill_pct`              | 9000 (90.00%) |

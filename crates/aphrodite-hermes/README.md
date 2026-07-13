@@ -69,19 +69,19 @@ All 12 tools are registered as closures in one `tool_registry()` HashMap in
 behavior in [Tool Relay: Tools](../../docs/tool-relay/tools.md):
 
 | Tool                        |
-| :--------------------------- |
-| `aphrodite_compress`         |
-| `aphrodite_retrieve`         |
-| `aphrodite_stats`            |
-| `aphrodite_catalog`          |
-| `aphrodite_search`           |
-| `aphrodite_diff`             |
-| `aphrodite_files`            |
-| `aphrodite_test`             |
-| `aphrodite_rebuild`          |
-| `aphrodite_reclassify`       |
-| `aphrodite_prefetch`         |
-| `aphrodite_prefetch_status`  |
+| :-------------------------- |
+| `aphrodite_compress`        |
+| `aphrodite_retrieve`        |
+| `aphrodite_stats`           |
+| `aphrodite_catalog`         |
+| `aphrodite_search`          |
+| `aphrodite_diff`            |
+| `aphrodite_files`           |
+| `aphrodite_test`            |
+| `aphrodite_rebuild`         |
+| `aphrodite_reclassify`      |
+| `aphrodite_prefetch`        |
+| `aphrodite_prefetch_status` |
 
 `tool_registry()` also holds a 13th, internal-only entry -
 `context_engine_pre_llm` - the context engine's pre-LLM hook, not a

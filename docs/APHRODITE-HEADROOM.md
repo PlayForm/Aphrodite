@@ -130,10 +130,10 @@ every time `vendor/headroom` gets a pin bump (report 08 F10/T7):
    superproject - the fork is developed and reviewed independently.
 2. **Run the fork's own test suite** (`cargo test --workspace --all-features`
    inside `vendor/headroom`, plus the Python suite if the merge touched
-   `headroom/`). Do this *before* touching the superproject at all - a
+   `headroom/`). Do this _before_ touching the superproject at all - a
    broken fork should never even become a pin-bump candidate.
 3. **Make a dedicated pin-bump commit** in the superproject: `git add
-   vendor/headroom && git commit`. One commit, one purpose - "bump
+vendor/headroom && git commit`. One commit, one purpose - "bump
    headroom-core to <sha>" - never bundled with unrelated Aphrodite changes,
    so a bad bump is a one-line revert.
 4. **Run the serde_json feature-parity check**

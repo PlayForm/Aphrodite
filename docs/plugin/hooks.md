@@ -153,12 +153,12 @@ threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cac
 
 `_extract_tool_metadata(tool_name, args, result)` extracts:
 
-| Tool           | Extracted fields                                          |
-| -------------- | ----------------------------------------------------------- |
+| Tool           | Extracted fields                                                |
+| -------------- | --------------------------------------------------------------- |
 | `read_file`    | `fn`, `ext`, `lines`, `names` (def/class/fn/struct/trait names) |
-| `search_files` | `q` (pattern), `files` (count)                              |
-| `terminal`     | `exit` (exit code), `last` (last line)                      |
-| Other tools    | Returns `None`                                              |
+| `search_files` | `q` (pattern), `files` (count)                                  |
+| `terminal`     | `exit` (exit code), `last` (last line)                          |
+| Other tools    | Returns `None`                                                  |
 
 ### Marker Type
 
@@ -232,7 +232,7 @@ Fill calculation:
   pct = 100 - (ratio_ema / 20), clamped [1..99]
 ```
 
-| Fill (`pct`) | Budget multiplier             |
+| Fill (`pct`) | Budget multiplier              |
 | ------------ | ------------------------------ |
 | < 25         | 0.25× (aggressive compression) |
 | < 50         | 0.50×                          |

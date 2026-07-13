@@ -20,10 +20,10 @@ inline-only hashes which use an `i:` prefix followed by 6+ hex characters
 (`marker::is_valid_ccr_hash` accepts `[0-9a-f]{24,}` as its lower validity
 floor, but every hash actually produced by this codebase is 40 chars).
 
-| Hash kind          | Algorithm             | Format               |
-| ------------------- | ---------------------- | --------------------- |
-| Standard content hash | BLAKE3, 40 hex chars  | `[0-9a-f]{40}`        |
-| Inline-only hash     | `i:` prefix + 6+ hex   | `i:[0-9a-f]{6,}`      |
+| Hash kind             | Algorithm            | Format           |
+| --------------------- | -------------------- | ---------------- |
+| Standard content hash | BLAKE3, 40 hex chars | `[0-9a-f]{40}`   |
+| Inline-only hash      | `i:` prefix + 6+ hex | `i:[0-9a-f]{6,}` |
 
 Every retrieval entry point (`retrieve.rs::handle_retrieve`,
 `proxy.rs::execute_tool_relay`'s `"aphrodite_retrieve"` arm, and
@@ -103,20 +103,20 @@ vocabulary: the proxy's hand-rolled `detect_content_type`
 
 ### Proxy classifier (`detect_content_type`, first-match-wins)
 
-| Type           | Detection                                                                                | Threshold                        |
-| -------------- | ----------------------------------------------------------------------------------------- | --------------------------------- |
-| `tool_output`  | Valid JSON + contains `exit_code` or `"status"`                                          | base                               |
-| `json`         | Valid JSON (starts with `{` or `[`)                                                      | base                               |
+| Type           | Detection                                                                                                                                                    | Threshold                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| `tool_output`  | Valid JSON + contains `exit_code` or `"status"`                                                                                                              | base                                 |
+| `json`         | Valid JSON (starts with `{` or `[`)                                                                                                                          | base                                 |
 | `code_rust`    | A line starts with `fn `/`pub fn `/`async fn `/`pub async fn `/`impl `/`struct `/`enum ` (or `pub` variants), AND the content contains `-> `, `&`, or `use ` | ×code multiplier (config, default 4) |
-| `code_python`  | Contains `def ` AND one of `import `/`class `/`from `/`self.`                            | ×code multiplier                   |
-| `code_go`      | Contains (`func ` or `package `) AND `import (`                                          | ×code multiplier                   |
-| `code_js`      | Contains (`function ` or `const ` or `=> `) AND (`import ` or `export `)                 | ×code multiplier                   |
-| `code`         | Generic fallback: contains `fn `, `def `, `class `, `import `, or `pub fn`                | ×code multiplier                   |
-| `error`        | First line contains `error`/`Error`/`ERROR`/`Traceback`/`panic`, or starts with `thread '` | ×8                                 |
-| `build_output` | First line starts with `Compiling `/`   Compiling `, contains `Finished`, or starts with `running `/`test ` | base (NOT halved - see below)      |
-| `linter`       | First line starts with `error[E`/`error: `/`warning[`/`warning: `, or contains `\|` + error/warning, or mentions `mypy`/`clippy`/`eslint`/`tsc ` | base (NOT halved)                  |
-| `diff`         | (see proxy.rs `detect_content_type` for the full diff/git branch)                        | ×2                                 |
-| `text`         | Fallback: none of the above matched                                                       | ×2                                 |
+| `code_python`  | Contains `def ` AND one of `import `/`class `/`from `/`self.`                                                                                                | ×code multiplier                     |
+| `code_go`      | Contains (`func ` or `package `) AND `import (`                                                                                                              | ×code multiplier                     |
+| `code_js`      | Contains (`function ` or `const ` or `=> `) AND (`import ` or `export `)                                                                                     | ×code multiplier                     |
+| `code`         | Generic fallback: contains `fn `, `def `, `class `, `import `, or `pub fn`                                                                                   | ×code multiplier                     |
+| `error`        | First line contains `error`/`Error`/`ERROR`/`Traceback`/`panic`, or starts with `thread '`                                                                   | ×8                                   |
+| `build_output` | First line starts with `Compiling `/`  Compiling`, contains `Finished`, or starts with `running `/`test `                                                    | base (NOT halved - see below)        |
+| `linter`       | First line starts with `error[E`/`error: `/`warning[`/`warning: `, or contains `\|` + error/warning, or mentions `mypy`/`clippy`/`eslint`/`tsc `             | base (NOT halved)                    |
+| `diff`         | (see proxy.rs `detect_content_type` for the full diff/git branch)                                                                                            | ×2                                   |
+| `text`         | Fallback: none of the above matched                                                                                                                          | ×2                                   |
 
 **Important correction:** `linter`, `build_output`, and `log` are explicitly
 pinned at the BASE threshold (`threshold_for` returns `base` for these three
@@ -157,11 +157,11 @@ such steps.
 `marker::ccr_marker`'s `headroom_budget` parameter, when supplied, truncates
 the preview:
 
-| Budget            | Preview Max              |
-| ----------------- | ------------------------- |
-| < 25              | 30 chars                  |
-| < 50              | 60 chars                  |
-| < 75              | 100 chars                 |
+| Budget            | Preview Max                            |
+| ----------------- | -------------------------------------- |
+| < 25              | 30 chars                               |
+| < 50              | 60 chars                               |
+| < 75              | 100 chars                              |
 | ≥ 75 or no budget | Left as supplied (no cap applied here) |
 
 This table applies to `marker::ccr_marker` specifically; the proxy pipeline's

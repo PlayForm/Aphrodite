@@ -15,9 +15,9 @@ level before it reaches the LLM context.
 ## Two-Listener Model
 
 | Listener | Port  | CCR Backend                             | Compression Threshold           | Tool Relay | Mode             |
-| -------- | ----- | ---------------------------------------- | -------------------------------- | ---------- | ----------------- |
-| Cache    | :9797 | InMemoryCcrStore (DashMap, 10K entries)  | >8KB (CACHE_COMPRESS_THRESHOLD)  | No         | ProxyMode::Cache  |
-| Token    | :9798 | SqliteCcrStore (SQLite, persistent)      | >1KB (TOKEN_COMPRESS_THRESHOLD)  | Yes        | ProxyMode::Token  |
+| -------- | ----- | --------------------------------------- | ------------------------------- | ---------- | ---------------- |
+| Cache    | :9797 | InMemoryCcrStore (DashMap, 10K entries) | >8KB (CACHE_COMPRESS_THRESHOLD) | No         | ProxyMode::Cache |
+| Token    | :9798 | SqliteCcrStore (SQLite, persistent)     | >1KB (TOKEN_COMPRESS_THRESHOLD) | Yes        | ProxyMode::Token |
 
 ## Data Flow
 
@@ -136,31 +136,31 @@ pub response_cache: Mutex<lru::LruCache<u64, Vec<u8>>>,  // 128 entries, FNV-1a 
 ## Routing Table
 
 | Route              | Method | Handler                   | Access                           |
-| ------------------ | ------ | -------------------------- | ---------------------------------- |
-| `/health`          | GET    | health_check               | Public (no loopback enforcement)   |
-| `/health/upstream` | GET    | upstream probe              | Loopback only                       |
-| `/version`         | GET    | CARGO_PKG_VERSION           | Loopback only                       |
-| `/stats`           | GET    | stats_json()                | Loopback only                       |
-| `/stats/db`        | GET    | ccr.stats_db()              | Loopback only                       |
-| `/metrics`         | GET    | Prometheus text format       | Loopback only (no auth)            |
-| `/history`         | GET    | request_history              | Loopback only                       |
-| `/retrieve`        | POST   | retrieve::handle_retrieve    | Loopback only                       |
-| `/tool/relay`      | POST   | handle_tool_relay             | Loopback only                       |
-| `/ccr/create`      | POST   | handle_ccr_create              | Loopback only                       |
-| `/ccr/list`        | GET    | handle_ccr_list                | Loopback only                       |
-| `/ccr/{hash}`      | DELETE | handle_ccr_delete               | Loopback only                       |
-| `/favicon.ico`     | GET    | 404                              | Loopback only                       |
-| `/robots.txt`      | GET    | `Disallow: /`                     | Loopback only                       |
-| `/`                | GET    | version JSON                       | Loopback only                       |
-| `/{*path}`         | ANY    | proxy_handler                       | Loopback only                       |
+| ------------------ | ------ | ------------------------- | -------------------------------- |
+| `/health`          | GET    | health_check              | Public (no loopback enforcement) |
+| `/health/upstream` | GET    | upstream probe            | Loopback only                    |
+| `/version`         | GET    | CARGO_PKG_VERSION         | Loopback only                    |
+| `/stats`           | GET    | stats_json()              | Loopback only                    |
+| `/stats/db`        | GET    | ccr.stats_db()            | Loopback only                    |
+| `/metrics`         | GET    | Prometheus text format    | Loopback only (no auth)          |
+| `/history`         | GET    | request_history           | Loopback only                    |
+| `/retrieve`        | POST   | retrieve::handle_retrieve | Loopback only                    |
+| `/tool/relay`      | POST   | handle_tool_relay         | Loopback only                    |
+| `/ccr/create`      | POST   | handle_ccr_create         | Loopback only                    |
+| `/ccr/list`        | GET    | handle_ccr_list           | Loopback only                    |
+| `/ccr/{hash}`      | DELETE | handle_ccr_delete         | Loopback only                    |
+| `/favicon.ico`     | GET    | 404                       | Loopback only                    |
+| `/robots.txt`      | GET    | `Disallow: /`             | Loopback only                    |
+| `/`                | GET    | version JSON              | Loopback only                    |
+| `/{*path}`         | ANY    | proxy_handler             | Loopback only                    |
 
 ## Middleware Stack
 
 | Layer                | Config                                                             |
-| --------------------- | -------------------------------------------------------------------- |
-| CORS                  | `CorsLayer::permissive()`                                             |
-| Body limit            | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                            |
-| Loopback enforcement  | `middleware::from_fn(loopback_only)` - all routes except `/health`     |
+| -------------------- | ------------------------------------------------------------------ |
+| CORS                 | `CorsLayer::permissive()`                                          |
+| Body limit           | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                        |
+| Loopback enforcement | `middleware::from_fn(loopback_only)` - all routes except `/health` |
 
 ## HTTP Client Config
 

@@ -134,11 +134,11 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 Every doc in this tree follows one style, the same one this page and the
 root `README.md` use:
 
-| Rule | What it means |
-| --- | --- |
-| Explain, then detail | Open with one or two plain sentences on what the thing is and why it exists, then drop into tables/code |
-| Tables over prose | Fields, flags, options, comparisons - anything with more than two rows of structured data - are a table, not a bulleted wall of text |
-| No file/line citations | Docs describe behavior directly; they don't cite exact source files or line numbers as proof - accuracy is a writing standard, not a footnote |
-| No placeholder content | If a documented setting or feature isn't confirmed to do anything, the doc says so plainly instead of presenting it as working |
-| Minimal external links | Link out only when the reader needs to click through to do something (download a release, read an upstream project's own docs) - not for attribution or "see also" padding |
-| Roadmap ideas are labeled | Forward-looking or unimplemented designs (see [Centers](centers.md)) say clearly which parts are shipped and which are sketches |
+| Rule                      | What it means                                                                                                                                                              |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Explain, then detail      | Open with one or two plain sentences on what the thing is and why it exists, then drop into tables/code                                                                    |
+| Tables over prose         | Fields, flags, options, comparisons - anything with more than two rows of structured data - are a table, not a bulleted wall of text                                       |
+| No file/line citations    | Docs describe behavior directly; they don't cite exact source files or line numbers as proof - accuracy is a writing standard, not a footnote                              |
+| No placeholder content    | If a documented setting or feature isn't confirmed to do anything, the doc says so plainly instead of presenting it as working                                             |
+| Minimal external links    | Link out only when the reader needs to click through to do something (download a release, read an upstream project's own docs) - not for attribution or "see also" padding |
+| Roadmap ideas are labeled | Forward-looking or unimplemented designs (see [Centers](centers.md)) say clearly which parts are shipped and which are sketches                                            |

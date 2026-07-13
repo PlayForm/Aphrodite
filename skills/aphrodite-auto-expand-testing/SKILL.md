@@ -18,7 +18,7 @@ appear raw or get auto-resolved.
 `_core/config.py`, `_engine.py`) describe the pre-Rust-port Python plugin
 layout. The current plugin (`plugins/aphrodite/`) is a thin ctypes loader -
 all compression/engine/auto-expand logic now lives in the Rust dylib
-(`crates/aphrodite/src/`, `crates/aphrodite-hermes/src/`). The *mechanism*
+(`crates/aphrodite/src/`, `crates/aphrodite-hermes/src/`). The _mechanism_
 described here (TOML `auto_expand_limit`, `APHRODITE_AUTO_EXPAND` env var,
 the pre_llm hook resolving markers below the limit) still applies
 conceptually, but the specific Python file/line citations no longer exist

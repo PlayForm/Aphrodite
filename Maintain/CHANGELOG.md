@@ -1,5 +1,67 @@
 # Changelog
 
+## v1.2.5 — macOS Gatekeeper Fix (2026-07-13)
+
+### Fixed
+
+- **`hermes --tui` SIGKILL on macOS** — two root causes fixed in `aphrodite setup`:
+  1. Dylib install names pointed to `target/release/deps/` (stale build paths). macOS
+     dynamic linker killed the process when loading from a copied location. Fixed by
+     running `install_name_tool -id @rpath/<name>.dylib` after every dylib copy.
+  2. Extended attributes (code signature, quarantine) preserved by `fs::copy`.
+     macOS Gatekeeper validated these at the source path and killed the process
+     when run from the install location. Fixed by running `xattr -c` after every
+     binary and dylib copy.
+
+- **Re-run install without `--force`**: `aphrodite setup` no longer blocks when
+  the target binary already exists. Binaries and dylibs are always overwritten;
+  config is preserved unless `--force` is passed.
+
+- **Dylibs always overwritten on re-run**: removed `dest.exists()` skip in
+  `copy_dylibs()` — stale dylibs with wrong install names were never replaced.
+
+## v1.2.3 — Conversational Directives System (2026-07-13)
+
+### Added
+
+- **Conversational Directives System** — lightweight `.md`-based behavioral context
+  injected into the LLM via `pre_llm_call`. Directives are short instruction files
+  that live between file compression and the LLM's context — never compressed,
+  never needing retrieval.
+  - `directives/*.md` — 4 built-in directives: `focus`, `explore`, `cleanup`, `foresight`
+  - `[directives]` TOML section with `active = [...]` 
+  - `aphrodite_directive(action, name)` C-ABI tool — `list`, `swap`, `add`, `remove`, `reset`
+  - Configurable per user/profile; swappable mid-conversation
+
+### Fixed
+
+- **CRLF line endings** in `download.sh`, `plugin.yaml`, `BINARY_VERSION` —
+  caused bash syntax errors on macOS/Linux
+
+### Refactored (accumulated from pre-release commits)
+
+- Feature-gated proxy modules: `#[cfg(feature = "proxy")]` on `config`, `proxy`,
+  `retrieve`, `setup` — cdylib no longer links axum/tokio/reqwest unnecessarily
+- Removed 7 unused dependencies (tower, tracing-appender, futures-util, http,
+  http-body-util, hyper, zstd)
+- Deleted `center.rs` (zero callers), `generate_summary` (dead code)
+- Extracted `preview.rs` module from lib.rs: `detect_type`, `build_preview`
+- Replaced inline catalog JSON with `catalog::build_catalog`
+- Renamed proxy duplicate functions: `proxy_detect_content_type`,
+  `proxy_build_preview`, `proxy_format_ccr_output`
+- Converted `SetupError` to `#[derive(thiserror::Error)]`
+- **SSE streaming** — `text/event-stream` responses forwarded chunk-by-chunk;
+  64 MB buffer cap for non-streaming bodies
+- `.githooks/pre-commit` with ggshield secret scanning
+- `Maintain/scripts/ops/check-no-runtime-state.sh` repo-guard script
+
+### Docs
+
+- Fixed stale numeric claims (145-line, 14 hooks, 3 levels → 5)
+- Status lines added to `.hermes/plans/` design documents
+- Prefetch wording updated to reflect synchronous semantics
+- Skill metadata cleanup: removed v0.8.43 markers, 6→28 content types
+
 ## v1.2.2 - crates.io Publish + Doc Sync (2026-07-13)
 
 ### Published
@@ -14,18 +76,18 @@
 
 ### Benchmarks (headroom-core, release profile, Apple M2 Max)
 
-| Benchmark | Result |
-|:----------|:-------|
-| Auth classify (empty) | 40.7 ns |
-| Auth classify (payg) | 80.4 ns |
-| Auth classify (oauth_jwt) | 122.8 ns |
-| Auth classify (subscription) | 50.5 ns |
-| CCR put (ST, new keys) | 453 ns |
-| CCR put (ST, overwrite) | 42.9 ns |
-| CCR get (ST, hit) | 119.4 ns |
-| CCR get (ST, miss) | 38.3 ns |
-| CCR mixed MT (8t, Dashmap) | 229 µs |
-| CCR mixed MT (8t, Mutex) | 1.15 ms |
+| Benchmark                      | Result      |
+| :----------------------------- | :---------- |
+| Auth classify (empty)          | 40.7 ns     |
+| Auth classify (payg)           | 80.4 ns     |
+| Auth classify (oauth_jwt)      | 122.8 ns    |
+| Auth classify (subscription)   | 50.5 ns     |
+| CCR put (ST, new keys)         | 453 ns      |
+| CCR put (ST, overwrite)        | 42.9 ns     |
+| CCR get (ST, hit)              | 119.4 ns    |
+| CCR get (ST, miss)             | 38.3 ns     |
+| CCR mixed MT (8t, Dashmap)     | 229 µs      |
+| CCR mixed MT (8t, Mutex)       | 1.15 ms     |
 | Tokenizer (small/medium/large) | 32–50 MiB/s |
 
 ### Verified

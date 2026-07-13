@@ -18,20 +18,20 @@ or reverse-proxy auth layer recommended for production.
 ### Request Counters
 
 | Metric                          | Type    | Labels               | Description                          |
-| ---------------------------------- | --------- | ----------------------- | ---------------------------------------- |
+| ------------------------------- | ------- | -------------------- | ------------------------------------ |
 | `aphrodite_requests_total`      | counter | `mode` (cache/token) | Total requests received              |
 | `aphrodite_requests_compressed` | counter | `mode` (cache/token) | Requests that had content compressed |
 
 ### Token Savings
 
 | Metric                   | Type    | Labels | Description                        |
-| --------------------------- | --------- | -------- | -------------------------------------- |
+| ------------------------ | ------- | ------ | ---------------------------------- |
 | `aphrodite_tokens_saved` | counter | -      | Total tokens saved via compression |
 
 ### CCR Operations
 
 | Metric                        | Type    | Labels | Description                  |
-| -------------------------------- | --------- | -------- | -------------------------------- |
+| ----------------------------- | ------- | ------ | ---------------------------- |
 | `aphrodite_ccr_hits`          | counter | -      | CCR cache hits               |
 | `aphrodite_ccr_misses`        | counter | -      | CCR cache misses             |
 | `aphrodite_ccr_created`       | counter | -      | New CCR entries created      |
@@ -41,7 +41,7 @@ or reverse-proxy auth layer recommended for production.
 ### Tool Relay
 
 | Metric                         | Type    | Labels | Description                  |
-| --------------------------------- | --------- | -------- | -------------------------------- |
+| ------------------------------ | ------- | ------ | ---------------------------- |
 | `aphrodite_tool_relay_calls`   | counter | -      | Total tool relay invocations |
 | `aphrodite_tool_relay_success` | counter | -      | Successful tool executions   |
 | `aphrodite_tool_relay_failure` | counter | -      | Failed tool executions       |
@@ -49,21 +49,21 @@ or reverse-proxy auth layer recommended for production.
 ### Response Cache
 
 | Metric                   | Type    | Labels | Description               |
-| --------------------------- | --------- | -------- | --------------------------- |
+| ------------------------ | ------- | ------ | ------------------------- |
 | `aphrodite_cache_hits`   | counter | -      | LLM response cache hits   |
 | `aphrodite_cache_misses` | counter | -      | LLM response cache misses |
 
 ### Inline CCR
 
 | Metric                        | Type    | Labels | Description            |
-| -------------------------------- | --------- | -------- | ------------------------ |
+| ----------------------------- | ------- | ------ | ---------------------- |
 | `aphrodite_inline_ccr_hits`   | counter | -      | Inline LruCache hits   |
 | `aphrodite_inline_ccr_misses` | counter | -      | Inline LruCache misses |
 
 ### Notification Callbacks
 
 | Metric                     | Type    | Labels | Description                       |
-| ----------------------------- | --------- | -------- | ------------------------------------ |
+| -------------------------- | ------- | ------ | --------------------------------- |
 | `aphrodite_notify_success` | counter | -      | Successful callback notifications |
 | `aphrodite_notify_failure` | counter | -      | Failed callback notifications     |
 
@@ -72,21 +72,21 @@ See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 ### Upstream Errors
 
 | Metric                              | Type    | Labels           | Description                   |
-| --------------------------------------- | --------- | ------------------ | ---------------------------------- |
+| ----------------------------------- | ------- | ---------------- | ----------------------------- |
 | `aphrodite_upstream_errors_total`   | counter | `code` (4xx/5xx) | Upstream HTTP error responses |
 | `aphrodite_upstream_timeouts_total` | counter | -                | Upstream connection timeouts  |
 
 ### Body Bytes
 
 | Metric                                | Type    | Labels | Description                       |
-| ------------------------------------------ | --------- | -------- | -------------------------------------- |
+| ------------------------------------- | ------- | ------ | --------------------------------- |
 | `aphrodite_request_body_bytes_total`  | counter | -      | Total request body bytes received |
 | `aphrodite_response_body_bytes_total` | counter | -      | Total response body bytes sent    |
 
 ### Latency
 
 | Metric                                   | Type      | Labels                         | Description                             |
-| --------------------------------------------- | ----------- | --------------------------------- | ------------------------------------------ |
+| ---------------------------------------- | --------- | ------------------------------ | --------------------------------------- |
 | `aphrodite_latency_seconds`              | histogram | `le` (0.001/0.01/0.1/1.0/10.0) | End-to-end request latency distribution |
 | `aphrodite_latency_seconds_count`        | counter   | -                              | Total latency observations              |
 | `aphrodite_latency_seconds_sum`          | counter   | -                              | Total latency in seconds                |
@@ -95,7 +95,7 @@ See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 ### Compression Ratio
 
 | Metric                            | Type  | Labels | Description                                     |
-| -------------------------------------- | ------- | -------- | ---------------------------------------------------- |
+| --------------------------------- | ----- | ------ | ----------------------------------------------- |
 | `aphrodite_compression_ratio_ema` | gauge | -      | Exponential moving average of compression ratio |
 
 ## Latency Bucket Boundaries
@@ -103,7 +103,7 @@ See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 Latency is tracked in 5 fixed buckets, each holding a cumulative count:
 
 | Bucket Index | le value | Range        |
-| -------------- | ---------- | -------------- |
+| ------------ | -------- | ------------ |
 | 0            | 0.001    | < 1ms        |
 | 1            | 0.01     | 1ms - 10ms   |
 | 2            | 0.1      | 10ms - 100ms |

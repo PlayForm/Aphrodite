@@ -197,20 +197,20 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 
 ## Tools 🔧
 
-| Tool                   | Description                                          |
-| :--------------------- | :--------------------------------------------------- |
-| `aphrodite_retrieve`   | Resolve `<<<CCR:hash\|type>>>` markers                |
-| `aphrodite_compress`   | Compress content via CCR with type hint               |
-| `aphrodite_stats`      | Proxy health, engine status, inline store size        |
-| `aphrodite_rebuild`    | Rebuild binary, kill proxies, restart                 |
-| `aphrodite_files`      | Tracked file references, grouped by tool              |
-| `aphrodite_diff`       | Conversation turn history with summaries              |
-| `aphrodite_search`     | Search CCR store by keyword or type                   |
-| `aphrodite_test`       | Smoke test suite: quick (1 check), full (3 checks)    |
-| `aphrodite_catalog`    | Full CCR catalog with hashes, types, sizes, previews  |
-| `aphrodite_reclassify` | Retroactive metadata enrichment for unclassified CCR  |
-| `aphrodite_prefetch`   | Read + compress files on demand; markers returned inline |
-| `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors      |
+| Tool                        | Description                                              |
+| :-------------------------- | :------------------------------------------------------- |
+| `aphrodite_retrieve`        | Resolve `<<<CCR:hash\|type>>>` markers                   |
+| `aphrodite_compress`        | Compress content via CCR with type hint                  |
+| `aphrodite_stats`           | Proxy health, engine status, inline store size           |
+| `aphrodite_rebuild`         | Rebuild binary, kill proxies, restart                    |
+| `aphrodite_files`           | Tracked file references, grouped by tool                 |
+| `aphrodite_diff`            | Conversation turn history with summaries                 |
+| `aphrodite_search`          | Search CCR store by keyword or type                      |
+| `aphrodite_test`            | Smoke test suite: quick (1 check), full (3 checks)       |
+| `aphrodite_catalog`         | Full CCR catalog with hashes, types, sizes, previews     |
+| `aphrodite_reclassify`      | Retroactive metadata enrichment for unclassified CCR     |
+| `aphrodite_prefetch`        | Read + compress files on demand; markers returned inline |
+| `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors           |
 
 ---
 
@@ -331,19 +331,19 @@ for the full, accurate breakdown of what's wired where.
 
 ## Performance ⚡
 
-| Size   | Text  |  Code  |  JSON  |   Ratio   |
-| :----- | :---: | :----: | :----: | :-------: |
-| 1 KB   | 0.4ms | 0.3ms  | 0.5ms  |    26×    |
-| 10 KB  | 0.6ms | 0.7ms  | 3.5ms  |   256×    |
-| 50 KB  | 0.7ms | 0.6ms  | 1.0ms  |  1,280×   |
-| 100 KB | 1.1ms | 1.0ms  | 1.1ms  |  2,560×   |
-| 500 KB | 2.1ms | 7.9ms  | 2.8ms  | 12,800×   |
+| Size   | Text  | Code  | JSON  |  Ratio  |
+| :----- | :---: | :---: | :---: | :-----: |
+| 1 KB   | 0.4ms | 0.3ms | 0.5ms |   26×   |
+| 10 KB  | 0.6ms | 0.7ms | 3.5ms |  256×   |
+| 50 KB  | 0.7ms | 0.6ms | 1.0ms | 1,280×  |
+| 100 KB | 1.1ms | 1.0ms | 1.1ms | 2,560×  |
+| 500 KB | 2.1ms | 7.9ms | 2.8ms | 12,800× |
 
-| Metric                    |  Value   |
-| :------------------------ | :------: |
-| Compression latency (avg) |  1.6 ms  |
+| Metric                    |   Value   |
+| :------------------------ | :-------: |
+| Compression latency (avg) |  1.6 ms   |
 | Classification latency    | 40–123 ns |
-| Preview generation        | <0.05 ms |
+| Preview generation        | <0.05 ms  |
 
 Benchmarks (`cargo run --release --example bench_0N_*`, see
 `Maintain/examples/`) and the in-process smoke suite (`aphrodite_test`, 3

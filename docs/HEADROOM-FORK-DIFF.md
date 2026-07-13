@@ -26,7 +26,7 @@ own `agent-evals` extraction into a standalone repo, not something this fork did
 
 This was a standard `git merge upstream/main` - real, resolved conflicts in 37 files,
 plus (see below) a number of **silent regressions** that git's 3-way merge introduced
-in files with *no* conflict markers at all. All were found via systematic post-merge
+in files with _no_ conflict markers at all. All were found via systematic post-merge
 symbol-diffing against upstream and fixed before this state was considered stable.
 
 ### What Came In From Upstream (highlights)
@@ -34,7 +34,7 @@ symbol-diffing against upstream and fixed before this state was considered stabl
 - **CCR defaults**: `CompressionStore`/`CCRConfig` TTL raised 300s → 1800s (session-scale,
   matches the 30-minute language already in the miss message); SQLite is now the
   **default** CCR backend (was in-memory) - restart-safe across proxy worker processes.
-- **TLS hardening**: `NODE_EXTRA_CA_CERTS` now builds an *additive* trust store (system
+- **TLS hardening**: `NODE_EXTRA_CA_CERTS` now builds an _additive_ trust store (system
   roots + the extra cert) instead of replacing the trust store outright (upstream #998);
   new `HEADROOM_TLS_STRICT` toggle for corporate MITM/TLS-inspection environments running
   Python 3.13 + OpenSSL 3.x strict mode.
@@ -79,7 +79,7 @@ someone wants to shrink the Python package's dependency footprint again.
 
 ### Silent Merge Regressions Found & Fixed
 
-Git's 3-way merge auto-resolved a number of non-conflicting hunks *incorrectly* -
+Git's 3-way merge auto-resolved a number of non-conflicting hunks _incorrectly_ -
 plausible-looking code with the right function names but stale or missing bodies.
 None of these had a conflict marker; all were caught by comparing the resolved file's
 symbol table and, where that wasn't enough, its full body, against upstream's intended
@@ -88,7 +88,7 @@ version. Categorized:
 - **Entirely missing files** a resolved file still imported: `headroom/cache/backends/sqlite.py`,
   plus ~68 other new-upstream files (langchain/agno subpackages, `headroom/audit/`,
   `headroom/cli/{doctor,update,audit,output_savings}.py`, `headroom/proxy/{output_savings,
-  output_shaper,verbosity_controller,cc_switch_reconciler,handlers/bedrock}.py`, live-test
+output_shaper,verbosity_controller,cc_switch_reconciler,handlers/bedrock}.py`, live-test
   fixtures, and more) that were silently dropped by the merge and never showed up as
   conflicts at all.
 - **Dropped functions/constants still referenced elsewhere**: `CCR_MISS_MESSAGE`,
@@ -175,10 +175,10 @@ All commits are on the `Current` branch. Oldest first.
 ### Phase 2: Hardening (2026-06-16)
 
 | Commit     | Date   | Description                                                                                                                    | Impact              |
-| ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
 | `9f9a3253` | Jun 15 | fix: add DeepSeek chat/r1/v4/v4-pro tokenizer mappings                                                                         | Rust                |
 | `a15e6c3b` | Jun 15 | fix: preserve `x-headroom-workspace` header for CCR cross-project scoping                                                      | proxy               |
-| `76e448b0` | Jun 15 | fix: raise relevance threshold 0.3->0.5 + add coding stop words                                                                 | Rust                |
+| `76e448b0` | Jun 15 | fix: raise relevance threshold 0.3->0.5 + add coding stop words                                                                | Rust                |
 | `57157225` | Jun 15 | perf: replace `list.pop(0)` with `deque.popleft()` in context_tracker LRU                                                      | Python              |
 | `a1396ff3` | Jun 16 | fix: CCR regex, loopback exempt, threshold invert, headers passthrough, savings accumulate, rate limit exempt, image auto mode | +235/-75 (9 files)  |
 | `e1afeca2` | Jun 16 | fix: CCR backends - in_memory LRU, sqlite spawn_blocking, redis pipeline                                                       | +37/-25 (5 files)   |
@@ -189,11 +189,11 @@ All commits are on the `Current` branch. Oldest first.
 
 ### Phase 3: Production Polish (2026-06-17)
 
-| Commit     | Date   | Description                                                                                  | Impact          |
-| ---------- | ------ | ---------------------------------------------------------------------------------------------- | --------------- |
-| `1dc3dae0` | Jun 17 | fix: SQLite overflow clamps + in-memory evict iteration cap                                  | +6/-7 (2 files) |
+| Commit     | Date   | Description                                                                                   | Impact          |
+| ---------- | ------ | --------------------------------------------------------------------------------------------- | --------------- |
+| `1dc3dae0` | Jun 17 | fix: SQLite overflow clamps + in-memory evict iteration cap                                   | +6/-7 (2 files) |
 | `536ce886` | Jun 17 | **fix: compute_key 24->40 hex chars** - safe for persistent backends with millions of entries | +7/-9           |
-| `8823704a` | Jun 16 | ci: bump dtolnay/rust-toolchain                                                              | CI              |
+| `8823704a` | Jun 16 | ci: bump dtolnay/rust-toolchain                                                               | CI              |
 | `483a7681` | Jun 16 | ci: bump codecov/codecov-action 4->7                                                          | CI              |
 | `8399a567` | Jun 16 | ci: bump actions/github-script 7->9                                                           | CI              |
 | `21fa2554` | Jun 16 | ci: bump aiohttp 3.14.0->3.14.1                                                               | deps            |
@@ -209,7 +209,7 @@ All commits are on the `Current` branch. Oldest first.
 ### Phase 4: Merge / Finalize (2026-06-17-18)
 
 | Commit     | Date   | Description                               |
-| ---------- | ------ | ------------------------------------------ |
+| ---------- | ------ | ----------------------------------------- |
 | `f5d9fb04` | Jun 17 | Merge dependabot PR #7 (python-multipart) |
 | `a0fc3a36` | Jun 17 | Merge dependabot PR #6 (starlette)        |
 | `1e5c5f31` | Jun 17 | Merge dependabot PR #5 (cryptography)     |
@@ -236,7 +236,7 @@ Three interstitial "save" commits (`702bdfa5`, `6ee1747f`, `c97f135d`, `50644506
 ### Integration Rip-Outs
 
 | Module                                      | Files   | Lines  | Reason                                                |
-| -------------------------------------------- | ------- | ------ | ------------------------------------------------------ |
+| ------------------------------------------- | ------- | ------ | ----------------------------------------------------- |
 | `headroom/integrations/langchain/`          | 7 files | ~3,500 | Aphrodite is Hermes-only - no langchain/orchestration |
 | `headroom/integrations/agno/`               | 4 files | ~1,400 | Same                                                  |
 | `headroom/integrations/asgi.py`             | 1 file  | 239    | No ASGI/FastAPI wrapping needed                       |
@@ -247,8 +247,8 @@ Three interstitial "save" commits (`702bdfa5`, `6ee1747f`, `c97f135d`, `50644506
 
 ### Removed Subsystems
 
-| File                                     | Lines   | Role                                                                             |
-| ----------------------------------------- | ------- | --------------------------------------------------------------------------------- |
+| File                                     | Lines   | Role                                                                           |
+| ---------------------------------------- | ------- | ------------------------------------------------------------------------------ |
 | `headroom/proxy/output_shaper.py`        | 360     | Intelligent output reformatting - removed in favor of Aphrodite's own pipeline |
 | `headroom/proxy/output_savings.py`       | 501     | Cost/savings tracking - Aphrodite has its own Prometheus metrics               |
 | `headroom/proxy/verbosity_controller.py` | 108     | Verbosity learning - removed                                                   |
@@ -260,11 +260,11 @@ Three interstitial "save" commits (`702bdfa5`, `6ee1747f`, `c97f135d`, `50644506
 | `headroom/cli/update.py`                 | 341     | Auto-update checker                                                            |
 | `headroom/cli/audit.py`                  | 107     | Audit CLI                                                                      |
 | `headroom/cli/output_savings.py`         | 61      | Output savings CLI                                                             |
-| `headroom/audit/`                        | 4 files | 762    | Audit modules (reads, codex, maturation)                                        |
+| `headroom/audit/`                        | 4 files | 762                                                                            | Audit modules (reads, codex, maturation) |
 | `headroom/cache/backends/sqlite.py`      | 275     | Python SQLite backend - Rust version used instead                              |
 | `headroom/update_check.py`               | 303     | Update notification                                                            |
 | `headroom/providers/codex/threads.py`    | 97      | Codex thread management                                                        |
-| `headroom/providers/mistral_vibe/`       | 2 files | 59     | Mistral Vibe runtime                                                            |
+| `headroom/providers/mistral_vibe/`       | 2 files | 59                                                                             | Mistral Vibe runtime                     |
 | `headroom/perf/analyzer.py`              | 189     | Performance analyzer                                                           |
 
 > **Note**: every file in this table was restored by the 2026-07-11 merge (above),
@@ -277,7 +277,7 @@ Three interstitial "save" commits (`702bdfa5`, `6ee1747f`, `c97f135d`, `50644506
 ### Removed Docs
 
 | File                                                 | Lines |
-| ------------------------------------------------------ | ----- |
+| ---------------------------------------------------- | ----- |
 | `docs/content/docs/ci-cd-flows.mdx`                  | 242   |
 | `docs/content/docs/claude-code-vertex.mdx`           | 117   |
 | `docs/lib/cn.ts`                                     | 6     |
@@ -306,7 +306,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 ### Hermes Demo Suite (`examples/hermes_demo/`)
 
 | File                                       | Lines | Purpose                                     |
-| -------------------------------------------- | ----- | ---------------------------------------------- |
+| ------------------------------------------ | ----- | ------------------------------------------- |
 | `hermes_via_proxy_demo.py`                 | 460   | End-to-end Aphrodite proxy integration demo |
 | `hermes_agent_eval.py`                     | 396   | Agent evaluation harness                    |
 | `test_hermes_ccr.py`                       | 298   | CCR unit tests                              |
@@ -320,7 +320,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 ### Other Additions
 
 | File                          | Lines | Purpose                                  |
-| ------------------------------- | ----- | ------------------------------------------- |
+| ----------------------------- | ----- | ---------------------------------------- |
 | `examples/recommendations.md` | 369   | Hermes agent integration recommendations |
 
 ---
@@ -331,24 +331,24 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 
 ### Rust Core (`crates/headroom-core/`) - 28 files
 
-| Area                   | Change Summary                                                                                                     |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Area                   | Change Summary                                                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **CCR hash**           | Length 24->40 hex chars (collision safety at scale). Algorithm remains BLAKE3. Python uses SHA-256 independently. |
-| **CCR backends**       | Poison-tolerant locks, debounced purge, queue compaction; in-memory LRU, SQLite spawn_blocking, redis pipeline   |
-| **SQLite**             | Overflow clamps, evict iteration caps                                                                            |
-| **Compression policy** | Coding-tuned defaults: looser lossy caps, higher volatile thresholds                                             |
+| **CCR backends**       | Poison-tolerant locks, debounced purge, queue compaction; in-memory LRU, SQLite spawn_blocking, redis pipeline    |
+| **SQLite**             | Overflow clamps, evict iteration caps                                                                             |
+| **Compression policy** | Coding-tuned defaults: looser lossy caps, higher volatile thresholds                                              |
 | **Relevance**          | Threshold 0.3->0.5, coding stop words added                                                                       |
-| **Live zone**          | Major rewrite (149 lines changed) - anthropic + openai + responses compression hooks                             |
-| **Smart crusher**      | Compaction classifier, formatter, walker, config, crusher, hashing - all tuned                                   |
-| **Search compressor**  | 33 lines changed                                                                                                 |
-| **Tokenizers**         | DeepSeek chat/r1/v4/v4-pro mappings added                                                                        |
-| **Build**              | sha2 0.11 hex format fix (LowerHex removed from Array)                                                           |
+| **Live zone**          | Major rewrite (149 lines changed) - anthropic + openai + responses compression hooks                              |
+| **Smart crusher**      | Compaction classifier, formatter, walker, config, crusher, hashing - all tuned                                    |
+| **Search compressor**  | 33 lines changed                                                                                                  |
+| **Tokenizers**         | DeepSeek chat/r1/v4/v4-pro mappings added                                                                         |
+| **Build**              | sha2 0.11 hex format fix (LowerHex removed from Array)                                                            |
 
 ### Rust Proxy (`crates/headroom-proxy/`) - 13 files
 
-| Area                    | Change Summary                                                                                                                      |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Bedrock**             | invoke.rs (186 lines changed), eventstream (20), streaming (98) - rewrote Python->Rust                                             |
+| Area                    | Change Summary                                                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Bedrock**             | invoke.rs (186 lines changed), eventstream (20), streaming (98) - rewrote Python->Rust                                            |
 | **Cache stabilization** | Anthropic cache control, drift detector, openai cache key, volatile detector - all tuned                                          |
 | **SSE**                 | Anthropic + OpenAI responses + framing - 38 lines changed                                                                         |
 | **Vertex**              | Envelope, raw_predict - 38 lines changed                                                                                          |
@@ -357,8 +357,8 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 
 ### Python (`headroom/`) - ~40 files
 
-| Area                    | Change Summary                                                                |
-| ------------------------- | ---------------------------------------------------------------------------------- |
+| Area                    | Change Summary                                                              |
+| ----------------------- | --------------------------------------------------------------------------- |
 | **`wrap.py`**           | -498 lines: simplified agent wrapping (removed agno, langchain, asgi paths) |
 | **`content_router.py`** | -664 lines: simplified routing                                              |
 | **`server.py`**         | -198 lines: stripped integration hooks                                      |
@@ -366,24 +366,24 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 | **`install.sh`**        | -98 lines: macOS LaunchAgent rewritten                                      |
 | **`dashboard.html`**    | -344 lines: PlayForm branding                                               |
 | **`code_handler.py`**   | -109 lines: simplified                                                      |
-| **Context tracker**     | `list.pop(0)->deque.popleft()` perf fix                                      |
+| **Context tracker**     | `list.pop(0)->deque.popleft()` perf fix                                     |
 
 ### Configuration & Build
 
-| File             | Change                                                       |
-| ------------------ | --------------------------------------------------------------- |
-| `pyproject.toml` | -368 lines: removed liteLLM, langchain, agno deps            |
-| `Cargo.toml`     | -54 lines: removed unused features                           |
+| File             | Change                                                     |
+| ---------------- | ---------------------------------------------------------- |
+| `pyproject.toml` | -368 lines: removed liteLLM, langchain, agno deps          |
+| `Cargo.toml`     | -54 lines: removed unused features                         |
 | `Cargo.lock`     | Deleted entirely (-5,557 lines) - regenerated from scratch |
-| `Dockerfile`     | -15 lines                                                    |
-| `deny.toml`      | -24 lines                                                    |
-| `.gitignore`     | Updated                                                      |
-| `uv.lock`        | Removed                                                      |
+| `Dockerfile`     | -15 lines                                                  |
+| `deny.toml`      | -24 lines                                                  |
+| `.gitignore`     | Updated                                                    |
+| `uv.lock`        | Removed                                                    |
 
 ### CI / Workflows
 
 | File                                       | Change    |
-| --------------------------------------------- | ----------- |
+| ------------------------------------------ | --------- |
 | `.github/workflows/ci.yml`                 | -16 lines |
 | `.github/workflows/docs.yml`               | -37 lines |
 | `.github/workflows/install-native-e2e.yml` | -37 lines |
@@ -394,7 +394,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 ### Docs & Release
 
 | File                                  | Change     |
-| ---------------------------------------- | ------------ |
+| ------------------------------------- | ---------- |
 | `docs/content/docs/releases.mdx`      | -448 lines |
 | `docs/content/docs/configuration.mdx` | -18 lines  |
 | `docs/content/docs/proxy.mdx`         | -22 lines  |
@@ -407,14 +407,14 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 
 ### Tests
 
-| Area                                        | Files | Change                           |
-| ---------------------------------------------- | ----- | ----------------------------------- |
-| `tests/test_proxy_dashboard_stats_cache.py` | 1     | -93 lines                        |
-| `tests/test_proxy_scalability.py`           | 1     | -30 lines                        |
-| `tests/test_cli/test_wrap_copilot.py`       | 1     | -39 lines                        |
-| `tests/test_provider_proxy_routes.py`       | 1     | -68 lines                        |
+| Area                                        | Files | Change                         |
+| ------------------------------------------- | ----- | ------------------------------ |
+| `tests/test_proxy_dashboard_stats_cache.py` | 1     | -93 lines                      |
+| `tests/test_proxy_scalability.py`           | 1     | -30 lines                      |
+| `tests/test_cli/test_wrap_copilot.py`       | 1     | -39 lines                      |
+| `tests/test_provider_proxy_routes.py`       | 1     | -68 lines                      |
 | `tests/test_auth_mode.rs`                   | 1     | +145/-0 (new regression tests) |
-| Various                                     | ~20   | Minor adjustments                |
+| Various                                     | ~20   | Minor adjustments              |
 
 ---
 
@@ -423,7 +423,7 @@ All tests for removed subsystems: `test_audit_*`, `test_output_savings*`, `test_
 Where the changes concentrate (by `git diff --dirstat`):
 
 | Directory                                            | % of Changes |
-| ------------------------------------------------------- | --------------- |
+| ---------------------------------------------------- | ------------ |
 | `tests/`                                             | 13.4%        |
 | `headroom/proxy/`                                    | 5.4%         |
 | `crates/headroom-core/src/transforms/`               | 2.8%         |
@@ -445,21 +445,21 @@ The PlayForm fork transforms Headroom from a **general-purpose LLM proxy** (supp
 langchain, agno, asgi, liteLLM, Claude Code, Copilot, Cursor, aider, etc.) into a
 **focused Hermes Agent compression engine** - the core that Aphrodite extends.
 
-| Axis                | Stock Headroom | PlayForm Fork                                                                                            |
-| ---------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------- |
-| Integration surface | 7+ frameworks  | Hermes-focused (langchain/agno present again after 2026-07-11 merge, unused by Aphrodite itself)         |
-| Python lines        | ~35,000        | ~11,000 pre-merge; grew back toward upstream after the 2026-07-11 sync (see above)                        |
+| Axis                | Stock Headroom | PlayForm Fork                                                                                           |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------- |
+| Integration surface | 7+ frameworks  | Hermes-focused (langchain/agno present again after 2026-07-11 merge, unused by Aphrodite itself)        |
+| Python lines        | ~35,000        | ~11,000 pre-merge; grew back toward upstream after the 2026-07-11 sync (see above)                      |
 | Hash algorithm      | BLAKE3         | BLAKE3 (length 24->40 hex). Python side uses SHA-256 - consistent internally, differs across languages. |
-| Hash length         | 24 hex chars   | 40 hex chars                                                                                             |
-| CCR backends        | Basic          | Poison-tolerant, debounced, pipelined; SQLite is now the default (upstream, 2026-07-11)                  |
-| Proxy modes         | Single         | Dual (cache :9797 + token :9798 via TOML)                                                                |
-| Compression policy  | Generic        | Coding-tuned (looser lossy, higher volatile)                                                             |
-| Relevance           | 0.3 threshold  | 0.5 + coding stop words                                                                                  |
-| Tokenizers          | Standard       | + DeepSeek v4 family                                                                                     |
-| Bedrock             | Python handler | Rust rewrite in `headroom-proxy`; Python `handlers/bedrock.py` also present again (upstream)             |
-| Branding            | Stock          | PlayForm identity                                                                                        |
-| Test suite          | Full upstream  | ~8,500 tests as of 2026-07-11 (grew back toward upstream's full suite after the sync)                     |
-| CI                  | Full matrix    | Simplified (no langchain/agno/litellm builds)                                                            |
+| Hash length         | 24 hex chars   | 40 hex chars                                                                                            |
+| CCR backends        | Basic          | Poison-tolerant, debounced, pipelined; SQLite is now the default (upstream, 2026-07-11)                 |
+| Proxy modes         | Single         | Dual (cache :9797 + token :9798 via TOML)                                                               |
+| Compression policy  | Generic        | Coding-tuned (looser lossy, higher volatile)                                                            |
+| Relevance           | 0.3 threshold  | 0.5 + coding stop words                                                                                 |
+| Tokenizers          | Standard       | + DeepSeek v4 family                                                                                    |
+| Bedrock             | Python handler | Rust rewrite in `headroom-proxy`; Python `handlers/bedrock.py` also present again (upstream)            |
+| Branding            | Stock          | PlayForm identity                                                                                       |
+| Test suite          | Full upstream  | ~8,500 tests as of 2026-07-11 (grew back toward upstream's full suite after the sync)                   |
+| CI                  | Full matrix    | Simplified (no langchain/agno/litellm builds)                                                           |
 
 ---
 
@@ -484,8 +484,8 @@ chopratejas/headroom (upstream)
 Headroom (both original upstream and our fork) has conditional compilation for
 Windows, but has never been end-to-end tested there.
 
-| Area                                                               | Status                                                                                                               |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Area                                                               | Status                                                                                                             |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | **Core Rust** (tokenizers, regex, sha2, rusqlite, dashmap, flate2) | Pure Rust, cross-platform ✓                                                                                        |
 | **Signal handling**                                                | Correctly gated: `#[cfg(unix)]` / `#[cfg(not(unix))]` ✓                                                            |
 | **`build.rs`**                                                     | Skips glibc shim on non-Linux-gnu ✓                                                                                |

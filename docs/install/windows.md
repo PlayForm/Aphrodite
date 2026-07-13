@@ -70,11 +70,11 @@ Copy-Item -Recurse "G:\AI\Hermes\Aphrodite-Hermes" "$env:USERPROFILE\.hermes\plu
 
 Pick one:
 
-| Option | How |
-| --- | --- |
-| Auto-download | `pwsh ./download.ps1` from inside your plugin clone (see [Fast path](#fast-path)) |
-| Download by hand | Go to the [releases page](https://github.com/PlayForm/Aphrodite/releases), find the tag matching the version you want (tags look like `Aphrodite/v1.2.2`), download `aphrodite-x86_64-pc-windows-msvc.exe` and `libaphrodite_hermes-x86_64-pc-windows-msvc.dll`, place both in `Aphrodite-Hermes\binaries\`, and rename them to `aphrodite.exe` and `aphrodite_hermes.dll` |
-| Build from source | `git submodule update --init --recursive && cargo build --release -p aphrodite -p aphrodite-hermes`, then copy `target\release\aphrodite.exe` and `target\release\aphrodite_hermes.dll` into `Aphrodite-Hermes\binaries\` |
+| Option            | How                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auto-download     | `pwsh ./download.ps1` from inside your plugin clone (see [Fast path](#fast-path))                                                                                                                                                                                                                                                                                          |
+| Download by hand  | Go to the [releases page](https://github.com/PlayForm/Aphrodite/releases), find the tag matching the version you want (tags look like `Aphrodite/v1.2.2`), download `aphrodite-x86_64-pc-windows-msvc.exe` and `libaphrodite_hermes-x86_64-pc-windows-msvc.dll`, place both in `Aphrodite-Hermes\binaries\`, and rename them to `aphrodite.exe` and `aphrodite_hermes.dll` |
+| Build from source | `git submodule update --init --recursive && cargo build --release -p aphrodite -p aphrodite-hermes`, then copy `target\release\aphrodite.exe` and `target\release\aphrodite_hermes.dll` into `Aphrodite-Hermes\binaries\`                                                                                                                                                  |
 
 If none of these ran and you skip straight to enabling the plugin, Hermes
 will try to auto-download for you on first launch - if that doesn't work,
@@ -105,11 +105,11 @@ be enabled and, optionally, wired as the context engine:
 
 ```yaml
 plugins:
-  enabled:
-    - aphrodite
+    enabled:
+        - aphrodite
 context:
-  engine: aphrodite
-  engine_threshold_pct: 55
+    engine: aphrodite
+    engine_threshold_pct: 55
 ```
 
 Proxy-side tuning (ports, thresholds, preview style) lives in `aphrodite.toml`,
