@@ -333,11 +333,26 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					replacement_from(&r)
 				},
 				"pre_llm_call" => {
+					// 01-F3: this is the ONLY pre_llm_call arm Hermes actually
+					// calls in production - core's `hooks::pre_llm_call` (which
+					// already builds directive context) has no caller on this
+					// path, so the "wire directives into pre_llm_call" feature
+					// shipped dead end-to-end. Append directive context to the
+					// same `context` string Hermes already honors, rather than
+					// adding a second field it wouldn't read.
 					let summary = aphrodite::session::catalog_summary(state);
-					if summary.is_empty() {
+					let directives =
+						aphrodite::directives::build_directive_context(&state.directives, &state.active_directives);
+					let context = match (summary.is_empty(), directives.is_empty()) {
+						(true, true) => String::new(),
+						(false, true) => summary,
+						(true, false) => directives,
+						(false, false) => format!("{summary}\n{directives}"),
+					};
+					if context.is_empty() {
 						serde_json::Value::Null
 					} else {
-						serde_json::json!({ "context": summary })
+						serde_json::json!({ "context": context })
 					}
 				},
 				"post_llm_call" => {

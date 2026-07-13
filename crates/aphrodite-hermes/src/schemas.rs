@@ -13,6 +13,7 @@ pub fn all_schemas() -> Vec<serde_json::Value> {
 		schema_files(),
 		schema_diff(),
 		schema_search(),
+		schema_directive(),
 		schema_test(),
 		schema_catalog(),
 		schema_reclassify(),
@@ -100,6 +101,20 @@ fn schema_search() -> serde_json::Value {
 				"type": {"type": "string", "description": "Optional: filter by CCR type"}
 			},
 			"required": ["query"]
+		}
+	})
+}
+
+fn schema_directive() -> serde_json::Value {
+	json!({
+		"name": "aphrodite_directive",
+		"description": "List, activate, or deactivate behavioral directives - short instructions injected into context via pre_llm_call (e.g. 'focus' for minimal tool usage, 'explore' for broad reading).",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"action": {"type": "string", "description": "list (default) | swap | add | remove | reset"},
+				"name": {"type": "string", "description": "Directive name - required for swap/add/remove"}
+			}
 		}
 	})
 }

@@ -357,6 +357,17 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		})
 	});
 
+	// ── directive: list/swap/add/remove/reset active behavioral directives ──
+	// (01-F3) - delegates to the same `directives::handle_action` the core
+	// crate's `aphrodite_directive`/`aphrodite_dispatch` C ABI entry points
+	// use, so this bridge exposes the identical action set/error shape.
+	m.insert("aphrodite_directive", |args| {
+		let action = str_arg(args, "action");
+		let action = if action.is_empty() { "list" } else { action };
+		let name = str_arg(args, "name");
+		with_shared(|state| aphrodite::directives::handle_action(state, action, name))
+	});
+
 	// ── files: file paths referenced this session ──
 	m.insert("aphrodite_files", |_args| {
 		with_shared(|state| {
