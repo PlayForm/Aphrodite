@@ -355,23 +355,7 @@ pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) ->
 	match get_handle(hid) {
 		Some(session) => {
 			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-			// NOTE: both "toc" and "full" modes emit the full 40-char hash -
-			// a truncated hash is unresolvable via exact-match retrieval
-			// (report 05 F3). Truncate only for human-readable display
-			// (e.g. `catalog::format_catalog_table`), never in machine-
-			// consumed JSON like this.
-			let items:Vec<serde_json::Value> = s
-				.recent_markers
-				.iter()
-				.map(|e| {
-					if m == "toc" {
-						serde_json::json!({"hash":&e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview})
-					} else {
-						serde_json::json!({"hash":e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview,"turn":e.turn})
-					}
-				})
-				.collect();
-			to_json_ok(&serde_json::json!({"total":items.len(),"items":items,"turn":s.turn_counter}))
+			to_json_ok(&crate::catalog::build_catalog(&s, &m))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
 	}
@@ -570,18 +554,7 @@ pub extern "C" fn aphrodite_dispatch(
 			"post_llm_call" => hooks::post_llm_call(s),
 			"catalog" => {
 				let mode = args.get("mode").and_then(|v| v.as_str()).unwrap_or("full");
-				let items:Vec<serde_json::Value> = s
-					.recent_markers
-					.iter()
-					.map(|e| {
-						if mode == "toc" {
-							serde_json::json!({"hash":&e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview})
-						} else {
-							serde_json::json!({"hash":e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview,"turn":e.turn})
-						}
-					})
-					.collect();
-				serde_json::json!({"total":items.len(),"items":items,"turn":s.turn_counter})
+				crate::catalog::build_catalog(s, mode)
 			},
 			"stats" => {
 				serde_json::json!({

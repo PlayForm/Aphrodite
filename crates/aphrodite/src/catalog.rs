@@ -69,11 +69,13 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 		.sum();
 
 	let mut result = serde_json::json!({
+		"total": items.len(),           // backward compat with inline callers
 		"total_items": items.len(),
 		"total_saved": total_saved,
 		"total_saved_human": fmt_size(total_saved),
 		"by_type": by_type_json,
 		"items": items,
+		"turn": state.turn_counter,     // backward compat with inline callers
 		"conv_turns": state.conv_index.len(),
 		"referenced_files": state.referenced_files.len(),
 	});
