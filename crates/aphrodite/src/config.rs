@@ -23,37 +23,38 @@ pub enum ProxyMode {
 pub enum Command {
 	/// Run the proxy server (default).
 	Run,
-	/// Bootstrap: copy binary, create config, register with hermes, launch proxy.
+	/// Bootstrap: copy binary, create config, register with hermes, launch
+	/// proxy.
 	Setup {
 		/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
 		#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true)]
-		api_key: Option<String>,
+		api_key:Option<String>,
 
 		/// Upstream API base URL.
 		#[arg(long, env = "APHRODITE_API_URL", default_value = "https://api.deepseek.com")]
-		api_url: String,
+		api_url:String,
 
 		/// Model name to forward.
 		#[arg(long, env = "APHRODITE_MODEL", default_value = "deepseek-v4-pro")]
-		model: String,
+		model:String,
 
 		/// Cache proxy listen port. Override per-instance to run multiple
 		/// concurrent Hermes Agents on the same machine.
 		#[arg(long, env = "APHRODITE_CACHE_PORT", default_value = "9797")]
-		cache_port: u16,
+		cache_port:u16,
 
 		/// Token proxy listen port. Override per-instance to run multiple
 		/// concurrent Hermes Agents on the same machine.
 		#[arg(long, env = "APHRODITE_TOKEN_PORT", default_value = "9798")]
-		token_port: u16,
+		token_port:u16,
 
 		/// Skip launching the proxy after setup.
 		#[arg(long)]
-		no_launch: bool,
+		no_launch:bool,
 
 		/// Force re-setup even if already installed.
 		#[arg(long)]
-		force: bool,
+		force:bool,
 	},
 }
 
@@ -61,35 +62,37 @@ pub enum Command {
 #[derive(Debug, Clone)]
 pub struct SetupArgs {
 	/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
-	pub api_key: Option<String>,
+	pub api_key:Option<String>,
 	/// Upstream API base URL.
-	pub api_url: String,
+	pub api_url:String,
 	/// Model name to forward.
-	pub model: String,
+	pub model:String,
 	/// Cache proxy listen port.
-	pub cache_port: u16,
+	pub cache_port:u16,
 	/// Token proxy listen port.
-	pub token_port: u16,
+	pub token_port:u16,
 	/// Skip launching the proxy after setup.
-	pub no_launch: bool,
+	pub no_launch:bool,
 	/// Force re-setup even if already installed.
-	pub force: bool,
+	pub force:bool,
 }
 
 impl From<Command> for SetupArgs {
-	fn from(cmd: Command) -> Self {
+	fn from(cmd:Command) -> Self {
 		match cmd {
 			Command::Setup { api_key, api_url, model, cache_port, token_port, no_launch, force } => {
 				Self { api_key, api_url, model, cache_port, token_port, no_launch, force }
-			}
-			_ => Self {
-				api_key: None,
-				api_url: "https://api.deepseek.com".into(),
-				model: "deepseek-v4-pro".into(),
-				cache_port: 9797,
-				token_port: 9798,
-				no_launch: false,
-				force: false,
+			},
+			_ => {
+				Self {
+					api_key:None,
+					api_url:"https://api.deepseek.com".into(),
+					model:"deepseek-v4-pro".into(),
+					cache_port:9797,
+					token_port:9798,
+					no_launch:false,
+					force:false,
+				}
 			},
 		}
 	}
@@ -103,7 +106,7 @@ impl From<Command> for SetupArgs {
 pub struct Cli {
 	/// Subcommand: `setup` to bootstrap, or omitted to run the proxy.
 	#[command(subcommand)]
-	pub command: Option<Command>,
+	pub command:Option<Command>,
 	/// Proxy mode: cache or token
 	#[arg(long, default_value = "token", env = "APHRODITE_MODE")]
 	pub mode:ProxyMode,
@@ -276,12 +279,8 @@ impl MultiConfig {
 			None => "127.0.0.1:9797".parse().unwrap(),
 		};
 		let listen = match (cfg.mode.as_deref(), cfg.name.as_deref()) {
-			(_, Some("cache")) | (Some("cache"), _) => {
-				Self::apply_port_override(listen, "APHRODITE_CACHE_PORT")
-			},
-			(_, Some("token")) | (Some("token"), _) => {
-				Self::apply_port_override(listen, "APHRODITE_TOKEN_PORT")
-			},
+			(_, Some("cache")) | (Some("cache"), _) => Self::apply_port_override(listen, "APHRODITE_CACHE_PORT"),
+			(_, Some("token")) | (Some("token"), _) => Self::apply_port_override(listen, "APHRODITE_TOKEN_PORT"),
 			_ => listen,
 		};
 		// Validate max_output < max_context
@@ -291,7 +290,7 @@ impl MultiConfig {
 			anyhow::bail!("max_output ({max_output}) must be less than max_context ({max_context})");
 		}
 		Ok(Cli {
-			command: None,
+			command:None,
 			mode:match cfg.mode.as_deref() {
 				Some("token") => ProxyMode::Token,
 				Some("cache") => ProxyMode::Cache,
@@ -319,11 +318,7 @@ impl MultiConfig {
 			max_context,
 			max_output,
 			// Resolve from toml - proxy.rs handles None default
-			ccr_db_path:cfg
-				.ccr_db_path
-				.clone()
-				.filter(|s| !s.is_empty())
-				.map(Into::into),
+			ccr_db_path:cfg.ccr_db_path.clone().filter(|s| !s.is_empty()).map(Into::into),
 			ccr_ttl_seconds:cfg
 				.ccr_ttl_seconds
 				.or_else(|| d.and_then(|d| d.ccr_ttl_seconds))
@@ -357,24 +352,209 @@ impl MultiConfig {
 	/// directory bug this override was added alongside.
 	fn apply_port_override(listen:SocketAddr, env_var:&str) -> SocketAddr {
 		match std::env::var(env_var) {
-			Ok(p) => match p.parse::<u16>() {
-				Ok(port) => {
-					let mut addr = listen;
-					addr.set_port(port);
-					tracing::info!("{}={} overriding listen to {}", env_var, port, addr);
-					addr
-				},
-				Err(_) => {
-					tracing::warn!(
-						"{}={:?} is not a valid port (1-65535); ignoring override, using {}",
-						env_var,
-						p,
-						listen,
-					);
-					listen
-				},
+			Ok(p) => {
+				match p.parse::<u16>() {
+					Ok(port) => {
+						let mut addr = listen;
+						addr.set_port(port);
+						tracing::info!("{}={} overriding listen to {}", env_var, port, addr);
+						addr
+					},
+					Err(_) => {
+						tracing::warn!(
+							"{}={:?} is not a valid port (1-65535); ignoring override, using {}",
+							env_var,
+							p,
+							listen,
+						);
+						listen
+					},
+				}
 			},
 			Err(_) => listen,
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Serializes tests that touch process-global env vars
+	/// (`APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT`), since `cargo test`
+	/// runs this module's tests concurrently by default.
+	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
+		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+		G.get_or_init(|| std::sync::Mutex::new(()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner)
+	}
+
+	fn multi_config_from_toml(toml_str:&str) -> MultiConfig { toml::from_str(toml_str).expect("valid test TOML") }
+
+	#[test]
+	fn test_resolve_default_ports_per_mode() {
+		let _g = env_guard();
+		std::env::remove_var("APHRODITE_CACHE_PORT");
+		std::env::remove_var("APHRODITE_TOKEN_PORT");
+
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "cache"
+			mode = "cache"
+			api_key = "test-key"
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert_eq!(cli.listen.port(), 9797); // default listen, no override present
+
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "token"
+			mode = "token"
+			api_key = "test-key"
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert_eq!(cli.listen.port(), 9797); // still 9797: no explicit `listen` was set in the TOML
+	}
+
+	#[test]
+	fn test_resolve_explicit_port_override_via_env() {
+		let _g = env_guard();
+		std::env::set_var("APHRODITE_CACHE_PORT", "19797");
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "cache"
+			mode = "cache"
+			api_key = "test-key"
+			listen = "127.0.0.1:9797"
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert_eq!(cli.listen.port(), 19797);
+		std::env::remove_var("APHRODITE_CACHE_PORT");
+	}
+
+	#[test]
+	fn test_resolve_invalid_mode_falls_back_to_token() {
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "weird"
+			mode = "not_a_real_mode"
+			api_key = "test-key"
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert!(matches!(cli.mode, ProxyMode::Token));
+	}
+
+	#[test]
+	fn test_resolve_missing_mode_falls_back_to_token() {
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "no_mode"
+			api_key = "test-key"
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert!(matches!(cli.mode, ProxyMode::Token));
+	}
+
+	#[test]
+	fn test_resolve_timeout_clamped_to_600() {
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "slow"
+			api_key = "test-key"
+			timeout = 9999
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert_eq!(cli.timeout, 600);
+	}
+
+	#[test]
+	fn test_resolve_timeout_under_max_is_unchanged() {
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "normal"
+			api_key = "test-key"
+			timeout = 120
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert_eq!(cli.timeout, 120);
+	}
+
+	#[test]
+	fn test_resolve_missing_api_key_errors() {
+		let _g = env_guard();
+		std::env::remove_var("APHRODITE_API_KEY");
+		std::env::remove_var("DEEPSEEK_API_KEY");
+		std::env::remove_var("HEADROOM_DEEPSEEK_KEY");
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "no_key"
+			"#,
+		);
+		let result = mc.resolve(&mc.proxies[0]);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_resolve_invalid_listen_address_errors() {
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "bad_listen"
+			api_key = "test-key"
+			listen = "not-an-address"
+			"#,
+		);
+		let result = mc.resolve(&mc.proxies[0]);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_resolve_max_output_must_be_less_than_max_context() {
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "bad_budget"
+			api_key = "test-key"
+			max_context = 100
+			max_output = 200
+			"#,
+		);
+		let result = mc.resolve(&mc.proxies[0]);
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_resolve_defaults_fill_in_missing_proxy_fields() {
+		let mc = multi_config_from_toml(
+			r#"
+			[defaults]
+			api_key = "default-key"
+			api_url = "https://default.example.com"
+			model = "default-model-name"
+
+			[[proxies]]
+			name = "uses_defaults"
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert_eq!(cli.api_key, "default-key");
+		assert_eq!(cli.api_url, "https://default.example.com");
+		assert_eq!(cli.model, "default-model-name");
 	}
 }

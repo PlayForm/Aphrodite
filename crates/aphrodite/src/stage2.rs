@@ -1,9 +1,21 @@
 //! Stage 2 compression - semantic reduction of CCR-stored content.
 //! Port of plugins/aphrodite/_stage2.py
 //!
-//! Produces a denser version of content stored in CCR. When the agent
-//! calls aphrodite_retrieve(hash, depth=2), it gets the reduced version
-//! instead of the raw original.
+//! Produces a denser version of a piece of content on demand via the
+//! stateless `aphrodite_stage2(content, ccr_type)` ABI (see
+//! `lib.rs::aphrodite_stage2`) - it takes content directly and returns the
+//! reduced string, with no interaction with the CCR store or the session's
+//! inline store.
+//!
+//! There is currently no depth-aware retrieval: no `aphrodite_retrieve` /
+//! `resolve_one` / `resolve::expand` entry point accepts a `depth` parameter,
+//! and nothing in this crate writes a stage-2-reduced value back into the
+//! store under a `{hash}#stage2` key for a later plain retrieval to pick up
+//! (report 05 F6 - a version of this docstring used to claim
+//! `aphrodite_retrieve(hash, depth=2)` returns the reduced version; that
+//! entry point does not exist). Wiring depth-aware retrieval up for real is
+//! a deliberate feature decision - see `.plans/05-compression-pipeline.md`
+//! §5 - not something this module does today.
 //!
 //! Reducers per content type:
 //! - JSON: whitespace minification + key extraction
@@ -189,48 +201,33 @@ fn regex_match(line:&str, pattern:&str) -> Option<Vec<String>> {
 			return Some(vec![line.to_string()]);
 		}
 	}
-	if pattern.contains(r"struct\s+(\w+)") {
-		if lower.starts_with("struct ") || lower.starts_with("pub struct ") {
-			return Some(vec![line.to_string()]);
-		}
+	if pattern.contains(r"struct\s+(\w+)") && (lower.starts_with("struct ") || lower.starts_with("pub struct ")) {
+		return Some(vec![line.to_string()]);
 	}
-	if pattern.contains(r"enum\s+(\w+)") {
-		if lower.starts_with("enum ") || lower.starts_with("pub enum ") {
-			return Some(vec![line.to_string()]);
-		}
+	if pattern.contains(r"enum\s+(\w+)") && (lower.starts_with("enum ") || lower.starts_with("pub enum ")) {
+		return Some(vec![line.to_string()]);
 	}
-	if pattern.contains(r"trait\s+(\w+)") {
-		if lower.starts_with("trait ") || lower.starts_with("pub trait ") {
-			return Some(vec![line.to_string()]);
-		}
+	if pattern.contains(r"trait\s+(\w+)") && (lower.starts_with("trait ") || lower.starts_with("pub trait ")) {
+		return Some(vec![line.to_string()]);
 	}
-	if pattern.contains(r"impl\b") {
-		if lower.starts_with("impl ") || lower.starts_with("impl<") {
-			return Some(vec![line.to_string()]);
-		}
+	if pattern.contains(r"impl\b") && (lower.starts_with("impl ") || lower.starts_with("impl<")) {
+		return Some(vec![line.to_string()]);
 	}
-	if pattern.contains(r"def\s+(\w+)\s*\(") {
-		if lower.starts_with("def ") {
-			return Some(vec![line.to_string()]);
-		}
+	if pattern.contains(r"def\s+(\w+)\s*\(") && lower.starts_with("def ") {
+		return Some(vec![line.to_string()]);
 	}
-	if pattern.contains(r"class\s+(\w+)") {
-		if lower.starts_with("class ") {
-			return Some(vec![line.to_string()]);
-		}
+	if pattern.contains(r"class\s+(\w+)") && lower.starts_with("class ") {
+		return Some(vec![line.to_string()]);
 	}
-	if pattern.contains(r"func\s+(\w+)\s*\(") {
-		if lower.starts_with("func ") {
-			return Some(vec![line.to_string()]);
-		}
+	if pattern.contains(r"func\s+(\w+)\s*\(") && lower.starts_with("func ") {
+		return Some(vec![line.to_string()]);
 	}
-	if pattern.contains(r"function\s+(\w+)") {
-		if lower.starts_with("export function ")
+	if pattern.contains(r"function\s+(\w+)")
+		&& (lower.starts_with("export function ")
 			|| lower.starts_with("export async function ")
-			|| lower.starts_with("function ")
-		{
-			return Some(vec![line.to_string()]);
-		}
+			|| lower.starts_with("function "))
+	{
+		return Some(vec![line.to_string()]);
 	}
 
 	None
@@ -357,23 +354,28 @@ mod tests {
 
 	#[test]
 	fn test_integration_json_minifies() {
-		// Pretty-printed JSON with significant whitespace
-		let content =
-			"{\n  \"users\": [\n    {\"id\": 1, \"name\": \"Alice\"},\n    {\"id\": 2, \"name\": \"Bob\"}\n  ],\n  \
-			 \"total\": 2\n}"
-				.to_string();
+		// Heavily whitespace-padded JSON (many keys, deep indentation) so that
+		// minification + the structural header is still smaller than the
+		// pretty-printed original - a real size assertion, not just "no panic".
+		let content = "{\n  \"users\": [\n    {\"id\": 1, \"name\": \"Alice\", \"active\": true, \"role\": \
+		               \"admin\"},\n    {\"id\": 2, \"name\": \"Bob\", \"active\": false, \"role\": \"user\"},\n    \
+		               {\"id\": 3, \"name\": \"Carol\", \"active\": true, \"role\": \"user\"}\n  ],\n  \"total\": \
+		               3,\n  \"page\": 1,\n  \"per_page\": 10\n}"
+			.to_string();
 		let original_len = content.len();
-		// reduce_json always minifies, so it should be smaller (even with header)
 		let reduced = reduce_json(&content);
 		assert!(reduced.is_some(), "reduce_json returned None");
 		let r = reduced.unwrap();
-		// The minified content alone (after structural header) should be smaller
-		// But we test that it produced output with the structural prefix
-		assert!(r.starts_with("[json:2 keys:"));
+		assert!(r.starts_with("[json:4 keys:"));
 		assert!(r.contains("\"users\""));
-		// compress_stage2 with the min threshold check
-		// This content IS >80 chars but after minification + header it may not
-		// save The point is it doesn't panic
+		// The whole point of stage2 reduction is to save space - assert it
+		// actually does, not merely that it runs without panicking.
+		assert!(
+			r.len() < original_len,
+			"reduced output ({} bytes) should be smaller than the pretty-printed original ({} bytes)",
+			r.len(),
+			original_len
+		);
 	}
 
 	#[test]

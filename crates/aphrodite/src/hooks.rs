@@ -32,6 +32,21 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
 	}
 
+	// Track file references BEFORE the essential-tool early return (F10):
+	// `read_file` is both listed in `ESSENTIAL_TOOLS` (never compressed - the
+	// agent needs the raw content) and in `state.file_tools` (tracked for
+	// `aphrodite_files`/the catalog's `referenced_files` stat). Tracking used
+	// to run after the essential-tool check returned early, so the single
+	// most common file-reference source - reading a file - was silently
+	// never recorded. Skipping compression and recording a reference are
+	// independent decisions; do both regardless of which tools land in
+	// which list.
+	if state.file_tools.contains(&tool_name.to_string()) {
+		if let Some(path) = extract_file_path(content, tool_name) {
+			state.record_file(path, tool_name.to_string());
+		}
+	}
+
 	// Skip essential tools
 	if ESSENTIAL_TOOLS.contains(&tool_name) {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "essential_tool"});
@@ -67,13 +82,6 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 		center:None,
 		meta:None,
 	});
-
-	// Track file references
-	if state.file_tools.contains(&tool_name.to_string()) {
-		if let Some(path) = extract_file_path(content, tool_name) {
-			state.record_file(path, tool_name.to_string());
-		}
-	}
 
 	serde_json::json!({
 		"status": "ok",
@@ -163,6 +171,15 @@ fn extract_file_path(content:&str, tool:&str) -> Option<String> {
 				}
 			})
 		},
+		// `search_files` output is conventionally a `path:line:match` (grep-
+		// style) list; the file being referenced is whatever's before the
+		// first `:` on the first result line (F10: this tool is listed in
+		// `state.file_tools` but was previously never actually matched here,
+		// so every search result silently went untracked).
+		"search_files" => content.lines().next().and_then(|line| {
+			let path = line.split(':').next().unwrap_or("").trim();
+			if path.starts_with('/') || path.starts_with("./") { Some(path.to_string()) } else { None }
+		}),
 		_ => None,
 	}
 }
@@ -177,6 +194,35 @@ mod tests {
 		let r = transform_tool_result(&mut s, "some content", "skill_view");
 		assert_eq!(r["compressed"], false);
 		assert_eq!(r["reason"], "essential_tool");
+	}
+
+	// ── T9 (F10): `read_file` is both an essential tool (never compressed -
+	// the agent needs the raw content) AND a tracked file tool
+	// (`state.file_tools`); both must hold at once. Previously the essential-
+	// tool early return ran before file-reference tracking, so the single
+	// most common file reference (reading a file) was silently never
+	// recorded in `referenced_files`.
+	#[test]
+	fn test_essential_tool_read_file_still_records_file_reference() {
+		let mut s = AphroditeState::default();
+		let r = transform_tool_result(&mut s, "/tmp/some/file.rs\nfn main() {}\n", "read_file");
+		assert_eq!(r["compressed"], false, "read_file must never be compressed");
+		assert_eq!(r["reason"], "essential_tool");
+		assert_eq!(s.referenced_files.len(), 1, "read_file must still be tracked as a file reference");
+		assert_eq!(s.referenced_files[0].0, "/tmp/some/file.rs");
+	}
+
+	// ── T9 (F10): `search_files` reaches the file-reference tracker (it's
+	// listed in `state.file_tools`) but `extract_file_path` had no arm for
+	// it, so search results were never recorded despite being tracked tools.
+	#[test]
+	fn test_search_files_records_file_reference() {
+		let mut s = AphroditeState::default();
+		s.tool_threshold = 0; // always compress, to also exercise the non-essential path
+		let content = "/tmp/some/file.rs:42:    let x = 1;\n/tmp/other/file.rs:7:    let y = 2;\n";
+		let _ = transform_tool_result(&mut s, content, "search_files");
+		assert_eq!(s.referenced_files.len(), 1);
+		assert_eq!(s.referenced_files[0].0, "/tmp/some/file.rs");
 	}
 
 	#[test]
@@ -201,7 +247,13 @@ mod tests {
 		let content = "fn main() {\n    println!(\"hello world\");\n}\n";
 		let r = transform_tool_result(&mut s, content, "terminal");
 		assert_eq!(r["compressed"], true);
-		assert!(r["hash"].as_str().unwrap().len() >= 40);
+		let hash = r["hash"].as_str().unwrap();
+		assert!(hash.len() >= 40);
+		// The round-trip is the actual promise here: the marker this hook hands
+		// back to the LLM must resolve, via aphrodite_retrieve, back to the
+		// exact original content - not merely produce a hash-shaped string.
+		let resolved = crate::resolve::expand(&mut s, hash);
+		assert_eq!(resolved, Some(content.to_string()));
 	}
 
 	#[test]

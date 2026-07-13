@@ -8,6 +8,17 @@
 //! and `aphrodite_destroy` frees it. The Hermes plugin uses the higher-level,
 //! process-global `aphrodite_hermes_*` ABI in the `aphrodite-hermes` crate.
 
+// Every `pub extern "C" fn` here takes a raw pointer without being marked
+// `unsafe fn` itself (the null/UTF-8 checks happen inside `cstr()`, not at
+// the signature level), which is exactly what this lint flags. Fixing it
+// properly means marking each function `unsafe extern "C" fn` and auditing
+// every caller across this crate, `aphrodite-hermes`, and the Python ctypes
+// bindings for the safety-contract change - that's the FFI/C-ABI boundary
+// report's job (.plans/03-ffi-c-abi.md), not a side effect of wiring up a
+// CI clippy gate. Scoped here so the gate is honest today; remove this once
+// report 03 lands.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 pub mod catalog;
 pub mod config_loader;
 pub mod hooks;
@@ -41,7 +52,12 @@ use state::AphroditeState;
 
 const MAX_CONTENT:usize = 16 * 1024 * 1024; // 16MB cap
 
+/// Process-global handle table. `None` until the first handle is allocated,
+/// so `Mutex::new` can stay `const` without requiring a heap alloc at
+/// startup; `handles()` lazily initializes it to `Some` on first use.
 static HANDLES:Mutex<Option<HashMap<usize, AphroditeState>>> = Mutex::new(None);
+/// Next handle ID to hand out from `alloc_handle`. Wraps on overflow rather
+/// than panicking - see the `wrapping_add` call there.
 static NEXT_ID:Mutex<usize> = Mutex::new(1);
 
 fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, AphroditeState>>> {
@@ -60,7 +76,7 @@ fn alloc_handle(state:AphroditeState) -> usize {
 	hid
 }
 
-fn with_state<T>(hid:usize, f:impl FnOnce(&mut AphroditeState) -> T + std::panic::UnwindSafe) -> Result<T, String> {
+fn with_state<T>(hid:usize, f:impl FnOnce(&mut AphroditeState) -> T) -> Result<T, String> {
 	let mut h = handles();
 	let state = match h.as_mut().and_then(|m| m.get_mut(&hid)) {
 		Some(s) => s,
@@ -73,6 +89,20 @@ fn with_state<T>(hid:usize, f:impl FnOnce(&mut AphroditeState) -> T + std::panic
 fn to_json_error(msg:&str) -> *mut c_char {
 	let json = serde_json::json!({"error": msg}).to_string();
 	CString::new(json).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut())
+}
+
+/// Run `f` under `catch_unwind`, converting a panic into an error-JSON
+/// `*mut c_char` instead of unwinding across the `extern "C"` boundary
+/// (which triggers the Rust runtime's forced process abort). `with_state`
+/// already gives stateful fns this guarantee; this covers the seven
+/// extern fns that don't go through `with_state` (classify, call_hook,
+/// retrieve, filter_lines, preview, stage2, struct_extract) - previously
+/// the only guard in this file was `with_state`'s, so these seven could
+/// abort the host process on a panic (e.g. the byte-slicing panics in
+/// struct_extract.rs/marker.rs, now fixed separately, but any future panic
+/// in these paths would have the same effect).
+fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
+	std::panic::catch_unwind(f).unwrap_or_else(|_| to_json_error("internal error: panicked"))
 }
 
 fn to_json_ok(v:&serde_json::Value) -> *mut c_char {
@@ -117,9 +147,14 @@ pub extern "C" fn aphrodite_free_string(s:*mut c_char) {
 
 #[no_mangle]
 pub extern "C" fn aphrodite_hooks() -> *mut c_char {
+	// `on_session_start`, not `session_start`: Hermes's VALID_HOOKS table
+	// requires the `on_` prefix - registering the bare name silently no-ops
+	// in Hermes (the bridge crate already returns the correct name; this
+	// discovery fn used to hand out the broken one). `aphrodite_dispatch`/
+	// `aphrodite_call_hook` accept both names for compatibility.
 	CString::new(
 		serde_json::json!([
-			"session_start",
+			"on_session_start",
 			"transform_tool_result",
 			"transform_terminal_output",
 			"pre_llm_call",
@@ -171,31 +206,36 @@ pub extern "C" fn aphrodite_classify(content:*const c_char) -> *mut c_char {
 		Some(s) => s,
 		None => return to_json_error("null content"),
 	};
-	if let Err(e) = check_content(&c) {
-		return to_json_error(e);
-	}
-	let ct = transforms::detect(&c);
-	to_json_ok(&serde_json::json!({"type":ct.as_str(),"lines":c.lines().count(),"bytes":c.len()}))
+	guarded(std::panic::AssertUnwindSafe(move || {
+		if let Err(e) = check_content(&c) {
+			return to_json_error(e);
+		}
+		let ct = transforms::detect(&c);
+		to_json_ok(&serde_json::json!({"type":ct.as_str(),"lines":c.lines().count(),"bytes":c.len()}))
+	}))
 }
 
 #[no_mangle]
 pub extern "C" fn aphrodite_call_hook(hook:*const c_char, args:*const c_char) -> *mut c_char {
 	let name = unsafe { cstr(hook) }.unwrap_or_default();
 	let args_str = unsafe { cstr(args) }.unwrap_or_default();
-	let a:serde_json::Value = match serde_json::from_str(&args_str) {
-		Ok(v) => v,
-		Err(e) => return to_json_error(&format!("invalid args: {}", e)),
-	};
-	let content = a.get("content").and_then(|v| v.as_str()).unwrap_or("");
-	let tool = a.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
-	let mut s = AphroditeState::default();
-	let r = match name.as_ref() {
-		"session_start" => hooks::on_session_start(&mut s),
-		"transform_tool_result" => hooks::transform_tool_result(&mut s, content, tool),
-		"transform_terminal_output" => hooks::transform_terminal_output(&mut s, content),
-		_ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
-	};
-	to_json_ok(&r)
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let a:serde_json::Value = match serde_json::from_str(&args_str) {
+			Ok(v) => v,
+			Err(e) => return to_json_error(&format!("invalid args: {}", e)),
+		};
+		let content = a.get("content").and_then(|v| v.as_str()).unwrap_or("");
+		let tool = a.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+		let mut s = AphroditeState::default();
+		let r = match name.as_ref() {
+			// Accept both the canonical Hermes name and the legacy alias.
+			"on_session_start" | "session_start" => hooks::on_session_start(&mut s),
+			"transform_tool_result" => hooks::transform_tool_result(&mut s, content, tool),
+			"transform_terminal_output" => hooks::transform_terminal_output(&mut s, content),
+			_ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
+		};
+		to_json_ok(&r)
+	}))
 }
 
 // ── Stateful operations ──────────────────────────────────────────────
@@ -252,16 +292,18 @@ pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let hash = unsafe { cstr(hash) }.unwrap_or_default();
-	let mut h = handles();
-	match h.as_mut().and_then(|m| m.get_mut(&hid)) {
-		Some(s) => {
-			match s.inline_store_get(&hash) {
-				Some(content) => CString::new(content).unwrap().into_raw(),
-				None => to_json_error(&format!("hash not found: {}", hash)),
-			}
-		},
-		None => to_json_error(&format!("invalid handle: {}", hid)),
-	}
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let mut h = handles();
+		match h.as_mut().and_then(|m| m.get_mut(&hid)) {
+			Some(s) => {
+				match s.inline_store_get(&hash) {
+					Some(content) => CString::new(content.replace('\0', "")).unwrap().into_raw(),
+					None => to_json_error(&format!("hash not found: {}", hash)),
+				}
+			},
+			None => to_json_error(&format!("invalid handle: {}", hid)),
+		}
+	}))
 }
 
 stateful!(aphrodite_transform, |s, content:*const c_char, tool:*const c_char| {
@@ -284,7 +326,7 @@ pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	match with_state(hid, |s| session::on_session_start(s)) {
+	match with_state(hid, session::on_session_start) {
 		Ok(v) => to_json_ok(&v),
 		Err(e) => to_json_error(&e),
 	}
@@ -300,12 +342,17 @@ pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) ->
 	let h = handles();
 	match h.as_ref().and_then(|map| map.get(&hid)) {
 		Some(s) => {
+			// NOTE: both "toc" and "full" modes emit the full 40-char hash -
+			// a truncated hash is unresolvable via exact-match retrieval
+			// (report 05 F3). Truncate only for human-readable display
+			// (e.g. `catalog::format_catalog_table`), never in machine-
+			// consumed JSON like this.
 			let items:Vec<serde_json::Value> = s
 				.recent_markers
 				.iter()
 				.map(|e| {
 					if m == "toc" {
-						serde_json::json!({"hash":&e.hash[..12.min(e.hash.len())],"type":e.ccr_type,"size":e.size,"preview":e.preview})
+						serde_json::json!({"hash":&e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview})
 					} else {
 						serde_json::json!({"hash":e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview,"turn":e.turn})
 					}
@@ -344,17 +391,24 @@ pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> 
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let p = unsafe { cstr(path) }.unwrap_or_default();
+	// Read the config file BEFORE taking the HANDLES lock (F9): this fn used
+	// to do the read inside `with_state`'s closure, holding the *global*
+	// handle-map mutex across disk I/O - on a slow/cold mount, one handle's
+	// reload blocks every other handle's every call, and it's a trap for a
+	// future `f` that calls back into another `aphrodite_*` fn (non-reentrant
+	// Mutex -> instant deadlock).
+	let context_engine_enabled = if !p.is_empty() {
+		std::fs::read_to_string(p.as_str())
+			.ok()
+			.and_then(|t| t.parse::<toml::Table>().ok())
+			.and_then(|tbl| tbl.get("compression").and_then(|v| v.as_table()).cloned())
+			.and_then(|c| c.get("context_engine").and_then(|v| v.as_bool()))
+	} else {
+		None
+	};
 	match with_state(hid, |s| {
-		if !p.is_empty() {
-			if let Ok(t) = std::fs::read_to_string(p.as_str()) {
-				if let Ok(tbl) = t.parse::<toml::Table>() {
-					if let Some(c) = tbl.get("compression").and_then(|v| v.as_table()) {
-						if let Some(v) = c.get("context_engine").and_then(|v| v.as_bool()) {
-							s.context_engine_enabled = v;
-						}
-					}
-				}
-			}
+		if let Some(v) = context_engine_enabled {
+			s.context_engine_enabled = v;
 		}
 		serde_json::json!({"status":"ok"})
 	}) {
@@ -375,7 +429,7 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 		Some(s) => {
 			let results: Vec<serde_json::Value> = s.recent_markers.iter()
                 .filter(|m| m.preview.to_lowercase().contains(&q) || m.ccr_type.to_lowercase().contains(&q))
-                .take(20).map(|m| serde_json::json!({"hash":&m.hash[..12.min(m.hash.len())],"type":m.ccr_type,"size":m.size,"preview":m.preview})).collect();
+                .take(20).map(|m| serde_json::json!({"hash":&m.hash,"type":m.ccr_type,"size":m.size,"preview":m.preview})).collect();
 			to_json_ok(&serde_json::json!({"total":results.len(),"results":results}))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
@@ -400,7 +454,7 @@ pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) 
 				"context_engine_enabled" => s.context_engine_enabled.to_string(),
 				_ => return to_json_error(&format!("unknown key: {}", k)),
 			};
-			CString::new(v).unwrap().into_raw()
+			CString::new(v.replace('\0', "")).unwrap().into_raw()
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
 	}
@@ -444,6 +498,11 @@ pub extern "C" fn aphrodite_config_set(handle:*const c_char, key:*const c_char, 
 /// crates (aphrodite-hermes) don't need a direct headroom-core dependency.
 pub fn detect_type(content:&str) -> String { transforms::detect(content).as_str().to_string() }
 
+/// Build a compact, human-readable preview string for compressed content,
+/// shaped per content type (e.g. error/warning counts for build output,
+/// +/- line counts for diffs, fn/struct counts for source code) so the LLM
+/// gets a useful summary instead of a generic byte/line count wherever a
+/// richer signal is available.
 pub fn build_preview(type_str:&str, content:&str) -> String {
 	let lines = content.lines().count();
 	let bytes = content.len();
@@ -499,6 +558,22 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 			let i = content.matches("{\"").count();
 			format!("[json:{}items {}L]", i, lines)
 		},
+		// `hooks::transform_terminal_output` overrides the classified type to
+		// "terminal" when the content looks like a shell/exit-code trace, but
+		// this function had no matching arm for it, so the preview silently
+		// fell through to the generic `_` branch (F10) - a bare line/byte
+		// count with no exit-code or last-output-line context, the exact
+		// signal a terminal preview exists to surface.
+		"terminal" => {
+			let exit_line = content
+				.lines()
+				.rev()
+				.find(|l| l.contains("exit code:") || l.contains("Error:"))
+				.map(|l| l.trim());
+			let last_line = content.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim());
+			let summary = exit_line.or(last_line).unwrap_or("").chars().take(60).collect::<String>();
+			format!("[terminal:{}L {}]", lines, summary)
+		},
 		_ => format!("[{}:{}L {}B]", type_str, lines, bytes),
 	}
 }
@@ -531,9 +606,26 @@ pub extern "C" fn aphrodite_dispatch(
 	}
 	let tool = args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 
+	// F9: read prefetch files from disk BEFORE taking the HANDLES lock, not
+	// inside `with_state`'s closure - up to 10MB per file was previously
+	// read while holding the *global* handle-map mutex, serializing every
+	// other session's every call behind this one's (possibly slow/cold-mount)
+	// disk reads.
+	// RefCell, not a plain local: `with_state`'s closure below still borrows
+	// `args`/`content`/`tool` for the other match arms, so it can't also
+	// `move` this out of an owned `Option` - a `RefCell` lets the "prefetch"
+	// arm take it through a shared capture instead.
+	let prefetch_outcomes = std::cell::RefCell::new(if name == "prefetch" {
+		let paths = args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+		let path_strings:Vec<String> = paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+		Some(crate::prefetch::read_paths(&path_strings))
+	} else {
+		None
+	});
+
 	let result = match with_state(hid, |s| {
 		match name.as_ref() {
-			"session_start" => hooks::on_session_start(s),
+			"on_session_start" | "session_start" => hooks::on_session_start(s),
 			"transform_tool_result" => hooks::transform_tool_result(s, content, tool),
 			"transform_terminal_output" => hooks::transform_terminal_output(s, content),
 			"pre_llm_call" => hooks::pre_llm_call(s),
@@ -545,7 +637,7 @@ pub extern "C" fn aphrodite_dispatch(
 					.iter()
 					.map(|e| {
 						if mode == "toc" {
-							serde_json::json!({"hash":&e.hash[..12.min(e.hash.len())],"type":e.ccr_type,"size":e.size,"preview":e.preview})
+							serde_json::json!({"hash":&e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview})
 						} else {
 							serde_json::json!({"hash":e.hash,"type":e.ccr_type,"size":e.size,"preview":e.preview,"turn":e.turn})
 						}
@@ -570,11 +662,11 @@ pub extern "C" fn aphrodite_dispatch(
 		                let matches_query = query.is_empty()
 		                    || m.preview.to_lowercase().contains(&query)
 		                    || m.ccr_type.to_lowercase().contains(&query);
-		                let matches_type = type_filter.map_or(true, |t| m.ccr_type == t);
+		                let matches_type = type_filter.is_none_or(|t| m.ccr_type == t);
 		                matches_query && matches_type
 		            })
 		            .take(20)
-		            .map(|m| serde_json::json!({"hash":&m.hash[..12.min(m.hash.len())],"type":m.ccr_type,"size":m.size,"preview":m.preview}))
+		            .map(|m| serde_json::json!({"hash":&m.hash,"type":m.ccr_type,"size":m.size,"preview":m.preview}))
 		            .collect();
 				serde_json::json!({"total":results.len(),"results":results})
 			},
@@ -601,10 +693,14 @@ pub extern "C" fn aphrodite_dispatch(
 				serde_json::json!({"type":ct.as_str(),"lines":content.lines().count(),"bytes":content.len()})
 			},
 			"prefetch" => {
-				let paths = args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-				let path_strings:Vec<String> = paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
-				let r = crate::prefetch::prefetch_files(s, &path_strings);
-				r
+				// `prefetch_outcomes` is always `Some` here because
+				// `name == "prefetch"` is exactly the condition that set it
+				// above, before this closure runs.
+				let outcomes = prefetch_outcomes
+					.borrow_mut()
+					.take()
+					.expect("prefetch_outcomes set when name == \"prefetch\"");
+				crate::prefetch::insert_outcomes(s, outcomes)
 			},
 			_ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
 		}
@@ -624,8 +720,10 @@ pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_c
 		None => return to_json_error("null content"),
 	};
 	let q = unsafe { cstr(query) }.unwrap_or_default();
-	let filtered = crate::resolve::filter_lines(&c, &q);
-	CString::new(filtered).unwrap().into_raw()
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let filtered = crate::resolve::filter_lines(&c, &q);
+		CString::new(filtered.replace('\0', "")).unwrap().into_raw()
+	}))
 }
 
 /// Resolve hash with full recursive expansion - port of _resolve.py
@@ -655,8 +753,10 @@ pub extern "C" fn aphrodite_preview(content:*const c_char, ccr_type:*const c_cha
 		None => return to_json_error("null content"),
 	};
 	let t = unsafe { cstr(ccr_type) }.unwrap_or_default();
-	let preview = crate::build_preview(&t, &c);
-	CString::new(preview).unwrap().into_raw()
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let preview = crate::build_preview(&t, &c);
+		CString::new(preview.replace('\0', "")).unwrap().into_raw()
+	}))
 }
 
 /// Stage 2 semantic reduction - port of _stage2.py
@@ -667,10 +767,12 @@ pub extern "C" fn aphrodite_stage2(content:*const c_char, ccr_type:*const c_char
 		None => return to_json_error("null content"),
 	};
 	let t = unsafe { cstr(ccr_type) }.unwrap_or_default();
-	match crate::stage2::compress_stage2(&c, &t) {
-		Some(reduced) => CString::new(reduced).unwrap().into_raw(),
-		None => to_json_error("no reduction possible"),
-	}
+	guarded(std::panic::AssertUnwindSafe(move || {
+		match crate::stage2::compress_stage2(&c, &t) {
+			Some(reduced) => CString::new(reduced.replace('\0', "")).unwrap().into_raw(),
+			None => to_json_error("no reduction possible"),
+		}
+	}))
 }
 
 /// Code structure extraction - port of _core/struct.py
@@ -681,6 +783,202 @@ pub extern "C" fn aphrodite_struct_extract(content:*const c_char, language:*cons
 		None => return to_json_error("null content"),
 	};
 	let lang = unsafe { cstr(language) }.unwrap_or_default();
-	let result = crate::struct_extract::extract_code_structure(&c, &lang);
-	to_json_ok(&serde_json::json!(result))
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let result = crate::struct_extract::extract_code_structure(&c, &lang);
+		to_json_ok(&serde_json::json!(result))
+	}))
+}
+
+#[cfg(test)]
+mod ffi_tests {
+	use super::*;
+
+	// ── T9 (F10): build_preview's "terminal" arm ──────────────────
+	// `hooks::transform_terminal_output` overrides the classified type to
+	// "terminal" for exit-code/error-shaped output, but `build_preview` had
+	// no matching arm, so the preview silently fell through to the generic
+	// `_` branch (a bare line/byte count with no exit-code context).
+	#[test]
+	fn test_build_preview_terminal_surfaces_exit_code() {
+		let preview = build_preview("terminal", "running tests\nall good\nexit code: 1\n");
+		assert!(preview.starts_with("[terminal:"));
+		assert!(preview.contains("exit code: 1"), "preview should surface the exit code line: {preview}");
+	}
+
+	#[test]
+	fn test_build_preview_terminal_falls_back_to_last_line() {
+		let preview = build_preview("terminal", "line one\nline two\nlast line here\n");
+		assert!(preview.starts_with("[terminal:"));
+		assert!(preview.contains("last line here"), "preview should fall back to the last non-empty line: {preview}");
+	}
+
+	fn cs(s:&str) -> CString { CString::new(s).unwrap() }
+
+	unsafe fn take(ptr:*mut c_char) -> String {
+		assert!(!ptr.is_null(), "expected non-null C string");
+		let s = CStr::from_ptr(ptr).to_string_lossy().into_owned();
+		aphrodite_free_string(ptr);
+		s
+	}
+
+	#[test]
+	fn init_with_null_config_yields_parseable_handle() {
+		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
+		assert!(h.parse::<usize>().is_ok(), "handle {:?} should parse as usize", h);
+		aphrodite_destroy(cs(&h).as_ptr());
+	}
+
+	#[test]
+	fn compress_retrieve_destroy_roundtrip() {
+		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
+		let handle = cs(&h);
+
+		let compress_json = unsafe {
+			take(aphrodite_compress(
+				handle.as_ptr(),
+				cs("fn main() {}").as_ptr(),
+				cs("text").as_ptr(),
+			))
+		};
+		let v:serde_json::Value = serde_json::from_str(&compress_json).unwrap();
+		let hash = v["hash"].as_str().unwrap().to_string();
+		assert!(!hash.is_empty());
+
+		let retrieved = unsafe { take(aphrodite_retrieve(handle.as_ptr(), cs(&hash).as_ptr())) };
+		assert_eq!(retrieved, "fn main() {}");
+
+		aphrodite_destroy(handle.as_ptr());
+		// Handle is gone: any further stateful call reports invalid handle, no crash.
+		let after = unsafe { take(aphrodite_stats(handle.as_ptr())) };
+		assert!(after.contains("invalid handle"));
+	}
+
+	#[test]
+	fn retrieve_unknown_hash_returns_error_json() {
+		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
+		let handle = cs(&h);
+		let out = unsafe { take(aphrodite_retrieve(handle.as_ptr(), cs("deadbeef00000000").as_ptr())) };
+		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		assert!(v["error"].as_str().unwrap().contains("hash not found"));
+		aphrodite_destroy(handle.as_ptr());
+	}
+
+	#[test]
+	fn invalid_handles_are_rejected_without_crashing() {
+		for bad in ["999999", "abc", ""] {
+			let handle = cs(bad);
+			for out in [
+				unsafe { take(aphrodite_stats(handle.as_ptr())) },
+				unsafe { take(aphrodite_catalog(handle.as_ptr(), cs("full").as_ptr())) },
+				unsafe { take(aphrodite_search(handle.as_ptr(), cs("q").as_ptr())) },
+				unsafe { take(aphrodite_config_get(handle.as_ptr(), cs("model").as_ptr())) },
+				unsafe { take(aphrodite_session_start(handle.as_ptr())) },
+				unsafe { take(aphrodite_compress(handle.as_ptr(), cs("x").as_ptr(), cs("text").as_ptr())) },
+				unsafe { take(aphrodite_retrieve(handle.as_ptr(), cs("x").as_ptr())) },
+			] {
+				assert!(
+					out.contains("invalid handle"),
+					"expected invalid-handle error for {:?}, got {:?}",
+					bad,
+					out
+				);
+			}
+			// Must not panic even though the handle is bogus.
+			aphrodite_destroy(handle.as_ptr());
+		}
+	}
+
+	#[test]
+	fn classify_null_content_returns_error() {
+		let out = unsafe { take(aphrodite_classify(std::ptr::null())) };
+		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		assert_eq!(v["error"].as_str().unwrap(), "null content");
+	}
+
+	#[test]
+	fn dispatch_known_and_unknown_hooks() {
+		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
+		let handle = cs(&h);
+
+		let ok = unsafe {
+			take(aphrodite_dispatch(
+				handle.as_ptr(),
+				cs("session_start").as_ptr(),
+				cs("{}").as_ptr(),
+			))
+		};
+		assert!(serde_json::from_str::<serde_json::Value>(&ok).is_ok());
+
+		let unknown = unsafe {
+			take(aphrodite_dispatch(
+				handle.as_ptr(),
+				cs("not_a_real_hook").as_ptr(),
+				cs("{}").as_ptr(),
+			))
+		};
+		let v:serde_json::Value = serde_json::from_str(&unknown).unwrap();
+		assert!(v["error"].as_str().unwrap().contains("unknown hook"));
+
+		aphrodite_destroy(handle.as_ptr());
+	}
+
+	#[test]
+	fn free_string_null_is_a_no_op() { aphrodite_free_string(std::ptr::null_mut()); }
+
+	#[test]
+	fn oversize_content_is_rejected() {
+		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
+		let handle = cs(&h);
+		let big = "a".repeat(MAX_CONTENT + 1);
+		let out = unsafe { take(aphrodite_compress(handle.as_ptr(), cs(&big).as_ptr(), cs("text").as_ptr())) };
+		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		assert!(v["error"].as_str().unwrap().contains("16MB"));
+		aphrodite_destroy(handle.as_ptr());
+	}
+
+	// ── T3 (F5): the seven previously-unguarded extern fns must survive a
+	// panic without aborting - a deliberately panicking classify call must
+	// come back as error JSON, not crash the test process. ──
+	#[test]
+	fn guarded_helper_converts_panic_to_error_json() {
+		let ptr = guarded(|| panic!("deliberate test panic"));
+		let out = unsafe { take(ptr) };
+		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		assert!(v["error"].as_str().unwrap().contains("panicked"));
+	}
+
+	// ── T4 (F3): interior NUL bytes in stored/derived content must not
+	// panic `CString::new(...).unwrap()` at any of the five raw-return
+	// sites (retrieve, config_get, filter_lines, preview, stage2). A raw
+	// C-string *input* can never carry a NUL (by definition), so the only
+	// real ingress is via JSON args to `aphrodite_dispatch`, exactly as F3
+	// describes: `{"content":"a\u0000b"}` decodes to a Rust `String`
+	// containing a NUL byte.
+	#[test]
+	fn retrieve_tolerates_interior_nul_in_dispatched_content() {
+		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
+		let handle = cs(&h);
+		// Force compression regardless of size so a hash is always produced.
+		let _ = unsafe {
+			take(aphrodite_config_set(
+				handle.as_ptr(),
+				cs("tool_threshold").as_ptr(),
+				cs("0").as_ptr(),
+			))
+		};
+		let args = cs(r#"{"content":"x\u0000y","tool_name":"t"}"#);
+		let dispatched = unsafe {
+			take(aphrodite_dispatch(
+				handle.as_ptr(),
+				cs("transform_tool_result").as_ptr(),
+				args.as_ptr(),
+			))
+		};
+		let v:serde_json::Value = serde_json::from_str(&dispatched).unwrap();
+		let hash = v["hash"].as_str().expect("compression should have produced a hash").to_string();
+		// Must not panic even though the stored content contains a NUL byte.
+		let retrieved = unsafe { take(aphrodite_retrieve(handle.as_ptr(), cs(&hash).as_ptr())) };
+		assert_eq!(retrieved, "xy"); // NUL stripped, not left dangling
+		aphrodite_destroy(handle.as_ptr());
+	}
 }

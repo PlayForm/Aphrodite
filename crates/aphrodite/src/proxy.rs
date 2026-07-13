@@ -10,8 +10,10 @@
 //! Chat Completions API:
 //! - Forwards POST /v1/chat/completions to DeepSeek
 //! - Intercepts responses, compresses tool output via CCR
-//! - Injects aphrodite_retrieve tool definition into tool_calls when aphrodite
-//!   mode
+//! - Does NOT inject the aphrodite_retrieve tool definition into response
+//!   tool_calls (that was tried and reverted - see Bug 18 in
+//!   `compress_chat_completion`); the Python plugin registers the tool
+//!   instead.
 
 use std::{
 	collections::{HashMap, VecDeque},
@@ -124,6 +126,9 @@ async fn ccr_len(ccr:&Arc<dyn CcrStore>) -> usize {
 
 // ── State ──────────────────────────────────────────────────────────
 
+/// Shared proxy state: upstream client config, CCR backend, and all
+/// counters/caches used by request handlers. Wrapped in `Arc` and cloned
+/// into every axum handler.
 pub struct AppState {
 	pub client:HttpClient,
 	pub api_url:String,
@@ -144,10 +149,9 @@ pub struct AppState {
 	/// tolerated: a poisoned mutex returns Err, and unwrap_or_default gives
 	/// an empty/logical-default so the proxy stays up.
 	pub request_history:std::sync::Mutex<VecDeque<serde_json::Value>>,
-	/// Inline CCR for tiny entries - no round-trip needed (<
-	/// INLINE_CCR_THRESHOLD bytes) Lock uses `.lock().map(...)` - same poison
-	/// safety pattern. Bounded to 1024 entries via LruCache to prevent
-	/// unbounded memory growth.
+	/// Inline CCR for tiny entries - no round-trip needed (< INLINE_CCR_THRESHOLD
+	/// bytes). Lock uses `.lock().map(...)` - same poison safety pattern.
+	/// Bounded to 1024 entries via LruCache to prevent unbounded memory growth.
 	pub inline_ccr:std::sync::Mutex<lru::LruCache<String, String>>,
 
 	// Stats
@@ -167,6 +171,16 @@ pub struct AppState {
 	// Stats
 	pub requests_total:AtomicU64,
 	pub requests_compressed:AtomicU64,
+	/// Cumulative bytes saved by compression/caching, despite the name
+	/// (report 05 F5: the field is exposed as `tokens_saved` in `/stats` and
+	/// that external API name is kept for compatibility, but every call site
+	/// now accumulates raw BYTES - originally-removed content length minus
+	/// whatever replaced it (a rendered marker, or nothing at all on a full
+	/// cache hit) - never a token estimate. Previously one site divided by 4
+	/// to estimate tokens while every other site counted bytes, making the
+	/// counter internally inconsistent by 4x; another subtracted the bare
+	/// 40-char hash length instead of the actual (much longer) marker length,
+	/// overstating savings.
 	pub tokens_saved:AtomicU64,
 	pub ccr_hits:AtomicU64,
 	pub ccr_misses:AtomicU64,
@@ -190,7 +204,7 @@ pub struct AppState {
 	/// x-headroom-budget for adaptive compression.
 	pub fill_pct:AtomicU64,
 
-	/// Rhai scripting engine  -  user-defined micro-scripts for hook injection.
+	/// Rhai scripting engine - user-defined micro-scripts for hook injection.
 	/// None when scripting feature is disabled or not configured.
 	#[cfg(feature = "scripting")]
 	pub script_engine:Option<std::sync::Arc<crate::scripting::ScriptEngine>>,
@@ -292,7 +306,7 @@ impl AppState {
 	/// aggressively.
 	fn threshold_for(&self, ct:&str) -> usize {
 		let base = self.compress_threshold();
-		// Noisy types: keep at base threshold  -  coding sessions need build output
+		// Noisy types: keep at base threshold - coding sessions need build output
 		// visible
 		match ct {
 			"linter" | "build_output" | "log" => return base,
@@ -400,6 +414,8 @@ impl AppState {
 
 // ── Tool relay types ────────────────────────────────────────────────
 
+/// Inbound request body for `POST /tool_relay`: a Hermes-side tool call to
+/// execute against this proxy's CCR state (e.g. `aphrodite_retrieve`).
 #[derive(Debug, Deserialize)]
 pub struct ToolRelayRequest {
 	pub tool:String,
@@ -407,6 +423,10 @@ pub struct ToolRelayRequest {
 	pub callback_url:Option<String>,
 }
 
+/// Response for a tool relay call. When `callback_url` was set on the
+/// request, the call runs asynchronously and this comes back immediately
+/// with `async_call:true` and no `result` - the real result is POSTed to
+/// the callback URL later.
 #[derive(Debug, Serialize)]
 pub struct ToolRelayResponse {
 	pub success:bool,
@@ -417,6 +437,8 @@ pub struct ToolRelayResponse {
 
 // ── CCR management types ────────────────────────────────────────────
 
+/// Inbound request body for `POST /ccr/create`: store `content` under an
+/// optional caller-supplied `key` (defaults to the content hash).
 #[derive(Debug, Deserialize)]
 pub struct CcrCreateRequest {
 	pub content:String,
@@ -425,6 +447,8 @@ pub struct CcrCreateRequest {
 	pub tags:Option<Vec<String>>,
 }
 
+/// Response for `POST /ccr/create`, reporting the resulting hash and the
+/// size reduction achieved.
 #[derive(Debug, Serialize)]
 pub struct CcrCreateResponse {
 	pub hash:String,
@@ -434,6 +458,9 @@ pub struct CcrCreateResponse {
 	pub marker_size:usize,
 }
 
+/// Webhook payload POSTed to `notify_url` when a new CCR entry is created,
+/// so external subscribers (e.g. Hermes) can track store growth without
+/// polling.
 #[derive(Debug, Serialize)]
 pub struct CcrNotification {
 	pub event:String,
@@ -445,6 +472,9 @@ pub struct CcrNotification {
 
 // ── Build state ─────────────────────────────────────────────────────
 
+/// Construct `AppState` from CLI config: builds the tuned HTTP client,
+/// opens the CCR backend appropriate for `cli.mode` (SQLite for Token,
+/// in-memory for Cache), and zeroes all counters.
 pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 	// Tuned HttpClient for high-concurrency API proxy workload.
 	// Default pool: 100 idle connections per host, 90s idle timeout, keepalive.
@@ -459,28 +489,23 @@ pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 	let ccr:Option<Arc<dyn CcrStore>> = match cli.mode {
 		ProxyMode::Token if !cli.no_ccr_marker => {
 			let db_path = cli.ccr_db_path.as_ref().map_or_else(
-			|| {
-				dirs::home_dir()
-					.unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-					.join(".hermes")
-					.join("aphrodite")
-					.join("ccr.db")
-			},
-			|p| p.clone(),
-		);
+				|| {
+					dirs::home_dir()
+						.unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+						.join(".hermes")
+						.join("aphrodite")
+						.join("ccr.db")
+				},
+				|p| p.clone(),
+			);
 			// Ensure parent directories exist before opening SQLite DB.
 			// Without this, a missing ~/.hermes/aphrodite/ directory causes
 			// the token proxy to fail silently at startup while the cache
-			// proxy continues running — a partial-failure that's invisible
+			// proxy continues running - a partial-failure that's invisible
 			// to the plugin because stderr is piped to DEVNULL.
 			if let Some(parent) = db_path.parent() {
-				std::fs::create_dir_all(parent).map_err(|e| {
-					anyhow::anyhow!(
-						"SQLite CCR: cannot create directory {}: {}",
-						parent.display(),
-						e
-					)
-				})?;
+				std::fs::create_dir_all(parent)
+					.map_err(|e| anyhow::anyhow!("SQLite CCR: cannot create directory {}: {}", parent.display(), e))?;
 			}
 			let store = SqliteCcrStore::open(&db_path, cli.ccr_ttl_seconds)
 				.map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
@@ -532,7 +557,7 @@ pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 		fill_pct:AtomicU64::new(9000), // 90.00% - moderate fill initial default
 		task_tracker:TaskTracker::new(),
 
-		// Scripting engine  -  enabled via --scripting or APHRODITE_SCRIPTING=1
+		// Scripting engine - enabled via --scripting or APHRODITE_SCRIPTING=1
 		#[cfg(feature = "scripting")]
 		script_engine:crate::scripting_enabled().then(|| {
 			let engine = crate::scripting::ScriptEngine::new();
@@ -658,8 +683,12 @@ pub async fn proxy_handler(
 	if let Some(ck) = cache_key {
 		if let Some(cached_body) = state.response_cache.lock().ok().and_then(|mut cache| cache.get(&ck).cloned()) {
 			state.cache_hits.fetch_add(1, Ordering::Relaxed);
-			state.tokens_saved.fetch_add(cached_body.len() as u64 / 4, Ordering::Relaxed);
-			// Estimate tokens saved: ~4 bytes per token for the cached content
+			// Bytes throughout (report 05 F5): a full upstream round-trip
+			// was avoided, so the whole cached response body counts as
+			// saved - previously this divided by 4 to estimate a token
+			// count while every other `tokens_saved` site counted raw
+			// bytes, making the field internally inconsistent by 4x.
+			state.tokens_saved.fetch_add(cached_body.len() as u64, Ordering::Relaxed);
 			if state.dev {
 				tracing::info!(
 					id = %req_id_short,
@@ -1029,21 +1058,12 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after_fn = if t.starts_with("pub async fn ") {
-						&t[14..]
-					} else if t.starts_with("pub fn ") {
-						&t[7..]
-					} else if t.starts_with("async fn ") {
-						&t[9..]
-					} else if t.starts_with("fn ") {
-						&t[3..]
-					} else {
-						return None;
-					};
-					after_fn
-						.split(|c:char| c == '(' || c == ' ' || c == '<')
-						.next()
-						.filter(|s| !s.is_empty())
+					let after_fn = t
+						.strip_prefix("pub async fn ")
+						.or_else(|| t.strip_prefix("pub fn "))
+						.or_else(|| t.strip_prefix("async fn "))
+						.or_else(|| t.strip_prefix("fn "))?;
+					after_fn.split(['(', ' ', '<']).next().filter(|s| !s.is_empty())
 				})
 				.collect();
 			if !fns.is_empty() {
@@ -1058,11 +1078,10 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after = if t.starts_with("pub struct ") { &t[11..] } else { &t[7..] };
-					after
-						.split(|c:char| c == '(' || c == ' ' || c == '<' || c == '{')
-						.next()
-						.filter(|s| !s.is_empty())
+					let after = t
+						.strip_prefix("pub struct ")
+						.unwrap_or_else(|| t.strip_prefix("struct ").unwrap_or(t));
+					after.split(['(', ' ', '<', '{']).next().filter(|s| !s.is_empty())
 				})
 				.collect();
 			if !structs.is_empty() {
@@ -1078,7 +1097,9 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after = if t.starts_with("pub impl ") { &t[9..] } else { &t[5..] };
+					let after = t
+						.strip_prefix("pub impl ")
+						.unwrap_or_else(|| t.strip_prefix("impl ").unwrap_or(t));
 					after.split_whitespace().next().map(|w| w.trim_end_matches('<'))
 				})
 				.collect();
@@ -1094,11 +1115,10 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after = if t.starts_with("pub trait ") { &t[10..] } else { &t[6..] };
-					after
-						.split(|c:char| c == ' ' || c == '<' || c == '{')
-						.next()
-						.filter(|s| !s.is_empty())
+					let after = t
+						.strip_prefix("pub trait ")
+						.unwrap_or_else(|| t.strip_prefix("trait ").unwrap_or(t));
+					after.split([' ', '<', '{']).next().filter(|s| !s.is_empty())
 				})
 				.collect();
 			if !traits.is_empty() {
@@ -1117,11 +1137,10 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after = if t.starts_with("async def ") { &t[10..] } else { &t[4..] };
-					after
-						.split(|c:char| c == '(' || c == ' ' || c == ':')
-						.next()
-						.filter(|s| !s.is_empty())
+					let after = t
+						.strip_prefix("async def ")
+						.unwrap_or_else(|| t.strip_prefix("def ").unwrap_or(t));
+					after.split(['(', ' ', ':']).next().filter(|s| !s.is_empty())
 				})
 				.collect();
 			if !fns.is_empty() {
@@ -1135,11 +1154,8 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after = &t[6..];
-					after
-						.split(|c:char| c == '(' || c == ' ' || c == ':')
-						.next()
-						.filter(|s| !s.is_empty())
+					let after = t.strip_prefix("class ")?;
+					after.split(['(', ' ', ':']).next().filter(|s| !s.is_empty())
 				})
 				.collect();
 			if !classes.is_empty() {
@@ -1153,13 +1169,10 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					if t.starts_with("import ") {
-						t[7..]
-							.split(|c:char| c == ' ' || c == ',' || c == ';')
-							.next()
-							.filter(|s| !s.is_empty())
+					if let Some(rest) = t.strip_prefix("import ") {
+						rest.split([' ', ',', ';']).next().filter(|s| !s.is_empty())
 					} else {
-						t[5..].split(' ').next().filter(|s| !s.is_empty())
+						t.strip_prefix("from ")?.split(' ').next().filter(|s| !s.is_empty())
 					}
 				})
 				.collect();
@@ -1176,7 +1189,7 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				.filter_map(|l| {
 					let t = l.trim_start();
 					let name = &t[1..];
-					name.split(|c:char| c == '(' || c == ' ').next().filter(|s| !s.is_empty())
+					name.split(['(', ' ']).next().filter(|s| !s.is_empty())
 				})
 				.collect();
 			if !decorators.is_empty() {
@@ -1194,8 +1207,8 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					let after = &t[5..];
-					after.split(|c:char| c == '(' || c == ' ').next().filter(|s| !s.is_empty())
+					let after = t.strip_prefix("func ")?;
+					after.split(['(', ' ']).next().filter(|s| !s.is_empty())
 				})
 				.collect();
 			if !fns.is_empty() {
@@ -1213,11 +1226,11 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					if t.starts_with("function ") {
-						t[9..].split(|c:char| c == '(' || c == ' ').next().filter(|s| !s.is_empty())
+					if let Some(rest) = t.strip_prefix("function ") {
+						rest.split(['(', ' ']).next().filter(|s| !s.is_empty())
 					} else {
-						t[6..]
-							.split(|c:char| c == ' ' || c == '=' || c == ':')
+						t.strip_prefix("const ")?
+							.split([' ', '=', ':'])
 							.next()
 							.filter(|s| !s.is_empty())
 					}
@@ -1244,21 +1257,14 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				})
 				.filter_map(|l| {
 					let t = l.trim_start();
-					if t.starts_with("fn ") {
-						t[3..].split(|c:char| c == '(' || c == ' ').next()
-					} else if t.starts_with("def ") {
-						t[4..].split(|c:char| c == '(' || c == ' ').next()
-					} else if t.starts_with("func ") {
-						t[5..].split(|c:char| c == '(' || c == ' ').next()
-					} else if t.starts_with("function ") {
-						t[9..].split(|c:char| c == '(' || c == ' ').next()
-					} else if t.starts_with("class ") {
-						t[6..].split(|c:char| c == '(' || c == ' ').next()
-					} else if t.starts_with("struct ") {
-						t[7..].split(|c:char| c == '(' || c == ' ').next()
-					} else {
-						None
-					}
+					let after = t
+						.strip_prefix("fn ")
+						.or_else(|| t.strip_prefix("def "))
+						.or_else(|| t.strip_prefix("func "))
+						.or_else(|| t.strip_prefix("function "))
+						.or_else(|| t.strip_prefix("class "))
+						.or_else(|| t.strip_prefix("struct "))?;
+					after.split(['(', ' ']).next()
 				})
 				.collect();
 			if !sigs.is_empty() {
@@ -1272,8 +1278,19 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 				let t = l.trim();
 				let ext_pos = t.find(".rs:").or_else(|| t.find(".py:")).or_else(|| t.find(".go:"));
 				if let Some(pos) = ext_pos {
-					let start = pos.saturating_sub(12);
-					let end = (pos + 40).min(t.len());
+					// `pos` itself is a valid boundary (`.find` on ASCII
+					// patterns), but `start`/`end` are arbitrary byte offsets
+					// from it and can land mid-codepoint on non-ASCII lines
+					// (e.g. a CJK comment before ".rs:") - snap both to the
+					// nearest valid boundary rather than panicking on `t[..]`.
+					let mut start = pos.saturating_sub(12);
+					while start > 0 && !t.is_char_boundary(start) {
+						start -= 1;
+					}
+					let mut end = (pos + 40).min(t.len());
+					while end < t.len() && !t.is_char_boundary(end) {
+						end += 1;
+					}
 					trace = t[start..end].to_string();
 					break;
 				}
@@ -1319,8 +1336,8 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 		"git" => {
 			for l in content.lines() {
 				let t = l.trim();
-				if t.starts_with("On branch ") {
-					parts.push(format!("branch={}", t[10..].trim().replace('|', "/")));
+				if let Some(rest) = t.strip_prefix("On branch ") {
+					parts.push(format!("branch={}", rest.trim().replace('|', "/")));
 					break;
 				}
 			}
@@ -1344,8 +1361,6 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 		"build_output" => {
 			if content.contains("error") || content.contains("aborting") {
 				parts.push("status=FAIL".to_string());
-			} else if content.contains("Finished") {
-				parts.push("status=OK".to_string());
 			} else {
 				parts.push("status=OK".to_string());
 			}
@@ -1460,13 +1475,11 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 	}
 
 	// Build final string: ;-separated key=value pairs (; safe within CCR marker's |
-	// delimiters) Comma separates list items within values. Max 400 chars
+	// delimiters). Comma separates list items within values. Max 400 chars
 	// (coding-tuned: enough for ~25 functions).
 	let result = parts.join(";").replace('\n', " ").replace('\r', "");
 	let truncated:String = result.chars().take(400).collect();
-	truncated
-		.trim_end_matches(|c:char| c == ';' || c == ' ' || c == ',')
-		.to_string()
+	truncated.trim_end_matches([';', ' ', ',']).to_string()
 }
 
 // ── CCR output template (editable) ────────────────────────────────
@@ -1537,12 +1550,10 @@ fn build_preview(content:&str, ct:&str) -> String {
 					}
 				}
 				// Go patterns
-				if ct == "code_go" {
-					if trimmed.starts_with("func ") {
-						let s:String = trimmed.chars().take(58).collect();
-						fns.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					}
+				if ct == "code_go" && trimmed.starts_with("func ") {
+					let s:String = trimmed.chars().take(58).collect();
+					fns.push(trimmed);
+					budget = budget.saturating_sub(s.len() + 2);
 				}
 			}
 
@@ -1621,7 +1632,7 @@ fn smart_marker(hash:&str, content:&str, ct:&str, center:Option<&str>) -> String
 	format_ccr_output(&preview, ct, &metadata, center, hash, size)
 }
 
-/// Cache-mode CCR output  -  preview + marker, same template.
+/// Cache-mode CCR output - preview + marker, same template.
 fn cache_marker(hash:&str, content:&str, ct:&str, center:Option<&str>) -> String {
 	let size = content.len();
 	let preview:String = content.chars().take(512).collect();
@@ -1640,7 +1651,7 @@ async fn compress_chat_completion(
 
 	// Headroom budget: lower values compress more aggressively.
 	// Coding-tuned: smooth linear curve from 0.50 (empty) to 1.0 (full).
-	// Never below 0.5×  -  semantics and tool chains are worth the tokens.
+	// Never below 0.5× - semantics and tool chains are worth the tokens.
 	let budget_mult = headroom_budget
 		.and_then(|b| {
 			let val:f64 = b.parse().ok()?;
@@ -1667,9 +1678,6 @@ async fn compress_chat_completion(
 							state.ccr_misses.fetch_add(1, Ordering::Relaxed);
 							ccr_put(ccr, &hash, content).await;
 							state.ccr_created.fetch_add(1, Ordering::Relaxed);
-							state
-								.tokens_saved
-								.fetch_add((content.len() - hash.len()) as u64, Ordering::Relaxed);
 						}
 
 						let (compressed, orig_len) = {
@@ -1682,6 +1690,14 @@ async fn compress_chat_completion(
 							(compressed, len)
 						};
 						let marker_len = compressed.len();
+						// Savings = bytes actually removed from the response
+						// (original content minus the rendered marker that
+						// replaces it), not the bare hash length - the marker
+						// is hundreds of chars longer than the 40-char hash,
+						// so subtracting only `hash.len()` overstated savings
+						// (report 05 F5). Unit is bytes throughout - see
+						// `tokens_saved`'s field doc for the naming caveat.
+						state.tokens_saved.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
 						*content_val = serde_json::Value::String(compressed);
 						did_compress = true;
 						state.update_compression_ratio(orig_len, marker_len);
@@ -1722,9 +1738,6 @@ async fn compress_chat_completion(
 											state.ccr_misses.fetch_add(1, Ordering::Relaxed);
 											ccr_put(ccr, &hash, &args_owned).await;
 											state.ccr_created.fetch_add(1, Ordering::Relaxed);
-											state
-												.tokens_saved
-												.fetch_add((args_owned.len() - hash.len()) as u64, Ordering::Relaxed);
 										}
 										let (compressed, orig_len) = {
 											let compressed = smart_marker(&hash, &args_owned, ct, None);
@@ -1733,6 +1746,13 @@ async fn compress_chat_completion(
 											(compressed, len)
 										};
 										let marker_len = compressed.len();
+										// Savings = bytes removed by the marker
+										// replacement, not the bare hash length
+										// (report 05 F5) - see the sibling fix
+										// above for `message.content`.
+										state
+											.tokens_saved
+											.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
 										*args = serde_json::Value::String(compressed);
 										did_compress = true;
 										state.update_compression_ratio(orig_len, marker_len);
@@ -1765,6 +1785,11 @@ async fn compress_chat_completion(
 
 // ── Tool relay handler ───────────────────────────────────────────────
 
+/// `POST /tool_relay` - dispatches a Hermes-side tool call (see
+/// [`execute_tool_relay`]). Runs synchronously unless the request carries
+/// an `https://` `callback_url`, in which case it's spawned onto
+/// `task_tracker` and the result is POSTed back later instead of returned
+/// inline.
 pub async fn handle_tool_relay(
 	State(state):State<Arc<AppState>>,
 	Json(req):Json<ToolRelayRequest>,
@@ -1772,9 +1797,8 @@ pub async fn handle_tool_relay(
 	state.tool_relay_calls.fetch_add(1, Ordering::Relaxed);
 	tracing::info!(tool = %req.tool, "tool_relay");
 
-	// Validate aphrodite_retrieve: hash is required.
-	// hash are invalid and must return 400 BAD_REQUEST instead of silently passing
-	// through.
+	// Validate aphrodite_retrieve: requests with only `query` and no `hash` are
+	// invalid and must return 400 BAD_REQUEST instead of silently passing through.
 	if req.tool == "aphrodite_retrieve" && req.params.get("hash").and_then(|v| v.as_str()).is_none() {
 		return (
 			StatusCode::BAD_REQUEST,
@@ -1832,6 +1856,9 @@ pub async fn handle_tool_relay(
 	}
 }
 
+/// Dispatch a single tool-relay call by name (`aphrodite_retrieve`,
+/// `aphrodite_compress`, `aphrodite_list`) - the actual work behind
+/// `POST /tool_relay`, called from [`handle_tool_relay`].
 async fn execute_tool_relay(
 	state:&AppState,
 	tool:&str,
@@ -1839,7 +1866,13 @@ async fn execute_tool_relay(
 ) -> Result<serde_json::Value, String> {
 	match tool {
 		"aphrodite_retrieve" => {
-			let hash = params.get("hash").and_then(|v| v.as_str()).ok_or("missing hash")?;
+			let hash_raw = params.get("hash").and_then(|v| v.as_str()).ok_or("missing hash")?;
+			// Strip a `|type|size` marker-body suffix and surrounding
+			// whitespace (report 05 F3) - an LLM sometimes echoes the full
+			// marker body back as the hash argument instead of the bare
+			// hash, and the lookups below (inline_ccr, CCR backend) are
+			// exact-match only.
+			let hash = crate::marker::normalize_hash(hash_raw);
 			// Check inline_ccr first (no round-trip needed for tiny entries)
 			if let Ok(mut map) = state.inline_ccr.lock() {
 				if let Some(content) = map.get(hash) {
@@ -1863,7 +1896,7 @@ async fn execute_tool_relay(
 			let center = params.get("_ccr_center").and_then(|v| v.as_str());
 			let hash = compute_key(content.as_bytes());
 			let size = content.len();
-			if size < INLINE_CCR_THRESHOLD as usize {
+			if size < INLINE_CCR_THRESHOLD {
 				// Tiny content: store inline to avoid CCR backend round-trip
 				if let Ok(mut map) = state.inline_ccr.lock() {
 					if map.contains(&hash) {
@@ -1880,11 +1913,12 @@ async fn execute_tool_relay(
 				}))
 			} else if let Some(ccr) = &state.ccr {
 				ccr_put(ccr, &hash, content).await;
-				state
-					.tokens_saved
-					.fetch_add(size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
+				let compressed = smart_marker(&hash, content, "compress", center);
+				// Savings = bytes removed by the marker replacement, not the
+				// bare hash length (report 05 F5).
+				state.tokens_saved.fetch_add(size.saturating_sub(compressed.len()) as u64, Ordering::Relaxed);
 				Ok(serde_json::json!({
-					"compressed": smart_marker(&hash, content, "compress", center),
+					"compressed": compressed,
 					"hash": hash,
 					"original_size": size
 				}))
@@ -1911,6 +1945,11 @@ async fn execute_tool_relay(
 
 // ── Programmatic CCR handlers ────────────────────────────────────────
 
+/// `POST /ccr/create` - stores content directly into the CCR backend,
+/// bypassing the Chat Completions compression path. Accepts either a JSON
+/// [`CcrCreateRequest`] body or a raw octet-stream (treated as the content
+/// itself, hashed for the key). Fires the `notify_url` webhook on success
+/// if configured.
 pub async fn handle_ccr_create(
 	State(state):State<Arc<AppState>>,
 	headers:axum::http::HeaderMap,
@@ -1929,6 +1968,12 @@ pub async fn handle_ccr_create(
 				if let Some(ccr) = &state.ccr {
 					ccr_put(ccr, &hash, &req.content).await;
 					state.ccr_created.fetch_add(1, Ordering::Relaxed);
+					// Unlike the chat-completion/tool-relay paths, this
+					// endpoint's documented wire contract IS the bare hash
+					// (see `compressed_size`/`marker_size` below and
+					// `test_ccr_create_response_serde_shape`) - no marker is
+					// rendered here, so `hash.len()` is the correct
+					// subtractee, not an approximation (report 05 F5).
 					state
 						.tokens_saved
 						.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
@@ -2008,6 +2053,8 @@ pub async fn handle_ccr_create(
 			ccr_put(ccr, &hash, &content).await;
 			state.ccr_created.fetch_add(1, Ordering::Relaxed);
 			state.requests_compressed.fetch_add(1, Ordering::Relaxed);
+			// See the JSON-body branch above: this endpoint's wire contract
+			// IS the bare hash, so `hash.len()` is the correct subtractee.
 			state
 				.tokens_saved
 				.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
@@ -2029,6 +2076,8 @@ pub async fn handle_ccr_create(
 	}
 }
 
+/// `GET /ccr/list` - reports entry count and backend kind for the active
+/// CCR store (no listing of actual entries/hashes).
 pub async fn handle_ccr_list(State(state):State<Arc<AppState>>) -> impl IntoResponse {
 	match &state.ccr {
 		Some(ccr) => {
@@ -2049,6 +2098,8 @@ pub async fn handle_ccr_list(State(state):State<Arc<AppState>>) -> impl IntoResp
 	}
 }
 
+/// `DELETE /ccr/:hash` - removes a single entry from the CCR backend.
+/// Returns 404 if the hash wasn't present, 503 if no backend is configured.
 pub async fn handle_ccr_delete(
 	State(state):State<Arc<AppState>>,
 	axum::extract::Path(hash):axum::extract::Path<String>,
@@ -2112,10 +2163,11 @@ pub async fn handle_ccr_reload() -> impl IntoResponse {
 
 // ── Health check ────────────────────────────────────────────────────
 
+/// `GET /health` - local-only liveness check; does not call the upstream
+/// API (see `/health/upstream` for that). Always returns 200 - capability
+/// state (e.g. whether CCR is enabled) is conveyed via the JSON body
+/// instead of the status code, since CCR is optional/opt-in.
 pub async fn health_check(State(state):State<Arc<AppState>>) -> impl IntoResponse {
-	// Local-only health - no upstream API call (done separately via
-	// /health/upstream) Always 200 - capability state conveyed via JSON body (CCR
-	// is optional/opt-in)
 	let ccr_ok = state.ccr.is_some();
 
 	(
@@ -2134,10 +2186,13 @@ pub async fn health_check(State(state):State<Arc<AppState>>) -> impl IntoRespons
 		.into_response()
 }
 
-// ── Tests
+// ── Tests ────────────────────────────────────────────────────────────
 
+// `pub(crate)` (not private) so other in-crate test modules - e.g.
+// `retrieve::tests` - can reach `test_state_with_ccr()` without duplicating
+// `AppState`'s ~47-field literal (report 05 T5 verification).
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 	use super::*;
 
 	#[test]
@@ -2219,7 +2274,9 @@ mod tests {
 	}
 
 	#[test]
-	fn test_ccr_create_response() {
+	fn test_ccr_create_response_serde_shape() {
+		// Pins the wire contract of POST /ccr/create: field names and values
+		// as they actually serialize, not just struct-literal field access.
 		let resp = CcrCreateResponse {
 			hash:"abc123".into(),
 			token_savings_ratio:2.5,
@@ -2227,26 +2284,213 @@ mod tests {
 			compressed_size:40,
 			marker_size:40,
 		};
-		assert_eq!(resp.hash, "abc123");
-		assert!((resp.token_savings_ratio - 2.5).abs() < 0.01);
+		let v = serde_json::to_value(&resp).unwrap();
+		assert_eq!(v["hash"], "abc123");
+		assert_eq!(v["original_size"], 100);
+		assert_eq!(v["compressed_size"], 40);
+		assert_eq!(v["marker_size"], 40);
+		assert!((v["token_savings_ratio"].as_f64().unwrap() - 2.5).abs() < 0.01);
+		// Regression guard for bench_01/02 (F3): the field is
+		// `token_savings_ratio`, never `compression_ratio`.
+		assert!(v.get("compression_ratio").is_none());
 	}
 
 	#[test]
-	fn test_tool_relay_response_sync() {
+	fn test_tool_relay_response_sync_serde_shape() {
 		let resp = ToolRelayResponse {
 			success:true,
 			result:Some(serde_json::json!({"found": true})),
 			error:None,
 			async_call:false,
 		};
-		assert!(resp.success);
-		assert!(!resp.async_call);
+		let v = serde_json::to_value(&resp).unwrap();
+		assert_eq!(v["success"], true);
+		assert_eq!(v["async_call"], false);
+		assert_eq!(v["result"]["found"], true);
+		assert!(v["error"].is_null());
 	}
 
 	#[test]
-	fn test_tool_relay_response_async() {
+	fn test_tool_relay_response_async_serde_shape() {
 		let resp = ToolRelayResponse { success:true, result:None, error:None, async_call:true };
-		assert!(resp.async_call);
+		let v = serde_json::to_value(&resp).unwrap();
+		assert_eq!(v["async_call"], true);
+		assert!(v["result"].is_null());
+	}
+
+	// ── T3: detect_content_type ─────────────────────────────────
+	#[test]
+	fn test_detect_content_type_json_tool_output() {
+		assert_eq!(detect_content_type(r#"{"exit_code": 0, "output": "ok"}"#), "tool_output");
+	}
+
+	#[test]
+	fn test_detect_content_type_invalid_json_is_text() {
+		// Starts with '{' but isn't valid JSON - must not be misclassified.
+		assert_eq!(detect_content_type("{ not json at all"), "text");
+	}
+
+	#[test]
+	fn test_detect_content_type_json_array() {
+		assert_eq!(detect_content_type(r#"[{"a":1},{"a":2}]"#), "json");
+	}
+
+	#[test]
+	fn test_detect_content_type_rust_code() {
+		let src = "use std::fmt;\nfn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
+		assert_eq!(detect_content_type(src), "code_rust");
+	}
+
+	#[test]
+	fn test_detect_content_type_python_code() {
+		let src = "import os\nclass Foo:\n    def bar(self):\n        pass\n";
+		assert_eq!(detect_content_type(src), "code_python");
+	}
+
+	#[test]
+	fn test_detect_content_type_go_code() {
+		let src = "package main\nimport (\n\t\"fmt\"\n)\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n";
+		assert_eq!(detect_content_type(src), "code_go");
+	}
+
+	#[test]
+	fn test_detect_content_type_js_code() {
+		let src = "import { foo } from 'bar';\nexport const add = (a, b) => a + b;\nconst x = 1;\nconst y = 2;\n";
+		assert_eq!(detect_content_type(src), "code_js");
+	}
+
+	#[test]
+	fn test_detect_content_type_error_first_line() {
+		assert_eq!(
+			detect_content_type("Traceback (most recent call last):\n  File \"x.py\", line 1\nValueError: bad\n"),
+			"error"
+		);
+	}
+
+	#[test]
+	fn test_detect_content_type_diff() {
+		let d = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,3 +1,4 @@\n+added a \
+		         line\n";
+		assert_eq!(detect_content_type(d), "diff");
+	}
+
+	#[test]
+	fn test_detect_content_type_log_lines() {
+		// Must not start with '{'/'[' (that short-circuits to the JSON branch).
+		let log = "starting up\n[INFO] service ready\n[WARN] disk low\n[ERROR] connection lost\n";
+		assert_eq!(detect_content_type(log), "log");
+	}
+
+	#[test]
+	fn test_detect_content_type_empty_is_text() {
+		assert_eq!(detect_content_type(""), "text");
+	}
+
+	#[test]
+	fn test_detect_content_type_plain_text() {
+		assert_eq!(detect_content_type("just some plain text\nnothing special\n"), "text");
+	}
+
+	// ── T3: generate_metadata ───────────────────────────────────
+	#[test]
+	fn test_generate_metadata_rust_has_lang_and_fns() {
+		let src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
+		let meta = generate_metadata(src, "code_rust");
+		assert!(meta.contains("lang=rs"));
+		assert!(meta.contains("fns=add"));
+	}
+
+	#[test]
+	fn test_generate_metadata_escapes_pipes() {
+		// The 'On branch' line can legally contain a literal '|' - must be escaped to
+		// '/'.
+		let src = "On branch feature|weird\n";
+		let meta = generate_metadata(src, "git");
+		assert!(!meta.contains('|'), "metadata must not contain a raw pipe: {meta}");
+	}
+
+	#[test]
+	fn test_generate_metadata_max_400_chars() {
+		let src = (0..100).map(|i| format!("fn f{i}() {{}}")).collect::<Vec<_>>().join("\n");
+		let meta = generate_metadata(&src, "code_rust");
+		assert!(meta.chars().count() <= 400, "metadata too long: {} chars", meta.chars().count());
+	}
+
+	#[test]
+	fn test_generate_metadata_error_branch_no_panic_on_multibyte_utf8() {
+		// Multi-byte UTF-8 characters sit right around the ".rs:" match position -
+		// byte-index slicing here must not panic on a non-char-boundary.
+		let src = "日本語エラー at src/日本.rs:10:5 something\n";
+		let meta = generate_metadata(src, "error");
+		// No assertion beyond "did not panic" is required, but sanity-check shape.
+		assert!(meta.is_empty() || meta.contains("trace=") || meta.contains("msg="));
+	}
+
+	#[test]
+	fn test_generate_metadata_text_has_line_count() {
+		let meta = generate_metadata("a\nb\nc\n", "text");
+		assert_eq!(meta, "ln=3");
+	}
+
+	// ── T3: build_preview ────────────────────────────────────────
+	#[test]
+	fn test_build_preview_code_has_ct_prefix() {
+		let src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
+		let preview = build_preview(src, "code_rust");
+		assert!(preview.starts_with("[code_rust:"));
+	}
+
+	#[test]
+	fn test_build_preview_error_has_ct_prefix_via_error_line() {
+		let src = "some noise\nerror[E0308]: mismatched types\nmore noise\n";
+		let preview = build_preview(src, "error");
+		assert!(preview.contains("error[E0308]"));
+	}
+
+	#[test]
+	fn test_build_preview_diff_has_ct_prefix() {
+		let src = "diff --git a/x b/x\n--- a/x\n+++ a/x\n";
+		let preview = build_preview(src, "diff");
+		assert!(preview.starts_with("diff --git"));
+	}
+
+	#[test]
+	fn test_build_preview_json_has_ct_prefix() {
+		let src = "{\"a\":1,\"b\":2}\n";
+		let preview = build_preview(src, "json");
+		assert!(preview.contains("keys"));
+	}
+
+	// ── T3: cache_key_from_body / fnv1a_64 ────────────────────────
+	#[test]
+	fn test_cache_key_from_body_deterministic() {
+		let body = br#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}"#;
+		let k1 = cache_key_from_body(body, "key-a");
+		let k2 = cache_key_from_body(body, "key-a");
+		assert!(k1.is_some());
+		assert_eq!(k1, k2);
+	}
+
+	#[test]
+	fn test_cache_key_from_body_differs_by_api_key() {
+		let body = br#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}"#;
+		let k1 = cache_key_from_body(body, "key-a");
+		let k2 = cache_key_from_body(body, "key-b");
+		assert_ne!(k1, k2);
+	}
+
+	#[test]
+	fn test_cache_key_from_body_none_on_junk() {
+		assert_eq!(cache_key_from_body(b"not json", "key"), None);
+		assert_eq!(cache_key_from_body(b"{}", "key"), None); // missing model/messages
+	}
+
+	#[test]
+	fn test_fnv1a_64_known_vectors() {
+		// FNV-1a 64-bit offset basis is the hash of the empty input.
+		assert_eq!(fnv1a_64(b""), 14695981039346656037);
+		// Two different inputs should (overwhelmingly likely) hash differently.
+		assert_ne!(fnv1a_64(b"a"), fnv1a_64(b"b"));
 	}
 
 	fn test_state() -> AppState {
@@ -2303,6 +2547,299 @@ mod tests {
 			request_body_bytes:AtomicU64::new(0),
 			response_body_bytes:AtomicU64::new(0),
 			upstream_latency_micros:AtomicU64::new(0),
+		}
+	}
+
+	/// `test_state()` with a real (in-memory) CCR backend attached, since
+	/// `compress_chat_completion` only compresses when `state.ccr` is `Some`.
+	///
+	/// `pub(crate)` (rather than private) so other in-crate test modules -
+	/// e.g. `retrieve::tests` - can build a real `AppState` without
+	/// duplicating this ~40-field literal (report 05 T5 verification).
+	pub(crate) fn test_state_with_ccr() -> AppState {
+		AppState {
+			ccr:Some(std::sync::Arc::new(InMemoryCcrStore::with_capacity_and_ttl(
+				1000,
+				std::time::Duration::from_secs(300),
+			))),
+			mode:ProxyMode::Token,
+			..test_state()
+		}
+	}
+
+	fn chat_completion_body(content:&str) -> Vec<u8> {
+		serde_json::json!({
+			"choices": [{
+				"message": {"role": "assistant", "content": content}
+			}]
+		})
+		.to_string()
+		.into_bytes()
+	}
+
+	// ── T4: compress_chat_completion ────────────────────────────
+	#[test]
+	fn test_compress_chat_completion_above_threshold_produces_marker() {
+		// Token mode base threshold is 1024B; a large repeated text block
+		// stays well above any auto-tuned multiplier of it.
+		let content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
+		let body = chat_completion_body(&content);
+		let state = test_state_with_ccr();
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+
+		let response = result.expect("content above threshold must be compressed");
+		let new_content = response["choices"][0]["message"]["content"].as_str().unwrap();
+		assert!(new_content.contains("<<<CCR:"), "expected a CCR marker, got: {new_content}");
+
+		// The original content must be retrievable from the CCR store.
+		let ccr = state.ccr.as_ref().unwrap().clone();
+		let hash = compute_key(content.as_bytes());
+		let stored = tokio::runtime::Runtime::new().unwrap().block_on(ccr_get(&ccr, &hash));
+		assert_eq!(stored.as_deref(), Some(content.as_str()));
+	}
+
+	#[test]
+	fn test_compress_chat_completion_below_threshold_is_none() {
+		let content = "short reply";
+		let body = chat_completion_body(content);
+		let state = test_state_with_ccr();
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+
+		assert!(result.is_none(), "short content must not be compressed: {result:?}");
+	}
+
+	#[test]
+	fn test_compress_chat_completion_tool_call_arguments_compressed_independently() {
+		let big_args = serde_json::json!({"data": "x".repeat(4000)}).to_string();
+		let body = serde_json::json!({
+			"choices": [{
+				"message": {
+					"role": "assistant",
+					"content": "ok",
+					"tool_calls": [{
+						"function": {"name": "f", "arguments": big_args}
+					}]
+				}
+			}]
+		})
+		.to_string()
+		.into_bytes();
+		let state = test_state_with_ccr();
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+
+		let response = result.expect("large tool-call arguments must be compressed");
+		// Message content ("ok") is short and must remain untouched.
+		assert_eq!(response["choices"][0]["message"]["content"], "ok");
+		let new_args = response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+			.as_str()
+			.unwrap();
+		assert!(
+			new_args.contains("<<<CCR:"),
+			"expected tool-call arguments to be compressed: {new_args}"
+		);
+	}
+
+	#[test]
+	fn test_compress_chat_completion_budget_header_lowers_effective_threshold() {
+		// A large-but-moderate payload: compressed when the budget header
+		// requests aggressive compression (fill=0 -> 0.5x multiplier), but
+		// left alone with no budget header (multiplier 1.0x) if it sits
+		// between the two thresholds.
+		let content = "line of moderate length text content here.\n".repeat(40); // ~1760B
+		let body = chat_completion_body(&content);
+
+		let state_no_budget = test_state_with_ccr();
+		let result_no_budget =
+			tokio::runtime::Runtime::new()
+				.unwrap()
+				.block_on(compress_chat_completion(&state_no_budget, &body, None));
+
+		let state_low_budget = test_state_with_ccr();
+		let result_low_budget = tokio::runtime::Runtime::new().unwrap().block_on(compress_chat_completion(
+			&state_low_budget,
+			&body,
+			Some("0"),
+		));
+
+		// A lower budget must never compress *less* than no budget at all.
+		if result_no_budget.is_some() {
+			assert!(
+				result_low_budget.is_some(),
+				"lower budget must compress at least as much as no budget"
+			);
+		}
+	}
+
+	// ── T5: execute_tool_relay ───────────────────────────────────
+	#[test]
+	fn test_execute_tool_relay_retrieve_missing_hash_param() {
+		let state = test_state_with_ccr();
+		let result = tokio::runtime::Runtime::new().unwrap().block_on(execute_tool_relay(
+			&state,
+			"aphrodite_retrieve",
+			&serde_json::json!({}),
+		));
+		assert_eq!(result, Err("missing hash".to_string()));
+	}
+
+	#[test]
+	fn test_execute_tool_relay_unknown_tool_is_err() {
+		let state = test_state_with_ccr();
+		let result = tokio::runtime::Runtime::new().unwrap().block_on(execute_tool_relay(
+			&state,
+			"not_a_real_tool",
+			&serde_json::json!({}),
+		));
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_execute_tool_relay_compress_small_content_stores_inline_and_returns_marker() {
+		let state = test_state_with_ccr();
+		let content = "tiny"; // well under INLINE_CCR_THRESHOLD (256B)
+		let result = tokio::runtime::Runtime::new().unwrap().block_on(execute_tool_relay(
+			&state,
+			"aphrodite_compress",
+			&serde_json::json!({"content": content}),
+		));
+		let v = result.expect("compress must succeed");
+		assert!(v["compressed"].as_str().unwrap().contains("<<<CCR:"));
+		assert_eq!(v["original_size"], content.len());
+	}
+
+	#[test]
+	fn test_execute_tool_relay_retrieve_finds_inline_entry() {
+		let state = test_state_with_ccr();
+		let content = "tiny";
+		let compressed = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(execute_tool_relay(
+				&state,
+				"aphrodite_compress",
+				&serde_json::json!({"content": content}),
+			))
+			.unwrap();
+		let hash = compressed["hash"].as_str().unwrap().to_string();
+
+		let retrieved = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(execute_tool_relay(
+				&state,
+				"aphrodite_retrieve",
+				&serde_json::json!({"hash": hash}),
+			))
+			.unwrap();
+		assert_eq!(retrieved["found"], true);
+		assert_eq!(retrieved["content"], content);
+	}
+
+	// ── T5 (F3): execute_tool_relay's "aphrodite_retrieve" arm must
+	// normalize the hash argument the same way `resolve_one` already does -
+	// strip a `|type|size` marker-body suffix an LLM might echo back, and
+	// trim surrounding whitespace.
+	#[test]
+	fn test_execute_tool_relay_retrieve_normalizes_pipe_suffixed_and_whitespace_hash() {
+		let state = test_state_with_ccr();
+		let content = "tiny";
+		let rt = tokio::runtime::Runtime::new().unwrap();
+		let compressed = rt
+			.block_on(execute_tool_relay(&state, "aphrodite_compress", &serde_json::json!({"content": content})))
+			.unwrap();
+		let hash = compressed["hash"].as_str().unwrap().to_string();
+
+		for hash_arg in [hash.clone(), format!("{hash}|tool|1024"), format!("  {hash}  ")] {
+			let retrieved = rt
+				.block_on(execute_tool_relay(&state, "aphrodite_retrieve", &serde_json::json!({"hash": hash_arg})))
+				.unwrap();
+			assert_eq!(retrieved["found"], true, "hash arg {hash_arg:?} must resolve: {retrieved:?}");
+			assert_eq!(retrieved["content"], content);
+		}
+	}
+
+	// ── T15 (F2): regression tests for the historical corpus examples ────
+	// These exercise the real Rust code (unlike Maintain/examples/*.py,
+	// which re-implement the buggy/fixed logic in Python and can never
+	// catch a Rust regression - see Maintain/examples/README.md).
+
+	/// Corpus 07_tokens_saved.py: the AtomicU64 must actually be incremented
+	/// on the real compression path, not just exist unused in /stats.
+	#[test]
+	fn regression_07_tokens_saved_increments_on_compress() {
+		let content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
+		let body = chat_completion_body(&content);
+		let state = test_state_with_ccr();
+
+		assert_eq!(state.tokens_saved.load(Ordering::Relaxed), 0);
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+		assert!(result.is_some(), "content above threshold must compress");
+		assert!(
+			state.tokens_saved.load(Ordering::Relaxed) > 0,
+			"tokens_saved must be incremented by the real compression path"
+		);
+	}
+
+	/// Corpus 11_should_compress.py: threshold gating must actually skip
+	/// compression below threshold, not compress unconditionally.
+	#[test]
+	fn regression_11_below_threshold_skips_compression_and_counter() {
+		let content = "short reply below any threshold";
+		let body = chat_completion_body(content);
+		let state = test_state_with_ccr();
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+		assert!(result.is_none(), "below-threshold content must not compress");
+		assert_eq!(
+			state.tokens_saved.load(Ordering::Relaxed),
+			0,
+			"no savings should be recorded when nothing was compressed"
+		);
+	}
+
+	/// Corpus 13_engine_truncation.py: a CCR marker must never be truncated
+	/// mid-terminator by a preview-length budget - format_ccr_output's
+	/// output must always contain a complete `<<<CCR:hash|type|size>>>` line,
+	/// regardless of how long the preview or metadata are.
+	#[test]
+	fn regression_13_marker_terminator_never_truncated() {
+		let hash = "abc123def456abc123def456abc123def456";
+		let huge_preview = "x".repeat(10_000);
+		let huge_metadata = "y".repeat(10_000);
+		let out = format_ccr_output(&huge_preview, "text", &huge_metadata, None, hash, 123456);
+		let expected_terminator = format!("<<<CCR:{hash}|text|123456>>>");
+		assert!(
+			out.contains(&expected_terminator),
+			"marker terminator must always be complete and unsliced, regardless of preview/metadata length"
+		);
+	}
+
+	// ── T8: property tests ───────────────────────────────────────
+	use proptest::{prop_assert, proptest};
+
+	proptest! {
+		/// `detect_content_type` and `generate_metadata` must never panic on
+		/// arbitrary UTF-8 input (this is literally the module's threat
+		/// model - arbitrary tool output), and the generated metadata must
+		/// respect its own documented invariants: no pipe/newline, <=400 chars.
+		#[test]
+		fn prop_classifier_and_metadata_never_panic(s in ".*") {
+			let ct = detect_content_type(&s);
+			let meta = generate_metadata(&s, ct);
+			prop_assert!(!meta.contains('|'));
+			prop_assert!(!meta.contains('\n'));
+			prop_assert!(meta.chars().count() <= 400);
 		}
 	}
 }

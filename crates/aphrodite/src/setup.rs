@@ -1,4 +1,5 @@
-//! Bootstrap setup: `aphrodite setup` - one-shot install after `cargo install aphrodite`.
+//! Bootstrap setup: `aphrodite setup` - one-shot install after
+//! `cargo install aphrodite`.
 //!
 //! Creates ~/.hermes/aphrodite/ with binaries, config, and plugin manifest,
 //! then optionally launches the proxy. Maximum security: self-verification,
@@ -19,7 +20,7 @@ use crate::config::SetupArgs;
 /// aphrodite.toml template - embedded at compile time.
 /// Placeholders: `{api_url}`, `{model}`, `{cache_port}`, `{token_port}` -
 /// replaced with user-provided values.
-const CONFIG_TEMPLATE: &str = include_str!("../templates/aphrodite.toml");
+const CONFIG_TEMPLATE:&str = include_str!("../templates/aphrodite.toml");
 
 /// Errors that can occur during setup.
 #[derive(Debug)]
@@ -32,7 +33,7 @@ pub enum SetupError {
 }
 
 impl std::fmt::Display for SetupError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Io(e) => write!(f, "I/O error: {e}"),
 			Self::HermesNotFound(msg) => write!(f, "{msg}"),
@@ -44,31 +45,30 @@ impl std::fmt::Display for SetupError {
 }
 
 impl From<io::Error> for SetupError {
-	fn from(e: io::Error) -> Self { Self::Io(e) }
+	fn from(e:io::Error) -> Self { Self::Io(e) }
 }
 
 impl std::error::Error for SetupError {}
 
 /// Context gathered during setup.
 struct SetupCtx {
-	aphrodite_dir: PathBuf,
-	binaries_dir: PathBuf,
-	own_path: PathBuf,
-	own_hash: String,
+	aphrodite_dir:PathBuf,
+	binaries_dir:PathBuf,
+	own_path:PathBuf,
+	own_hash:String,
 }
 
 /// Run the setup/bootstrap process.
-pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
-	let home = dirs::home_dir().ok_or_else(|| {
-		SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set"))
-	})?;
+pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
+	let home =
+		dirs::home_dir().ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?;
 
 	let own_path = std::env::current_exe().map_err(SetupError::Io)?;
 	let own_hash = self_hash(&own_path);
 
 	let ctx = SetupCtx {
-		aphrodite_dir: home.join(".hermes").join("aphrodite"),
-		binaries_dir: home.join(".hermes").join("aphrodite").join("binaries"),
+		aphrodite_dir:home.join(".hermes").join("aphrodite"),
+		binaries_dir:home.join(".hermes").join("aphrodite").join("binaries"),
 		own_path,
 		own_hash,
 	};
@@ -128,12 +128,12 @@ pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 }
 
 /// Compute BLAKE3 hash of the binary for integrity display.
-fn self_hash(path: &Path) -> String {
+fn self_hash(path:&Path) -> String {
 	match fs::read(path) {
 		Ok(bytes) => {
 			let hash = blake3::hash(&bytes);
 			hash.to_hex().to_string()
-		}
+		},
 		Err(_) => "unknown".into(),
 	}
 }
@@ -148,19 +148,19 @@ fn verify_hermes() -> Result<(), SetupError> {
 		},
 		Ok(out) => {
 			let stderr = String::from_utf8_lossy(&out.stderr);
-			Err(SetupError::HermesNotFound(format!(
-				"hermes --version failed: {stderr}"
-			)))
+			Err(SetupError::HermesNotFound(format!("hermes --version failed: {stderr}")))
 		},
-		Err(_) => Err(SetupError::HermesNotFound(
-			"hermes not found in PATH - install hermes agent first".into()
-		)),
+		Err(_) => {
+			Err(SetupError::HermesNotFound(
+				"hermes not found in PATH - install hermes agent first".into(),
+			))
+		},
 	}
 }
 
 /// Copy dylibs from cargo build target to binaries dir.
-fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
-	let dylib_names: &[&str] = if cfg!(target_os = "macos") {
+fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
+	let dylib_names:&[&str] = if cfg!(target_os = "macos") {
 		&["libaphrodite.dylib", "libaphrodite_hermes.dylib"]
 	} else if cfg!(target_os = "linux") {
 		&["libaphrodite.so", "libaphrodite_hermes.so"]
@@ -169,7 +169,7 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 	};
 
 	let exe_dir = ctx.own_path.parent().unwrap_or(Path::new("."));
-	let search_paths: Vec<PathBuf> = vec![
+	let search_paths:Vec<PathBuf> = vec![
 		exe_dir.to_path_buf(),
 		exe_dir.join("deps"),
 		PathBuf::from("/usr/local/lib"),
@@ -225,9 +225,11 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Write plugin.yaml manifest.
-fn write_plugin_yaml(ctx: &SetupCtx, args: &SetupArgs) -> Result<(), SetupError> {
+fn write_plugin_yaml(ctx:&SetupCtx, args:&SetupArgs) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("plugin.yaml");
-	if path.exists() { return Ok(()); }
+	if path.exists() {
+		return Ok(());
+	}
 
 	let yaml = format!(
 		r#"name: aphrodite
@@ -272,9 +274,11 @@ install_message: |
 }
 
 /// Write __init__.py shim for hermes plugin loading.
-fn write_init_py(ctx: &SetupCtx) -> Result<(), SetupError> {
+fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("__init__.py");
-	if path.exists() { return Ok(()); }
+	if path.exists() {
+		return Ok(());
+	}
 
 	let shim = include_str!("../templates/__init__.py");
 	println!("writing __init__.py -> {}", path.display());
@@ -284,7 +288,7 @@ fn write_init_py(ctx: &SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Symlink ~/.hermes/plugins/aphrodite -> ~/.hermes/aphrodite/
-fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
+fn symlink_plugin(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let plugins_dir = dirs::home_dir()
 		.ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?
 		.join(".hermes")
@@ -335,7 +339,7 @@ fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
 /// Recursively copy a directory tree - the Windows fallback when a junction
 /// can't be created (e.g. `mklink` disabled by policy).
 #[cfg(windows)]
-fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
+fn copy_dir_recursive(src:&Path, dst:&Path) -> io::Result<()> {
 	fs::create_dir_all(dst)?;
 	for entry in fs::read_dir(src)? {
 		let entry = entry?;
@@ -350,7 +354,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
 }
 
 /// Register plugin with hermes.
-fn register_plugin(_ctx: &SetupCtx) -> Result<(), SetupError> {
+fn register_plugin(_ctx:&SetupCtx) -> Result<(), SetupError> {
 	let status = Command::new("hermes")
 		.args(["plugins", "enable", "aphrodite"])
 		.output()
@@ -366,7 +370,7 @@ fn register_plugin(_ctx: &SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Set strict file permissions (Unix only).
-fn secure_perms(path: &Path, mode: u32) -> io::Result<()> {
+fn secure_perms(path:&Path, mode:u32) -> io::Result<()> {
 	#[cfg(unix)]
 	{
 		use std::os::unix::fs::PermissionsExt;
@@ -379,6 +383,4 @@ fn secure_perms(path: &Path, mode: u32) -> io::Result<()> {
 	Ok(())
 }
 
-fn binary_name() -> &'static str {
-	if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" }
-}
+fn binary_name() -> &'static str { if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" } }

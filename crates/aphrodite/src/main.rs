@@ -52,29 +52,27 @@ fn main() -> anyhow::Result<()> {
 	// Parse early to check for setup before building the tokio runtime.
 	if args.iter().any(|a| a == "setup") {
 		let cli = Cli::parse();
-		match cli.command {
-			Some(Command::Setup { api_key, api_url, model, cache_port, token_port, no_launch, force }) => {
-				let setup_args = SetupArgs { api_key, api_url, model, cache_port, token_port, no_launch, force };
-				match setup::run(&setup_args) {
-					Ok(()) => {
-						if setup_args.no_launch {
-							// --no-launch: setup done, don't start proxy.
-							return Ok(());
-						}
-						// Default: setup complete, drop through to start proxy
-						println!("setup complete, starting proxy...");
+		if let Some(Command::Setup { api_key, api_url, model, cache_port, token_port, no_launch, force }) = cli.command
+		{
+			let setup_args = SetupArgs { api_key, api_url, model, cache_port, token_port, no_launch, force };
+			match setup::run(&setup_args) {
+				Ok(()) => {
+					if setup_args.no_launch {
+						// --no-launch: setup done, don't start proxy.
+						return Ok(());
 					}
-					Err(e) => {
-						eprintln!("setup failed: {e}");
-						std::process::exit(1);
-					}
-				}
+					// Default: setup complete, drop through to start proxy
+					println!("setup complete, starting proxy...");
+				},
+				Err(e) => {
+					eprintln!("setup failed: {e}");
+					std::process::exit(1);
+				},
 			}
-			_ => {}
 		}
 	}
 
-	// Worker thread count  -  I/O-bound proxy needs more than CPU cores.
+	// Worker thread count - I/O-bound proxy needs more than CPU cores.
 	// Default: 4× CPU or 32 minimum. Override: APHRODITE_WORKER_THREADS.
 	let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
 		.ok()
@@ -286,7 +284,11 @@ async fn run_single(
 				if let Some(exe_dir) = exe_path.parent() {
 					let old = db_path.display().to_string();
 					cli.ccr_db_path = Some(exe_dir.join(db_path));
-					tracing::info!("resolved relative ccr_db_path from {} to {}", old, cli.ccr_db_path.as_ref().unwrap().display());
+					tracing::info!(
+						"resolved relative ccr_db_path from {} to {}",
+						old,
+						cli.ccr_db_path.as_ref().unwrap().display()
+					);
 				}
 			}
 		}

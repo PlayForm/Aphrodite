@@ -1,6 +1,6 @@
-//! Rhai scripting engine  -  user-defined micro-scripts.
+//! Rhai scripting engine - user-defined micro-scripts.
 //! Feature-gated behind `APHRODITE_SCRIPTING=1`.
-//! Compiles scripts per-call (no AST storage  -  avoids Send issues).
+//! Compiles scripts per-call (no AST storage - avoids Send issues).
 
 #[cfg(feature = "scripting")]
 mod engine {
@@ -20,6 +20,9 @@ mod engine {
 	}
 
 	impl ScriptEngine {
+		/// Create a new engine and load scripts from the user
+		/// (`~/.hermes/aphrodite/scripts`) and project-local (`scripts/aphrodite`)
+		/// directories.
 		pub fn new() -> Self {
 			let home = dirs::home_dir().unwrap_or_default();
 			let se = ScriptEngine {
@@ -72,6 +75,9 @@ mod engine {
 			}
 		}
 
+		/// Run all loaded scripts' `on_compress` hook in sequence, threading the
+		/// result of each through to the next. Scripts that fail to expose the
+		/// hook (or error) are skipped, leaving `result` unchanged.
 		pub fn on_compress(&self, content:&str, ct:&str, size:usize) -> String {
 			self.check_reload();
 			let scripts = self.scripts.lock().unwrap_or_else(|e| e.into_inner());
@@ -90,6 +96,9 @@ mod engine {
 			result
 		}
 
+		/// Run all loaded scripts' `on_marker` hook in sequence, letting each
+		/// script rewrite the CCR marker preview text before it's shown to the
+		/// agent.
 		pub fn on_marker(&self, hash:&str, ct:&str, meta:&str, preview:&str) -> String {
 			self.check_reload();
 			let scripts = self.scripts.lock().unwrap_or_else(|e| e.into_inner());
@@ -109,6 +118,9 @@ mod engine {
 			result
 		}
 
+		/// Run all loaded scripts' `on_retrieve` hook in sequence, letting each
+		/// script post-process retrieved content before it's returned to the
+		/// agent.
 		pub fn on_retrieve(&self, hash:&str, content:&str, ct:&str) -> String {
 			self.check_reload();
 			let scripts = self.scripts.lock().unwrap_or_else(|e| e.into_inner());
@@ -132,6 +144,10 @@ mod engine {
 #[cfg(not(feature = "scripting"))]
 mod engine {
 	pub struct ScriptEngine;
+	impl Default for ScriptEngine {
+		fn default() -> Self { Self::new() }
+	}
+
 	impl ScriptEngine {
 		pub fn new() -> Self { ScriptEngine }
 		pub fn on_compress(&self, c:&str, _:&str, _:usize) -> String { c.to_string() }

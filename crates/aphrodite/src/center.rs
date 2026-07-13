@@ -1,4 +1,4 @@
-//! CCR Center  -  temporary LLM memory deposits.
+//! CCR Center - temporary LLM memory deposits.
 //!
 //! A center is a point where the LLM places information that converges
 //! with content when it later flows through the pipeline. Like a
@@ -6,7 +6,7 @@
 //! both meet at the same understanding.
 //!
 //! Centers are embedded in CCR markers and survive retrievals.
-//! They're simple strings  -  the LLM says what it means.
+//! They're simple strings - the LLM says what it means.
 
 /// Parse a center string from the LLM.
 /// Returns the content type override if the center names a known code type.
