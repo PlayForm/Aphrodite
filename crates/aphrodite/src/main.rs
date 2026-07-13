@@ -19,7 +19,6 @@ use axum::{
 	routing::{any, delete, get, post},
 };
 use clap::Parser;
-use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use aphrodite::{
 	config::{Cli, Command, MultiConfig, ProxyMode, SetupArgs},
@@ -594,11 +593,17 @@ async fn run_single(
         // Loopback enforcement layer on all non-/health routes
         .layer(middleware::from_fn(loopback_only));
 
-	// Public route (no loopback enforcement) merged with restricted routes
+	// Public route (no loopback enforcement) merged with restricted routes.
+	// report 12 F1: no `CorsLayer` at all - this proxy has no legitimate
+	// browser-based consumer (Hermes and the Python plugin are non-browser
+	// HTTP clients), so `CorsLayer::permissive()` only ever served to let
+	// any website a user visits `fetch()` `/history`/`/retrieve`/`/ccr/*`
+	// cross-origin and read or tamper with stored session content -
+	// `loopback_only`'s peer-IP check does not stop this, since the
+	// browser making the request genuinely is a loopback client.
 	let app = Router::new()
 		.route("/health", get(health_check))
 		.merge(restricted)
-		.layer(CorsLayer::permissive())
 		.with_state(state);
 
 	// F9: `listener` was already bound in `run()` before any proxy task was
@@ -625,6 +630,25 @@ async fn run_single(
 	Ok(())
 }
 
+/// Hostnames a legitimate loopback caller can present in its `Host` header.
+/// report 12 F1: a peer-IP check alone is not DNS-rebinding-safe - a
+/// hostile webpage's JS can point a hostname it controls at 127.0.0.1 via
+/// DNS, making the TCP connection genuinely loopback while the `Host`
+/// header carries the attacker's own domain. Requiring `Host` to name the
+/// loopback address itself closes that gap; real clients (Hermes, the
+/// Python plugin, `curl`) already address the proxy this way.
+const ALLOWED_LOOPBACK_HOSTS:&[&str] = &["localhost", "127.0.0.1", "[::1]", "::1"];
+
+/// Strip an optional trailing `:port` from a `Host` header value - but not
+/// from a bracketed IPv6 literal's own colons (`[::1]:9797` -> `[::1]`).
+fn host_header_to_hostname(host:&str) -> String {
+	if let Some(rest) = host.strip_prefix('[') {
+		rest.split(']').next().map(|h| format!("[{h}]")).unwrap_or_default()
+	} else {
+		host.split(':').next().unwrap_or("").to_string()
+	}
+}
+
 /// Middleware that rejects non-loopback clients on all routes except /health.
 /// /health is intentionally exempt so external load-balancer probes work.
 async fn loopback_only(
@@ -636,6 +660,14 @@ async fn loopback_only(
 		return Err((
 			StatusCode::FORBIDDEN,
 			Json(serde_json::json!({"error": "only loopback clients allowed"})),
+		));
+	}
+	let host = request.headers().get(axum::http::header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("");
+	let hostname = host_header_to_hostname(host);
+	if !hostname.is_empty() && !ALLOWED_LOOPBACK_HOSTS.contains(&hostname.as_str()) {
+		return Err((
+			StatusCode::FORBIDDEN,
+			Json(serde_json::json!({"error": "Host header does not name a loopback address"})),
 		));
 	}
 	Ok(next.run(request).await)
@@ -654,4 +686,49 @@ async fn shutdown_signal() {
 	#[cfg(not(unix))]
 	let terminate = std::future::pending::<()>();
 	tokio::select! { _ = ctrl_c => {}, _ = terminate => {} }
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// ── T5 (F1): Host-header validation must accept every loopback form a
+	// real client uses and reject a DNS-rebinding attacker's own hostname,
+	// which is where the peer-IP-only check (still enforced separately)
+	// cannot help - the TCP connection genuinely is loopback in that attack. ──
+	#[test]
+	fn test_host_header_to_hostname_strips_port() {
+		assert_eq!(host_header_to_hostname("127.0.0.1:9797"), "127.0.0.1");
+		assert_eq!(host_header_to_hostname("localhost:9798"), "localhost");
+	}
+
+	#[test]
+	fn test_host_header_to_hostname_no_port() {
+		assert_eq!(host_header_to_hostname("127.0.0.1"), "127.0.0.1");
+		assert_eq!(host_header_to_hostname("localhost"), "localhost");
+	}
+
+	#[test]
+	fn test_host_header_to_hostname_ipv6_bracketed() {
+		assert_eq!(host_header_to_hostname("[::1]:9797"), "[::1]");
+		assert_eq!(host_header_to_hostname("[::1]"), "[::1]");
+	}
+
+	#[test]
+	fn test_allowed_loopback_hosts_accepts_real_clients() {
+		for h in ["127.0.0.1", "localhost", "[::1]"] {
+			assert!(ALLOWED_LOOPBACK_HOSTS.contains(&h), "{h} must be an allowed loopback host");
+		}
+	}
+
+	#[test]
+	fn test_allowed_loopback_hosts_rejects_dns_rebinding_hostname() {
+		// The exact attack this closes: a hostile page's JS does
+		// `fetch("http://attacker.example:9797/retrieve")` where
+		// `attacker.example` DNS-resolves to 127.0.0.1 - the TCP peer is
+		// loopback (passes the IP check), but the Host header carries the
+		// attacker's own domain, not a loopback name.
+		let hostname = host_header_to_hostname("attacker.example:9797");
+		assert!(!ALLOWED_LOOPBACK_HOSTS.contains(&hostname.as_str()));
+	}
 }

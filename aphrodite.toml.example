@@ -8,16 +8,24 @@
 # doesn't exist falls through to single-proxy CLI-flag mode instead).
 
 # ── Proxies ─────────────────────────────────────────────────────────────────
+# `listen` binds loopback-only by default (report 12 F2) - the router already
+# rejects non-loopback peers on everything except /health, but binding
+# 0.0.0.0 still needlessly exposes an unauthenticated listener to your LAN.
+# Uncomment the 0.0.0.0 lines only if you deliberately want another machine
+# on your network to reach this proxy - understand that /retrieve, /history,
+# and /ccr/* have no authentication of their own.
 [[proxies]]
 name = "cache"
-listen = "0.0.0.0:9797"
+listen = "127.0.0.1:9797"
+# listen = "0.0.0.0:9797"  # WARNING: exposes proxy to your network
 mode = "cache"
 tool_relay = true
 timeout = 120
 
 [[proxies]]
 name = "token"
-listen = "0.0.0.0:9798"
+listen = "127.0.0.1:9798"
+# listen = "0.0.0.0:9798"  # WARNING: exposes proxy to your network
 mode = "token"
 tool_relay = true
 timeout = 300

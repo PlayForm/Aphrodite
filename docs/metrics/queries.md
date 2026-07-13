@@ -152,16 +152,16 @@ want a number right now, hit the proxy directly:
 
 ```bash
 # Full metrics dump (Prometheus text format)
-curl -s http://0.0.0.0:9798/metrics
+curl -s http://127.0.0.1:9798/metrics
 
 # Just CCR-related lines
-curl -s http://0.0.0.0:9798/metrics | grep ccr
+curl -s http://127.0.0.1:9798/metrics | grep ccr
 
 # Just latency lines
-curl -s http://0.0.0.0:9798/metrics | grep latency
+curl -s http://127.0.0.1:9798/metrics | grep latency
 
 # Stats as JSON
-curl -s http://0.0.0.0:9798/stats | python3 -m json.tool
+curl -s http://127.0.0.1:9798/stats | python3 -m json.tool
 ```
 
 If you do have a Prometheus server, `PROM=http://localhost:9090/api/v1/query`

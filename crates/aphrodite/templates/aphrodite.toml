@@ -11,14 +11,14 @@
 
 [[proxies]]
 name = "cache"
-listen = "0.0.0.0:{cache_port}"
+listen = "127.0.0.1:{cache_port}"
 mode = "cache"
 tool_relay = true
 timeout = 120
 
 [[proxies]]
 name = "token"
-listen = "0.0.0.0:{token_port}"
+listen = "127.0.0.1:{token_port}"
 mode = "token"
 tool_relay = true
 timeout = 300

@@ -4,8 +4,8 @@
 
 COUNT="${1:-10}"
 DELAY="${2:-2}"
-CACHE="http://0.0.0.0:9797"
-TOKEN="http://0.0.0.0:9798"
+CACHE="http://127.0.0.1:9797"
+TOKEN="http://127.0.0.1:9798"
 
 echo "Hitting aphrodite proxies ${COUNT}x with ${DELAY}s delay..."
 echo "  Cache: $CACHE"
