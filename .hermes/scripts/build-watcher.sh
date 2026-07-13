@@ -1,7 +1,8 @@
 #!/bin/bash
-# Monitor pane 17 cargo watch, write build-status.json every 5s
-# Run via: hermes tool terminal "bash .hermes/build-watcher.sh" background=true
+# Monitor a wezterm pane's cargo watch output, write build-status.json every 5s
+# Run via: WEZTERM_PANE_ID=17 hermes tool terminal "bash .hermes/build-watcher.sh" background=true
 
+WEZTERM_PANE_ID="${WEZTERM_PANE_ID:-}"
 STATE_DIR="$HOME/.hermes"
 OUTPUT_FILE="$STATE_DIR/build-status.json"
 mkdir -p "$STATE_DIR"
@@ -18,15 +19,22 @@ JSONEOF
 get_buffer() {
 	# Use hermes's mcp_wezterm_get_buffer via the running session's tool API
 	# We'll use the hermes CLI directly since it can invoke MCP tools
+	if [ -z "$WEZTERM_PANE_ID" ]; then
+		return 1
+	fi
 	local result
-	result=$(hermes tool mcp wezterm get_buffer --pane-id 17 --lines 8 2> /dev/null)
+	result=$(hermes tool mcp wezterm get_buffer --pane-id "$WEZTERM_PANE_ID" --lines 8 2> /dev/null)
 	echo "$result"
 }
 
 # Initial status
 write_status "idle" ""
 
-log "Starting pane 17 monitor (every 5s)"
+if [ -z "$WEZTERM_PANE_ID" ]; then
+	log "WEZTERM_PANE_ID not set - run as: WEZTERM_PANE_ID=<id> bash $0"
+	exit 1
+fi
+log "Starting pane $WEZTERM_PANE_ID monitor (every 5s)"
 
 while true; do
 	buffer=$(get_buffer 2> /dev/null || true)
