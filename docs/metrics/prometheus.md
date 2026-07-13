@@ -159,7 +159,7 @@ schema:
     "mode": "token" | "cache",
     "proxy": "aphrodite",
     "ccr_backend": "enabled" | "none",
-    "tool_relay": bool,
+    "tool_relay_enabled": bool,
     "requests": {
         "total": u64,
         "compressed": u64
