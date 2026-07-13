@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
 		);
 		return Ok(());
 	}
-	if args.iter().any(|a| a == "--help" || a == "-h") {
+	if args.get(1).map(String::as_str) == Some("--help") || args.get(1).map(String::as_str) == Some("-h") {
 		// Cli::parse() prints help/errors and exits the process internally.
 		Cli::parse();
 		return Ok(());
@@ -53,7 +53,7 @@ fn main() -> anyhow::Result<()> {
 
 	// ── Handle `aphrodite setup` subcommand ──
 	// Parse early to check for setup before building the tokio runtime.
-	if args.iter().any(|a| a == "setup") {
+	if args.get(1).map(String::as_str) == Some("setup") {
 		let cli = Cli::parse();
 		if let Some(Command::Setup { api_key, api_url, model, cache_port, token_port, no_launch, force }) = cli.command
 		{

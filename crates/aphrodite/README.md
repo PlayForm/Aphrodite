@@ -36,7 +36,7 @@ Four pipeline stages, all under 1ms:
 
 1. **Classify** - 28-type regex classifier (`diff`, `build_output`, `code_rust`, …)
 2. **Template** - TOML-driven preview templates per content type
-3. **Store** - SHA-256 hash → SQLite or in-memory → CCR marker
+3. **Store** - blake3 hash → SQLite or in-memory → CCR marker
 4. **Preview** - Structured `[type:metadata]` the LLM reads instantly
 
 ---
@@ -45,7 +45,7 @@ Four pipeline stages, all under 1ms:
 
 ```
 src/
-├── lib.rs               ← 17 C ABI exports for dylib loading
+├── lib.rs               ← 22 C ABI exports for dylib loading
 ├── proxy.rs             ← HTTP proxy (:9797 cache, :9798 token)
 ├── hooks.rs             ← transform_tool_result, terminal, pre/post LLM
 ├── session.rs           ← Turn lifecycle, conversation index, catalog
@@ -58,47 +58,25 @@ src/
 ├── config.rs            ← CLI args + TOML multi-config
 ├── config_loader.rs     ← TOML + env var loading
 ├── prefetch.rs          ← Background file read + compress threads
-├── scripting.rs         ← Rhai scripting engine
-├── center.rs            ← Center annotation extraction
-└── main.rs              ← Binary entry point
-
-tests/                   ← Integration tests
+├── preview.rs           ← detect_type, build_preview (shared across proxy + dylib)
+├── main.rs              ← Binary entry point
+└── retrieve.rs          ← POST /retrieve — hash → content, zstd decode, filter, paginate
 ```
 
-## C ABI (17 functions)
+## C ABI (22 functions)
 
-Exported for the Hermes plugin via `#[no_mangle] extern "C"`:
-
-```
-aphrodite_hermes_session_start
-aphrodite_hermes_session_end
-aphrodite_hermes_next_turn
-aphrodite_hermes_transform_tool_result
-aphrodite_hermes_transform_terminal_output
-aphrodite_hermes_pre_llm_call
-aphrodite_hermes_post_llm_call
-aphrodite_hermes_dispatch_tool        ← Universal tool dispatch (14 hooks)
-aphrodite_hermes_proxy_health
-aphrodite_hermes_free_string
-aphrodite_hermes_get_state_json
-aphrodite_hermes_set_config
-aphrodite_hermes_get_config
-aphrodite_hermes_list_skills
-aphrodite_hermes_get_schemas
-aphrodite_hermes_get_hooks
-aphrodite_hermes_get_version
-```
+The 22 `#[no_mangle] extern "C"` exports in `lib.rs` serve both the
+`aphrodite-hermes` bridge crate (which re-exports a higher-level ABI — see
+`crates/aphrodite-hermes/README.md`) and the Python plugin's ctypes bindings.
 
 ---
 
 ## Dependencies
 
-- `headroom-core` - Content transforms + classifier (vendored fork at `vendor/headroom/`)
-- `axum` / `tokio` / `tower` - HTTP proxy (optional, gated behind `proxy` feature)
+- `headroom-core` - Content transforms + classifier + SQLite backend (vendored fork at `vendor/headroom/`)
+- `axum` / `tokio` / `tower-http` - HTTP proxy (optional, gated behind `proxy` feature)
 - `serde` / `serde_json` - Serialization
 - `blake3` - Content-addressed hashing
-- `rusqlite` - SQLite CCR backend (bundled)
-- `zstd` - Compression
 
 ---
 

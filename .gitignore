@@ -18,11 +18,8 @@ venv/
 env/
 
 # Hermes / dev artifacts
-!./.hermes/
-!./.hermes/**/*
 
 .headroom/
-.DS_Store
 *.log
 *.lock
 *.tar.gz

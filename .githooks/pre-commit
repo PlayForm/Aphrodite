@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# pre-commit - Run ggshield secret scan before each commit.
+# Installed via: git config core.hooksPath .githooks
+set -euo pipefail
+
+# Gate: skip entirely in CI or when ggshield is absent.
+if [ -n "${CI:-}" ]; then
+	exit 0
+fi
+
+if ! command -v ggshield &>/dev/null; then
+	echo "pre-commit: ggshield not found - install with: pip install ggshield"
+	echo "pre-commit: skipping secret scan (no ggshield binary)"
+	exit 0
+fi
+
+exec ggshield secret scan pre-commit "$@"

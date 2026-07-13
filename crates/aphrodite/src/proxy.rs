@@ -41,6 +41,7 @@ use headroom_core::ccr::{
 	compute_key,
 };
 use tokio_util::task::TaskTracker;
+use futures::StreamExt;
 
 /// API key wrapper with safe Debug and Display - never leaks to logs.
 #[derive(Clone)]
@@ -87,6 +88,12 @@ const CHAT_COMPLETIONS_PATH:&str = "/v1/chat/completions";
 /// could hold well over 100 MB resident for a cache whose only purpose is
 /// avoiding a repeat upstream round-trip on an identical request.
 const RESPONSE_CACHE_MAX_BODY_BYTES:usize = 1024 * 1024;
+
+/// Non-streaming response body cap (report 02-T10). A single buffered
+/// `.bytes().await` can exhaust memory if the upstream returns a huge body
+/// (e.g. a full codebase in a single completion). Streamed (SSE) responses
+/// bypass this limit entirely — they're chunked at the protocol level.
+const RESPONSE_MAX_BODY_BYTES:usize = 64 * 1024 * 1024; // 64 MB
 
 /// Live-resolved compression thresholds (report 07 F2/F4/T15): env var >
 /// TOML `[compression]` value > compiled-in default, the same precedence
@@ -153,7 +160,6 @@ async fn ccr_put(ccr:&Arc<dyn CcrStore>, hash:&str, content:&str) -> bool {
 }
 
 /// Wrapper for `ccr.del()` on a blocking thread.
-#[allow(dead_code)]
 async fn ccr_del(ccr:&Arc<dyn CcrStore>, hash:&str) -> bool {
 	let ccr = ccr.clone();
 	let hash = hash.to_owned();
@@ -677,23 +683,6 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 
 // ── Main proxy handler ──────────────────────────────────────────────
 
-/// Generate a simple summary - first 3 lines or first 200 chars.
-#[allow(dead_code)]
-fn generate_summary(content:&str) -> String {
-	let lines:Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).take(3).collect();
-	if lines.len() >= 2 {
-		format!(
-			"[summary] {} lines, {}B: {}",
-			content.lines().count(),
-			content.len(),
-			lines.join(" | ")
-		)
-	} else {
-		let preview:String = content.char_indices().take_while(|(i, _)| *i < 200).map(|(_, c)| c).collect();
-		format!("[summary] {}B: {}", content.len(), preview)
-	}
-}
-
 /// Compute a cache key from a Chat Completions request body: hash(api_key +
 /// model + messages). Uses FNV-1a (deterministic across restarts, unlike
 /// DefaultHasher). Includes api_key to prevent cross-user cache collision.
@@ -785,6 +774,33 @@ fn copy_upstream_headers(
 		}
 	}
 	builder
+}
+
+/// Accumulate the full response body with a byte cap (report 02-T10).
+/// Replaces the single unbounded `response.bytes().await` in the
+/// non-streaming branch — returns a 502 error if the upstream exceeds
+/// `max_bytes`, protecting the proxy's memory from a single huge response.
+async fn accumulate_body(
+	response: reqwest::Response,
+	max_bytes: usize,
+) -> Result<bytes::Bytes, String> {
+	let mut buf = Vec::new();
+	let mut stream = response.bytes_stream();
+	while let Some(chunk) = stream.next().await {
+		match chunk {
+			Ok(b) => {
+				if buf.len() + b.len() > max_bytes {
+					return Err(format!(
+						"response body exceeded {} MB limit",
+						max_bytes / (1024 * 1024)
+					));
+				}
+				buf.extend_from_slice(&b);
+			},
+			Err(e) => return Err(format!("body read: {}", e)),
+		}
+	}
+	Ok(bytes::Bytes::from(buf))
 }
 
 /// FNV-1a 64-bit hash over bytes. Deterministic across restarts.
@@ -983,7 +999,34 @@ pub async fn proxy_handler(
 			// that clients rely on for backoff and support.
 			let upstream_headers = response.headers().clone();
 			let content_type = upstream_headers.get("content-type").cloned();
-			let resp_body = match response.bytes().await {
+
+			// T10 (F6): SSE streaming — text/event-stream responses must be
+			// forwarded chunk-by-chunk, not buffered into a single JSON blob
+			// (which an SSE client can't parse). Skip compression + cache
+			// entirely for this path.
+			let is_sse = content_type.as_ref()
+				.map(|ct| ct.as_bytes().starts_with(b"text/event-stream"))
+				.unwrap_or(false);
+			if is_sse {
+				let stream = response.bytes_stream();
+				if state.dev {
+					tracing::info!(id = %req_id_short, status = %status, "<<< STREAM (SSE)");
+				}
+				state.record_latency(t0.elapsed());
+				state.record_request(req_id_short, method.as_str(), path.path(), status.as_u16(), false, t0.elapsed().as_millis());
+				let mut builder = Response::builder().status(status);
+				builder = copy_upstream_headers(builder, &upstream_headers);
+				if let Some(ct) = content_type {
+					builder = builder.header("Content-Type", ct);
+				}
+				builder = builder.header("X-Aphrodite-Streamed", "true");
+				return builder.body(Body::from_stream(stream)).unwrap();
+			}
+
+			// Buffer the full response body (non-streaming path). Cap at
+			// RESPONSE_MAX_BODY_BYTES to prevent a single huge upstream
+			// response from exhausting process memory.
+			let resp_body = match accumulate_body(response, RESPONSE_MAX_BODY_BYTES).await {
 				Ok(b) => b,
 				Err(e) => {
 					state.record_error(format!("body read: {}", e));
