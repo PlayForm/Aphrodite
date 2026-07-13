@@ -21,6 +21,7 @@
 
 pub mod catalog;
 pub mod config_loader;
+pub mod directives;
 pub mod hooks;
 pub mod marker;
 pub mod prefetch;
@@ -438,6 +439,54 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 }
 
 #[no_mangle]
+pub extern "C" fn aphrodite_directive(handle:*const c_char, action:*const c_char, name:*const c_char) -> *mut c_char {
+	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
+		Ok(id) => id,
+		Err(_) => return to_json_error("invalid handle"),
+	};
+	let act = unsafe { cstr(action) }.unwrap_or_default();
+	let nm = unsafe { cstr(name) }.unwrap_or_default();
+	match get_handle(hid) {
+		Some(session) => {
+			let mut s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+			match act.as_ref() {
+				"list" => {
+					let all:Vec<String> = s.directives.keys().cloned().collect();
+					to_json_ok(&serde_json::json!({
+						"available": all,
+						"active": &s.active_directives,
+					}))
+				},
+				"swap" => {
+					if s.directives.contains_key(&nm.to_string()) {
+						s.active_directives = vec![nm.to_string()];
+						to_json_ok(&serde_json::json!({"swapped": nm, "active": &s.active_directives}))
+					} else {
+						to_json_error(&format!("unknown directive: {}", nm))
+					}
+				},
+				"add" => {
+					if s.directives.contains_key(&nm.to_string()) && !s.active_directives.contains(&nm.to_string()) {
+						s.active_directives.push(nm.to_string());
+					}
+					to_json_ok(&serde_json::json!({"active": &s.active_directives}))
+				},
+				"remove" => {
+					s.active_directives.retain(|d| d != &nm);
+					to_json_ok(&serde_json::json!({"active": &s.active_directives}))
+				},
+				"reset" => {
+					s.active_directives.clear();
+					to_json_ok(&serde_json::json!({"active": &s.active_directives}))
+				},
+				_ => to_json_error(&format!("unknown action: {} (use list|swap|add|remove|reset)", act)),
+			}
+		},
+		None => to_json_error(&format!("invalid handle: {}", hid)),
+	}
+}
+
+#[no_mangle]
 pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -564,6 +613,39 @@ pub extern "C" fn aphrodite_dispatch(
 					"turn": s.turn_counter,
 					"engine_enabled": s.context_engine_enabled,
 				})
+			},
+			"directive" => {
+				let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("list");
+				let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+				match action {
+					"list" => serde_json::json!({
+						"available": s.directives.keys().collect::<Vec<&String>>(),
+						"active": &s.active_directives,
+					}),
+					"swap" => {
+						if s.directives.contains_key(name) {
+							s.active_directives = vec![name.to_string()];
+							serde_json::json!({"swapped": name, "active": &s.active_directives})
+						} else {
+							serde_json::json!({"error": format!("unknown directive: {}", name)})
+						}
+					},
+					"add" => {
+						if s.directives.contains_key(name) && !s.active_directives.contains(&name.to_string()) {
+							s.active_directives.push(name.to_string());
+						}
+						serde_json::json!({"active": &s.active_directives})
+					},
+					"remove" => {
+						s.active_directives.retain(|d| d != name);
+						serde_json::json!({"active": &s.active_directives})
+					},
+					"reset" => {
+						s.active_directives.clear();
+						serde_json::json!({"active": &s.active_directives})
+					},
+					_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|remove|reset)", action)}),
+				}
 			},
 			"search" => {
 				let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();

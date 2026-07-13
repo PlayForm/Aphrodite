@@ -141,13 +141,18 @@ pub fn transform_terminal_output(state:&mut AphroditeState, content:&str) -> ser
 /// Session start hook - full reset.
 pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value { crate::session::on_session_start(state) }
 
-/// Pre-LLM call hook - inject catalog into context.
+/// Pre-LLM call hook - inject catalog + active directives into context.
 pub fn pre_llm_call(state:&AphroditeState) -> serde_json::Value {
 	let summary = crate::session::catalog_summary(state);
+	let directives = crate::directives::build_directive_context(
+		&state.directives,
+		&state.active_directives,
+	);
 	serde_json::json!({
 		"status": "ok",
 		"catalog": summary,
 		"compressed_count": state.recent_markers.len(),
+		"directives": if directives.is_empty() { None } else { Some(directives) },
 	})
 }
 
