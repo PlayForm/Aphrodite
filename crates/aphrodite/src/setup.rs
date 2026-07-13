@@ -160,10 +160,6 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let mut copied = 0u32;
 	for name in dylib_names {
 		let dest = ctx.binaries_dir.join(name);
-		if dest.exists() {
-			copied += 1;
-			continue;
-		}
 
 		let mut found = false;
 		for search_dir in &search_paths {
@@ -171,7 +167,17 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 			if src.exists() {
 				println!("copying dylib {} -> {}", name, dest.display());
 				fs::copy(&src, &dest)?;
-				secure_perms(&dest, 0o755)?;
+				// Fix install name: `cargo build` embeds the target/deps/
+				// path as the dylib's ID. Loading a copied dylib whose ID
+				// points to a non-existent (or stale) build-directory path
+				// causes the macOS dynamic linker to SIGKILL the process.
+				#[cfg(target_os = "macos")]
+				{
+					let rpath = format!("@rpath/{}", name);
+					let _ = std::process::Command::new("install_name_tool")
+						.args(["-id", &rpath, dest.to_str().unwrap_or("")])
+						.output();
+				}
 				found = true;
 				copied += 1;
 				break;
