@@ -14,8 +14,15 @@ related_skills: [aphrodite-boundary-behaviors, aphrodite-dev-workflow]
 Protocol for testing auto-expand behavior: whether `<<<CCR:...>>>` markers
 appear raw or get auto-resolved.
 
-**Source**: `plugins/aphrodite/_hooks/session.py:155-189` (pre_llm hook),
-`_core/config.py:161-163`.
+**Historical note:** the file references below (`plugins/aphrodite/_hooks/session.py`,
+`_core/config.py`, `_engine.py`) describe the pre-Rust-port Python plugin
+layout. The current plugin (`plugins/aphrodite/`) is a thin ctypes loader -
+all compression/engine/auto-expand logic now lives in the Rust dylib
+(`crates/aphrodite/src/`, `crates/aphrodite-hermes/src/`). The *mechanism*
+described here (TOML `auto_expand_limit`, `APHRODITE_AUTO_EXPAND` env var,
+the pre_llm hook resolving markers below the limit) still applies
+conceptually, but the specific Python file/line citations no longer exist
+in this tree and Step 1's `from _core import AUTO_EXPAND_LIMIT` will fail.
 
 ## Mechanism
 

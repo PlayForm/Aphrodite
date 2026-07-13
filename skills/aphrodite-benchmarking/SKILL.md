@@ -32,8 +32,11 @@ structure encodes everything needed to prove compression worked.
 aphrodite_test(mode="full")
 ```
 
-Expected: 13/13 PASS (all tests pass as of v0.8.43). `aphrodite_search` and
-`aphrodite_files` are fixed - no `NameError` bugs remain.
+Expected (current Rust `aphrodite_test` tool, `crates/aphrodite-hermes/src/tools.rs`):
+`{"mode":"full","status":"ok","passed":3,"total":3,"checks":[...],"proxies":{...}}` -
+3 round-trip checks (source_code/build/json_array samples), not 13. There is
+no `matrix`/`pipeline` mode; any `mode` value other than `"quick"` runs the
+same 3-check `full` set.
 
 ## Compression Type Matrix
 
@@ -62,11 +65,13 @@ Same content → same hash → cache hit:
 r1 = aphrodite_compress(content="fn test() {}", type="code")
 # Repeat exactly
 r2 = aphrodite_compress(content="fn test() {}", type="code")
-# r2 will have source="cache_hit", compression_ratio=1.0
+# r2 will have the same hash as r1 (content-addressed)
 ```
 
-Expected: `source: "cache_hit"`, `compression_ratio: 1.0`,
-`note: "already in store"`.
+Expected shape (current Rust `aphrodite_compress` tool): `{"hash":...,
+"type":..., "size":..., "preview":..., "marker":...}`. There is no
+`source`/`compression_ratio`/`note` field on this tool's response - dedup is
+observed by comparing `hash` across calls, not by a cache-hit flag.
 
 Cache hits also work when the center parameter varies - the hash is
 content-based, not center-based. Same content with different centers still
@@ -165,8 +170,6 @@ Benchmark CCR: `4b47d220c805679cc964f66f264896dbba76f51d`
 
 ## Pitfalls
 
-- **aphrodite_search and aphrodite_files are fixed** (v0.8.43). Both pass in
-  the full smoke test suite. `NameError` bugs resolved.
 - **aphrodite_catalog reports 0** when inline store has entries. Use
   `aphrodite_stats` for accurate inline counts.
 - **Don't retrieve to verify** - the CCR marker IS the proof. Retrieval wastes

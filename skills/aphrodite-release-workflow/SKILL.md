@@ -36,35 +36,35 @@ to `Source` remote.
 ## Version Sync
 
 The Aphrodite project has two independent version tracks:
-- **Binary version** (`1.0.4`) — Rust crates, must match across Cargo.toml files
-- **Plugin version** (`2.0.1`) — Hermes plugin, lives in the `plugins/aphrodite` submodule
+- **Binary version** (`1.0.4`) - Rust crates, must match across Cargo.toml files
+- **Plugin version** (`2.0.1`) - Hermes plugin, lives in the `plugins/aphrodite` submodule
 
-**Binary version locations** (monorepo — bump these together):
+**Binary version locations** (monorepo - bump these together):
 
-1. `crates/aphrodite/Cargo.toml` — `version = "1.0.4"` (line 3)
-2. `crates/aphrodite-hermes/Cargo.toml` — `version = "1.0.4"` (line 3, package)
-3. `crates/aphrodite-hermes/Cargo.toml` — `aphrodite = { ..., version = "1.0.4" }` (line 15, dependency)
+1. `crates/aphrodite/Cargo.toml` - `version = "1.0.4"` (line 3)
+2. `crates/aphrodite-hermes/Cargo.toml` - `version = "1.0.4"` (line 3, package)
+3. `crates/aphrodite-hermes/Cargo.toml` - `aphrodite = { ..., version = "1.0.4" }` (line 15, dependency)
 
 **Plugin version locations** (submodule `plugins/aphrodite/`):
 
-4. `plugin.yaml` — `version: 2.0.1` (line 2)
-5. `plugin.yaml` — `install_message:` block contains `aphrodite v2.0.1 -` (line 31)
-6. `pyproject.toml` — `version = "2.0.1"` (if file exists)
-7. `__init__.py` — docstring `aphrodite v2.0.1 - ...` (if version appears there)
-8. `_core/config.py` — `BIN_VERSION` + `PLUGIN_VERSION` constants (if file exists)
+4. `plugin.yaml` - `version: 2.0.1` (line 2)
+5. `plugin.yaml` - `install_message:` block contains `aphrodite v2.0.1 -` (line 31)
+6. `pyproject.toml` - `version = "2.0.1"` (if file exists)
+7. `__init__.py` - docstring `aphrodite v2.0.1 - ...` (if version appears there)
+8. `_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION` constants (if file exists)
 
 **Documentation:**
 
-9. `README.md` — example output shows `"version":"v1.0.4"` (line ~258)
+9. `README.md` - example output shows `"version":"v1.0.4"` (line ~258)
 
 **What `auto-release.sh` bumps** (complete list):
 
-- `crates/aphrodite/Cargo.toml` — binary version ✅
-- `crates/aphrodite-hermes/Cargo.toml` — package version + aphrodite dependency ✅
-- `plugins/aphrodite/plugin.yaml` — version field + install_message ✅
-- `plugins/aphrodite/pyproject.toml` — version (if file exists) ✅
-- `plugins/aphrodite/__init__.py` — docstring version (if present) ✅
-- `plugins/aphrodite/_core/config.py` — BIN_VERSION + PLUGIN_VERSION (if file exists) ✅
+- `crates/aphrodite/Cargo.toml` - binary version ✅
+- `crates/aphrodite-hermes/Cargo.toml` - package version + aphrodite dependency ✅
+- `plugins/aphrodite/plugin.yaml` - version field + install_message ✅
+- `plugins/aphrodite/pyproject.toml` - version (if file exists) ✅
+- `plugins/aphrodite/__init__.py` - docstring version (if present) ✅
+- `plugins/aphrodite/_core/config.py` - BIN_VERSION + PLUGIN_VERSION (if file exists) ✅
 
 ## Submodule Release Flow
 
@@ -81,7 +81,7 @@ The Aphrodite project has two independent version tracks:
 
 **Manually verify after release:**
 
-- `README.md:~258` — example output version (non-critical, grep for `"version":"v`)
+- `README.md:~258` - example output version (non-critical, grep for `"version":"v`)
 
 ## Binary Symlink
 
@@ -126,10 +126,15 @@ One paragraph. What this release is. 2-3 sentences.
 - Lint: `cargo clippy` ✅
 
 ### What Ships
-| Artifact | Platform |
+Build.yml's 4-target matrix (`aarch64-apple-darwin`, `x86_64-apple-darwin`,
+`x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`) stages, per target, the
+`aphrodite` binary + `libaphrodite_hermes` dylib + a `SHA256SUMS-<target>.txt`
+- 4 targets × 3 files = 12 artifacts total on a full release.
+
+| Artifact pattern | Platform |
 |----------|----------|
-| `aphrodite-aarch64-apple-darwin` | macOS ARM64 |
-| `aphrodite-x86_64-unknown-linux-gnu` | Linux x86_64 |
+| `aphrodite-<target>` / `libaphrodite_hermes-<target>.{so,dylib,dll}` | per matrix target above |
+| `SHA256SUMS-<target>.txt` | checksums for that target's two binaries |
 | Plugin vA.B.C | Hermes (standalone repo) |
 
 ### Links
@@ -137,9 +142,11 @@ One paragraph. What this release is. 2-3 sentences.
 - **CHANGELOG.md**: [CHANGELOG.md](CHANGELOG.md)
 - **Plugin**: https://github.com/PlayForm/Aphrodite-Hermes
 EOF
+# In normal operation Build.yml's Release job attaches every staged artifact
+# automatically on tag push - this manual form is only for a from-source
+# re-attach. Glob every staged file rather than naming 2 of the 12:
 gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md \
-  target/release/aphrodite-aarch64-apple-darwin \
-  target/release/aphrodite-x86_64-unknown-linux-gnu
+  staging/aphrodite-* staging/libaphrodite_hermes-* staging/SHA256SUMS-*.txt
 ```
 
 ## Cross-Module Import Pitfall
