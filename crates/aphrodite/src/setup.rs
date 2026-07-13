@@ -23,32 +23,19 @@ use crate::config::SetupArgs;
 const CONFIG_TEMPLATE:&str = include_str!("../templates/aphrodite.toml");
 
 /// Errors that can occur during setup.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum SetupError {
-	Io(io::Error),
+	#[error("I/O error: {0}")]
+	Io(#[from] io::Error),
+	#[error("{0}")]
 	HermesNotFound(String),
+	#[error("aphrodite already installed - use --force to re-setup")]
 	AlreadyInstalled,
+	#[error("{0}")]
 	DylibNotFound(String),
+	#[error("{0}")]
 	PluginRegistrationFailed(String),
 }
-
-impl std::fmt::Display for SetupError {
-	fn fmt(&self, f:&mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Io(e) => write!(f, "I/O error: {e}"),
-			Self::HermesNotFound(msg) => write!(f, "{msg}"),
-			Self::AlreadyInstalled => write!(f, "aphrodite already installed - use --force to re-setup"),
-			Self::DylibNotFound(msg) => write!(f, "{msg}"),
-			Self::PluginRegistrationFailed(msg) => write!(f, "{msg}"),
-		}
-	}
-}
-
-impl From<io::Error> for SetupError {
-	fn from(e:io::Error) -> Self { Self::Io(e) }
-}
-
-impl std::error::Error for SetupError {}
 
 /// Context gathered during setup.
 struct SetupCtx {
