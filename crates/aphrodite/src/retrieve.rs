@@ -172,6 +172,13 @@ fn paginate(content:&str, offset:usize, limit:usize) -> Result<String, String> {
 	let limit = if limit == 0 { 10_000 } else { limit.min(10_000) };
 	let lines:Vec<&str> = content.lines().collect();
 	let total = lines.len();
+	// F20: a zero-line (empty) document is a valid stored entry (e.g.
+	// `POST /ccr/create` with `content: ""`), not an out-of-range offset -
+	// `offset (0) >= total (0)` used to 400 on this, turning a legitimate
+	// create("") -> retrieve round-trip into an error.
+	if total == 0 {
+		return Ok(String::new());
+	}
 	if offset >= total {
 		return Err(format!("[offset {} out of range; document has {} lines]", offset, total));
 	}
@@ -229,6 +236,13 @@ mod tests {
 		let content = "a\nb\nc";
 		let result = paginate(content, 0, 0).unwrap();
 		assert_eq!(result, "a\nb\nc");
+	}
+
+	// ── report 02 T20 (F20): an empty stored document is valid, not an
+	// out-of-range offset. ──
+	#[test]
+	fn test_paginate_empty_content_returns_empty_ok_not_error() {
+		assert_eq!(paginate("", 0, 0), Ok(String::new()));
 	}
 
 	#[test]
