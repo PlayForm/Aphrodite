@@ -6,4 +6,33 @@
 # any time this hook fired, repeatedly and invisibly since `.gitmodules` sets
 # `ignore = all`). Pin advances are now a deliberate act (e.g.
 # auto-release.sh), not a side effect of checking out a branch or tag.
-git submodule update --init --recursive
+#
+# Dirty-guard (added after a second incident): `git submodule update` does a
+# forced checkout inside each submodule to the superproject-pinned SHA. If a
+# submodule has uncommitted work (e.g. mid-fix, not yet committed) and this
+# hook fires for any reason - including a no-op checkout of the same branch,
+# a `git stash`, or an IDE's background git operations - it silently discards
+# that work with zero signal, because `ignore = all` in `.gitmodules` also
+# hides the dirtiness from `git status`. Skip any submodule that is currently
+# dirty and warn instead of clobbering it.
+dirty=""
+for path in $(git config -f .gitmodules --get-regexp '\.path$' 2>/dev/null | awk '{print $2}'); do
+	if [ -e "$path/.git" ]; then
+		if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
+			dirty="$dirty $path"
+		fi
+	fi
+done
+
+if [ -n "$dirty" ]; then
+	echo "githooks/post-checkout: skipping submodule sync - uncommitted changes in:$dirty" >&2
+	echo "githooks/post-checkout: commit or stash those changes, then run 'git submodule update --init --recursive' manually to sync the rest." >&2
+	for path in $(git config -f .gitmodules --get-regexp '\.path$' 2>/dev/null | awk '{print $2}'); do
+		case " $dirty " in
+			*" $path "*) continue ;;
+		esac
+		git submodule update --init -- "$path"
+	done
+else
+	git submodule update --init --recursive
+fi

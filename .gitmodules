@@ -1,17 +1,17 @@
 [submodule "plugins/aphrodite"]
 path = plugins/aphrodite
 url = https://github.com/PlayForm/Aphrodite-Hermes.git
-ignore = all
+ignore = dirty
 branch = Current
 
 [submodule "vendor/headroom"]
 path = vendor/headroom
 url = https://github.com/PlayForm/Headroom.git
-ignore = all
+ignore = dirty
 branch = Current
 
 [submodule "vendor/rtk"]
 path = vendor/rtk
 url = https://github.com/PlayForm/rtk.git
-ignore = all
+ignore = dirty
 branch = Current
