@@ -72,17 +72,26 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// is the install payload; config is preserved unless --force) ──
 	let target_binary = ctx.binaries_dir.join(binary_name());
 	println!("copying binary -> {}", target_binary.display());
-	fs::copy(&ctx.own_path, &target_binary)?;
-	// Strip extended attributes: `fs::copy` preserves source xattrs
-	// (code signature, quarantine) which macOS Gatekeeper enforces
-	// at the source path — not the install path. Clearing them lets
-	// the binary run from the installed location.
+	// macOS: `fs::copy` preserves extended attributes (code signature,
+	// quarantine) from the build directory — Gatekeeper kills the copied
+	// binary at the install path. `ditto` strips xattrs; `xattr -c` is
+	// the fallback for when ditto is unavailable.
 	#[cfg(target_os = "macos")]
 	{
-		let _ = std::process::Command::new("xattr")
-			.args(["-c", target_binary.to_str().unwrap_or("")])
-			.output();
+		let _ = std::fs::remove_file(&target_binary);
+		if std::process::Command::new("ditto")
+			.args([ctx.own_path.to_str().unwrap_or(""), target_binary.to_str().unwrap_or("")])
+			.status()
+			.is_err()
+		{
+			fs::copy(&ctx.own_path, &target_binary)?;
+			let _ = std::process::Command::new("xattr")
+				.args(["-c", target_binary.to_str().unwrap_or("")])
+				.output();
+		}
 	}
+	#[cfg(not(target_os = "macos"))]
+	fs::copy(&ctx.own_path, &target_binary)?;
 	secure_perms(&target_binary, 0o700)?;
 
 	// ── Step 5: Find and copy dylibs ──
@@ -176,6 +185,22 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 			let src = search_dir.join(name);
 			if src.exists() {
 				println!("copying dylib {} -> {}", name, dest.display());
+				// macOS: use `ditto` to avoid xattr preservation (see binary copy).
+				#[cfg(target_os = "macos")]
+				{
+					let _ = std::fs::remove_file(&dest);
+					if std::process::Command::new("ditto")
+						.args([src.to_str().unwrap_or(""), dest.to_str().unwrap_or("")])
+						.status()
+						.is_err()
+					{
+						fs::copy(&src, &dest)?;
+						let _ = std::process::Command::new("xattr")
+							.args(["-c", dest.to_str().unwrap_or("")])
+							.output();
+					}
+				}
+				#[cfg(not(target_os = "macos"))]
 				fs::copy(&src, &dest)?;
 				// Fix install name: `cargo build` embeds the target/deps/
 				// path as the dylib's ID. Loading a copied dylib whose ID
