@@ -106,7 +106,15 @@ impl Config {
 			self.get_usize("APHRODITE_ENGINE_PROTECT_FIRST", "compression", "engine_protect_first", 2);
 		state.engine_protect_last =
 			self.get_usize("APHRODITE_ENGINE_PROTECT_LAST", "compression", "engine_protect_last", 5);
-		state.tool_threshold = self.get_usize("APHRODITE_TOOL_THRESHOLD", "compression", "tool_threshold", 4096);
+		// F3: was keyed "tool_threshold" and env var APHRODITE_TOOL_THRESHOLD -
+		// neither exists in any shipped TOML/doc (they use
+		// tool_threshold_token/tool_threshold_cache); wiring this up as-is
+		// would always fall through to the default. The Hermes dylib path
+		// is the tool-injecting, aggressive-compression environment (no
+		// cache-vs-token split like the proxy's dual listeners), so it maps
+		// to `tool_threshold_token`.
+		state.tool_threshold =
+			self.get_usize("APHRODITE_TOOL_THRESHOLD_TOKEN", "compression", "tool_threshold_token", 4096);
 		state.terminal_threshold =
 			self.get_usize("APHRODITE_TERMINAL_THRESHOLD", "compression", "terminal_threshold", 1024);
 		state.model = self.get_string("APHRODITE_MODEL", "defaults", "model", "gpt-4o");
@@ -134,5 +142,27 @@ mod tests {
 			cfg.get_u64("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45),
 			90
 		);
+	}
+
+	// ── T16 (F3): `apply_compression` must read the TOML key/env var that
+	// actually ships (`tool_threshold_token`/`APHRODITE_TOOL_THRESHOLD_TOKEN`)
+	// - the old `tool_threshold`/`APHRODITE_TOOL_THRESHOLD` names exist in no
+	// shipped TOML or doc, so wiring this up without the rename would have
+	// silently resolved to the default forever. ──
+	#[test]
+	fn test_apply_compression_reads_tool_threshold_token_key() {
+		let mut cfg = Config::default();
+		cfg.set_override("APHRODITE_TOOL_THRESHOLD_TOKEN", "777");
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.tool_threshold, 777);
+	}
+
+	#[test]
+	fn test_apply_compression_from_toml_table() {
+		let cfg = Config { raw:"[compression]\ntool_threshold_token = 321\n".parse().unwrap(), overrides:HashMap::new() };
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.tool_threshold, 321);
 	}
 }

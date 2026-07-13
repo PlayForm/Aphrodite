@@ -274,15 +274,26 @@ install_message: |
 }
 
 /// Write __init__.py shim for hermes plugin loading.
+///
+/// Embeds `plugins/aphrodite/__init__.py` (the monorepo's live Hermes
+/// plugin) directly, rather than maintaining a separate hand-copied template
+/// (report 07 F14/T8) - a hand-maintained second copy had drifted
+/// significantly: stale dylib-reload/free_string handling (report 06 F1),
+/// a `register_tool` call with the wrong argument count, no skills
+/// registration, no version handshake, no port-env reads, no health poll,
+/// and stderr piped to `DEVNULL` (silently re-introducing a startup-failure
+/// bug the live plugin had already fixed). `include_str!` of the real file
+/// means the two can never diverge again.
+const HERMES_PLUGIN_SHIM:&str = include_str!("../../../plugins/aphrodite/__init__.py");
+
 fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("__init__.py");
 	if path.exists() {
 		return Ok(());
 	}
 
-	let shim = include_str!("../templates/__init__.py");
 	println!("writing __init__.py -> {}", path.display());
-	fs::write(&path, shim)?;
+	fs::write(&path, HERMES_PLUGIN_SHIM)?;
 	secure_perms(&path, 0o644)?;
 	Ok(())
 }
@@ -384,3 +395,46 @@ fn secure_perms(path:&Path, mode:u32) -> io::Result<()> {
 }
 
 fn binary_name() -> &'static str { if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" } }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// ── T8 (F14): the setup-embedded shim is now `include_str!`'d directly
+	// from the live plugin, so it can't drift - these pin the specific bugs
+	// the old hand-copied `templates/__init__.py` had regrown. ──
+	#[test]
+	fn test_hermes_plugin_shim_has_no_stderr_devnull() {
+		assert!(
+			!HERMES_PLUGIN_SHIM.contains("stderr=subprocess.DEVNULL"),
+			"stderr must go to a log file, not DEVNULL (re-introduces the v1.2.1 silent-startup bug)"
+		);
+	}
+
+	#[test]
+	fn test_hermes_plugin_shim_reads_no_auto_launch() {
+		assert!(
+			HERMES_PLUGIN_SHIM.contains(r#"os.environ.get("APHRODITE_NO_AUTO_LAUNCH""#),
+			"the guard must be read, not just set"
+		);
+	}
+
+	#[test]
+	fn test_hermes_plugin_shim_reads_port_env_vars() {
+		assert!(HERMES_PLUGIN_SHIM.contains("APHRODITE_CACHE_PORT"));
+		assert!(HERMES_PLUGIN_SHIM.contains("APHRODITE_TOKEN_PORT"));
+	}
+
+	#[test]
+	fn test_hermes_plugin_shim_gates_context_engine_opt_in() {
+		assert!(HERMES_PLUGIN_SHIM.contains("APHRODITE_CONTEXT_ENGINE"));
+	}
+
+	#[test]
+	fn test_hermes_plugin_shim_registers_tools_with_toolset_arg() {
+		// The old template called `ctx.register_tool(schema, handler)` (2
+		// args) while the real Hermes API + live plugin use
+		// `register_tool(name, toolset, schema, handler)` (4 args).
+		assert!(HERMES_PLUGIN_SHIM.contains(r#"ctx.register_tool(name, "aphrodite", schema, "#));
+	}
+}

@@ -4,7 +4,10 @@
 //! 1. Single proxy: `aphrodite --mode cache --listen :9797 --api-key KEY`
 //! 2. Multi-proxy: `aphrodite` (reads aphrodite.toml, spawns all listeners)
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+	net::SocketAddr,
+	sync::{Arc, atomic::Ordering},
+};
 
 use anyhow::Context;
 use axum::{
@@ -75,13 +78,23 @@ fn main() -> anyhow::Result<()> {
 
 	// Worker thread count - I/O-bound proxy needs more than CPU cores.
 	// Default: 4× CPU or 32 minimum. Override: APHRODITE_WORKER_THREADS.
-	let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
-		.ok()
-		.and_then(|v| v.parse::<usize>().ok())
-		.unwrap_or_else(|| {
+	// F15: warn (via eprintln, not tracing - the subscriber isn't initialized
+	// this early, see `run()`'s matching comment) on a malformed value
+	// instead of silently falling back, mirroring `apply_port_override`.
+	let worker_threads = match std::env::var("APHRODITE_WORKER_THREADS") {
+		Ok(v) => match v.parse::<usize>() {
+			Ok(n) => n,
+			Err(_) => {
+				eprintln!("APHRODITE_WORKER_THREADS={v:?} is not a valid number; using the computed default");
+				let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
+				(cpus * 4).max(32)
+			},
+		},
+		Err(_) => {
 			let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
 			(cpus * 4).max(32)
-		});
+		},
+	};
 	let runtime = tokio::runtime::Builder::new_multi_thread()
 		.worker_threads(worker_threads)
 		.enable_all()
@@ -98,15 +111,33 @@ async fn run() -> anyhow::Result<()> {
 	// overrides, timeout clamping) that would otherwise fire against no
 	// registered subscriber and be silently dropped, defeating the whole
 	// point of adding them.
-	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
+	// F6: `aphrodite setup` writes its generated config to
+	// `~/.hermes/aphrodite/aphrodite.toml`, but this used to only ever look
+	// at `./aphrodite.toml` (or an explicit `APHRODITE_CONFIG_PATH`) - a
+	// setup run from any directory without its own `aphrodite.toml` fell
+	// straight into CLI-parse mode, where `--api-key`/`APHRODITE_API_KEY` is
+	// required, and the templated config (ports, model, api_url) was never
+	// read. Only falls back when `APHRODITE_CONFIG_PATH` was NOT explicitly
+	// set - an explicit override that doesn't exist should surface as
+	// CLI-fallback (or a clear error), not silently redirect elsewhere.
+	let explicit_config_path = std::env::var("APHRODITE_CONFIG_PATH").ok();
+	let config_path = explicit_config_path.clone().unwrap_or_else(|| "aphrodite.toml".to_string());
 	let use_multi_config = std::path::Path::new(&config_path).exists();
+	let (config_path, use_multi_config) = if use_multi_config || explicit_config_path.is_some() {
+		(config_path, use_multi_config)
+	} else {
+		match dirs::home_dir().map(|h| h.join(".hermes").join("aphrodite").join("aphrodite.toml")) {
+			Some(p) if p.exists() => (p.to_string_lossy().into_owned(), true),
+			_ => (config_path, false),
+		}
+	};
 	let (multi_config, cli_fallback, log_compact) = if use_multi_config {
 		let config = MultiConfig::load(&config_path)?;
-		let log_compact = std::env::var("APHRODITE_LOG_COMPACT").is_ok();
+		let log_compact = aphrodite::config::env_bool("APHRODITE_LOG_COMPACT");
 		(Some(config), None, log_compact)
 	} else {
 		let cli = Cli::parse();
-		let log_compact = cli.log_compact || std::env::var("APHRODITE_LOG_COMPACT").is_ok();
+		let log_compact = cli.log_compact || aphrodite::config::env_bool("APHRODITE_LOG_COMPACT");
 		(None, Some(cli), log_compact)
 	};
 
@@ -119,6 +150,12 @@ async fn run() -> anyhow::Result<()> {
 	} else {
 		subscriber.with(tracing_subscriber::fmt::layer()).try_init()?;
 	}
+
+	// The `[compression]` table is a single top-level section shared by every
+	// `[[proxies]]` entry (report 07 F2/T15) - each listener's `AppState`
+	// resolves its own cache-vs-token threshold from the same table via
+	// `resolve_thresholds`.
+	let compression = multi_config.as_ref().and_then(|c| c.compression.clone());
 
 	let proxies:Vec<(String, Cli)> = if let Some(config) = multi_config {
 		config
@@ -147,7 +184,59 @@ async fn run() -> anyhow::Result<()> {
 
 	tracing::info!("starting {} proxy listener(s)", proxies.len());
 
+	// ── Shared shutdown watch channel ────────────────────────────────
+	// Initial value false; main() sets true on first Ctrl+C/SIGTERM,
+	// each run_single() task waits on the receiver for graceful_shutdown.
+	let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
+	// F9: bind every listener BEFORE spawning any proxy task. Previously
+	// each `run_single` bound its own port deep inside its spawned task, so
+	// a bind failure (port already in use - a stale instance, a conflict
+	// between the cache/token pair) only logged an error and left that one
+	// listener silently dead while the other kept serving - the process
+	// exited 0 and looked healthy. Binding here means a failure aborts
+	// startup entirely, loudly, before any listener goes live.
+	//
+	// `AppState` is also built here now, not inside `run_single` (report 07
+	// F4/T15) - the config-file watcher below needs every listener's
+	// `Arc<AppState>` up front so a file change can actually apply new
+	// compression thresholds to the live proxies, not just re-parse and log.
+	let mut bound = Vec::with_capacity(proxies.len());
+	for (name, mut cli) in proxies {
+		// Resolve relative ccr_db_path against the binary directory, not CWD.
+		// This way the database path is stable regardless of where the
+		// process is launched from. (Moved here from `run_single` so
+		// `build_state` can run before spawning.)
+		if let Some(ref db_path) = cli.ccr_db_path {
+			if !db_path.as_os_str().is_empty() && !db_path.is_absolute() {
+				if let Ok(exe_path) = std::env::current_exe() {
+					if let Some(exe_dir) = exe_path.parent() {
+						let old = db_path.display().to_string();
+						cli.ccr_db_path = Some(exe_dir.join(db_path));
+						tracing::info!(
+							"resolved relative ccr_db_path from {} to {}",
+							old,
+							cli.ccr_db_path.as_ref().unwrap().display()
+						);
+					}
+				}
+			}
+			if let Some(parent) = cli.ccr_db_path.as_ref().and_then(|p| p.parent()) {
+				std::fs::create_dir_all(parent)?;
+			}
+		}
+		let listener = tokio::net::TcpListener::bind(cli.listen)
+			.await
+			.with_context(|| format!("failed to bind listener \"{name}\" on {}", cli.listen))?;
+		let state = Arc::new(proxy::build_state(&cli, compression.as_ref()).await?);
+		bound.push((name, cli, listener, state));
+	}
+
 	// ── Spawn config file watcher for hot-reload ──────────────────
+	// Holds a clone of every listener's `Arc<AppState>` so a file change
+	// applies to all of them (report 07 F4/T15 - previously this only
+	// re-parsed and logged; `AppState` didn't exist yet at this point in
+	// startup, so there was nothing live for it to write into).
 	let watch_path = {
 		let p = std::path::PathBuf::from(&config_path);
 		if p.is_relative() {
@@ -157,6 +246,7 @@ async fn run() -> anyhow::Result<()> {
 		}
 	};
 	let watch_path_str = watch_path.to_string_lossy().to_string();
+	let states_for_watcher:Vec<_> = bound.iter().map(|(_, _, _, s)| s.clone()).collect();
 	tokio::spawn(async move {
 		use notify::{Event, EventKind, RecursiveMode, Watcher};
 		let (tx, mut rx) = tokio::sync::mpsc::channel(16);
@@ -188,17 +278,23 @@ async fn run() -> anyhow::Result<()> {
 				while rx.try_recv().is_ok() {}
 				match aphrodite::config::MultiConfig::load(&watch_path_str) {
 					Ok(config) => {
-						let comp = config.compression.as_ref();
+						let thresholds = proxy::resolve_thresholds(config.compression.as_ref());
+						for state in &states_for_watcher {
+							state.cache_compress_threshold.store(thresholds.cache, Ordering::Relaxed);
+							state.token_compress_threshold.store(thresholds.token, Ordering::Relaxed);
+							state.inline_ccr_threshold.store(thresholds.inline, Ordering::Relaxed);
+							state
+								.code_multiplier_x100
+								.store((thresholds.code_multiplier * 100.0) as u64, Ordering::Relaxed);
+						}
 						tracing::info!(
 							path = %watch_path_str,
-							auto_expand_limit = comp.and_then(|c| c.auto_expand_limit).unwrap_or(0),
-							engine_threshold = comp.and_then(|c| c.engine_threshold_pct).unwrap_or(0),
-							// F15: this only re-parses and validates the file - `AppState`
-						// is built once in `run_single` and thresholds are consts, so
-						// nothing here is actually applied to the running proxy.
-						// The previous wording claimed otherwise, costing real
-						// debugging time when a changed threshold had no effect.
-						"config validated (file watch) - restart required for proxy-side values to take effect; the Python plugin reloads independently"
+							cache_threshold = thresholds.cache,
+							token_threshold = thresholds.token,
+							inline_threshold = thresholds.inline,
+							code_multiplier = thresholds.code_multiplier,
+							listeners = states_for_watcher.len(),
+							"config reloaded - compression thresholds applied to all live listeners"
 						);
 					},
 					Err(e) => {
@@ -209,31 +305,11 @@ async fn run() -> anyhow::Result<()> {
 		}
 	});
 
-	// ── Shared shutdown watch channel ────────────────────────────────
-	// Initial value false; main() sets true on first Ctrl+C/SIGTERM,
-	// each run_single() task waits on the receiver for graceful_shutdown.
-	let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-
-	// F9: bind every listener BEFORE spawning any proxy task. Previously
-	// each `run_single` bound its own port deep inside its spawned task, so
-	// a bind failure (port already in use - a stale instance, a conflict
-	// between the cache/token pair) only logged an error and left that one
-	// listener silently dead while the other kept serving - the process
-	// exited 0 and looked healthy. Binding here means a failure aborts
-	// startup entirely, loudly, before any listener goes live.
-	let mut bound = Vec::with_capacity(proxies.len());
-	for (name, cli) in proxies {
-		let listener = tokio::net::TcpListener::bind(cli.listen)
-			.await
-			.with_context(|| format!("failed to bind listener \"{name}\" on {}", cli.listen))?;
-		bound.push((name, cli, listener));
-	}
-
 	let mut handles = Vec::new();
-	for (name, cli, listener) in bound {
+	for (name, cli, listener, state) in bound {
 		let rx = shutdown_rx.clone();
 		let handle = tokio::spawn(async move {
-			if let Err(e) = run_single(name, cli, listener, rx).await {
+			if let Err(e) = run_single(name, cli, listener, state, rx).await {
 				tracing::error!(%e, "proxy listener failed");
 			}
 		});
@@ -293,33 +369,11 @@ async fn run() -> anyhow::Result<()> {
 
 async fn run_single(
 	name:String,
-	mut cli:Cli,
+	cli:Cli,
 	listener:tokio::net::TcpListener,
+	state:Arc<proxy::AppState>,
 	mut shutdown_rx:tokio::sync::watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
-	// Resolve relative ccr_db_path against the binary directory, not CWD.
-	// This way the database path is stable regardless of where the process is
-	// launched from.
-	if let Some(ref db_path) = cli.ccr_db_path {
-		if !db_path.as_os_str().is_empty() && !db_path.is_absolute() {
-			if let Ok(exe_path) = std::env::current_exe() {
-				if let Some(exe_dir) = exe_path.parent() {
-					let old = db_path.display().to_string();
-					cli.ccr_db_path = Some(exe_dir.join(db_path));
-					tracing::info!(
-						"resolved relative ccr_db_path from {} to {}",
-						old,
-						cli.ccr_db_path.as_ref().unwrap().display()
-					);
-				}
-			}
-		}
-		if let Some(parent) = cli.ccr_db_path.as_ref().and_then(|p| p.parent()) {
-			std::fs::create_dir_all(parent)?;
-		}
-	}
-
-	let state = Arc::new(proxy::build_state(&cli).await?);
 	let task_tracker = state.task_tracker.clone();
 
 	let mode_str = match cli.mode {

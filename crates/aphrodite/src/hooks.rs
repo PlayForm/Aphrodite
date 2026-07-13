@@ -152,7 +152,17 @@ pub fn pre_llm_call(state:&AphroditeState) -> serde_json::Value {
 }
 
 /// Post-LLM call hook - archive turn.
+///
+/// Archives the last marker recorded this turn into `conv_index` before
+/// advancing the turn counter (report 06 F11/T13) - previously `archive_turn`
+/// was never called from any hook, so `conv_index` stayed empty forever and
+/// `aphrodite_diff` always returned zero turns despite compressions
+/// happening every turn.
 pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
+	if let Some(last) = state.recent_markers.iter().rev().find(|m| m.turn == state.turn_counter) {
+		let (hash, summary, size) = (last.hash.clone(), last.preview.clone(), last.size);
+		crate::session::archive_turn(state, &hash, &summary, size);
+	}
 	crate::session::next_turn(state);
 	serde_json::json!({"status": "ok", "turn": state.turn_counter})
 }
@@ -272,5 +282,32 @@ mod tests {
 		s.terminal_threshold = 0;
 		let r = transform_terminal_output(&mut s, "error: broke\nexit code: 1\n");
 		assert_eq!(r["type"], "terminal");
+	}
+
+	// ── T13 (F11): post_llm_call must archive the turn's last marker into
+	// conv_index, not just advance the turn counter - otherwise
+	// `aphrodite_diff` always returns zero turns despite compressions
+	// happening every turn. ──
+	#[test]
+	fn test_post_llm_call_archives_last_marker_of_turn() {
+		let mut s = AphroditeState::default();
+		s.tool_threshold = 0; // always compress
+		let content = "fn main() {\n    println!(\"hello world\");\n}\n";
+		let r = transform_tool_result(&mut s, content, "terminal");
+		let hash = r["hash"].as_str().unwrap().to_string();
+		assert!(s.conv_index.is_empty(), "not archived until post_llm_call runs");
+
+		let post = post_llm_call(&mut s);
+		assert_eq!(post["turn"], 1);
+		assert_eq!(s.conv_index.len(), 1, "post_llm_call must archive the turn's marker");
+		let turns = crate::session::get_conv_index(&s);
+		assert_eq!(turns[0]["hash"], hash);
+	}
+
+	#[test]
+	fn test_post_llm_call_with_no_markers_this_turn_does_not_archive() {
+		let mut s = AphroditeState::default();
+		post_llm_call(&mut s);
+		assert!(s.conv_index.is_empty(), "nothing to archive when no marker was recorded this turn");
 	}
 }

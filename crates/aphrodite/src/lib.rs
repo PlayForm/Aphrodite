@@ -35,14 +35,13 @@ pub mod center;
 pub mod config;
 pub mod proxy;
 pub mod retrieve;
-pub mod scripting;
 pub mod setup;
 
 use std::{
 	collections::HashMap,
 	ffi::{CStr, CString},
 	os::raw::c_char,
-	sync::Mutex,
+	sync::{Arc, Mutex},
 };
 
 use headroom_core::transforms;
@@ -55,12 +54,19 @@ const MAX_CONTENT:usize = 16 * 1024 * 1024; // 16MB cap
 /// Process-global handle table. `None` until the first handle is allocated,
 /// so `Mutex::new` can stay `const` without requiring a heap alloc at
 /// startup; `handles()` lazily initializes it to `Some` on first use.
-static HANDLES:Mutex<Option<HashMap<usize, AphroditeState>>> = Mutex::new(None);
+///
+/// Each session's state lives behind its own `Arc<Mutex<..>>` (F4/T6, report
+/// 06) rather than directly in the map: the outer `HANDLES` mutex is only
+/// ever held long enough to look up and clone that `Arc`, never across a
+/// hook/tool body. Previously one global lock serialized every session's
+/// every call - two different agent sessions could not classify/compress
+/// concurrently at all, even though they share nothing.
+static HANDLES:Mutex<Option<HashMap<usize, Arc<Mutex<AphroditeState>>>>> = Mutex::new(None);
 /// Next handle ID to hand out from `alloc_handle`. Wraps on overflow rather
 /// than panicking - see the `wrapping_add` call there.
 static NEXT_ID:Mutex<usize> = Mutex::new(1);
 
-fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, AphroditeState>>> {
+fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, Arc<Mutex<AphroditeState>>>>> {
 	let mut g = HANDLES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	if g.is_none() {
 		*g = Some(HashMap::new());
@@ -68,21 +74,36 @@ fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, AphroditeSt
 	g
 }
 
+/// Look up a session's handle and clone its `Arc` out from under the map
+/// lock, which is dropped before returning - callers lock the per-session
+/// mutex separately so the map lock is never held across state access.
+fn get_handle(hid:usize) -> Option<Arc<Mutex<AphroditeState>>> {
+	handles().as_ref().and_then(|m| m.get(&hid)).cloned()
+}
+
 fn alloc_handle(state:AphroditeState) -> usize {
 	let mut id = NEXT_ID.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	let hid = *id;
 	*id = id.wrapping_add(1); // overflow-safe
-	handles().as_mut().unwrap().insert(hid, state);
+	handles().as_mut().unwrap().insert(hid, Arc::new(Mutex::new(state)));
 	hid
 }
 
+/// Torn-state contract (report 06 F12): `f` runs under `catch_unwind`, so a
+/// panicking hook returns an error instead of aborting the process, but any
+/// mutation `f` already made to `state` before panicking is NOT rolled back
+/// - a panic between two steps of a multi-step mutation (e.g. `retain` then
+/// `push_front` in `inline_store_put`) leaves whatever partial state existed
+/// at the panic point for the next caller to observe. This crate's mutation
+/// sequences are ordered so an interruption degrades to "entry missing"
+/// rather than "duplicate entry" - keep that ordering if you touch them.
 fn with_state<T>(hid:usize, f:impl FnOnce(&mut AphroditeState) -> T) -> Result<T, String> {
-	let mut h = handles();
-	let state = match h.as_mut().and_then(|m| m.get_mut(&hid)) {
+	let session = match get_handle(hid) {
 		Some(s) => s,
 		None => return Err(format!("invalid handle: {}", hid)),
 	};
-	std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(state)))
+	let mut state = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+	std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut state)))
 		.map_err(|_| "internal error: hook panicked".to_string())
 }
 
@@ -196,7 +217,7 @@ pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn aphrodite_destroy(handle:*const c_char) {
 	if let Ok(hid) = unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
-		handles().as_mut().map(|m| m.remove(&hid));
+		handles().as_mut().and_then(|m| m.remove(&hid));
 	}
 }
 
@@ -293,15 +314,14 @@ pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -
 	};
 	let hash = unsafe { cstr(hash) }.unwrap_or_default();
 	guarded(std::panic::AssertUnwindSafe(move || {
-		let mut h = handles();
-		match h.as_mut().and_then(|m| m.get_mut(&hid)) {
-			Some(s) => {
-				match s.inline_store_get(&hash) {
-					Some(content) => CString::new(content.replace('\0', "")).unwrap().into_raw(),
-					None => to_json_error(&format!("hash not found: {}", hash)),
-				}
-			},
-			None => to_json_error(&format!("invalid handle: {}", hid)),
+		let session = match get_handle(hid) {
+			Some(s) => s,
+			None => return to_json_error(&format!("invalid handle: {}", hid)),
+		};
+		let mut s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+		match s.inline_store_get(&hash) {
+			Some(content) => CString::new(content.replace('\0', "")).unwrap().into_raw(),
+			None => to_json_error(&format!("hash not found: {}", hash)),
 		}
 	}))
 }
@@ -339,9 +359,9 @@ pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) ->
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let m = unsafe { cstr(mode) }.unwrap_or_default();
-	let h = handles();
-	match h.as_ref().and_then(|map| map.get(&hid)) {
-		Some(s) => {
+	match get_handle(hid) {
+		Some(session) => {
+			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			// NOTE: both "toc" and "full" modes emit the full 40-char hash -
 			// a truncated hash is unresolvable via exact-match retrieval
 			// (report 05 F3). Truncate only for human-readable display
@@ -370,9 +390,9 @@ pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	let h = handles();
-	match h.as_ref().and_then(|map| map.get(&hid)) {
-		Some(s) => {
+	match get_handle(hid) {
+		Some(session) => {
+			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			to_json_ok(&serde_json::json!({
 				"version":env!("CARGO_PKG_VERSION"),"inline_entries":s.inline_store.len(),
 				"markers":s.recent_markers.len(),"turn":s.turn_counter,
@@ -424,9 +444,9 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let q = unsafe { cstr(query) }.unwrap_or_default().to_lowercase();
-	let h = handles();
-	match h.as_ref().and_then(|map| map.get(&hid)) {
-		Some(s) => {
+	match get_handle(hid) {
+		Some(session) => {
+			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			let results:Vec<serde_json::Value> = s
 				.recent_markers
 				.iter()
@@ -447,9 +467,9 @@ pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) 
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let k = unsafe { cstr(key) }.unwrap_or_default();
-	let h = handles();
-	match h.as_ref().and_then(|map| map.get(&hid)) {
-		Some(s) => {
+	match get_handle(hid) {
+		Some(session) => {
+			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			let v = match k.as_ref() {
 				"model" => s.model.clone(),
 				"api_url" => s.api_url.clone(),
@@ -831,6 +851,42 @@ mod ffi_tests {
 		let s = CStr::from_ptr(ptr).to_string_lossy().into_owned();
 		aphrodite_free_string(ptr);
 		s
+	}
+
+	// ── T6 (F4, report 06): per-handle locking, not one global mutex ──
+	// Previously `HANDLES` held every session's `AphroditeState` directly
+	// under one `Mutex`, so a long-running call on one session (e.g. a slow
+	// hook) serialized every OTHER session's calls behind it too, even
+	// though sessions share no state. Verifies handle 2's call completes
+	// quickly while handle 1's call is still sleeping inside its own lock.
+	#[test]
+	fn with_state_does_not_serialize_across_different_handles() {
+		let h1:usize = unsafe { take(aphrodite_init(std::ptr::null())) }.parse().unwrap();
+		let h2:usize = unsafe { take(aphrodite_init(std::ptr::null())) }.parse().unwrap();
+
+		let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+		let b1 = barrier.clone();
+		let t1 = std::thread::spawn(move || {
+			with_state(h1, |_s| {
+				b1.wait();
+				std::thread::sleep(std::time::Duration::from_millis(300));
+			})
+			.unwrap();
+		});
+
+		barrier.wait();
+		let start = std::time::Instant::now();
+		with_state(h2, |_s| {}).unwrap();
+		let elapsed = start.elapsed();
+
+		t1.join().unwrap();
+		handles().as_mut().and_then(|m| m.remove(&h1));
+		handles().as_mut().and_then(|m| m.remove(&h2));
+
+		assert!(
+			elapsed < std::time::Duration::from_millis(150),
+			"handle 2's call should not block behind handle 1's long-held lock, took {elapsed:?}"
+		);
 	}
 
 	#[test]

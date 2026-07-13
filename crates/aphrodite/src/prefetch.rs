@@ -12,7 +12,7 @@ use crate::state::{AphroditeState, MarkerEntry};
 const MAX_PREFETCH_SIZE:u64 = 10 * 1024 * 1024;
 
 /// Outcome of reading one path, before any state mutation.
-pub(crate) enum ReadOutcome {
+pub enum ReadOutcome {
 	Missing,
 	Error,
 	SkippedSize { size:u64 },
@@ -23,7 +23,7 @@ pub(crate) enum ReadOutcome {
 /// whatever lock guards the caller's `AphroditeState` (F9: a global
 /// process/handle lock held across file I/O serializes every other
 /// session's every call behind one slow/cold-mount read).
-pub(crate) fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
+pub fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
 	paths
 		.iter()
 		.map(|path_str| {
@@ -49,7 +49,7 @@ pub(crate) fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
 /// Classify and store already-read file contents into `state`. Pure state
 /// mutation + JSON assembly - no I/O, so this is the only part that needs
 /// the lock.
-pub(crate) fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutcome)>) -> serde_json::Value {
+pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutcome)>) -> serde_json::Value {
 	let total = outcomes.len();
 	let mut results = Vec::with_capacity(total);
 	let mut loaded = 0u32;

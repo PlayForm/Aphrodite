@@ -30,11 +30,13 @@ pub struct AphroditeState {
 	/// Defaults to [`DEFAULT_INLINE_BYTE_BUDGET`]; see
 	/// `inline_store_byte_budget`/`set_inline_store_byte_budget`.
 	inline_store_byte_budget:usize,
-	/// Hash alias map: {full_sha256: short_hash}
-	pub hash_alias:HashMap<String, String>,
 	/// Recent CCR markers for catalog: [{hash, type, size, preview, turn}]
 	pub recent_markers:Vec<MarkerEntry>,
-	/// Conversation index: {turn_num: (hash, summary, size)}
+	/// Conversation index: {turn_num: (hash, summary, size)} - the last
+	/// marker archived per turn by `session::archive_turn`, called from
+	/// `hooks::post_llm_call` (report 06 F11/T13: previously `archive_turn`
+	/// was never called from any hook, so this stayed empty forever and
+	/// `aphrodite_diff` always returned zero turns).
 	pub conv_index:HashMap<usize, (String, String, usize)>,
 	/// Referenced files: {filepath: last_tool_name}
 	pub referenced_files:VecDeque<(String, String)>,
@@ -42,8 +44,6 @@ pub struct AphroditeState {
 	pub turn_counter:usize,
 	/// Scanned message index for incremental marker scan.
 	pub scanned_msg_idx:usize,
-	/// Git cache: {timestamp, summary}
-	pub git_cache:HashMap<String, String>,
 	/// File tools set.
 	pub file_tools:Vec<String>,
 	// ── Config values (mirrored from aphrodite.toml) ──
@@ -78,13 +78,11 @@ impl Default for AphroditeState {
 			inline_store:VecDeque::with_capacity(INLINE_MAX),
 			inline_store_bytes:0,
 			inline_store_byte_budget:DEFAULT_INLINE_BYTE_BUDGET,
-			hash_alias:HashMap::new(),
 			recent_markers:Vec::new(),
 			conv_index:HashMap::new(),
 			referenced_files:VecDeque::new(),
 			turn_counter:0,
 			scanned_msg_idx:0,
-			git_cache:HashMap::new(),
 			file_tools:vec!["read_file".into(), "write_file".into(), "patch".into(), "search_files".into()],
 			api_url:String::new(),
 			model:"gpt-4o".into(),
@@ -95,7 +93,7 @@ impl Default for AphroditeState {
 			context_engine_enabled:true,
 			tool_threshold:4096,
 			terminal_threshold:1024,
-			catalog_mode:"auto".into(),
+			catalog_mode:"tool".into(),
 			expand_guidance:false,
 			dev_mode:false,
 		}

@@ -21,7 +21,7 @@ use std::{
 	sync::{
 		Arc,
 		Mutex,
-		atomic::{AtomicU64, Ordering},
+		atomic::{AtomicU64, AtomicUsize, Ordering},
 	},
 	time::Duration,
 };
@@ -67,7 +67,7 @@ impl From<String> for Secret {
 	fn from(s:String) -> Self { Secret(s) }
 }
 
-use crate::config::{Cli, ProxyMode};
+use crate::config::{Cli, CompressionConfig, ProxyMode, env_parse_warn};
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -81,16 +81,51 @@ const TOKEN_COMPRESS_THRESHOLD:usize = 1024;
 const INLINE_CCR_THRESHOLD:usize = 256;
 /// Chat Completions API path.
 const CHAT_COMPLETIONS_PATH:&str = "/v1/chat/completions";
+/// Max body size cached in `response_cache` (1 MB). `response_cache` is
+/// count-bounded (128 entries via LRU) but not byte-bounded (report 06 F7) -
+/// without this, 128 large completions (e.g. big code-generation responses)
+/// could hold well over 100 MB resident for a cache whose only purpose is
+/// avoiding a repeat upstream round-trip on an identical request.
+const RESPONSE_CACHE_MAX_BODY_BYTES:usize = 1024 * 1024;
 
-/// Code multiplier: how many times the base threshold for code content.
-/// Coding-optimized default: 2× (compresses code aggressively, LLM retrieves on
-/// demand). Override: APHRODITE_CODE_MULTIPLIER env var (e.g. 4 to preserve
-/// more code).
-fn code_multiplier() -> usize {
-	std::env::var("APHRODITE_CODE_MULTIPLIER")
-		.ok()
-		.and_then(|v| v.parse().ok())
-		.unwrap_or(2)
+/// Live-resolved compression thresholds (report 07 F2/F4/T15): env var >
+/// TOML `[compression]` value > compiled-in default, the same precedence
+/// pattern `apply_port_override` already uses for the listen port. Computed
+/// once at startup (`build_state`) and re-computed on every hot-reload
+/// (config-file watcher + `POST /reload`) so both actually change the live
+/// proxy instead of only re-parsing and logging.
+pub struct ResolvedThresholds {
+	pub cache:usize,
+	pub token:usize,
+	pub inline:usize,
+	pub code_multiplier:f64,
+}
+
+/// Resolve the four compression thresholds from env vars, the TOML
+/// `[compression]` table (if any), and the compiled-in defaults, in that
+/// precedence order.
+///
+/// `code_multiplier` defaults to `3.0`, not the old free-function's `2`: the
+/// prior default only existed because `APHRODITE_CODE_MULTIPLIER=3.0`
+/// silently failed a `usize` parse (report 07 F10) - every shipped TOML and
+/// doc has always said `3.0`, so `2` was a masked bug, not an intentional
+/// value, and this restores the value the project's own config always
+/// claimed.
+pub fn resolve_thresholds(compression:Option<&CompressionConfig>) -> ResolvedThresholds {
+	ResolvedThresholds {
+		cache:env_parse_warn::<usize>("APHRODITE_TOOL_THRESHOLD_CACHE")
+			.or_else(|| compression.and_then(|c| c.tool_threshold_cache).map(|v| v as usize))
+			.unwrap_or(CACHE_COMPRESS_THRESHOLD),
+		token:env_parse_warn::<usize>("APHRODITE_TOOL_THRESHOLD_TOKEN")
+			.or_else(|| compression.and_then(|c| c.tool_threshold_token).map(|v| v as usize))
+			.unwrap_or(TOKEN_COMPRESS_THRESHOLD),
+		inline:env_parse_warn::<usize>("APHRODITE_INLINE_THRESHOLD")
+			.or_else(|| compression.and_then(|c| c.inline_threshold).map(|v| v as usize))
+			.unwrap_or(INLINE_CCR_THRESHOLD),
+		code_multiplier:env_parse_warn::<f64>("APHRODITE_CODE_MULTIPLIER")
+			.or_else(|| compression.and_then(|c| c.code_multiplier))
+			.unwrap_or(3.0),
+	}
 }
 
 // ── spawn_blocking wrappers for CcrStore (rusqlite is blocking) ─────
@@ -103,11 +138,18 @@ pub(crate) async fn ccr_get(ccr:&Arc<dyn CcrStore>, hash:&str) -> Option<String>
 }
 
 /// Wrapper for `ccr.put()` on a blocking thread.
-async fn ccr_put(ccr:&Arc<dyn CcrStore>, hash:&str, content:&str) {
+/// Store `content` under `hash` in the CCR backend. Returns whether the
+/// store actually succeeded (F4) - a caller that discards this and replaces
+/// the original content with a marker anyway ships a marker whose hash
+/// resolves to nothing the moment the store is full/locked/panics, which is
+/// permanent data loss (the original content never reached the client).
+async fn ccr_put(ccr:&Arc<dyn CcrStore>, hash:&str, content:&str) -> bool {
 	let ccr = ccr.clone();
 	let hash = hash.to_owned();
 	let content = content.to_owned();
-	let _ = tokio::task::spawn_blocking(move || ccr.put(&hash, &content)).await;
+	tokio::task::spawn_blocking(move || ccr.put(&hash, &content))
+		.await
+		.unwrap_or(false)
 }
 
 /// Wrapper for `ccr.del()` on a blocking thread.
@@ -189,8 +231,16 @@ pub struct AppState {
 	pub compression_ratio_ema:AtomicU64, // ×100 for EMA of compression ratio
 
 	// LLM API response cache (model+messages → compressed response)
-	/// LRU cache: hash(model+messages) → serialized response body
-	pub response_cache:std::sync::Mutex<lru::LruCache<u64, Vec<u8>>>,
+	/// LRU cache: hash(model+messages) → (inserted-at, serialized response body).
+	/// F5 (report 06): entries never expired on their own - a marker minted at
+	/// minute 0 of a long session was replayed unchanged at minute 90, silently
+	/// diverging from what a fresh (possibly temperature>0) upstream call would
+	/// return. Checked against `response_cache_ttl` on the hit path.
+	pub response_cache:std::sync::Mutex<lru::LruCache<u64, (std::time::Instant, Vec<u8>)>>,
+	/// TTL applied to `response_cache` entries - reuses `cli.ccr_ttl_seconds`
+	/// so cached LLM responses don't outlive the CCR content they were
+	/// derived from by a different, uncoordinated lifetime.
+	pub response_cache_ttl:std::time::Duration,
 	pub cache_hits:AtomicU64,
 	pub cache_misses:AtomicU64,
 
@@ -204,13 +254,6 @@ pub struct AppState {
 	/// x-headroom-budget for adaptive compression.
 	pub fill_pct:AtomicU64,
 
-	/// Rhai scripting engine - user-defined micro-scripts for hook injection.
-	/// None when scripting feature is disabled or not configured.
-	#[cfg(feature = "scripting")]
-	pub script_engine:Option<std::sync::Arc<crate::scripting::ScriptEngine>>,
-	#[cfg(not(feature = "scripting"))]
-	pub script_engine:Option<()>,
-
 	// Extended metrics
 	pub inline_ccr_hits:AtomicU64,
 	pub inline_ccr_misses:AtomicU64,
@@ -221,11 +264,39 @@ pub struct AppState {
 	pub upstream_errors_4xx:AtomicU64,
 	pub upstream_errors_5xx:AtomicU64,
 	pub upstream_timeouts:AtomicU64,
+	/// Non-timeout transport failures (connection refused, DNS, TLS) - split
+	/// from `upstream_timeouts` (F17), which previously counted every kind
+	/// of transport error as a "timeout".
+	pub upstream_connect_errors:AtomicU64,
 	pub ccr_store_entries:AtomicU64,
 	pub ccr_store_bytes:AtomicU64,
 	pub request_body_bytes:AtomicU64,
 	pub response_body_bytes:AtomicU64,
 	pub upstream_latency_micros:AtomicU64,
+
+	/// TTL cache for the `/health/upstream` probe result: `(ok, checked_at)`.
+	/// F19: without this, a monitor polling `/health/upstream` every 10-15s
+	/// re-probes the real upstream on every single call - the exact cost
+	/// class `Maintain/examples/08_health_upstream.py` documents (a live
+	/// upstream call was already removed from the plain `/health` endpoint
+	/// for this reason; `/health/upstream` just re-introduced it under a
+	/// different path).
+	pub upstream_health_cache:std::sync::Mutex<Option<(bool, std::time::Instant)>>,
+
+	/// Live compression thresholds (report 07 F2/F4/T15) - previously
+	/// `CACHE_COMPRESS_THRESHOLD`/`TOKEN_COMPRESS_THRESHOLD`/
+	/// `INLINE_CCR_THRESHOLD` were consts, so every shipped TOML's
+	/// `[compression]` table was parsed and then silently discarded; `POST
+	/// /reload` and the config-file watcher logged success while applying
+	/// nothing. Resolved once at startup (env > TOML > const default, see
+	/// `resolve_thresholds`) and updated in place by both the watcher and
+	/// `/reload` - this is what makes hot-reload real instead of theater.
+	pub cache_compress_threshold:AtomicUsize,
+	pub token_compress_threshold:AtomicUsize,
+	pub inline_ccr_threshold:AtomicUsize,
+	/// `code_multiplier`, ×100 for integer atomic storage (matches the
+	/// existing `compression_ratio_ema` ×100 convention above).
+	pub code_multiplier_x100:AtomicU64,
 }
 
 impl AppState {
@@ -237,7 +308,13 @@ impl AppState {
 			},
 			"proxy": "aphrodite",
 			"ccr_backend": if self.ccr.is_some() { "enabled" } else { "none" },
-			"tool_relay": self.tool_relay,
+			// Renamed from "tool_relay" (F12): a duplicate "tool_relay" key
+			// further down (the stats object) silently won in
+			// `serde_json::json!`'s map construction, so this boolean -
+			// whether tool relay is enabled at all - was never actually
+			// exposed; there was no way to distinguish "relay disabled"
+			// from "relay enabled, zero calls".
+			"tool_relay_enabled": self.tool_relay,
 			"requests": {
 				"total": self.requests_total.load(Ordering::Relaxed),
 				"compressed": self.requests_compressed.load(Ordering::Relaxed),
@@ -282,6 +359,9 @@ impl AppState {
 				"4xx": self.upstream_errors_4xx.load(Ordering::Relaxed),
 				"5xx": self.upstream_errors_5xx.load(Ordering::Relaxed),
 				"timeouts": self.upstream_timeouts.load(Ordering::Relaxed),
+				// F17: non-timeout transport failures (connect refused, DNS,
+				// TLS) - previously folded into "timeouts" above.
+				"connect_errors": self.upstream_connect_errors.load(Ordering::Relaxed),
 			},
 			"ccr_store": {
 				"entries": self.ccr_store_entries.load(Ordering::Relaxed),
@@ -297,10 +377,22 @@ impl AppState {
 
 	fn compress_threshold(&self) -> usize {
 		match self.mode {
-			ProxyMode::Cache => CACHE_COMPRESS_THRESHOLD,
-			ProxyMode::Token => TOKEN_COMPRESS_THRESHOLD,
+			ProxyMode::Cache => self.cache_compress_threshold.load(Ordering::Relaxed),
+			ProxyMode::Token => self.token_compress_threshold.load(Ordering::Relaxed),
 		}
 	}
+
+	/// Inline-vs-durable storage cutoff (report 07 F2/T15) - was the
+	/// `INLINE_CCR_THRESHOLD` const; now live-configurable via
+	/// `compression.inline_threshold`.
+	fn inline_ccr_threshold(&self) -> usize { self.inline_ccr_threshold.load(Ordering::Relaxed) }
+
+	/// How many times the base threshold for code content (report 07
+	/// F2/F10/T11/T15) - was a free fn parsing `APHRODITE_CODE_MULTIPLIER` as
+	/// `usize` (silently truncating the documented `3.0` to a parse failure
+	/// -> default 2); now live-configurable via `compression.code_multiplier`
+	/// and re-resolved as `f64` on every hot-reload.
+	fn code_multiplier(&self) -> f64 { self.code_multiplier_x100.load(Ordering::Relaxed) as f64 / 100.0 }
 
 	/// Per-type threshold - code stays in context longer, logs compressed
 	/// aggressively.
@@ -326,7 +418,7 @@ impl AppState {
 		let base = (base as f64 * tune) as usize;
 		match ct {
 			"error" => base * 8,
-			"code_rust" | "code_python" | "code_go" | "code_js" | "code" => base * code_multiplier(),
+			"code_rust" | "code_python" | "code_go" | "code_js" | "code" => (base as f64 * self.code_multiplier()) as usize,
 			"diff" | "git" => base * 2,
 			"text" => base * 2,
 			"tool_output" => base,
@@ -475,7 +567,7 @@ pub struct CcrNotification {
 /// Construct `AppState` from CLI config: builds the tuned HTTP client,
 /// opens the CCR backend appropriate for `cli.mode` (SQLite for Token,
 /// in-memory for Cache), and zeroes all counters.
-pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
+pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> anyhow::Result<AppState> {
 	// Tuned HttpClient for high-concurrency API proxy workload.
 	// Default pool: 100 idle connections per host, 90s idle timeout, keepalive.
 	let client = HttpClient::builder()
@@ -519,6 +611,8 @@ pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 		_ => None,
 	};
 
+	let thresholds = resolve_thresholds(compression);
+
 	Ok(AppState {
 		client,
 		api_url:cli.api_url.clone(),
@@ -552,20 +646,11 @@ pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 		tool_relay_calls:AtomicU64::new(0),
 		compression_ratio_ema:AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
 		response_cache:Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
+		response_cache_ttl:std::time::Duration::from_secs(cli.ccr_ttl_seconds),
 		cache_hits:AtomicU64::new(0),
 		cache_misses:AtomicU64::new(0),
 		fill_pct:AtomicU64::new(9000), // 90.00% - moderate fill initial default
 		task_tracker:TaskTracker::new(),
-
-		// Scripting engine - enabled via --scripting or APHRODITE_SCRIPTING=1
-		#[cfg(feature = "scripting")]
-		script_engine:crate::scripting_enabled().then(|| {
-			let engine = crate::scripting::ScriptEngine::new();
-			tracing::info!("scripting engine loaded with rhai scripts");
-			std::sync::Arc::new(engine)
-		}),
-		#[cfg(not(feature = "scripting"))]
-		script_engine:None,
 
 		inline_ccr_hits:AtomicU64::new(0),
 		inline_ccr_misses:AtomicU64::new(0),
@@ -576,11 +661,17 @@ pub async fn build_state(cli:&Cli) -> anyhow::Result<AppState> {
 		upstream_errors_4xx:AtomicU64::new(0),
 		upstream_errors_5xx:AtomicU64::new(0),
 		upstream_timeouts:AtomicU64::new(0),
+		upstream_connect_errors:AtomicU64::new(0),
 		ccr_store_entries:AtomicU64::new(0),
 		ccr_store_bytes:AtomicU64::new(0),
 		request_body_bytes:AtomicU64::new(0),
 		response_body_bytes:AtomicU64::new(0),
 		upstream_latency_micros:AtomicU64::new(0),
+		upstream_health_cache:std::sync::Mutex::new(None),
+		cache_compress_threshold:AtomicUsize::new(thresholds.cache),
+		token_compress_threshold:AtomicUsize::new(thresholds.token),
+		inline_ccr_threshold:AtomicUsize::new(thresholds.inline),
+		code_multiplier_x100:AtomicU64::new((thresholds.code_multiplier * 100.0) as u64),
 	})
 }
 
@@ -609,14 +700,91 @@ fn generate_summary(content:&str) -> String {
 /// Returns None if the body can't be parsed as JSON or lacks model/messages.
 fn cache_key_from_body(body:&[u8], api_key:&str) -> Option<u64> {
 	let v:serde_json::Value = serde_json::from_slice(body).ok()?;
-	let model = v.get("model")?.as_str()?;
-	let messages = v.get("messages")?;
-	let messages_str = serde_json::to_string(messages).ok()?;
+	// F3: never cache a streamed request - the cached entry is a single
+	// buffered JSON body, replayed with `Content-Type: application/json`,
+	// which is nothing like an SSE stream a `"stream": true` client expects.
+	if v.get("stream").and_then(|s| s.as_bool()).unwrap_or(false) {
+		return None;
+	}
+	// `model`/`messages` must both be present for this to be a valid,
+	// cacheable chat-completion request.
+	v.get("model")?.as_str()?;
+	v.get("messages")?;
+	// F3: the key used to hash only api_key+model+messages, so two requests
+	// differing solely in `tools`, `tool_choice`, `temperature`, `top_p`,
+	// `n`, or `response_format` collided and got served each other's cached
+	// response. Include every field that changes what a valid response can
+	// look like, in a fixed, canonical order (serde_json's key order from
+	// `v` itself is not guaranteed stable across equivalent requests).
+	let mut parts:Vec<u8> = Vec::new();
+	parts.extend_from_slice(api_key.as_bytes());
+	for (label, val) in [
+		("model", v.get("model")),
+		("messages", v.get("messages")),
+		("tools", v.get("tools")),
+		("tool_choice", v.get("tool_choice")),
+		("temperature", v.get("temperature")),
+		("top_p", v.get("top_p")),
+		("n", v.get("n")),
+		("response_format", v.get("response_format")),
+	] {
+		parts.push(b':');
+		parts.extend_from_slice(label.as_bytes());
+		parts.push(b'=');
+		if let Some(val) = val {
+			parts.extend_from_slice(serde_json::to_string(val).ok()?.as_bytes());
+		}
+	}
 	// FNV-1a 64-bit hash - deterministic across process restarts
-	// Include api_key to prevent cross-user cache collision
-	Some(fnv1a_64(
-		&[api_key.as_bytes(), b":", model.as_bytes(), b":", messages_str.as_bytes()].concat(),
-	))
+	Some(fnv1a_64(&parts))
+}
+
+/// Look up `ck` in `state.response_cache`, treating an entry older than
+/// `state.response_cache_ttl` as a miss and evicting it (report 06 F5) -
+/// without this, a marker minted at minute 0 of a long session gets its
+/// cached response replayed unchanged at minute 90, silently diverging from
+/// what a fresh (possibly temperature>0) upstream call would return.
+fn response_cache_get(state:&AppState, ck:u64) -> Option<Vec<u8>> {
+	state.response_cache.lock().ok().and_then(|mut cache| {
+		let expired = cache
+			.peek(&ck)
+			.map(|(inserted_at, _)| inserted_at.elapsed() >= state.response_cache_ttl)
+			.unwrap_or(false);
+		if expired {
+			cache.pop(&ck);
+			None
+		} else {
+			cache.get(&ck).map(|(_, body)| body.clone())
+		}
+	})
+}
+
+/// Copy upstream response headers onto `builder`, skipping hop-by-hop
+/// headers (F5) - `content-length` is always skipped too since the caller
+/// may be sending a re-serialized body of a different length than upstream's,
+/// and `content-type`/the two `X-Aphrodite-*` headers the caller sets itself
+/// afterward win if there's a name collision (axum keeps both; callers add
+/// their own explicit `content-type` after calling this).
+fn copy_upstream_headers(
+	mut builder:axum::http::response::Builder,
+	upstream_headers:&reqwest::header::HeaderMap,
+) -> axum::http::response::Builder {
+	const SKIP:&[&str] = &[
+		"content-length",
+		"content-type",
+		"transfer-encoding",
+		"connection",
+		"keep-alive",
+	];
+	for (name, value) in upstream_headers.iter() {
+		if SKIP.contains(&name.as_str()) {
+			continue;
+		}
+		if let Ok(v) = axum::http::HeaderValue::from_bytes(value.as_bytes()) {
+			builder = builder.header(name.as_str(), v);
+		}
+	}
+	builder
 }
 
 /// FNV-1a 64-bit hash over bytes. Deterministic across restarts.
@@ -668,10 +836,18 @@ pub async fn proxy_handler(
 		);
 	}
 
-	let deepseek_path = path.path().trim_start_matches('/');
-	let url = format!("{}/{}", state.api_url.trim_end_matches('/'), deepseek_path);
+	// F10: forward the query string too - `path.path()` excludes it, so any
+	// OpenAI-compatible endpoint using query params (e.g. `GET
+	// /v1/models?limit=5`) had it silently dropped by this catch-all.
+	let deepseek_path_and_query = path
+		.0
+		.path_and_query()
+		.map(|pq| pq.as_str())
+		.unwrap_or_else(|| path.path())
+		.trim_start_matches('/');
+	let url = format!("{}/{}", state.api_url.trim_end_matches('/'), deepseek_path_and_query);
 
-	let is_chat_completion = deepseek_path == CHAT_COMPLETIONS_PATH.trim_start_matches('/');
+	let is_chat_completion = path.path().trim_start_matches('/') == CHAT_COMPLETIONS_PATH.trim_start_matches('/');
 
 	let body_vec = body.to_vec();
 	let cache_key = if is_chat_completion {
@@ -681,7 +857,8 @@ pub async fn proxy_handler(
 	};
 	// Check LLM API response cache before upstream call
 	if let Some(ck) = cache_key {
-		if let Some(cached_body) = state.response_cache.lock().ok().and_then(|mut cache| cache.get(&ck).cloned()) {
+		let cached_body = response_cache_get(&state, ck);
+		if let Some(cached_body) = cached_body {
 			state.cache_hits.fetch_add(1, Ordering::Relaxed);
 			// Bytes throughout (report 05 F5): a full upstream round-trip
 			// was avoided, so the whole cached response body counts as
@@ -696,6 +873,12 @@ pub async fn proxy_handler(
 					"<<< CACHE HIT"
 				);
 			}
+			// F18: cache hits used to skip both of these entirely, so
+			// `/history` and the latency histogram never saw them - the p50
+			// skewed upward (only ever measuring cache MISSES) and the
+			// request-history ring buffer under-reported real traffic.
+			state.record_latency(t0.elapsed());
+			state.record_request(req_id_short, method.as_str(), path.path(), 200, false, t0.elapsed().as_millis());
 			return Response::builder()
 				.status(StatusCode::OK)
 				.header("Content-Type", "application/json; charset=utf-8")
@@ -717,6 +900,11 @@ pub async fn proxy_handler(
 		}
 	}
 	let mut upstream_result = Err("unreachable".to_string());
+	// F17: which counter the final error increments - `upstream_timeouts`
+	// used to count every kind of transport failure (connection refused,
+	// DNS failure, TLS error) as a "timeout", which is a real metrics lie
+	// for anyone diagnosing outages from `/metrics`.
+	let mut final_error_was_timeout = false;
 	for attempt in 1..=3u32 {
 		let req = state
 			.client
@@ -727,7 +915,25 @@ pub async fn proxy_handler(
 		let mut req = req;
 		for (key, val) in headers.iter() {
 			let k = key.as_str().to_lowercase();
-			if k != "host" && k != "authorization" && k != "content-length" && !k.starts_with("x-aphrodite-") {
+			// Strip (F5/F18): `content-type`/`accept` are forced above already -
+			// forwarding the client's own values too would append duplicate
+			// headers (reqwest's `header()` appends, it doesn't replace), and
+			// strict upstreams reject a duplicated `Content-Type`.
+			// `accept-encoding` is stripped entirely (F5): this client is built
+			// without gzip/brotli auto-decompression
+			// (`Cargo.toml`'s reqwest features), so forwarding a client's
+			// `Accept-Encoding: gzip` gets a compressed body back that this
+			// proxy can't decode, fails to JSON-parse (compression silently
+			// skipped), and returns to the caller as binary garbage labeled
+			// `application/json`.
+			if k != "host"
+				&& k != "authorization"
+				&& k != "content-length"
+				&& k != "content-type"
+				&& k != "accept"
+				&& k != "accept-encoding"
+				&& !k.starts_with("x-aphrodite-")
+			{
 				req = req.header(key, val);
 			}
 		}
@@ -737,14 +943,25 @@ pub async fn proxy_handler(
 				break;
 			},
 			Err(e) => {
-				if attempt < 3 {
+				// F17: only retry connect-phase failures - the request never
+				// left, so resending is safe. A post-send request TIMEOUT
+				// (`e.is_timeout()` after the body was already transmitted)
+				// may have been accepted by the upstream; blindly retrying a
+				// non-idempotent `POST /v1/chat/completions` risks double
+				// token billing, and combined with the 300s per-attempt
+				// timeout, 3 blind retries could hold a client for ~15
+				// minutes. Non-connect errors now fail fast on the first
+				// attempt instead.
+				if attempt < 3 && e.is_connect() {
 					let base_ms = 100 * 2u64.pow(attempt - 1);
 					let jitter = rand::random::<f64>() * 0.5 + 0.75; // 0.75x to 1.25x
 					let ms = (base_ms as f64 * jitter) as u64;
-					tracing::warn!(attempt, backoff_ms = ms, "upstream retry after error: {}", e);
+					tracing::warn!(attempt, backoff_ms = ms, "upstream retry after connect error: {}", e);
 					tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
 				} else {
+					final_error_was_timeout = e.is_timeout();
 					upstream_result = Err(format!("{}", e));
+					break;
 				}
 			},
 		}
@@ -759,8 +976,13 @@ pub async fn proxy_handler(
 			} else if status_code >= 400 {
 				state.upstream_errors_4xx.fetch_add(1, Ordering::Relaxed);
 			}
-			// Extract content-type before consuming response body
-			let content_type = response.headers().get("content-type").cloned();
+			// F5: capture the full upstream response header map before
+			// consuming the body, not just `content-type` - the proxy used
+			// to rebuild the response with only `Content-Type`, silently
+			// dropping `Retry-After`, `x-ratelimit-*`, `request-id`, etc.
+			// that clients rely on for backoff and support.
+			let upstream_headers = response.headers().clone();
+			let content_type = upstream_headers.get("content-type").cloned();
 			let resp_body = match response.bytes().await {
 				Ok(b) => b,
 				Err(e) => {
@@ -782,11 +1004,12 @@ pub async fn proxy_handler(
 			// Only compress Chat Completions responses
 			let elapsed = t0.elapsed();
 			if is_chat_completion && state.ccr.is_some() {
-				// Extract headroom budget from inbound headers for compression aggressiveness
-				let headroom_budget = headers
-					.get("x-headroom-budget")
-					.and_then(|v| v.to_str().ok())
-					.or_else(|| headers.get("X-Headroom-Budget").and_then(|v| v.to_str().ok()));
+				// Extract headroom budget from inbound headers for compression
+				// aggressiveness. `HeaderMap::get` is already case-insensitive
+				// (F20), so the second lookup below used to be permanently
+				// dead - removed rather than kept as misleading "just in case"
+				// code implying case-sensitive matching.
+				let headroom_budget = headers.get("x-headroom-budget").and_then(|v| v.to_str().ok());
 				if state.dev && headroom_budget.is_some() {
 					tracing::info!(
 						id = %req_id_short,
@@ -819,14 +1042,22 @@ pub async fn proxy_handler(
 						);
 					}
 					let body = serde_json::to_vec(&compressed).unwrap_or_else(|_| resp_body.to_vec());
-					// Store in LLM response cache
+					// Store in LLM response cache - only successful responses (F2):
+					// caching an upstream 4xx/5xx here would replay it as a 200 to
+					// every later identical request, and a client would parse the
+					// error body as a real chat completion. TTL-stamped (F5,
+					// report 06) so it's checked against `response_cache_ttl` on
+					// the hit path instead of replaying forever.
 					if let Some(ck) = cache_key {
-						if let Ok(mut cache) = state.response_cache.lock() {
-							cache.put(ck, body.clone());
+						if status.is_success() && body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES {
+							if let Ok(mut cache) = state.response_cache.lock() {
+								cache.put(ck, (std::time::Instant::now(), body.clone()));
+							}
 						}
 					}
-					return Response::builder()
-						.status(status)
+					let mut builder = Response::builder().status(status);
+					builder = copy_upstream_headers(builder, &upstream_headers);
+					return builder
 						.header("Content-Type", "application/json; charset=utf-8")
 						.header("X-Aphrodite-Compressed", "true")
 						.header("X-Aphrodite-Cache", "MISS")
@@ -867,13 +1098,18 @@ pub async fn proxy_handler(
 				false,
 				t0.elapsed().as_millis(),
 			);
-			// Store raw response in LLM cache if applicable
+			// Store raw response in LLM cache if applicable - success only (F2, see
+			// the compressed-path cache write above for the full rationale).
 			if let Some(ck) = cache_key {
-				if let Ok(mut cache) = state.response_cache.lock() {
-					cache.put(ck, resp_body.to_vec());
+				if status.is_success() && resp_body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES {
+					if let Ok(mut cache) = state.response_cache.lock() {
+						cache.put(ck, (std::time::Instant::now(), resp_body.to_vec()));
+					}
 				}
 			}
-			let mut builder = Response::builder().status(status).header("X-Aphrodite-Cache", "MISS");
+			let mut builder = Response::builder().status(status);
+			builder = copy_upstream_headers(builder, &upstream_headers);
+			builder = builder.header("X-Aphrodite-Cache", "MISS");
 			builder = builder.header("X-Aphrodite-Fill-Pct", {
 				let v = state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0;
 				if v.is_finite() { format!("{:.1}", v) } else { "0.0".to_string() }
@@ -884,7 +1120,11 @@ pub async fn proxy_handler(
 			builder.body(Body::from(resp_body)).unwrap()
 		},
 		Err(e) => {
-			state.upstream_timeouts.fetch_add(1, Ordering::Relaxed);
+			if final_error_was_timeout {
+				state.upstream_timeouts.fetch_add(1, Ordering::Relaxed);
+			} else {
+				state.upstream_connect_errors.fetch_add(1, Ordering::Relaxed);
+			}
 			state.record_latency(t0.elapsed());
 			state.record_request(req_id_short, method.as_str(), path.path(), 502, false, t0.elapsed().as_millis());
 			state.record_error(format!("upstream: {}", e));
@@ -1672,37 +1912,53 @@ async fn compress_chat_completion(
 				if content.len() > threshold {
 					if let Some(ccr) = &state.ccr {
 						let hash = compute_key(content.as_bytes());
-						if ccr_get(ccr, &hash).await.is_some() {
+						// F4: only replace `content` with a marker if the content is
+						// actually retrievable under `hash` - either it was already
+						// there (cache hit) or this `put` succeeded. A failed put
+						// (store full/locked/panicked) must NOT be followed by
+						// swapping the response for an unresolvable marker - that
+						// would permanently destroy content that never reached the
+						// client any other way.
+						let stored = if ccr_get(ccr, &hash).await.is_some() {
 							state.ccr_hits.fetch_add(1, Ordering::Relaxed);
+							true
 						} else {
 							state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-							ccr_put(ccr, &hash, content).await;
-							state.ccr_created.fetch_add(1, Ordering::Relaxed);
-						}
-
-						let (compressed, orig_len) = {
-							let compressed = match state.mode {
-								ProxyMode::Cache => cache_marker(&hash, content, ct, None),
-								ProxyMode::Token => smart_marker(&hash, content, ct, None),
-							};
-							let len = content.len();
-							state.record_compression(ct);
-							(compressed, len)
+							let ok = ccr_put(ccr, &hash, content).await;
+							if ok {
+								state.ccr_created.fetch_add(1, Ordering::Relaxed);
+							} else {
+								tracing::error!(hash = %hash, "ccr_put failed - leaving content uncompressed to avoid data loss");
+							}
+							ok
 						};
-						let marker_len = compressed.len();
-						// Savings = bytes actually removed from the response
-						// (original content minus the rendered marker that
-						// replaces it), not the bare hash length - the marker
-						// is hundreds of chars longer than the 40-char hash,
-						// so subtracting only `hash.len()` overstated savings
-						// (report 05 F5). Unit is bytes throughout - see
-						// `tokens_saved`'s field doc for the naming caveat.
-						state.tokens_saved.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
-						*content_val = serde_json::Value::String(compressed);
-						did_compress = true;
-						state.update_compression_ratio(orig_len, marker_len);
+						if stored {
+							let (compressed, orig_len) = {
+								let compressed = match state.mode {
+									ProxyMode::Cache => cache_marker(&hash, content, ct, None),
+									ProxyMode::Token => smart_marker(&hash, content, ct, None),
+								};
+								let len = content.len();
+								state.record_compression(ct);
+								(compressed, len)
+							};
+							let marker_len = compressed.len();
+							// Savings = bytes actually removed from the response
+							// (original content minus the rendered marker that
+							// replaces it), not the bare hash length - the marker
+							// is hundreds of chars longer than the 40-char hash,
+							// so subtracting only `hash.len()` overstated savings
+							// (report 05 F5). Unit is bytes throughout - see
+							// `tokens_saved`'s field doc for the naming caveat.
+							state
+								.tokens_saved
+								.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
+							*content_val = serde_json::Value::String(compressed);
+							did_compress = true;
+							state.update_compression_ratio(orig_len, marker_len);
+						}
 					}
-				} else if content.len() > INLINE_CCR_THRESHOLD {
+				} else if content.len() > state.inline_ccr_threshold() {
 					// Below compression threshold but above inline threshold: store in inline_ccr
 					// so later retrievals can find tiny entries without a backend round-trip.
 					let hash = compute_key(content.as_bytes());
@@ -1732,32 +1988,44 @@ async fn compress_chat_completion(
 								if args_owned.len() > threshold {
 									if let Some(ccr) = &state.ccr {
 										let hash = compute_key(args_owned.as_bytes());
-										if ccr_get(ccr, &hash).await.is_some() {
+										// F4: same rule as the message.content branch
+										// above - only replace with a marker if the
+										// content is actually retrievable.
+										let stored = if ccr_get(ccr, &hash).await.is_some() {
 											state.ccr_hits.fetch_add(1, Ordering::Relaxed);
+											true
 										} else {
 											state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-											ccr_put(ccr, &hash, &args_owned).await;
-											state.ccr_created.fetch_add(1, Ordering::Relaxed);
-										}
-										let (compressed, orig_len) = {
-											let compressed = smart_marker(&hash, &args_owned, ct, None);
-											let len = args_owned.len();
-											state.record_compression(ct);
-											(compressed, len)
+											let ok = ccr_put(ccr, &hash, &args_owned).await;
+											if ok {
+												state.ccr_created.fetch_add(1, Ordering::Relaxed);
+											} else {
+												tracing::error!(hash = %hash, "ccr_put failed - leaving tool_call arguments uncompressed to avoid data loss");
+											}
+											ok
 										};
-										let marker_len = compressed.len();
-										// Savings = bytes removed by the marker
-										// replacement, not the bare hash length
-										// (report 05 F5) - see the sibling fix
-										// above for `message.content`.
-										state
-											.tokens_saved
-											.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
-										*args = serde_json::Value::String(compressed);
-										did_compress = true;
-										state.update_compression_ratio(orig_len, marker_len);
+										if stored {
+											let (compressed, orig_len) = {
+												let compressed = smart_marker(&hash, &args_owned, ct, None);
+												let len = args_owned.len();
+												state.record_compression(ct);
+												(compressed, len)
+											};
+											let marker_len = compressed.len();
+											// Savings = bytes removed by the marker
+											// replacement, not the bare hash length
+											// (report 05 F5) - see the sibling fix
+											// above for `message.content`.
+											state.tokens_saved.fetch_add(
+												orig_len.saturating_sub(marker_len) as u64,
+												Ordering::Relaxed,
+											);
+											*args = serde_json::Value::String(compressed);
+											did_compress = true;
+											state.update_compression_ratio(orig_len, marker_len);
+										}
 									}
-								} else if args_owned.len() > INLINE_CCR_THRESHOLD {
+								} else if args_owned.len() > state.inline_ccr_threshold() {
 									let hash = compute_key(args_owned.as_bytes());
 									if let Ok(mut map) = state.inline_ccr.lock() {
 										if map.contains(&hash) {
@@ -1821,8 +2089,20 @@ pub async fn handle_tool_relay(
 		let parsed_url = match url::Url::parse(cb) {
 			Ok(u) if u.scheme() == "https" => u,
 			_ => {
-				tracing::warn!(callback_url = %cb, "tool_relay callback skipped: only https scheme allowed");
-				return Json(ToolRelayResponse { success:true, result:None, error:None, async_call:false })
+				// F13: report the rejection honestly instead of `success:true`
+				// with nothing executed - a caller passing e.g. a loopback
+				// `http://` callback previously got told it worked and then
+				// waited forever for a callback that would never arrive.
+				tracing::warn!(callback_url = %cb, "tool_relay callback rejected: only https scheme allowed");
+				return (
+					StatusCode::BAD_REQUEST,
+					Json(ToolRelayResponse {
+						success:false,
+						result:None,
+						error:Some("callback_url must use the https scheme".into()),
+						async_call:false,
+					}),
+				)
 					.into_response();
 			},
 		};
@@ -1833,6 +2113,16 @@ pub async fn handle_tool_relay(
 		let cb = parsed_url.to_string();
 		tracker.spawn(async move {
 			let result = execute_tool_relay(&state, &tool, &params).await;
+			// F13: the execute result itself (success/failure of the tool
+			// call) was never counted on this async path - only the
+			// synchronous path below incremented these, so
+			// `tool_relay_success + tool_relay_failure` silently diverged
+			// from `tool_relay_calls` for every async callback request.
+			if result.is_ok() {
+				state.tool_relay_success.fetch_add(1, Ordering::Relaxed);
+			} else {
+				state.tool_relay_failure.fetch_add(1, Ordering::Relaxed);
+			}
 			let _ = state
 				.client
 				.post(&cb)
@@ -1896,8 +2186,18 @@ async fn execute_tool_relay(
 			let center = params.get("_ccr_center").and_then(|v| v.as_str());
 			let hash = compute_key(content.as_bytes());
 			let size = content.len();
-			if size < INLINE_CCR_THRESHOLD {
-				// Tiny content: store inline to avoid CCR backend round-trip
+			if size < state.inline_ccr_threshold() {
+				// Tiny content: store inline for the fast path (no CCR backend
+				// round-trip), AND to the durable backend when one is
+				// configured (report 06 F5) - the inline map is a 1024-entry
+				// process-memory LRU, so a busy session can evict this entry
+				// within minutes even though the marker handed back looks
+				// exactly like a durable one; without the durable copy,
+				// `aphrodite_retrieve` after eviction (or a proxy restart)
+				// returns `{"found": false}` for a marker the model was told
+				// is resolvable. Best-effort: a failed durable put doesn't
+				// fail this call since the inline copy still serves reads
+				// until it's evicted.
 				if let Ok(mut map) = state.inline_ccr.lock() {
 					if map.contains(&hash) {
 						state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
@@ -1906,17 +2206,25 @@ async fn execute_tool_relay(
 						map.put(hash.clone(), content.to_string());
 					}
 				}
+				if let Some(ccr) = &state.ccr {
+					ccr_put(ccr, &hash, content).await;
+				}
 				Ok(serde_json::json!({
 					"compressed": smart_marker(&hash, content, "compress", center),
 					"hash": hash,
 					"original_size": size
 				}))
 			} else if let Some(ccr) = &state.ccr {
-				ccr_put(ccr, &hash, content).await;
+				// F4: don't hand back a marker for content that failed to store.
+				if !ccr_put(ccr, &hash, content).await {
+					return Err("failed to store content in CCR backend".into());
+				}
 				let compressed = smart_marker(&hash, content, "compress", center);
 				// Savings = bytes removed by the marker replacement, not the
 				// bare hash length (report 05 F5).
-				state.tokens_saved.fetch_add(size.saturating_sub(compressed.len()) as u64, Ordering::Relaxed);
+				state
+					.tokens_saved
+					.fetch_add(size.saturating_sub(compressed.len()) as u64, Ordering::Relaxed);
 				Ok(serde_json::json!({
 					"compressed": compressed,
 					"hash": hash,
@@ -1965,20 +2273,40 @@ pub async fn handle_ccr_create(
 				let original_size = req.content.len();
 				let hash = req.key.unwrap_or_else(|| compute_key(req.content.as_bytes()));
 
-				if let Some(ccr) = &state.ccr {
-					ccr_put(ccr, &hash, &req.content).await;
-					state.ccr_created.fetch_add(1, Ordering::Relaxed);
-					// Unlike the chat-completion/tool-relay paths, this
-					// endpoint's documented wire contract IS the bare hash
-					// (see `compressed_size`/`marker_size` below and
-					// `test_ccr_create_response_serde_shape`) - no marker is
-					// rendered here, so `hash.len()` is the correct
-					// subtractee, not an approximation (report 05 F5).
-					state
-						.tokens_saved
-						.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
-					state.requests_compressed.fetch_add(1, Ordering::Relaxed);
+				// F14: report unavailability instead of a fabricated success -
+				// previously this endpoint returned a hash + savings ratio even
+				// when `state.ccr` was `None` (e.g. token mode with
+				// `--no-ccr-marker`), so nothing was ever stored and every
+				// later `/retrieve` of that hash 404s. Mirrors
+				// `handle_ccr_delete`'s existing `None` branch.
+				let ccr = match &state.ccr {
+					Some(ccr) => ccr,
+					None => {
+						return (
+							StatusCode::SERVICE_UNAVAILABLE,
+							Json(serde_json::json!({"error": "CCR not enabled"})),
+						)
+							.into_response();
+					},
+				};
+				if !ccr_put(ccr, &hash, &req.content).await {
+					return (
+						StatusCode::INTERNAL_SERVER_ERROR,
+						Json(serde_json::json!({"error": "failed to store content in CCR backend"})),
+					)
+						.into_response();
 				}
+				state.ccr_created.fetch_add(1, Ordering::Relaxed);
+				// Unlike the chat-completion/tool-relay paths, this
+				// endpoint's documented wire contract IS the bare hash
+				// (see `compressed_size`/`marker_size` below and
+				// `test_ccr_create_response_serde_shape`) - no marker is
+				// rendered here, so `hash.len()` is the correct
+				// subtractee, not an approximation (report 05 F5).
+				state
+					.tokens_saved
+					.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
+				state.requests_compressed.fetch_add(1, Ordering::Relaxed);
 
 				if let Some(notify_url) = &state.notify_url {
 					let notification = CcrNotification {
@@ -2049,16 +2377,33 @@ pub async fn handle_ccr_create(
 		let original_size = content.len();
 		let hash = compute_key(content.as_bytes());
 
-		if let Some(ccr) = &state.ccr {
-			ccr_put(ccr, &hash, &content).await;
-			state.ccr_created.fetch_add(1, Ordering::Relaxed);
-			state.requests_compressed.fetch_add(1, Ordering::Relaxed);
-			// See the JSON-body branch above: this endpoint's wire contract
-			// IS the bare hash, so `hash.len()` is the correct subtractee.
-			state
-				.tokens_saved
-				.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
+		// F14/F4: same rules as the JSON-body branch above - 503 when CCR
+		// isn't enabled, 500 (not a fabricated success) when the store write
+		// itself fails.
+		let ccr = match &state.ccr {
+			Some(ccr) => ccr,
+			None => {
+				return (
+					StatusCode::SERVICE_UNAVAILABLE,
+					Json(serde_json::json!({"error": "CCR not enabled"})),
+				)
+					.into_response();
+			},
+		};
+		if !ccr_put(ccr, &hash, &content).await {
+			return (
+				StatusCode::INTERNAL_SERVER_ERROR,
+				Json(serde_json::json!({"error": "failed to store content in CCR backend"})),
+			)
+				.into_response();
 		}
+		state.ccr_created.fetch_add(1, Ordering::Relaxed);
+		state.requests_compressed.fetch_add(1, Ordering::Relaxed);
+		// See the JSON-body branch above: this endpoint's wire contract
+		// IS the bare hash, so `hash.len()` is the correct subtractee.
+		state
+			.tokens_saved
+			.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
 
 		let compressed_size = hash.len();
 		Json(CcrCreateResponse {
@@ -2129,26 +2474,54 @@ pub async fn handle_ccr_delete(
 
 /// Hot-reload aphrodite.toml and apply compression config changes.
 /// POST /reload - returns the newly loaded compression settings.
-pub async fn handle_ccr_reload() -> impl IntoResponse {
+/// `POST /reload` - re-parse `aphrodite.toml` and apply its `[compression]`
+/// thresholds to THIS listener's live `AppState` (report 07 F2/F4/T15) -
+/// previously this endpoint parsed the file, echoed the values back, and
+/// discarded them; a 200 response with `"reloaded": true` asserted a state
+/// change that never happened. Other `[compression]` keys
+/// (`engine_threshold_pct`, `catalog_mode`, `auto_expand*`) have no consumer
+/// in this crate's proxy path (they're echoed for visibility, not applied -
+/// see report 07 F8/F9 for their fate).
+pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoResponse {
 	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
 	match crate::config::MultiConfig::load(&config_path) {
 		Ok(config) => {
 			let comp = config.compression.as_ref();
+			let thresholds = resolve_thresholds(comp);
+			state.cache_compress_threshold.store(thresholds.cache, Ordering::Relaxed);
+			state.token_compress_threshold.store(thresholds.token, Ordering::Relaxed);
+			state.inline_ccr_threshold.store(thresholds.inline, Ordering::Relaxed);
+			state
+				.code_multiplier_x100
+				.store((thresholds.code_multiplier * 100.0) as u64, Ordering::Relaxed);
 			let body = serde_json::json!({
 				"reloaded": true,
+				"applied": true,
 				"config": config_path,
 				"compression": {
+					"tool_threshold_cache": thresholds.cache,
+					"tool_threshold_token": thresholds.token,
+					"inline_threshold": thresholds.inline,
+					"code_multiplier": thresholds.code_multiplier,
+				},
+				// Parsed and visible, but not applied by this proxy (see doc
+				// comment above).
+				"parsed_only": {
 					"auto_expand": comp.and_then(|c| c.auto_expand),
 					"auto_expand_limit": comp.and_then(|c| c.auto_expand_limit),
-					"tool_threshold_token": comp.and_then(|c| c.tool_threshold_token),
-					"tool_threshold_cache": comp.and_then(|c| c.tool_threshold_cache),
 					"terminal_threshold": comp.and_then(|c| c.terminal_threshold),
-					"inline_threshold": comp.and_then(|c| c.inline_threshold),
 					"engine_threshold_pct": comp.and_then(|c| c.engine_threshold_pct),
 					"catalog_mode": comp.and_then(|c| c.catalog_mode.clone()),
 				}
 			});
-			tracing::info!(%config_path, "config hot-reloaded");
+			tracing::info!(
+				%config_path,
+				cache_threshold = thresholds.cache,
+				token_threshold = thresholds.token,
+				inline_threshold = thresholds.inline,
+				code_multiplier = thresholds.code_multiplier,
+				"config reloaded - compression thresholds applied"
+			);
 			(StatusCode::OK, Json(body)).into_response()
 		},
 		Err(e) => {
@@ -2231,11 +2604,11 @@ pub(crate) mod tests {
 			last_errors:Mutex::new(VecDeque::new()),
 			compressions_by_type:Mutex::new(HashMap::new()),
 			response_cache:Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
+			response_cache_ttl:std::time::Duration::from_secs(3600),
 			cache_hits:AtomicU64::new(0),
 			cache_misses:AtomicU64::new(0),
 			fill_pct:AtomicU64::new(9000),
 			task_tracker:TaskTracker::new(),
-			script_engine:None,
 			inline_ccr_hits:AtomicU64::new(0),
 			inline_ccr_misses:AtomicU64::new(0),
 			tool_relay_success:AtomicU64::new(0),
@@ -2245,11 +2618,17 @@ pub(crate) mod tests {
 			upstream_errors_4xx:AtomicU64::new(0),
 			upstream_errors_5xx:AtomicU64::new(0),
 			upstream_timeouts:AtomicU64::new(0),
+			upstream_connect_errors:AtomicU64::new(0),
 			ccr_store_entries:AtomicU64::new(0),
 			ccr_store_bytes:AtomicU64::new(0),
 			request_body_bytes:AtomicU64::new(0),
 			response_body_bytes:AtomicU64::new(0),
 			upstream_latency_micros:AtomicU64::new(0),
+			upstream_health_cache:std::sync::Mutex::new(None),
+			cache_compress_threshold:AtomicUsize::new(CACHE_COMPRESS_THRESHOLD),
+			token_compress_threshold:AtomicUsize::new(TOKEN_COMPRESS_THRESHOLD),
+			inline_ccr_threshold:AtomicUsize::new(INLINE_CCR_THRESHOLD),
+			code_multiplier_x100:AtomicU64::new(300),
 		};
 		assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
 	}
@@ -2258,6 +2637,81 @@ pub(crate) mod tests {
 	fn test_compress_threshold_aphrodite() {
 		let state = AppState { mode:ProxyMode::Token, ..test_state() };
 		assert_eq!(state.compress_threshold(), TOKEN_COMPRESS_THRESHOLD);
+	}
+
+	// ── T15 (F2): TOML `[compression]` thresholds must actually be honored,
+	// not silently discarded in favor of the compiled-in consts. ──
+	#[test]
+	fn test_resolve_thresholds_toml_overrides_defaults() {
+		let comp = CompressionConfig {
+			engine_threshold_pct:None,
+			engine_protect_first:None,
+			engine_protect_last:None,
+			engine_min_msgs:None,
+			tool_threshold_token:Some(512),
+			tool_threshold_cache:Some(4096),
+			terminal_threshold:None,
+			inline_threshold:Some(2048),
+			auto_expand:None,
+			auto_expand_limit:None,
+			catalog_mode:None,
+			classifier_poll:None,
+			code_multiplier:Some(5.0),
+		};
+		let t = resolve_thresholds(Some(&comp));
+		assert_eq!(t.cache, 4096);
+		assert_eq!(t.token, 512);
+		assert_eq!(t.inline, 2048);
+		assert_eq!(t.code_multiplier, 5.0);
+	}
+
+	#[test]
+	fn test_resolve_thresholds_defaults_when_no_toml() {
+		let t = resolve_thresholds(None);
+		assert_eq!(t.cache, CACHE_COMPRESS_THRESHOLD);
+		assert_eq!(t.token, TOKEN_COMPRESS_THRESHOLD);
+		assert_eq!(t.inline, INLINE_CCR_THRESHOLD);
+		// F10: the corrected default - 2 only ever existed because
+		// "3.0".parse::<usize>() silently failed.
+		assert_eq!(t.code_multiplier, 3.0);
+	}
+
+	// ── T15 (F4): `/reload` must actually apply the new thresholds to the
+	// live `AppState`, not just re-parse and echo the file. ──
+	#[test]
+	fn test_handle_ccr_reload_applies_thresholds_to_state() {
+		let dir = std::env::temp_dir();
+		let path =
+			dir.join(format!("aphrodite_reload_test_{}_{}.toml", std::process::id(), fnv1a_64(b"reload-test-salt")));
+		std::fs::write(
+			&path,
+			r#"
+[[proxies]]
+name = "token"
+mode = "token"
+
+[compression]
+tool_threshold_token = 999
+tool_threshold_cache = 1234
+inline_threshold = 77
+code_multiplier = 6.5
+"#,
+		)
+		.unwrap();
+
+		// No other test in this crate reads/writes APHRODITE_CONFIG_PATH.
+		std::env::set_var("APHRODITE_CONFIG_PATH", &path);
+		let state = std::sync::Arc::new(test_state());
+		let rt = tokio::runtime::Runtime::new().unwrap();
+		let resp = rt.block_on(handle_ccr_reload(State(state.clone()))).into_response();
+		std::env::remove_var("APHRODITE_CONFIG_PATH");
+		let _ = std::fs::remove_file(&path);
+
+		assert_eq!(resp.status(), axum::http::StatusCode::OK);
+		assert_eq!(state.token_compress_threshold.load(Ordering::Relaxed), 999);
+		assert_eq!(state.cache_compress_threshold.load(Ordering::Relaxed), 1234);
+		assert_eq!(state.inline_ccr_threshold.load(Ordering::Relaxed), 77);
+		assert_eq!(state.code_multiplier_x100.load(Ordering::Relaxed), 650);
 	}
 
 	#[test]
@@ -2271,6 +2725,22 @@ pub(crate) mod tests {
 		aph.mode = ProxyMode::Token;
 		let stats = aph.stats_json();
 		assert_eq!(stats["mode"], "token");
+	}
+
+	// ── T13 (F12): the enabled/disabled flag and the calls-stats object
+	// must both be visible - a duplicate JSON key used to let the stats
+	// object silently shadow the boolean. ──
+	#[test]
+	fn test_stats_json_tool_relay_enabled_flag_not_shadowed() {
+		let mut state = test_state();
+		state.tool_relay = true;
+		let stats = state.stats_json();
+		assert_eq!(stats["tool_relay_enabled"], true);
+		assert!(
+			stats["tool_relay"].is_object(),
+			"the calls-stats object must still be present under its own key"
+		);
+		assert!(stats["tool_relay"]["total"].is_u64());
 	}
 
 	#[test]
@@ -2485,6 +2955,53 @@ pub(crate) mod tests {
 		assert_eq!(cache_key_from_body(b"{}", "key"), None); // missing model/messages
 	}
 
+	// ── T8 (F3): the cache key must cover the request parameters that
+	// change what a valid response can look like, and streamed requests
+	// must never be cached at all. ──
+	#[test]
+	fn test_cache_key_from_body_differs_by_tools_and_temperature_and_stream() {
+		let base = br#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}"#;
+		let with_tools =
+			br#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"tools":[{"type":"function"}]}"#;
+		let with_temp = br#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"temperature":0.7}"#;
+		let k_base = cache_key_from_body(base, "key");
+		let k_tools = cache_key_from_body(with_tools, "key");
+		let k_temp = cache_key_from_body(with_temp, "key");
+		assert!(k_base.is_some());
+		assert_ne!(k_base, k_tools, "differing `tools` must produce a different cache key");
+		assert_ne!(k_base, k_temp, "differing `temperature` must produce a different cache key");
+		assert_ne!(k_tools, k_temp);
+	}
+
+	#[test]
+	fn test_cache_key_from_body_none_when_streaming() {
+		let streamed = br#"{"model":"gpt-4","messages":[{"role":"user","content":"hi"}],"stream":true}"#;
+		assert_eq!(cache_key_from_body(streamed, "key"), None);
+	}
+
+	// ── T1 remainder (F5, report 06): response_cache entries must expire
+	// on their own instead of being replayed forever. ──
+	#[test]
+	fn test_response_cache_get_expires_past_ttl() {
+		let mut state = test_state();
+		state.response_cache_ttl = std::time::Duration::from_millis(1);
+		state.response_cache.lock().unwrap().put(42, (std::time::Instant::now(), b"cached".to_vec()));
+		std::thread::sleep(std::time::Duration::from_millis(20));
+		assert_eq!(response_cache_get(&state, 42), None, "expired entry must not be returned");
+		assert!(
+			state.response_cache.lock().unwrap().peek(&42).is_none(),
+			"expired entry must be evicted, not just skipped"
+		);
+	}
+
+	#[test]
+	fn test_response_cache_get_hits_within_ttl() {
+		let mut state = test_state();
+		state.response_cache_ttl = std::time::Duration::from_secs(3600);
+		state.response_cache.lock().unwrap().put(7, (std::time::Instant::now(), b"cached".to_vec()));
+		assert_eq!(response_cache_get(&state, 7), Some(b"cached".to_vec()));
+	}
+
 	#[test]
 	fn test_fnv1a_64_known_vectors() {
 		// FNV-1a 64-bit offset basis is the hash of the empty input.
@@ -2528,11 +3045,11 @@ pub(crate) mod tests {
 			last_errors:Mutex::new(VecDeque::new()),
 			compressions_by_type:Mutex::new(HashMap::new()),
 			response_cache:Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
+			response_cache_ttl:std::time::Duration::from_secs(3600),
 			cache_hits:AtomicU64::new(0),
 			cache_misses:AtomicU64::new(0),
 			fill_pct:AtomicU64::new(9000),
 			task_tracker:TaskTracker::new(),
-			script_engine:None,
 			inline_ccr_hits:AtomicU64::new(0),
 			inline_ccr_misses:AtomicU64::new(0),
 			tool_relay_success:AtomicU64::new(0),
@@ -2542,11 +3059,17 @@ pub(crate) mod tests {
 			upstream_errors_4xx:AtomicU64::new(0),
 			upstream_errors_5xx:AtomicU64::new(0),
 			upstream_timeouts:AtomicU64::new(0),
+			upstream_connect_errors:AtomicU64::new(0),
 			ccr_store_entries:AtomicU64::new(0),
 			ccr_store_bytes:AtomicU64::new(0),
 			request_body_bytes:AtomicU64::new(0),
 			response_body_bytes:AtomicU64::new(0),
 			upstream_latency_micros:AtomicU64::new(0),
+			upstream_health_cache:std::sync::Mutex::new(None),
+			cache_compress_threshold:AtomicUsize::new(CACHE_COMPRESS_THRESHOLD),
+			token_compress_threshold:AtomicUsize::new(TOKEN_COMPRESS_THRESHOLD),
+			inline_ccr_threshold:AtomicUsize::new(INLINE_CCR_THRESHOLD),
+			code_multiplier_x100:AtomicU64::new(300),
 		}
 	}
 
@@ -2565,6 +3088,72 @@ pub(crate) mod tests {
 			mode:ProxyMode::Token,
 			..test_state()
 		}
+	}
+
+	/// A `CcrStore` whose `put` always fails - used to test report 02's F4
+	/// fix: a failed store write must never be followed by replacing
+	/// content with an unresolvable marker.
+	struct FailingCcrStore;
+	impl headroom_core::ccr::CcrStore for FailingCcrStore {
+		fn put(&self, _hash:&str, _payload:&str) -> bool { false }
+		fn get(&self, _hash:&str) -> Option<String> { None }
+		fn len(&self) -> usize { 0 }
+		fn del(&self, _hash:&str) -> bool { false }
+	}
+
+	fn test_state_with_failing_ccr() -> AppState {
+		AppState {
+			ccr:Some(std::sync::Arc::new(FailingCcrStore)),
+			mode:ProxyMode::Token,
+			..test_state()
+		}
+	}
+
+	// ── T4 (F4): a failed ccr_put must leave content uncompressed, not
+	// silently swapped for an unresolvable marker. ──
+	#[test]
+	fn test_compress_chat_completion_ccr_put_failure_leaves_content_uncompressed() {
+		let state = test_state_with_failing_ccr();
+		let content = "fn answer() -> i32 { 42 }\n".repeat(200); // well above threshold
+		let body = chat_completion_body(&content);
+		let rt = tokio::runtime::Runtime::new().unwrap();
+		let result = rt.block_on(compress_chat_completion(&state, &body, None));
+		// Nothing could be safely compressed (the only candidate's store
+		// write failed), so the whole response must come back `None`
+		// (unmodified pass-through), not `Some` with a poisoned marker.
+		assert!(result.is_none(), "a failed ccr_put must not produce a compressed response");
+	}
+
+	// ── T5 (F14): /ccr/create must report unavailability, not a
+	// fabricated success, when CCR isn't enabled or the store write fails. ──
+	#[test]
+	fn test_handle_ccr_create_503_when_ccr_disabled() {
+		let mut state = test_state();
+		state.ccr = None;
+		let state = std::sync::Arc::new(state);
+		let rt = tokio::runtime::Runtime::new().unwrap();
+		let resp = rt
+			.block_on(handle_ccr_create(
+				State(state),
+				axum::http::HeaderMap::new(),
+				Bytes::from_static(b"hello world"),
+			))
+			.into_response();
+		assert_eq!(resp.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+	}
+
+	#[test]
+	fn test_handle_ccr_create_500_when_put_fails() {
+		let state = std::sync::Arc::new(test_state_with_failing_ccr());
+		let rt = tokio::runtime::Runtime::new().unwrap();
+		let resp = rt
+			.block_on(handle_ccr_create(
+				State(state),
+				axum::http::HeaderMap::new(),
+				Bytes::from_static(b"hello world"),
+			))
+			.into_response();
+		assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
 	}
 
 	fn chat_completion_body(content:&str) -> Vec<u8> {
@@ -2716,6 +3305,27 @@ pub(crate) mod tests {
 		assert_eq!(v["original_size"], content.len());
 	}
 
+	// ── T7 (F5, report 06): tiny relay-compress content must also land in
+	// the durable backend, not only the 1024-entry inline LRU - otherwise a
+	// busy session evicts the "durable-looking" marker's only copy within
+	// minutes. Verifies the durable store has the content directly,
+	// independent of the inline cache. ──
+	#[test]
+	fn test_execute_tool_relay_compress_small_content_also_stores_durably() {
+		let state = test_state_with_ccr();
+		let content = "tiny"; // well under INLINE_CCR_THRESHOLD (256B)
+		let rt = tokio::runtime::Runtime::new().unwrap();
+		let result = rt.block_on(execute_tool_relay(&state, "aphrodite_compress", &serde_json::json!({"content": content})));
+		let v = result.expect("compress must succeed");
+		let hash = v["hash"].as_str().unwrap().to_string();
+
+		// Simulate the inline entry having been evicted (busy session /
+		// restart) by going straight to the durable backend.
+		let ccr = state.ccr.as_ref().unwrap();
+		let durable = rt.block_on(ccr_get(ccr, &hash));
+		assert_eq!(durable.as_deref(), Some(content), "tiny content must also be durable, not inline-only");
+	}
+
 	#[test]
 	fn test_execute_tool_relay_retrieve_finds_inline_entry() {
 		let state = test_state_with_ccr();
@@ -2752,13 +3362,21 @@ pub(crate) mod tests {
 		let content = "tiny";
 		let rt = tokio::runtime::Runtime::new().unwrap();
 		let compressed = rt
-			.block_on(execute_tool_relay(&state, "aphrodite_compress", &serde_json::json!({"content": content})))
+			.block_on(execute_tool_relay(
+				&state,
+				"aphrodite_compress",
+				&serde_json::json!({"content": content}),
+			))
 			.unwrap();
 		let hash = compressed["hash"].as_str().unwrap().to_string();
 
 		for hash_arg in [hash.clone(), format!("{hash}|tool|1024"), format!("  {hash}  ")] {
 			let retrieved = rt
-				.block_on(execute_tool_relay(&state, "aphrodite_retrieve", &serde_json::json!({"hash": hash_arg})))
+				.block_on(execute_tool_relay(
+					&state,
+					"aphrodite_retrieve",
+					&serde_json::json!({"hash": hash_arg}),
+				))
 				.unwrap();
 			assert_eq!(retrieved["found"], true, "hash arg {hash_arg:?} must resolve: {retrieved:?}");
 			assert_eq!(retrieved["content"], content);

@@ -251,7 +251,13 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		if paths.is_empty() {
 			return serde_json::json!({"error": "paths is required"});
 		}
-		with_shared(|state| aphrodite::prefetch::prefetch_files(state, &paths))
+		// F4/T5 (report 06): read files from disk BEFORE taking the
+		// process-global `with_shared` lock, not inside it - this crate's
+		// `STATE` is a single `Mutex` shared by every hook and tool call, so
+		// disk I/O held under it (network/USB-mounted paths, slow filesystems)
+		// stalls every other concurrent hook/tool for the duration of the read.
+		let outcomes = aphrodite::prefetch::read_paths(&paths);
+		with_shared(|state| aphrodite::prefetch::insert_outcomes(state, outcomes))
 	});
 
 	// ── prefetch_status: which prefetched files are resolvable ──

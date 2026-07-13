@@ -7,6 +7,42 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use clap::{Parser, ValueEnum};
 
+/// Resolve a boolean env var with one consistent truthiness rule across the
+/// crate (report 07 F12): `"1"`/`"true"` (case-insensitive) is true,
+/// anything else present (including `"0"`/`"false"`/empty string) or absent
+/// is false. Previously this repo had three different ad-hoc conventions in
+/// three places: `"true"/"1"` (the dead `config_loader`), `"1"` only
+/// (Python's `APHRODITE_CONTEXT_ENGINE` check), and presence-only
+/// (`APHRODITE_LOG_COMPACT=0` used to still enable compact logging, since
+/// `.is_ok()` doesn't look at the value at all).
+pub fn env_bool(var:&str) -> bool {
+	match std::env::var(var) {
+		Ok(v) => matches!(v.to_lowercase().as_str(), "1" | "true"),
+		Err(_) => false,
+	}
+}
+
+/// Parse a present env var, warning (not silently defaulting) if it fails to
+/// parse as `T` - the bug class `Maintain/examples/01_env_var_typo.py`
+/// documents and `MultiConfig::apply_port_override`'s comment explains
+/// (report 07 F10/F15): a missing var is the unremarkable common case, but a
+/// *present-and-malformed* one left an operator with no way to tell "my
+/// override didn't apply" from "I didn't set an override". Single shared
+/// implementation so every numeric env-var read in the crate uses the same
+/// rule (report 07 §7 generalization note).
+pub fn env_parse_warn<T:std::str::FromStr>(var:&str) -> Option<T> {
+	match std::env::var(var) {
+		Ok(v) => match v.parse::<T>() {
+			Ok(parsed) => Some(parsed),
+			Err(_) => {
+				tracing::warn!("{}={:?} could not be parsed; ignoring override", var, v);
+				None
+			},
+		},
+		Err(_) => None,
+	}
+}
+
 /// Proxy operation mode.
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ProxyMode {
@@ -304,29 +340,44 @@ impl MultiConfig {
 				},
 			},
 			listen,
-			api_url:cfg
-				.api_url
-				.clone()
+			// env > TOML (proxy > defaults) > hardcoded default (report 07
+			// F1/T17) - previously only the API-key chain and the two port
+			// vars pierced the TOML in this path, contradicting every shipped
+			// TOML's own header comment ("Env vars override TOML values at
+			// runtime"). `mode`/`listen` are deliberately NOT given a
+			// blanket env override here: a single process-wide
+			// `APHRODITE_MODE`/`APHRODITE_LISTEN` would incorrectly apply to
+			// every `[[proxies]]` entry at once, breaking the cache/token
+			// dual-proxy split that the existing per-mode
+			// `APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT` overrides above
+			// are already careful to respect.
+			api_url:std::env::var("APHRODITE_API_URL")
+				.ok()
+				.or_else(|| cfg.api_url.clone())
 				.or_else(|| d.and_then(|d| d.api_url.clone()))
 				.unwrap_or_else(|| "https://api.openai.com".into()),
 			api_key,
-			model:cfg
-				.model
-				.clone()
+			model:std::env::var("APHRODITE_MODEL")
+				.ok()
+				.or_else(|| cfg.model.clone())
 				.or_else(|| d.and_then(|d| d.model.clone()))
 				.unwrap_or_else(|| "default-model".into()),
 			max_context,
 			max_output,
 			// Resolve from toml - proxy.rs handles None default
-			ccr_db_path:cfg.ccr_db_path.clone().filter(|s| !s.is_empty()).map(Into::into),
-			ccr_ttl_seconds:cfg
-				.ccr_ttl_seconds
+			ccr_db_path:std::env::var("APHRODITE_DB")
+				.ok()
+				.or_else(|| cfg.ccr_db_path.clone())
+				.filter(|s| !s.is_empty())
+				.map(Into::into),
+			ccr_ttl_seconds:env_parse_warn::<u64>("APHRODITE_CCR_TTL")
+				.or(cfg.ccr_ttl_seconds)
 				.or_else(|| d.and_then(|d| d.ccr_ttl_seconds))
 				.unwrap_or(3600),
 			no_ccr_marker:false,
 			tool_relay:cfg.tool_relay.unwrap_or(false),
-			notify_url:cfg.notify_url.clone(),
-			notify_key:cfg.notify_key.clone(),
+			notify_url:std::env::var("APHRODITE_NOTIFY_URL").ok().or_else(|| cfg.notify_url.clone()),
+			notify_key:std::env::var("APHRODITE_NOTIFY_KEY").ok().or_else(|| cfg.notify_key.clone()),
 			dev:cfg.dev.unwrap_or(false),
 			log_compact:false,
 			timeout:{
@@ -390,6 +441,28 @@ mod tests {
 			.unwrap_or_else(std::sync::PoisonError::into_inner)
 	}
 
+	// ── T10 (F12): one truthiness rule for boolean env vars everywhere. ──
+	#[test]
+	fn test_env_bool_true_values_case_insensitive() {
+		let _g = env_guard();
+		for v in ["1", "true", "TRUE", "True"] {
+			std::env::set_var("APHRODITE_TEST_BOOL", v);
+			assert!(env_bool("APHRODITE_TEST_BOOL"), "{v:?} should be true");
+		}
+		std::env::remove_var("APHRODITE_TEST_BOOL");
+	}
+
+	#[test]
+	fn test_env_bool_false_values() {
+		let _g = env_guard();
+		for v in ["0", "false", "yes", ""] {
+			std::env::set_var("APHRODITE_TEST_BOOL", v);
+			assert!(!env_bool("APHRODITE_TEST_BOOL"), "{v:?} should be false");
+		}
+		std::env::remove_var("APHRODITE_TEST_BOOL");
+		assert!(!env_bool("APHRODITE_TEST_BOOL"), "absent should be false");
+	}
+
 	fn multi_config_from_toml(toml_str:&str) -> MultiConfig { toml::from_str(toml_str).expect("valid test TOML") }
 
 	#[test]
@@ -437,6 +510,79 @@ mod tests {
 		let cli = mc.resolve(&mc.proxies[0]).unwrap();
 		assert_eq!(cli.listen.port(), 19797);
 		std::env::remove_var("APHRODITE_CACHE_PORT");
+	}
+
+	// ── T17 (F1): env vars must override TOML values in multi-proxy mode,
+	// matching every shipped TOML's own header comment ("Env vars
+	// (APHRODITE_*) override TOML values at runtime") - previously only the
+	// API-key chain and the two port vars actually did this. ──
+	#[test]
+	fn test_resolve_env_overrides_toml_for_api_url_model_ttl_db_notify() {
+		let _g = env_guard();
+		for (k, v) in [
+			("APHRODITE_API_URL", "https://env-api.example.com"),
+			("APHRODITE_MODEL", "env-model"),
+			("APHRODITE_CCR_TTL", "42"),
+			("APHRODITE_DB", "/tmp/env-ccr.db"),
+			("APHRODITE_NOTIFY_URL", "https://env-notify.example.com"),
+			("APHRODITE_NOTIFY_KEY", "env-notify-key"),
+		] {
+			std::env::set_var(k, v);
+		}
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "token"
+			mode = "token"
+			api_key = "test-key"
+			api_url = "https://toml-api.example.com"
+			model = "toml-model"
+			ccr_ttl_seconds = 111
+			ccr_db_path = "/tmp/toml-ccr.db"
+			notify_url = "https://toml-notify.example.com"
+			notify_key = "toml-notify-key"
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		for k in [
+			"APHRODITE_API_URL",
+			"APHRODITE_MODEL",
+			"APHRODITE_CCR_TTL",
+			"APHRODITE_DB",
+			"APHRODITE_NOTIFY_URL",
+			"APHRODITE_NOTIFY_KEY",
+		] {
+			std::env::remove_var(k);
+		}
+		assert_eq!(cli.api_url, "https://env-api.example.com");
+		assert_eq!(cli.model, "env-model");
+		assert_eq!(cli.ccr_ttl_seconds, 42);
+		assert_eq!(cli.ccr_db_path.unwrap().to_string_lossy(), "/tmp/env-ccr.db");
+		assert_eq!(cli.notify_url.as_deref(), Some("https://env-notify.example.com"));
+		assert_eq!(cli.notify_key.as_deref(), Some("env-notify-key"));
+	}
+
+	#[test]
+	fn test_resolve_falls_back_to_toml_when_env_unset() {
+		let _g = env_guard();
+		for k in ["APHRODITE_API_URL", "APHRODITE_MODEL", "APHRODITE_CCR_TTL", "APHRODITE_DB"] {
+			std::env::remove_var(k);
+		}
+		let mc = multi_config_from_toml(
+			r#"
+			[[proxies]]
+			name = "token"
+			mode = "token"
+			api_key = "test-key"
+			api_url = "https://toml-api.example.com"
+			model = "toml-model"
+			ccr_ttl_seconds = 111
+			"#,
+		);
+		let cli = mc.resolve(&mc.proxies[0]).unwrap();
+		assert_eq!(cli.api_url, "https://toml-api.example.com");
+		assert_eq!(cli.model, "toml-model");
+		assert_eq!(cli.ccr_ttl_seconds, 111);
 	}
 
 	#[test]
@@ -541,6 +687,11 @@ mod tests {
 
 	#[test]
 	fn test_resolve_defaults_fill_in_missing_proxy_fields() {
+		// api_url/model are env-overridable since T17 - guard against the
+		// process-global env vars racing with other tests in this module.
+		let _g = env_guard();
+		std::env::remove_var("APHRODITE_API_URL");
+		std::env::remove_var("APHRODITE_MODEL");
 		let mc = multi_config_from_toml(
 			r#"
 			[defaults]

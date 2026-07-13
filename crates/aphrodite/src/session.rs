@@ -1,7 +1,7 @@
 //! Session lifecycle - port of plugins/aphrodite/_hooks/session.py
 //!
-//! Manages: turn counter, conversation index, git cache, referenced files,
-//! scanned message index, marker-at-end-of-turn archive.
+//! Manages: turn counter, conversation index, referenced files, scanned
+//! message index, marker-at-end-of-turn archive.
 
 use crate::state::AphroditeState;
 
@@ -12,7 +12,6 @@ pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value {
 	state.conv_index.clear();
 	state.recent_markers.clear();
 	state.referenced_files.clear();
-	state.git_cache.clear();
 
 	serde_json::json!({
 		"status": "ok",
@@ -31,6 +30,9 @@ pub fn next_turn(state:&mut AphroditeState) -> usize {
 }
 
 /// Archive a compression at end of turn into the conversation index.
+/// Called from `hooks::post_llm_call` (report 06 F11/T13) with the last
+/// marker recorded during the turn - previously unwired, so `conv_index`
+/// stayed empty and `aphrodite_diff` always returned zero turns.
 pub fn archive_turn(state:&mut AphroditeState, hash:&str, summary:&str, size:usize) {
 	let turn = state.turn_counter;
 	state.conv_index.insert(turn, (hash.to_string(), summary.to_string(), size));
@@ -43,17 +45,17 @@ pub fn archive_turn(state:&mut AphroditeState, hash:&str, summary:&str, size:usi
 	}
 }
 
-/// Record a git operation in the cache.
-pub fn record_git(state:&mut AphroditeState, summary:&str) {
-	let ts = chrono::Utc::now().format("%H:%M").to_string();
-	state.git_cache.insert(ts, summary.to_string());
-	// Keep last 20 entries
-	if state.git_cache.len() > 20 {
-		let oldest = state.git_cache.keys().min().cloned();
-		if let Some(key) = oldest {
-			state.git_cache.remove(&key);
-		}
-	}
+/// Get the conversation index as a JSON-serializable value, sorted oldest
+/// turn first.
+pub fn get_conv_index(state:&AphroditeState) -> Vec<serde_json::Value> {
+	let mut turns:Vec<_> = state.conv_index.iter().collect();
+	turns.sort_by_key(|(k, _)| *k);
+	turns
+		.iter()
+		.map(
+			|(turn, (hash, summary, size))| serde_json::json!({"turn": turn, "hash": hash, "summary": summary, "size": size}),
+		)
+		.collect()
 }
 
 /// Record a referenced file path.
@@ -65,18 +67,6 @@ pub fn record_file(state:&mut AphroditeState, path:&str, tool:&str) {
 	while state.referenced_files.len() > 100 {
 		state.referenced_files.pop_back();
 	}
-}
-
-/// Get the conversation index as a JSON-serializable value.
-pub fn get_conv_index(state:&AphroditeState) -> Vec<serde_json::Value> {
-	let mut turns:Vec<_> = state.conv_index.iter().collect();
-	turns.sort_by_key(|(k, _)| *k);
-	turns
-		.iter()
-		.map(
-			|(turn, (hash, summary, size))| serde_json::json!({"turn": turn, "hash": hash, "summary": summary, "size": size}),
-		)
-		.collect()
 }
 
 /// Generate a catalog summary for the context engine prompt injection.
@@ -158,5 +148,20 @@ mod tests {
 		}
 		assert!(s.conv_index.len() <= 50);
 		assert!(!s.conv_index.contains_key(&1)); // oldest evicted
+	}
+
+	#[test]
+	fn test_get_conv_index_sorted_oldest_first() {
+		let mut s = AphroditeState::default();
+		s.turn_counter = 2;
+		archive_turn(&mut s, "hash2", "second", 20);
+		s.turn_counter = 1;
+		archive_turn(&mut s, "hash1", "first", 10);
+		let turns = get_conv_index(&s);
+		assert_eq!(turns.len(), 2);
+		assert_eq!(turns[0]["turn"], 1);
+		assert_eq!(turns[0]["hash"], "hash1");
+		assert_eq!(turns[1]["turn"], 2);
+		assert_eq!(turns[1]["hash"], "hash2");
 	}
 }

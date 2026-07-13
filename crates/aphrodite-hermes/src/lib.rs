@@ -44,12 +44,44 @@ pub use aphrodite::state::AphroditeState;
 // one call must not wedge every later call.
 
 /// Access the process-global session state.
+///
+/// Initializes from `aphrodite.toml` (report 07 F3/T16) via
+/// `config_loader::Config` - previously this crate always ran on hardcoded
+/// `AphroditeState::default()` values; `Config::load()`/`apply_compression`
+/// were the only implementation of the advertised env>TOML>default
+/// resolution for this path but had zero call sites anywhere in the repo.
+///
+/// Test builds skip the TOML load and use plain defaults: `Config::load()`
+/// searches `./aphrodite.toml` first, and this crate's own tests run with
+/// the workspace root (which HAS a real `aphrodite.toml`) as their working
+/// directory - without this split, unit tests would non-hermetically pick
+/// up whatever the repo's live config happens to contain instead of the
+/// documented defaults they assert against.
 pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 	static STATE:OnceLock<Mutex<AphroditeState>> = OnceLock::new();
-	STATE.get_or_init(|| Mutex::new(AphroditeState::default()))
+	STATE.get_or_init(|| {
+		#[cfg(not(test))]
+		let state = {
+			let mut s = AphroditeState::default();
+			aphrodite::config_loader::Config::load().apply_compression(&mut s);
+			s
+		};
+		#[cfg(test)]
+		let state = AphroditeState::default();
+		Mutex::new(state)
+	})
 }
 
 /// Run `f` against the shared session state under the global lock.
+///
+/// Torn-state contract (report 06 F12): `with_shared` itself does not
+/// `catch_unwind` - the panic guard lives one layer up, in `guarded()` at
+/// every call site that dispatches into this fn. If `f` panics partway
+/// through a multi-step mutation, whatever partial state existed at the
+/// panic point is what the next caller observes (the lock itself is fine -
+/// poison is recovered via `into_inner` above). Keep multi-step mutations
+/// (e.g. `retain` then `push_front` in `inline_store_put`) ordered so an
+/// interruption degrades to "entry missing" rather than "duplicate entry".
 pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
 	let mut guard = shared().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	f(&mut guard)
@@ -92,8 +124,25 @@ const DEFAULT_TOKEN_PORT:u16 = 9798;
 /// each be pointed at their own proxy pair (see `aphrodite setup --cache-port
 /// / --token-port`), falling back to the historical 9797/9798 defaults.
 fn configured_ports() -> (u16, u16) {
-	let port_from_env =
-		|var:&str, default:u16| std::env::var(var).ok().and_then(|v| v.parse::<u16>().ok()).unwrap_or(default);
+	// F11/F15: warn on a malformed (present but unparseable) value instead of
+	// silently falling back - a missing var is unremarkable, but a typo'd one
+	// left an operator with no way to tell "my override didn't apply" from "I
+	// didn't set an override" (the exact bug class `apply_port_override`'s
+	// comment in `aphrodite::config` documents).
+	// This crate has no logging/tracing subscriber of its own (it's a dylib
+	// loaded into the host Python process, not a standalone binary) - use
+	// `eprintln!` directly so the warning actually reaches the host's
+	// captured stderr instead of a silently-unsubscribed `tracing` call.
+	let port_from_env = |var:&str, default:u16| match std::env::var(var) {
+		Ok(v) => match v.parse::<u16>() {
+			Ok(port) => port,
+			Err(_) => {
+				eprintln!("aphrodite-hermes: {}={:?} is not a valid port (1-65535); using default {}", var, v, default);
+				default
+			},
+		},
+		Err(_) => default,
+	};
 	(
 		port_from_env("APHRODITE_CACHE_PORT", DEFAULT_CACHE_PORT),
 		port_from_env("APHRODITE_TOKEN_PORT", DEFAULT_TOKEN_PORT),
@@ -276,7 +325,13 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					}
 				},
 				"post_llm_call" => {
-					aphrodite::session::next_turn(state);
+					// Delegates to `hooks::post_llm_call`, not a bare `next_turn`
+					// (report 06 F11/T13): this is the process-global dispatch
+					// path the Hermes Python plugin actually calls on every
+					// turn, so calling `next_turn` directly here bypassed the
+					// turn-archive step entirely - `conv_index` stayed empty in
+					// real usage even after wiring `hooks::post_llm_call`.
+					aphrodite::hooks::post_llm_call(state);
 					serde_json::Value::Null
 				},
 				_ => serde_json::json!({ "error": format!("unknown hook: {}", name) }),
@@ -327,6 +382,36 @@ mod tests {
 	use std::ffi::CString;
 
 	use super::*;
+
+	/// Serializes tests that touch process-global env vars
+	/// (`APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT`).
+	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
+		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+		G.get_or_init(|| std::sync::Mutex::new(())).lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+	}
+
+	// ── T9 (F11/F15): a malformed port env var must fall back to the
+	// default, not propagate a parse failure or silently pick something
+	// else - and it must not panic. ──
+	#[test]
+	fn test_configured_ports_falls_back_on_malformed_value() {
+		let _g = env_guard();
+		std::env::set_var("APHRODITE_CACHE_PORT", "not-a-port");
+		std::env::remove_var("APHRODITE_TOKEN_PORT");
+		let (cache, token) = configured_ports();
+		std::env::remove_var("APHRODITE_CACHE_PORT");
+		assert_eq!(cache, DEFAULT_CACHE_PORT);
+		assert_eq!(token, DEFAULT_TOKEN_PORT);
+	}
+
+	#[test]
+	fn test_configured_ports_honors_valid_override() {
+		let _g = env_guard();
+		std::env::set_var("APHRODITE_CACHE_PORT", "19797");
+		let (cache, _token) = configured_ports();
+		std::env::remove_var("APHRODITE_CACHE_PORT");
+		assert_eq!(cache, 19797);
+	}
 
 	#[test]
 	fn test_version_is_semver() {
@@ -380,6 +465,37 @@ mod tests {
 		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
 		assert_eq!(v["status"], "ok");
 		aphrodite_hermes_free_string(result_ptr);
+	}
+
+	// ── T13 (F11): the production hook-dispatch path Python actually calls
+	// (`aphrodite_hermes_call_hook("post_llm_call", ...)`) must archive the
+	// turn's marker, not just advance the counter - a prior fix routed
+	// `hooks::post_llm_call` through `crates/aphrodite/src/lib.rs`'s
+	// separate FFI dispatch, but this crate's own `call_hook` bypassed it
+	// entirely by calling `next_turn` directly, so `aphrodite_diff` still
+	// returned zero turns in real Hermes usage even after that fix. ──
+	#[test]
+	fn test_call_hook_post_llm_call_archives_turn_for_aphrodite_diff() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(CString::new("session_start").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+
+		let compress_args = CString::new(serde_json::json!({"content": "x".repeat(5000)}).to_string()).unwrap();
+		let compress_ptr =
+			aphrodite_hermes_dispatch_tool(CString::new("aphrodite_compress").unwrap().as_ptr(), compress_args.as_ptr());
+		unsafe { CStr::from_ptr(compress_ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(compress_ptr);
+
+		let hook_ptr =
+			aphrodite_hermes_call_hook(CString::new("post_llm_call").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		aphrodite_hermes_free_string(hook_ptr);
+
+		let diff_ptr =
+			aphrodite_hermes_dispatch_tool(CString::new("aphrodite_diff").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		let diff_result = unsafe { CStr::from_ptr(diff_ptr) }.to_string_lossy().into_owned();
+		let v:serde_json::Value = serde_json::from_str(&diff_result).unwrap();
+		aphrodite_hermes_free_string(diff_ptr);
+
+		assert_eq!(v["total"], 1, "aphrodite_diff must report the archived turn: {v:?}");
 	}
 
 	#[test]
