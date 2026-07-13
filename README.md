@@ -12,7 +12,8 @@
 > Sub-ms compress, 12,800× max ratio, 28-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.2.2-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/badge/release-v1.3.1-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![crates.io](https://img.shields.io/crates/v/aphrodite?color=orange)](https://crates.io/crates/aphrodite)
 [![plugin](https://img.shields.io/badge/plugin-v2.0.6-purple)](plugins/aphrodite/plugin.yaml)
 ![rust](https://img.shields.io/badge/rust-1.88+-orange)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
@@ -39,6 +40,17 @@ hermes
 
 On first launch, the plugin auto-downloads the `aphrodite` binary from
 [releases](https://github.com/PlayForm/Aphrodite/releases). No Rust toolchain needed.
+
+### Via cargo install
+
+```bash
+cargo install aphrodite          # proxy binary + libaphrodite.dylib
+cargo install aphrodite-hermes   # hermes bridge dylib + helper bin
+aphrodite setup                  # plugin structure + config + symlink
+```
+
+All three commands together: the proxy on `:9797/:9798`, the Hermes dylib
+for hook/tool integration, and the plugin registered with Hermes.
 
 > **Windows**: `plugins/aphrodite/download.ps1` is a native PowerShell
 > equivalent of `download.sh` - no Git Bash/WSL needed. See
@@ -348,6 +360,21 @@ for the full, accurate breakdown of what's wired where.
 Benchmarks (`cargo run --release --example bench_0N_*`, see
 `Maintain/examples/`) and the in-process smoke suite (`aphrodite_test`, 3
 checks in `full` mode) are reproducible commands rather than fixed pass-rate
+
+### Real-world savings (Hermes Agent, deepseek-v4-pro)
+
+Measured via `.bench/e2e/hermes_z_ab.sh` — 4 standardized coding prompts,
+A/B testing with aphrodite ON vs OFF, `focus` directive active:
+
+| Prompt               | OFF (tokens) | ON (tokens) | Saved  | API calls OFF/ON |
+|----------------------|-------------:|------------:|-------:|:----------------:|
+| Read + summarize     |      444,236 |     178,636 | **60%** | 13 → 7 |
+| Cargo build output   |       28,913 |      28,903 |  0%    | 2 → 2 |
+| Search codebase      |       68,719 |      30,500 | **56%** | 4 → 2 |
+| Read two docs        |       34,075 |      34,049 |  0%    | 2 → 2 |
+| **Total**            |  **575,943** | **272,088** | **53%** | 21 → 13 |
+
+Cost: $0.18 (OFF) → $0.15 (ON) — 18% cheaper, 38% fewer API calls.
 numbers - run them directly to see current results.
 
 ---
