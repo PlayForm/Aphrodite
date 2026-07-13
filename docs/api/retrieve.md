@@ -34,7 +34,7 @@ pub struct RetrieveRequest {
     #[serde(default)]
     pub offset: usize,              // 0-based line offset for pagination
     #[serde(default)]
-    pub limit: usize,               // Max lines (0 = no limit)
+    pub limit: usize,               // Max lines (0 = server default cap: 10,000)
 }
 ```
 
@@ -47,9 +47,14 @@ pub struct RetrieveRequest {
 	"found": true,
 	"content": "original content...",
 	"source": "ccr",
-	"error": null
+	"error": null,
+	"truncated": false
 }
 ```
+
+`truncated` is `true` when `content` is a partial window of a larger stored
+document (because of `offset`/`limit`, or because `limit` hit the 10,000-line
+cap) - see [Pagination](#pagination).
 
 ### Not Found (404)
 
@@ -58,7 +63,8 @@ pub struct RetrieveRequest {
 	"found": false,
 	"content": null,
 	"source": "none",
-	"error": "CCR entry not found: abc123..."
+	"error": "CCR entry not found: abc123...",
+	"truncated": false
 }
 ```
 
@@ -69,7 +75,8 @@ pub struct RetrieveRequest {
 	"found": false,
 	"content": null,
 	"source": "none",
-	"error": "`hash` required"
+	"error": "`hash` required",
+	"truncated": false
 }
 ```
 
@@ -80,18 +87,8 @@ pub struct RetrieveRequest {
 	"found": false,
 	"content": "[offset 500 out of range; document has 42 lines]",
 	"source": "ccr",
-	"error": null
-}
-```
-
-### Decompression Error (500)
-
-```json
-{
-	"found": false,
-	"content": null,
-	"source": "ccr",
-	"error": "decompression failed"
+	"error": null,
+	"truncated": false
 }
 ```
 
@@ -102,6 +99,7 @@ pub struct RetrieveResponse {
     pub found: bool,
     pub content: Option<String>,
     pub source: String,           // "ccr", "inline", "none"
+    pub truncated: bool,          // true if content is a partial window
     pub error: Option<String>,
 }
 ```
@@ -159,36 +157,11 @@ fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
 
 ## Pagination
 
-```rust
-if req.limit > 0 {
-    let lines: Vec<&str> = content.lines().collect();
-    let total = lines.len();
-    let start = req.offset.min(total);
-    let end = (start + req.limit).min(total);
-    content = lines[start..end].join("\n");
-    if start > 0 || end < total {
-        content = format!("[lines {}-{}/{}]\n{}", start + 1, end, total, content);
-    }
-}
-```
-
-## Zstd Decompression
-
-```rust
-if content.as_bytes().starts_with(&[0x28, 0xB5, 0x2F, 0xFD]) {
-    match zstd::decode_all(content.as_bytes()) {
-        Ok(decompressed) => {
-            content = String::from_utf8_lossy(&decompressed).to_string();
-        },
-        Err(e) => {
-            return 500 with "decompression failed"
-        }
-    }
-}
-```
-
-Magic bytes `0x28 0xB5 0x2F 0xFD` identify zstd-compressed frames stored by CCR
-backends.
+`limit: 0` does not mean unlimited - it is clamped to a 10,000-line server
+default cap, same as any `limit` above 10,000. When the returned window
+doesn't cover the whole document (because of `offset`, `limit`, or the cap),
+a `[lines a-b/total]` header is prepended to `content` so the caller can tell
+a truncated result from a genuinely short document without guessing.
 
 ## Source Tracking
 

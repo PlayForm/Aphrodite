@@ -657,8 +657,14 @@ fn check_loopback_request(addr:SocketAddr, host_header:&str) -> Result<(), &'sta
 	if !addr.ip().is_loopback() {
 		return Err("only loopback clients allowed");
 	}
+	// A missing/unparseable Host is rejected, not waved through: peer-IP
+	// loopback is the first layer, but this second layer exists specifically
+	// to catch a DNS-rebinding request that genuinely originates from
+	// loopback yet carries a non-loopback (or absent) Host - HTTP/1.1
+	// mandates Host, and every real caller here (curl, the Hermes plugin)
+	// sends it, so there's no legitimate case to exempt (02-F6).
 	let hostname = host_header_to_hostname(host_header);
-	if !hostname.is_empty() && !ALLOWED_LOOPBACK_HOSTS.contains(&hostname.as_str()) {
+	if !ALLOWED_LOOPBACK_HOSTS.contains(&hostname.as_str()) {
 		return Err("Host header does not name a loopback address");
 	}
 	Ok(())
@@ -762,13 +768,13 @@ mod tests {
 		assert!(check_loopback_request(loopback_v4(9797), "127.0.0.1").is_ok(), "no-port Host must also pass");
 	}
 
+	// 02-F6: a missing/unparseable Host must be REJECTED, not waved through -
+	// otherwise a client that can omit or strip Host (HTTP/1.0, some
+	// non-browser `fetch` engines) skips the second defense layer entirely,
+	// leaving only the peer-IP check the Host check exists to back up.
 	#[test]
-	fn test_check_loopback_request_allows_missing_host_header() {
-		// A client that omits `Host` entirely (unusual for HTTP/1.1, but
-		// some minimal/raw clients or HTTP/1.0 requests do) must not be
-		// rejected by this check - the peer-IP check is still the primary
-		// gate for that case.
-		assert!(check_loopback_request(loopback_v4(9797), "").is_ok());
+	fn test_check_loopback_request_rejects_missing_host_header() {
+		assert!(check_loopback_request(loopback_v4(9797), "").is_err());
 	}
 
 	#[test]
