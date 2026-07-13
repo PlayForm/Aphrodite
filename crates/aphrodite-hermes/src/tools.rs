@@ -58,6 +58,87 @@ fn read_path_guarded(path:&str) -> Result<String, String> {
 	std::fs::read_to_string(&canon).map_err(|e| format!("read {path}: {e}"))
 }
 
+/// Hermes wraps all tool results in JSON wrappers like
+/// {"output":"...","exit_code":N}, {"success":true,"diff":"..."},
+/// {"total_count":N,"matches":[...]}, etc. The aphrodite classifier
+/// sees '{' and returns json_array — hiding the real content behind a
+/// useless preview. This extracts the meaningful content and reclassifies.
+fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
+	// Only attempt unwrapping if the content looks like a JSON object.
+	if !content.trim_start().starts_with('{') {
+		return None;
+	}
+	let v:serde_json::Value = serde_json::from_str(content).ok()?;
+	let obj = v.as_object()?;
+
+	// ── Terminal: {"output":"...","exit_code":N,"error":null} ──
+	if let (Some(output), Some(_exit)) = (
+		obj.get("output").and_then(|o| o.as_str()),
+		obj.get("exit_code"),
+	) {
+		if output.is_empty() { return None; }
+		let ct = if output.contains("exit code:") || output.contains("Error:") {
+			"terminal".to_string()
+		} else {
+			aphrodite::detect_type(output)
+		};
+		return Some((output.to_string(), ct));
+	}
+
+	// ── Patch / write_file: {"success":...,"diff":"...","error":"..."} ──
+	if let Some(diff) = obj.get("diff").and_then(|d| d.as_str()) {
+		if !diff.is_empty() {
+			return Some((diff.to_string(), aphrodite::detect_type(diff)));
+		}
+	}
+	if let Some(msg) = obj.get("error").and_then(|m| m.as_str()) {
+		if msg.starts_with("Found") && msg.contains("matches") {
+			return Some((msg.to_string(), "text".to_string()));
+		}
+		if !msg.is_empty() && !msg.starts_with('{') && !msg.starts_with('[') {
+			return Some((format!("{}", msg), "text".to_string()));
+		}
+	}
+	if let Some(ok) = obj.get("success") {
+		if ok.as_bool() == Some(true) && obj.len() <= 2 {
+			return Some(("ok".to_string(), "text".to_string()));
+		}
+		if let Some(msg) = ok.as_str() {
+			if !msg.is_empty() && !msg.starts_with('{') {
+				return Some((msg.to_string(), "text".to_string()));
+			}
+		}
+	}
+
+	// ── Search: {"total_count":N,"matches":[...],"truncated":bool} ──
+	if let Some(count) = obj.get("total_count").and_then(|c| c.as_u64()) {
+		let truncated = obj.get("truncated").and_then(|t| t.as_bool()).unwrap_or(false);
+		let label = if truncated { format!("{} results (truncated)", count) }
+					else { format!("{} results found", count) };
+		return Some((label, "search".to_string()));
+	}
+
+	// ── File read: {"content":"...","total_lines":N} ──
+	// (read_file is usually essential-skipped, but handle it anyway.)
+	if let Some(text) = obj.get("content").and_then(|c| c.as_str()) {
+		return Some((text.to_string(), aphrodite::detect_type(text)));
+	}
+
+	// ── Other Hermes tools: extract first meaningful string field ──
+	// E.g. skill_view: {"name":"...","description":"..."}
+	//       aphrodite_retrieve: {"found":true,"content":"..."}
+	let priority_keys = ["description", "summary", "result", "message", "preview", "found"];
+	for key in &priority_keys {
+		if let Some(s) = obj.get(*key).and_then(|v| v.as_str()) {
+			if !s.is_empty() && !s.starts_with('{') && !s.starts_with('[') {
+				return Some((s.to_string(), "text".to_string()));
+			}
+		}
+	}
+
+	None
+}
+
 /// Store content in the session's inline store and record a catalog marker.
 /// `center` is an optional caller-supplied string that travels with the
 /// marker (schema param `_ccr_center`) - previously documented but silently
@@ -65,10 +146,17 @@ fn read_path_guarded(path:&str) -> Result<String, String> {
 /// and the rendered marker.
 /// Returns `{hash, type, size, preview, marker}`.
 fn compress_into(state:&mut AphroditeState, content:&str, hint:&str, center:Option<&str>) -> serde_json::Value {
-	let detected = aphrodite::detect_type(content);
-	let ccr_type = if hint.is_empty() || hint == "text" { detected } else { hint.to_string() };
-	// Unwrap Hermes tool-result JSON wrappers so previews show real content.
-	let (eff_content, eff_type) = aphrodite::hooks::extract_hermes_result(content, &ccr_type);
+	// Hermes wraps tool results in JSON. Unwrap before compression so
+	// previews show real content (terminal output, diffs, etc.) instead
+	// of a meaningless "[json:1items 1L]".
+	let (eff_content, eff_type) = if let Some((c, t)) = unwrap_hermes_result(content) {
+		(c, t)
+	} else {
+		let detected = aphrodite::detect_type(content);
+		let ccr_type = if hint.is_empty() || hint == "text" { detected } else { hint.to_string() };
+		(content.to_string(), ccr_type)
+	};
+
 	let hash = aphrodite::hooks::compute_hash(&eff_content);
 	let preview = aphrodite::build_preview(&eff_type, &eff_content);
 	let marker = aphrodite::marker::ccr_marker(&hash, &eff_type, eff_content.len(), &preview, None, None, center);

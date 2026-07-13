@@ -26,57 +26,6 @@ const ESSENTIAL_TOOLS:&[&str] = &[
 	"read_terminal",
 ];
 
-/// Extract meaningful content from Hermes tool-result JSON wrappers.
-/// All Hermes tools return JSON like {"output":"...","exit_code":N} or
-/// {"success":true,"diff":"..."}. The classifier sees '{' and returns
-/// json_array — hiding the real content behind a useless preview.
-/// This extracts the meaningful field(s) and returns (content, type).
-pub fn extract_hermes_result(content:&str, classified_type:&str) -> (String, String) {
-	if !classified_type.starts_with("json") {
-		return (content.to_string(), classified_type.to_string());
-	}
-	let v:serde_json::Value = match serde_json::from_str(content) {
-		Ok(v) => v,
-		Err(_) => return (content.to_string(), classified_type.to_string()),
-	};
-	// Terminal output: {"output":"...","exit_code":N}
-	if let Some(output) = v.get("output").and_then(|o| o.as_str()) {
-		if output.is_empty() { return (content.to_string(), classified_type.to_string()); }
-		let ct = if output.contains("exit code:") || output.contains("Error:") {
-			"terminal".to_string()
-		} else {
-			transforms::detect(output).as_str().to_string()
-		};
-		return (output.to_string(), ct);
-	}
-	// Patch/write_file diff: {"success":..., "diff":"..."}
-	if let Some(diff) = v.get("diff").and_then(|d| d.as_str()) {
-		if !diff.is_empty() {
-			let ct = transforms::detect(diff).as_str().to_string();
-			return (diff.to_string(), ct);
-		}
-	}
-	// Patch/write_file result message: {"success":true/false, "error":"..."}
-	if let Some(msg) = v.get("error").or(v.get("success")).and_then(|m| m.as_str()) {
-		if !msg.is_empty() {
-			return (format!("result: {}", msg), "text".to_string());
-		}
-	}
-	// Search results: {"total_count":N, "matches":[...]}
-	if let Some(count) = v.get("total_count") {
-		if let Some(n) = count.as_u64() {
-			return (format!("{} results found", n), "search".to_string());
-		}
-	}
-	// File read: {"content":"...","total_lines":N} (read_file is usually
-	// essential-skipped, but if it reaches here, extract the content).
-	if let Some(text) = v.get("content").and_then(|c| c.as_str()) {
-		let ct = transforms::detect(text).as_str().to_string();
-		return (text.to_string(), ct);
-	}
-	(content.to_string(), classified_type.to_string())
-}
-
 /// Transform tool output - full compression pipeline.
 pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:&str) -> serde_json::Value {
 	if content.is_empty() {
@@ -117,25 +66,17 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 
 	let ct = transforms::detect(content);
 	let type_str = ct.as_str();
+	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 
-	// Hermes wraps ALL tool results in JSON: {"output":"...","exit_code":N},
-	// {"success":true,"diff":"..."}, {"total_count":N,"matches":[...]}, etc.
-	// The classifier sees '{' and returns json_array — hiding the real
-	// content behind a useless "[json:1items 1L]" preview. Extract the
-	// meaningful field and re-classify so previews show terminal output,
-	// diffs, build errors, search hit counts, etc.
-	let (eff_content, eff_type) = extract_hermes_result(content, type_str);
-	let hash = headroom_core::ccr::compute_key(eff_content.as_bytes());
+	state.inline_store_put(hash.clone(), content.to_string());
 
-	state.inline_store_put(hash.clone(), eff_content.clone());
-
-	let preview = crate::build_preview(&eff_type, &eff_content);
-	let marker = ccr_marker(&hash, &eff_type, eff_content.len(), &preview, None, None, None);
+	let preview = crate::build_preview(type_str, content);
+	let marker = ccr_marker(&hash, type_str, content.len(), &preview, None, None, None);
 
 	state.record_marker(MarkerEntry {
 		hash:hash.clone(),
-		ccr_type:eff_type.clone(),
-		size:eff_content.len(),
+		ccr_type:type_str.to_string(),
+		size:content.len(),
 		preview:preview.clone(),
 		turn:state.turn_counter,
 		center:None,
@@ -146,8 +87,8 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 		"status": "ok",
 		"compressed": true,
 		"hash": hash,
-		"type": eff_type,
-		"size": eff_content.len(),
+		"type": type_str,
+		"size": content.len(),
 		"preview": preview,
 		"marker": marker,
 	})

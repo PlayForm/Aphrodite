@@ -281,17 +281,14 @@ stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 	} else {
 		hint.to_string()
 	};
-	// Unwrap Hermes tool-result JSON wrappers so previews show real content
-	// (terminal output, diffs, search hits) instead of "[json:1items 1L]".
-	let (eff_content, eff_type) = hooks::extract_hermes_result(&content, &t);
-	let hash = headroom_core::ccr::compute_key(eff_content.as_bytes());
-	s.inline_store_put(hash.clone(), eff_content.to_string());
-	let preview = crate::build_preview(&eff_type, &eff_content);
-	let marker = marker::ccr_marker(&hash, &eff_type, eff_content.len(), &preview, None, None, None);
+	let hash = headroom_core::ccr::compute_key(content.as_bytes());
+	s.inline_store_put(hash.clone(), content.to_string());
+	let preview = crate::build_preview(&t, &content);
+	let marker = marker::ccr_marker(&hash, &t, content.len(), &preview, None, None, None);
 	s.record_marker(state::MarkerEntry {
 		hash:hash.clone(),
-		ccr_type:eff_type.clone(),
-		size:eff_content.len(),
+		ccr_type:t.clone(),
+		size:content.len(),
 		preview:preview.clone(),
 		turn:s.turn_counter,
 		center:None,
