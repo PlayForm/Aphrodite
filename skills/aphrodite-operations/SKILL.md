@@ -16,8 +16,9 @@ When the context engine compresses tool output into CCR markers, do NOT fight it
 by re-reading the same file with different offsets or tools. The engine
 compresses every read. Instead:
 
-1. **Plan reads ahead** - use `aphrodite_prefetch(paths=[...])` to read files in
-   background. Markers return instantly; content loads concurrently.
+1. **Plan reads ahead** - use `aphrodite_prefetch(paths=[...])` to read files and
+   compress them. Markers are returned inline; use `aphrodite_prefetch_status`
+   to track loading progress.
 2. **Retrieve, don't re-read** - when you get `<<<CCR:hash|type|size>>>`, use
    `aphrodite_retrieve(hash)`. Don't call `read_file` again with different
    offsets.

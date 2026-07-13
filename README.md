@@ -205,7 +205,7 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 | `aphrodite_test`       | Smoke test suite: quick (1 check), full (3 checks)    |
 | `aphrodite_catalog`    | Full CCR catalog with hashes, types, sizes, previews  |
 | `aphrodite_reclassify` | Retroactive metadata enrichment for unclassified CCR  |
-| `aphrodite_prefetch`   | Background file read + compress; markers return instantly |
+| `aphrodite_prefetch`   | Read + compress files on demand; markers returned inline |
 | `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors      |
 
 ---
@@ -238,7 +238,7 @@ crates/aphrodite/           ← Core engine (binary + cdylib)
     stage2.rs               ← Semantic reduction for JSON, build, diff, code
     struct_extract.rs       ← Code structure maps (Rust, Python, Go, JS/TS)
     config_loader.rs        ← TOML + env var config loading
-    prefetch.rs             ← Background file read + compress threads
+    prefetch.rs             ← On-demand file read + compress
 
 crates/aphrodite-hermes/    ← Hermes bridge
   src/
