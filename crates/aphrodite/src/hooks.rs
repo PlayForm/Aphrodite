@@ -15,6 +15,37 @@ use crate::{
 /// Compute a CCR hash for content using BLAKE3 (40 hex chars).
 pub fn compute_hash(content:&str) -> String { headroom_core::ccr::compute_key(content.as_bytes()) }
 
+/// Try to extract meaningful content from JSON-wrapped agent outputs.
+/// Returns (content, type). If content is not JSON or has no known fields,
+/// returns the original content and type unchanged.
+fn try_extract_json(content:&str, classified:&str) -> (String, String) {
+	if !classified.starts_with("json") { return (content.to_string(), classified.to_string()); }
+	let v:serde_json::Value = match serde_json::from_str(content) {
+		Ok(v) => v, Err(_) => return (content.to_string(), classified.to_string()),
+	};
+	let obj = match v.as_object() { Some(o) => o, None => return (content.to_string(), classified.to_string()) };
+	if let Some(o) = obj.get("output").and_then(|v| v.as_str()) {
+		if o.is_empty() { return (content.to_string(), classified.to_string()); }
+		let ct = if o.contains("exit code:") || o.contains("Error:") { "terminal" }
+			else if o.contains("   Compiling") || o.contains("    Finished")
+				|| o.contains("   Running") || o.contains("test result:")
+				|| o.contains("warning:") || o.contains("error[")
+			{ if o.contains("error[") || o.contains("error: could not") { "build_error" } else { "build_output" } }
+			else { transforms::detect(o).as_str() };
+		return (o.to_string(), ct.to_string());
+	}
+	if let Some(d) = obj.get("diff").and_then(|v| v.as_str()) {
+		if !d.is_empty() { return (d.to_string(), transforms::detect(d).as_str().to_string()); }
+	}
+	if let Some(t) = obj.get("content").and_then(|v| v.as_str()) {
+		if !t.is_empty() { return (t.to_string(), transforms::detect(t).as_str().to_string()); }
+	}
+	if let Some(m) = obj.get("error").or(obj.get("message")).and_then(|v| v.as_str()) {
+		if !m.is_empty() && !m.starts_with('{') { return (m.to_string(), "text".to_string()); }
+	}
+	(content.to_string(), classified.to_string())
+}
+
 /// Essential tools that must NOT be compressed - agent needs raw output.
 const ESSENTIAL_TOOLS:&[&str] = &[
 	"skill_view",
@@ -66,31 +97,28 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 
 	let ct = transforms::detect(content);
 	let type_str = ct.as_str();
-	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 
-	state.inline_store_put(hash.clone(), content.to_string());
-
-	let preview = crate::build_preview(type_str, content);
-	let marker = ccr_marker(&hash, type_str, content.len(), &preview, None, None, None);
-
+	// Agent frameworks often wrap tool results in JSON. Try to extract
+	// meaningful fields (output, diff, content, error) before compression
+	// so previews show real content instead of "[json:1items 1L]".
+	let (c, t) = try_extract_json(content, type_str);
+	let hash = headroom_core::ccr::compute_key(c.as_bytes());
+	state.inline_store_put(hash.clone(), c.to_string());
+	let preview = crate::build_preview(&t, &c);
+	let marker = ccr_marker(&hash, &t, c.len(), &preview, None, None, None);
 	state.record_marker(MarkerEntry {
 		hash:hash.clone(),
-		ccr_type:type_str.to_string(),
-		size:content.len(),
+		ccr_type:t.to_string(),
+		size:c.len(),
 		preview:preview.clone(),
 		turn:state.turn_counter,
 		center:None,
 		meta:None,
 	});
-
 	serde_json::json!({
-		"status": "ok",
-		"compressed": true,
-		"hash": hash,
-		"type": type_str,
-		"size": content.len(),
-		"preview": preview,
-		"marker": marker,
+		"status": "ok", "compressed": true,
+		"hash": hash, "type": t, "size": c.len(),
+		"preview": preview, "marker": marker,
 	})
 }
 
