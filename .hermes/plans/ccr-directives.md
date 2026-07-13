@@ -1,5 +1,7 @@
 # CCR Directive System - LLM-Controlled Compression Pipeline
 
+Status: design-only (not implemented)
+
 ## Problem
 
 Current architecture mixes the LLM's request, tool output processing, and

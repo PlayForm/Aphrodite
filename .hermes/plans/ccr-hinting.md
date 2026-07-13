@@ -1,5 +1,7 @@
 # CCR Hinting System - Lightweight LLM Pipeline Control
 
+Status: design-only (not implemented)
+
 ## Philosophy
 
 Hints are **advisory signals** the LLM can pass alongside tool calls. They bias

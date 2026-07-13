@@ -1,5 +1,8 @@
 # Rhai Scripting System - Aphrodite Plugin Architecture
 
+Status: removed (2026-07-13) — scripting.rs deleted (report 01-T3/06-T10).
+Was compile-broken, zero call sites.
+
 ## Overview
 
 Users write `.rhai` micro-scripts that inject into aphrodite's runtime at
