@@ -10,6 +10,7 @@ description = "aphrodite: Chat Completions proxy with CCR, tool relay, and progr
 [[bin]]
 name = "aphrodite"
 path = "src/main.rs"
+required-features = ["proxy"]
 
 [[example]]
 name = "bench_01_corpus"

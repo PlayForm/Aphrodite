@@ -30,11 +30,18 @@ pub mod stage2;
 pub mod state;
 pub mod struct_extract;
 
-// Proxy modules (used by main.rs binary)
+// Proxy modules (used by main.rs binary) — gated behind the `proxy`
+// feature (report 01-T2) so the cdylib built by `aphrodite-hermes` with
+// `default-features = false` doesn't link axum/tokio/reqwest into the
+// Hermes dylib unnecessarily.
 // center.rs removed (report 01-T6): zero callers, dead machinery
+#[cfg(feature = "proxy")]
 pub mod config;
+#[cfg(feature = "proxy")]
 pub mod proxy;
+#[cfg(feature = "proxy")]
 pub mod retrieve;
+#[cfg(feature = "proxy")]
 pub mod setup;
 
 use std::{
