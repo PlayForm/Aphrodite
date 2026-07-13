@@ -1,5 +1,9 @@
 #!/bin/sh
-# Keep vendored submodules (plugins/aphrodite, vendor/headroom, vendor/rtk)
-# tracking their remote branch tip after every pull/merge, so nobody has to
-# remember to run `git submodule update --remote --recursive --merge` by hand.
-git submodule update --init --remote --recursive --merge
+# Sync submodules (plugins/aphrodite, vendor/headroom, vendor/rtk) to the
+# commit pinned in the superproject's index after every pull/merge - NOT to
+# their remote branch tip (--remote --merge was found, during a 2026-07-13
+# analysis pass, to silently advance submodules past their pinned commits
+# any time this hook fired, repeatedly and invisibly since `.gitmodules` sets
+# `ignore = all`). Pin advances are now a deliberate act (e.g.
+# auto-release.sh), not a side effect of pulling or merging.
+git submodule update --init --recursive
