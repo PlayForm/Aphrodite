@@ -179,6 +179,16 @@ async fn ccr_len(ccr:&Arc<dyn CcrStore>) -> usize {
 /// into every axum handler.
 pub struct AppState {
 	pub client:HttpClient,
+	/// 02-F2: a separate client with no total `.timeout()`, used only for
+	/// requests the caller marked `"stream": true` before sending - reqwest's
+	/// client-level timeout bounds the WHOLE request lifetime including
+	/// consuming the response body, not just headers, so a chat completion
+	/// streaming tokens past `cli.timeout` (300s default) had its
+	/// `bytes_stream()` killed mid-answer on the shared, bounded `client`.
+	/// Hang protection here comes from `connect_timeout` + `tcp_keepalive`
+	/// instead of a total deadline - deliberate, since a legitimately slow
+	/// but still-progressing stream must not be cut off.
+	pub stream_client:HttpClient,
 	pub api_url:String,
 	pub model:String,
 	pub api_key:Secret,
@@ -583,6 +593,14 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		.pool_idle_timeout(std::time::Duration::from_secs(90))
 		.tcp_keepalive(std::time::Duration::from_secs(60))
 		.build()?;
+	// 02-F2: same tuning, no total timeout - see `AppState::stream_client`'s
+	// doc comment.
+	let stream_client = HttpClient::builder()
+		.connect_timeout(std::time::Duration::from_secs(10))
+		.pool_max_idle_per_host(100)
+		.pool_idle_timeout(std::time::Duration::from_secs(90))
+		.tcp_keepalive(std::time::Duration::from_secs(60))
+		.build()?;
 
 	let ccr:Option<Arc<dyn CcrStore>> = match cli.mode {
 		ProxyMode::Token if !cli.no_ccr_marker => {
@@ -621,6 +639,7 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 
 	Ok(AppState {
 		client,
+		stream_client,
 		api_url:cli.api_url.clone(),
 		model:cli.model.clone(),
 		api_key:cli.api_key.clone().into(),
@@ -682,6 +701,18 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 }
 
 // ── Main proxy handler ──────────────────────────────────────────────
+
+/// 02-F2: does this request body ask for a streamed (SSE) response? Checked
+/// before sending so `proxy_handler` can pick `state.stream_client` (no
+/// total timeout) instead of the bounded `state.client` - the upstream
+/// `Content-Type` isn't known until headers come back, by which point a
+/// bounded client's timeout is already ticking against the whole response.
+fn body_wants_stream(body:&[u8]) -> bool {
+	serde_json::from_slice::<serde_json::Value>(body)
+		.ok()
+		.and_then(|v| v.get("stream").and_then(|s| s.as_bool()))
+		.unwrap_or(false)
+}
 
 /// Compute a cache key from a Chat Completions request body: hash(api_key +
 /// model + messages). Uses FNV-1a (deterministic across restarts, unlike
@@ -921,9 +952,11 @@ pub async fn proxy_handler(
 	// DNS failure, TLS error) as a "timeout", which is a real metrics lie
 	// for anyone diagnosing outages from `/metrics`.
 	let mut final_error_was_timeout = false;
+	// 02-F2: a `"stream": true` request goes out on `stream_client` (no
+	// total timeout), not the bounded `client` - see its doc comment.
+	let http_client = if body_wants_stream(&body_vec) { &state.stream_client } else { &state.client };
 	for attempt in 1..=3u32 {
-		let req = state
-			.client
+		let req = http_client
 			.request(method.clone(), &url)
 			.header("Content-Type", "application/json; charset=utf-8")
 			.header("Accept", "application/json")
@@ -2553,6 +2586,7 @@ pub(crate) mod tests {
 		use std::{collections::HashMap, sync::Mutex};
 		let state = AppState {
 			client:HttpClient::new(),
+			stream_client:HttpClient::new(),
 			api_url:"https://upstream-openai.com".into(),
 			model:"test".into(),
 			api_key:"test".into(),
@@ -2990,10 +3024,32 @@ code_multiplier = 6.5
 		assert_ne!(fnv1a_64(b"a"), fnv1a_64(b"b"));
 	}
 
+	// ── 02-F2: `body_wants_stream` decides which client (bounded vs
+	// no-total-timeout) a request goes out on - must match on the exact
+	// field real clients send, and fail closed (bounded client) on anything
+	// unparseable rather than accidentally going timeout-free for garbage
+	// input. ──
+	#[test]
+	fn test_body_wants_stream_true_when_set() {
+		assert!(body_wants_stream(br#"{"model":"gpt-4o","stream":true}"#));
+	}
+
+	#[test]
+	fn test_body_wants_stream_false_when_absent_or_false() {
+		assert!(!body_wants_stream(br#"{"model":"gpt-4o"}"#));
+		assert!(!body_wants_stream(br#"{"model":"gpt-4o","stream":false}"#));
+	}
+
+	#[test]
+	fn test_body_wants_stream_false_on_invalid_json() {
+		assert!(!body_wants_stream(b"not json"));
+	}
+
 	fn test_state() -> AppState {
 		use std::{collections::HashMap, sync::Mutex};
 		AppState {
 			client:HttpClient::new(),
+			stream_client:HttpClient::new(),
 			api_url:"https://upstream-openai.com".into(),
 			model:"default-model".into(),
 			api_key:"test".into(),
