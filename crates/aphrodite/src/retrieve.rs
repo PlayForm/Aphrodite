@@ -107,29 +107,16 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 		}
 	};
 
-	// Decompress zstd if magic bytes are present
-	if content.as_bytes().starts_with(&[0x28, 0xB5, 0x2F, 0xFD]) {
-		let compressed_len = content.len();
-		match zstd::decode_all(content.as_bytes()) {
-			Ok(decompressed) => {
-				content = String::from_utf8_lossy(&decompressed).to_string();
-				tracing::debug!("zstd-decompressed content, {}b -> {}b", compressed_len, decompressed.len());
-			},
-			Err(e) => {
-				tracing::warn!("zstd decompress failed for hash content: {}", e);
-				return (
-					StatusCode::INTERNAL_SERVER_ERROR,
-					Json(RetrieveResponse {
-						found:false,
-						content:None,
-						source:"ccr".into(),
-						error:Some("decompression failed".into()),
-					}),
-				)
-					.into_response();
-			},
-		}
-	}
+	// NOTE (report 05 F12): a zstd-magic-byte decompression branch used to
+	// live here. It was unreachable dead code: `CcrStore::get` returns
+	// `Option<String>` (vendor/headroom/crates/headroom-core/src/ccr/mod.rs)
+	// and every backend implementation (in-memory, SQLite, Redis) stores and
+	// returns the exact `String`/`&str` payload verbatim - none of them ever
+	// zstd-encodes content. Since a Rust `String` is guaranteed valid UTF-8,
+	// and a real zstd frame is essentially never valid UTF-8, `content` here
+	// could never legally contain the zstd magic bytes this branch checked
+	// for. Removed rather than "fixed" - see `.plans/05-compression-pipeline.md`
+	// T12 and `docs/ccr/lifecycle.md`'s retrieve-flow section.
 
 	// Apply query filter, then pagination
 	content = filter_content(&content, req.query.as_deref());
