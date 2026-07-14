@@ -1086,10 +1086,15 @@ pub async fn proxy_handler(
 			let resp_body = match accumulate_body(response, RESPONSE_MAX_BODY_BYTES).await {
 				Ok(b) => b,
 				Err(e) => {
+					// 02-F8: the detailed error (which can embed the
+					// upstream URL/host) goes server-side only, via
+					// `record_error` - the client gets a generic message.
+					// `/stats`'s `last_errors` still has the real string for
+					// an operator to diagnose from.
 					state.record_error(format!("body read: {}", e));
 					return (
 						StatusCode::BAD_GATEWAY,
-						Json(serde_json::json!({"error": format!("body read: {}", e)})),
+						Json(serde_json::json!({"error": "upstream request failed"})),
 					)
 						.into_response();
 				},
@@ -1236,9 +1241,13 @@ pub async fn proxy_handler(
 					"<<< ERR"
 				);
 			}
+			// 02-F8: same rule as the body-read error above - `reqwest::Error`'s
+			// `Display` can embed the upstream URL and, in some TLS/DNS
+			// failure modes, host/proxy details; a caller shouldn't be able
+			// to fingerprint `state.api_url` through this response.
 			(
 				StatusCode::BAD_GATEWAY,
-				Json(serde_json::json!({"error": format!("upstream: {}", e)})),
+				Json(serde_json::json!({"error": "upstream request failed"})),
 			)
 				.into_response()
 		},
