@@ -284,6 +284,15 @@ pub struct AppState {
 	/// from `upstream_timeouts` (F17), which previously counted every kind
 	/// of transport error as a "timeout".
 	pub upstream_connect_errors:AtomicU64,
+	/// 02-F9: mid-stream chunk errors on the SSE relay path - distinct from
+	/// `upstream_connect_errors`/`upstream_timeouts`, which only ever see
+	/// failures before the response status/headers arrive. Once
+	/// `Body::from_stream` owns the stream, a later chunk `Err` (the F2
+	/// failure mode: an upstream that hangs or drops mid-stream) was
+	/// otherwise invisible to every counter - a 200 status had already been
+	/// recorded, so an operator diagnosing "streams cut off" from `/stats`
+	/// saw nothing.
+	pub sse_stream_errors:AtomicU64,
 	pub ccr_store_entries:AtomicU64,
 	pub ccr_store_bytes:AtomicU64,
 	pub request_body_bytes:AtomicU64,
@@ -378,6 +387,8 @@ impl AppState {
 				// F17: non-timeout transport failures (connect refused, DNS,
 				// TLS) - previously folded into "timeouts" above.
 				"connect_errors": self.upstream_connect_errors.load(Ordering::Relaxed),
+				// 02-F9: mid-stream chunk errors on the SSE relay path.
+				"sse_stream_errors": self.sse_stream_errors.load(Ordering::Relaxed),
 			},
 			"ccr_store": {
 				"entries": self.ccr_store_entries.load(Ordering::Relaxed),
@@ -687,6 +698,7 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		upstream_errors_5xx:AtomicU64::new(0),
 		upstream_timeouts:AtomicU64::new(0),
 		upstream_connect_errors:AtomicU64::new(0),
+		sse_stream_errors:AtomicU64::new(0),
 		ccr_store_entries:AtomicU64::new(0),
 		ccr_store_bytes:AtomicU64::new(0),
 		request_body_bytes:AtomicU64::new(0),
@@ -1041,7 +1053,19 @@ pub async fn proxy_handler(
 				.map(|ct| ct.as_bytes().starts_with(b"text/event-stream"))
 				.unwrap_or(false);
 			if is_sse {
-				let stream = response.bytes_stream();
+				// 02-F9: count bytes and observe mid-stream errors as chunks
+				// flow through - once `Body::from_stream` owns the raw
+				// `bytes_stream()`, a later chunk `Err` (F2's failure mode)
+				// and every SSE byte were otherwise invisible to `/stats`.
+				let state_for_stream = state.clone();
+				let stream = response.bytes_stream().inspect(move |chunk| match chunk {
+					Ok(bytes) => {
+						state_for_stream.response_body_bytes.fetch_add(bytes.len() as u64, Ordering::Relaxed);
+					},
+					Err(_) => {
+						state_for_stream.sse_stream_errors.fetch_add(1, Ordering::Relaxed);
+					},
+				});
 				if state.dev {
 					tracing::info!(id = %req_id_short, status = %status, "<<< STREAM (SSE)");
 				}
@@ -2633,6 +2657,7 @@ pub(crate) mod tests {
 			upstream_errors_5xx:AtomicU64::new(0),
 			upstream_timeouts:AtomicU64::new(0),
 			upstream_connect_errors:AtomicU64::new(0),
+		sse_stream_errors:AtomicU64::new(0),
 			ccr_store_entries:AtomicU64::new(0),
 			ccr_store_bytes:AtomicU64::new(0),
 			request_body_bytes:AtomicU64::new(0),
@@ -3096,6 +3121,7 @@ code_multiplier = 6.5
 			upstream_errors_5xx:AtomicU64::new(0),
 			upstream_timeouts:AtomicU64::new(0),
 			upstream_connect_errors:AtomicU64::new(0),
+		sse_stream_errors:AtomicU64::new(0),
 			ccr_store_entries:AtomicU64::new(0),
 			ccr_store_bytes:AtomicU64::new(0),
 			request_body_bytes:AtomicU64::new(0),
