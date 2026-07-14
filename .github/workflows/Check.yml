@@ -163,7 +163,7 @@ jobs:
           git submodule status
           ls plugins/aphrodite/plugin.yaml || echo "MISSING: plugins/aphrodite not checked out"
 
-      - uses: astral-sh/ruff-action@4919ec5cf1f49eff0871dbcea0da843445b837e6 # v3
+      - uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
         with:
           src: plugins/aphrodite/
 
@@ -185,6 +185,6 @@ jobs:
       # errors - accepting/ignoring them is a policy decision for a human,
       # not something this pass makes unilaterally. Until triaged, expect
       # this job to be red.
-      - uses: EmbarkStudios/cargo-deny-action@bb137d7af7e4fb67e5f82a49c4fce4fad40782fe # v2.0.20
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check
