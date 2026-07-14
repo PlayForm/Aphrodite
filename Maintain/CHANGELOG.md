@@ -319,7 +319,7 @@ runtime code changes.
 
 ### Verified
 
-- `cargo test --workspace`: 1,089+ passed, 0 failed (849 headroom-core + 240 aphrodite crates)
+- `cargo test --workspace`: 1,089+ passed, 0 failed - this command runs both this project's own crates AND the vendored `vendor/headroom` submodule (part of the same Cargo workspace), so the combined figure is not solely a measure of this project's own correctness: 240 in `aphrodite`/`aphrodite-hermes` (the code this changelog actually describes) + 849 in the vendored `aphrodite-headroom-core`
 - `cargo build --release -p aphrodite -p aphrodite-hermes`: clean (10.8s)
 - GitHub Release `Aphrodite/v1.2.2` auto-created by CI with all 9 cross-platform assets
 - All docs scanned and version badges synced to v1.2.2 / v2.0.6
@@ -357,7 +357,7 @@ runtime code changes.
 
 ### Verified
 
-- `cargo test --workspace`: 849+ passed, 0 failed.
+- `cargo test --workspace`: 849+ passed, 0 failed - includes the vendored `vendor/headroom` submodule's own test suite (part of the same Cargo workspace), not solely this project's `aphrodite`/`aphrodite-hermes` crates.
 - Directly exercised both fixes against the built binary: deleted
   `~/.hermes/aphrodite/` and confirmed auto-create + both proxies healthy
   (twice, to confirm idempotency); ran two concurrent instances on default

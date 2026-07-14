@@ -132,6 +132,13 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --release
 
+      # Maintain/dynamic_hooks/rust is its own standalone Cargo project (not
+      # a workspace member of the root Cargo.toml), so `cargo test
+      # --workspace` above never touches its 6 tests - they carried zero CI
+      # coverage until this step.
+      - name: cargo test (Maintain/dynamic_hooks)
+        run: cargo test --manifest-path Maintain/dynamic_hooks/rust/Cargo.toml
+
       - name: Install uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 

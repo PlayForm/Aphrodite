@@ -250,4 +250,81 @@ mod tests {
 			context.len()
 		);
 	}
+
+	// ── 04-T7: load_directives is not cwd-relative (the caller passes an
+	// explicit path), so these are hermetic tempdir tests - no cwd mutation
+	// risk, unlike apply_compression's own directory search. ──
+
+	/// A unique scratch directory per test, auto-removed on drop.
+	struct TempDir(std::path::PathBuf);
+	impl TempDir {
+		fn new(tag:&str) -> Self {
+			let path = std::env::temp_dir().join(format!(
+				"aphrodite-directives-test-{tag}-{}",
+				std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+			));
+			std::fs::create_dir_all(&path).unwrap();
+			Self(path)
+		}
+
+		fn path(&self) -> std::path::PathBuf { self.0.clone() }
+	}
+	impl Drop for TempDir {
+		fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+	}
+
+	#[test]
+	fn test_load_directives_reads_md_files_from_dir() {
+		let dir = TempDir::new("basic");
+		std::fs::write(dir.path().join("focus.md"), "# focus\nstay concise").unwrap();
+		std::fs::write(dir.path().join("explore.md"), "# explore\nlook around").unwrap();
+
+		let loaded = load_directives(&dir.path());
+		assert_eq!(loaded.len(), 2);
+		assert_eq!(loaded["focus"].content, "# focus\nstay concise");
+		assert_eq!(loaded["explore"].content, "# explore\nlook around");
+	}
+
+	#[test]
+	fn test_load_directives_skips_non_md_files() {
+		let dir = TempDir::new("skip-non-md");
+		std::fs::write(dir.path().join("focus.md"), "keep me").unwrap();
+		std::fs::write(dir.path().join("README.txt"), "not a directive").unwrap();
+		std::fs::write(dir.path().join("notes"), "no extension at all").unwrap();
+
+		let loaded = load_directives(&dir.path());
+		assert_eq!(loaded.len(), 1);
+		assert!(loaded.contains_key("focus"));
+	}
+
+	#[test]
+	fn test_load_directives_missing_dir_returns_empty() {
+		let missing = std::env::temp_dir().join("aphrodite-directives-test-does-not-exist");
+		let loaded = load_directives(&missing);
+		assert!(loaded.is_empty());
+	}
+
+	#[test]
+	fn test_load_directives_truncates_at_max_chars_with_ellipsis() {
+		let dir = TempDir::new("truncate");
+		let oversized = "x".repeat(MAX_DIRECTIVE_CHARS + 500);
+		std::fs::write(dir.path().join("huge.md"), &oversized).unwrap();
+
+		let loaded = load_directives(&dir.path());
+		let content = &loaded["huge"].content;
+		// MAX_DIRECTIVE_CHARS worth of 'x' plus the ellipsis marker.
+		assert_eq!(content.chars().count(), MAX_DIRECTIVE_CHARS + 1);
+		assert!(content.ends_with('…'));
+	}
+
+	#[test]
+	fn test_load_directives_under_cap_is_not_truncated() {
+		let dir = TempDir::new("under-cap");
+		let small = "short directive body";
+		std::fs::write(dir.path().join("small.md"), small).unwrap();
+
+		let loaded = load_directives(&dir.path());
+		assert_eq!(loaded["small"].content, small);
+		assert!(!loaded["small"].content.ends_with('…'));
+	}
 }
