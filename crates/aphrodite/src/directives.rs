@@ -261,7 +261,10 @@ mod tests {
 		fn new(tag:&str) -> Self {
 			let path = std::env::temp_dir().join(format!(
 				"aphrodite-directives-test-{tag}-{}",
-				std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+				std::time::SystemTime::now()
+					.duration_since(std::time::UNIX_EPOCH)
+					.unwrap()
+					.as_nanos()
 			));
 			std::fs::create_dir_all(&path).unwrap();
 			Self(path)

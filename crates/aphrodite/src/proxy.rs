@@ -334,14 +334,14 @@ pub struct AppState {
 ///
 /// The estimate is clamped so the ratio never goes below 1.0× (a
 /// compressor can't expand content beyond the original size in the
-/// worst case — it stores the literal).
+/// worst case - it stores the literal).
 fn estimate_compressed_size(content:&str) -> usize {
 	use std::collections::HashSet;
 
 	let bytes = content.as_bytes();
 	let sample = if bytes.len() <= 4096 { bytes } else { &bytes[..4096] };
 	if sample.len() < 3 {
-		// Too short for trigrams — just return a minimal size so the
+		// Too short for trigrams - just return a minimal size so the
 		// ratio is reasonable but not inflated.
 		return sample.len().max(40);
 	}
@@ -898,6 +898,16 @@ fn fnv1a_64(bytes:&[u8]) -> u64 {
 	hash
 }
 
+/// T10 (F6): does this upstream `content-type` mark an SSE response that must
+/// be streamed chunk-by-chunk rather than buffered (a buffered SSE body is
+/// unparseable by an SSE client)? Prefix match, not exact - real servers
+/// append `; charset=utf-8` and similar.
+fn is_sse(content_type:Option<&axum::http::HeaderValue>) -> bool {
+	content_type
+		.map(|ct| ct.as_bytes().starts_with(b"text/event-stream"))
+		.unwrap_or(false)
+}
+
 /// Catch-all proxy handler - forwards any request to DeepSeek.
 /// Specifically handles Chat Completions API at /v1/chat/completions.
 pub async fn proxy_handler(
@@ -1089,11 +1099,7 @@ pub async fn proxy_handler(
 			// forwarded chunk-by-chunk, not buffered into a single JSON blob
 			// (which an SSE client can't parse). Skip compression + cache
 			// entirely for this path.
-			let is_sse = content_type
-				.as_ref()
-				.map(|ct| ct.as_bytes().starts_with(b"text/event-stream"))
-				.unwrap_or(false);
-			if is_sse {
+			if is_sse(content_type.as_ref()) {
 				// 02-F9: count bytes and observe mid-stream errors as chunks
 				// flow through - once `Body::from_stream` owns the raw
 				// `bytes_stream()`, a later chunk `Err` (F2's failure mode)
@@ -3629,5 +3635,130 @@ code_multiplier = 6.5
 			prop_assert!(!meta.contains('\n'));
 			prop_assert!(meta.chars().count() <= 400);
 		}
+	}
+
+	// ── 04-T8: SSE detection + handler-level streaming tests ──────
+
+	fn header_value(s:&str) -> axum::http::HeaderValue { axum::http::HeaderValue::from_str(s).unwrap() }
+
+	#[test]
+	fn test_is_sse_exact_match() {
+		assert!(is_sse(Some(&header_value("text/event-stream"))));
+	}
+
+	#[test]
+	fn test_is_sse_prefix_match_with_charset() {
+		assert!(is_sse(Some(&header_value("text/event-stream; charset=utf-8"))));
+	}
+
+	#[test]
+	fn test_is_sse_rejects_non_sse_content_types() {
+		assert!(!is_sse(Some(&header_value("application/json"))));
+		assert!(!is_sse(Some(&header_value("text/plain"))));
+		// Not a prefix match on a superstring that merely contains the token.
+		assert!(!is_sse(Some(&header_value("text/x-event-stream"))));
+	}
+
+	#[test]
+	fn test_is_sse_missing_header_is_false() {
+		assert!(!is_sse(None));
+	}
+
+	/// A minimal raw-TCP mock upstream: accepts one connection, drains the
+	/// request, and writes back a canned HTTP/1.1 response before closing -
+	/// this crate has no HTTP mocking dependency, and a hand-rolled listener
+	/// is simpler than standing up a second axum server for one test.
+	async fn spawn_mock_upstream(response:&'static str) -> std::net::SocketAddr {
+		let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+		let addr = listener.local_addr().unwrap();
+		tokio::spawn(async move {
+			use tokio::io::{AsyncReadExt, AsyncWriteExt};
+			let (mut socket, _) = listener.accept().await.unwrap();
+			let mut buf = [0u8; 4096];
+			// Drain (don't need to parse) the request up to the header terminator.
+			loop {
+				let n = socket.read(&mut buf).await.unwrap_or(0);
+				if n == 0 || buf[..n].windows(4).any(|w| w == b"\r\n\r\n") {
+					break;
+				}
+			}
+			let _ = socket.write_all(response.as_bytes()).await;
+			let _ = socket.shutdown().await;
+		});
+		addr
+	}
+
+	fn test_request(
+		state:Arc<AppState>,
+		path:&str,
+		body:&'static str,
+	) -> (
+		axum::extract::State<Arc<AppState>>,
+		Method,
+		axum::extract::OriginalUri,
+		axum::http::HeaderMap,
+		Bytes,
+	) {
+		(
+			axum::extract::State(state),
+			Method::POST,
+			axum::extract::OriginalUri(format!("http://x{path}").parse().unwrap()),
+			axum::http::HeaderMap::new(),
+			Bytes::from_static(body.as_bytes()),
+		)
+	}
+
+	#[tokio::test]
+	async fn test_sse_response_is_streamed_with_header_and_not_cached() {
+		let addr = spawn_mock_upstream(
+			"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nConnection: close\r\n\r\ndata: \
+			 {\"delta\":\"hi\"}\n\ndata: [DONE]\n\n",
+		)
+		.await;
+
+		let mut state = test_state();
+		state.api_url = format!("http://{addr}");
+		let state = Arc::new(state);
+
+		// Non-streaming request body (no "stream": true) - proves the SSE
+		// path is driven by the upstream's Content-Type, not the request.
+		let (s, m, p, h, b) = test_request(state.clone(), CHAT_COMPLETIONS_PATH, r#"{"model":"x","messages":[]}"#);
+		let response = proxy_handler(s, m, p, h, b).await.into_response();
+
+		assert_eq!(
+			response.headers().get("X-Aphrodite-Streamed").map(|v| v.to_str().unwrap()),
+			Some("true"),
+			"SSE responses must be marked with X-Aphrodite-Streamed"
+		);
+		assert_eq!(
+			response.headers().get("content-type").map(|v| v.to_str().unwrap()),
+			Some("text/event-stream")
+		);
+
+		// No cache write: an SSE response must never populate the response
+		// cache (F3's whole point - a cached entry is a single buffered JSON
+		// body, nothing like a stream).
+		let cache_key = cache_key_from_body(r#"{"model":"x","messages":[]}"#.as_bytes(), state.api_key.expose());
+		if let Some(ck) = cache_key {
+			assert!(response_cache_get(&state, ck).is_none(), "SSE response must not be cached");
+		}
+	}
+
+	#[tokio::test]
+	async fn test_non_sse_response_is_not_streamed() {
+		let addr = spawn_mock_upstream(
+			"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\nConnection: close\r\n\r\n{\"ok\":true}",
+		)
+		.await;
+
+		let mut state = test_state();
+		state.api_url = format!("http://{addr}");
+		let (s, m, p, h, b) = test_request(Arc::new(state), "/v1/models", "");
+		let response = proxy_handler(s, m, p, h, b).await.into_response();
+
+		assert!(
+			response.headers().get("X-Aphrodite-Streamed").is_none(),
+			"a plain JSON upstream response must not be marked as streamed"
+		);
 	}
 }
