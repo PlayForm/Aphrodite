@@ -269,7 +269,7 @@ Public (no loopback enforcement).
 	"status": "healthy",
 	"ccr": true,
 	"mode": "token",
-	"version": "1.3.2",
+	"version": "1.3.3",
 	"fill_pct": 90.0
 }
 ```
