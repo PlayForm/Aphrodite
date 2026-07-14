@@ -2,10 +2,19 @@
 
 The proxy decides whether to compress each piece of Chat Completions response
 content, and if so, how. The pipeline detects content type, computes adaptive
-thresholds, checks cache, compresses with zstd, and tracks token savings.
+thresholds, checks cache, stores the original content by hash, and tracks
+token savings ("compression" here means replacing content with a compact CCR
+marker - the stored bytes themselves are kept verbatim, not codec-compressed).
 The compression ratio EMA is updated from BOTH the Chat Completions path
 (using the rendered marker length) AND the direct `/ccr/create` endpoint
 (using a trigram-uniqueness heuristic for the compressed-size estimate).
+
+## What Is Never Compressed
+
+| Exempt content                      | Why                                                                                                                             |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `tool_calls[].function.arguments`   | Client-executable JSON, not model-facing prose - a real OpenAI-tools client (no Aphrodite plugin) can't parse a CCR marker as JSON, so compressing it broke every tool call it made. Only `message.content` is a compression target. Fixed in v1.3.2 |
+| SSE streams (`text/event-stream`)   | Forwarded chunk-by-chunk, never buffered - see [Architecture: Streaming (SSE)](architecture.md#streaming-sse)                    |
 
 ## Full Pipeline
 
@@ -15,8 +24,9 @@ The compression ratio EMA is updated from BOTH the Chat Completions path
                     ┌─────────▼─────────┐
                     │ For each choice:   │
                     │  message.content   │
-                    │  tool_calls[].     │
-                    │    function.args   │
+                    │  (tool_calls[].    │
+                    │   function.args    │
+                    │   NEVER touched)   │
                     └─────────┬─────────┘
                               │
                     ┌─────────▼─────────┐
@@ -137,12 +147,13 @@ compresses.
 ```rust
 pub fn compute_key(payload: &[u8]) -> String {
     let h = blake3::hash(payload);
-    h.to_hex().as_str()[..24].to_string()
+    h.to_hex().as_str()[..40].to_string()
 }
 ```
 
-BLAKE3, first 24 hex chars (96 bits). Deterministic - same content always yields
-the same hash.
+BLAKE3, first 40 hex chars (160 bits). Deterministic - same content always
+yields the same hash. An earlier draft of this doc said 24 chars; the shipped
+`headroom_core::ccr::compute_key` has a test pinning 40.
 
 ## 4. CCR Cache
 
@@ -151,11 +162,14 @@ the same hash.
 | Hit  | `ccr_hits` incremented; marker generated, content replaced; no store operation                                                                                         |
 | Miss | `ccr_misses` incremented; `ccr.put(hash, content)` stored; `ccr_created` incremented; `tokens_saved` += content.len() - hash.len(); marker generated, content replaced |
 
-### Compression (zstd)
+### Storage Is Verbatim (no zstd)
 
-CCR backends compress content with zstd before storage (magic bytes:
-`0x28, 0xB5, 0x2F, 0xFD`). On retrieval, `zstd::decode_all()` decompresses
-transparently.
+CCR backends store the original content bytes as-is - the "compression" is
+the marker substitution in the LLM-facing response, not a byte-level codec.
+An earlier draft of this doc (and of `retrieve.rs` itself) described a zstd
+encode/decode step; that branch was dead code and has been removed - see
+[CCR Lifecycle](../ccr/lifecycle.md#phase-5-retrieve) for the full
+correction.
 
 ## 5. Marker Generation
 

@@ -12,7 +12,9 @@ POST /retrieve
 
 ## Access
 
-Loopback only.
+Loopback only. Requires `Authorization: Bearer <token>` when
+`APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat) -
+see [Environment Variables](../config/env-vars.md).
 
 ## Request
 

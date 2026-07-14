@@ -73,12 +73,18 @@ Err(e) => {
 After 3 failed attempts:
 
 - Track `upstream_timeouts` counter
-- Record error in `last_errors` ring buffer (max 100)
-- Return `502 BAD_GATEWAY` with JSON error body:
+- Record the specific error in the `last_errors` ring buffer (max 100),
+  visible via `/stats`
+- Return `502 BAD_GATEWAY` with a deliberately generic JSON error body:
 
 ```json
-{ "error": "upstream: connection refused (or specific error)" }
+{ "error": "upstream request failed" }
 ```
+
+The specific transport error is never sent to the client - `reqwest::Error`'s
+`Display` can embed the upstream URL/host, which would leak the configured
+`api_url` to whoever hit the proxy. The detail lives server-side in
+`last_errors`/`/stats` only (v1.3.2).
 
 ## Upstream Timeout
 
@@ -100,3 +106,10 @@ if t > 600 {
     600
 } else { t }
 ```
+
+**Streaming exemption**: `"stream": true` requests go out on a separate
+client with **no total timeout** - reqwest's client-level `.timeout()` bounds
+the whole request including the response body stream, which used to cut off
+legitimately slow but progressing SSE streams mid-answer. Hang protection for
+streams comes from `connect_timeout` + `tcp_keepalive` instead. See
+[Architecture: Streaming (SSE)](architecture.md#streaming-sse).

@@ -50,4 +50,6 @@ optional/opt-in).
 ## Note
 
 `/health` does NOT probe the upstream API. For upstream health, use
-`/health/upstream` (loopback-only).
+`/health/upstream` (loopback-only, and gated by `APHRODITE_MGMT_TOKEN` when
+set). `/health` itself is deliberately exempt from both loopback enforcement
+and management-route auth so external load balancers keep working.

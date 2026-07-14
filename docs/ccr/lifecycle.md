@@ -13,7 +13,7 @@ expiry.
 
 ```
 1. Parse Chat Completions response JSON
-2. For each choice.message.content AND each tool_call.function.arguments:
+2. For each choice.message.content:
    a. detect_content_type() → ct (e.g., "code_rust", "error", "diff")
    b. threshold_for(ct) × budget_mult (from x-headroom-budget) → threshold
    c. If content.len() > threshold:
@@ -22,12 +22,20 @@ expiry.
       iii. If miss: ccr.put(hash, content), increment ccr_created
       iv.  Update tokens_saved counter
       v.   Generate smart_marker(hash, content, ct) → marker string
-      vi.  Replace content/arguments with marker in JSON
+      vi.  Replace content with marker in JSON
       vii. update_compression_ratio(original_len, marker_len) → EMA
    d. Else if content.len() > INLINE_CCR_THRESHOLD (256B):
       i.   compute_key(content) → hash
       ii.  Store in inline_ccr LruCache (max 1024 entries)
 ```
+
+`tool_calls[].function.arguments` is **never** a compression target (v1.3.2):
+it's client-executable JSON, not model-facing prose - an earlier version of
+the pipeline (and of this doc) compressed large tool-call arguments into a
+CCR marker string, which a real OpenAI-tools client (no Aphrodite plugin)
+can't parse as JSON, breaking every tool call it made. SSE
+(`text/event-stream`) responses also bypass this phase entirely - see
+[Proxy: Architecture](../proxy/architecture.md#streaming-sse).
 
 ## Phase 2: Cache
 
@@ -131,8 +139,16 @@ Retrieval flow:
 5. Apply optional query filter (case-insensitive line grep, truncated to
    512 chars, char-safe)
 6. Apply optional pagination (offset + limit, limit clamped to 10,000 lines)
-7. Return {found: true/false, content: "…", source: "ccr"/"none"}
+7. Return {found: true/false, content: "…", source: "ccr"/"none",
+   truncated: true/false}
 ```
+
+Full-document retrieval is byte-identical since v1.3.2: a stored file ending
+in `\n` used to come back one byte short (`str::lines()` discards the
+trailing newline and `join("\n")` never restored it), breaking the
+content-addressing round-trip. The `truncated` response field (also v1.3.2)
+lets a client detect a windowed/capped result without parsing the
+`[lines a-b/total]` header - see [Retrieve Endpoint](../api/retrieve.md).
 
 Earlier drafts of this doc (and of `retrieve.rs` itself) described a step
 that checked returned content for zstd magic bytes (`0x28 0xB5 0x2F 0xFD`)

@@ -3,13 +3,24 @@
 These endpoints let the Python plugin, Hermes agent, and external tools
 create, list, and delete compressed content entries directly.
 
+## Authentication
+
+All three endpoints are loopback only, and require
+`Authorization: Bearer <token>` when `APHRODITE_MGMT_TOKEN` is set (unset =
+any loopback caller, back-compat with a one-time startup warning). This is
+the management-route auth introduced in v1.3.2 - a hostile local page could
+previously issue a CORS "simple request" that lands as a write (seed CCR
+entries) even though it can't read the reply. Note this is a different token
+from `notify_key` below, which authenticates the *outbound* notification
+callback.
+
 ## POST /ccr/create
 
 Creates a new CCR entry. Supports both JSON and raw octet-stream bodies.
 
 ### Access
 
-Loopback only.
+Loopback only + mgmt token (see [Authentication](#authentication)).
 
 ### JSON Mode
 
@@ -109,7 +120,7 @@ Returns CCR entry count and backend info.
 
 ### Access
 
-Loopback only.
+Loopback only + mgmt token (see [Authentication](#authentication)).
 
 ### Response (CCR enabled)
 
@@ -144,7 +155,7 @@ Deletes a specific CCR entry by hash.
 
 ### Access
 
-Loopback only.
+Loopback only + mgmt token (see [Authentication](#authentication)).
 
 ### Response (200 OK)
 

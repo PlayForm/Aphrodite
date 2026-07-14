@@ -12,7 +12,9 @@ GET /metrics
 
 ## Access
 
-Loopback only - subject to `loopback_only` middleware. No auth.
+Loopback only - subject to `loopback_only` middleware. No auth - `/metrics`
+stays exempt even when `APHRODITE_MGMT_TOKEN` gates the other management
+routes, so Prometheus scrapers keep working unmodified.
 
 ## Content-Type
 

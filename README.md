@@ -226,6 +226,7 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 | `aphrodite_files`           | Tracked file references, grouped by tool                 |
 | `aphrodite_diff`            | Conversation turn history with summaries                 |
 | `aphrodite_search`          | Search CCR store by keyword or type                      |
+| `aphrodite_directive`       | List/swap/add/remove/reset behavioral directives         |
 | `aphrodite_test`            | Smoke test suite: quick (1 check), full (3 checks)       |
 | `aphrodite_catalog`         | Full CCR catalog with hashes, types, sizes, previews     |
 | `aphrodite_reclassify`      | Retroactive metadata enrichment for unclassified CCR     |
@@ -371,6 +372,18 @@ only affect the separate Hermes-plugin dylib session or aren't consumed by
 anything yet - see [`docs/config/aphrodite-toml.md`](docs/config/aphrodite-toml.md)
 for the full, accurate breakdown of what's wired where.
 
+Two more knobs worth knowing about:
+
+- **Directives** - `[directives] active = ["focus"]` seeds short behavioral
+  instructions (`directives/*.md`) injected into the LLM's context every
+  turn, swappable mid-conversation via the `aphrodite_directive` tool. See
+  [`docs/plugin/directives.md`](docs/plugin/directives.md).
+- **Management auth** - set `APHRODITE_MGMT_TOKEN` to require
+  `Authorization: Bearer <token>` on the proxy's management routes
+  (`/stats`, `/retrieve`, `/ccr/*`, `/reload`, ...); `/health` and
+  `/metrics` stay open. Unset = open loopback access (back-compat), with a
+  startup warning. See [`docs/config/env-vars.md`](docs/config/env-vars.md).
+
 ---
 
 ## Performance ⚡
@@ -389,9 +402,10 @@ for the full, accurate breakdown of what's wired where.
 | Classification latency    | 40-123 ns |
 | Preview generation        | <0.05 ms  |
 
-Benchmarks (`cargo run --release --example bench_0N_*`, see
-`Maintain/examples/`) and the in-process smoke suite (`aphrodite_test`, 3
-checks in `full` mode) are reproducible commands rather than fixed pass-rate
+Benchmarks (`cargo run --release -p aphrodite --example bench_0N_*`, see
+`crates/aphrodite/examples/`) and the in-process smoke suite
+(`aphrodite_test`, 3 checks in `full` mode) are reproducible commands rather
+than fixed pass-rate numbers - run them directly to see current results.
 
 ### Real-world savings (Hermes Agent, deepseek-v4-pro)
 
@@ -407,7 +421,6 @@ A/B testing with aphrodite ON vs OFF, `focus` directive active:
 | **Total**            |  **575,943** | **272,088** | **53%** | 21 → 13 |
 
 Cost: $0.18 (OFF) → $0.15 (ON) - 18% cheaper, 38% fewer API calls.
-numbers - run them directly to see current results.
 
 ---
 

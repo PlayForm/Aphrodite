@@ -3,6 +3,11 @@
 Aphrodite exposes HTTP endpoints for proxying LLM API requests, managing CCR
 entries, executing tool relay calls, and health checks.
 
+Every management handler below (everything except `proxy_handler` and
+`health_check`) additionally requires `Authorization: Bearer <token>` once
+`APHRODITE_MGMT_TOKEN` is set - see
+[Architecture: Management-Route Authentication](architecture.md#management-route-authentication).
+
 ## proxy_handler
 
 Catch-all handler. Forwards any request to the upstream LLM API.
@@ -34,8 +39,10 @@ pub async fn proxy_handler(
 2. Generate UUID request ID (short: first 8 chars)
 3. If dev mode: log incoming headers (authorization redacted)
 4. Build upstream URL: {api_url}/{path}
-5. Determine if Chat Completions request
+5. Determine if Chat Completions request; pick the HTTP client -
+   "stream": true requests go out on stream_client (no total timeout)
 6. Compute cache key (FNV-1a(api_key:model:messages)) for Chat Completions
+   (skipped for streaming requests - they are never cached)
 7. Check LLM response cache:
    a. HIT → return cached response with X-Aphrodite-Cache: HIT
    b. MISS → continue
@@ -45,14 +52,23 @@ pub async fn proxy_handler(
    c. On transport error: exponential backoff + jitter
 9. On success: extract response
    a. Track upstream_errors_4xx/5xx
-   b. Read response body
-   c. Track upstream_latency_micros, response_body_bytes
-   d. If Chat Completions + CCR enabled:
+   b. If Content-Type is text/event-stream: forward chunk-by-chunk
+      (Body::from_stream), propagate upstream headers, add
+      X-Aphrodite-Streamed: true, count bytes into response_body_bytes,
+      count mid-stream chunk errors into sse_stream_errors - skip
+      compression and caching entirely, done
+   c. Read response body
+   d. Track upstream_latency_micros, response_body_bytes
+   e. If Chat Completions + CCR enabled:
       - Extract x-headroom-budget from inbound headers
-      - compress_chat_completion()
+      - compress_chat_completion() (message.content only -
+        tool_calls[].function.arguments is never compressed)
       - If compressed: set X-Aphrodite-Compressed: true, store in response_cache
-   e. Otherwise: return raw, store in response_cache
-10. On failure: track upstream_timeouts, return 502 BAD_GATEWAY
+   f. Otherwise: return raw, store in response_cache
+10. On failure: track upstream_timeouts, return 502 BAD_GATEWAY with a
+    generic {"error": "upstream request failed"} body - the transport
+    error's detail (which can embed the upstream URL/host) is recorded
+    server-side in last_errors, never leaked to the client
 ```
 
 ### Response Headers
@@ -62,6 +78,7 @@ pub async fn proxy_handler(
 | `Content-Type`           | application/json; charset=utf-8 | Always                               |
 | `X-Aphrodite-Cache`      | HIT or MISS                     | Chat Completions                     |
 | `X-Aphrodite-Compressed` | true                            | When compression occurred            |
+| `X-Aphrodite-Streamed`   | true                            | SSE (text/event-stream) responses    |
 | `X-Aphrodite-Fill-Pct`   | float (0.0-99.0)                | Chat Completions (from fill_pct/100) |
 
 ### Forwarded Headers
@@ -252,7 +269,7 @@ Public (no loopback enforcement).
 	"status": "healthy",
 	"ccr": true,
 	"mode": "token",
-	"version": "0.5.69",
+	"version": "1.3.2",
 	"fill_pct": 90.0
 }
 ```
@@ -285,7 +302,8 @@ POST /retrieve
 	"found": true,
 	"content": "original content...",
 	"source": "ccr",
-	"error": null
+	"error": null,
+	"truncated": false
 }
 ```
 
@@ -294,7 +312,11 @@ POST /retrieve
 1. Validate hash (required, 400 if missing)
 2. Check inline_ccr (LruCache, lock dropped before await)
 3. Fallback to CCR backend (SQLite/InMemory via blocking thread)
-4. Decompress zstd if magic bytes present (0x28, 0xB5, 0x2F, 0xFD)
-5. Apply query filter (case-insensitive, max 512 chars)
-6. Apply pagination (offset + limit)
-7. Return with source tracking
+4. Apply query filter (case-insensitive, max 512 chars)
+5. Apply pagination (offset + limit, clamped to a 10,000-line cap); set
+   `truncated: true` when the returned window doesn't cover the whole
+   document
+6. Return with source tracking
+
+Full request/response schemas, the pagination contract, and the `truncated`
+flag semantics: [Retrieve Endpoint](../api/retrieve.md).
