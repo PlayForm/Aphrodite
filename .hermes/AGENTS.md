@@ -14,12 +14,18 @@ Every line you write here directly makes LLMs cheaper, faster, and smarter. ✨
 
 ## Dev Flow - The Joyful Loop
 
-- **Pane 0**: `cargo watch -x 'run -p aphrodite'` - instant feedback on every save
+- **Pane 0**: `cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x 'run -p aphrodite'` - instant feedback on every save
 - **Pane 1**: `hermes --profile dev-aphrodite` - test in production immediately
 - **Pane 2**: WezTerm MCP for scripted verification - never interrupt the main session!
 
 Pro tip: The Rust dylib hot-reloads on mtime change - rebuild and the plugin picks
 it up without restarting Hermes. Pure magic. 🪄
+
+Watch BOTH packages, not just `aphrodite`: `-p aphrodite` alone never rebuilds
+`libaphrodite_hermes.dylib` (it's a sibling package that depends on `aphrodite`,
+not the other way around, so Cargo has no reason to touch it). Watching only
+`aphrodite` means the proxy pane looks alive while the Hermes plugin keeps
+running old code indefinitely.
 
 ## Key Paths
 

@@ -29,7 +29,10 @@ aphrodite --mode token --listen :9798 --api-key $APHRODITE_API_KEY --tool-relay
 ### Dev rebuild (auto-reload)
 
 ```bash
-APHRODITE_API_KEY=sk-... cargo watch -x 'run -p aphrodite'
+# Build BOTH packages - `-p aphrodite` alone never rebuilds
+# libaphrodite_hermes.dylib (aphrodite-hermes depends on aphrodite, not the
+# reverse, so Cargo has no reason to touch it).
+APHRODITE_API_KEY=sk-... cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x 'run -p aphrodite'
 ```
 
 ### Hermes config

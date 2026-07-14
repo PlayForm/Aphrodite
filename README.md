@@ -285,7 +285,11 @@ pass/fail status. CC0-1.0 - public domain.
 
 ```bash
 # Terminal 1: cargo watch (rebuilds dylib on change)
-APHRODITE_NO_AUTO_LAUNCH=1 cargo watch -x 'build -p aphrodite'
+# Build BOTH packages, not just `aphrodite` - `aphrodite-hermes` (the crate
+# that actually produces libaphrodite_hermes.dylib) depends ON `aphrodite`,
+# not the other way around, so `cargo build -p aphrodite` alone never
+# touches the dylib at all, no matter what changed.
+APHRODITE_NO_AUTO_LAUNCH=1 cargo watch -x 'build -p aphrodite -p aphrodite-hermes'
 
 # Terminal 2: Hermes (loads hot-reloaded dylib)
 hermes --profile dev-aphrodite
@@ -343,8 +347,9 @@ aphrodite
 curl http://127.0.0.1:9798/health
 # -> {"status":"healthy","ccr":true,"mode":"token","version":"1.3.2","fill_pct":90.0}
 
-# Dev loop with auto-reload
-RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'
+# Dev loop with auto-reload (also rebuilds aphrodite-hermes's dylib, not just
+# the proxy binary - see "Developer Workflow" above)
+RUST_LOG=aphrodite=info cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x 'run -p aphrodite'
 ```
 
 ### Configuration - everything in one file

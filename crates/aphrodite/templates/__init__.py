@@ -30,6 +30,8 @@ _BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH",
 
 _dylib: ctypes.CDLL | None = None
 _dylib_mtime: float = 0.0
+_dylib_copy_path: str | None = None
+_dylib_gen = itertools.count()
 # Guards _dylib/_dylib_mtime: ctypes releases the GIL during foreign calls, so
 # two Hermes threads can race through _load_dylib during a reload window
 # (F12) - worst case one thread frees a string through a half-swapped
@@ -37,9 +39,32 @@ _dylib_mtime: float = 0.0
 _dylib_lock = threading.Lock()
 
 
+def _load_fresh_copy(src_path: str) -> str:
+    """Copy `src_path` to a uniquely-named file so a subsequent
+    `ctypes.CDLL()` genuinely loads the new bytes instead of a cached image.
+
+    dlopen (both macOS dyld and Linux glibc) memoizes loaded images by
+    canonical path and hands back the SAME cached handle on a repeat dlopen
+    of the same path - even when the file's mtime/content on disk changed,
+    and even though nothing here ever calls dlclose. This silently defeated
+    the mtime check below for every reload after the first: the check fired
+    and logged a "hot-reloading" warning, `ctypes.CDLL(path)` ran again, but
+    the OS just returned the original in-memory image untouched. Verified
+    empirically: a rebuilt dylib with a changed embedded constant, re-opened
+    via `ctypes.CDLL()` on the same live process, kept returning the OLD
+    constant and the identical `_handle` value. Loading each generation from
+    a fresh path sidesteps the path-keyed cache entirely.
+    """
+    hotreload_dir = os.path.join(os.path.dirname(src_path), ".hotreload")
+    os.makedirs(hotreload_dir, exist_ok=True)
+    dst = os.path.join(hotreload_dir, f"{os.path.basename(src_path)}.{os.getpid()}.{next(_dylib_gen)}")
+    shutil.copy2(src_path, dst)
+    return dst
+
+
 def _load_dylib() -> ctypes.CDLL:
     """Load libaphrodite_hermes.dylib with ctypes. Hot-reloads on mtime change."""
-    global _dylib, _dylib_mtime
+    global _dylib, _dylib_mtime, _dylib_copy_path
 
     with _dylib_lock:
         # Find current dylib path
@@ -77,7 +102,22 @@ def _load_dylib() -> ctypes.CDLL:
                 "the transcript will no longer resolve via aphrodite_retrieve",
                 _dylib_mtime, current_mtime, path)
 
-        dylib = ctypes.CDLL(path)
+        # Load from a fresh unique-path copy, not `path` directly - see
+        # `_load_fresh_copy`'s docstring for why a repeat dlopen of the same
+        # path silently returns stale, cached code on every platform.
+        load_path = _load_fresh_copy(path)
+        dylib = ctypes.CDLL(load_path)
+
+        # The previous generation's copy is no longer needed - its mapped
+        # pages stay valid for any in-flight call even after the directory
+        # entry is removed (standard POSIX unlink-while-mapped semantics),
+        # so deleting it here is safe and keeps `.hotreload/` from growing
+        # unboundedly across a long dev session.
+        if _dylib_copy_path is not None:
+            try:
+                os.remove(_dylib_copy_path)
+            except OSError:
+                pass
 
         try:
             # c_void_p avoids Python 3.14 c_char_p malloc mismatch → SIGABRT
@@ -103,6 +143,7 @@ def _load_dylib() -> ctypes.CDLL:
 
         _dylib = dylib
         _dylib_mtime = current_mtime
+        _dylib_copy_path = load_path
         return dylib
 
 

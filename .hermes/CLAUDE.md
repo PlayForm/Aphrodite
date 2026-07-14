@@ -19,8 +19,12 @@ you'll ship faster, break nothing, and feel great about every commit. 💪
 5. **Green means go**: Ruff 0 errors. Pyright 0 errors. Before every commit.
    We earned that clean CI badge - let's keep it glowing. 🟢
 
-6. **One watch to rule them all**: `cargo watch -x 'run -p aphrodite'` -
-   single command, instant rebuilds, pure flow state.
+6. **One watch to rule them all**: `cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x 'run -p aphrodite'` -
+   single command, instant rebuilds, pure flow state. Build BOTH packages, not
+   just `aphrodite`: `cargo build -p aphrodite` alone never touches
+   `libaphrodite_hermes.dylib` (it's a sibling package, not a dependency of
+   `aphrodite`), so editing shared code and watching only the proxy pane gives
+   zero signal about whether the Hermes plugin's dylib changed at all.
 
 7. **Scripts have a home**: `Maintain/scripts/` for build, release, bench, ops.
    Root directory stays clean and beautiful.
