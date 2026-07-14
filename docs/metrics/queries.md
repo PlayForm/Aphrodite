@@ -127,14 +127,14 @@ rate(aphrodite_inline_ccr_hits_total[5m]) / (rate(aphrodite_inline_ccr_hits_tota
 
 ### Key Health Indicators
 
-| Panel            | Query                                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------ |
-| Requests/sec     | `rate(aphrodite_requests_total{mode="token"}[1m])`                                                     |
-| P95 Latency      | `histogram_quantile(0.95, rate(aphrodite_latency_seconds_bucket[5m]))`                                 |
-| Compression Rate | `rate(aphrodite_requests_compressed_total[5m]) / rate(aphrodite_requests_total[5m]) * 100`                   |
+| Panel            | Query                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Requests/sec     | `rate(aphrodite_requests_total{mode="token"}[1m])`                                                                       |
+| P95 Latency      | `histogram_quantile(0.95, rate(aphrodite_latency_seconds_bucket[5m]))`                                                   |
+| Compression Rate | `rate(aphrodite_requests_compressed_total[5m]) / rate(aphrodite_requests_total[5m]) * 100`                               |
 | CCR Hit Rate     | `rate(aphrodite_ccr_hits_total[5m]) / (rate(aphrodite_ccr_hits_total[5m]) + rate(aphrodite_ccr_misses_total[5m])) * 100` |
-| Tokens Saved/sec | `rate(aphrodite_tokens_saved_total[5m])`                                                                     |
-| Error Rate       | `rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) + rate(aphrodite_upstream_timeouts_total[5m])`  |
+| Tokens Saved/sec | `rate(aphrodite_tokens_saved_total[5m])`                                                                                 |
+| Error Rate       | `rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) + rate(aphrodite_upstream_timeouts_total[5m])`                    |
 
 ### Alerts
 

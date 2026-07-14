@@ -11,10 +11,10 @@ The compression ratio EMA is updated from BOTH the Chat Completions path
 
 ## What Is Never Compressed
 
-| Exempt content                      | Why                                                                                                                             |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `tool_calls[].function.arguments`   | Client-executable JSON, not model-facing prose - a real OpenAI-tools client (no Aphrodite plugin) can't parse a CCR marker as JSON, so compressing it broke every tool call it made. Only `message.content` is a compression target. Fixed in v1.3.2 |
-| SSE streams (`text/event-stream`)   | Forwarded chunk-by-chunk, never buffered - see [Architecture: Streaming (SSE)](architecture.md#streaming-sse)                    |
+| Exempt content                    | Why                                                                                                                                                                                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tool_calls[].function.arguments` | Client-executable JSON, not model-facing prose - a real OpenAI-tools client (no Aphrodite plugin) can't parse a CCR marker as JSON, so compressing it broke every tool call it made. Only `message.content` is a compression target. Fixed in v1.3.2 |
+| SSE streams (`text/event-stream`) | Forwarded chunk-by-chunk, never buffered - see [Architecture: Streaming (SSE)](architecture.md#streaming-sse)                                                                                                                                        |
 
 ## Full Pipeline
 

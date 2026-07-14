@@ -20,11 +20,14 @@ from effects import Effect, runtime
 
 # ── Paths ────────────────────────────────────────────────────────────────
 _HERE = Path(__file__).resolve().parent
-_DYLIB_NAME = "libaphrodite_dynamic.dylib" if sys.platform == "darwin" else "libaphrodite_dynamic.so"
+_DYLIB_NAME = (
+    "libaphrodite_dynamic.dylib" if sys.platform == "darwin" else "libaphrodite_dynamic.so"
+)
 _DYLIB = (_HERE.parent / "rust" / "target" / "release" / _DYLIB_NAME).resolve()
 
 
 # ── Built-in services ────────────────────────────────────────────────────
+
 
 def _load_dylib() -> ctypes.CDLL:
     """Load the Rust dylib with C ABI signatures."""
@@ -85,6 +88,7 @@ def bootstrap():
         lib = _load_dylib()
     except FileNotFoundError as e:
         import logging
+
         logging.getLogger("aphrodite").warning("dylib bootstrap failed: %s", e)
         return
 
@@ -108,18 +112,24 @@ def bootstrap():
                     dylib = runtime.service("dylib")
                     result_json = _dylib_call(dylib, "aphrodite_call_hook", name, json.dumps(args))
                     return json.loads(result_json)
+
                 return Effect.try_(_call)
+
             return pipeline_fn
 
         runtime.pipeline(hook_name, [make_pipeline_fn(hook_name)])
 
     import logging
+
     logging.getLogger("aphrodite").info(
-        "aphrodite runtime bootstrapped - v%s hooks=%s", version, hooks,
+        "aphrodite runtime bootstrapped - v%s hooks=%s",
+        version,
+        hooks,
     )
 
 
 # ── Hermes plugin interface ──────────────────────────────────────────────
+
 
 def register(ctx):
     """
@@ -133,12 +143,14 @@ def register(ctx):
     hooks = runtime.service("dylib_hooks") if _has_service("dylib_hooks") else []
 
     for hook_name in hooks:
+
         def make_handler(name: str):
             def handler(**kwargs):
                 exit_result = runtime.run_exit(name, kwargs)
                 if exit_result["_tag"] == "Success":
                     return exit_result["value"]
                 return None
+
             return handler
 
         ctx.hook(hook_name)(make_handler(hook_name))
@@ -162,8 +174,9 @@ if __name__ == "__main__":
     r = runtime.run_exit("session_start", {"session_id": "test"})
     print(f"  session_start: {r}")
 
-    r = runtime.run_exit("transform_tool_result",
-                         {"content": "error: broke\nline2", "tool_name": "test"})
+    r = runtime.run_exit(
+        "transform_tool_result", {"content": "error: broke\nline2", "tool_name": "test"}
+    )
     print(f"  transform:     {r}")
 
     print("\n✓ Effect runtime ready - extensions load via runtime.prepend()/append()")

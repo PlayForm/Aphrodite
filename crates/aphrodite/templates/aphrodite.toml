@@ -48,11 +48,11 @@ catalog_mode = "tool"       # compact | full | tool
 classifier_poll = true      # skip CCR for clean outputs
 code_multiplier = 3.0       # multiply threshold for code types
 context_engine = true       # dylib-path only (aphrodite_stats/config_get/set,
-                             # aphrodite_dispatch) - a status flag exposed by
-                             # the C-ABI/Hermes bridge; the standalone HTTP
-                             # proxy (main.rs/proxy.rs) never reads it and has
-                             # no gated behavior tied to this key
-prefetch = true             # enable aphrodite_prefetch tool
+# aphrodite_dispatch) - a status flag exposed by
+# the C-ABI/Hermes bridge; the standalone HTTP
+# proxy (main.rs/proxy.rs) never reads it and has
+# no gated behavior tied to this key
+prefetch = true # enable aphrodite_prefetch tool
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -78,4 +78,4 @@ catalog_intent_hints = true   # show intent=read with hashes?
 [directives]
 # Active directives loaded from directives/*.md at startup.
 # Swap mid-conversation via aphrodite_directive("swap", "explore").
-active = []  # e.g. ["focus", "foresight"]
+active = [] # e.g. ["focus", "foresight"]

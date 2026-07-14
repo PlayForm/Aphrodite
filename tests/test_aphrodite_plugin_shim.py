@@ -5,6 +5,7 @@
 Covers the config-surface fixes from `.plans/07-configuration.md`: the
 APHRODITE_NO_AUTO_LAUNCH guard (F13/T7) actually being read, not just set.
 """
+
 import os
 import sys
 from unittest import mock

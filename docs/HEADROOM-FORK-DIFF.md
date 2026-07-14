@@ -72,21 +72,21 @@ merging them.
 
 ### Conflicts & Resolutions (13 paths)
 
-| File | Resolution | Rationale |
-| ---- | ---------- | --------- |
-| `Cargo.lock` | ours (stay deleted) | Fork deletes the lock (regenerated locally); upstream's references its own crate set |
-| `Cargo.toml` | manual | Kept fork members (`headroom-ffi`) + tab style; added upstream's `headroom-simulators` to members + default-members |
-| `crates/headroom-core/Cargo.toml` | manual (ours for comment) | Kept fork's 40-char `compute_key` doc comment; upstream's `ort` pins and `toml 1.1` retained |
-| `crates/headroom-core/src/transforms/detection.rs` | theirs | Our delta since base was formatting-only; upstream renamed the magika availability helper |
-| `crates/headroom-core/src/transforms/magika_detector.rs` | theirs | Same - ours formatting-only; upstream's session-init availability rework wins |
-| `headroom/cache/prefix_tracker.py` | theirs | Ours comment-punctuation only |
-| `headroom/cli/wrap.py` | theirs | Ours comment-punctuation only |
-| `headroom/providers/proxy_routes.py` | theirs | Ours 2-line comment delta only |
-| `headroom/proxy/auth_mode.py` | theirs | Ours comment-punctuation only |
-| `headroom/proxy/forwarded_headers.py` | theirs | Upstream's policy extraction; fork had no code delta |
-| `headroom/proxy/helpers.py` | theirs | Upstream's ~20 policy extractions; fork punctuation only |
-| `headroom/proxy/image_compression_decision.py` | theirs | Upstream policy extraction; no fork code delta |
-| `headroom/transforms/content_router.py` | manual | Deleted the inline mixed-content block upstream moved to `headroom/transforms/mixed_content.py` (which carries the in-string bracket fix); fork's `_net_cost_cache_ttl_seconds` P_alive decay + env guard preserved; `mixed_content` compat re-exports intact |
+| File                                                     | Resolution                | Rationale                                                                                                                                                                                                                                                     |
+| -------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Cargo.lock`                                             | ours (stay deleted)       | Fork deletes the lock (regenerated locally); upstream's references its own crate set                                                                                                                                                                          |
+| `Cargo.toml`                                             | manual                    | Kept fork members (`headroom-ffi`) + tab style; added upstream's `headroom-simulators` to members + default-members                                                                                                                                           |
+| `crates/headroom-core/Cargo.toml`                        | manual (ours for comment) | Kept fork's 40-char `compute_key` doc comment; upstream's `ort` pins and `toml 1.1` retained                                                                                                                                                                  |
+| `crates/headroom-core/src/transforms/detection.rs`       | theirs                    | Our delta since base was formatting-only; upstream renamed the magika availability helper                                                                                                                                                                     |
+| `crates/headroom-core/src/transforms/magika_detector.rs` | theirs                    | Same - ours formatting-only; upstream's session-init availability rework wins                                                                                                                                                                                 |
+| `headroom/cache/prefix_tracker.py`                       | theirs                    | Ours comment-punctuation only                                                                                                                                                                                                                                 |
+| `headroom/cli/wrap.py`                                   | theirs                    | Ours comment-punctuation only                                                                                                                                                                                                                                 |
+| `headroom/providers/proxy_routes.py`                     | theirs                    | Ours 2-line comment delta only                                                                                                                                                                                                                                |
+| `headroom/proxy/auth_mode.py`                            | theirs                    | Ours comment-punctuation only                                                                                                                                                                                                                                 |
+| `headroom/proxy/forwarded_headers.py`                    | theirs                    | Upstream's policy extraction; fork had no code delta                                                                                                                                                                                                          |
+| `headroom/proxy/helpers.py`                              | theirs                    | Upstream's ~20 policy extractions; fork punctuation only                                                                                                                                                                                                      |
+| `headroom/proxy/image_compression_decision.py`           | theirs                    | Upstream policy extraction; no fork code delta                                                                                                                                                                                                                |
+| `headroom/transforms/content_router.py`                  | manual                    | Deleted the inline mixed-content block upstream moved to `headroom/transforms/mixed_content.py` (which carries the in-string bracket fix); fork's `_net_cost_cache_ttl_seconds` P_alive decay + env guard preserved; `mixed_content` compat re-exports intact |
 
 ### Post-Merge Symbol Sweep (silent-regression check)
 

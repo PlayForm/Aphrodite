@@ -380,9 +380,7 @@ def Main() -> None:
         try:
             return int(Value)
         except ValueError:
-            raise argparse.ArgumentTypeError(
-                f"Expected an integer or 'All', got: {Value!r}"
-            )
+            raise argparse.ArgumentTypeError(f"Expected an integer or 'All', got: {Value!r}")
 
     Parser.add_argument(
         "--OpenBraceDepth",
@@ -421,9 +419,7 @@ def Main() -> None:
         Parser.print_help()
         sys.exit(1)
 
-    Changed = sum(
-        ProcessFile(File, Args.DryRun, Args.OpenBraceDepth) for File in Target
-    )
+    Changed = sum(ProcessFile(File, Args.DryRun, Args.OpenBraceDepth) for File in Target)
     Total = len(Target)
     Verb = "would change" if Args.DryRun else "changed"
     print(f"\nDone - {Verb} {Changed}/{Total} file(s).")

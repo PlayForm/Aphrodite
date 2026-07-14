@@ -10,6 +10,7 @@ loads each generation from a freshly-named copy instead of the fixed path;
 these tests cover that copy/cleanup bookkeeping without paying for a second
 full `cargo build` per test run.
 """
+
 import ctypes
 import importlib.util
 import os

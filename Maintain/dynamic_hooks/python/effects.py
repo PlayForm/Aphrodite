@@ -29,6 +29,7 @@ B = TypeVar("B")
 #   Effects declare service needs via Effect.service("name").
 #   Extensions register services via Runtime.provide("name", value_or_factory).
 
+
 class ServiceRegistry:
     """Holds named services provided to effects during execution."""
 
@@ -41,9 +42,7 @@ class ServiceRegistry:
 
     def get(self, name: str) -> Any:
         if name not in self._services:
-            raise KeyError(
-                f"Service '{name}' not found. Available: {list(self._services)}"
-            )
+            raise KeyError(f"Service '{name}' not found. Available: {list(self._services)}")
         return self._services[name]
 
     def has(self, name: str) -> bool:
@@ -55,6 +54,7 @@ class ServiceRegistry:
 #     - succeeds with value of type A
 #     - fails with error of type E
 #     - requires services in R (a frozenset of service names)
+
 
 @dataclass(frozen=True)
 class Effect(Generic[A]):
@@ -85,48 +85,57 @@ class Effect(Generic[A]):
     @staticmethod
     def sync(fn: Callable[[], B]) -> Effect[B]:
         """Effect wrapping a synchronous computation. Throws become failures."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             try:
                 return (fn(), None)
             except Exception as exc:
                 return (None, exc)
+
         return Effect(_run)
 
     @staticmethod
     def try_(fn: Callable[[], B], on_error: Callable[[Exception], Any] | None = None) -> Effect[B]:
         """Effect wrapping a fallible sync computation with custom error mapping."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             try:
                 return (fn(), None)
             except Exception as exc:
                 err = on_error(exc) if on_error else exc
                 return (None, err)
+
         return Effect(_run)
 
     @staticmethod
     def service(name: str) -> Effect[Any]:
         """Effect that accesses a named service from the runtime."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             try:
                 return (services.get(name), None)
             except KeyError as exc:
                 return (None, exc)
+
         return Effect(_run)
 
     @staticmethod
     def from_callable(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Effect[Any]:
         """Effect wrapping an arbitrary callable."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             try:
                 return (fn(*args, **kwargs), None)
             except Exception as exc:
                 return (None, exc)
+
         return Effect(_run)
 
     # ── Composition ─────────────────────────────────────────────────────
 
     def map(self, f: Callable[[A], B]) -> Effect[B]:
         """Transform the success value."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             value, error = self._run(services)
             if error is not None:
@@ -135,28 +144,34 @@ class Effect(Generic[A]):
                 return (f(value), None)
             except Exception as exc:
                 return (None, exc)
+
         return Effect(_run)
 
     def flat_map(self, f: Callable[[A], Effect[B]]) -> Effect[B]:
         """Chain effects: run this, feed success into f, run the result."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             value, error = self._run(services)
             if error is not None:
                 return (None, error)
             return f(value)._run(services)
+
         return Effect(_run)
 
     def catch_all(self, f: Callable[[Any], Effect[B]]) -> Effect[B]:
         """Recover from errors: if this fails, run the recovery effect."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             value, error = self._run(services)
             if error is not None:
                 return f(error)._run(services)
             return (value, None)
+
         return Effect(_run)
 
     def provide_service(self, name: str, value: Any) -> Effect[A]:
         """Provide a service to this effect (eliminates a requirement)."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             scoped = ServiceRegistry()
             # Copy existing services + add the new one
@@ -164,10 +179,12 @@ class Effect(Generic[A]):
                 scoped._services[k] = v
             scoped._services[name] = value
             return self._run(scoped)
+
         return Effect(_run)
 
     def tap(self, f: Callable[[A], Any]) -> Effect[A]:
         """Run a side-effect for observation, pass the value through."""
+
         def _run(services: ServiceRegistry) -> tuple[Any, Any | None]:
             value, error = self._run(services)
             if error is not None:
@@ -177,6 +194,7 @@ class Effect(Generic[A]):
             except Exception:
                 pass  # tap failures are silently ignored
             return (value, None)
+
         return Effect(_run)
 
     # ── Execution ───────────────────────────────────────────────────────
@@ -203,6 +221,7 @@ class Effect(Generic[A]):
 # ── pipe ────────────────────────────────────────────────────────────────────
 #   Left-to-right composition. Each function receives the previous result.
 #   Designed to match Effect-TS: pipe(value, Effect.map(f), Effect.flatMap(g), ...)
+
 
 def pipe(initial: Any, *fns: Callable[[Any], Any]) -> Any:
     """
@@ -231,6 +250,7 @@ def pipe(initial: Any, *fns: Callable[[Any], Any]) -> Any:
 # ── Runtime ─────────────────────────────────────────────────────────────────
 #   The runtime is the single source of services + pipeline registry.
 #   Extensions register services and pipeline effects here.
+
 
 class Runtime:
     """

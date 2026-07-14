@@ -141,21 +141,24 @@ struct Sample {
 
 fn corpus() -> Vec<Sample> {
 	vec![
-		Sample { label:"tiny_text", content:"ok ".repeat(40) }, // 120 B  - below all thresholds
-		Sample { label:"small_prose", content:"The quick brown fox jumps. ".repeat(18) }, // ~468 B - inline zone
+		Sample { label: "tiny_text", content: "ok ".repeat(40) }, // 120 B  - below all thresholds
+		Sample { label: "small_prose", content: "The quick brown fox jumps. ".repeat(18) }, // ~468 B - inline zone
 		Sample {
-			label:"medium_prose",
-			content:"Lorem ipsum dolor sit amet, consectetur adipiscing. ".repeat(30),
+			label: "medium_prose",
+			content: "Lorem ipsum dolor sit amet, consectetur adipiscing. ".repeat(30),
 		}, // ~1.5 KB
-		Sample { label:"large_prose", content:"Lorem ipsum dolor. ".repeat(600) }, // ~11 KB
-		Sample { label:"rust_code", content:include_str!("bench_payloads/sample.rs").to_string() }, // ~3.5 KB
+		Sample { label: "large_prose", content: "Lorem ipsum dolor. ".repeat(600) }, // ~11 KB
 		Sample {
-			label:"build_output",
-			content:"   Compiling aphrodite v0.5.0\n".repeat(70) + "    Finished release in 14.2s\n",
+			label: "rust_code",
+			content: include_str!("bench_payloads/sample.rs").to_string(),
+		}, // ~3.5 KB
+		Sample {
+			label: "build_output",
+			content: "   Compiling aphrodite v0.5.0\n".repeat(70) + "    Finished release in 14.2s\n",
 		},
 		Sample {
-			label:"linter_output",
-			content:(0..50)
+			label: "linter_output",
+			content: (0..50)
 				.map(|i| {
 					format!(
 						"error[E0308]: mismatched types\n  --> src/lib.rs:{}:5\n   |\n{}|   expected `u64`\n",
@@ -166,8 +169,8 @@ fn corpus() -> Vec<Sample> {
 				.collect::<String>(),
 		},
 		Sample {
-			label:"diff",
-			content:format!(
+			label: "diff",
+			content: format!(
 				"diff --git a/src/proxy.rs b/src/proxy.rs\nindex abc..def 100644\n--- a/src/proxy.rs\n+++ \
 				 b/src/proxy.rs\n{}",
 				(0..100)
@@ -176,8 +179,8 @@ fn corpus() -> Vec<Sample> {
 			),
 		},
 		Sample {
-			label:"json_tool",
-			content:serde_json::to_string_pretty(&serde_json::json!({
+			label: "json_tool",
+			content: serde_json::to_string_pretty(&serde_json::json!({
 				"exit_code": 0,
 				"stdout": "ok\n".repeat(150),
 				"stderr": "",
@@ -186,8 +189,8 @@ fn corpus() -> Vec<Sample> {
 			.unwrap(),
 		},
 		Sample {
-			label:"error_output",
-			content:format!(
+			label: "error_output",
+			content: format!(
 				"thread 'main' panicked at 'index out of bounds'\nstack backtrace:\n{}",
 				(0..35)
 					.map(|i| format!("  {}: some::module::fn_{} at src/lib.rs:{}\n", i, i, i * 4 + 1))
@@ -195,8 +198,8 @@ fn corpus() -> Vec<Sample> {
 			),
 		},
 		Sample {
-			label:"log_output",
-			content:(0..80)
+			label: "log_output",
+			content: (0..80)
 				.map(|i| {
 					format!(
 						"2026-06-16T09:{:02}:{:02}Z [INFO] request id=req-{:04} elapsed={}ms\n",
@@ -211,6 +214,48 @@ fn corpus() -> Vec<Sample> {
 		Sample {
 			label:"unicode_cjk", content:"日本語テスト привет мир 🦀🔥 ".repeat(140)
 		}, // ~4 KB mixed UTF-8
+		Sample {
+			label:"code_python",
+			content:"#!/usr/bin/env python3\nimport sys\nimport json\n\ndef main():\n    data = json.loads(sys.stdin.read())\n    result = process(data)\n    print(json.dumps(result))\n\ndef process(data):\n    out = []\n    for item in data:\n        out.append({\"id\": item[\"id\"], \"name\": item[\"name\"].upper()})\n    return out\n\nclass DataHandler:\n    def __init__(self, limit=100):\n        self.limit = limit\n        self.items = []\n    def add(self, item):\n        if len(self.items) < self.limit:\n            self.items.append(item)\n    def flush(self):\n        result = self.items.copy()\n        self.items.clear()\n        return result\n\nif __name__ == \"__main__\":\n    main()\n".repeat(8),
+		}, // ~3 KB Python
+		Sample {
+			label:"code_js",
+			content:"import { useState, useEffect } from 'react';\n\nfunction useDebounce(value, delay = 300) {\n    const [debounced, setDebounced] = useState(value);\n    useEffect(() => {\n        const timer = setTimeout(() => setDebounced(value), delay);\n        return () => clearTimeout(timer);\n    }, [value, delay]);\n    return debounced;\n}\n\nconst API_BASE = process.env.API_URL || 'http://localhost:3000';\n\nasync function fetchData(endpoint) {\n    const res = await fetch(`${API_BASE}/${endpoint}`);\n    if (!res.ok) throw new Error(`HTTP ${res.status}`);\n    return res.json();\n}\n\nexport { useDebounce, fetchData };\n".repeat(12),
+		}, // ~3 KB JavaScript
+		Sample {
+			label:"code_go",
+			content:"package main\n\nimport (\n    \"fmt\"\n    \"net/http\"\n    \"sync\"\n)\n\ntype Cache struct {\n    mu    sync.RWMutex\n    items map[string]string\n}\n\nfunc NewCache() *Cache {\n    return &Cache{items: make(map[string]string)}\n}\n\nfunc (c *Cache) Get(key string) (string, bool) {\n    c.mu.RLock()\n    defer c.mu.RUnlock()\n    v, ok := c.items[key]\n    return v, ok\n}\n\nfunc (c *Cache) Set(key, value string) {\n    c.mu.Lock()\n    defer c.mu.Unlock()\n    c.items[key] = value\n}\n\nfunc main() {\n    cache := NewCache()\n    cache.Set(\"hello\", \"world\")\n    if v, ok := cache.Get(\"hello\"); ok {\n        fmt.Println(v)\n    }\n    http.HandleFunc(\"/health\", func(w http.ResponseWriter, r *http.Request) {\n        w.WriteHeader(200)\n    })\n}\n".repeat(8),
+		}, // ~3 KB Go
+		Sample {
+			label:"search_results",
+			content:"./src/proxy.rs:470:1\n./src/proxy.rs:503:1\n./src/proxy.rs:540:1\n./src/proxy.rs:577:1\n./src/proxy.rs:614:1\n./src/proxy.rs:651:1\n./src/proxy.rs:688:1\n./src/proxy.rs:725:1\n./src/proxy.rs:762:1\n./src/proxy.rs:799:1\n./src/proxy.rs:836:1\n./src/proxy.rs:873:1\n".repeat(40),
+		}, // ~2 KB search output
+		Sample {
+			label:"terminal_exit",
+			content:format!(
+				"$ cargo build --release\n   Compiling aphrodite v1.3.3\n{}\nerror: could not compile `aphrodite` (lib) due to 3 previous errors\nexit code: 101\n",
+				(0..60).map(|i| format!("error[E{:04}]: some error message at line {}\n", i, i * 10 + 1)).collect::<String>()
+			),
+		}, // ~4 KB terminal with errors
+		Sample {
+			label:"build_error",
+			content:format!(
+				"{}\n{}\nerror: could not compile `mycrate` (lib) due to 12 previous errors\n\nSome errors have detailed explanations: E0308, E0502.\nFor more information about an error, try `rustc --explain E0308`.\n",
+				(0..40).map(|i| format!("error[E{:04}]: type mismatch\n  --> src/module{}.rs:{}:{}\n   |\n{}|     let x: u64 = \"hello\";\n   |                  ^^^^^^^ expected `u64`, found `&str`\n", 300 + i, i, i * 5 + 2, i * 3 + 1, " ".repeat(5))).collect::<String>(),
+				(0..10).map(|i| format!("warning[W{:04}]: unused variable `x`\n  --> src/module{}.rs:{}:{}\n", 100 + i, i, i * 7 + 5, i * 4 + 3)).collect::<String>()
+			),
+		}, // ~6 KB build errors
+		Sample {
+			label:"huge_prose",
+			content:"The Aphrodite compression engine provides context-aware CCR. ".repeat(400),
+		}, // ~24 KB large prose
+		Sample {
+			label:"shell_output",
+			content:format!(
+				"total 120\ndrwxr-xr-x  11 user  staff   352 Jul 14 04:10 .\ndrwxr-xr-x   7 user  staff   224 Jul 14 04:11 ..\n{}\n-rw-r--r--   1 user  staff  2222 Jul 14 04:12 Cargo.lock\n-rw-r--r--   1 user  staff   555 Jul 14 04:12 Cargo.toml\n",
+				(0..80).map(|i| format!("-rw-r--r--   1 user  staff  {:>5} Jul {:>2} 04:12 file_{:03}.rs", 100 + i * 30, (i % 28) + 1, i)).collect::<Vec<_>>().join("\n")
+			),
+		}, // ~5 KB shell listing
 	]
 }
 

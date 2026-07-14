@@ -3,6 +3,7 @@
 All logic in libaphrodite_hermes.dylib. This file is a thin registration shim.
 Architecture: __init__.py → ctypes → libaphrodite_hermes.dylib → aphrodite crate (rlib)
 """
+
 import contextlib
 import ctypes
 import itertools
@@ -21,13 +22,18 @@ _log = logging.getLogger("aphrodite")
 
 # ── Dylib path resolution ──
 _PLUGIN_DIR = Path(__file__).resolve().parent
-_DYLIB_NAME = "libaphrodite_hermes.dylib" if sys.platform == "darwin" else \
-              "libaphrodite_hermes.so" if sys.platform == "linux" else "aphrodite_hermes.dll"
-_DYLIB_PATH = os.environ.get("APHRODITE_HERMES_DYLIB_PATH",
-    str(_PLUGIN_DIR / "binaries" / _DYLIB_NAME))
+_DYLIB_NAME = (
+    "libaphrodite_hermes.dylib"
+    if sys.platform == "darwin"
+    else "libaphrodite_hermes.so"
+    if sys.platform == "linux"
+    else "aphrodite_hermes.dll"
+)
+_DYLIB_PATH = os.environ.get(
+    "APHRODITE_HERMES_DYLIB_PATH", str(_PLUGIN_DIR / "binaries" / _DYLIB_NAME)
+)
 _BINARY_NAME = "aphrodite.exe" if sys.platform == "win32" else "aphrodite"
-_BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH",
-    str(_PLUGIN_DIR / "binaries" / _BINARY_NAME))
+_BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH", str(_PLUGIN_DIR / "binaries" / _BINARY_NAME))
 
 _dylib: ctypes.CDLL | None = None
 _dylib_mtime: float = 0.0
@@ -58,7 +64,9 @@ def _load_fresh_copy(src_path: str) -> str:
     """
     hotreload_dir = os.path.join(os.path.dirname(src_path), ".hotreload")
     os.makedirs(hotreload_dir, exist_ok=True)
-    dst = os.path.join(hotreload_dir, f"{os.path.basename(src_path)}.{os.getpid()}.{next(_dylib_gen)}")
+    dst = os.path.join(
+        hotreload_dir, f"{os.path.basename(src_path)}.{os.getpid()}.{next(_dylib_gen)}"
+    )
     shutil.copy2(src_path, dst)
     return dst
 
@@ -105,7 +113,10 @@ def _load_dylib() -> ctypes.CDLL:
                 "dylib mtime changed (%.2f -> %.2f) - hot-reloading %s; "
                 "this resets ALL session CCR state - existing markers in "
                 "the transcript will no longer resolve via aphrodite_retrieve",
-                _dylib_mtime, current_mtime, path)
+                _dylib_mtime,
+                current_mtime,
+                path,
+            )
 
         # Load from a fresh unique-path copy, not `path` directly - see
         # `_load_fresh_copy`'s docstring for why a repeat dlopen of the same
@@ -179,15 +190,19 @@ def _make_handler(tool_name: str) -> Callable[..., str]:
     time) so tool calls always use the current image - see the hook
     registration loop below for why hooks need the same treatment.
     """
+
     def handler(args: dict[str, Any] | None = None, **kwargs: Any) -> str:
         args_json = json.dumps(args or {})
         dylib = _load_dylib()
-        return json.dumps(_call_json(
-            dylib,
-            "aphrodite_hermes_dispatch_tool",
-            tool_name.encode("utf-8"),
-            args_json.encode("utf-8"),
-        ))
+        return json.dumps(
+            _call_json(
+                dylib,
+                "aphrodite_hermes_dispatch_tool",
+                tool_name.encode("utf-8"),
+                args_json.encode("utf-8"),
+            )
+        )
+
     return handler
 
 
@@ -208,7 +223,8 @@ def _check_version(dylib: ctypes.CDLL) -> None:
                 "aphrodite-hermes dylib version mismatch: loaded %s, "
                 "BINARY_VERSION expects %s - the JSON contract (hook/tool "
                 "schemas) may have changed between these versions",
-                loaded_version, expected_version,
+                loaded_version,
+                expected_version,
             )
     except Exception as e:
         # Version check is best-effort diagnostics, never a hard requirement.
@@ -348,6 +364,7 @@ def register(ctx: Any) -> None:
     # Register hooks - dispatch to Rust dylib via aphrodite_hermes_call_hook
     hooks = _call_json(dylib, "aphrodite_hermes_get_hooks")
     if hooks:
+
         def _hook_dispatch(hook_name: str, **kwargs: Any) -> Any:
             """Dispatch hook to Rust dylib and return parsed result.
 
@@ -370,8 +387,10 @@ def register(ctx: Any) -> None:
             )
 
         for hook_name in hooks:
+
             def _dispatch(*a: Any, name: str = hook_name, **kw: Any) -> Any:
                 return _hook_dispatch(name, **kw)
+
             ctx.register_hook(hook_name, _dispatch)
         _log.info("registered %d hooks", len(hooks))
 
@@ -438,7 +457,8 @@ def register(ctx: Any) -> None:
         except Exception as e:
             _log.warning(
                 "context engine opt-in requested but not registered (%s); "
-                "falling back to hooks + proxy", e,
+                "falling back to hooks + proxy",
+                e,
             )
 
     _start_proxy()

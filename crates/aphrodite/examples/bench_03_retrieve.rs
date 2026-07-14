@@ -139,6 +139,30 @@ fn found(port:u16, hash:&str) -> bool {
 		.unwrap_or(false)
 }
 
+/// POST /retrieve and return HTTP status code (for negative-path tests).
+fn retrieve_status(port:u16, hash:&str) -> Option<u16> {
+	let body = serde_json::json!({"hash": hash}).to_string();
+	Command::new("curl")
+		.args([
+			"-s",
+			"-o",
+			"/dev/null",
+			"-w",
+			"%{http_code}",
+			"-X",
+			"POST",
+			&format!("http://127.0.0.1:{}/retrieve", port),
+			"-H",
+			"Content-Type: application/json",
+			"-d",
+			&body,
+		])
+		.output()
+		.ok()
+		.and_then(|o| String::from_utf8(o.stdout).ok())
+		.and_then(|s| s.trim().parse().ok())
+}
+
 /// DELETE /ccr/{hash}
 fn delete(port:u16, hash:&str) -> bool {
 	let out = Command::new("curl")
@@ -244,8 +268,52 @@ fn main() {
 	check(10, "double-store: same hash returned", h1 == h2, &mut failures);
 	check(10, "double-store: still retrievable", found(TOKEN_PORT, &h1), &mut failures);
 
+	// ── 11  invalid hashes rejected ─────────────────────────────────────
+	check(
+		11,
+		"invalid hash (too short): miss",
+		!found(TOKEN_PORT, "abc123"),
+		&mut failures,
+	);
+	check(
+		11,
+		"invalid hash (non-hex): miss",
+		!found(TOKEN_PORT, "gggggggggggggggggggggggggggggggggggggggg"),
+		&mut failures,
+	);
+	check(11, "empty hash: miss", !found(TOKEN_PORT, ""), &mut failures);
+	check(
+		11,
+		"non-existent hash: miss",
+		!found(TOKEN_PORT, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		&mut failures,
+	);
+
+	// ── 12  large content round-trip (250 KB) ──────────────────────────
+	let huge = "LARGE PAYLOAD ".repeat(20_000); // ~260 KB
+	let hh = store(TOKEN_PORT, &huge).expect("huge store");
+	let raw_huge = retrieve_raw(TOKEN_PORT, &hh);
+	let huge_ok = raw_huge
+		.as_ref()
+		.and_then(|v| v.get("content").and_then(|c| c.as_str()))
+		.map(|c| c == huge)
+		.unwrap_or(false);
+	check(12, "large content (260 KB): round-trip byte-exact", huge_ok, &mut failures);
+
+	// ── 13  concurrent stores + retrieves (5 parallel curl calls) ──────
+	let entries:Vec<String> = (0u32..10)
+		.filter_map(|i| store(TOKEN_PORT, &format!("concurrent bulk {:04} {}", i, "data ".repeat(500))))
+		.collect();
+	let misses = entries.iter().filter(|h| !found(TOKEN_PORT, h)).count();
+	check(
+		13,
+		&format!("concurrent storm: {}/10 retrieved, 0 misses", entries.len() - misses),
+		misses == 0,
+		&mut failures,
+	);
+
 	// ── summary ───────────────────────────────────────────────────────────
-	let total = 12usize; // total check() calls above
+	let total = 17usize; // total check() calls above
 	eprintln!("\n[bench_03] {}/{} checks passed", total - failures, total);
 	if failures > 0 {
 		eprintln!("[bench_03] FAILED");

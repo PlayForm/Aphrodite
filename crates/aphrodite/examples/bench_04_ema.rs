@@ -170,11 +170,13 @@ fn main() {
 	let proxy = spawn_proxy();
 	let mut failures = 0usize;
 
-	// High-ratio content: highly repetitive, zlib/zstd compresses extremely well
-	let high = || -> String { "aaabbbccc ".repeat(800) }; // ~8 KB, ratio >> 10x
-	// Low-ratio content: pseudo-random hex, nearly incompressible
+	// High-ratio content: single repeated character — only 1 unique 3-byte
+	// trigram, so the entropy estimate gives the highest possible ratio.
+	// 100 KB pushes EMA well above 20×, triggering the R-9 auto-tune branch.
+	let high = || -> String { "a".repeat(100_000) }; // 100 KB, maximum compression
+	// Low-ratio content: pseudo-random hex, ~32 KB, nearly incompressible
 	let low = || -> String {
-		(0u64..500)
+		(0u64..8000)
 			.map(|i| format!("{:016x}", i.wrapping_mul(6364136223846793005)))
 			.collect()
 	};

@@ -11,7 +11,7 @@ any loopback caller, back-compat with a one-time startup warning). This is
 the management-route auth introduced in v1.3.2 - a hostile local page could
 previously issue a CORS "simple request" that lands as a write (seed CCR
 entries) even though it can't read the reply. Note this is a different token
-from `notify_key` below, which authenticates the *outbound* notification
+from `notify_key` below, which authenticates the _outbound_ notification
 callback.
 
 ## POST /ccr/create

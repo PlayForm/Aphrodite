@@ -158,8 +158,8 @@ that's confirmed.
 active = []                        # e.g. ["focus", "foresight"]
 ```
 
-| Field    | Meaning                                                                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Field    | Meaning                                                                                                                                                                                                                                                                       |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `active` | Which loaded directives start active. Directive `.md` files are discovered from `./directives/` or `~/.hermes/directives/` **whenever the directory exists** - loading is not gated on this list being non-empty. Names not found in the loaded set are silently filtered out |
 
 Read by the Hermes-plugin dylib session (`config_loader`), not the Rust

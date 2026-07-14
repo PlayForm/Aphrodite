@@ -412,13 +412,13 @@ than fixed pass-rate numbers - run them directly to see current results.
 Measured via `.bench/e2e/hermes_z_ab.sh` - 4 standardized coding prompts,
 A/B testing with aphrodite ON vs OFF, `focus` directive active:
 
-| Prompt               | OFF (tokens) | ON (tokens) | Saved  | API calls OFF/ON |
-|----------------------|-------------:|------------:|-------:|:----------------:|
-| Read + summarize     |      444,236 |     178,636 | **60%** | 13 → 7 |
-| Cargo build output   |       28,913 |      28,903 |  0%    | 2 → 2 |
-| Search codebase      |       68,719 |      30,500 | **56%** | 4 → 2 |
-| Read two docs        |       34,075 |      34,049 |  0%    | 2 → 2 |
-| **Total**            |  **575,943** | **272,088** | **53%** | 21 → 13 |
+| Prompt             | OFF (tokens) | ON (tokens) |   Saved | API calls OFF/ON |
+| ------------------ | -----------: | ----------: | ------: | :--------------: |
+| Read + summarize   |      444,236 |     178,636 | **60%** |      13 → 7      |
+| Cargo build output |       28,913 |      28,903 |      0% |      2 → 2       |
+| Search codebase    |       68,719 |      30,500 | **56%** |      4 → 2       |
+| Read two docs      |       34,075 |      34,049 |      0% |      2 → 2       |
+| **Total**          |  **575,943** | **272,088** | **53%** |     21 → 13      |
 
 Cost: $0.18 (OFF) → $0.15 (ON) - 18% cheaper, 38% fewer API calls.
 

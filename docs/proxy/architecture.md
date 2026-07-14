@@ -137,24 +137,24 @@ pub response_cache: Mutex<lru::LruCache<u64, Vec<u8>>>,  // 128 entries, FNV-1a 
 
 ## Routing Table
 
-| Route              | Method | Handler                   | Access                                 |
-| ------------------ | ------ | ------------------------- | -------------------------------------- |
-| `/health`          | GET    | health_check              | Public (no loopback enforcement)       |
-| `/health/upstream` | GET    | upstream probe            | Loopback + mgmt token                  |
-| `/version`         | GET    | CARGO_PKG_VERSION         | Loopback + mgmt token                  |
-| `/stats`           | GET    | stats_json()              | Loopback + mgmt token                  |
-| `/stats/db`        | GET    | ccr.stats_db()            | Loopback + mgmt token                  |
-| `/metrics`         | GET    | Prometheus text format    | Loopback only (no auth, by design)     |
-| `/history`         | GET    | request_history           | Loopback + mgmt token                  |
-| `/retrieve`        | POST   | retrieve::handle_retrieve | Loopback + mgmt token                  |
-| `/tool/relay`      | POST   | handle_tool_relay         | Loopback + mgmt token                  |
-| `/ccr/create`      | POST   | handle_ccr_create         | Loopback + mgmt token                  |
-| `/ccr/list`        | GET    | handle_ccr_list           | Loopback + mgmt token                  |
-| `/ccr/{hash}`      | DELETE | handle_ccr_delete         | Loopback + mgmt token                  |
-| `/reload`          | POST   | config hot-reload         | Loopback + mgmt token                  |
-| `/favicon.ico`     | GET    | 404                       | Loopback only                          |
-| `/robots.txt`      | GET    | `Disallow: /`             | Loopback only                          |
-| `/`                | GET    | version JSON              | Loopback only                          |
+| Route              | Method | Handler                   | Access                                   |
+| ------------------ | ------ | ------------------------- | ---------------------------------------- |
+| `/health`          | GET    | health_check              | Public (no loopback enforcement)         |
+| `/health/upstream` | GET    | upstream probe            | Loopback + mgmt token                    |
+| `/version`         | GET    | CARGO_PKG_VERSION         | Loopback + mgmt token                    |
+| `/stats`           | GET    | stats_json()              | Loopback + mgmt token                    |
+| `/stats/db`        | GET    | ccr.stats_db()            | Loopback + mgmt token                    |
+| `/metrics`         | GET    | Prometheus text format    | Loopback only (no auth, by design)       |
+| `/history`         | GET    | request_history           | Loopback + mgmt token                    |
+| `/retrieve`        | POST   | retrieve::handle_retrieve | Loopback + mgmt token                    |
+| `/tool/relay`      | POST   | handle_tool_relay         | Loopback + mgmt token                    |
+| `/ccr/create`      | POST   | handle_ccr_create         | Loopback + mgmt token                    |
+| `/ccr/list`        | GET    | handle_ccr_list           | Loopback + mgmt token                    |
+| `/ccr/{hash}`      | DELETE | handle_ccr_delete         | Loopback + mgmt token                    |
+| `/reload`          | POST   | config hot-reload         | Loopback + mgmt token                    |
+| `/favicon.ico`     | GET    | 404                       | Loopback only                            |
+| `/robots.txt`      | GET    | `Disallow: /`             | Loopback only                            |
+| `/`                | GET    | version JSON              | Loopback only                            |
 | `/{*path}`         | ANY    | proxy_handler             | Loopback only (no mgmt token - LLM path) |
 
 ## Management-Route Authentication
@@ -165,18 +165,18 @@ a hostile local page could previously issue a CORS "simple request" that
 lands as a write (seed CCR entries, evict markers via `/reload`) even though
 it can't read the reply.
 
-| Property        | Behavior                                                                    |
-| --------------- | ---------------------------------------------------------------------------- |
-| Unset (default) | Back-compat: any loopback caller accepted; a one-time startup `warn!` fires |
-| Set             | Missing/wrong bearer token → 401                                            |
+| Property        | Behavior                                                                                                    |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| Unset (default) | Back-compat: any loopback caller accepted; a one-time startup `warn!` fires                                 |
+| Set             | Missing/wrong bearer token → 401                                                                            |
 | Exempt          | `/health` (external health checks), `/metrics` (Prometheus scrapers), and the LLM-proxying `/{*path}` route |
 
 ## Middleware Stack
 
-| Layer                | Config                                                             |
-| -------------------- | ------------------------------------------------------------------ |
-| CORS                 | `CorsLayer::permissive()`                                          |
-| Body limit           | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                        |
+| Layer                | Config                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CORS                 | `CorsLayer::permissive()`                                                                                                                                          |
+| Body limit           | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                                                                                                                        |
 | Loopback enforcement | `middleware::from_fn(loopback_only)` - all routes except `/health`; an empty or unparseable `Host` header is rejected (DNS-rebinding hardening), not waved through |
 
 ## Streaming (SSE)
@@ -184,15 +184,15 @@ it can't read the reply.
 `"stream": true` requests and `text/event-stream` upstream responses take a
 dedicated pass-through path:
 
-| Aspect          | Behavior                                                                                                            |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Detection       | Request body `"stream": true` selects the streaming HTTP client; response `Content-Type: text/event-stream` (prefix match, charset-tolerant) selects the streaming response path |
-| Client          | A separate `stream_client` with **no total timeout** - reqwest's client-level `.timeout()` bounds the whole body stream, which used to sever legitimately slow but progressing streams mid-answer; hang protection comes from `connect_timeout` + `tcp_keepalive` instead |
-| Forwarding      | Chunk-by-chunk via `Body::from_stream` - never buffered                                                             |
-| Compression     | Skipped entirely - markers can't be spliced into a live stream                                                      |
-| Response cache  | Skipped - no cache key is computed for streaming requests                                                           |
-| Headers         | Upstream headers propagated; `X-Aphrodite-Streamed: true` added                                                     |
-| Metrics         | Streamed bytes count into `response_body_bytes`; mid-stream chunk errors increment `sse_stream_errors` (in `/stats` and `/metrics`) - previously a stream that died mid-flight recorded a 200 with zero signal |
+| Aspect         | Behavior                                                                                                                                                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Detection      | Request body `"stream": true` selects the streaming HTTP client; response `Content-Type: text/event-stream` (prefix match, charset-tolerant) selects the streaming response path                                                                                          |
+| Client         | A separate `stream_client` with **no total timeout** - reqwest's client-level `.timeout()` bounds the whole body stream, which used to sever legitimately slow but progressing streams mid-answer; hang protection comes from `connect_timeout` + `tcp_keepalive` instead |
+| Forwarding     | Chunk-by-chunk via `Body::from_stream` - never buffered                                                                                                                                                                                                                   |
+| Compression    | Skipped entirely - markers can't be spliced into a live stream                                                                                                                                                                                                            |
+| Response cache | Skipped - no cache key is computed for streaming requests                                                                                                                                                                                                                 |
+| Headers        | Upstream headers propagated; `X-Aphrodite-Streamed: true` added                                                                                                                                                                                                           |
+| Metrics        | Streamed bytes count into `response_body_bytes`; mid-stream chunk errors increment `sse_stream_errors` (in `/stats` and `/metrics`) - previously a stream that died mid-flight recorded a 200 with zero signal                                                            |
 
 ## HTTP Client Config
 

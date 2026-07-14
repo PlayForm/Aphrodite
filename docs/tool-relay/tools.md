@@ -172,8 +172,14 @@ Case-insensitive match against preview text or type, newest first, capped at
 	"parameters": {
 		"type": "object",
 		"properties": {
-			"action": { "type": "string", "description": "list (default) | swap | add | remove | reset" },
-			"name": { "type": "string", "description": "Directive name - required for swap/add/remove" }
+			"action": {
+				"type": "string",
+				"description": "list (default) | swap | add | remove | reset"
+			},
+			"name": {
+				"type": "string",
+				"description": "Directive name - required for swap/add/remove"
+			}
 		}
 	}
 }

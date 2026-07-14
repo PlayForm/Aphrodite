@@ -28,14 +28,14 @@ directive named after its file stem - the built-ins aren't special-cased.
 
 ## Discovery and loading
 
-| Rule            | Behavior                                                                                                                                      |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Search order    | `./directives/` (working directory), then `~/.hermes/directives/` - the **first directory that exists** wins; they are not merged             |
-| File filter     | Only `*.md` files; anything else is silently skipped                                                                                          |
-| Naming          | Directive name = file stem (`focus.md` → `focus`)                                                                                             |
-| Per-file cap    | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                           |
-| Combined cap    | 4,000 chars across all active directives' injected text combined - several active directives can't blow past the context budget together     |
-| Load condition  | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty (it was before v1.3.2, which made runtime `add`/`swap` impossible from a cold start with the shipped `active = []` default) |
+| Rule           | Behavior                                                                                                                                                                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search order   | `./directives/` (working directory), then `~/.hermes/directives/` - the **first directory that exists** wins; they are not merged                                                                                                             |
+| File filter    | Only `*.md` files; anything else is silently skipped                                                                                                                                                                                          |
+| Naming         | Directive name = file stem (`focus.md` → `focus`)                                                                                                                                                                                             |
+| Per-file cap   | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                                                                                                                           |
+| Combined cap   | 4,000 chars across all active directives' injected text combined - several active directives can't blow past the context budget together                                                                                                      |
+| Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty (it was before v1.3.2, which made runtime `add`/`swap` impossible from a cold start with the shipped `active = []` default) |
 
 ## `[directives]` in aphrodite.toml
 
@@ -65,12 +65,12 @@ focus:
   Use aphrodite_retrieve(hash) for any <<<CCR:...>>> you see
 ```
 
-| Detail            | Behavior                                                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Header line       | `[directives: name1, name2]` - active names, comma-joined                                                         |
-| Body              | Each active directive's **full** (per-file-capped) body, not just its title line - leading `#` markers stripped, blank lines dropped, remaining lines indented |
-| Placement         | Appended after the catalog summary in the hook's returned `{"context": "..."}`; empty when no directives are active |
-| Frequency         | Every `pre_llm_call` - the block reflects the active set at that moment, so a `swap` takes effect on the very next turn |
+| Detail      | Behavior                                                                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header line | `[directives: name1, name2]` - active names, comma-joined                                                                                                      |
+| Body        | Each active directive's **full** (per-file-capped) body, not just its title line - leading `#` markers stripped, blank lines dropped, remaining lines indented |
+| Placement   | Appended after the catalog summary in the hook's returned `{"context": "..."}`; empty when no directives are active                                            |
+| Frequency   | Every `pre_llm_call` - the block reflects the active set at that moment, so a `swap` takes effect on the very next turn                                        |
 
 Before v1.3.2 only each directive's first line (a markdown title) was
 injected - the behavioral bullets never reached the model. The full body now
@@ -92,13 +92,13 @@ place in the full 13-tool reference):
 }
 ```
 
-| Action   | Effect                                          | Response                                     |
-| -------- | ----------------------------------------------- | -------------------------------------------- |
-| `list`   | Enumerate loaded + active directives (default)  | `{available: [...], active: [...]}`          |
-| `swap`   | Replace the active set with one directive       | `{swapped: name, active: [name]}` or `{error: "unknown directive: ..."}` |
-| `add`    | Append a directive to the active set (idempotent) | `{active: [...]}`                          |
-| `remove` | Drop a directive from the active set            | `{active: [...]}`                            |
-| `reset`  | Clear the active set                            | `{active: []}`                               |
+| Action   | Effect                                            | Response                                                                 |
+| -------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
+| `list`   | Enumerate loaded + active directives (default)    | `{available: [...], active: [...]}`                                      |
+| `swap`   | Replace the active set with one directive         | `{swapped: name, active: [name]}` or `{error: "unknown directive: ..."}` |
+| `add`    | Append a directive to the active set (idempotent) | `{active: [...]}`                                                        |
+| `remove` | Drop a directive from the active set              | `{active: [...]}`                                                        |
+| `reset`  | Clear the active set                              | `{active: []}`                                                           |
 
 An unknown action returns
 `{error: "unknown action: ... (use list|swap|add|remove|reset)"}`.
@@ -109,11 +109,11 @@ All three entry points delegate to the single shared
 `directives::handle_action`, so they expose the identical action set and
 error shape:
 
-| Path                                        | Caller                                            |
-| ------------------------------------------- | -------------------------------------------------- |
-| Hermes tool dispatch (`aphrodite_directive`) | The agent, in a live Hermes session               |
-| Core C ABI export `aphrodite_directive`     | Handle-based FFI consumers of `libaphrodite`      |
-| `aphrodite_dispatch`'s `"directive"` arm    | The universal string-dispatch C ABI entry point   |
+| Path                                         | Caller                                          |
+| -------------------------------------------- | ----------------------------------------------- |
+| Hermes tool dispatch (`aphrodite_directive`) | The agent, in a live Hermes session             |
+| Core C ABI export `aphrodite_directive`      | Handle-based FFI consumers of `libaphrodite`    |
+| `aphrodite_dispatch`'s `"directive"` arm     | The universal string-dispatch C ABI entry point |
 
 The active set persists across a session reset (like the inline store) - it's
 per-process state, not per-turn.

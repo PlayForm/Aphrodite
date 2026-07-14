@@ -10,6 +10,7 @@ Locally, if the dylib hasn't been built yet, tests are skipped with a
 clear message. In CI, set `APHRODITE_REQUIRE_DYLIB=1` so a missing dylib
 fails the run instead of silently skipping (see `.github/workflows/Check.yml`).
 """
+
 import ctypes
 import json
 import os
@@ -118,7 +119,7 @@ def test_get_schema_unknown_tool_is_error():
 
 
 def test_compress_then_retrieve_roundtrip():
-    content = "fn hello() -> &'static str { \"world\" }\n"
+    content = 'fn hello() -> &\'static str { "world" }\n'
     compressed = dispatch_tool("aphrodite_compress", {"content": content})
     assert compressed["hash"]
     retrieved = dispatch_tool("aphrodite_retrieve", {"hash": compressed["hash"]})
@@ -127,9 +128,7 @@ def test_compress_then_retrieve_roundtrip():
 
 
 def test_retrieve_unknown_hash_not_found():
-    result = dispatch_tool(
-        "aphrodite_retrieve", {"hash": "deadbeefdeadbeefdeadbeef"}
-    )
+    result = dispatch_tool("aphrodite_retrieve", {"hash": "deadbeefdeadbeefdeadbeef"})
     assert result["found"] is False
 
 

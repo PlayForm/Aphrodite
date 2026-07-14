@@ -74,18 +74,18 @@ See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 
 ### Upstream Errors
 
-| Metric                                      | Type    | Labels           | Description                                            |
-| ------------------------------------------- | ------- | ---------------- | ------------------------------------------------------ |
-| `aphrodite_upstream_errors_total`           | counter | `code` (4xx/5xx) | Upstream HTTP error responses                          |
-| `aphrodite_upstream_timeouts_total`         | counter | -                | Upstream request timeouts                              |
-| `aphrodite_upstream_connect_errors_total`   | counter | -                | Non-timeout transport failures (connect refused, DNS, TLS) |
-| `aphrodite_sse_stream_errors_total`         | counter | -                | Mid-stream chunk errors on the SSE relay path          |
+| Metric                                    | Type    | Labels           | Description                                                |
+| ----------------------------------------- | ------- | ---------------- | ---------------------------------------------------------- |
+| `aphrodite_upstream_errors_total`         | counter | `code` (4xx/5xx) | Upstream HTTP error responses                              |
+| `aphrodite_upstream_timeouts_total`       | counter | -                | Upstream request timeouts                                  |
+| `aphrodite_upstream_connect_errors_total` | counter | -                | Non-timeout transport failures (connect refused, DNS, TLS) |
+| `aphrodite_sse_stream_errors_total`       | counter | -                | Mid-stream chunk errors on the SSE relay path              |
 
 ### Body Bytes
 
-| Metric                                | Type    | Labels | Description                       |
-| ------------------------------------- | ------- | ------ | --------------------------------- |
-| `aphrodite_request_body_bytes_total`  | counter | -      | Total request body bytes received |
+| Metric                                | Type    | Labels | Description                                         |
+| ------------------------------------- | ------- | ------ | --------------------------------------------------- |
+| `aphrodite_request_body_bytes_total`  | counter | -      | Total request body bytes received                   |
 | `aphrodite_response_body_bytes_total` | counter | -      | Total response body bytes sent (SSE bytes included) |
 
 ### Latency
@@ -107,13 +107,13 @@ See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 
 Latency is tracked in 5 fixed buckets, each holding a cumulative count:
 
-| Bucket Index | le value | Range              |
-| ------------ | -------- | ------------------ |
-| 0            | 0.001    | < 1ms              |
-| 1            | 0.01     | 1ms - 10ms         |
-| 2            | 0.1      | 10ms - 100ms       |
-| 3            | 1.0      | 100ms - 1s         |
-| 4            | +Inf     | ≥ 1s (unbounded)   |
+| Bucket Index | le value | Range            |
+| ------------ | -------- | ---------------- |
+| 0            | 0.001    | < 1ms            |
+| 1            | 0.01     | 1ms - 10ms       |
+| 2            | 0.1      | 10ms - 100ms     |
+| 3            | 1.0      | 100ms - 1s       |
+| 4            | +Inf     | ≥ 1s (unbounded) |
 
 Buckets are cumulative in the Prometheus output, as required by the format:
 each bucket's count includes all observations from lower buckets. The last

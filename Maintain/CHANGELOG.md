@@ -28,7 +28,7 @@ release channels agree.
 - **Hermes JSON-unwrap regression on the live hook path** - `8f138c1` (v1.3.0)
   moved wrapper-unwrapping into `aphrodite-hermes`'s `compress_into()`, reached
   only by the explicit `aphrodite_compress`/`aphrodite_test` tools - but the
-  hook Hermes actually fires on *every* tool result
+  hook Hermes actually fires on _every_ tool result
   (`aphrodite_hermes_call_hook("transform_tool_result", ...)`) called core's
   `hooks::transform_tool_result` directly, which has zero unwrapping. The
   "previews show `[json:1items 1L]`" symptom the v1.3.0 fixes chased was only
@@ -38,7 +38,7 @@ release channels agree.
   `unwrap_hermes_result` and passes it through, keeping the core crate
   agent-agnostic.
 - **Lossy compression on Hermes wrappers** - `compress_into` stored the
-  *extracted* content under `hash(extracted)`, discarding the original. A
+  _extracted_ content under `hash(extracted)`, discarding the original. A
   failed command's `exit_code`/`error` fields were unrecoverable after
   compression, and caller JSON that merely matched a wrapper shape (e.g.
   `{"content":"hi","id":42}`) got permanently collapsed to one field. Both
@@ -46,7 +46,7 @@ release channels agree.
   `unwrap_hermes_result`'s output is used only for classification and preview.
 - **Empty-`output` terminal wrapper aborted extraction entirely** - a failed
   command with empty stdout (`{"output":"","exit_code":1,"error":"..."}`) is
-  exactly the case where the error string *is* the payload; it now falls
+  exactly the case where the error string _is_ the payload; it now falls
   through to the error/success branches instead of returning `None`.
 - Added a 15-case table-driven regression suite for `unwrap_hermes_result` -
   this ~100-line heuristic had been rewritten three times with zero tests.
@@ -115,7 +115,7 @@ release channels agree.
 
 - Consolidated every macOS artifact copy (binary, dylib, dev-build fallback)
   through one `install_macos_artifact` helper. Fixes three related bugs:
-  a *failed* (non-zero exit) `ditto` was treated as success (only a spawn
+  a _failed_ (non-zero exit) `ditto` was treated as success (only a spawn
   failure was checked), so the `fs::copy` fallback never ran; the
   `target/release` dev-build fallback path skipped the Gatekeeper treatment
   entirely, reproducing the SIGKILL bug on the most common dev workflow;
@@ -133,7 +133,7 @@ release channels agree.
   unrelated staged work). Previously `git submodule update` reset to
   whatever SHA happened to be pinned, which could silently sit behind
   `Current` for a long time. A fresh clone's plain `git submodule update
-  --init --recursive` now lands close to `Current`'s tip too, since the pin
+--init --recursive` now lands close to `Current`'s tip too, since the pin
   stays continuously synced rather than only moving via an explicit release
   action.
 - Safety preserved from the prior dirty-guard design: a submodule with
@@ -166,8 +166,8 @@ release channels agree.
 
 ## v1.3.0 - Hermes Wrapper-Unwrap Fix, cargo install Support (2026-07-13)
 
-*(Consolidates unreleased intermediate bumps 1.2.7-1.2.9, none separately
-tagged or published.)*
+_(Consolidates unreleased intermediate bumps 1.2.7-1.2.9, none separately
+tagged or published.)_
 
 ### Summary
 
@@ -232,13 +232,13 @@ runtime code changes.
 ### Fixed
 
 - **`hermes --tui` SIGKILL on macOS** - two root causes fixed in `aphrodite setup`:
-  1. Dylib install names pointed to `target/release/deps/` (stale build paths). macOS
-     dynamic linker killed the process when loading from a copied location. Fixed by
-     running `install_name_tool -id @rpath/<name>.dylib` after every dylib copy.
-  2. Extended attributes (code signature, quarantine) preserved by `fs::copy`.
-     macOS Gatekeeper validated these at the source path and killed the process
-     when run from the install location. Fixed by running `xattr -c` after every
-     binary and dylib copy.
+    1. Dylib install names pointed to `target/release/deps/` (stale build paths). macOS
+       dynamic linker killed the process when loading from a copied location. Fixed by
+       running `install_name_tool -id @rpath/<name>.dylib` after every dylib copy.
+    2. Extended attributes (code signature, quarantine) preserved by `fs::copy`.
+       macOS Gatekeeper validated these at the source path and killed the process
+       when run from the install location. Fixed by running `xattr -c` after every
+       binary and dylib copy.
 
 - **Re-run install without `--force`**: `aphrodite setup` no longer blocks when
   the target binary already exists. Binaries and dylibs are always overwritten;
@@ -255,10 +255,10 @@ runtime code changes.
   injected into the LLM via `pre_llm_call`. Directives are short instruction files
   that live between file compression and the LLM's context - never compressed,
   never needing retrieval.
-  - `directives/*.md` - 4 built-in directives: `focus`, `explore`, `cleanup`, `foresight`
-  - `[directives]` TOML section with `active = [...]` 
-  - `aphrodite_directive(action, name)` C-ABI tool - `list`, `swap`, `add`, `remove`, `reset`
-  - Configurable per user/profile; swappable mid-conversation
+    - `directives/*.md` - 4 built-in directives: `focus`, `explore`, `cleanup`, `foresight`
+    - `[directives]` TOML section with `active = [...]`
+    - `aphrodite_directive(action, name)` C-ABI tool - `list`, `swap`, `add`, `remove`, `reset`
+    - Configurable per user/profile; swappable mid-conversation
 
 ### Fixed
 

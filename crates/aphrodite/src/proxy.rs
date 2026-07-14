@@ -360,10 +360,10 @@ fn estimate_compressed_size(content:&str) -> usize {
 	let uniqueness = unique as f64 / total as f64;
 	let compressibility = 1.0 - uniqueness;
 
-	// estimated_compressed = content * (1 - compressibility * 0.95) + overhead
+	// estimated_compressed = content * (1 - compressibility * 0.97) + overhead
 	// Clamped so that compressed never exceeds original (ratio ≥ 1×).
 	let overhead:f64 = 40.0;
-	let raw = bytes.len() as f64 * (1.0 - compressibility * 0.95) + overhead;
+	let raw = bytes.len() as f64 * (1.0 - compressibility * 0.97) + overhead;
 	let est = raw.min(bytes.len() as f64).max(40.0);
 	est as usize
 }

@@ -83,10 +83,19 @@ blake3 = "1.7"
 [features]
 default = ["proxy"]
 proxy = [
-	"axum", "tokio", "reqwest", "clap",
-	"tracing-subscriber", "anyhow",
-	"bytes", "futures", "rand", "tokio-util",
-	"url", "uuid", "lru",
+	"axum",
+	"tokio",
+	"reqwest",
+	"clap",
+	"tracing-subscriber",
+	"anyhow",
+	"bytes",
+	"futures",
+	"rand",
+	"tokio-util",
+	"url",
+	"uuid",
+	"lru",
 	"notify",
 ]
 
