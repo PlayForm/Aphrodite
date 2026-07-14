@@ -40,7 +40,7 @@ engine_protect_last = 5     # messages to keep at end
 engine_min_msgs = 8         # minimum messages before activating
 tool_threshold_token = 512  # token proxy threshold (bytes)
 tool_threshold_cache = 4096 # cache proxy threshold (bytes)
-terminal_threshold = 1024   # terminal output threshold (bytes)
+terminal_threshold = 256    # terminal output threshold (bytes)
 inline_threshold = 2048     # inline zlib fallback threshold (bytes)
 auto_expand = false         # off: markers stay raw
 auto_expand_limit = 0       # 0 = disabled

@@ -101,8 +101,8 @@ impl Default for AphroditeState {
 			engine_protect_first:2,
 			engine_protect_last:5,
 			context_engine_enabled:true,
-			tool_threshold:4096,
-			terminal_threshold:1024,
+			tool_threshold:512,
+			terminal_threshold:256,
 			catalog_mode:"tool".into(),
 			expand_guidance:false,
 			dev_mode:false,
@@ -311,8 +311,8 @@ mod tests {
 	fn test_default_values() {
 		let s = AphroditeState::default();
 		assert_eq!(s.turn_counter, 0);
-		assert_eq!(s.tool_threshold, 4096);
-		assert_eq!(s.terminal_threshold, 1024);
+		assert_eq!(s.tool_threshold, 512);
+		assert_eq!(s.terminal_threshold, 256);
 		assert!(s.context_engine_enabled);
 	}
 
@@ -323,5 +323,44 @@ mod tests {
 		s.inline_store_put("hash".into(), "v2".into());
 		assert_eq!(s.inline_store.len(), 1);
 		assert_eq!(s.inline_store_get("hash"), Some("v2".into()));
+	}
+
+	// ── 04-T9: pathological-input coverage for the inline store. Unlike
+	// `ccr_marker`'s preview (which deliberately sanitizes for safe rendering),
+	// the inline store is the retrieval source-of-truth - it must round-trip
+	// arbitrary content byte-for-byte, not mutate it. ──
+
+	#[test]
+	fn test_inline_store_roundtrips_interior_nul_bytes() {
+		let mut s = AphroditeState::default();
+		let content = "before\0after\0\0end";
+		s.inline_store_put("hash".into(), content.into());
+		assert_eq!(
+			s.inline_store_get("hash"),
+			Some(content.to_string()),
+			"NUL bytes must survive intact"
+		);
+	}
+
+	#[test]
+	fn test_inline_store_roundtrips_multibyte_utf8_at_every_boundary() {
+		let mut s = AphroditeState::default();
+		// Mix of 1/2/3/4-byte UTF-8 sequences (ASCII, é, 中, emoji) so any
+		// byte-oriented mishandling (rather than char-oriented) would show up.
+		let content = "a\u{00e9}\u{4e2d}\u{1f600}b".repeat(20);
+		s.inline_store_put("hash".into(), content.clone());
+		assert_eq!(s.inline_store_get("hash"), Some(content));
+	}
+
+	#[test]
+	fn test_inline_store_roundtrips_literal_marker_shaped_content() {
+		// Content that happens to already contain marker-shaped text (e.g. a
+		// user pasted an example transcript) must round-trip unchanged - the
+		// inline store has no reason to reinterpret or mangle it, unlike
+		// ccr_marker's preview sanitization.
+		let mut s = AphroditeState::default();
+		let content = "before <<<CCR:fake000|text|1>>> after";
+		s.inline_store_put("hash".into(), content.into());
+		assert_eq!(s.inline_store_get("hash"), Some(content.to_string()));
 	}
 }

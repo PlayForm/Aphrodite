@@ -90,3 +90,66 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		_ => format!("[{}:{}L {}B]", type_str, lines, bytes),
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// ── 04-T9: pathological-input coverage (UTF-8 boundary, literal
+	// markers, interior NUL) - previously untested in this module. ──
+
+	#[test]
+	fn test_detect_type_never_panics_on_interior_nul() {
+		let content = "before\0after\0\0end";
+		let _ = detect_type(content); // must not panic
+	}
+
+	#[test]
+	fn test_build_preview_never_panics_on_interior_nul_across_type_branches() {
+		let content = "line one\0line two\0\0error: boom\nwarning: also this";
+		for ty in ["build", "diff", "code_rust", "search", "json_array", "terminal", "text"] {
+			let _ = build_preview(ty, content); // must not panic for any branch
+		}
+	}
+
+	#[test]
+	fn test_build_preview_code_rust_truncates_signature_on_char_boundary() {
+		// The "code" family truncates the first signature to 48 *chars* via
+		// `.chars().take(48)`, not a byte slice - a signature packed with
+		// multi-byte UTF-8 must not panic or split a character mid-encoding.
+		// This function never panics on reaching an assertion at all (a byte-
+		// boundary split would have panicked inside `String` construction
+		// before we got here), so the pass condition is simply completing
+		// without a panic and producing the expected preview shape.
+		let content = format!("fn \u{4e2d}\u{6587}_{}() {{}}", "x".repeat(60));
+		let out = build_preview("code_rust", &content);
+		assert!(out.starts_with("[code:"));
+	}
+
+	#[test]
+	fn test_build_preview_never_panics_on_multibyte_utf8_every_type() {
+		let content = "a\u{00e9}\u{4e2d}\u{1f600}b".repeat(30);
+		for ty in ["build", "diff", "code_rust", "search", "json_array", "terminal", "text"] {
+			let _ = build_preview(ty, &content);
+		}
+	}
+
+	#[test]
+	fn test_build_preview_handles_literal_marker_shaped_content() {
+		// Content that already contains marker-shaped text (e.g. a pasted
+		// example transcript) must not confuse the line/byte counting or
+		// panic in any branch - build_preview only ever summarizes, it never
+		// re-parses content as a marker.
+		let content = "before <<<CCR:fake000|text|1>>> after\nerror: boom";
+		for ty in ["build", "diff", "code_rust", "search", "json_array", "terminal", "text"] {
+			let out = build_preview(ty, content);
+			assert!(!out.is_empty());
+		}
+	}
+
+	#[test]
+	fn test_detect_type_never_panics_on_multibyte_utf8() {
+		let content = "\u{1f600}".repeat(500);
+		let _ = detect_type(&content);
+	}
+}

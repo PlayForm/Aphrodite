@@ -298,4 +298,78 @@ mod tests {
 		assert_eq!(parse_preview("[nocolon]"), None);
 		assert_eq!(parse_preview("[code_rust:hello]"), Some("hello".to_string()));
 	}
+
+	// ── 04-T9: pathological-input coverage (UTF-8 boundary, literal
+	// markers, interior NUL) for the marker module. ──
+
+	#[test]
+	fn test_ccr_marker_strips_interior_nul_bytes() {
+		// The control-char filter (`*c >= ' '`) excludes NUL (0x00) along with
+		// every other C0 control code - a literal embedded NUL in tool output
+		// must not survive into the rendered marker.
+		let preview = "before\0after";
+		let m = ccr_marker("abc123def456abc123def456abc123def456", "text", 12, preview, None, None, None);
+		assert!(!m.contains('\0'), "NUL byte must be stripped from the preview: {m:?}");
+		assert!(m.contains("beforeafter"));
+	}
+
+	#[test]
+	fn test_ccr_marker_truncates_multibyte_preview_on_char_boundary() {
+		// budget < 25 truncates to 30 *chars* via `.chars().take(n)`, not a
+		// byte slice - a preview packed with multi-byte UTF-8 (each 'é' is 2
+		// bytes) must not panic or produce a str that isn't valid UTF-8 when
+		// the char boundary and a naive byte boundary would disagree.
+		let preview = "é".repeat(50);
+		let m = ccr_marker(
+			"abc123def456abc123def456abc123def456",
+			"text",
+			100,
+			&preview,
+			Some(10), // budget < 25 -> take(30) chars
+			None,
+			None,
+		);
+		let preview_line = m.lines().nth(1).unwrap();
+		let inner = parse_preview(preview_line).unwrap();
+		assert_eq!(inner.chars().count(), 30, "must truncate to exactly 30 chars, not 30 bytes");
+	}
+
+	#[test]
+	fn test_ccr_marker_preview_containing_literal_marker_syntax_does_not_confuse_extraction() {
+		// Characterization test, not a fix (marker wire format is a protected
+		// surface - see report 01 §5 "do-not-touch"): if the ORIGINAL content
+		// being compressed already contains marker-shaped text (e.g. a user
+		// pasted documentation showing `<<<CCR:...>>>` as a literal example),
+		// the preview's own `|` -> `-` sanitization (which exists to keep the
+		// `hash|type|size` OUTER structure parseable) has a useful side
+		// effect: it also mangles any embedded literal marker's delimiters,
+		// so `extract_hashes` on the full rendered output can't mistake the
+		// literal text for a second real marker.
+		let literal_marker_text = "example: <<<CCR:fake000|text|1>>>";
+		let m = ccr_marker(
+			"abc123def456abc123def456abc123def456",
+			"text",
+			999,
+			literal_marker_text,
+			None,
+			None,
+			None,
+		);
+		assert!(m.starts_with("<<<CCR:abc123def456abc123def456abc123def456|text|999>>>"));
+		// The embedded pipes were replaced with hyphens by the same
+		// sanitization every preview goes through - "fake000|text|1" becomes
+		// "fake000-text-1".
+		assert!(
+			m.contains("fake000-text-1"),
+			"embedded literal text survives, pipes mangled: {m:?}"
+		);
+		assert!(
+			!m.contains("fake000|text|1"),
+			"the original pipe-delimited literal must not survive intact: {m:?}"
+		);
+		// Only the real, outer hash is extractable - the mangled literal
+		// text no longer parses as a second marker.
+		let hashes = extract_hashes(&m);
+		assert_eq!(hashes, vec!["abc123def456abc123def456abc123def456"]);
+	}
 }
