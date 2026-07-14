@@ -144,6 +144,12 @@ impl Config {
 		state.model = self.get_string("APHRODITE_MODEL", "defaults", "model", "gpt-4o");
 		state.api_url = self.get_string("APHRODITE_API_URL", "defaults", "api_url", "");
 
+		// ── Flow-context assembler (05-P1/T5) ──
+		// Hard cap for ALL per-turn injected context assembled by
+		// `flow::build_turn_context`; kept well below Hermes's 10k-char spill
+		// threshold so the catalog never gets spill-mangled.
+		state.flow_budget_chars = self.get_usize("APHRODITE_FLOW_BUDGET_CHARS", "flow", "budget_chars", 4000);
+
 		// ── Directives ──
 		// 01-F4: load whenever a directives/ dir exists, not gated on `active`
 		// being non-empty - the shipped template default is `active = []`, so
@@ -212,5 +218,66 @@ mod tests {
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
 		assert_eq!(state.tool_threshold, 321);
+	}
+
+	// ── 05-T5 (P1): `[flow] budget_chars` (+ env override) resolves into
+	// `state.flow_budget_chars`; default is 4000. ──
+	#[test]
+	fn test_flow_budget_from_toml() {
+		let cfg = Config { raw:"[flow]\nbudget_chars = 1234\n".parse().unwrap(), overrides:HashMap::new() };
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.flow_budget_chars, 1234);
+
+		// Env override wins over TOML.
+		let mut cfg2 = Config::default();
+		cfg2.set_override("APHRODITE_FLOW_BUDGET_CHARS", "555");
+		let mut state2 = crate::state::AphroditeState::default();
+		cfg2.apply_compression(&mut state2);
+		assert_eq!(state2.flow_budget_chars, 555);
+
+		// Absent everywhere => default 4000.
+		let mut state3 = crate::state::AphroditeState::default();
+		Config::default().apply_compression(&mut state3);
+		assert_eq!(state3.flow_budget_chars, 4000);
+	}
+
+	// ── 05-T2 (P1/G3): directives load whenever a `directives/` dir exists,
+	// independent of whether `[directives] active` is empty - the pre-05
+	// gating on a non-empty `active` left `state.directives` empty on cold
+	// start, making runtime discover-then-activate impossible. This test runs
+	// from a temp cwd containing a `directives/` dir so it is hermetic. ──
+	#[test]
+	fn test_directives_loaded_even_when_active_empty() {
+		use std::sync::{Mutex, OnceLock};
+		static CWD_GUARD:OnceLock<Mutex<()>> = OnceLock::new();
+		let _g = CWD_GUARD.get_or_init(|| Mutex::new(())).lock().unwrap();
+
+		let tmp = std::env::temp_dir().join(format!(
+			"aphrodite-cfg-directives-{}",
+			std::time::SystemTime::now()
+				.duration_since(std::time::UNIX_EPOCH)
+				.unwrap()
+				.as_nanos()
+		));
+		std::fs::create_dir_all(tmp.join("directives")).unwrap();
+		std::fs::write(tmp.join("directives").join("focus.md"), "# focus\nstay targeted").unwrap();
+
+		let original = std::env::current_dir().unwrap();
+		std::env::set_current_dir(&tmp).unwrap();
+
+		// `active` is empty - directives must still load.
+		let cfg = Config { raw:"[directives]\nactive = []\n".parse().unwrap(), overrides:HashMap::new() };
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+
+		std::env::set_current_dir(&original).unwrap();
+		let _ = std::fs::remove_dir_all(&tmp);
+
+		assert!(
+			state.directives.contains_key("focus"),
+			"directives must load even when [directives] active is empty"
+		);
+		assert!(state.active_directives.is_empty(), "empty active must seed no activation");
 	}
 }

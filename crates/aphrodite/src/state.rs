@@ -69,6 +69,57 @@ pub struct AphroditeState {
 	pub directives:std::collections::HashMap<String, crate::directives::Directive>,
 	/// Currently active directive names (the ones injected into context).
 	pub active_directives:Vec<String>,
+	/// Ephemeral (one-shot / TTL) directives - inline nudges that render once
+	/// (or for a bounded number of turns) then self-purge (P3/T9). Distinct
+	/// from `active_directives` (permanent-until-removed named entries).
+	pub ephemeral_directives:Vec<ActiveDirective>,
+	// ── Flow context assembler (P1) ──
+	/// Hard cap for ALL per-turn injected context assembled by
+	/// `flow::build_turn_context` (default 4000 chars, `[flow] budget_chars`).
+	pub flow_budget_chars:usize,
+	/// Turn number of the most recent MANUAL `aphrodite_directive` mutation
+	/// (swap/add/remove/reset). Latches phase-aware auto-swaps out (P6); set by
+	/// `directives::handle_action` on any successful mutation.
+	pub manual_directive_turn:Option<usize>,
+	// ── Turn-telemetry spine (P2) ──
+	/// Bounded ring of per-tool-call events (cap 200, evict front). Feeds phase
+	/// detection, error-loop breaking, delta previews, checkpoints (P6-P11).
+	pub tool_events:VecDeque<ToolEvent>,
+}
+
+/// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
+/// stored, never raw args, so no PII lands in state.
+#[derive(Debug, Clone)]
+pub struct ToolEvent {
+	/// Turn on which the call happened.
+	pub turn:usize,
+	/// Tool name (or `"terminal"` for terminal output).
+	pub tool:String,
+	/// FNV-1a of tool + normalized args (P8 similarity key).
+	pub sig:u64,
+	/// `status != "error" && returncode == 0` (fail-open: missing → true).
+	pub ok:bool,
+	/// FNV-1a of `error_type` + first line of `error_message`, when failing.
+	pub error_sig:Option<u64>,
+	/// Byte length of the call's result content.
+	pub bytes:usize,
+	/// `write_file`/`patch` target path, when this call wrote a file (P11).
+	pub wrote_path:Option<String>,
+}
+
+/// An ephemeral directive activation entry (P3/T9). Named entries key into
+/// `state.directives`; inline entries carry literal nudge text synthesized by a
+/// feature (error-loop breaker, redundant-read deflector, auto-swap announce).
+/// `expires_after_turn = None` is permanent; `Some(n)` renders while
+/// `turn_counter <= n` and is purged in `post_llm_call` once past.
+#[derive(Debug, Clone)]
+pub struct ActiveDirective {
+	/// Key into `state.directives`, or empty for an inline entry.
+	pub name:String,
+	/// Literal nudge text for synthesized entries (rendered as `[nudge: …]`).
+	pub inline:Option<String>,
+	/// Last turn on which this entry renders; `None` = permanent.
+	pub expires_after_turn:Option<usize>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -108,6 +159,10 @@ impl Default for AphroditeState {
 			dev_mode:false,
 			directives:std::collections::HashMap::new(),
 			active_directives:Vec::new(),
+			ephemeral_directives:Vec::new(),
+			flow_budget_chars:4000,
+			manual_directive_turn:None,
+			tool_events:VecDeque::new(),
 		}
 	}
 }
@@ -177,6 +232,21 @@ impl AphroditeState {
 			self.recent_markers.remove(0);
 		}
 	}
+
+	/// Record a per-call tool event into the bounded ring (P2/T6). Caps at 200
+	/// entries, evicting the front (oldest) - same eviction style as
+	/// `recent_markers`.
+	pub fn record_tool_event(&mut self, event:ToolEvent) {
+		self.tool_events.push_back(event);
+		while self.tool_events.len() > 200 {
+			self.tool_events.pop_front();
+		}
+	}
+
+	/// Non-promoting membership test for the inline store (P4/T12): unlike
+	/// `inline_store_get`, this does NOT move the entry to the front, so the
+	/// recall renderer can check resolvability without perturbing LRU order.
+	pub fn inline_store_contains(&self, hash:&str) -> bool { self.inline_store.iter().any(|(h, _)| h == hash) }
 
 	/// Record a referenced file.
 	pub fn record_file(&mut self, path:String, tool:String) {

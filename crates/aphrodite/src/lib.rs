@@ -22,6 +22,7 @@
 pub mod catalog;
 pub mod config_loader;
 pub mod directives;
+pub mod flow;
 pub mod hooks;
 pub mod marker;
 pub mod prefetch;

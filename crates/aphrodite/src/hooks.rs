@@ -9,8 +9,21 @@ use headroom_core::transforms;
 
 use crate::{
 	marker::ccr_marker,
-	state::{AphroditeState, MarkerEntry},
+	state::{AphroditeState, MarkerEntry, ToolEvent},
 };
+
+/// Metadata Hermes already sends alongside a tool result (report 05, P2) - the
+/// signals the bridge historically dropped on the floor (`status`,
+/// `error_type`, `error_message`, `args`, `duration_ms`). Threaded through
+/// [`transform_tool_result_with_meta`] into the `tool_events` telemetry ring.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ToolCallMeta<'a> {
+	pub args_json:Option<&'a serde_json::Value>,
+	pub status:Option<&'a str>,
+	pub error_type:Option<&'a str>,
+	pub error_message:Option<&'a str>,
+	pub duration_ms:Option<u64>,
+}
 
 /// Compute a CCR hash for content using BLAKE3 (40 hex chars).
 pub fn compute_hash(content:&str) -> String { headroom_core::ccr::compute_key(content.as_bytes()) }
@@ -28,7 +41,7 @@ const ESSENTIAL_TOOLS:&[&str] = &[
 
 /// Transform tool output - full compression pipeline.
 pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:&str) -> serde_json::Value {
-	transform_tool_result_classified(state, content, tool_name, None)
+	transform_tool_result_inner(state, content, tool_name, None, &ToolCallMeta::default())
 }
 
 /// Same as [`transform_tool_result`], but a caller that has already found the
@@ -44,6 +57,80 @@ pub fn transform_tool_result_classified(
 	tool_name:&str,
 	classify:Option<(&str, &str)>,
 ) -> serde_json::Value {
+	transform_tool_result_inner(state, content, tool_name, classify, &ToolCallMeta::default())
+}
+
+/// Same as [`transform_tool_result_classified`], plus the Hermes-supplied call
+/// metadata (report 05, P2/T6) that gets recorded into the `tool_events`
+/// telemetry ring. This is the entry point the Hermes bridge routes to so the
+/// error/args/duration signals Hermes ships on every call stop being dropped.
+pub fn transform_tool_result_with_meta(
+	state:&mut AphroditeState,
+	content:&str,
+	tool_name:&str,
+	classify:Option<(&str, &str)>,
+	meta:&ToolCallMeta,
+) -> serde_json::Value {
+	transform_tool_result_inner(state, content, tool_name, classify, meta)
+}
+
+/// Record a per-call telemetry event from the supplied metadata (P2/T6).
+/// `ok` is fail-open: a missing `status` means success. `wrote_path` is
+/// inferred from the args of `write_file`/`patch`-style tools.
+fn record_tool_event_from_meta(state:&mut AphroditeState, tool_name:&str, content:&str, meta:&ToolCallMeta) {
+	let ok = meta.status.map(|s| s != "error").unwrap_or(true);
+	let error_sig = if ok {
+		None
+	} else {
+		Some(crate::flow::error_sig(meta.error_type, meta.error_message))
+	};
+	let wrote_path = wrote_path_from(tool_name, meta.args_json, content);
+	let sig = crate::flow::normalize_args_sig(tool_name, meta.args_json);
+	state.record_tool_event(ToolEvent {
+		turn:state.turn_counter,
+		tool:tool_name.to_string(),
+		sig,
+		ok,
+		error_sig,
+		bytes:content.len(),
+		wrote_path,
+	});
+}
+
+/// Infer the written path for a write-style tool (P2/T6, feeds P11). Reads a
+/// `path`/`file` arg for `write_file`/`patch`; falls back to the first-line
+/// path heuristic used by `extract_file_path`.
+fn wrote_path_from(tool_name:&str, args:Option<&serde_json::Value>, content:&str) -> Option<String> {
+	if !matches!(tool_name, "write_file" | "patch") {
+		return None;
+	}
+	if let Some(v) = args {
+		for key in ["path", "file", "file_path", "filename"] {
+			if let Some(p) = v.get(key).and_then(|x| x.as_str()) {
+				if !p.is_empty() {
+					return Some(p.to_string());
+				}
+			}
+		}
+	}
+	extract_file_path(content, tool_name)
+}
+
+fn transform_tool_result_inner(
+	state:&mut AphroditeState,
+	content:&str,
+	tool_name:&str,
+	classify:Option<(&str, &str)>,
+	meta:&ToolCallMeta,
+) -> serde_json::Value {
+	// Record the telemetry event first (P2/T6): it must happen even when the
+	// content is empty or the tool is essential/self/below-threshold - the
+	// phase detector and error-loop breaker care about ALL calls, not only the
+	// ones that produced a compressible marker. Skip only genuinely empty
+	// content (no signal at all).
+	if !content.is_empty() {
+		record_tool_event_from_meta(state, tool_name, content, meta);
+	}
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
 	}
@@ -140,6 +227,56 @@ pub fn transform_terminal_output_classified(
 	content:&str,
 	classify:Option<(&str, &str)>,
 ) -> serde_json::Value {
+	transform_terminal_output_inner(state, content, classify, None, None)
+}
+
+/// Same as [`transform_terminal_output_classified`], plus the Hermes-supplied
+/// `command` and `returncode` (report 05, P2/T6/T8) recorded into the
+/// `tool_events` telemetry ring. `returncode == 0` (or absent) is `ok`.
+pub fn transform_terminal_output_with_meta(
+	state:&mut AphroditeState,
+	content:&str,
+	classify:Option<(&str, &str)>,
+	command:Option<&str>,
+	returncode:Option<i64>,
+) -> serde_json::Value {
+	transform_terminal_output_inner(state, content, classify, command, returncode)
+}
+
+fn transform_terminal_output_inner(
+	state:&mut AphroditeState,
+	content:&str,
+	classify:Option<(&str, &str)>,
+	command:Option<&str>,
+	returncode:Option<i64>,
+) -> serde_json::Value {
+	// Telemetry (P2/T6): record before threshold/empty gating - a failing
+	// command with tiny output is exactly what the error-loop breaker needs.
+	if !content.is_empty() {
+		let ok = returncode.map(|rc| rc == 0).unwrap_or(true);
+		let args = command.map(|c| serde_json::json!({"command": c}));
+		let sig = crate::flow::normalize_args_sig("terminal", args.as_ref());
+		let error_sig = if ok {
+			None
+		} else {
+			// Terminal failures have no error_type; key on the command + first
+			// error-looking line of the output so distinct failures differ.
+			let first_err = content
+				.lines()
+				.find(|l| l.contains("error") || l.contains("Error") || l.contains("FAILED") || l.contains("panicked"))
+				.or_else(|| content.lines().next());
+			Some(crate::flow::error_sig(command, first_err))
+		};
+		state.record_tool_event(ToolEvent {
+			turn:state.turn_counter,
+			tool:"terminal".to_string(),
+			sig,
+			ok,
+			error_sig,
+			bytes:content.len(),
+			wrote_path:None,
+		});
+	}
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
 	}
@@ -203,14 +340,23 @@ pub fn transform_terminal_output_classified(
 pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value { crate::session::on_session_start(state) }
 
 /// Pre-LLM call hook - inject catalog + active directives into context.
-pub fn pre_llm_call(state:&AphroditeState) -> serde_json::Value {
+///
+/// Keeps its historical JSON shape (`catalog`/`directives`/`compressed_count`)
+/// for proxy/FFI consumers, but ALSO returns the unified `context` string built
+/// by `flow::build_turn_context` (report 05, P1) so this path and the Hermes
+/// bridge path can never fork on what the model actually sees. The bridge and
+/// `context_engine_pre_llm` return only `{"context": ...}`; core keeps the
+/// richer shape for back-compat.
+pub fn pre_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 	let summary = crate::session::catalog_summary(state);
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
+	let context = crate::flow::build_turn_context(state, None);
 	serde_json::json!({
 		"status": "ok",
 		"catalog": summary,
 		"compressed_count": state.recent_markers.len(),
 		"directives": if directives.is_empty() { None } else { Some(directives) },
+		"context": if context.is_empty() { None } else { Some(context) },
 	})
 }
 
@@ -227,6 +373,10 @@ pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 		crate::session::archive_turn(state, &hash, &summary, size);
 	}
 	crate::session::next_turn(state);
+	// P3/T9: purge expired ephemeral nudges AFTER advancing the turn, so a
+	// one-shot pushed during turn N renders in turn N+1's context exactly once
+	// and is gone by turn N+2.
+	crate::flow::purge_expired_nudges(state);
 	serde_json::json!({"status": "ok", "turn": state.turn_counter})
 }
 
@@ -365,6 +515,41 @@ mod tests {
 		assert_eq!(s.conv_index.len(), 1, "post_llm_call must archive the turn's marker");
 		let turns = crate::session::get_conv_index(&s);
 		assert_eq!(turns[0]["hash"], hash);
+	}
+
+	// ── T6 (P2): transform_tool_result_with_meta records a ToolEvent, and a
+	// failing status yields ok=false + an error_sig. ──
+	#[test]
+	fn test_tool_event_recorded_with_error_sig() {
+		let mut s = AphroditeState::default();
+		s.tool_threshold = 0;
+		let args = serde_json::json!({"command": "cargo test"});
+		let meta = ToolCallMeta {
+			args_json:Some(&args),
+			status:Some("error"),
+			error_type:Some("compile_error"),
+			error_message:Some("E0382: borrow of moved value\n  more detail"),
+			duration_ms:Some(42),
+		};
+		let content = "error[E0382]: borrow of moved value\n".repeat(20);
+		let _ = transform_tool_result_with_meta(&mut s, &content, "terminal", None, &meta);
+		let ev = s.tool_events.back().expect("a tool event must be recorded");
+		assert!(!ev.ok, "status=error must record ok=false");
+		assert!(ev.error_sig.is_some(), "a failing event must carry an error_sig");
+		assert_eq!(ev.tool, "terminal");
+		assert_eq!(ev.bytes, content.len());
+	}
+
+	// ── T6 (P2): a successful call with no status defaults ok=true and no
+	// error_sig (fail-open). ──
+	#[test]
+	fn test_tool_event_ok_defaults_true_without_status() {
+		let mut s = AphroditeState::default();
+		s.tool_threshold = 0;
+		let _ = transform_tool_result(&mut s, "some output content here", "read_file");
+		let ev = s.tool_events.back().expect("a tool event must be recorded");
+		assert!(ev.ok, "absent status must be treated as success");
+		assert!(ev.error_sig.is_none());
 	}
 
 	#[test]

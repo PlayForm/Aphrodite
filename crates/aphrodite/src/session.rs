@@ -12,6 +12,9 @@ pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value {
 	state.conv_index.clear();
 	state.recent_markers.clear();
 	state.referenced_files.clear();
+	state.tool_events.clear();
+	state.ephemeral_directives.clear();
+	state.manual_directive_turn = None;
 
 	serde_json::json!({
 		"status": "ok",

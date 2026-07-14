@@ -70,7 +70,12 @@ ccr_marker_hint = true             # append "…(use aphrodite_retrieve)"?
 catalog_intent_hints = true        # show intent=read with hashes?
 
 # ── Directives ───────────────────────────────────────────────────────────────
-# Conversational behavioral context — short .md files injected into the LLM's
+# Conversational behavioral context - short .md files injected into the LLM's
 # context via pre_llm_call. Swappable mid-conversation via aphrodite_directive().
 [directives]
 active = []                        # e.g. ["focus", "foresight"]
+
+# Per-turn injected-context assembler (report 05). Hard cap for ALL injected
+# context; kept below Hermes's 10k-char spill threshold.
+[flow]
+budget_chars = 4000                # env: APHRODITE_FLOW_BUDGET_CHARS

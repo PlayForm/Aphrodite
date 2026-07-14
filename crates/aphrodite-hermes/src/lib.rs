@@ -322,40 +322,54 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					// but hand core the ORIGINAL content so it's what gets
 					// hashed and stored (retrieval must stay lossless).
 					let classify = crate::tools::unwrap_hermes_result(tool_content);
-					let r = aphrodite::hooks::transform_tool_result_classified(
+					// 05-P2/T8: parse the error/args/timing signals Hermes ships
+					// on every call (previously dropped on the floor) and route
+					// them into the telemetry ring via `_with_meta`.
+					let meta = aphrodite::hooks::ToolCallMeta {
+						args_json:parsed.get("args"),
+						status:parsed.get("status").and_then(|v| v.as_str()),
+						error_type:parsed.get("error_type").and_then(|v| v.as_str()),
+						error_message:parsed.get("error_message").and_then(|v| v.as_str()),
+						duration_ms:parsed.get("duration_ms").and_then(|v| v.as_u64()),
+					};
+					let r = aphrodite::hooks::transform_tool_result_with_meta(
 						state,
 						tool_content,
 						tool,
 						classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
+						&meta,
 					);
 					replacement_from(&r)
 				},
 				"transform_terminal_output" => {
 					let classify = crate::tools::unwrap_hermes_result(term_content);
-					let r = aphrodite::hooks::transform_terminal_output_classified(
+					// 05-P2/T8: thread the terminal `command`/`returncode` into
+					// the telemetry ring so terminal failures feed error-loop
+					// detection.
+					let command = parsed.get("command").and_then(|v| v.as_str());
+					let returncode = parsed.get("returncode").and_then(|v| v.as_i64());
+					let r = aphrodite::hooks::transform_terminal_output_with_meta(
 						state,
 						term_content,
 						classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
+						command,
+						returncode,
 					);
 					replacement_from(&r)
 				},
 				"pre_llm_call" => {
-					// 01-F3: this is the ONLY pre_llm_call arm Hermes actually
-					// calls in production - core's `hooks::pre_llm_call` (which
-					// already builds directive context) has no caller on this
-					// path, so the "wire directives into pre_llm_call" feature
-					// shipped dead end-to-end. Append directive context to the
-					// same `context` string Hermes already honors, rather than
-					// adding a second field it wouldn't read.
-					let summary = aphrodite::session::catalog_summary(state);
-					let directives =
-						aphrodite::directives::build_directive_context(&state.directives, &state.active_directives);
-					let context = match (summary.is_empty(), directives.is_empty()) {
-						(true, true) => String::new(),
-						(false, true) => summary,
-						(true, false) => directives,
-						(false, false) => format!("{summary}\n{directives}"),
-					};
+					// 05-P1/T1: route this - the ONLY pre_llm_call arm Hermes
+					// actually calls in production - through the single shared
+					// `flow::build_turn_context` assembler, the same one core's
+					// `hooks::pre_llm_call` and `context_engine_pre_llm` use.
+					// This makes the G1 bug class (bridge reimplements the hook
+					// body and forks on every core improvement - directives were
+					// dead here for two releases, 01-F3) unrepresentable: there
+					// is exactly one place that composes model-visible context.
+					// `args.len()` is the request-size proxy for the P9 telemetry
+					// line (Hermes serializes conversation_history into the
+					// kwargs JSON).
+					let context = aphrodite::flow::build_turn_context(state, Some(args.len()));
 					if context.is_empty() {
 						serde_json::Value::Null
 					} else {
@@ -548,6 +562,76 @@ mod tests {
 		// session_start (deliberately) - clean up so this test doesn't leak
 		// an active directive into whichever test runs next.
 		with_shared(|state| state.active_directives.clear());
+	}
+
+	// ── 05-T1 (P1): the end-to-end proof that directives inject through the
+	// single `flow::build_turn_context` assembler on the production Hermes
+	// path. Activate a directive, call the `pre_llm_call` hook, and assert the
+	// `[directives:` marker appears in the returned `context`. This is the
+	// choke point that makes the G1 bug class (directives dead on the Hermes
+	// path) unrepresentable. ──
+	#[test]
+	fn test_call_hook_pre_llm_includes_directives() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		with_shared(|state| {
+			state.directives.insert(
+				"focus".into(),
+				aphrodite::directives::Directive { name:"focus".into(), content:"stay targeted, 1-2 tools".into() },
+			);
+			state.active_directives = vec!["focus".into()];
+		});
+
+		let hook_ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_llm_call").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		let result = unsafe { CStr::from_ptr(hook_ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(hook_ptr);
+
+		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
+		let context = v["context"].as_str().unwrap_or_default();
+		assert!(
+			context.contains("[directives: focus]"),
+			"assembler must inject directives on the Hermes path: {context}"
+		);
+		assert!(context.contains("stay targeted"), "directive body missing: {context}");
+
+		with_shared(|state| state.active_directives.clear());
+	}
+
+	// ── 05-T8 (P2): the bridge must parse the status/error kwargs Hermes ships
+	// on a tool result and record a failing telemetry event. ──
+	#[test]
+	fn test_call_hook_tool_result_records_error_event() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		let args = serde_json::json!({
+			"tool_name": "terminal",
+			"result": "error[E0382]: borrow of moved value\n".repeat(50),
+			"status": "error",
+			"error_type": "compile_error",
+			"error_message": "E0382: borrow of moved value",
+			"args": {"command": "cargo build"},
+		})
+		.to_string();
+		let hook_ptr = aphrodite_hermes_call_hook(
+			CString::new("transform_tool_result").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		aphrodite_hermes_free_string(hook_ptr);
+
+		with_shared(|state| {
+			let ev = state.tool_events.back().expect("bridge must record a tool event");
+			assert!(!ev.ok, "status=error must record a failing event");
+			assert!(ev.error_sig.is_some(), "a failing event must carry an error_sig");
+		});
 	}
 
 	// ── T13 (F11): the production hook-dispatch path Python actually calls

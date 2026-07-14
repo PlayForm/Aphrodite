@@ -114,14 +114,29 @@ pub fn build_directive_context(all:&HashMap<String, Directive>, active:&[String]
 pub fn handle_action(state:&mut crate::state::AphroditeState, action:&str, name:&str) -> serde_json::Value {
 	match action {
 		"list" => {
+			// P3/T10: surface ephemeral (nudge/TTL) entries with their expiry so
+			// the mechanism is observable.
+			let ephemeral:Vec<serde_json::Value> = state
+				.ephemeral_directives
+				.iter()
+				.map(|e| {
+					serde_json::json!({
+						"name": e.name,
+						"inline": e.inline,
+						"expires_after_turn": e.expires_after_turn,
+					})
+				})
+				.collect();
 			serde_json::json!({
 				"available": state.directives.keys().collect::<Vec<&String>>(),
 				"active": &state.active_directives,
+				"ephemeral": ephemeral,
 			})
 		},
 		"swap" => {
 			if state.directives.contains_key(name) {
 				state.active_directives = vec![name.to_string()];
+				state.manual_directive_turn = Some(state.turn_counter);
 				serde_json::json!({"swapped": name, "active": &state.active_directives})
 			} else {
 				serde_json::json!({"error": format!("unknown directive: {}", name)})
@@ -131,14 +146,20 @@ pub fn handle_action(state:&mut crate::state::AphroditeState, action:&str, name:
 			if state.directives.contains_key(name) && !state.active_directives.contains(&name.to_string()) {
 				state.active_directives.push(name.to_string());
 			}
+			state.manual_directive_turn = Some(state.turn_counter);
 			serde_json::json!({"active": &state.active_directives})
 		},
 		"remove" => {
 			state.active_directives.retain(|d| d != name);
+			state.manual_directive_turn = Some(state.turn_counter);
 			serde_json::json!({"active": &state.active_directives})
 		},
 		"reset" => {
+			// `reset` clears named actives AND ephemeral nudges AND the manual
+			// latch (P3/P6: explicit return to auto mode - see T10/T20).
 			state.active_directives.clear();
+			state.ephemeral_directives.clear();
+			state.manual_directive_turn = None;
 			serde_json::json!({"active": &state.active_directives})
 		},
 		_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|remove|reset)", action)}),
@@ -230,6 +251,89 @@ mod tests {
 
 		let r = handle_action(&mut state, "bogus", "");
 		assert!(r["error"].as_str().unwrap().contains("unknown action"));
+	}
+
+	// ── P3/T9: a one-shot nudge (ttl=1) pushed during turn N renders in turn
+	// N+1's context exactly once, then is purged by post_llm_call so it never
+	// shows again. ──
+	#[test]
+	fn test_one_shot_nudge_renders_once_then_purged() {
+		let mut s = crate::state::AphroditeState::default();
+		s.turn_counter = 5;
+		crate::flow::push_nudge(&mut s, "step back and restate the goal", 1);
+
+		// Simulate the turn advancing (post_llm_call runs next_turn then purge):
+		// during turn 5 the nudge is live; render at turn 6 must include it.
+		s.turn_counter = 6;
+		let ctx6 = crate::flow::build_turn_context(&mut s, None);
+		assert!(ctx6.contains("[nudge:"), "one-shot nudge must render at turn 6: {ctx6}");
+		assert!(ctx6.contains("step back and restate the goal"));
+
+		// post_llm_call advances to turn 7 and purges expired nudges.
+		crate::hooks::post_llm_call(&mut s);
+		assert_eq!(s.turn_counter, 7);
+		let ctx7 = crate::flow::build_turn_context(&mut s, None);
+		assert!(!ctx7.contains("[nudge:"), "expired nudge must be gone at turn 7: {ctx7}");
+	}
+
+	// ── P3/T10: at most 4 ephemeral entries are stored; a 5th drops the
+	// oldest. ──
+	#[test]
+	fn test_nudge_cap_drops_oldest() {
+		let mut s = crate::state::AphroditeState::default();
+		for i in 0..5 {
+			crate::flow::push_nudge(&mut s, &format!("nudge number {i}"), 10);
+		}
+		assert_eq!(s.ephemeral_directives.len(), 4, "cap must hold at 4 stored entries");
+		assert!(
+			!s.ephemeral_directives
+				.iter()
+				.any(|e| e.inline.as_deref() == Some("nudge number 0")),
+			"the oldest nudge must have been dropped"
+		);
+		assert!(
+			s.ephemeral_directives
+				.iter()
+				.any(|e| e.inline.as_deref() == Some("nudge number 4")),
+			"the newest nudge must survive"
+		);
+	}
+
+	// ── P3/T10: `list` surfaces ephemeral entries; `reset` clears them and the
+	// manual latch. ──
+	#[test]
+	fn test_list_shows_ephemeral_and_reset_clears_them() {
+		let mut s = crate::state::AphroditeState::default();
+		s.turn_counter = 3;
+		crate::flow::push_nudge(&mut s, "watch out", 2);
+		s.manual_directive_turn = Some(3);
+
+		let listed = handle_action(&mut s, "list", "");
+		let eph = listed["ephemeral"].as_array().expect("ephemeral array");
+		assert_eq!(eph.len(), 1);
+		assert_eq!(eph[0]["inline"], "watch out");
+		assert_eq!(eph[0]["expires_after_turn"], 5);
+
+		handle_action(&mut s, "reset", "");
+		assert!(s.ephemeral_directives.is_empty(), "reset must clear ephemeral nudges");
+		assert!(s.manual_directive_turn.is_none(), "reset must clear the manual latch");
+	}
+
+	// ── P1/T3: any manual mutation latches `manual_directive_turn` to the
+	// current turn (P6 override latch). ──
+	#[test]
+	fn test_manual_mutation_sets_manual_directive_turn() {
+		let mut s = crate::state::AphroditeState::default();
+		s.turn_counter = 12;
+		s.directives
+			.insert("focus".into(), Directive { name:"focus".into(), content:"stay focused".into() });
+		handle_action(&mut s, "swap", "focus");
+		assert_eq!(s.manual_directive_turn, Some(12), "a manual swap must latch the turn");
+
+		// A failed swap (unknown directive) must NOT latch.
+		s.manual_directive_turn = None;
+		handle_action(&mut s, "swap", "nope");
+		assert!(s.manual_directive_turn.is_none(), "a failed swap must not latch");
 	}
 
 	#[test]

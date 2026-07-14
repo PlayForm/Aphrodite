@@ -506,13 +506,15 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 	});
 
 	// ── context engine pre-LLM hook (registered via ctx.register_context_engine) ──
+	// 05-P1/T1: same single assembler as the bridge `pre_llm_call` arm and core
+	// `hooks::pre_llm_call`, so this path can't fork on what the model sees.
 	m.insert("context_engine_pre_llm", |_args| {
 		with_shared(|state| {
-			let summary = aphrodite::session::catalog_summary(state);
-			if summary.is_empty() {
+			let context = aphrodite::flow::build_turn_context(state, None);
+			if context.is_empty() {
 				serde_json::Value::Null
 			} else {
-				serde_json::json!({"context": summary})
+				serde_json::json!({"context": context})
 			}
 		})
 	});

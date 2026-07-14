@@ -79,3 +79,12 @@ catalog_intent_hints = true   # show intent=read with hashes?
 # Active directives loaded from directives/*.md at startup.
 # Swap mid-conversation via aphrodite_directive("swap", "explore").
 active = [] # e.g. ["focus", "foresight"]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  FLOW  -  per-turn injected-context assembler (report 05)
+# ══════════════════════════════════════════════════════════════════════════════
+[flow]
+# Hard cap for ALL per-turn injected context; kept below Hermes's 10k-char
+# spill threshold. Env: APHRODITE_FLOW_BUDGET_CHARS.
+budget_chars = 4000
