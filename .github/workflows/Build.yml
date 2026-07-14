@@ -139,19 +139,30 @@ jobs:
           fi
           ls -lh aphrodite-${TARGET}* libaphrodite_hermes-${TARGET}*
 
+      # Windows gets its own PowerShell step (Get-FileHash), not bash +
+      # certutil/findstr: Git Bash's MSYS path-conversion layer mangles a
+      # single-slash flag like `findstr /v "hash"` into a filesystem path
+      # (e.g. treating `/v` as a root-relative path), so `findstr` tried to
+      # open a file literally named "hash"/"CertUtil" instead of using them
+      # as an exclude pattern - "FINDSTR: Cannot open hash". This silently
+      # broke every Windows release artifact (job always failed here).
+      - name: Generate checksums (Windows)
+        if: contains(matrix.target, 'windows')
+        shell: pwsh
+        run: |
+          $target = "${{ matrix.target }}"
+          $binHash = (Get-FileHash "aphrodite-$target.exe" -Algorithm SHA256).Hash.ToLower()
+          $dllHash = (Get-FileHash "libaphrodite_hermes-$target.dll" -Algorithm SHA256).Hash.ToLower()
+          "$binHash  aphrodite-$target.exe" | Out-File -FilePath "SHA256SUMS-$target.txt" -Encoding ascii
+          "$dllHash  libaphrodite_hermes-$target.dll" | Out-File -FilePath "SHA256SUMS-$target.txt" -Encoding ascii -Append
+          Get-Content "SHA256SUMS-$target.txt"
+
       - name: Generate checksums
+        if: ${{ !contains(matrix.target, 'windows') }}
         shell: bash
         run: |
           TARGET="${{ matrix.target }}"
-          if [[ "$TARGET" == *windows* ]]; then
-              certutil -hashfile "aphrodite-${TARGET}.exe" SHA256 | findstr /v "hash" | findstr /v "CertUtil" > sha_bin.txt
-              certutil -hashfile "libaphrodite_hermes-${TARGET}.dll" SHA256 | findstr /v "hash" | findstr /v "CertUtil" > sha_dll.txt
-              echo "$(cat sha_bin.txt | tr -d '\r\n')  aphrodite-${TARGET}.exe" > "SHA256SUMS-${TARGET}.txt"
-              echo "$(cat sha_dll.txt | tr -d '\r\n')  libaphrodite_hermes-${TARGET}.dll" >> "SHA256SUMS-${TARGET}.txt"
-              rm -f sha_bin.txt sha_dll.txt
-          else
-              shasum -a 256 aphrodite-${TARGET}* libaphrodite_hermes-${TARGET}* > "SHA256SUMS-${TARGET}.txt"
-          fi
+          shasum -a 256 aphrodite-${TARGET}* libaphrodite_hermes-${TARGET}* > "SHA256SUMS-${TARGET}.txt"
           cat "SHA256SUMS-${TARGET}.txt"
 
       - name: Upload artifact
