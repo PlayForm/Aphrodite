@@ -9,7 +9,8 @@
 //! `include_str!` - no runtime file dependency for cargo-installed binaries.
 
 use std::{
-	fs, io,
+	fs,
+	io,
 	path::{Path, PathBuf},
 	process::Command,
 };
@@ -19,7 +20,7 @@ use crate::config::SetupArgs;
 /// aphrodite.toml template - embedded at compile time.
 /// Placeholders: `{api_url}`, `{model}`, `{cache_port}`, `{token_port}` -
 /// replaced with user-provided values.
-const CONFIG_TEMPLATE: &str = include_str!("../templates/aphrodite.toml");
+const CONFIG_TEMPLATE:&str = include_str!("../templates/aphrodite.toml");
 
 /// Errors that can occur during setup.
 #[derive(Debug, thiserror::Error)]
@@ -36,14 +37,14 @@ pub enum SetupError {
 
 /// Context gathered during setup.
 struct SetupCtx {
-	aphrodite_dir: PathBuf,
-	binaries_dir: PathBuf,
-	own_path: PathBuf,
-	own_hash: String,
+	aphrodite_dir:PathBuf,
+	binaries_dir:PathBuf,
+	own_path:PathBuf,
+	own_hash:String,
 }
 
 /// Run the setup/bootstrap process.
-pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
+pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	let home =
 		dirs::home_dir().ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?;
 
@@ -51,8 +52,8 @@ pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 	let own_hash = self_hash(&own_path);
 
 	let ctx = SetupCtx {
-		aphrodite_dir: home.join(".hermes").join("aphrodite"),
-		binaries_dir: home.join(".hermes").join("aphrodite").join("binaries"),
+		aphrodite_dir:home.join(".hermes").join("aphrodite"),
+		binaries_dir:home.join(".hermes").join("aphrodite").join("binaries"),
 		own_path,
 		own_hash,
 	};
@@ -141,7 +142,7 @@ pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 ///   now an explicit, warned-on-failure step too, instead of relying on
 ///   macOS to incidentally re-sign a linker-edited Mach-O.
 #[cfg(target_os = "macos")]
-fn install_macos_artifact(src: &Path, dest: &Path, dylib_id_name: Option<&str>, mode: u32) -> Result<(), SetupError> {
+fn install_macos_artifact(src:&Path, dest:&Path, dylib_id_name:Option<&str>, mode:u32) -> Result<(), SetupError> {
 	let _ = std::fs::remove_file(dest);
 	let ditto_ok = Command::new("ditto")
 		.args([src.to_str().unwrap_or(""), dest.to_str().unwrap_or("")])
@@ -195,7 +196,7 @@ fn install_macos_artifact(src: &Path, dest: &Path, dylib_id_name: Option<&str>, 
 }
 
 /// Compute BLAKE3 hash of the binary for integrity display.
-fn self_hash(path: &Path) -> String {
+fn self_hash(path:&Path) -> String {
 	match fs::read(path) {
 		Ok(bytes) => {
 			let hash = blake3::hash(&bytes);
@@ -217,9 +218,11 @@ fn verify_hermes() -> Result<(), SetupError> {
 			let stderr = String::from_utf8_lossy(&out.stderr);
 			Err(SetupError::HermesNotFound(format!("hermes --version failed: {stderr}")))
 		},
-		Err(_) => Err(SetupError::HermesNotFound(
-			"hermes not found in PATH - install hermes agent first".into(),
-		)),
+		Err(_) => {
+			Err(SetupError::HermesNotFound(
+				"hermes not found in PATH - install hermes agent first".into(),
+			))
+		},
 	}
 }
 
@@ -241,8 +244,8 @@ fn verify_hermes() -> Result<(), SetupError> {
 ///
 /// The download path fetches the tripled name and saves it as the
 /// un-tripled name the plugin expects.
-fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
-	let dylib_names: &[&str] = if cfg!(target_os = "macos") {
+fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
+	let dylib_names:&[&str] = if cfg!(target_os = "macos") {
 		&["libaphrodite.dylib", "libaphrodite_hermes.dylib"]
 	} else if cfg!(target_os = "linux") {
 		&["libaphrodite.so", "libaphrodite_hermes.so"]
@@ -251,7 +254,7 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 	};
 
 	let exe_dir = ctx.own_path.parent().unwrap_or(Path::new("."));
-	let search_paths: Vec<PathBuf> = vec![
+	let search_paths:Vec<PathBuf> = vec![
 		exe_dir.to_path_buf(),
 		exe_dir.join("deps"),
 		PathBuf::from("/usr/local/lib"),
@@ -339,7 +342,7 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 /// version.  `dest_name` is the bare filename (e.g. `libaphrodite.dylib`);
 /// the remote asset is named with a target-triple suffix (e.g.
 /// `libaphrodite-aarch64-apple-darwin.dylib`).
-fn download_dylib(dest_name: &str, dest: &Path) -> Result<(), String> {
+fn download_dylib(dest_name:&str, dest:&Path) -> Result<(), String> {
 	// ── Determine the target triple ──────────────────────────────
 	let triple = target_triple();
 	// Build the remote asset name from the destination filename.
@@ -401,7 +404,7 @@ fn download_dylib(dest_name: &str, dest: &Path) -> Result<(), String> {
 /// hashing tool (`shasum`/`sha256sum`/`Get-FileHash`) rather than adding a
 /// crate dependency, matching this function's existing curl/PowerShell
 /// shell-out pattern.
-fn verify_download_checksum(release_dir: &str, triple: &str, asset_name: &str, dest: &Path) -> Result<(), String> {
+fn verify_download_checksum(release_dir:&str, triple:&str, asset_name:&str, dest:&Path) -> Result<(), String> {
 	let sums_url = format!("{release_dir}/SHA256SUMS-{triple}.txt");
 	let sums_text = if cfg!(windows) {
 		Command::new("powershell")
@@ -444,11 +447,13 @@ fn verify_download_checksum(release_dir: &str, triple: &str, asset_name: &str, d
 		Command::new("sha256sum").arg(dest.to_str().unwrap_or("")).output()
 	};
 	let actual = match hash_output {
-		Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
-			.split_whitespace()
-			.next()
-			.unwrap_or("")
-			.to_lowercase(),
+		Ok(o) if o.status.success() => {
+			String::from_utf8_lossy(&o.stdout)
+				.split_whitespace()
+				.next()
+				.unwrap_or("")
+				.to_lowercase()
+		},
 		_ => return Err("no shasum/sha256sum/Get-FileHash available to verify checksum".to_string()),
 	};
 
@@ -475,11 +480,14 @@ fn target_triple() -> &'static str {
 }
 
 /// Write plugin.yaml manifest.
-fn write_plugin_yaml(ctx: &SetupCtx, args: &SetupArgs) -> Result<(), SetupError> {
+///
+/// Always overwritten (03-F8): the manifest is generated code whose tool/hook
+/// list and `version:` must track the installed binary, so a re-run of
+/// `aphrodite setup` (e.g. after `cargo install aphrodite@<newer>`) must
+/// refresh it rather than freeze it at the first-install version. Only the
+/// user-editable `aphrodite.toml` stays `--force`-gated.
+fn write_plugin_yaml(ctx:&SetupCtx, args:&SetupArgs) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("plugin.yaml");
-	if path.exists() {
-		return Ok(());
-	}
 
 	let yaml = format!(
 		r#"name: aphrodite
@@ -533,16 +541,22 @@ install_message: |
 /// a `register_tool` call with the wrong argument count, no skills
 /// registration, no version handshake, no port-env reads, no health poll,
 /// and stderr piped to `DEVNULL` (silently re-introducing a startup-failure
-/// bug the live plugin had already fixed). `include_str!` of the real file
-/// means the two can never diverge again.
-const HERMES_PLUGIN_SHIM: &str = include_str!("../templates/__init__.py");
+/// bug the live plugin had already fixed).
+///
+/// `templates/__init__.py` is a *copy* of the live plugin (the crate can't
+/// `include_str!` a path outside its own package and still `cargo package`),
+/// so the two are kept in sync by the
+/// `test_hermes_plugin_shim_template_matches_live` drift guard below (03-F10),
+/// which fails if they diverge.
+const HERMES_PLUGIN_SHIM:&str = include_str!("../templates/__init__.py");
 
-fn write_init_py(ctx: &SetupCtx) -> Result<(), SetupError> {
+fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("__init__.py");
-	if path.exists() {
-		return Ok(());
-	}
 
+	// Always overwritten (03-F8): the shim is code, not config - its FFI symbol
+	// list and registration logic must match the freshly-installed dylib, so a
+	// re-run of `aphrodite setup` must refresh a doctored/stale shim rather than
+	// preserve it.
 	println!("writing __init__.py -> {}", path.display());
 	fs::write(&path, HERMES_PLUGIN_SHIM)?;
 	secure_perms(&path, 0o644)?;
@@ -550,7 +564,7 @@ fn write_init_py(ctx: &SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Symlink ~/.hermes/plugins/aphrodite -> ~/.hermes/aphrodite/
-fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
+fn symlink_plugin(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let plugins_dir = dirs::home_dir()
 		.ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?
 		.join(".hermes")
@@ -601,7 +615,7 @@ fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
 /// Recursively copy a directory tree - the Windows fallback when a junction
 /// can't be created (e.g. `mklink` disabled by policy).
 #[cfg(windows)]
-fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
+fn copy_dir_recursive(src:&Path, dst:&Path) -> io::Result<()> {
 	fs::create_dir_all(dst)?;
 	for entry in fs::read_dir(src)? {
 		let entry = entry?;
@@ -616,7 +630,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
 }
 
 /// Register plugin with hermes.
-fn register_plugin(_ctx: &SetupCtx) -> Result<(), SetupError> {
+fn register_plugin(_ctx:&SetupCtx) -> Result<(), SetupError> {
 	let status = Command::new("hermes")
 		.args(["plugins", "enable", "aphrodite"])
 		.output()
@@ -632,7 +646,7 @@ fn register_plugin(_ctx: &SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Set strict file permissions (Unix only).
-fn secure_perms(path: &Path, mode: u32) -> io::Result<()> {
+fn secure_perms(path:&Path, mode:u32) -> io::Result<()> {
 	#[cfg(unix)]
 	{
 		use std::os::unix::fs::PermissionsExt;
@@ -645,9 +659,7 @@ fn secure_perms(path: &Path, mode: u32) -> io::Result<()> {
 	Ok(())
 }
 
-fn binary_name() -> &'static str {
-	if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" }
-}
+fn binary_name() -> &'static str { if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" } }
 
 #[cfg(test)]
 mod tests {
@@ -689,6 +701,34 @@ mod tests {
 		// args) while the real Hermes API + live plugin use
 		// `register_tool(name, toolset, schema, handler)` (4 args).
 		assert!(HERMES_PLUGIN_SHIM.contains(r#"ctx.register_tool(name, "aphrodite", schema, "#));
+	}
+
+	// ── T8 (F10): drift guard. The embedded `templates/__init__.py` is a copy
+	// of the live `plugins/aphrodite/__init__.py`; nothing but this test keeps
+	// them from diverging (as they had before v1-04-F2). Compare CRLF-normalized
+	// so a working tree with `core.autocrlf=true` doesn't produce a false fail,
+	// and early-return when the live file is absent so a published-crate build
+	// (no submodule checkout) still passes. ──
+	#[test]
+	fn test_hermes_plugin_shim_template_matches_live() {
+		let live_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+			.join("..")
+			.join("..")
+			.join("plugins")
+			.join("aphrodite")
+			.join("__init__.py");
+		let Ok(live) = fs::read_to_string(&live_path) else {
+			// Live plugin submodule not checked out (e.g. published-crate build)
+			// - nothing to compare against, so this guard is a no-op.
+			return;
+		};
+		let normalize = |s:&str| s.replace("\r\n", "\n");
+		assert_eq!(
+			normalize(&live),
+			normalize(HERMES_PLUGIN_SHIM),
+			"templates/__init__.py has drifted from the live plugins/aphrodite/__init__.py - re-copy the live plugin \
+			 into crates/aphrodite/templates/__init__.py to keep the setup-embedded shim in sync"
+		);
 	}
 
 	// Network-touching (real GitHub release) - not run by default, only on
