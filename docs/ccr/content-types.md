@@ -5,6 +5,11 @@ thresholds can adapt per-type - errors stay visible, while verbose logs get
 compressed aggressively. Both the Rust proxy and the Python plugin implement
 their own classifiers, each with a distinct type registry and detection order.
 
+Once a type is chosen, the marker's human-readable preview is built per-type -
+see [Enriched Preview Catalog](../proxy/compression.md#enriched-preview-catalog)
+for the shape each content type produces (git status, git log, grep, ls, test,
+build, diff, code, terminal, and the plain-text fallback).
+
 ## Detection Order (Rust)
 
 The Rust classifier returns exactly one type per invocation. Order matters -

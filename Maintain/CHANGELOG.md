@@ -1,5 +1,58 @@
 # Changelog
 
+## v1.3.4 - Preview Intelligence & Release Hardening (2026-07-14, unreleased)
+
+### Added
+
+- **High-intelligibility previews for common tool outputs** - an Aphrodite-side
+  semantic detector recognizes shapes the vendored classifier flattens to
+  generic `text`/`log`, emitting decision-grade one-liners so the agent
+  retrieves far less often: git status `[git:2M 2A 1D 3?? | path path +N more]`,
+  test runs `[test:220 pass 0 fail 1 ignored | 0.31s]` (names first failure),
+  grep `[grep:4 hits in 3 files | src/x.rs:12]`, git log, directory listings,
+  enriched build (first error inline) and diff (first changed files). Default on
+  both the proxy and Hermes hook/FFI paths, byte-identical across the two.
+- **Benchmark suite expanded** to 84 checks across 4 benches; pathological-input
+  coverage (UTF-8 boundary / interior-NUL / literal marker-shaped content).
+- **Dylib checksum verification** in `aphrodite setup` (SHA-256 before install).
+
+### Fixed
+
+- **Preview doubling bug** - a marker preview could render as
+  `[text:[text:53L 1913B]]` when an already-self-describing preview was
+  re-wrapped in `render_marker`; now emitted exactly once (regression-tested).
+- Release scripts use pattern-based `sed` for version bumps to avoid stale-string
+  drift; SSE detection extracted into a dedicated, integration-tested function.
+
+### Benchmarks (measured 2026-07-14)
+
+- Standard corpus (20 samples, 106 KB): **132.82× overall**, 3×-610× per type,
+  9-40 ms end-to-end round-trips, 20/20 retrieve OK.
+- Retrieve 17/17 (byte-exact incl. 260 KB + concurrent storms); adaptive-EMA
+  threshold 7/7; 307 crate tests + 849 vendored headroom-core.
+
+## v1.3.3 - Self-Bootstrapping Setup & FFI Hardening (2026-07-14)
+
+### Added
+
+- `aphrodite setup` downloads missing dylibs from the matching GitHub Release
+  when the local search exhausts all paths - makes
+  `cargo install aphrodite && aphrodite setup` work without a source checkout.
+- `/ccr/create` now feeds the compression-ratio EMA (same auto-tune loop as the
+  Chat Completions path).
+
+### Fixed
+
+- Dylib hot-reload cache staleness - each load copies to a unique temp path so
+  the macOS dynamic linker cannot serve a stale image after rebuild.
+- FFI panic-guard sweep - remaining bare `extern "C"` functions wrapped so a
+  panic cannot abort the host process across the boundary.
+
+### Chore
+
+- Benchmarks relocated into `crates/aphrodite/examples/`; docs synced;
+  Headroom fork advanced (87-commit upstream sync).
+
 ## v1.3.2 - Correctness Sweep: Compression Losslessness, Proxy Security, Release Channel (2026-07-14)
 
 ### Summary

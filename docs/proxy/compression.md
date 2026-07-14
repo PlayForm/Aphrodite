@@ -178,6 +178,42 @@ correction.
 | Cache | `<<<CCR:{hash}\|{type}\|{size}>>>` followed by the first 512 bytes of content as a preview - simpler format, no structured metadata                                               |
 | Token | `<<<CCR:{hash}\|{type}\|{size}\|{metadata_flat}>>` via `smart_marker`, where metadata includes type-specific keys: `lang=rs`, `fns=main,init`, `ln=42`, `keys=status,error`, etc. |
 
+## Enriched Preview Catalog
+
+Every marker carries a compact, human-readable preview built by
+`build_preview` (`crates/aphrodite/src/preview.rs`). These enriched previews
+are **automatic and default** - no flag - and are emitted identically on both
+the proxy path and the Hermes hook/FFI path (both funnel through the same
+`build_preview` function).
+
+When the classifier only reaches a generic bucket (`text`/`terminal`/`log`/
+empty), an Aphrodite-side semantic detector (`detect_semantic_type`) upgrades
+the arm to a high-signal shape (git status, git log, grep, ls, test) before
+the preview is built. Detection is conservative (line-prefix / marker
+patterns, majority votes) so ordinary prose is never mis-tagged. An explicit
+non-generic type from the classifier is always honored as-is.
+
+| Content type                           | Enriched preview shape                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| build / build_output / build_error     | `[build:1E 1W 142L \| error[E0432]: unresolved import ...]` (first error msg) |
+| diff                                   | `[diff:2F +7/-3 12L \| src/main.rs Cargo.toml +N more]` (first file names)  |
+| git status (`git`)                     | `[git:2M 2A 1D 3?? \| src/x.rs src/y.rs +5 more]` (code tallies + paths)    |
+| git log (`gitlog`)                     | `[gitlog:2 commits \| abc1234 fix… → def5678 feat…]` (first→last hash/subj) |
+| directory listing (`ls`)               | `[ls:3 files 2 dirs \| .rs×2 .md×1]` (file/dir counts + top extensions)     |
+| test output (`test`)                   | `[test:220 pass 0 fail 1 ignored \| 0.31s]` (or `\| FAIL name` on failure)  |
+| grep / ripgrep (`grep`)                | `[grep:4 hits in 3 files \| src/preview.rs:12 …]` (hits, files, first loc)  |
+| source_code / code_* (`code`)          | `[code:3fns\|2structs fn main() 414L]` (structure map + first signature)    |
+| search (`search`)                      | `[search:Nhits ML]`                                                         |
+| json_array (`json`)                    | `[json:5items 3L]`                                                          |
+| terminal (`terminal`)                  | `[terminal:14L exit code: 0]` (exit-code / last-output-line context)        |
+| plain text / unrecognized (fallback)   | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)    |
+
+The semantic-detection upgrade (`git`, `gitlog`, `grep`, `ls`, `test`) landed
+in commit `c53cb5e`; the terminal arm and the first-line text fallback are
+part of the same enriched-preview pass. See also
+[../ccr/content-types.md](../ccr/content-types.md) for the underlying type
+taxonomy.
+
 ## 6. EMA Update
 
 ```rust

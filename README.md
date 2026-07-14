@@ -9,10 +9,11 @@
 > **Your LLM burns 90% of its context on output it never reads. We fix that.**
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.
-> Sub-ms compress, 12,800× max ratio, 26-type classifier, TOML-driven.
+> Up to 610× on the standard corpus (132× overall), ~10 ms end-to-end,
+> 26-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.3.3-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/badge/release-v1.3.4-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/crates/v/aphrodite?color=orange)](https://crates.io/crates/aphrodite)
 [![plugin](https://img.shields.io/badge/plugin-v2.0.6-purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 ![rust](https://img.shields.io/badge/rust-1.88+-orange)
@@ -131,14 +132,17 @@ needs it.
 ```
  ANY OUTPUT ──────► Aphrodite ──────► Agent (preview, not raw)
                        │
-                       ├─ tool output    → [build:2E 0W 14L]
-                       ├─ terminal       → [terminal:cargo build exit=0]
-                       ├─ file read      → [code_rust:3fns 414L]
-                       ├─ search results → [search:10 results 5L]
-                       ├─ build logs     → [build:1E 2W 142L]
-                       ├─ browser snap   → [dom:342 elements]
-                       ├─ JSON blobs     → [json:total_items,by_type]
-                       └─ tracebacks     → [error:AttributeError]
+                       ├─ build logs     → [build:1E 1W 142L | error[E0432]: ...]
+                       ├─ terminal       → [terminal:14L exit code: 0]
+                       ├─ file read      → [code:3fns|2structs fn main() 414L]
+                       ├─ grep/ripgrep   → [grep:4 hits in 3 files | src/x.rs:12 …]
+                       ├─ git status     → [git:2M 1A 1D 3?? | src/x.rs +N more]
+                       ├─ git log        → [gitlog:2 commits | abc123 … → def456 …]
+                       ├─ test output    → [test:220 pass 0 fail 1 ignored | 0.31s]
+                       ├─ dir listing    → [ls:3 files 2 dirs | .rs×2 .md×1]
+                       ├─ diff           → [diff:2F +7/-3 12L | src/main.rs Cargo.toml]
+                       ├─ JSON blobs     → [json:5items 3L]
+                       └─ plain text     → [text:3L 50B | first line hint …]
 
     Agent decides:
     • Preview is enough → skip retrieval, keep reasoning
@@ -149,12 +153,18 @@ needs it.
     • Agent never hits context window ceiling
 ```
 
-Four layers, all under 1ms:
+Four layers, all fast (classification 40-123 ns; whole compress step
+sub-millisecond, dwarfed by the HTTP round-trip):
 
 1. **Classify** - 26-type regex classifier identifies content (40-123 ns)
-2. **Template** - TOML-driven templates produce `[type:key=val]` previews
+2. **Preview** - enriched, type-aware previews (git/test/grep/log/build/diff/
+   code/ls, etc.) produced by default on both the proxy and hook paths
 3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
 4. **Decide** - Agent reads preview, retrieves only when needed
+
+The enriched preview shapes are emitted automatically (no flag) - see
+[docs/proxy/compression.md](docs/proxy/compression.md#enriched-preview-catalog)
+for the full content-type → preview catalog.
 
 ---
 
@@ -346,7 +356,7 @@ aphrodite
 
 # Verify
 curl http://127.0.0.1:9798/health
-# -> {"status":"healthy","ccr":true,"mode":"token","version":"1.3.3","fill_pct":90.0}
+# -> {"status":"healthy","ccr":true,"mode":"token","version":"1.3.4","fill_pct":90.0}
 
 # Dev loop with auto-reload (also rebuilds aphrodite-hermes's dylib, not just
 # the proxy binary - see "Developer Workflow" above)
@@ -388,24 +398,45 @@ Two more knobs worth knowing about:
 
 ## Performance ⚡
 
-| Size   | Text  | Code  | JSON  |  Ratio  |
-| :----- | :---: | :---: | :---: | :-----: |
-| 1 KB   | 0.4ms | 0.3ms | 0.5ms |   26×   |
-| 10 KB  | 0.6ms | 0.7ms | 3.5ms |  256×   |
-| 50 KB  | 0.7ms | 0.6ms | 1.0ms | 1,280×  |
-| 100 KB | 1.1ms | 1.0ms | 1.1ms | 2,560×  |
-| 500 KB | 2.1ms | 7.9ms | 2.8ms | 12,800× |
+Standard corpus (`bench_01`, 20 samples, 106,256 B, measured 2026-07-14).
+Ratio scales with input size and drops with entropy - tiny/high-entropy
+inputs compress little, large low-entropy prose compresses a lot:
 
-| Metric                    |   Value   |
-| :------------------------ | :-------: |
-| Compression latency (avg) |  1.6 ms   |
-| Classification latency    | 40-123 ns |
-| Preview generation        | <0.05 ms  |
+| Sample (size)                 |        Ratio        |
+| :---------------------------- | :-----------------: |
+| `tiny_text` (120 B)           |        3.00×        |
+| `json_tool` (675 B)           |       16.88×        |
+| `rust_code` (2,673 B)         |       66.83×        |
+| `linter_output` (4,014 B)     |       100.35×       |
+| `log_output` (4,943 B)        |       123.58×       |
+| `code_go` (5,712 B)           |       142.80×       |
+| `unicode_cjk` (6,720 B)       |       168.00×       |
+| `build_error` (6,949 B)       |       173.72×       |
+| `code_js` (7,212 B)           |       180.30×       |
+| `search_results` (10,080 B)   |       252.00×       |
+| `large_prose` (11,400 B)      |       285.00×       |
+| `huge_prose` (24,400 B)       |     **610.00×**     |
+| **Overall (106,256 → 800 B)** |     **132.82×**     |
+
+Range: **3.00×** (120 B) to **610.00×** (24 KB prose); overall **132.82×**.
+Cache and token modes measured identical ratios. 20/20 compressed, 20/20
+retrieve round-trips OK (0 misses).
+
+| Metric                     |           Value           |
+| :------------------------- | :-----------------------: |
+| End-to-end latency (cache) | 9-40 ms (HTTP round-trip) |
+| End-to-end latency (token) |      8-10 ms typical      |
+| Classification latency     |         40-123 ns         |
+
+Latency figures are end-to-end - they include the HTTP round-trip, not just
+the compress call. The compress step itself is sub-millisecond; the corpus
+harness does not isolate it, so we quote the measured wall-clock numbers
+rather than a compress-only figure.
 
 Benchmarks (`cargo run --release -p aphrodite --example bench_0N_*`, see
 `crates/aphrodite/examples/`) and the in-process smoke suite
-(`aphrodite_test`, 3 checks in `full` mode) are reproducible commands rather
-than fixed pass-rate numbers - run them directly to see current results.
+(`aphrodite_test`, 3 checks in `full` mode) are reproducible commands - run
+them directly to reproduce the numbers above.
 
 ### Real-world savings (Hermes Agent, deepseek-v4-pro)
 

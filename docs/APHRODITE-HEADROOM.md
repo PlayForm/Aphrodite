@@ -46,7 +46,7 @@ Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
 | **API surface**          | Added `/ccr/create`, `/ccr/list`, `/ccr/{hash}` programmatic endpoints                                                                                                                                |
 | **Retrieve**             | Full `POST /retrieve` with query filtering + pagination (no zstd decompression - every backend stores/returns content verbatim, so that branch was unreachable dead code and has been removed)        |
 | **Multi-proxy**          | Dual-proxy spawn from single TOML (`[[proxies]]` with name/mode/listen)                                                                                                                               |
-| **Prometheus**           | 31 metrics, latency histogram, per-type compression counters, EMAs                                                                                                                                    |
+| **Prometheus**           | 28 metrics, latency histogram, per-type compression counters, EMAs                                                                                                                                    |
 | **Build system**         | Version auto-bump, release automation (`scripts/auto-release.sh`)                                                                                                                                     |
 | **Testing**              | Smoke test suite, benchmark pipeline, verification checklist                                                                                                                                          |
 | **Cargo deps**           | Upgraded to latest (axum 0.7+, reqwest 0.13+, notify 8+)                                                                                                                                              |
@@ -62,7 +62,7 @@ The Aphrodite crate produces BOTH a proxy binary and a cdylib from one build:
 ```
 crates/aphrodite/
   ├── src/main.rs          # Proxy binary - spawns :9797 + :9798
-  ├── src/lib.rs           # 17 C ABI functions - cdylib for Python loading
+  ├── src/lib.rs           # 25 C ABI functions - cdylib for Python loading
   ├── src/proxy.rs         # Handler, compression, tool relay
   ├── src/resolve.rs       # CCR marker resolution (nested, recursive)
   ├── src/stage2.rs        # Semantic reduction (JSON, build, diff, code)
