@@ -9,18 +9,18 @@ dependency that Aphrodite extends.
 
 | Layer                     | Aphrodite                                                                               | Headroom (stock)         |
 | ------------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| **Hermes plugin**         | ✅ Full Hermes Agent plugin - hooks, 12 tools, context engine, smoke tests              | ❌ No Hermes integration |
+| **Hermes plugin**         | ✅ Full Hermes Agent plugin - hooks, 13 tools, context engine, smoke tests              | ❌ No Hermes integration |
 | **Proxy binaries**        | ✅ Dual-proxy mode (:9797 cache + :9798 token) with TOML config                         | Single proxy, CLI only   |
 | **Tool relay**            | ✅ Bidirectional `/tool/relay` - LLM calls Hermes tools through proxy                   | ❌                       |
 | **CCR endpoints**         | ✅ `/ccr/create`, `/ccr/list`, `/ccr/{hash}` REST API                                   | Basic CCR store          |
-| **Content classifier**    | ✅ 28-type classifier (diff, build, terminal, code, JSON, table…)                       | Generic                  |
+| **Content classifier**    | ✅ 26-type classifier (diff, build, terminal, code, JSON, table…)                       | Generic                  |
 | **Preview templates**     | ✅ TOML-driven `[type:key=val]` format, 3 families (compact/balance/code_first)         | ❌                       |
 | **Context engine**        | ✅ Async middle-message compression with head/tail protection                           | ❌                       |
 | **Auto-expand**           | ✅ Configurable marker resolution (off by default)                                      | ❌                       |
-| **HEALTH + Prometheus**   | ✅ `/health` endpoint, `/metrics` → 31 Prometheus metrics                               | Basic only               |
+| **HEALTH + Prometheus**   | ✅ `/health` endpoint, `/metrics` → 28 Prometheus metrics                               | Basic only               |
 | **Python settings store** | ✅ In-memory mutable store, API-driven reload, hot-reload from TOML                     | ❌                       |
 | **Config file watcher**   | ✅ Proxy + plugin auto-detect `aphrodite.toml` changes                                  | ❌                       |
-| **Hermes skills**         | ✅ 14 bundled skills for agent operation                                                | ❌                       |
+| **Hermes skills**         | ✅ 9 bundled skills for agent operation                                                 | ❌                       |
 | **Live container**        | ✅ `APHRODITE_LIVE_CONTAINER` mode for streaming `read_file` via CCR                    | ❌                       |
 | **Rhai scripting**        | ✅ Feature-gated hook injection (`--features scripting`)                                | ❌                       |
 | **Auto-download binary**  | ✅ Detects platform, downloads from GitHub releases, validates magic bytes              | ❌                       |
@@ -42,9 +42,9 @@ Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
 | **CCR marker**           | `<<<CCR:hash\|type\|size>>>` format shared across Rust and Python                                                                                                                                     |
 | **Compression pipeline** | Absorptive preview pipeline - new content types auto-formatted                                                                                                                                        |
 | **Tool relay**           | Added Hermes-specific tool relay protocol: `POST /tool/relay` with async callbacks                                                                                                                    |
-| **Content types**        | Extended from generic to 28 typed categories with TOML-driven templates                                                                                                                               |
+| **Content types**        | Extended from generic to 26 typed categories with TOML-driven templates                                                                                                                               |
 | **API surface**          | Added `/ccr/create`, `/ccr/list`, `/ccr/{hash}` programmatic endpoints                                                                                                                                |
-| **Retrieve**             | Full `POST /retrieve` with zstd decompression + query filtering + pagination                                                                                                                          |
+| **Retrieve**             | Full `POST /retrieve` with query filtering + pagination (no zstd decompression - every backend stores/returns content verbatim, so that branch was unreachable dead code and has been removed)      |
 | **Multi-proxy**          | Dual-proxy spawn from single TOML (`[[proxies]]` with name/mode/listen)                                                                                                                               |
 | **Prometheus**           | 31 metrics, latency histogram, per-type compression counters, EMAs                                                                                                                                    |
 | **Build system**         | Version auto-bump, release automation (`scripts/auto-release.sh`)                                                                                                                                     |
@@ -73,9 +73,9 @@ crates/aphrodite/
   └── src/config.rs        # MultiConfig from aphrodite.toml
 
 crates/aphrodite-hermes/   # Hermes-specific integration (cdylib)
-  ├── tools.rs             # 12 tool dispatch handlers
+  ├── tools.rs             # 13 tool dispatch handlers
   ├── schemas.rs           # JSON Schema definitions
-  └── skills.rs            # 14 bundled skills
+  └── skills.rs            # 9 bundled skills
 
 vendor/headroom/
   └── crates/headroom-core/  # Compression engine (PlayForm fork)

@@ -38,7 +38,7 @@ All five hooks register in `plugin.yaml`. Zero changes to Hermes core.
 | Terminal compression    | ✅ `transform_terminal_output`        | ❌                               |
 | Context engine          | ✅ Compresses middle messages         | ❌                               |
 | Auto-launch             | ✅ Proxies start automatically        | ❌ Manual `aphrodite` command    |
-| aphrodite\_\* tools     | ✅ 12 tools in agent namespace        | ❌ Agent doesn't know about them |
+| aphrodite\_\* tools     | ✅ 13 tools in agent namespace        | ❌ Agent doesn't know about them |
 | Bundled skills          | ✅ 9 skills auto-loaded               | ❌                               |
 | Prompt injection        | ✅ Retrieval guidance added           | ❌                               |
 | CCR storage             | ✅ Token + cache proxy                | ✅ Token + cache proxy           |

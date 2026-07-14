@@ -2,7 +2,7 @@
 name: aphrodite-benchmarking
 description: "Comprehensive benchmark protocol for aphrodite proxy - compression
     throughput, cache hit rates, cross-worker behavior, terminal threshold
-    verification, and all-type coverage. Current as of v0.8.43."
+    verification, and all-type coverage. Current as of v1.3.1."
 version: 1.2.0
 platforms: [macos]
 related_skills:
@@ -12,7 +12,7 @@ related_skills:
 # Aphrodite Proxy Benchmarking
 
 Protocol for running comprehensive benchmarks of the aphrodite compression
-proxy. Covers smoke tests, all 28 content types, center feature, cache hit
+proxy. Covers smoke tests, all 26 content types, center feature, cache hit
 rates, cross-worker behavior, and terminal output compression.
 
 ## The CCR Marker IS the Proof

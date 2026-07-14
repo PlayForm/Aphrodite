@@ -29,7 +29,7 @@ let app = Router::new()
 	"status": "healthy",
 	"ccr": true,
 	"mode": "token",
-	"version": "0.5.69",
+	"version": "1.3.1",
 	"fill_pct": 90.0
 }
 ```

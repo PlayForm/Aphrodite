@@ -9,7 +9,7 @@
 > **Your LLM burns 90% of its context on output it never reads. We fix that.**
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.
-> Sub-ms compress, 12,800× max ratio, 28-type classifier, TOML-driven.
+> Sub-ms compress, 12,800× max ratio, 26-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
 [![release](https://img.shields.io/badge/release-v1.3.1-blue)](https://github.com/PlayForm/Aphrodite/releases)
@@ -106,7 +106,7 @@ cargo build --release -p aphrodite -p aphrodite-hermes
         └── aphrodite → ~/.hermes/plugins/aphrodite
 ```
 
-The plugin registers **12 tools** (`aphrodite_*`), **5 hooks**, and a **context engine** -
+The plugin registers **13 tools** (`aphrodite_*`), **5 hooks**, and a **context engine** -
 all routed through the Rust dylib. Two proxies launch automatically on `:9797` (cache)
 and `:9798` (token).
 
@@ -151,7 +151,7 @@ needs it.
 
 Four layers, all under 1ms:
 
-1. **Classify** - 28-type regex classifier identifies content (40-123 ns)
+1. **Classify** - 26-type regex classifier identifies content (40-123 ns)
 2. **Template** - TOML-driven templates produce `[type:key=val]` previews
 3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
 4. **Decide** - Agent reads preview, retrieves only when needed
@@ -169,14 +169,14 @@ crates/aphrodite/          ← Core compression engine (binary + cdylib)
   ├── struct_extract.rs    ← Code structure extraction (Rust, Python, Go, JS/TS)
   ├── state.rs             ← Session state, inline store, LRU
   ├── catalog.rs, session.rs, marker.rs, prefetch.rs, config_loader.rs
-  └── lib.rs               ← 22 C ABI functions for dylib loading
+  └── lib.rs               ← 25 C ABI functions for dylib loading
 
 crates/aphrodite-hermes/   ← Hermes-specific integration (cdylib)
-  ├── tools.rs             ← 12 tool dispatch handlers
+  ├── tools.rs             ← 13 tool dispatch handlers
   ├── schemas.rs           ← JSON Schema definitions
   └── skills.rs            ← Bundled Hermes skills
 
-plugins/aphrodite/         ← Thin Python loader (423 lines)
+plugins/aphrodite/         ← Thin Python loader (421 lines)
   └── __init__.py          ← loads dylib, registers hooks/tools/engine via C ABI
 ```
 
@@ -243,7 +243,7 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 ```
 plugins/aphrodite/          ← Standalone Hermes plugin (git submodule)
   __init__.py               ← Python loader (ctypes FFI, thin shim)
-  plugin.yaml               ← 12 tools, 5 hooks, context engine
+  plugin.yaml               ← 13 tools, 5 hooks, context engine
   download.sh               ← Binary auto-downloader (macOS/Linux/Git Bash/WSL)
   download.ps1              ← Binary auto-downloader (native Windows PowerShell)
   binaries/                 ← Platform-native dylib + proxy binary
@@ -251,7 +251,7 @@ plugins/aphrodite/          ← Standalone Hermes plugin (git submodule)
 
 crates/aphrodite/           ← Core engine (binary + cdylib)
   src/
-    lib.rs                  ← 22 C ABI functions (session, hooks, catalog, …)
+    lib.rs                  ← 25 C ABI functions (session, hooks, catalog, …)
     proxy.rs                ← HTTP proxy server (:9797/:9798)
     hooks.rs                ← transform_tool_result, terminal, pre/post LLM
     session.rs              ← Turn lifecycle, conversation index, git cache
@@ -267,7 +267,7 @@ crates/aphrodite/           ← Core engine (binary + cdylib)
 crates/aphrodite-hermes/    ← Hermes bridge
   src/
     lib.rs                  ← Universal dispatch (5 hooks → Rust functions)
-    tools.rs                ← 12 tool handler implementations
+    tools.rs                ← 13 tool handler implementations
     schemas.rs              ← JSON Schema for all tools
     skills.rs               ← Bundled skill registration for Hermes
 
@@ -341,7 +341,7 @@ aphrodite
 
 # Verify
 curl http://127.0.0.1:9798/health
-# -> {"status":"ok","version":"v1.2.2"}
+# -> {"status":"healthy","ccr":true,"mode":"token","version":"1.3.1","fill_pct":90.0}
 
 # Dev loop with auto-reload
 RUST_LOG=aphrodite=info cargo watch -x 'run -p aphrodite'

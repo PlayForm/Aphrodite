@@ -34,7 +34,7 @@ tool output → classify → template → store → <<<CCR:hash|type|size>>>
 
 Four pipeline stages, all under 1ms:
 
-1. **Classify** - 28-type regex classifier (`diff`, `build_output`, `code_rust`, …)
+1. **Classify** - 26-type regex classifier (`diff`, `build_output`, `code_rust`, …)
 2. **Template** - TOML-driven preview templates per content type
 3. **Store** - blake3 hash → SQLite or in-memory → CCR marker
 4. **Preview** - Structured `[type:metadata]` the LLM reads instantly
@@ -45,7 +45,7 @@ Four pipeline stages, all under 1ms:
 
 ```
 src/
-├── lib.rs               ← 22 C ABI exports for dylib loading
+├── lib.rs               ← 25 C ABI exports for dylib loading
 ├── proxy.rs             ← HTTP proxy (:9797 cache, :9798 token)
 ├── hooks.rs             ← transform_tool_result, terminal, pre/post LLM
 ├── session.rs           ← Turn lifecycle, conversation index, catalog
@@ -60,13 +60,13 @@ src/
 ├── prefetch.rs          ← Background file read + compress threads
 ├── preview.rs           ← detect_type, build_preview (shared across proxy + dylib)
 ├── main.rs              ← Binary entry point
-└── retrieve.rs          ← POST /retrieve — hash → content, zstd decode, filter, paginate
+└── retrieve.rs          ← POST /retrieve - hash → content, zstd decode, filter, paginate
 ```
 
 ## C ABI (22 functions)
 
 The 22 `#[no_mangle] extern "C"` exports in `lib.rs` serve both the
-`aphrodite-hermes` bridge crate (which re-exports a higher-level ABI — see
+`aphrodite-hermes` bridge crate (which re-exports a higher-level ABI - see
 `crates/aphrodite-hermes/README.md`) and the Python plugin's ctypes bindings.
 
 ---

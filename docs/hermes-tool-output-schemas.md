@@ -7,7 +7,7 @@ it documents. Its machine-readable companion is
 `Maintain/hermes_tool_output_formats.json`.
 
 > **Every tool your agent runs produces output with a unique shape. This
-> document maps every single one - 43 tools, 28 classification types, 100+
+> document maps every single one - 43 tools, 22 classification types, 100+
 > extraction patterns. The absorptive classifier uses this as its playbook.**
 
 Comprehensive reference of ALL Hermes tool output formats, their classification
@@ -17,7 +17,7 @@ documented here first - the classifier follows.
 
 ---
 
-## Classification Taxonomy (28 types)
+## Classification Taxonomy (22 types)
 
 | Type               | Detects                  | Key fields                 |
 | ------------------ | ------------------------ | -------------------------- |

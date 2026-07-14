@@ -543,6 +543,9 @@ async fn run_single(
                     if let Some(c) = ue["5xx"].as_u64() { out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"5xx\"}} {c}\n")); }
                     if let Some(t) = ue["timeouts"].as_u64() { out.push_str(&format!("aphrodite_upstream_timeouts_total {t}\n")); }
                     if let Some(c) = ue["connect_errors"].as_u64() { out.push_str(&format!("aphrodite_upstream_connect_errors_total {c}\n")); }
+                    // 02-F9: mid-stream SSE chunk errors - added to /stats when
+                    // sse_stream_errors was introduced, but missed here.
+                    if let Some(c) = ue["sse_stream_errors"].as_u64() { out.push_str(&format!("aphrodite_sse_stream_errors_total {c}\n")); }
                 }
                 // CCR store info
                 if let Some(cs) = stats["ccr_store"].as_object() {

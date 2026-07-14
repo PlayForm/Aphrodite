@@ -4,7 +4,7 @@ Aphrodite compresses context before it hits the LLM - through a reverse proxy
 for any OpenAI-compatible client, or as a native Hermes plugin with hook-level
 interception. Covers tool output, terminal output, file reads, search results,
 browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
-28-type classifier, context engine, and prefetch pipeline - all under 1ms.
+26-type classifier, context engine, and prefetch pipeline - all under 1ms.
 
 ## Index
 
@@ -86,9 +86,9 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 ### Tool Relay
 
-- [Tools](tool-relay/tools.md) - 12 tools with full JSON schemas:
-  aphrodite_retrieve, compress, stats, rebuild, files, diff, search, test,
-  catalog, reclassify, prefetch, prefetch_status. All delegate to Rust dylib
+- [Tools](tool-relay/tools.md) - 13 tools with full JSON schemas:
+  aphrodite_retrieve, compress, stats, rebuild, files, diff, search, directive,
+  test, catalog, reclassify, prefetch, prefetch_status. All delegate to Rust dylib
 - [Callbacks](tool-relay/callbacks.md) - Async tool relay + CCR create
   notifications. SSRF protection (https only), Bearer token auth, 5s timeout,
   TaskTracker lifecycle, metrics
@@ -113,7 +113,7 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 - [Health](api/health.md) - GET /health →
   `{status, ccr, mode, version, fill_pct}` (public, no loopback)
-- [Metrics](api/metrics-endpoint.md) - GET /metrics → Prometheus text, 31
+- [Metrics](api/metrics-endpoint.md) - GET /metrics → Prometheus text, 28
   metrics, 5 latency buckets
 - [Retrieve](api/retrieve.md) - POST /retrieve `{hash, query?, offset?, limit?}`
   → `{found, content, source}`

@@ -54,8 +54,8 @@ The bridge provides:
 
 ```
 src/
-├── lib.rs          ← Universal dispatch: 14 hooks → Rust functions
-├── tools.rs        ← 12 tool handler implementations
+├── lib.rs          ← Universal dispatch: 5 hooks → Rust functions
+├── tools.rs        ← 13 tool handler implementations
 ├── schemas.rs      ← JSON Schema for all tools
 ├── skills.rs       ← Bundled skill registration
 ```
@@ -64,7 +64,7 @@ src/
 
 ## Tools
 
-All 12 tools are registered as closures in one `tool_registry()` HashMap in
+All 13 tools are registered as closures in one `tool_registry()` HashMap in
 `src/tools.rs` (not separate per-tool modules) - full schemas and handler
 behavior in [Tool Relay: Tools](../../docs/tool-relay/tools.md):
 
@@ -77,13 +77,14 @@ behavior in [Tool Relay: Tools](../../docs/tool-relay/tools.md):
 | `aphrodite_search`          |
 | `aphrodite_diff`            |
 | `aphrodite_files`           |
+| `aphrodite_directive`       |
 | `aphrodite_test`            |
 | `aphrodite_rebuild`         |
 | `aphrodite_reclassify`      |
 | `aphrodite_prefetch`        |
 | `aphrodite_prefetch_status` |
 
-`tool_registry()` also holds a 13th, internal-only entry -
+`tool_registry()` also holds a 14th, internal-only entry -
 `context_engine_pre_llm` - the context engine's pre-LLM hook, not a
 Hermes-callable tool (it isn't in `plugin.yaml`'s `provides_tools`).
 
@@ -106,7 +107,7 @@ code with zero call sites, so this always returned `{"total": 0}`).
 - [Installing Aphrodite](../../docs/install/README.md) - which artifact you
   need, per-platform install guides, troubleshooting
 - [Tool Relay: Tools](../../docs/tool-relay/tools.md) - full schema +
-  handler behavior for all 12 tools this crate dispatches
+  handler behavior for all 13 tools this crate dispatches
 - [Hermes Integration](../../docs/hermes-integration.md) - why a native
   plugin sees things a generic HTTP proxy can't
 

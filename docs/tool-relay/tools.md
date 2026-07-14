@@ -1,7 +1,7 @@
 # Tool Relay Tools
 
-Aphrodite exposes 12 tools to the Hermes agent for compression, retrieval,
-stats, and session management. All 12 dispatch entirely inside the Rust
+Aphrodite exposes 13 tools to the Hermes agent for compression, retrieval,
+stats, and session management. All 13 dispatch entirely inside the Rust
 dylib - the Python plugin shim forwards tool calls in and returns the JSON
 result verbatim; there's no separate Python-side tool logic to know about.
 
@@ -15,16 +15,17 @@ result verbatim; there's no separate Python-side tool logic to know about.
 | 4   | `aphrodite_files`           | File paths referenced this session                              |
 | 5   | `aphrodite_diff`            | Conversation turn history                                       |
 | 6   | `aphrodite_search`          | Search compressed entries by keyword or type                    |
-| 7   | `aphrodite_test`            | In-process smoke test: compress → retrieve round trips          |
-| 8   | `aphrodite_catalog`         | Full or table-of-contents view of everything compressed         |
-| 9   | `aphrodite_reclassify`      | Re-detect type/preview for already-stored entries               |
-| 10  | `aphrodite_prefetch`        | Read + compress files ahead of time                             |
-| 11  | `aphrodite_prefetch_status` | What prefetch has loaded so far                                 |
-| 12  | `aphrodite_rebuild`         | Report binary/proxy version and rebuild instructions            |
+| 7   | `aphrodite_directive`       | List/swap/add/remove/reset active behavioral directives         |
+| 8   | `aphrodite_test`            | In-process smoke test: compress → retrieve round trips          |
+| 9   | `aphrodite_catalog`         | Full or table-of-contents view of everything compressed         |
+| 10  | `aphrodite_reclassify`      | Re-detect type/preview for already-stored entries               |
+| 11  | `aphrodite_prefetch`        | Read + compress files ahead of time                             |
+| 12  | `aphrodite_prefetch_status` | What prefetch has loaded so far                                 |
+| 13  | `aphrodite_rebuild`         | Report binary/proxy version and rebuild instructions            |
 
 All handlers share one session state, so content compressed by a hook or
 `aphrodite_compress` stays resolvable by `aphrodite_retrieve` for the life of
-the session. There's also an internal 13th entry, `context_engine_pre_llm` -
+the session. There's also an internal 14th entry, `context_engine_pre_llm` -
 the context engine's own pre-LLM hook, not a tool an agent calls directly.
 
 ## 1. aphrodite_compress
@@ -162,7 +163,29 @@ Returns `{total, turns: [...]}`.
 Case-insensitive match against preview text or type, newest first, capped at
 20 results. Returns `{query, total, results: [{hash, type, size, preview}]}`.
 
-## 7. aphrodite_test
+## 7. aphrodite_directive
+
+```json
+{
+	"name": "aphrodite_directive",
+	"description": "List, activate, or deactivate behavioral directives - short instructions injected into context via pre_llm_call (e.g. 'focus' for minimal tool usage, 'explore' for broad reading).",
+	"parameters": {
+		"type": "object",
+		"properties": {
+			"action": { "type": "string", "description": "list (default) | swap | add | remove | reset" },
+			"name": { "type": "string", "description": "Directive name - required for swap/add/remove" }
+		}
+	}
+}
+```
+
+`list` returns `{available, active}`; `swap` replaces the active set with a
+single directive; `add`/`remove` mutate the active set; `reset` clears it.
+Active directives' full bodies (from `directives/*.md`, `#`-markers
+stripped) are injected into `pre_llm_call`'s `context` string, appended
+after the catalog summary.
+
+## 8. aphrodite_test
 
 ```json
 {
@@ -173,7 +196,7 @@ Case-insensitive match against preview text or type, newest first, capped at
 		"properties": {
 			"mode": {
 				"type": "string",
-				"description": "Test mode: quick (default), full, or matrix"
+				"description": "Test mode: quick (default, 1 sample) or anything else (full, 3 samples)"
 			}
 		}
 	}
@@ -189,7 +212,7 @@ Returns `{mode, status: "ok"|"fail", passed, total, checks, proxies}`. This is
 the same tool [Troubleshooting](../install/troubleshooting.md#verify-the-proxy-without-hermes)
 points to for confirming things work without a full Hermes session.
 
-## 8. aphrodite_catalog
+## 9. aphrodite_catalog
 
 ```json
 {
@@ -210,7 +233,7 @@ points to for confirming things work without a full Hermes session.
 `mode: "toc"` returns a compact `{hash, type, size, preview}` per entry; the
 default full mode adds `{turn}`. Newest entries first.
 
-## 9. aphrodite_reclassify
+## 10. aphrodite_reclassify
 
 ```json
 {
@@ -236,7 +259,7 @@ Re-runs type detection and preview generation against already-stored content
 (all entries, or one `hash`), updating the marker in place. Returns
 `{status: "ok", reclassified: <count>}`.
 
-## 10. aphrodite_prefetch
+## 11. aphrodite_prefetch
 
 ```json
 {
@@ -260,7 +283,7 @@ Despite "background" in the description, prefetch currently runs
 synchronously - anything it reports is already resolvable by the time the
 tool call returns.
 
-## 11. aphrodite_prefetch_status
+## 12. aphrodite_prefetch_status
 
 ```json
 {
@@ -274,7 +297,7 @@ Returns `{loading: [], ready: [{path, hash, type, size}], errors: [], total_read
 `loading`/`errors` are always empty today since prefetch is synchronous -
 anything tracked is immediately `ready`.
 
-## 12. aphrodite_rebuild
+## 13. aphrodite_rebuild
 
 Reports state rather than performing a rebuild - the dylib can't safely
 rebuild itself mid-session. Returns

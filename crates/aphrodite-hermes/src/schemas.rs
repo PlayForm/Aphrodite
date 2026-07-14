@@ -126,7 +126,7 @@ fn schema_test() -> serde_json::Value {
 		"parameters": {
 			"type": "object",
 			"properties": {
-				"mode": {"type": "string", "description": "Test mode: quick (default), full, or matrix"}
+				"mode": {"type": "string", "description": "Test mode: quick (default, 1 sample) or anything else (full, 3 samples)"}
 			}
 		}
 	})
@@ -186,7 +186,7 @@ fn schema_prefetch_status() -> serde_json::Value {
 fn schema_rebuild() -> serde_json::Value {
 	json!({
 		"name": "aphrodite_rebuild",
-		"description": "Rebuild aphrodite crate from source and install binary. Use after code changes.",
+		"description": "Report the running binary's version and proxy health, with a hint for how to rebuild from source - does not rebuild or install anything itself.",
 		"parameters": {
 			"type": "object",
 			"properties": {}
