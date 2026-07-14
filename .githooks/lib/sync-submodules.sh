@@ -75,7 +75,6 @@ sync_submodules() {
 		remote=$(git -C "$path" remote -v 2>/dev/null | awk -v u="$sub_url" '$2==u && $3=="(fetch)"{print $1; exit}')
 		[ -z "$remote" ] && remote="origin"
 
-		before=$(git -C "$path" rev-parse HEAD 2>/dev/null)
 		if ! git -C "$path" fetch --quiet "$remote" "$branch" 2>/dev/null; then
 			skipped="$skipped $path(fetch-failed)"
 			continue
@@ -88,8 +87,15 @@ sync_submodules() {
 
 		git -C "$path" checkout -B "$branch" "$remote/$branch" --quiet 2>/dev/null
 
+		# Compare against the superproject's OWN recorded pin, not just this
+		# run's before/after - a submodule can already be ahead of the pin
+		# without this run's float having moved it (e.g. a direct commit +
+		# push made straight in the submodule outside this hook entirely).
+		# Comparing only before/after missed that case: nothing changed
+		# during THIS invocation, so the pin bump silently never happened.
 		after=$(git -C "$path" rev-parse HEAD 2>/dev/null)
-		if [ "$before" != "$after" ]; then
+		pinned=$(git rev-parse "HEAD:$path" 2>/dev/null)
+		if [ -n "$after" ] && [ "$after" != "$pinned" ]; then
 			changed="$changed $path"
 		fi
 	done
