@@ -14,22 +14,22 @@ required-features = ["proxy"]
 
 [[example]]
 name = "bench_01_corpus"
-path = "../../Maintain/examples/bench_01_corpus.rs"
+path = "examples/bench_01_corpus.rs"
 required-features = ["proxy"]
 
 [[example]]
 name = "bench_02_threshold"
-path = "../../Maintain/examples/bench_02_threshold.rs"
+path = "examples/bench_02_threshold.rs"
 required-features = ["proxy"]
 
 [[example]]
 name = "bench_03_retrieve"
-path = "../../Maintain/examples/bench_03_retrieve.rs"
+path = "examples/bench_03_retrieve.rs"
 required-features = ["proxy"]
 
 [[example]]
 name = "bench_04_ema"
-path = "../../Maintain/examples/bench_04_ema.rs"
+path = "examples/bench_04_ema.rs"
 required-features = ["proxy"]
 
 [lib]
