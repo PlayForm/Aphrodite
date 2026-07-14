@@ -75,9 +75,13 @@ def _load_dylib() -> ctypes.CDLL:
             str(_PLUGIN_DIR / "binaries" / _DYLIB_NAME),
             str(_PLUGIN_DIR.parent / "binaries" / _DYLIB_NAME),
         ]
-        if sys.platform == "darwin":
+        # Monorepo dev-build fallback: for `<repo>/plugins/aphrodite/__init__.py`,
+        # parents[2] is `<repo>` (where `target/release` actually lives) - not
+        # darwin-specific (Linux dev builds want the .so equally), and
+        # parents[3] covers a one-deeper nesting some checkouts use.
+        for depth in (2, 3):
             candidates.append(
-                str(Path(__file__).resolve().parents[3] / "target" / "release" / _DYLIB_NAME)
+                str(Path(__file__).resolve().parents[depth] / "target" / "release" / _DYLIB_NAME)
             )
         for p in candidates:
             if os.path.exists(p):
@@ -384,8 +388,26 @@ def register(ctx: Any) -> None:
                 _log.warning("failed to register tool %s: %s", name, e)
         _log.info("registered %d tools: %s", len(registered), registered)
 
-    # Register skills - from monorepo skills/ directory (Hermes wants a Path).
-    _skills_dir = Path(__file__).resolve().parent.parent.parent / "skills"
+    # Register skills - probe candidate layouts in order (Hermes wants a Path):
+    # a `skills/` copied alongside this plugin (the standalone/`aphrodite setup`
+    # install target), the monorepo layout (`<repo>/skills`, two levels up from
+    # `<repo>/plugins/aphrodite`), and one level further for a deeper nesting.
+    # Under a resolved symlink install (`~/.hermes/plugins/aphrodite` ->
+    # `~/.hermes/aphrodite`), the old hardcoded `parent.parent.parent` guess
+    # landed on `~/skills` (never exists) - 0 of the 9 advertised skills ever
+    # registered outside a monorepo checkout, with only an info log to notice.
+    _skills_dir_candidates = [
+        _PLUGIN_DIR / "skills",
+        _PLUGIN_DIR.parents[1] / "skills",
+        _PLUGIN_DIR.parents[2] / "skills",
+    ]
+    _skills_dir = next((p for p in _skills_dir_candidates if p.is_dir()), None)
+    if _skills_dir is None:
+        _log.warning(
+            "no skills/ directory found (tried %s) - 0 skills will register",
+            _skills_dir_candidates,
+        )
+        _skills_dir = _skills_dir_candidates[0]
     skills = _call_json(dylib, "aphrodite_hermes_list_skills")
     if skills:
         count = 0
