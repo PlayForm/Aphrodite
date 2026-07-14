@@ -315,7 +315,7 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 			}
 		}
 		if !found {
-			// Local search exhausted — try downloading from the GitHub
+			// Local search exhausted - try downloading from the GitHub
 			// release matching this binary's version.  `cargo install`
 			// only delivers [[bin]] targets, never cdylib artifacts, so
 			// a `cargo install aphrodite && aphrodite setup` user will
@@ -358,7 +358,8 @@ fn download_dylib(dest_name:&str, dest:&Path) -> Result<(), String> {
 	let remote_name = format!("{base}-{triple}.{ext}");
 
 	let version = env!("CARGO_PKG_VERSION");
-	let url = format!("https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite/v{version}/{remote_name}");
+	let release_dir = format!("https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite/v{version}");
+	let url = format!("{release_dir}/{remote_name}");
 
 	println!("downloading {remote_name} from GitHub Releases...");
 	println!("  url: {url}");
@@ -381,6 +382,14 @@ fn download_dylib(dest_name:&str, dest:&Path) -> Result<(), String> {
 	match status {
 		Ok(s) if s.success() => {
 			println!("  downloaded -> {}", dest.display());
+			// SHA256SUMS-verified (F3): a missing sums file (e.g. a release
+			// cut before this was added) degrades to a loud warning rather
+			// than a hard failure, matching download.sh's own tolerance for
+			// older tags - see verify_download_checksum.
+			if let Err(e) = verify_download_checksum(&release_dir, triple, &remote_name, dest) {
+				let _ = fs::remove_file(dest);
+				return Err(e);
+			}
 			#[cfg(unix)]
 			secure_perms(dest, 0o755).map_err(|e| e.to_string())?;
 			Ok(())
@@ -388,6 +397,71 @@ fn download_dylib(dest_name:&str, dest:&Path) -> Result<(), String> {
 		Ok(s) => Err(format!("download failed with exit code {}", s.code().unwrap_or(-1))),
 		Err(e) => Err(format!("could not run download command: {e}")),
 	}
+}
+
+/// Fetch `SHA256SUMS-<triple>.txt` from the same release and verify `dest`
+/// against the entry for `asset_name`. Shells out to the platform's own
+/// hashing tool (`shasum`/`sha256sum`/`Get-FileHash`) rather than adding a
+/// crate dependency, matching this function's existing curl/PowerShell
+/// shell-out pattern.
+fn verify_download_checksum(release_dir:&str, triple:&str, asset_name:&str, dest:&Path) -> Result<(), String> {
+	let sums_url = format!("{release_dir}/SHA256SUMS-{triple}.txt");
+	let sums_text = if cfg!(windows) {
+		Command::new("powershell")
+			.args([
+				"-Command",
+				&format!("(Invoke-WebRequest -Uri '{sums_url}' -UseBasicParsing).Content"),
+			])
+			.output()
+	} else {
+		Command::new("curl").args(["-fsSL", &sums_url]).output()
+	};
+	let sums_text = match sums_text {
+		Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
+		_ => {
+			println!("  WARNING: {sums_url} not found - skipping checksum verification for this release");
+			return Ok(());
+		},
+	};
+	let expected = sums_text.lines().find_map(|line| {
+		let mut parts = line.split_whitespace();
+		let hash = parts.next()?;
+		let name = parts.next()?;
+		(name == asset_name).then(|| hash.to_lowercase())
+	});
+	let Some(expected) = expected else {
+		println!("  WARNING: {asset_name} has no entry in SHA256SUMS-{triple}.txt - skipping checksum check");
+		return Ok(());
+	};
+
+	let hash_output = if cfg!(windows) {
+		Command::new("powershell")
+			.args([
+				"-Command",
+				&format!("(Get-FileHash '{}' -Algorithm SHA256).Hash", dest.display()),
+			])
+			.output()
+	} else if Command::new("shasum").arg("--version").output().is_ok() {
+		Command::new("shasum").args(["-a", "256", dest.to_str().unwrap_or("")]).output()
+	} else {
+		Command::new("sha256sum").arg(dest.to_str().unwrap_or("")).output()
+	};
+	let actual = match hash_output {
+		Ok(o) if o.status.success() => {
+			String::from_utf8_lossy(&o.stdout)
+				.split_whitespace()
+				.next()
+				.unwrap_or("")
+				.to_lowercase()
+		},
+		_ => return Err("no shasum/sha256sum/Get-FileHash available to verify checksum".to_string()),
+	};
+
+	if actual != expected {
+		return Err(format!("checksum mismatch for {asset_name}: expected {expected}, got {actual}"));
+	}
+	println!("  checksum verified");
+	Ok(())
 }
 
 /// Return the Rust target triple for the current platform.
@@ -618,5 +692,34 @@ mod tests {
 		// args) while the real Hermes API + live plugin use
 		// `register_tool(name, toolset, schema, handler)` (4 args).
 		assert!(HERMES_PLUGIN_SHIM.contains(r#"ctx.register_tool(name, "aphrodite", schema, "#));
+	}
+
+	// Network-touching (real GitHub release) - not run by default, only on
+	// demand (`cargo test -p aphrodite --lib -- --ignored`) since the
+	// hermetic suite must stay network-free.
+	#[test]
+	#[ignore = "hits the real GitHub release - run explicitly to verify"]
+	fn test_verify_download_checksum_against_real_release() {
+		let dir = std::env::temp_dir().join("aphrodite-checksum-test");
+		fs::create_dir_all(&dir).unwrap();
+		let release_dir = "https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite/v1.3.2";
+		let triple = "aarch64-apple-darwin";
+		let asset = "aphrodite-aarch64-apple-darwin";
+		let dest = dir.join(asset);
+		let status = Command::new("curl")
+			.args(["-fsSL", "-o", dest.to_str().unwrap(), &format!("{release_dir}/{asset}")])
+			.status()
+			.unwrap();
+		assert!(status.success());
+
+		// Correct hash passes.
+		verify_download_checksum(release_dir, triple, asset, &dest).expect("real asset must verify clean");
+
+		// A deliberately corrupted file must be rejected, not silently accepted.
+		fs::write(&dest, b"corrupted content").unwrap();
+		let result = verify_download_checksum(release_dir, triple, asset, &dest);
+		assert!(result.is_err(), "corrupted asset must fail checksum verification");
+
+		fs::remove_dir_all(&dir).unwrap();
 	}
 }
