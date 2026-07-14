@@ -4,9 +4,11 @@ All logic in libaphrodite_hermes.dylib. This file is a thin registration shim.
 Architecture: __init__.py → ctypes → libaphrodite_hermes.dylib → aphrodite crate (rlib)
 """
 import ctypes
+import itertools
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import threading

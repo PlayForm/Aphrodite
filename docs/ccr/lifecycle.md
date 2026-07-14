@@ -3,8 +3,11 @@
 CCR (Compress-Cache-Retrieve) provides lossless end-to-end compression for LLM
 proxy traffic. Content is hashed, compressed, stored, and replaced with a
 marker in the response; the LLM retrieves the original by hash if it needs the
-full content. This doc walks through the six phases of that lifecycle, from
-initial compression to eventual expiry.
+full content. The `/ccr/create` endpoint (direct CCR store, no chat response)
+also updates the compression EMA after each successful store, using a
+trigram-uniqueness heuristic to estimate the compressed size. This doc walks
+through the six phases of that lifecycle, from initial compression to eventual
+expiry.
 
 ## Phase 1: Compress
 
@@ -33,6 +36,25 @@ initial compression to eventual expiry.
 ```
 ccr.get(hash) → hit? ccr_hits++ : ccr_misses++ (then store)
 ```
+
+### /ccr/create Path (Direct CCR Store)
+
+The direct `POST /ccr/create` endpoint follows a shorter path than the Chat
+Completions pipeline (no response body to rewrite, no marker rendered in a
+response), but it ALSO updates the compression EMA:
+
+```
+1. Parse CcrCreateRequest JSON → content, optional key, TTL, tags
+2. compute_key(content.as_bytes()) → hash
+3. ccr.put(hash, content) → stored
+4. tokens_saved += original_size - hash.len()
+5. requests_compressed += 1
+6. estimate_compressed_size(content) → trigram-uniqueness heuristic
+7. update_compression_ratio(original_size, estimated_compressed_size) → EMA
+```
+
+This path feeds the same EMA that the Chat Completions path does, so auto-tune
+thresholds react to content flowing through either endpoint.
 
 ### Inline Cache Check
 

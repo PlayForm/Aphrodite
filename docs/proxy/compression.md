@@ -2,8 +2,10 @@
 
 The proxy decides whether to compress each piece of Chat Completions response
 content, and if so, how. The pipeline detects content type, computes adaptive
-thresholds, checks cache, compresses with zstd, computes a rolling EMA for
-auto-tuning, and tracks token savings.
+thresholds, checks cache, compresses with zstd, and tracks token savings.
+The compression ratio EMA is updated from BOTH the Chat Completions path
+(using the rendered marker length) AND the direct `/ccr/create` endpoint
+(using a trigram-uniqueness heuristic for the compressed-size estimate).
 
 ## Full Pipeline
 

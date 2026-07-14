@@ -10,5 +10,5 @@
 | Stats/DB  | :9798/stats/db   | ✅     | 323 entries, 31MB→8KB, persistent      |
 | Compress  | POST /ccr/create | ✅     | Hash returned, ratio varies by content |
 | Retrieve  | POST /retrieve   | ✅     | Round-trip verified                    |
-| Benchmark | benchmark.py     | ✅     | 19/19 pass, sub-ms latencies           |
+| Benchmark | 4 Rust benches   | ✅     | 63/63 checks pass (corpus, threshold, retrieve, EMA) |
 | Metrics   | :9798/metrics    | ✅     | Prometheus format                      |

@@ -37,7 +37,7 @@
 | P0       | `task_tracker` no graceful shutdown                                 |
 | P1       | `reqwest::Client` missing `connect_timeout`                         |
 | P1       | `rand::random()` → `thread_rng()`                                   |
-| P1       | `compression_ratio_EMA` float truncation drift                      |
+| P1       | `compression_ratio_ema` u64×100 precision loss (acceptable — 0.01× granularity) |
 | P1       | `cache_key` includes `api_key` (intentional - cross-user isolation) |
 | P2       | Retry loop only retries transport, not 5xx HTTP                     |
 

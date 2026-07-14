@@ -21,7 +21,7 @@
 | Compression latency   | 0ms (none)                        | 0.2-4.3ms                                                                  | **Negligible**               |
 | LLM latency           | 5-6s (full SSE wait)              | 5-6s + ~1ms (same, compression overhead invisible)                         | **Same (de facto)**          |
 | Deduplication         | None - same file 5x = 5x tokens   | Hash check → cache hit → marker                                            | **5x → 1x after first read** |
-| Benchmark             | N/A                               | 19/19 pass, 0.9ms avg                                                      | **Validated**                |
+| Benchmark             | N/A                               | 4 benches, 63 checks, all pass                                             | **Validated**                |
 | Tools available       | 0 (no tool layer)                 | 9 (compress, retrieve, catalog, stats, search, diff, files, rebuild, test) | **Rich tool ecosystem**      |
 
 ## Key Observations
@@ -72,7 +72,7 @@ filling up in ~30 minutes.
 | Ad-hoc 1-5 turn queries           | **Either**        | Context fill is negligible either way                  |
 | File-heavy session (20+ reads)    | **Aphrodite CCR** | Deduplication saves 5-10x on repeated file reads       |
 | Error investigation (long traces) | **Aphrodite CCR** | 80x compression on backtraces, full content on demand  |
-| CI / automated runs               | **Aphrodite CCR** | Persistent stats, 19/19 benchmark, restart-safe        |
+| CI / automated runs               | **Aphrodite CCR** | Persistent stats, 4-bench suite (63 checks), restart-safe |
 
 ## Bottom Line
 

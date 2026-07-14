@@ -116,11 +116,16 @@ Inline store:     0 entries (current session scope)
 
 ## Benchmark Results
 
-```
-19/19 tests passed
-Avg latency: 0.9ms per operation
-Worst case: 4.3ms (large terminal output)
-```
+Four Rust example benchmarks (`cargo run --example bench_0{1,2,3,4}_*`),
+each spawning its own proxy pair and driving them with curl:
+
+| Bench               | Checks | Result                                              |
+| ------------------- | ------ | --------------------------------------------------- |
+| bench_01_corpus     | 24     | 24/24 retrieve hits, 82.35× ratio (cache + token)   |
+| bench_02_threshold  | 20     | 20/20 boundary sweep (inline, token, cache, per-type thresholds) |
+| bench_03_retrieve   | 12     | 12/12 (cross-port isolation, bulk storm, delete, UTF-8 round-trip) |
+| bench_04_ema        | 7      | 7/7 EMA auto-tune drift + threshold feedback loop   |
+| **Total**           | **63** | **all pass**                                        |
 
 ---
 

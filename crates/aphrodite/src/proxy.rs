@@ -324,6 +324,50 @@ pub struct AppState {
 	pub code_multiplier_x100:AtomicU64,
 }
 
+/// Estimate the effective compressed byte-size of `content` for EMA
+/// feedback purposes, using a simple byte-entropy heuristic.
+///
+/// Counts unique 3-byte trigrams in the first 4096 bytes.  Highly
+/// repetitive content (few unique trigrams) yields a small estimate
+/// → high compression ratio.  Near-random content yields an estimate
+/// close to the original size → ratio near 1×.
+///
+/// The estimate is clamped so the ratio never goes below 1.0× (a
+/// compressor can't expand content beyond the original size in the
+/// worst case — it stores the literal).
+fn estimate_compressed_size(content:&str) -> usize {
+	use std::collections::HashSet;
+
+	let bytes = content.as_bytes();
+	let sample = if bytes.len() <= 4096 { bytes } else { &bytes[..4096] };
+	if sample.len() < 3 {
+		// Too short for trigrams — just return a minimal size so the
+		// ratio is reasonable but not inflated.
+		return sample.len().max(40);
+	}
+
+	// Collect unique 3-byte trigrams.
+	let mut trigrams:HashSet<[u8;3]> = HashSet::with_capacity(sample.len().min(4096));
+	for window in sample.windows(3) {
+		trigrams.insert([window[0], window[1], window[2]]);
+	}
+
+	let unique = trigrams.len().max(1);
+	let total = sample.len().saturating_sub(2).max(1);
+
+	// Compressibility: what fraction of the content is NOT unique.
+	// 0.0 = perfectly random (no compression), 1.0 = fully repetitive.
+	let uniqueness = unique as f64 / total as f64;
+	let compressibility = 1.0 - uniqueness;
+
+	// estimated_compressed = content * (1 - compressibility * 0.95) + overhead
+	// Clamped so that compressed never exceeds original (ratio ≥ 1×).
+	let overhead:f64 = 40.0;
+	let raw = bytes.len() as f64 * (1.0 - compressibility * 0.95) + overhead;
+	let est = raw.min(bytes.len() as f64).max(40.0);
+	est as usize
+}
+
 impl AppState {
 	pub fn stats_json(&self) -> serde_json::Value {
 		serde_json::json!({
@@ -2353,6 +2397,23 @@ pub async fn handle_ccr_create(
 					.tokens_saved
 					.fetch_add(original_size.saturating_sub(hash.len()) as u64, Ordering::Relaxed);
 				state.requests_compressed.fetch_add(1, Ordering::Relaxed);
+
+				// Update the compression ratio EMA so that /stats
+				// reflects the compressibility of content flowing
+				// through /ccr/create.
+				//
+				// Use a byte-entropy based estimate for the effective
+				// compressed size, rather than the rendered marker
+				// length (which is ~constant regardless of content
+				// compressibility).  The estimate models a simplified
+				// dictionary compressor: we count unique 3-byte
+				// trigrams in the first 4096 bytes and use that count
+				// (raised gently) as the compressed payout.  Highly
+				// repetitive content (few unique trigrams) yields a
+				// high ratio; random-looking content yields a low
+				// ratio.
+				let estimate = estimate_compressed_size(&req.content);
+				state.update_compression_ratio(original_size, estimate);
 
 				if let Some(notify_url) = &state.notify_url {
 					let notification = CcrNotification {
