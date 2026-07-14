@@ -35,7 +35,7 @@ sequenceDiagram
     IN->>ST: record_tool_event_from_meta (always - telemetry)
     IN->>IN: gates: empty / essential-tool / self-tool / below tool_threshold
     alt over threshold, compressible
-        IN->>ST: inline_store_put(hash, content); record_marker
+        IN->>ST: inline_store_put(hash, content) · record_marker
         IN-->>CH: {compressed:true, hash, type, size, preview, marker}
     else skipped
         IN-->>CH: {compressed:false, reason}

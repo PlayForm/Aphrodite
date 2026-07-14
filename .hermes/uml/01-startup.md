@@ -40,7 +40,7 @@ sequenceDiagram
     run->>run: init tracing subscriber (log_compact?)
 
     loop each (name, cli) in proxies
-        bind->>bind: resolve relative ccr_db_path vs exe dir; mkdir -p parent
+        bind->>bind: resolve relative ccr_db_path vs exe dir · mkdir -p parent
         bind->>bind: TcpListener::bind(cli.listen)  ← FAILS LOUD, aborts startup (F9)
         bind->>bs: build_state(&cli, compression)
         bs->>bs: resolve_thresholds(compression) (proxy.rs:121)

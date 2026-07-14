@@ -30,7 +30,7 @@ sequenceDiagram
     participant MK as smart_marker/cache_marker (proxy.rs:2060)
 
     Client->>PH: POST /v1/chat/completions {messages,tools,...}
-    PH->>PH: requests_total++; is_chat_completion = path==/v1/chat/completions
+    PH->>PH: requests_total++ · is_chat_completion = path==/v1/chat/completions
     PH->>Cache: cache_key_from_body(body, api_key)  (skips if stream:true)
     alt cache HIT
         Cache-->>PH: cached bytes
@@ -61,7 +61,7 @@ sequenceDiagram
                         CC->>MK: Cache→cache_marker / Token→smart_marker
                         MK-->>CC: "preview\n[ct: meta]\n<<<CCR:hash|ct|size>>>"
                         CC->>TH: update_compression_ratio(orig,marker) → EMA
-                        CC->>CC: replace content with marker; did_compress=true
+                        CC->>CC: replace content with marker · did_compress=true
                     else content.len() > inline_ccr_threshold (INLINE only)
                         CC->>Store: inline_ccr.put(hash, content)  (no marker swap)
                     else below all thresholds
