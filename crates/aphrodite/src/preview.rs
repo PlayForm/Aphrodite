@@ -117,7 +117,7 @@ fn git_status_code(line:&str) -> Option<&str> {
 		return None;
 	}
 	// A two-char code of at least one real status letter (not `  `).
-	Some(line.get(..2)?)
+	line.get(..2)
 }
 
 /// True when a line looks like a grep/ripgrep hit: `path:line:match` (with a
