@@ -1378,6 +1378,17 @@ fn proxy_detect_content_type(content:&str) -> &'static str {
 		}
 	}
 
+	// Aphrodite-side semantic detection runs BEFORE the loose first-line prefix
+	// heuristics below (which misfire on e.g. a `test result:` summary line -
+	// classified `build_output` by the `test ` prefix - or grep hits whose text
+	// happens to contain "error"). The detector is conservative (strong
+	// line-prefix / marker signals, majority votes) so it only fires on a
+	// genuine git-status / ls / test / grep / git-log shape, and it keeps the
+	// proxy path in parity with the hook/FFI path (which runs the same detector).
+	if let Some(t) = crate::preview::detect_semantic_type(content) {
+		return t;
+	}
+
 	// Error output - always keep visible
 	if first_line.contains("error")
 		|| first_line.contains("Error")
@@ -1906,6 +1917,20 @@ fn proxy_format_ccr_output(preview:&str, ct:&str, metadata:&str, center:Option<&
 /// - JSON: key count summary
 /// - Default: first line, ~250 chars
 fn proxy_build_preview(content:&str, ct:&str) -> String {
+	// Parity + DEFAULT (report 09 §5): route common semantic shapes through the
+	// SAME `crate::preview::build_preview` the Hermes hook/FFI path uses, so
+	// both paths emit an IDENTICAL, self-describing `[type:...]` preview instead
+	// of drifting. Applies to the newly-enriched shapes (git status, ls, test,
+	// grep, git log) plus generic buckets the Aphrodite-side detector can
+	// upgrade. The proxy's own richer per-language arms below stay authoritative
+	// for code/error/json.
+	if matches!(
+		ct,
+		"git" | "git_status" | "gitlog" | "git_log" | "ls" | "dir" | "test" | "test_output" | "grep" | "log"
+	) || (matches!(ct, "text" | "terminal") && crate::preview::detect_semantic_type(content).is_some())
+	{
+		return crate::preview::build_preview(ct, content);
+	}
 	match ct {
 		"code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
 			// Code: structure-map preview - extract fn/def/class/struct sigs
@@ -3034,6 +3059,26 @@ code_multiplier = 6.5
 		let src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
 		let preview = proxy_build_preview(src, "code_rust");
 		assert!(preview.starts_with("[code_rust:"));
+	}
+
+	// ── Parity (report 09 §5): for the common semantic shapes the proxy path
+	// (`proxy_build_preview`) must emit the IDENTICAL preview string the Hermes
+	// hook/FFI path emits (`crate::preview::build_preview`), so the two code
+	// paths never drift. Both are wired to the same shared builder + detector.
+	#[test]
+	fn test_proxy_and_hook_previews_are_identical_for_semantic_shapes() {
+		let git_status = " M src/preview.rs\nA  src/new.rs\nD  src/old.rs\n?? tmp/x\n?? tmp/y";
+		let cargo_test = "test result: ok. 220 passed; 0 failed; 1 ignored; finished in 0.31s";
+		let ripgrep = "src/a.rs:12:hit one\nsrc/a.rs:20:hit two\nsrc/b.rs:5:hit three";
+		let ls = "-rw-r--r-- 1 u g 10 x a.rs\n-rw-r--r-- 1 u g 10 x b.rs\ndrwxr-xr-x 2 u g 64 x sub";
+		for content in [git_status, cargo_test, ripgrep, ls] {
+			// Both paths independently classify then build - the results must match.
+			let ct = proxy_detect_content_type(content);
+			let proxy_preview = proxy_build_preview(content, ct);
+			let hook_preview = crate::preview::build_preview(ct, content);
+			assert_eq!(proxy_preview, hook_preview, "preview drift for ct={ct} content={content:?}");
+			assert!(proxy_preview.starts_with('['), "expected enriched preview, got {proxy_preview}");
+		}
 	}
 
 	#[test]

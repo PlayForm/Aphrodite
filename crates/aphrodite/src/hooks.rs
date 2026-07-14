@@ -82,7 +82,23 @@ pub fn transform_tool_result_classified(
 
 	let (type_str, classify_content):(String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
-		None => (transforms::detect(content).as_str().to_string(), content),
+		None => {
+			// Extend the "terminal" override pattern: let Aphrodite's own
+			// semantic detector upgrade a generic classification (git status,
+			// ls, test, grep, git log) so the reported `type` AND the preview
+			// both carry the high-signal shape. Detection stays in Aphrodite's
+			// layer - the vendored classifier is untouched.
+			let base = transforms::detect(content).as_str().to_string();
+			let t = match base.as_str() {
+				"text" | "log" | "plain" | "" => {
+					crate::preview::detect_semantic_type(content)
+						.map(|s| s.to_string())
+						.unwrap_or(base)
+				},
+				_ => base,
+			};
+			(t, content)
+		},
 	};
 	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 
@@ -139,7 +155,18 @@ pub fn transform_terminal_output_classified(
 			let t = if content.contains("exit code:") || content.contains("Error:") {
 				"terminal".to_string()
 			} else {
-				ct.as_str().to_string()
+				// Terminal output is very often a git status / ls / test / grep
+				// dump; upgrade a generic classification via Aphrodite's detector
+				// so the preview is high-signal on the terminal path too.
+				let base = ct.as_str().to_string();
+				match base.as_str() {
+					"text" | "log" | "plain" | "" => {
+						crate::preview::detect_semantic_type(content)
+							.map(|s| s.to_string())
+							.unwrap_or(base)
+					},
+					_ => base,
+				}
 			};
 			(t, content)
 		},

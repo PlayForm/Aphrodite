@@ -86,14 +86,45 @@ pub fn ccr_marker(
 }
 
 /// Render the marker using the canonical three-line format.
+///
+/// Doubling-bug fix (report 09 §5): `build_preview` already returns a
+/// self-describing, fully bracketed preview like `[text:53L 1913B]` or
+/// `[git:5M 2A | src/x.rs]`. Re-wrapping that in `[{center_str}:{preview}]`
+/// produced the visible `[text:[text:53L 1913B]]` doubling. When the preview
+/// is already a `[label:...]`-shaped string, emit it verbatim on the preview
+/// line; only wrap bare previews (e.g. cache-mode raw excerpts) in the
+/// `[{center_str}:...]` frame. A preview is thus produced exactly once.
 fn render_marker(preview:&str, ccr_type:&str, meta:&str, center:Option<&str>, hash:&str, size:usize) -> String {
 	let center_str = center.unwrap_or(ccr_type);
 	let meta_part = if meta.is_empty() { String::new() } else { format!("\n[meta:{}]", meta) };
 
-	format!(
-		"<<<CCR:{}|{}|{}>>>\n[{}:{}]{}",
-		hash, ccr_type, size, center_str, preview, meta_part
-	)
+	let preview_line = if is_self_bracketed_preview(preview) {
+		preview.to_string()
+	} else {
+		format!("[{}:{}]", center_str, preview)
+	};
+
+	format!("<<<CCR:{}|{}|{}>>>\n{}{}", hash, ccr_type, size, preview_line, meta_part)
+}
+
+/// True when `preview` is already a self-describing `[label:...]` preview (as
+/// produced by `build_preview`), so `render_marker` must not wrap it again.
+/// Requires a leading `[`, a matching trailing `]`, and a `[word:` label head
+/// (`\[\w+:`) so a bare excerpt that merely happens to start with `[` isn't
+/// mistaken for a preview.
+fn is_self_bracketed_preview(preview:&str) -> bool {
+	let p = preview.trim();
+	if !p.starts_with('[') || !p.ends_with(']') {
+		return false;
+	}
+	let inner = &p[1..];
+	match inner.find(':') {
+		Some(colon) => {
+			let label = &inner[..colon];
+			!label.is_empty() && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+		},
+		None => false,
+	}
 }
 
 /// Parse the preview field from a marker line.
@@ -177,13 +208,10 @@ mod tests {
 	fn test_marker_format() {
 		// Component assertions rather than a full-string snapshot, so this
 		// test states the actual contract (a well-formed CCR marker line
-		// followed by exactly one preview line) instead of pinning a specific
-		// rendering as "correct". NOTE: `render_marker` currently prints
-		// `[{ct}:{preview}]`, and when `preview` already carries its own
-		// `[{ct}:...]` prefix (as built by `build_preview`), the result
-		// visibly doubles the type tag (see .plans/09-testing-quality.md §5
-		// "doubled marker prefix" - open question for the user, not changed
-		// here).
+		// followed by exactly one preview line). `build_preview` returns a
+		// self-describing `[ct:...]` preview; `render_marker` must emit it
+		// verbatim (report 09 §5 doubling-bug fix) rather than re-wrapping it
+		// into `[ct:[ct:...]]`.
 		let m = ccr_marker(
 			"abc123def456abc123def456abc123def456",
 			"code_rust",
@@ -199,7 +227,68 @@ mod tests {
 		// The marker line and the preview line are on separate lines.
 		let mut lines = m.lines();
 		assert!(lines.next().unwrap().starts_with("<<<CCR:"));
-		assert!(lines.next().unwrap().starts_with('['));
+		let preview_line = lines.next().unwrap();
+		assert!(preview_line.starts_with('['));
+		// Doubling-bug fix: the preview line is the self-describing preview
+		// verbatim, NOT re-wrapped into `[code_rust:[code_rust:...]]`.
+		assert_eq!(preview_line, "[code_rust:3fns 42L]");
+	}
+
+	// ── Doubling-bug regression (report 09 §5): a self-describing preview from
+	// `build_preview` (e.g. `[text:53L 1913B]`) must NEVER be re-wrapped into
+	// `[type:[type:...]]`. The emitted marker's preview line must not match the
+	// `\[\w+:\[` doubling signature for ANY content type. ──
+	#[test]
+	fn test_marker_preview_never_doubles_bracket_prefix() {
+		let re = regex::Regex::new(r"\[\w+:\[").unwrap();
+		for ty in [
+			"text",
+			"git",
+			"ls",
+			"test",
+			"grep",
+			"gitlog",
+			"build",
+			"diff",
+			"code_rust",
+			"json_array",
+		] {
+			let preview = crate::build_preview(ty, "M crates/aphrodite/src/preview.rs\nA src/new.rs\n?? tmp\n");
+			let m = ccr_marker("abc123def456abc123def456abc123def456", ty, 42, &preview, None, None, None);
+			assert!(
+				!re.is_match(&m),
+				"marker preview must not double the bracket prefix for type {ty:?}: {m:?}"
+			);
+		}
+	}
+
+	#[test]
+	fn test_render_marker_wraps_bare_preview_but_not_bracketed() {
+		// A bare (cache-mode) excerpt is wrapped once with the center label...
+		let bare = ccr_marker(
+			"abc123def456abc123def456abc123def456",
+			"text",
+			5,
+			"hello world",
+			None,
+			None,
+			None,
+		);
+		assert!(bare.contains("\n[text:hello world]"));
+		// ...but an already-bracketed preview is emitted verbatim (modulo the
+		// marker's `|` -> `-` sanitization that every preview goes through, to
+		// keep the outer `hash|type|size` structure parseable).
+		let bracketed = ccr_marker(
+			"abc123def456abc123def456abc123def456",
+			"git",
+			5,
+			"[git:2M | a.rs]",
+			None,
+			None,
+			None,
+		);
+		assert!(bracketed.contains("\n[git:2M - a.rs]"));
+		assert!(!bracketed.contains("[git:[git:"));
 	}
 
 	#[test]
