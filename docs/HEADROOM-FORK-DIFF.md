@@ -5,15 +5,111 @@
 > catalogues every change - what was ripped out, rewritten, hardened, and
 > added.
 
-**Current baseline**: merged at upstream `5e14b8c0` (2026-07-10, "fix(memory/sync):
-don't clobber memories sharing a first line (#1976)"). See
-[2026-07-11 Merge](#2026-07-11-merge-upstream-sync-to-5e14b8c0) below for what changed
-in the most recent sync. The sections after that describe the original June 2026
+**Current baseline**: merged at upstream `c365c7ff` (2026-07-12, "fix(proxy): only queue
+mid-turn messages for opt-in clients with explicit session header (#1951)"). See
+[2026-07-14 Merge](#2026-07-14-merge-upstream-sync-to-c365c7ff) below for what changed
+in the most recent sync. Upstream has since been **renamed/moved** to
+`headroomlabs-ai/headroom` (the `chopratejas/headroom` URL still redirects); the
+`upstream` remote in `vendor/headroom` now points at the new URL.
+
+**Previous baseline** (superseded): merged at upstream `5e14b8c0` (2026-07-10,
+"fix(memory/sync): don't clobber memories sharing a first line (#1976)"). See
+[2026-07-11 Merge](#2026-07-11-merge-upstream-sync-to-5e14b8c0) below.
+The sections after that describe the original June 2026
 rip-out/hardening pass and are kept for historical context.
 
 **Original baseline** (superseded): merged at upstream `bcabc5cb` (2026-06-19,
 "fix(providers): update DeepSeek V3 context limit from 128K to 1M").
 **Divergence at that point**: 47 commits, 313 files changed, **+5,359 / -29,715 lines** (net: -24,356).
+
+---
+
+## 2026-07-14 Merge - Upstream Sync to `c365c7ff`
+
+**Range**: `5e14b8c0` (2026-07-10, previous baseline) → `c365c7ff` (2026-07-12).
+**87 upstream commits**, 229 files changed, **+14,147 / -3,568 lines**. Merge commit
+`b1932981` on `Current` (first parent `a2b90b65`). Upstream repo renamed:
+`chopratejas/headroom` → `headroomlabs-ai/headroom`; the fork's `upstream` remote URL
+was updated as part of this sync.
+
+**Deliberately NOT included**: upstream had already advanced 53 further commits
+(`c365c7ff..09be107d`, incl. tokenizer o200k_base mappings, cache/ccr eviction fixes,
+Hermes scoped coding-agent passthrough compression) at merge time. This sync pinned the
+classified/validated tip `c365c7ff`; the delta is queued for the next sync and several
+of those commits touch the fork's protected ccr/tokenizer surface - re-classify before
+merging them.
+
+### What Came In From Upstream (highlights)
+
+- **Proxy policy extraction**: ~45 refactors carving `headroom/proxy/helpers.py` and
+  friends into ~30 dedicated `*_policy.py` modules (auth classification, rate limit,
+  forwarded headers, CCR marker/session/golden-replay, tool injection, wire debug,
+  memory injection/query/rank, SSE byte buffer, image compression, output
+  effort/turn/verbosity, semantic cache key, proxy mode, ...). Pure moves - the fork's
+  behavioral deltas in these areas (e.g. `RATE_LIMIT_EXEMPT` path exemptions) were
+  re-wired on top and verified present post-merge.
+- **Output shaping on the OpenAI Responses path** (Codex HTTP + WS) (#1943); terminal
+  tool + chatgpt streaming preservation on Codex Responses (#2000, #2012).
+- **`/stats` input-savings-rate**: new-content-relative input savings reporting (#2058).
+- **Provider simulator service**: new `crates/headroom-simulators` crate + proxy e2e
+  suite (#2014). Added to workspace members alongside the fork's `headroom-ffi`.
+- **Magika/detection rework** (came in via #2014): `magika_detector.rs` session-init
+  availability API (`magika_runtime_available_for_session_init`) replaces
+  `magika_onnx_runtime_supported_by_cpu`; `transforms::detect()` signature unchanged
+  (Aphrodite's only detection entry point - verified unaffected).
+- **Semantic cache**: entries keyed by context hash, not query text (#2022).
+- **Cache**: partial cached-prefix replay + idle-aware net-cost (#1933).
+- **CCR (Python)**: `parse_tool_call` no longer crashes on non-object tool args (#2071).
+- **C# support** in CodeAwareCompressor (#1926); language-alias coercion (#1975).
+- **Memory**: MCP retrieval access tracking (#2065); session id scoped by top-level
+  system prompt (#2070).
+- **Deps**: `thiserror` 2, `toml` 1.1, `tower-http` 0.7, `prometheus` 0.14,
+  `tree-sitter` <0.27, explicit `ort` 2.0.0-rc.12 pins on the load-dynamic targets.
+- Dozens of fixes: vertex request-region routing, `stream_options.include_usage`,
+  ClientDisconnect handling in passthrough reads, HEAD on catch-all route, savings
+  ledger 30-day cap, copilot quota remaining=0, ModelRegistry longest-prefix match,
+  kompress model-not-ready surfacing, Windows wheel CI job.
+
+### Conflicts & Resolutions (13 paths)
+
+| File | Resolution | Rationale |
+| ---- | ---------- | --------- |
+| `Cargo.lock` | ours (stay deleted) | Fork deletes the lock (regenerated locally); upstream's references its own crate set |
+| `Cargo.toml` | manual | Kept fork members (`headroom-ffi`) + tab style; added upstream's `headroom-simulators` to members + default-members |
+| `crates/headroom-core/Cargo.toml` | manual (ours for comment) | Kept fork's 40-char `compute_key` doc comment; upstream's `ort` pins and `toml 1.1` retained |
+| `crates/headroom-core/src/transforms/detection.rs` | theirs | Our delta since base was formatting-only; upstream renamed the magika availability helper |
+| `crates/headroom-core/src/transforms/magika_detector.rs` | theirs | Same - ours formatting-only; upstream's session-init availability rework wins |
+| `headroom/cache/prefix_tracker.py` | theirs | Ours comment-punctuation only |
+| `headroom/cli/wrap.py` | theirs | Ours comment-punctuation only |
+| `headroom/providers/proxy_routes.py` | theirs | Ours 2-line comment delta only |
+| `headroom/proxy/auth_mode.py` | theirs | Ours comment-punctuation only |
+| `headroom/proxy/forwarded_headers.py` | theirs | Upstream's policy extraction; fork had no code delta |
+| `headroom/proxy/helpers.py` | theirs | Upstream's ~20 policy extractions; fork punctuation only |
+| `headroom/proxy/image_compression_decision.py` | theirs | Upstream policy extraction; no fork code delta |
+| `headroom/transforms/content_router.py` | manual | Deleted the inline mixed-content block upstream moved to `headroom/transforms/mixed_content.py` (which carries the in-string bracket fix); fork's `_net_cost_cache_ttl_seconds` P_alive decay + env guard preserved; `mixed_content` compat re-exports intact |
+
+### Post-Merge Symbol Sweep (silent-regression check)
+
+Per the 2026-07-11 lesson, the merged tree was symbol-diffed against upstream on every
+upstream-touched path: all **135 upstream-added files present**; residual diffs vs
+upstream on auto-merged files were verified to be the fork's intentional deltas
+(comment punctuation, `RATE_LIMIT_EXEMPT`, WS URL introspection in `openai.py`,
+`TRANSFORMERS_VERBOSITY` setdefault removal - a pre-existing fork removal upstream
+kept, correctly preserved as removed). Protected surface intact: `compute_key` 40-hex,
+SQLite `busy_timeout`/`user_version` schema check/`put`-side lazy purge, `headroom-ffi`
+crate, `aphrodite-` package prefixes, serde_json `preserve_order` +
+`arbitrary_precision` + `raw_value` (upstream unchanged - **no drift**).
+
+### Verification
+
+- `cargo test -p aphrodite-headroom-core` (merged tree + real checkout): **849 passed,
+  0 failed** + all integration suites (auth_mode 24, cache_control 14, ccr_backends 7,
+  ccr_roundtrip 14, live_zone 14, tokenizer_proptest 5, ...) green.
+- Aphrodite consumer: `cargo test -p aphrodite -p aphrodite-hermes --lib` -
+  **aphrodite 225 passed, aphrodite-hermes 29 passed, 0 failed** (run both against a
+  /tmp workspace copy pointed at the merged tree and in the monorepo after apply).
+- `python3 -m compileall headroom/` clean. Full pytest suite not run this pass
+  (Python-side changes are upstream's own; run before the next PyPI-style release).
 
 ---
 
