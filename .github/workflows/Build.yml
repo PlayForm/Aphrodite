@@ -75,6 +75,11 @@ jobs:
     if: always() && (needs.Release.result == 'success' || needs.Release.result == 'skipped')
     runs-on: ${{ matrix.os }}
     strategy:
+      # Let every platform finish (and attach its assets) even if one leg is
+      # slow or fails - Windows is the long pole. The `Finalize` job below then
+      # fails loudly if the matrix came out incomplete, so a partial upload is
+      # caught rather than silently shipped.
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -189,3 +194,37 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Runs once, only after EVERY matrix leg has finished attaching (needs: Build).
+  # This is the race-killer behind the recurring "no Windows release" note: the
+  # release body's "What Ships" was authored from a point-in-time asset snapshot
+  # while the slow Windows leg was still building, so it hedged "no Windows" even
+  # though the .exe/.dll landed minutes later. This job asserts all four targets'
+  # assets are present and fails loudly otherwise - so notes can never truthfully
+  # be authored (or shipped) for an incomplete matrix.
+  Finalize:
+    name: Finalize release assets
+    needs: [Build]
+    if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Verify every platform's assets are attached
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          assets=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')
+          echo "Attached assets:"; echo "$assets"
+          missing=0
+          for t in x86_64-unknown-linux-gnu aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-msvc; do
+            echo "$assets" | grep -q "aphrodite-$t"          || { echo "::error::missing binary for $t";    missing=1; }
+            echo "$assets" | grep -q "libaphrodite_hermes-$t" || { echo "::error::missing dylib for $t";     missing=1; }
+            echo "$assets" | grep -q "SHA256SUMS-$t"          || { echo "::error::missing checksums for $t"; missing=1; }
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Release matrix is incomplete - do NOT publish notes claiming a full platform set."
+            exit 1
+          fi
+          echo "All 4 platforms present (12 assets). Matrix complete - Windows included."

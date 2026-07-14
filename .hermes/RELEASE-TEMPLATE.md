@@ -54,6 +54,14 @@ One paragraph. What this release is, why it matters, 2-3 sentences max.
 | `aphrodite-x86_64-pc-windows-msvc` | Windows x86_64 |
 | Plugin v{PLUGIN_VERSION} | Hermes (standalone repo) |
 
+> **Always list all four targets above - do NOT trim from a live asset count.**
+> `Build.yml`'s matrix always produces the full set, and the `Finalize` job
+> fails the release if any platform is missing. Windows is the slow leg, so at
+> authoring time only 9/12 assets may be attached yet - that is a timing race,
+> not a missing Windows build. Never write "no Windows release": either it's
+> coming (wait for `Build` to finish / the tag's run to conclude) or the build
+> genuinely failed (then `Finalize` is red - fix the build, don't ship the note).
+
 ### Links
 
 - **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/{PREV_VERSION}...Aphrodite/{BIN_VERSION}
@@ -105,7 +113,7 @@ as they were. Omit this section entirely rather than fabricate artifacts.
 2. **Changes** - bullet list grouped by Feature/Fix/Chore/Docs. Omit empty categories. Every bullet must trace to a real commit in range.
 3. **Infrastructure** (live) - always present when you can actually run the commands. Never claim a check you didn't run.
 4. **Verification** (retrospective) - always present. States what was analyzed, not what was re-tested.
-5. **What Ships** - live: list every binary artifact you're attaching now. Retrospective: list only what the historical release actually shipped, or omit.
+5. **What Ships** - live: list the full fixed platform matrix (all four targets + plugin), NOT a point-in-time asset snapshot - the `Build.yml` matrix always produces them and the `Finalize` job enforces completeness, so a partial attach at authoring time is a race, never a missing platform. Retrospective: list only what that historical release actually shipped, or omit (older releases predate some targets - do not backfill artifacts that were never there).
 6. **Links** - always present. Minimum: compare link. Add CHANGELOG/plugin/fork links when relevant to that release.
 7. Never emit a bare compare-link-only body. That's the anti-pattern this template exists to fix.
 
