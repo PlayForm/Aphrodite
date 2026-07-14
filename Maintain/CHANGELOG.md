@@ -1,10 +1,228 @@
 # Changelog
 
-## v1.2.5 — macOS Gatekeeper Fix (2026-07-13)
+## v1.3.1 - Correctness Sweep: Compression Losslessness, Proxy Security, Release Channel (2026-07-14)
+
+### Summary
+
+The largest correctness pass since the Rust migration. A fresh full-repo
+re-analysis (v2 plan corpus) turned up real regressions left by earlier
+work in this same version - most notably that the Hermes JSON-unwrap fix
+from v1.3.0 never actually reached the live hook path Hermes calls on every
+tool result, and that compressing a Hermes wrapper destroyed the original
+bytes permanently. Both are fixed. Also closes a real security gap
+(unauthenticated management APIs), a correctness bug that broke every
+OpenAI-tools client through the proxy, and an SSE bug that silently killed
+long-running streams mid-answer.
+
+### Fixed - Compression pipeline
+
+- **Hermes JSON-unwrap regression on the live hook path** - `8f138c1` (v1.3.0)
+  moved wrapper-unwrapping into `aphrodite-hermes`'s `compress_into()`, reached
+  only by the explicit `aphrodite_compress`/`aphrodite_test` tools - but the
+  hook Hermes actually fires on *every* tool result
+  (`aphrodite_hermes_call_hook("transform_tool_result", ...)`) called core's
+  `hooks::transform_tool_result` directly, which has zero unwrapping. The
+  "previews show `[json:1items 1L]`" symptom the v1.3.0 fixes chased was only
+  ever fixed for the rarely-called explicit tool. `hooks::transform_tool_result`/
+  `transform_terminal_output` gained classified variants that accept an
+  optional `(content, type)` hint; the bridge computes that hint via
+  `unwrap_hermes_result` and passes it through, keeping the core crate
+  agent-agnostic.
+- **Lossy compression on Hermes wrappers** - `compress_into` stored the
+  *extracted* content under `hash(extracted)`, discarding the original. A
+  failed command's `exit_code`/`error` fields were unrecoverable after
+  compression, and caller JSON that merely matched a wrapper shape (e.g.
+  `{"content":"hi","id":42}`) got permanently collapsed to one field. Both
+  hook and tool paths now hash and store the ORIGINAL content always;
+  `unwrap_hermes_result`'s output is used only for classification and preview.
+- **Empty-`output` terminal wrapper aborted extraction entirely** - a failed
+  command with empty stdout (`{"output":"","exit_code":1,"error":"..."}`) is
+  exactly the case where the error string *is* the payload; it now falls
+  through to the error/success branches instead of returning `None`.
+- Added a 15-case table-driven regression suite for `unwrap_hermes_result` -
+  this ~100-line heuristic had been rewritten three times with zero tests.
+
+### Fixed - Proxy correctness & security
+
+- **`tool_calls[].function.arguments` mangling** - the proxy compressed large
+  tool-call arguments into a CCR marker string, which a real OpenAI-tools
+  client (no Aphrodite plugin) can't parse as JSON, breaking every tool call
+  it makes. `function.arguments` is client-executable JSON, not model-facing
+  prose - it's never compressed now; `message.content` remains the
+  legitimate target.
+- **Bearer-token auth on management routes** - `/stats`, `/stats/db`,
+  `/history`, `/retrieve`, `/ccr/*`, `/reload`, `/tool/relay`, `/version`,
+  `/health/upstream` now require `Authorization: Bearer <token>` when
+  `APHRODITE_MGMT_TOKEN` is set (unset = unchanged back-compat behavior, with
+  a one-time startup warning). Closes a cross-site-write gap: a hostile local
+  page could previously issue a CORS "simple request" that lands as a write
+  (seed CCR entries, evict markers via `/reload`) even though it can't read
+  the reply. `/health` and `/metrics` stay unauthenticated (health checks,
+  Prometheus scrapers); the LLM-proxying route is unaffected.
+- **SSE streams cut off mid-answer past the configured timeout** - reqwest's
+  client-level `.timeout()` bounds the whole request including the response
+  body stream, not just headers. A `"stream": true` request now goes out on a
+  separate client with no total timeout (relying on `connect_timeout` +
+  `tcp_keepalive` for hang protection instead), so a legitimately slow but
+  progressing stream is never severed.
+- SSE responses now count bytes into `response_body_bytes` and a new
+  `sse_stream_errors` counter observes mid-stream chunk errors - previously
+  a stream that died mid-flight recorded a 200 with zero signal anywhere.
+- Upstream transport-error bodies (which can embed the upstream URL/host via
+  `reqwest::Error`'s `Display`) are now a generic `"upstream request failed"`
+  to the client; the detail is still recorded server-side in
+  `record_error`/`/stats.last_errors`.
+- **DNS-rebinding gap**: an empty/unparseable `Host` header was waved through
+  the loopback check instead of rejected - closed; every real caller here
+  (curl, the Hermes plugin) already sends `Host`, so there's no legitimate
+  case to exempt.
+- **`/retrieve` dropped the trailing newline** on full-document retrieval
+  (`str::lines()` discards it, `join("\n")` never restored it) - a stored
+  file ending in `\n` (nearly every source file) came back one byte short,
+  breaking the content-addressing round-trip. Fixed; also added a
+  `truncated: bool` field to the response so a client can detect a
+  windowed/capped result without parsing the `[lines a-b/total]` header.
+
+### Added - Directives, wired end-to-end
+
+- The Conversational Directives feature (shipped dark in v1.2.3 - no schema,
+  no dispatch arm, no bridge wiring) is now reachable from Hermes:
+  `aphrodite_directive` is a registered schema + dispatchable tool in the
+  bridge, and the bridge's `pre_llm_call` arm actually injects active
+  directives' text into the context Hermes reads (previously it only ever
+  injected the catalog summary).
+- Directive loading no longer gated on `active` being non-empty - the
+  shipped template default is `active = []`, so a cold start could never
+  discover directives to `add`/`swap` into. Directories now load
+  unconditionally when present; `active` only seeds what starts active.
+- Directive injection now carries each active directive's full body (minus
+  leading `#` markers), not just its first line (a markdown title) - the
+  actual behavioral bullets never reached the model before.
+- Deduplicated ~90 lines of copy-pasted directive-action logic between the
+  core C-ABI `aphrodite_directive` export and `aphrodite_dispatch`'s
+  `"directive"` arm into one `directives::handle_action`.
+
+### Fixed - macOS install/setup
+
+- Consolidated every macOS artifact copy (binary, dylib, dev-build fallback)
+  through one `install_macos_artifact` helper. Fixes three related bugs:
+  a *failed* (non-zero exit) `ditto` was treated as success (only a spawn
+  failure was checked), so the `fs::copy` fallback never ran; the
+  `target/release` dev-build fallback path skipped the Gatekeeper treatment
+  entirely, reproducing the SIGKILL bug on the most common dev workflow;
+  and `install_name_tool`/`xattr` failures were silently swallowed with
+  `let _ = ...`, so a machine missing Xcode Command Line Tools got the
+  SIGKILL bug back with zero diagnostic. All three now `eprintln!` a
+  specific warning, and dylibs get an explicit ad-hoc `codesign -f -s -`
+  re-sign step.
+
+### Changed - Submodule workflow
+
+- Local checkouts now always float `plugins/aphrodite`, `vendor/headroom`,
+  and `vendor/rtk` to their `Current` branch tip on every checkout/merge,
+  auto-committing the resulting pin bump (pathspec-scoped - never sweeps up
+  unrelated staged work). Previously `git submodule update` reset to
+  whatever SHA happened to be pinned, which could silently sit behind
+  `Current` for a long time. A fresh clone's plain `git submodule update
+  --init --recursive` now lands close to `Current`'s tip too, since the pin
+  stays continuously synced rather than only moving via an explicit release
+  action.
+- Safety preserved from the prior dirty-guard design: a submodule with
+  uncommitted changes, or with local commits not yet pushed to its tracking
+  branch (checked via `merge-base` ancestry, not just `git status`), is
+  skipped and reported rather than force-reset.
+- Fixed a remote-resolution bug found while building this: `vendor/rtk`'s
+  `origin` remote is the upstream `rtk-ai/rtk` repo (no `Current` branch
+  there at all) - the fork actually tracked is under a remote named
+  `Source`. The sync now resolves the fetch remote by matching
+  `.gitmodules`' configured `url`, not by assuming `origin`.
+
+### Fixed - Documentation accuracy
+
+- Corrected every stale count found against the real built artifacts: tool
+  count (12→13, `aphrodite_directive` was missing everywhere), C-ABI export
+  count (22→25), content-classifier type count (28→26, matching the
+  canonical registry in `docs/ccr/content-types.md`), hook count (a
+  long-stale "14 hooks" in two READMEs, actual is 5), skill count (a
+  stale "14 bundled skills", actual is 9), Prometheus metric count (31→28,
+  and the metrics doc's own listing was completely out of sync with the
+  real `/metrics` output - wrong names, missing the `+Inf` bucket relabel).
+  Also removed a "zstd decompression" doc section describing dead code
+  already removed from `/retrieve` in an earlier pass.
+- Fixed two schema-text bugs found in the same pass: `aphrodite_test`'s
+  schema advertised a "matrix" mode that never existed (the handler only
+  ever branches on `quick` vs everything-else); `aphrodite_rebuild`'s schema
+  claimed it "rebuilds from source and installs" - it's a report-only
+  handler that can't safely rebuild itself mid-session.
+
+## v1.3.0 - Hermes Wrapper-Unwrap Fix, cargo install Support (2026-07-13)
+
+*(Consolidates unreleased intermediate bumps 1.2.7-1.2.9, none separately
+tagged or published.)*
+
+### Summary
+
+Fixes the "tool results not expanding properly" bug: every Hermes tool wraps
+its result in a JSON envelope, and Aphrodite was compressing that wrapper
+whole - so markers pointed at JSON scaffolding instead of the real content.
+(v1.3.1 found and closed the gap where this fix didn't reach the live hook
+path - see above.)
+
+### Changed
+
+- Extracted real content from Hermes tool-result JSON wrappers
+  (`crates/aphrodite/src/hooks.rs`) - detects the envelope every Hermes tool
+  wraps its result in and compresses the meaningful content inside with
+  proper re-classification, instead of compressing the wrapper whole.
+- Wired the extraction into the actual `aphrodite_compress` path
+  (`compress_into()` in the bridge crate) - the initial fix never fired for
+  tool-driven compression.
+- Consolidated unwrapping into the `aphrodite-hermes` bridge exclusively,
+  reverting the core-crate copy - core `aphrodite` stays agent-agnostic;
+  `unwrap_hermes_result()` handles terminal output, patch diffs,
+  error/success messages, search results, file reads, and generic Hermes
+  result fields.
+- Improved classification: terminal build output now detects
+  `Compiling`/`Finished` → `build_output`, `error[E...]` → `build_error`;
+  search results render as grep-style hit previews.
+- `aphrodite setup` uses `ditto` on macOS instead of bare `fs::copy` -
+  strips extended attributes (code signature, quarantine, provenance) by
+  default, with `fs::copy` + `xattr -c` as fallback when `ditto` is
+  unavailable. Completes the v1.2.5 Gatekeeper work.
+- Added `cargo install aphrodite-hermes` support: a helper binary so the
+  crate has an installable `[[bin]]` target (a bare library crate can't be
+  `cargo install`ed). Its messaging was corrected in v1.3.1 once it became
+  clear `cargo install` cannot distribute the cdylib itself, only this
+  helper.
+- `.gitguardian.yaml` migrated to the current config format.
+- Fixed a non-functional secret-content scanner in
+  `check-no-runtime-state.sh` (it only ever grepped filenames, never file
+  contents), and wired `.githooks/pre-commit` to actually invoke that guard
+  script (it previously only ran `ggshield`, via `exec`, silently skipping
+  the repo's own check entirely).
+- Fixed a dead `.gitignore` re-inclusion rule for `.hermes/` (a leading
+  `./` prefix is invalid gitignore syntax and never matched).
+
+## v1.2.6 - CHANGELOG Backfill, Docs Sync (2026-07-13)
+
+### Summary
+
+Documentation-and-bookkeeping release: backfills the CHANGELOG entries for
+v1.2.3 and v1.2.5, and syncs version/doc references across the tree. No
+runtime code changes.
+
+### Changed
+
+- CHANGELOG backfill for v1.2.3 (Conversational Directives System, CRLF
+  fix, accumulated refactors) and v1.2.5 (macOS Gatekeeper fix).
+- Docs/version sync across `README.md`, `crates/aphrodite-hermes/README.md`,
+  and the `docs/` tree.
+
+## v1.2.5 - macOS Gatekeeper Fix (2026-07-13)
 
 ### Fixed
 
-- **`hermes --tui` SIGKILL on macOS** — two root causes fixed in `aphrodite setup`:
+- **`hermes --tui` SIGKILL on macOS** - two root causes fixed in `aphrodite setup`:
   1. Dylib install names pointed to `target/release/deps/` (stale build paths). macOS
      dynamic linker killed the process when loading from a copied location. Fixed by
      running `install_name_tool -id @rpath/<name>.dylib` after every dylib copy.
@@ -18,30 +236,30 @@
   config is preserved unless `--force` is passed.
 
 - **Dylibs always overwritten on re-run**: removed `dest.exists()` skip in
-  `copy_dylibs()` — stale dylibs with wrong install names were never replaced.
+  `copy_dylibs()` - stale dylibs with wrong install names were never replaced.
 
-## v1.2.3 — Conversational Directives System (2026-07-13)
+## v1.2.3 - Conversational Directives System (2026-07-13)
 
 ### Added
 
-- **Conversational Directives System** — lightweight `.md`-based behavioral context
+- **Conversational Directives System** - lightweight `.md`-based behavioral context
   injected into the LLM via `pre_llm_call`. Directives are short instruction files
-  that live between file compression and the LLM's context — never compressed,
+  that live between file compression and the LLM's context - never compressed,
   never needing retrieval.
-  - `directives/*.md` — 4 built-in directives: `focus`, `explore`, `cleanup`, `foresight`
+  - `directives/*.md` - 4 built-in directives: `focus`, `explore`, `cleanup`, `foresight`
   - `[directives]` TOML section with `active = [...]` 
-  - `aphrodite_directive(action, name)` C-ABI tool — `list`, `swap`, `add`, `remove`, `reset`
+  - `aphrodite_directive(action, name)` C-ABI tool - `list`, `swap`, `add`, `remove`, `reset`
   - Configurable per user/profile; swappable mid-conversation
 
 ### Fixed
 
-- **CRLF line endings** in `download.sh`, `plugin.yaml`, `BINARY_VERSION` —
+- **CRLF line endings** in `download.sh`, `plugin.yaml`, `BINARY_VERSION` -
   caused bash syntax errors on macOS/Linux
 
 ### Refactored (accumulated from pre-release commits)
 
 - Feature-gated proxy modules: `#[cfg(feature = "proxy")]` on `config`, `proxy`,
-  `retrieve`, `setup` — cdylib no longer links axum/tokio/reqwest unnecessarily
+  `retrieve`, `setup` - cdylib no longer links axum/tokio/reqwest unnecessarily
 - Removed 7 unused dependencies (tower, tracing-appender, futures-util, http,
   http-body-util, hyper, zstd)
 - Deleted `center.rs` (zero callers), `generate_summary` (dead code)
@@ -50,7 +268,7 @@
 - Renamed proxy duplicate functions: `proxy_detect_content_type`,
   `proxy_build_preview`, `proxy_format_ccr_output`
 - Converted `SetupError` to `#[derive(thiserror::Error)]`
-- **SSE streaming** — `text/event-stream` responses forwarded chunk-by-chunk;
+- **SSE streaming** - `text/event-stream` responses forwarded chunk-by-chunk;
   64 MB buffer cap for non-streaming bodies
 - `.githooks/pre-commit` with ggshield secret scanning
 - `Maintain/scripts/ops/check-no-runtime-state.sh` repo-guard script
@@ -66,7 +284,7 @@
 
 ### Published
 
-- **First crates.io publish** — all three crates published in dependency order:
+- **First crates.io publish** - all three crates published in dependency order:
   `aphrodite-headroom-core` (0.1.1) → `aphrodite` (1.2.2) → `aphrodite-hermes` (1.2.2)
 - `aphrodite` publish required moving the `include_str!("../../../plugins/aphrodite/__init__.py")`
   into the crate's `templates/` directory so `cargo publish` could package it
@@ -88,7 +306,7 @@
 | CCR get (ST, miss)             | 38.3 ns     |
 | CCR mixed MT (8t, Dashmap)     | 229 µs      |
 | CCR mixed MT (8t, Mutex)       | 1.15 ms     |
-| Tokenizer (small/medium/large) | 32–50 MiB/s |
+| Tokenizer (small/medium/large) | 32-50 MiB/s |
 
 ### Verified
 
@@ -96,7 +314,7 @@
 - `cargo build --release -p aphrodite -p aphrodite-hermes`: clean (10.8s)
 - GitHub Release `Aphrodite/v1.2.2` auto-created by CI with all 9 cross-platform assets
 - All docs scanned and version badges synced to v1.2.2 / v2.0.6
-- Classification claim updated: <0.1ms → 40–123 ns (benchmark-verified)
+- Classification claim updated: <0.1ms → 40-123 ns (benchmark-verified)
 - Real-world savings example added: 216 KB → 12 markers, 54K→240 tokens (225×)
 
 ## v1.2.1 - Silent Startup Failures (2026-07-11)
