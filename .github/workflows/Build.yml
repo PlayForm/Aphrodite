@@ -65,7 +65,7 @@ jobs:
       # `.hermes/RELEASE-TEMPLATE.md` by the release process (see SKILL.md),
       # not auto-generated here.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -179,7 +179,7 @@ jobs:
       # each matrix job only attaches its own files here.
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           # Trailing * catches the Windows `.exe`; fail loudly if a rename slips.
           files: |
