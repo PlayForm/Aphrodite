@@ -47,7 +47,11 @@ auto_expand_limit = 0       # 0 = disabled
 catalog_mode = "tool"       # compact | full | tool
 classifier_poll = true      # skip CCR for clean outputs
 code_multiplier = 3.0       # multiply threshold for code types
-context_engine = true       # default-on, no env var needed
+context_engine = true       # dylib-path only (aphrodite_stats/config_get/set,
+                             # aphrodite_dispatch) - a status flag exposed by
+                             # the C-ABI/Hermes bridge; the standalone HTTP
+                             # proxy (main.rs/proxy.rs) never reads it and has
+                             # no gated behavior tied to this key
 prefetch = true             # enable aphrodite_prefetch tool
 
 
