@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.3.1 - Correctness Sweep: Compression Losslessness, Proxy Security, Release Channel (2026-07-14)
+## v1.3.2 - Correctness Sweep: Compression Losslessness, Proxy Security, Release Channel (2026-07-14)
 
 ### Summary
 
@@ -13,6 +13,15 @@ bytes permanently. Both are fixed. Also closes a real security gap
 (unauthenticated management APIs), a correctness bug that broke every
 OpenAI-tools client through the proxy, and an SSE bug that silently killed
 long-running streams mid-answer.
+
+**Why 1.3.2, not 1.3.1**: `crates.io` already had `aphrodite`/`aphrodite-hermes`
+1.3.1 published (2026-07-13, before any of this entry's fixes existed) -
+crate versions are immutable once published, so this work ships as 1.3.2
+instead. A GitHub tag `Aphrodite/v1.3.1` was created moments before this was
+discovered and does contain this entry's fixes (its binaries are real and
+fine to use) - but do not treat "v1.3.1" as a single consistent artifact
+across GitHub and crates.io; `v1.3.2` is the first version where both
+release channels agree.
 
 ### Fixed - Compression pipeline
 
@@ -165,7 +174,7 @@ tagged or published.)*
 Fixes the "tool results not expanding properly" bug: every Hermes tool wraps
 its result in a JSON envelope, and Aphrodite was compressing that wrapper
 whole - so markers pointed at JSON scaffolding instead of the real content.
-(v1.3.1 found and closed the gap where this fix didn't reach the live hook
+(v1.3.2 found and closed the gap where this fix didn't reach the live hook
 path - see above.)
 
 ### Changed
@@ -191,7 +200,7 @@ path - see above.)
   unavailable. Completes the v1.2.5 Gatekeeper work.
 - Added `cargo install aphrodite-hermes` support: a helper binary so the
   crate has an installable `[[bin]]` target (a bare library crate can't be
-  `cargo install`ed). Its messaging was corrected in v1.3.1 once it became
+  `cargo install`ed). Its messaging was corrected in v1.3.2 once it became
   clear `cargo install` cannot distribute the cdylib itself, only this
   helper.
 - `.gitguardian.yaml` migrated to the current config format.

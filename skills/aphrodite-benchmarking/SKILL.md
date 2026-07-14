@@ -2,7 +2,7 @@
 name: aphrodite-benchmarking
 description: "Comprehensive benchmark protocol for aphrodite proxy - compression
     throughput, cache hit rates, cross-worker behavior, terminal threshold
-    verification, and all-type coverage. Current as of v1.3.1."
+    verification, and all-type coverage. Current as of v1.3.2."
 version: 1.2.0
 platforms: [macos]
 related_skills:
