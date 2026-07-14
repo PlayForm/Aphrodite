@@ -123,13 +123,18 @@ fn to_json_error(msg:&str) -> *mut c_char {
 /// Run `f` under `catch_unwind`, converting a panic into an error-JSON
 /// `*mut c_char` instead of unwinding across the `extern "C"` boundary
 /// (which triggers the Rust runtime's forced process abort). `with_state`
-/// already gives stateful fns this guarantee; this covers the seven
-/// extern fns that don't go through `with_state` (classify, call_hook,
-/// retrieve, filter_lines, preview, stage2, struct_extract) - previously
-/// the only guard in this file was `with_state`'s, so these seven could
-/// abort the host process on a panic (e.g. the byte-slicing panics in
-/// struct_extract.rs/marker.rs, now fixed separately, but any future panic
-/// in these paths would have the same effect).
+/// already gives stateful fns this guarantee; this covers every extern fn
+/// that doesn't go through `with_state` (classify, retrieve, filter_lines,
+/// preview, stage2, struct_extract, init, catalog, stats, search, directive,
+/// config_get) - previously several of these could abort the host process
+/// on a panic (e.g. the byte-slicing panics in struct_extract.rs/marker.rs,
+/// now fixed separately, but any future panic in these paths would have the
+/// same effect).
+///
+/// Rule: every new `pub extern "C" fn` added to this file must either route
+/// through `with_state` (which guards internally) or wrap its body in
+/// `guarded(AssertUnwindSafe(...))` directly - there is no third option that
+/// stays panic-safe across the FFI boundary.
 fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
 	std::panic::catch_unwind(f).unwrap_or_else(|_| to_json_error("internal error: panicked"))
 }
@@ -198,16 +203,18 @@ pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 	let path = unsafe { cstr(config_path) }.unwrap_or_default();
-	let mut state = AphroditeState::default();
-	// 01-F4/F9: delegate to `config_loader::Config` instead of hand-parsing
-	// four `[compression]` keys here - this hand-rolled copy had already
-	// drifted from `apply_compression`'s own key names (e.g. `tool_threshold`
-	// vs `tool_threshold_token`) and never honored env var overrides, unlike
-	// every other init path in the crate.
-	if !path.is_empty() {
-		crate::config_loader::Config::load_from(&path).apply_compression(&mut state);
-	}
-	CString::new(alloc_handle(state).to_string()).unwrap().into_raw()
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let mut state = AphroditeState::default();
+		// 01-F4/F9: delegate to `config_loader::Config` instead of hand-parsing
+		// four `[compression]` keys here - this hand-rolled copy had already
+		// drifted from `apply_compression`'s own key names (e.g. `tool_threshold`
+		// vs `tool_threshold_token`) and never honored env var overrides, unlike
+		// every other init path in the crate.
+		if !path.is_empty() {
+			crate::config_loader::Config::load_from(&path).apply_compression(&mut state);
+		}
+		CString::new(alloc_handle(state).to_string()).unwrap().into_raw()
+	}))
 }
 
 #[no_mangle]
@@ -341,13 +348,13 @@ pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) ->
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let m = unsafe { cstr(mode) }.unwrap_or_default();
-	match get_handle(hid) {
+	guarded(std::panic::AssertUnwindSafe(move || match get_handle(hid) {
 		Some(session) => {
 			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			to_json_ok(&crate::catalog::build_catalog(&s, &m))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
-	}
+	}))
 }
 
 #[no_mangle]
@@ -356,7 +363,7 @@ pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
-	match get_handle(hid) {
+	guarded(std::panic::AssertUnwindSafe(move || match get_handle(hid) {
 		Some(session) => {
 			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			to_json_ok(&serde_json::json!({
@@ -367,7 +374,7 @@ pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 			}))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
-	}
+	}))
 }
 
 #[no_mangle]
@@ -410,7 +417,7 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let q = unsafe { cstr(query) }.unwrap_or_default().to_lowercase();
-	match get_handle(hid) {
+	guarded(std::panic::AssertUnwindSafe(move || match get_handle(hid) {
 		Some(session) => {
 			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			let results:Vec<serde_json::Value> = s
@@ -423,7 +430,7 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 			to_json_ok(&serde_json::json!({"total":results.len(),"results":results}))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
-	}
+	}))
 }
 
 #[no_mangle]
@@ -434,13 +441,13 @@ pub extern "C" fn aphrodite_directive(handle:*const c_char, action:*const c_char
 	};
 	let act = unsafe { cstr(action) }.unwrap_or_default();
 	let nm = unsafe { cstr(name) }.unwrap_or_default();
-	match get_handle(hid) {
+	guarded(std::panic::AssertUnwindSafe(move || match get_handle(hid) {
 		Some(session) => {
 			let mut s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			to_json_ok(&directives::handle_action(&mut s, &act, &nm))
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
-	}
+	}))
 }
 
 #[no_mangle]
@@ -450,7 +457,7 @@ pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) 
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let k = unsafe { cstr(key) }.unwrap_or_default();
-	match get_handle(hid) {
+	guarded(std::panic::AssertUnwindSafe(move || match get_handle(hid) {
 		Some(session) => {
 			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			let v = match k.as_ref() {
@@ -464,7 +471,7 @@ pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) 
 			CString::new(v.replace('\0', "")).unwrap().into_raw()
 		},
 		None => to_json_error(&format!("invalid handle: {}", hid)),
-	}
+	}))
 }
 
 #[no_mangle]

@@ -58,17 +58,6 @@ pub fn get_conv_index(state:&AphroditeState) -> Vec<serde_json::Value> {
 		.collect()
 }
 
-/// Record a referenced file path.
-pub fn record_file(state:&mut AphroditeState, path:&str, tool:&str) {
-	// Remove existing entry if present (will be re-added at front)
-	state.referenced_files.retain(|(p, _)| p != path);
-	state.referenced_files.push_front((path.to_string(), tool.to_string()));
-	// Keep last 100
-	while state.referenced_files.len() > 100 {
-		state.referenced_files.pop_back();
-	}
-}
-
 /// Generate a catalog summary for the context engine prompt injection.
 pub fn catalog_summary(state:&AphroditeState) -> String {
 	if state.recent_markers.is_empty() && state.conv_index.is_empty() {

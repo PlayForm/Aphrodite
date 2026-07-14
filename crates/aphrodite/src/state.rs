@@ -50,12 +50,17 @@ pub struct AphroditeState {
 	pub api_url:String,
 	pub model:String,
 	pub engine_threshold_pct:u64,
+	// RESERVED: write-only today (loaded from aphrodite.toml, never read back
+	// by the proxy) - candidate consumers for the context-engine work
+	// (13-P2), not deleted since that work may land on them directly
+	// (01-F9, user decision: keep-reserved over delete).
 	pub engine_min_msgs:usize,
 	pub engine_protect_first:usize,
 	pub engine_protect_last:usize,
 	pub context_engine_enabled:bool,
 	pub tool_threshold:usize,
 	pub terminal_threshold:usize,
+	// RESERVED: same as engine_min_msgs above (01-F9).
 	pub catalog_mode:String,
 	pub expand_guidance:bool,
 	pub dev_mode:bool,
@@ -163,18 +168,6 @@ impl AphroditeState {
 			None
 		}
 	}
-
-	/// Increment turn counter.
-	pub fn increment_turn(&mut self) -> usize {
-		self.turn_counter += 1;
-		self.turn_counter
-	}
-
-	/// Reset scanned message index.
-	pub fn reset_scanned(&mut self) { self.scanned_msg_idx = 0; }
-
-	/// Reset turn counter.
-	pub fn reset_turns(&mut self) { self.turn_counter = 0; }
 
 	/// Record a compression marker.
 	pub fn record_marker(&mut self, entry:MarkerEntry) {
