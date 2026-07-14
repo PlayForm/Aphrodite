@@ -48,7 +48,7 @@ pub fn all_skills() -> Vec<serde_json::Value> {
 	]
 }
 
-fn skill(name:&str, description:&str) -> serde_json::Value {
+fn skill(name: &str, description: &str) -> serde_json::Value {
 	json!({
 		"name": name,
 		"description": description,

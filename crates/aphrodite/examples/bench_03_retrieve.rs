@@ -39,12 +39,12 @@ fn bin_path() -> std::path::PathBuf {
 		.map(|p| p.join(bin_name))
 		.unwrap_or_else(|| bin_name.into())
 }
-const CACHE_PORT:u16 = 39797;
-const TOKEN_PORT:u16 = 39798;
+const CACHE_PORT: u16 = 39797;
+const TOKEN_PORT: u16 = 39798;
 
 struct Proxy {
-	child:std::process::Child,
-	port:u16,
+	child: std::process::Child,
+	port: u16,
 }
 impl Drop for Proxy {
 	fn drop(&mut self) {
@@ -52,7 +52,7 @@ impl Drop for Proxy {
 		let _ = self.child.wait();
 	}
 }
-fn spawn(mode:&str, port:u16) -> Proxy {
+fn spawn(mode: &str, port: u16) -> Proxy {
 	let listen = format!("127.0.0.1:{}", port);
 	// Isolate CCR storage per bench run so this never touches the operator's
 	// real ~/.hermes/aphrodite/ccr.db (token mode only opens SQLite there).
@@ -95,7 +95,7 @@ fn spawn(mode:&str, port:u16) -> Proxy {
 	Proxy { child, port }
 }
 
-fn store(port:u16, content:&str) -> Option<String> {
+fn store(port: u16, content: &str) -> Option<String> {
 	let body = serde_json::json!({"content": content}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -110,12 +110,12 @@ fn store(port:u16, content:&str) -> Option<String> {
 		])
 		.output()
 		.ok()?;
-	let v:serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+	let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
 	v.get("hash").and_then(|h| h.as_str()).map(|s| s.to_string())
 }
 
 /// POST /retrieve  {"hash": "..."}  → {"found": bool, "content": ...}
-fn retrieve_raw(port:u16, hash:&str) -> Option<serde_json::Value> {
+fn retrieve_raw(port: u16, hash: &str) -> Option<serde_json::Value> {
 	let body = serde_json::json!({"hash": hash}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -133,14 +133,14 @@ fn retrieve_raw(port:u16, hash:&str) -> Option<serde_json::Value> {
 	serde_json::from_slice(&out.stdout).ok()
 }
 
-fn found(port:u16, hash:&str) -> bool {
+fn found(port: u16, hash: &str) -> bool {
 	retrieve_raw(port, hash)
 		.and_then(|v| v.get("found").and_then(|f| f.as_bool()))
 		.unwrap_or(false)
 }
 
 /// DELETE /ccr/{hash}
-fn delete(port:u16, hash:&str) -> bool {
+fn delete(port: u16, hash: &str) -> bool {
 	let out = Command::new("curl")
 		.args(["-s", "-X", "DELETE", &format!("http://127.0.0.1:{}/ccr/{}", port, hash)])
 		.output()
@@ -150,7 +150,7 @@ fn delete(port:u16, hash:&str) -> bool {
 		.unwrap_or(false)
 }
 
-fn check(id:u8, label:&str, pass:bool, failures:&mut usize) {
+fn check(id: u8, label: &str, pass: bool, failures: &mut usize) {
 	eprintln!("  {:02}  {:<52} {}", id, label, if pass { "PASS" } else { "FAIL ←" });
 	if !pass {
 		*failures += 1;
@@ -218,7 +218,7 @@ fn main() {
 	check(7, "utf-8 content: byte-exact round-trip", content_ok, &mut failures);
 
 	// ── 08  bulk storm: 50 entries ────────────────────────────────────────
-	let hashes:Vec<String> = (0u32..50)
+	let hashes: Vec<String> = (0u32..50)
 		.filter_map(|i| store(TOKEN_PORT, &format!("bulk {:04} {}", i, "payload ".repeat(200))))
 		.collect();
 	let hits = hashes.iter().filter(|h| found(TOKEN_PORT, h)).count();

@@ -58,7 +58,7 @@ pub use aphrodite::state::AphroditeState;
 /// up whatever the repo's live config happens to contain instead of the
 /// documented defaults they assert against.
 pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
-	static STATE:OnceLock<Mutex<AphroditeState>> = OnceLock::new();
+	static STATE: OnceLock<Mutex<AphroditeState>> = OnceLock::new();
 	STATE.get_or_init(|| {
 		#[cfg(not(test))]
 		let state = {
@@ -82,7 +82,7 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 /// poison is recovered via `into_inner` above). Keep multi-step mutations
 /// (e.g. `retain` then `push_front` in `inline_store_put`) ordered so an
 /// interruption degrades to "entry missing" rather than "duplicate entry".
-pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
+pub(crate) fn with_shared<T>(f: impl FnOnce(&mut AphroditeState) -> T) -> T {
 	let mut guard = shared().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	f(&mut guard)
 }
@@ -91,7 +91,7 @@ pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
 /// the shared session state is process-global and `on_session_start` resets it.
 #[cfg(test)]
 pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
-	static G:OnceLock<Mutex<()>> = OnceLock::new();
+	static G: OnceLock<Mutex<()>> = OnceLock::new();
 	G.get_or_init(|| Mutex::new(()))
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -103,7 +103,7 @@ pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// `transform_terminal_output` (first non-None string wins; non-strings pass
 /// through). So return the CCR marker string when compression happened, and
 /// `null` otherwise to leave the original output untouched.
-pub(crate) fn replacement_from(r:&serde_json::Value) -> serde_json::Value {
+pub(crate) fn replacement_from(r: &serde_json::Value) -> serde_json::Value {
 	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false) {
 		if let Some(marker) = r.get("marker").and_then(|v| v.as_str()) {
 			return serde_json::Value::String(marker.to_string());
@@ -113,9 +113,9 @@ pub(crate) fn replacement_from(r:&serde_json::Value) -> serde_json::Value {
 }
 
 /// Default cache proxy port, used when `APHRODITE_CACHE_PORT` is unset.
-const DEFAULT_CACHE_PORT:u16 = 9797;
+const DEFAULT_CACHE_PORT: u16 = 9797;
 /// Default token proxy port, used when `APHRODITE_TOKEN_PORT` is unset.
-const DEFAULT_TOKEN_PORT:u16 = 9798;
+const DEFAULT_TOKEN_PORT: u16 = 9798;
 
 /// Resolve the cache/token proxy ports for this process.
 ///
@@ -133,11 +133,14 @@ fn configured_ports() -> (u16, u16) {
 	// loaded into the host Python process, not a standalone binary) - use
 	// `eprintln!` directly so the warning actually reaches the host's
 	// captured stderr instead of a silently-unsubscribed `tracing` call.
-	let port_from_env = |var:&str, default:u16| match std::env::var(var) {
+	let port_from_env = |var: &str, default: u16| match std::env::var(var) {
 		Ok(v) => match v.parse::<u16>() {
 			Ok(port) => port,
 			Err(_) => {
-				eprintln!("aphrodite-hermes: {}={:?} is not a valid port (1-65535); using default {}", var, v, default);
+				eprintln!(
+					"aphrodite-hermes: {}={:?} is not a valid port (1-65535); using default {}",
+					var, v, default
+				);
 				default
 			},
 		},
@@ -153,7 +156,7 @@ fn configured_ports() -> (u16, u16) {
 pub(crate) fn proxy_health() -> serde_json::Value {
 	use std::{net::TcpStream, time::Duration};
 	let timeout = Duration::from_millis(400);
-	let alive = |addr:String| {
+	let alive = |addr: String| {
 		addr.parse()
 			.ok()
 			.and_then(|a| TcpStream::connect_timeout(&a, timeout).ok())
@@ -178,7 +181,7 @@ pub(crate) fn proxy_health() -> serde_json::Value {
 /// stays valid for the duration of this call (the standard `CStr::from_ptr`
 /// contract). Every caller in this crate passes pointers received directly
 /// from Hermes's C ABI call, which are expected to uphold that contract.
-unsafe fn cstr_to_string(ptr:*const c_char) -> String {
+unsafe fn cstr_to_string(ptr: *const c_char) -> String {
 	if ptr.is_null() {
 		String::new()
 	} else {
@@ -186,9 +189,13 @@ unsafe fn cstr_to_string(ptr:*const c_char) -> String {
 	}
 }
 
-fn to_c_string(s:&str) -> *mut c_char { CString::new(s).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut()) }
+fn to_c_string(s: &str) -> *mut c_char {
+	CString::new(s).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut())
+}
 
-fn to_json_error(msg:&str) -> *mut c_char { to_c_string(&serde_json::json!({"error": msg}).to_string()) }
+fn to_json_error(msg: &str) -> *mut c_char {
+	to_c_string(&serde_json::json!({"error": msg}).to_string())
+}
 
 /// Run `f` under `catch_unwind`, converting a panic into an error-JSON string
 /// instead of letting it unwind across the `extern "C"` boundary (which would
@@ -196,7 +203,7 @@ fn to_json_error(msg:&str) -> *mut c_char { to_c_string(&serde_json::json!({"err
 /// zero panic guards until this was added). Every exported fn except
 /// `aphrodite_hermes_free_string` (must stay minimal/infallible) routes
 /// through this.
-fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
+fn guarded(f: impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
 	std::panic::catch_unwind(f).unwrap_or_else(|_| to_json_error("internal error: panicked in aphrodite-hermes"))
 }
 
@@ -206,7 +213,7 @@ fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_ch
 /// Returns JSON result string. Caller must free with
 /// aphrodite_hermes_free_string.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name:*const c_char, args_json:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name: *const c_char, args_json: *const c_char) -> *mut c_char {
 	let name = unsafe { cstr_to_string(tool_name) };
 	let args = unsafe { cstr_to_string(args_json) };
 
@@ -239,19 +246,17 @@ pub extern "C" fn aphrodite_hermes_list_skills() -> *mut c_char {
 
 /// Get a single tool schema by name.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_get_schema(tool_name:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_hermes_get_schema(tool_name: *const c_char) -> *mut c_char {
 	let name = unsafe { cstr_to_string(tool_name) };
-	guarded(std::panic::AssertUnwindSafe(move || {
-		match schemas::get_schema(&name) {
-			Some(s) => to_c_string(&serde_json::to_string(&s).unwrap_or_default()),
-			None => to_json_error(&format!("unknown tool: {}", name)),
-		}
+	guarded(std::panic::AssertUnwindSafe(move || match schemas::get_schema(&name) {
+		Some(s) => to_c_string(&serde_json::to_string(&s).unwrap_or_default()),
+		None => to_json_error(&format!("unknown tool: {}", name)),
 	}))
 }
 
 /// Free a string returned by any aphrodite_hermes_* function.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_free_string(s:*mut c_char) {
+pub extern "C" fn aphrodite_hermes_free_string(s: *mut c_char) {
 	if !s.is_null() {
 		unsafe {
 			let _ = CString::from_raw(s);
@@ -279,13 +284,13 @@ pub extern "C" fn aphrodite_hermes_version() -> *mut c_char {
 ///     summary.
 ///   - `on_session_start` / `post_llm_call` - lifecycle; return value ignored.
 #[no_mangle]
-pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_hermes_call_hook(hook_name: *const c_char, args_json: *const c_char) -> *mut c_char {
 	let name = unsafe { cstr_to_string(hook_name) };
 	let args = unsafe { cstr_to_string(args_json) };
 
 	guarded(std::panic::AssertUnwindSafe(move || {
 		// Parse args as JSON object
-		let parsed:serde_json::Value = match serde_json::from_str(&args) {
+		let parsed: serde_json::Value = match serde_json::from_str(&args) {
 			Ok(v) => v,
 			Err(e) => return to_json_error(&format!("invalid args: {}", e)),
 		};
@@ -304,7 +309,7 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 			.and_then(|v| v.as_str())
 			.unwrap_or("");
 
-		let result:serde_json::Value = with_shared(|state| {
+		let result: serde_json::Value = with_shared(|state| {
 			match name.as_str() {
 				// Accept both the canonical Hermes name and the legacy alias.
 				"on_session_start" | "session_start" => aphrodite::session::on_session_start(state),
@@ -417,8 +422,10 @@ mod tests {
 	/// Serializes tests that touch process-global env vars
 	/// (`APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT`).
 	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
-		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-		G.get_or_init(|| std::sync::Mutex::new(())).lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+		static G: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+		G.get_or_init(|| std::sync::Mutex::new(()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner)
 	}
 
 	// ── T9 (F11/F15): a malformed port env var must fall back to the
@@ -448,7 +455,7 @@ mod tests {
 	fn test_version_is_semver() {
 		let json_ptr = aphrodite_hermes_version();
 		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 		let ver = v["version"].as_str().unwrap();
 		assert!(
 			ver.starts_with("0.") || ver.starts_with("1."),
@@ -461,7 +468,7 @@ mod tests {
 	fn test_list_tools_returns_array() {
 		let json_ptr = aphrodite_hermes_list_tools();
 		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 		assert!(v.is_array());
 		assert!(v.as_array().unwrap().len() >= 10);
 		aphrodite_hermes_free_string(json_ptr);
@@ -471,7 +478,7 @@ mod tests {
 	fn test_list_skills_returns_array() {
 		let json_ptr = aphrodite_hermes_list_skills();
 		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 		assert!(v.is_array());
 		aphrodite_hermes_free_string(json_ptr);
 	}
@@ -493,7 +500,7 @@ mod tests {
 		let args = CString::new("{}").unwrap();
 		let result_ptr = aphrodite_hermes_call_hook(hook.as_ptr(), args.as_ptr());
 		let result = unsafe { CStr::from_ptr(result_ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&result).unwrap();
 		assert_eq!(v["status"], "ok");
 		aphrodite_hermes_free_string(result_ptr);
 	}
@@ -508,23 +515,34 @@ mod tests {
 	#[test]
 	fn test_call_hook_pre_llm_call_injects_active_directive_context() {
 		let _g = crate::test_guard();
-		aphrodite_hermes_call_hook(CString::new("session_start").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
 		with_shared(|state| {
 			state.directives.insert(
 				"focus".into(),
-				aphrodite::directives::Directive { name:"focus".into(), content:"stay concise, 1-2 tools/turn".into() },
+				aphrodite::directives::Directive {
+					name: "focus".into(),
+					content: "stay concise, 1-2 tools/turn".into(),
+				},
 			);
 			state.active_directives = vec!["focus".into()];
 		});
 
-		let hook_ptr =
-			aphrodite_hermes_call_hook(CString::new("pre_llm_call").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		let hook_ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_llm_call").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
 		let result = unsafe { CStr::from_ptr(hook_ptr) }.to_string_lossy().into_owned();
 		aphrodite_hermes_free_string(hook_ptr);
 
-		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&result).unwrap();
 		let context = v["context"].as_str().unwrap_or_default();
-		assert!(context.contains("[directives: focus]"), "context missing directive marker: {context}");
+		assert!(
+			context.contains("[directives: focus]"),
+			"context missing directive marker: {context}"
+		);
 		assert!(context.contains("stay concise"), "context missing directive body: {context}");
 
 		// `active_directives` is process-global and not reset by
@@ -543,22 +561,31 @@ mod tests {
 	#[test]
 	fn test_call_hook_post_llm_call_archives_turn_for_aphrodite_diff() {
 		let _g = crate::test_guard();
-		aphrodite_hermes_call_hook(CString::new("session_start").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
 
 		let compress_args = CString::new(serde_json::json!({"content": "x".repeat(5000)}).to_string()).unwrap();
-		let compress_ptr =
-			aphrodite_hermes_dispatch_tool(CString::new("aphrodite_compress").unwrap().as_ptr(), compress_args.as_ptr());
+		let compress_ptr = aphrodite_hermes_dispatch_tool(
+			CString::new("aphrodite_compress").unwrap().as_ptr(),
+			compress_args.as_ptr(),
+		);
 		unsafe { CStr::from_ptr(compress_ptr) }.to_string_lossy().into_owned();
 		aphrodite_hermes_free_string(compress_ptr);
 
-		let hook_ptr =
-			aphrodite_hermes_call_hook(CString::new("post_llm_call").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		let hook_ptr = aphrodite_hermes_call_hook(
+			CString::new("post_llm_call").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
 		aphrodite_hermes_free_string(hook_ptr);
 
-		let diff_ptr =
-			aphrodite_hermes_dispatch_tool(CString::new("aphrodite_diff").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		let diff_ptr = aphrodite_hermes_dispatch_tool(
+			CString::new("aphrodite_diff").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
 		let diff_result = unsafe { CStr::from_ptr(diff_ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&diff_result).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&diff_result).unwrap();
 		aphrodite_hermes_free_string(diff_ptr);
 
 		assert_eq!(v["total"], 1, "aphrodite_diff must report the archived turn: {v:?}");
@@ -572,7 +599,10 @@ mod tests {
 	#[test]
 	fn test_call_hook_transform_tool_result_unwraps_hermes_wrapper() {
 		let _g = crate::test_guard();
-		aphrodite_hermes_call_hook(CString::new("session_start").unwrap().as_ptr(), CString::new("{}").unwrap().as_ptr());
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
 
 		let wrapped = serde_json::json!({"output": "x".repeat(5000), "exit_code": 1}).to_string();
 		let args = serde_json::json!({"tool_name": "terminal", "result": wrapped}).to_string();
@@ -581,7 +611,7 @@ mod tests {
 			CString::new(args).unwrap().as_ptr(),
 		);
 		let hook_result = unsafe { CStr::from_ptr(hook_ptr) }.to_string_lossy().into_owned();
-		let marker_str:String = serde_json::from_str(&hook_result).expect("a marker string, not null");
+		let marker_str: String = serde_json::from_str(&hook_result).expect("a marker string, not null");
 		aphrodite_hermes_free_string(hook_ptr);
 
 		assert!(
@@ -593,7 +623,10 @@ mod tests {
 			let last = state.recent_markers.last().expect("hook must record a marker");
 			(last.hash.clone(), last.preview.clone())
 		});
-		assert!(!preview.starts_with("[json:"), "recorded preview must reflect the unwrapped payload: {preview}");
+		assert!(
+			!preview.starts_with("[json:"),
+			"recorded preview must reflect the unwrapped payload: {preview}"
+		);
 
 		let retrieved = crate::tools::dispatch("aphrodite_retrieve", &serde_json::json!({"hash": hash}).to_string());
 		assert_eq!(retrieved["found"], true);
@@ -609,7 +642,7 @@ mod tests {
 		let name = CString::new("aphrodite_compress").unwrap();
 		let result_ptr = aphrodite_hermes_get_schema(name.as_ptr());
 		let result = unsafe { CStr::from_ptr(result_ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&result).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&result).unwrap();
 		assert_eq!(v["name"], "aphrodite_compress");
 		aphrodite_hermes_free_string(result_ptr);
 	}
@@ -620,7 +653,7 @@ mod tests {
 	fn test_guarded_converts_panic_to_error_json() {
 		let ptr = guarded(|| panic!("deliberate test panic"));
 		let json = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 		assert!(v["error"].as_str().unwrap().contains("panicked"));
 		aphrodite_hermes_free_string(ptr);
 	}

@@ -10,10 +10,7 @@
 //! Per profile, per user: `directives/*.md` files are swappable at runtime
 //! via `aphrodite_directive("swap", "name")`.
 
-use std::{
-	collections::HashMap,
-	path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 
 /// A loaded directive - name and content.
 #[derive(Debug, Clone)]
@@ -57,10 +54,7 @@ pub fn load_directives(dir: &PathBuf) -> HashMap<String, Directive> {
 		} else {
 			content
 		};
-		directives.insert(name.to_string(), Directive {
-			name: name.to_string(),
-			content,
-		});
+		directives.insert(name.to_string(), Directive { name: name.to_string(), content });
 	}
 	directives
 }
@@ -83,10 +77,7 @@ pub fn load_directives(dir: &PathBuf) -> HashMap<String, Directive> {
 /// full (per-file `MAX_DIRECTIVE_CHARS`-capped) body, stripped of leading `#`
 /// markers, under a combined-output cap so several active directives can't
 /// blow past the context budget this feature is supposed to respect.
-pub fn build_directive_context(
-	all: &HashMap<String, Directive>,
-	active: &[String],
-) -> String {
+pub fn build_directive_context(all: &HashMap<String, Directive>, active: &[String]) -> String {
 	if active.is_empty() {
 		return String::new();
 	}
@@ -120,11 +111,7 @@ pub fn build_directive_context(
 /// the dispatch arm embedded `{"error": ...}` inside an otherwise-success
 /// value). This always returns the latter shape - callers pass the result
 /// straight through their own success serializer.
-pub fn handle_action(
-	state: &mut crate::state::AphroditeState,
-	action: &str,
-	name: &str,
-) -> serde_json::Value {
+pub fn handle_action(state: &mut crate::state::AphroditeState, action: &str, name: &str) -> serde_json::Value {
 	match action {
 		"list" => serde_json::json!({
 			"available": state.directives.keys().collect::<Vec<&String>>(),
@@ -137,21 +124,21 @@ pub fn handle_action(
 			} else {
 				serde_json::json!({"error": format!("unknown directive: {}", name)})
 			}
-		}
+		},
 		"add" => {
 			if state.directives.contains_key(name) && !state.active_directives.contains(&name.to_string()) {
 				state.active_directives.push(name.to_string());
 			}
 			serde_json::json!({"active": &state.active_directives})
-		}
+		},
 		"remove" => {
 			state.active_directives.retain(|d| d != name);
 			serde_json::json!({"active": &state.active_directives})
-		}
+		},
 		"reset" => {
 			state.active_directives.clear();
 			serde_json::json!({"active": &state.active_directives})
-		}
+		},
 		_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|remove|reset)", action)}),
 	}
 }
@@ -170,10 +157,10 @@ mod tests {
 	#[test]
 	fn test_build_with_active() {
 		let mut all = HashMap::new();
-		all.insert("focus".into(), Directive {
-			name: "focus".into(),
-			content: "stay concise\nuse 1-2 tools".into(),
-		});
+		all.insert(
+			"focus".into(),
+			Directive { name: "focus".into(), content: "stay concise\nuse 1-2 tools".into() },
+		);
 		let context = build_directive_context(&all, &["focus".into()]);
 		assert!(context.contains("[directives: focus]"));
 		assert!(context.contains("focus:\n"));
@@ -187,17 +174,26 @@ mod tests {
 	#[test]
 	fn test_build_with_active_injects_full_body_not_just_first_line() {
 		let mut all = HashMap::new();
-		all.insert("focus".into(), Directive {
-			name:"focus".into(),
-			content:"# focus - stay targeted, minimal tool usage\n\n\
+		all.insert(
+			"focus".into(),
+			Directive {
+				name: "focus".into(),
+				content: "# focus - stay targeted, minimal tool usage\n\n\
 			         # Each turn: use at most 1-2 tools.\n\n\
 			         - One primary action per turn\n\
 			         - Prefer aphrodite_retrieve over re-reading"
-				.into(),
-		});
+					.into(),
+			},
+		);
 		let context = build_directive_context(&all, &["focus".into()]);
-		assert!(context.contains("Each turn: use at most 1-2 tools."), "body line missing: {context}");
-		assert!(context.contains("One primary action per turn"), "bullet line missing: {context}");
+		assert!(
+			context.contains("Each turn: use at most 1-2 tools."),
+			"body line missing: {context}"
+		);
+		assert!(
+			context.contains("One primary action per turn"),
+			"bullet line missing: {context}"
+		);
 		assert!(!context.contains('#'), "leading # markers must be stripped: {context}");
 	}
 
@@ -207,7 +203,10 @@ mod tests {
 	#[test]
 	fn test_handle_action_all_actions_and_unknown() {
 		let mut state = crate::state::AphroditeState::default();
-		state.directives.insert("focus".into(), Directive { name:"focus".into(), content:"stay focused".into() });
+		state.directives.insert(
+			"focus".into(),
+			Directive { name: "focus".into(), content: "stay focused".into() },
+		);
 
 		let r = handle_action(&mut state, "list", "");
 		assert_eq!(r["available"], serde_json::json!(["focus"]));
@@ -237,9 +236,19 @@ mod tests {
 	#[test]
 	fn test_build_with_active_caps_combined_output() {
 		let mut all = HashMap::new();
-		all.insert("big".into(), Directive { name:"big".into(), content:"x".repeat(MAX_DIRECTIVE_CHARS) });
-		all.insert("also-big".into(), Directive { name:"also-big".into(), content:"y".repeat(MAX_DIRECTIVE_CHARS) });
+		all.insert(
+			"big".into(),
+			Directive { name: "big".into(), content: "x".repeat(MAX_DIRECTIVE_CHARS) },
+		);
+		all.insert(
+			"also-big".into(),
+			Directive { name: "also-big".into(), content: "y".repeat(MAX_DIRECTIVE_CHARS) },
+		);
 		let context = build_directive_context(&all, &["big".into(), "also-big".into()]);
-		assert!(context.len() <= MAX_COMBINED_CHARS + 10, "combined output must respect the cap: {} chars", context.len());
+		assert!(
+			context.len() <= MAX_COMBINED_CHARS + 10,
+			"combined output must respect the cap: {} chars",
+			context.len()
+		);
 	}
 }

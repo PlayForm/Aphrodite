@@ -6,7 +6,7 @@
 use crate::state::AphroditeState;
 
 /// Handle session start - reset all per-session state.
-pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value {
+pub fn on_session_start(state: &mut AphroditeState) -> serde_json::Value {
 	state.turn_counter = 0;
 	state.scanned_msg_idx = 0;
 	state.conv_index.clear();
@@ -23,7 +23,7 @@ pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value {
 }
 
 /// Increment turn counter and return new value.
-pub fn next_turn(state:&mut AphroditeState) -> usize {
+pub fn next_turn(state: &mut AphroditeState) -> usize {
 	state.turn_counter += 1;
 	state.scanned_msg_idx = 0; // reset scan position for new turn
 	state.turn_counter
@@ -33,7 +33,7 @@ pub fn next_turn(state:&mut AphroditeState) -> usize {
 /// Called from `hooks::post_llm_call` (report 06 F11/T13) with the last
 /// marker recorded during the turn - previously unwired, so `conv_index`
 /// stayed empty and `aphrodite_diff` always returned zero turns.
-pub fn archive_turn(state:&mut AphroditeState, hash:&str, summary:&str, size:usize) {
+pub fn archive_turn(state: &mut AphroditeState, hash: &str, summary: &str, size: usize) {
 	let turn = state.turn_counter;
 	state.conv_index.insert(turn, (hash.to_string(), summary.to_string(), size));
 	// Keep last 50 turns
@@ -47,8 +47,8 @@ pub fn archive_turn(state:&mut AphroditeState, hash:&str, summary:&str, size:usi
 
 /// Get the conversation index as a JSON-serializable value, sorted oldest
 /// turn first.
-pub fn get_conv_index(state:&AphroditeState) -> Vec<serde_json::Value> {
-	let mut turns:Vec<_> = state.conv_index.iter().collect();
+pub fn get_conv_index(state: &AphroditeState) -> Vec<serde_json::Value> {
+	let mut turns: Vec<_> = state.conv_index.iter().collect();
 	turns.sort_by_key(|(k, _)| *k);
 	turns
 		.iter()
@@ -59,7 +59,7 @@ pub fn get_conv_index(state:&AphroditeState) -> Vec<serde_json::Value> {
 }
 
 /// Generate a catalog summary for the context engine prompt injection.
-pub fn catalog_summary(state:&AphroditeState) -> String {
+pub fn catalog_summary(state: &AphroditeState) -> String {
 	if state.recent_markers.is_empty() && state.conv_index.is_empty() {
 		return String::new();
 	}
@@ -68,8 +68,8 @@ pub fn catalog_summary(state:&AphroditeState) -> String {
 
 	let marker_count = state.recent_markers.len();
 	if marker_count > 0 {
-		let last_few:Vec<_> = state.recent_markers.iter().rev().take(5).collect();
-		let previews:Vec<String> = last_few.iter().map(|m| m.preview.clone()).collect();
+		let last_few: Vec<_> = state.recent_markers.iter().rev().take(5).collect();
+		let previews: Vec<String> = last_few.iter().map(|m| m.preview.clone()).collect();
 		parts.push(format!(
 			"[Aphrodite] {} compressions this session. Recent: {}",
 			marker_count,
@@ -84,7 +84,7 @@ pub fn catalog_summary(state:&AphroditeState) -> String {
 
 	let file_count = state.referenced_files.len();
 	if file_count > 0 {
-		let files:Vec<String> = state
+		let files: Vec<String> = state
 			.referenced_files
 			.iter()
 			.take(5)
@@ -105,13 +105,13 @@ mod tests {
 		let mut s = AphroditeState::default();
 		s.turn_counter = 42;
 		s.record_marker(crate::state::MarkerEntry {
-			hash:"abc".into(),
-			ccr_type:"text".into(),
-			size:100,
-			preview:"[text]".into(),
-			turn:1,
-			center:None,
-			meta:None,
+			hash: "abc".into(),
+			ccr_type: "text".into(),
+			size: 100,
+			preview: "[text]".into(),
+			turn: 1,
+			center: None,
+			meta: None,
 		});
 
 		let r = on_session_start(&mut s);

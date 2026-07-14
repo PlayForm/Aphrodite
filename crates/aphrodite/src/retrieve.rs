@@ -15,34 +15,37 @@ use crate::proxy::{AppState, ccr_get};
 /// stored payload instead of returning it in full.
 #[derive(Debug, Deserialize)]
 pub struct RetrieveRequest {
-	pub hash:Option<String>,
-	pub query:Option<String>,
+	pub hash: Option<String>,
+	pub query: Option<String>,
 	#[serde(default)]
-	pub offset:usize,
+	pub offset: usize,
 	#[serde(default)]
-	pub limit:usize,
+	pub limit: usize,
 }
 
 /// Response body for `/retrieve`. `source` reports which backend served the
 /// content (e.g. `"inline_ccr"`, `"ccr"`, `"none"`) for observability.
 #[derive(Debug, Serialize)]
 pub struct RetrieveResponse {
-	pub found:bool,
-	pub content:Option<String>,
-	pub source:String,
-	pub error:Option<String>,
+	pub found: bool,
+	pub content: Option<String>,
+	pub source: String,
+	pub error: Option<String>,
 	/// `true` when `content` is a partial window of a larger stored
 	/// document - because of `offset`/`limit`, or because `limit` (including
 	/// `0`, which is NOT "unlimited") hit the 10,000-line server cap (02-F5).
 	/// A `[lines a-b/total]` header is also prepended to `content` in that
 	/// case; this field lets a caller detect truncation without parsing it.
-	pub truncated:bool,
+	pub truncated: bool,
 }
 
 /// Resolve a CCR marker hash back to its original content, optionally
 /// filtered by `query` and paged by `offset`/`limit`. Checks the inline_ccr
 /// store first, then falls back to the CCR backend.
-pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<RetrieveRequest>) -> impl IntoResponse {
+pub async fn handle_retrieve(
+	State(state): State<Arc<AppState>>,
+	Json(req): Json<RetrieveRequest>,
+) -> impl IntoResponse {
 	let hash = match &req.hash {
 		// Strip a `|type|size` marker-body suffix and surrounding whitespace
 		// (report 05 F3) - an LLM sometimes echoes the full marker body back
@@ -53,11 +56,11 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 			return (
 				StatusCode::BAD_REQUEST,
 				Json(RetrieveResponse {
-					found:false,
-					content:None,
-					source:"none".into(),
-					error:Some("`hash` required".into()),
-					truncated:false,
+					found: false,
+					content: None,
+					source: "none".into(),
+					error: Some("`hash` required".into()),
+					truncated: false,
 				}),
 			)
 				.into_response();
@@ -76,38 +79,36 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 			state.inline_ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 			// Fallback to CCR backend
 			match &state.ccr {
-				Some(ccr) => {
-					match ccr_get(ccr, &hash).await {
-						Some(c) => {
-							state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-							c
-						},
-						None => {
-							state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-							return (
-								StatusCode::NOT_FOUND,
-								Json(RetrieveResponse {
-									found:false,
-									content:None,
-									source:"none".into(),
-									error:Some(format!("CCR entry not found: {}", hash)),
-									truncated:false,
-								}),
-							)
-								.into_response();
-						},
-					}
+				Some(ccr) => match ccr_get(ccr, &hash).await {
+					Some(c) => {
+						state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+						c
+					},
+					None => {
+						state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+						return (
+							StatusCode::NOT_FOUND,
+							Json(RetrieveResponse {
+								found: false,
+								content: None,
+								source: "none".into(),
+								error: Some(format!("CCR entry not found: {}", hash)),
+								truncated: false,
+							}),
+						)
+							.into_response();
+					},
 				},
 				None => {
 					state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 					return (
 						StatusCode::NOT_FOUND,
 						Json(RetrieveResponse {
-							found:false,
-							content:None,
-							source:"none".into(),
-							error:Some(format!("CCR entry not found: {}", hash)),
-							truncated:false,
+							found: false,
+							content: None,
+							source: "none".into(),
+							error: Some(format!("CCR entry not found: {}", hash)),
+							truncated: false,
 						}),
 					)
 						.into_response();
@@ -134,18 +135,31 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 		Err(err) => {
 			return (
 				StatusCode::BAD_REQUEST,
-				Json(RetrieveResponse { found:false, content:Some(err), source:"ccr".into(), error:None, truncated:false }),
+				Json(RetrieveResponse {
+					found: false,
+					content: Some(err),
+					source: "ccr".into(),
+					error: None,
+					truncated: false,
+				}),
 			)
 				.into_response();
 		},
 	};
 
-	Json(RetrieveResponse { found:true, content:Some(content), source:"ccr".into(), error:None, truncated }).into_response()
+	Json(RetrieveResponse {
+		found: true,
+		content: Some(content),
+		source: "ccr".into(),
+		error: None,
+		truncated,
+	})
+	.into_response()
 }
 
 /// Keep only lines of `content` matching `query` (case-insensitive substring),
 /// or return `content` unchanged if `query` is `None`/empty.
-fn filter_content(content:&str, query:Option<&str>) -> String {
+fn filter_content(content: &str, query: Option<&str>) -> String {
 	match query {
 		Some(q) if !q.is_empty() => {
 			// Truncate FIRST (char-boundary-safe, not a raw byte slice), then
@@ -155,7 +169,7 @@ fn filter_content(content:&str, query:Option<&str>) -> String {
 			// filter itself (report 05 F2).
 			let q = crate::struct_extract::floor_boundary(q, 512);
 			let q_lower = q.to_ascii_lowercase();
-			let filtered:Vec<&str> = content
+			let filtered: Vec<&str> = content
 				.lines()
 				.filter(|line| line.to_ascii_lowercase().contains(&q_lower))
 				.collect();
@@ -178,10 +192,10 @@ fn filter_content(content:&str, query:Option<&str>) -> String {
 /// [`handle_retrieve`]). Returns `(content, truncated)`: a `[lines a-b/total]`
 /// header is prepended to `content`, and `truncated` is `true`, whenever the
 /// window doesn't cover the whole document.
-fn paginate(content:&str, offset:usize, limit:usize) -> Result<(String, bool), String> {
+fn paginate(content: &str, offset: usize, limit: usize) -> Result<(String, bool), String> {
 	// Clamp limit: 0 = server default cap, max 10_000 lines for safety
 	let limit = if limit == 0 { 10_000 } else { limit.min(10_000) };
-	let lines:Vec<&str> = content.lines().collect();
+	let lines: Vec<&str> = content.lines().collect();
 	let total = lines.len();
 	// F20: a zero-line (empty) document is a valid stored entry (e.g.
 	// `POST /ccr/create` with `content: ""`), not an out-of-range offset -
@@ -240,7 +254,7 @@ mod tests {
 		}
 		let state = Arc::new(state);
 
-		async fn body_of(resp:axum::response::Response) -> serde_json::Value {
+		async fn body_of(resp: axum::response::Response) -> serde_json::Value {
 			let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
 			serde_json::from_slice(&bytes).unwrap()
 		}
@@ -249,7 +263,7 @@ mod tests {
 			for hash_arg in ["abc123", "abc123|tool|1024", "  abc123  "] {
 				let resp = handle_retrieve(
 					State(state.clone()),
-					Json(RetrieveRequest { hash:Some(hash_arg.to_string()), query:None, offset:0, limit:0 }),
+					Json(RetrieveRequest { hash: Some(hash_arg.to_string()), query: None, offset: 0, limit: 0 }),
 				)
 				.await
 				.into_response();

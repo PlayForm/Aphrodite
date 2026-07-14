@@ -13,10 +13,12 @@ use crate::{
 };
 
 /// Compute a CCR hash for content using BLAKE3 (40 hex chars).
-pub fn compute_hash(content:&str) -> String { headroom_core::ccr::compute_key(content.as_bytes()) }
+pub fn compute_hash(content: &str) -> String {
+	headroom_core::ccr::compute_key(content.as_bytes())
+}
 
 /// Essential tools that must NOT be compressed - agent needs raw output.
-const ESSENTIAL_TOOLS:&[&str] = &[
+const ESSENTIAL_TOOLS: &[&str] = &[
 	"skill_view",
 	"skills_list",
 	"skill_manage",
@@ -27,7 +29,7 @@ const ESSENTIAL_TOOLS:&[&str] = &[
 ];
 
 /// Transform tool output - full compression pipeline.
-pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:&str) -> serde_json::Value {
+pub fn transform_tool_result(state: &mut AphroditeState, content: &str, tool_name: &str) -> serde_json::Value {
 	transform_tool_result_classified(state, content, tool_name, None)
 }
 
@@ -39,10 +41,10 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 /// `aphrodite_retrieve` always returns exactly what was passed in; `classify`
 /// affects only the reported `type` and the generated preview.
 pub fn transform_tool_result_classified(
-	state:&mut AphroditeState,
-	content:&str,
-	tool_name:&str,
-	classify:Option<(&str, &str)>,
+	state: &mut AphroditeState,
+	content: &str,
+	tool_name: &str,
+	classify: Option<(&str, &str)>,
 ) -> serde_json::Value {
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
@@ -80,7 +82,7 @@ pub fn transform_tool_result_classified(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let (type_str, classify_content):(String, &str) = match classify {
+	let (type_str, classify_content): (String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
 		None => (transforms::detect(content).as_str().to_string(), content),
 	};
@@ -92,13 +94,13 @@ pub fn transform_tool_result_classified(
 	let marker = ccr_marker(&hash, &type_str, content.len(), &preview, None, None, None);
 
 	state.record_marker(MarkerEntry {
-		hash:hash.clone(),
-		ccr_type:type_str.clone(),
-		size:content.len(),
-		preview:preview.clone(),
-		turn:state.turn_counter,
-		center:None,
-		meta:None,
+		hash: hash.clone(),
+		ccr_type: type_str.clone(),
+		size: content.len(),
+		preview: preview.clone(),
+		turn: state.turn_counter,
+		center: None,
+		meta: None,
 	});
 
 	serde_json::json!({
@@ -113,16 +115,16 @@ pub fn transform_tool_result_classified(
 }
 
 /// Transform terminal output - exit code aware.
-pub fn transform_terminal_output(state:&mut AphroditeState, content:&str) -> serde_json::Value {
+pub fn transform_terminal_output(state: &mut AphroditeState, content: &str) -> serde_json::Value {
 	transform_terminal_output_classified(state, content, None)
 }
 
 /// Same as [`transform_terminal_output`], with the same `classify` contract
 /// as [`transform_tool_result_classified`].
 pub fn transform_terminal_output_classified(
-	state:&mut AphroditeState,
-	content:&str,
-	classify:Option<(&str, &str)>,
+	state: &mut AphroditeState,
+	content: &str,
+	classify: Option<(&str, &str)>,
 ) -> serde_json::Value {
 	if content.is_empty() {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
@@ -132,7 +134,7 @@ pub fn transform_terminal_output_classified(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let (type_str, classify_content):(String, &str) = match classify {
+	let (type_str, classify_content): (String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
 		None => {
 			let ct = transforms::detect(content);
@@ -152,13 +154,13 @@ pub fn transform_terminal_output_classified(
 	let marker = ccr_marker(&hash, &type_str, content.len(), &preview, None, None, None);
 
 	state.record_marker(MarkerEntry {
-		hash:hash.clone(),
-		ccr_type:type_str.to_string(),
-		size:content.len(),
-		preview:preview.clone(),
-		turn:state.turn_counter,
-		center:None,
-		meta:None,
+		hash: hash.clone(),
+		ccr_type: type_str.to_string(),
+		size: content.len(),
+		preview: preview.clone(),
+		turn: state.turn_counter,
+		center: None,
+		meta: None,
 	});
 
 	serde_json::json!({
@@ -173,15 +175,14 @@ pub fn transform_terminal_output_classified(
 }
 
 /// Session start hook - full reset.
-pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value { crate::session::on_session_start(state) }
+pub fn on_session_start(state: &mut AphroditeState) -> serde_json::Value {
+	crate::session::on_session_start(state)
+}
 
 /// Pre-LLM call hook - inject catalog + active directives into context.
-pub fn pre_llm_call(state:&AphroditeState) -> serde_json::Value {
+pub fn pre_llm_call(state: &AphroditeState) -> serde_json::Value {
 	let summary = crate::session::catalog_summary(state);
-	let directives = crate::directives::build_directive_context(
-		&state.directives,
-		&state.active_directives,
-	);
+	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
 	serde_json::json!({
 		"status": "ok",
 		"catalog": summary,
@@ -197,7 +198,7 @@ pub fn pre_llm_call(state:&AphroditeState) -> serde_json::Value {
 /// was never called from any hook, so `conv_index` stayed empty forever and
 /// `aphrodite_diff` always returned zero turns despite compressions
 /// happening every turn.
-pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
+pub fn post_llm_call(state: &mut AphroditeState) -> serde_json::Value {
 	if let Some(last) = state.recent_markers.iter().rev().find(|m| m.turn == state.turn_counter) {
 		let (hash, summary, size) = (last.hash.clone(), last.preview.clone(), last.size);
 		crate::session::archive_turn(state, &hash, &summary, size);
@@ -207,7 +208,7 @@ pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 }
 
 /// Extract file path from tool output - heuristic.
-fn extract_file_path(content:&str, tool:&str) -> Option<String> {
+fn extract_file_path(content: &str, tool: &str) -> Option<String> {
 	match tool {
 		"read_file" | "write_file" | "patch" => {
 			// First line often contains path
@@ -225,16 +226,14 @@ fn extract_file_path(content:&str, tool:&str) -> Option<String> {
 		// first `:` on the first result line (F10: this tool is listed in
 		// `state.file_tools` but was previously never actually matched here,
 		// so every search result silently went untracked).
-		"search_files" => {
-			content.lines().next().and_then(|line| {
-				let path = line.split(':').next().unwrap_or("").trim();
-				if path.starts_with('/') || path.starts_with("./") {
-					Some(path.to_string())
-				} else {
-					None
-				}
-			})
-		},
+		"search_files" => content.lines().next().and_then(|line| {
+			let path = line.split(':').next().unwrap_or("").trim();
+			if path.starts_with('/') || path.starts_with("./") {
+				Some(path.to_string())
+			} else {
+				None
+			}
+		}),
 		_ => None,
 	}
 }
@@ -347,6 +346,9 @@ mod tests {
 	fn test_post_llm_call_with_no_markers_this_turn_does_not_archive() {
 		let mut s = AphroditeState::default();
 		post_llm_call(&mut s);
-		assert!(s.conv_index.is_empty(), "nothing to archive when no marker was recorded this turn");
+		assert!(
+			s.conv_index.is_empty(),
+			"nothing to archive when no marker was recorded this turn"
+		);
 	}
 }

@@ -30,15 +30,15 @@ fn bin_path() -> std::path::PathBuf {
         .map(|p| p.join(bin_name))
         .unwrap_or_else(|| bin_name.into())
 }
-const CACHE_PORT:u16 = 49797;
-const TOKEN_PORT:u16 = 49798;
+const CACHE_PORT: u16 = 49797;
+const TOKEN_PORT: u16 = 49798;
 
 // ── proxy lifecycle ────────────────────────────────────────────────
 
 struct Proxy {
-	child:std::process::Child,
-	port:u16,
-	mode:&'static str,
+	child: std::process::Child,
+	port: u16,
+	mode: &'static str,
 }
 impl Drop for Proxy {
 	fn drop(&mut self) {
@@ -47,7 +47,7 @@ impl Drop for Proxy {
 	}
 }
 
-fn spawn(mode:&'static str, port:u16) -> Proxy {
+fn spawn(mode: &'static str, port: u16) -> Proxy {
 	let listen = format!("127.0.0.1:{}", port);
 	// Isolate CCR storage per bench run so this never touches the operator's
 	// real ~/.hermes/aphrodite/ccr.db (token mode only opens SQLite there).
@@ -94,7 +94,7 @@ fn spawn(mode:&'static str, port:u16) -> Proxy {
 
 // ── HTTP via curl (no extra deps) ──────────────────────────────────
 
-fn ccr_create(port:u16, content:&str) -> Option<serde_json::Value> {
+fn ccr_create(port: u16, content: &str) -> Option<serde_json::Value> {
 	let body = serde_json::json!({"content": content}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -113,7 +113,7 @@ fn ccr_create(port:u16, content:&str) -> Option<serde_json::Value> {
 }
 
 /// POST /retrieve  body: {"hash": "..."}
-fn ccr_retrieve(port:u16, hash:&str) -> bool {
+fn ccr_retrieve(port: u16, hash: &str) -> bool {
 	let body = serde_json::json!({"hash": hash}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -135,27 +135,30 @@ fn ccr_retrieve(port:u16, hash:&str) -> bool {
 // ── corpus ─────────────────────────────────────────────────────────
 
 struct Sample {
-	label:&'static str,
-	content:String,
+	label: &'static str,
+	content: String,
 }
 
 fn corpus() -> Vec<Sample> {
 	vec![
-		Sample { label:"tiny_text", content:"ok ".repeat(40) }, // 120 B  - below all thresholds
-		Sample { label:"small_prose", content:"The quick brown fox jumps. ".repeat(18) }, // ~468 B - inline zone
+		Sample { label: "tiny_text", content: "ok ".repeat(40) }, // 120 B  - below all thresholds
+		Sample { label: "small_prose", content: "The quick brown fox jumps. ".repeat(18) }, // ~468 B - inline zone
 		Sample {
-			label:"medium_prose",
-			content:"Lorem ipsum dolor sit amet, consectetur adipiscing. ".repeat(30),
+			label: "medium_prose",
+			content: "Lorem ipsum dolor sit amet, consectetur adipiscing. ".repeat(30),
 		}, // ~1.5 KB
-		Sample { label:"large_prose", content:"Lorem ipsum dolor. ".repeat(600) }, // ~11 KB
-		Sample { label:"rust_code", content:include_str!("bench_payloads/sample.rs").to_string() }, // ~3.5 KB
+		Sample { label: "large_prose", content: "Lorem ipsum dolor. ".repeat(600) }, // ~11 KB
 		Sample {
-			label:"build_output",
-			content:"   Compiling aphrodite v0.5.0\n".repeat(70) + "    Finished release in 14.2s\n",
+			label: "rust_code",
+			content: include_str!("bench_payloads/sample.rs").to_string(),
+		}, // ~3.5 KB
+		Sample {
+			label: "build_output",
+			content: "   Compiling aphrodite v0.5.0\n".repeat(70) + "    Finished release in 14.2s\n",
 		},
 		Sample {
-			label:"linter_output",
-			content:(0..50)
+			label: "linter_output",
+			content: (0..50)
 				.map(|i| {
 					format!(
 						"error[E0308]: mismatched types\n  --> src/lib.rs:{}:5\n   |\n{}|   expected `u64`\n",
@@ -166,8 +169,8 @@ fn corpus() -> Vec<Sample> {
 				.collect::<String>(),
 		},
 		Sample {
-			label:"diff",
-			content:format!(
+			label: "diff",
+			content: format!(
 				"diff --git a/src/proxy.rs b/src/proxy.rs\nindex abc..def 100644\n--- a/src/proxy.rs\n+++ \
 				 b/src/proxy.rs\n{}",
 				(0..100)
@@ -176,8 +179,8 @@ fn corpus() -> Vec<Sample> {
 			),
 		},
 		Sample {
-			label:"json_tool",
-			content:serde_json::to_string_pretty(&serde_json::json!({
+			label: "json_tool",
+			content: serde_json::to_string_pretty(&serde_json::json!({
 				"exit_code": 0,
 				"stdout": "ok\n".repeat(150),
 				"stderr": "",
@@ -186,8 +189,8 @@ fn corpus() -> Vec<Sample> {
 			.unwrap(),
 		},
 		Sample {
-			label:"error_output",
-			content:format!(
+			label: "error_output",
+			content: format!(
 				"thread 'main' panicked at 'index out of bounds'\nstack backtrace:\n{}",
 				(0..35)
 					.map(|i| format!("  {}: some::module::fn_{} at src/lib.rs:{}\n", i, i, i * 4 + 1))
@@ -195,8 +198,8 @@ fn corpus() -> Vec<Sample> {
 			),
 		},
 		Sample {
-			label:"log_output",
-			content:(0..80)
+			label: "log_output",
+			content: (0..80)
 				.map(|i| {
 					format!(
 						"2026-06-16T09:{:02}:{:02}Z [INFO] request id=req-{:04} elapsed={}ms\n",
@@ -209,7 +212,7 @@ fn corpus() -> Vec<Sample> {
 				.collect::<String>(),
 		},
 		Sample {
-			label:"unicode_cjk", content:"日本語テスト привет мир 🦀🔥 ".repeat(140)
+			label: "unicode_cjk", content: "日本語テスト привет мир 🦀🔥 ".repeat(140)
 		}, // ~4 KB mixed UTF-8
 	]
 }
@@ -218,21 +221,21 @@ fn corpus() -> Vec<Sample> {
 
 #[derive(Default)]
 struct Row {
-	orig:usize,
-	marker:usize,
-	compressed:bool,
-	retrieve_ok:bool,
-	retrieve_attempted:bool,
-	latency_ms:u128,
+	orig: usize,
+	marker: usize,
+	compressed: bool,
+	retrieve_ok: bool,
+	retrieve_attempted: bool,
+	latency_ms: u128,
 }
 
-fn run(proxy:&Proxy, samples:&[Sample]) -> Vec<(&'static str, Row)> {
+fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<(&'static str, Row)> {
 	let mut rows = Vec::new();
 	for s in samples {
 		let t0 = Instant::now();
 		let res = ccr_create(proxy.port, &s.content);
 		let latency = t0.elapsed().as_millis();
-		let mut row = Row { orig:s.content.len(), latency_ms:latency, ..Default::default() };
+		let mut row = Row { orig: s.content.len(), latency_ms: latency, ..Default::default() };
 		if let Some(v) = res {
 			// CcrCreateResponse serializes `token_savings_ratio`, never
 			// `compression_ratio` (proxy.rs's CcrCreateResponse struct).
@@ -270,7 +273,7 @@ fn run(proxy:&Proxy, samples:&[Sample]) -> Vec<(&'static str, Row)> {
 	rows
 }
 
-fn print_report(mode:&str, rows:&[(&'static str, Row)]) {
+fn print_report(mode: &str, rows: &[(&'static str, Row)]) {
 	eprintln!("\n{}", "─".repeat(80));
 	eprintln!("  mode={}  {} samples", mode, rows.len());
 	eprintln!(
@@ -297,11 +300,11 @@ fn print_report(mode:&str, rows:&[(&'static str, Row)]) {
 			r.latency_ms
 		);
 	}
-	let misses:usize = rows.iter().filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok).count();
-	let hits:usize = rows.iter().filter(|(_, r)| r.retrieve_ok).count();
-	let compr:usize = rows.iter().filter(|(_, r)| r.compressed).count();
-	let total_orig:usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.orig).sum();
-	let total_mark:usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.marker).sum();
+	let misses: usize = rows.iter().filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok).count();
+	let hits: usize = rows.iter().filter(|(_, r)| r.retrieve_ok).count();
+	let compr: usize = rows.iter().filter(|(_, r)| r.compressed).count();
+	let total_orig: usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.orig).sum();
+	let total_mark: usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.marker).sum();
 	eprintln!("{}", "─".repeat(80));
 	eprintln!(
 		"  compressed={} passthrough={}  retrieve hits={} misses={}",
@@ -339,7 +342,7 @@ fn main() {
 	print_report("cache", &cache_rows);
 	print_report("token", &token_rows);
 
-	let misses:usize = cache_rows
+	let misses: usize = cache_rows
 		.iter()
 		.chain(token_rows.iter())
 		.filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok)

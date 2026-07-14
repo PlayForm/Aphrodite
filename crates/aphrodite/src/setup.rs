@@ -9,8 +9,7 @@
 //! `include_str!` - no runtime file dependency for cargo-installed binaries.
 
 use std::{
-	fs,
-	io,
+	fs, io,
 	path::{Path, PathBuf},
 	process::Command,
 };
@@ -20,7 +19,7 @@ use crate::config::SetupArgs;
 /// aphrodite.toml template - embedded at compile time.
 /// Placeholders: `{api_url}`, `{model}`, `{cache_port}`, `{token_port}` -
 /// replaced with user-provided values.
-const CONFIG_TEMPLATE:&str = include_str!("../templates/aphrodite.toml");
+const CONFIG_TEMPLATE: &str = include_str!("../templates/aphrodite.toml");
 
 /// Errors that can occur during setup.
 #[derive(Debug, thiserror::Error)]
@@ -37,14 +36,14 @@ pub enum SetupError {
 
 /// Context gathered during setup.
 struct SetupCtx {
-	aphrodite_dir:PathBuf,
-	binaries_dir:PathBuf,
-	own_path:PathBuf,
-	own_hash:String,
+	aphrodite_dir: PathBuf,
+	binaries_dir: PathBuf,
+	own_path: PathBuf,
+	own_hash: String,
 }
 
 /// Run the setup/bootstrap process.
-pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
+pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 	let home =
 		dirs::home_dir().ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?;
 
@@ -52,8 +51,8 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	let own_hash = self_hash(&own_path);
 
 	let ctx = SetupCtx {
-		aphrodite_dir:home.join(".hermes").join("aphrodite"),
-		binaries_dir:home.join(".hermes").join("aphrodite").join("binaries"),
+		aphrodite_dir: home.join(".hermes").join("aphrodite"),
+		binaries_dir: home.join(".hermes").join("aphrodite").join("binaries"),
 		own_path,
 		own_hash,
 	};
@@ -142,7 +141,7 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 ///   now an explicit, warned-on-failure step too, instead of relying on
 ///   macOS to incidentally re-sign a linker-edited Mach-O.
 #[cfg(target_os = "macos")]
-fn install_macos_artifact(src:&Path, dest:&Path, dylib_id_name:Option<&str>, mode:u32) -> Result<(), SetupError> {
+fn install_macos_artifact(src: &Path, dest: &Path, dylib_id_name: Option<&str>, mode: u32) -> Result<(), SetupError> {
 	let _ = std::fs::remove_file(dest);
 	let ditto_ok = Command::new("ditto")
 		.args([src.to_str().unwrap_or(""), dest.to_str().unwrap_or("")])
@@ -161,7 +160,10 @@ fn install_macos_artifact(src:&Path, dest:&Path, dylib_id_name:Option<&str>, mod
 	}
 	if let Some(name) = dylib_id_name {
 		let rpath = format!("@rpath/{name}");
-		match Command::new("install_name_tool").args(["-id", &rpath, dest.to_str().unwrap_or("")]).output() {
+		match Command::new("install_name_tool")
+			.args(["-id", &rpath, dest.to_str().unwrap_or("")])
+			.output()
+		{
 			Ok(out) if out.status.success() => {},
 			_ => eprintln!(
 				"warning: install_name_tool failed or unavailable for {} - Gatekeeper may kill Hermes when loading this dylib; install Xcode Command Line Tools and re-run setup",
@@ -170,7 +172,10 @@ fn install_macos_artifact(src:&Path, dest:&Path, dylib_id_name:Option<&str>, mod
 		}
 		// Ad-hoc re-sign: install_name_tool invalidates the dylib's embedded
 		// signature on arm64.
-		match Command::new("codesign").args(["-f", "-s", "-", dest.to_str().unwrap_or("")]).output() {
+		match Command::new("codesign")
+			.args(["-f", "-s", "-", dest.to_str().unwrap_or("")])
+			.output()
+		{
 			Ok(out) if out.status.success() => {},
 			_ => eprintln!(
 				"warning: codesign failed or unavailable for {} - Gatekeeper may still kill this dylib",
@@ -183,7 +188,7 @@ fn install_macos_artifact(src:&Path, dest:&Path, dylib_id_name:Option<&str>, mod
 }
 
 /// Compute BLAKE3 hash of the binary for integrity display.
-fn self_hash(path:&Path) -> String {
+fn self_hash(path: &Path) -> String {
 	match fs::read(path) {
 		Ok(bytes) => {
 			let hash = blake3::hash(&bytes);
@@ -205,17 +210,15 @@ fn verify_hermes() -> Result<(), SetupError> {
 			let stderr = String::from_utf8_lossy(&out.stderr);
 			Err(SetupError::HermesNotFound(format!("hermes --version failed: {stderr}")))
 		},
-		Err(_) => {
-			Err(SetupError::HermesNotFound(
-				"hermes not found in PATH - install hermes agent first".into(),
-			))
-		},
+		Err(_) => Err(SetupError::HermesNotFound(
+			"hermes not found in PATH - install hermes agent first".into(),
+		)),
 	}
 }
 
 /// Copy dylibs from cargo build target to binaries dir.
-fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
-	let dylib_names:&[&str] = if cfg!(target_os = "macos") {
+fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
+	let dylib_names: &[&str] = if cfg!(target_os = "macos") {
 		&["libaphrodite.dylib", "libaphrodite_hermes.dylib"]
 	} else if cfg!(target_os = "linux") {
 		&["libaphrodite.so", "libaphrodite_hermes.so"]
@@ -224,7 +227,7 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 	};
 
 	let exe_dir = ctx.own_path.parent().unwrap_or(Path::new("."));
-	let search_paths:Vec<PathBuf> = vec![
+	let search_paths: Vec<PathBuf> = vec![
 		exe_dir.to_path_buf(),
 		exe_dir.join("deps"),
 		PathBuf::from("/usr/local/lib"),
@@ -296,7 +299,7 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Write plugin.yaml manifest.
-fn write_plugin_yaml(ctx:&SetupCtx, args:&SetupArgs) -> Result<(), SetupError> {
+fn write_plugin_yaml(ctx: &SetupCtx, args: &SetupArgs) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("plugin.yaml");
 	if path.exists() {
 		return Ok(());
@@ -356,9 +359,9 @@ install_message: |
 /// and stderr piped to `DEVNULL` (silently re-introducing a startup-failure
 /// bug the live plugin had already fixed). `include_str!` of the real file
 /// means the two can never diverge again.
-const HERMES_PLUGIN_SHIM:&str = include_str!("../templates/__init__.py");
+const HERMES_PLUGIN_SHIM: &str = include_str!("../templates/__init__.py");
 
-fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
+fn write_init_py(ctx: &SetupCtx) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("__init__.py");
 	if path.exists() {
 		return Ok(());
@@ -371,7 +374,7 @@ fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Symlink ~/.hermes/plugins/aphrodite -> ~/.hermes/aphrodite/
-fn symlink_plugin(ctx:&SetupCtx) -> Result<(), SetupError> {
+fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
 	let plugins_dir = dirs::home_dir()
 		.ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?
 		.join(".hermes")
@@ -422,7 +425,7 @@ fn symlink_plugin(ctx:&SetupCtx) -> Result<(), SetupError> {
 /// Recursively copy a directory tree - the Windows fallback when a junction
 /// can't be created (e.g. `mklink` disabled by policy).
 #[cfg(windows)]
-fn copy_dir_recursive(src:&Path, dst:&Path) -> io::Result<()> {
+fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
 	fs::create_dir_all(dst)?;
 	for entry in fs::read_dir(src)? {
 		let entry = entry?;
@@ -437,7 +440,7 @@ fn copy_dir_recursive(src:&Path, dst:&Path) -> io::Result<()> {
 }
 
 /// Register plugin with hermes.
-fn register_plugin(_ctx:&SetupCtx) -> Result<(), SetupError> {
+fn register_plugin(_ctx: &SetupCtx) -> Result<(), SetupError> {
 	let status = Command::new("hermes")
 		.args(["plugins", "enable", "aphrodite"])
 		.output()
@@ -453,7 +456,7 @@ fn register_plugin(_ctx:&SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Set strict file permissions (Unix only).
-fn secure_perms(path:&Path, mode:u32) -> io::Result<()> {
+fn secure_perms(path: &Path, mode: u32) -> io::Result<()> {
 	#[cfg(unix)]
 	{
 		use std::os::unix::fs::PermissionsExt;
@@ -466,7 +469,9 @@ fn secure_perms(path:&Path, mode:u32) -> io::Result<()> {
 	Ok(())
 }
 
-fn binary_name() -> &'static str { if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" } }
+fn binary_name() -> &'static str {
+	if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" }
+}
 
 #[cfg(test)]
 mod tests {

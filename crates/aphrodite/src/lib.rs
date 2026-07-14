@@ -57,7 +57,7 @@ use state::AphroditeState;
 
 // ── Hardened primitives ──────────────────────────────────────────────
 
-const MAX_CONTENT:usize = 16 * 1024 * 1024; // 16MB cap
+const MAX_CONTENT: usize = 16 * 1024 * 1024; // 16MB cap
 
 /// Process-global handle table. `None` until the first handle is allocated,
 /// so `Mutex::new` can stay `const` without requiring a heap alloc at
@@ -69,10 +69,10 @@ const MAX_CONTENT:usize = 16 * 1024 * 1024; // 16MB cap
 /// hook/tool body. Previously one global lock serialized every session's
 /// every call - two different agent sessions could not classify/compress
 /// concurrently at all, even though they share nothing.
-static HANDLES:Mutex<Option<HashMap<usize, Arc<Mutex<AphroditeState>>>>> = Mutex::new(None);
+static HANDLES: Mutex<Option<HashMap<usize, Arc<Mutex<AphroditeState>>>>> = Mutex::new(None);
 /// Next handle ID to hand out from `alloc_handle`. Wraps on overflow rather
 /// than panicking - see the `wrapping_add` call there.
-static NEXT_ID:Mutex<usize> = Mutex::new(1);
+static NEXT_ID: Mutex<usize> = Mutex::new(1);
 
 fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, Arc<Mutex<AphroditeState>>>>> {
 	let mut g = HANDLES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -85,11 +85,11 @@ fn handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, Arc<Mutex<A
 /// Look up a session's handle and clone its `Arc` out from under the map
 /// lock, which is dropped before returning - callers lock the per-session
 /// mutex separately so the map lock is never held across state access.
-fn get_handle(hid:usize) -> Option<Arc<Mutex<AphroditeState>>> {
+fn get_handle(hid: usize) -> Option<Arc<Mutex<AphroditeState>>> {
 	handles().as_ref().and_then(|m| m.get(&hid)).cloned()
 }
 
-fn alloc_handle(state:AphroditeState) -> usize {
+fn alloc_handle(state: AphroditeState) -> usize {
 	let mut id = NEXT_ID.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	let hid = *id;
 	*id = id.wrapping_add(1); // overflow-safe
@@ -105,7 +105,7 @@ fn alloc_handle(state:AphroditeState) -> usize {
 /// at the panic point for the next caller to observe. This crate's mutation
 /// sequences are ordered so an interruption degrades to "entry missing"
 /// rather than "duplicate entry" - keep that ordering if you touch them.
-fn with_state<T>(hid:usize, f:impl FnOnce(&mut AphroditeState) -> T) -> Result<T, String> {
+fn with_state<T>(hid: usize, f: impl FnOnce(&mut AphroditeState) -> T) -> Result<T, String> {
 	let session = match get_handle(hid) {
 		Some(s) => s,
 		None => return Err(format!("invalid handle: {}", hid)),
@@ -115,7 +115,7 @@ fn with_state<T>(hid:usize, f:impl FnOnce(&mut AphroditeState) -> T) -> Result<T
 		.map_err(|_| "internal error: hook panicked".to_string())
 }
 
-fn to_json_error(msg:&str) -> *mut c_char {
+fn to_json_error(msg: &str) -> *mut c_char {
 	let json = serde_json::json!({"error": msg}).to_string();
 	CString::new(json).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut())
 }
@@ -135,24 +135,24 @@ fn to_json_error(msg:&str) -> *mut c_char {
 /// through `with_state` (which guards internally) or wrap its body in
 /// `guarded(AssertUnwindSafe(...))` directly - there is no third option that
 /// stays panic-safe across the FFI boundary.
-fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
+fn guarded(f: impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_char {
 	std::panic::catch_unwind(f).unwrap_or_else(|_| to_json_error("internal error: panicked"))
 }
 
-fn to_json_ok(v:&serde_json::Value) -> *mut c_char {
+fn to_json_ok(v: &serde_json::Value) -> *mut c_char {
 	CString::new(v.to_string())
 		.map(|c| c.into_raw())
 		.unwrap_or(std::ptr::null_mut())
 }
 
-unsafe fn cstr(ptr:*const c_char) -> Option<String> {
+unsafe fn cstr(ptr: *const c_char) -> Option<String> {
 	if ptr.is_null() {
 		return None;
 	}
 	Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
 }
 
-fn check_content(content:&str) -> Result<(), &'static str> {
+fn check_content(content: &str) -> Result<(), &'static str> {
 	if content.is_empty() {
 		return Err("empty content");
 	}
@@ -168,10 +168,12 @@ fn check_content(content:&str) -> Result<(), &'static str> {
 // ── C ABI ────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub extern "C" fn aphrodite_version() -> *mut c_char { CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw() }
+pub extern "C" fn aphrodite_version() -> *mut c_char {
+	CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw()
+}
 
 #[no_mangle]
-pub extern "C" fn aphrodite_free_string(s:*mut c_char) {
+pub extern "C" fn aphrodite_free_string(s: *mut c_char) {
 	if !s.is_null() {
 		unsafe {
 			let _ = CString::from_raw(s);
@@ -201,7 +203,7 @@ pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_init(config_path: *const c_char) -> *mut c_char {
 	let path = unsafe { cstr(config_path) }.unwrap_or_default();
 	guarded(std::panic::AssertUnwindSafe(move || {
 		let mut state = AphroditeState::default();
@@ -218,14 +220,14 @@ pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_destroy(handle:*const c_char) {
+pub extern "C" fn aphrodite_destroy(handle: *const c_char) {
 	if let Ok(hid) = unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		handles().as_mut().and_then(|m| m.remove(&hid));
 	}
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_classify(content:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_classify(content: *const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
 		None => return to_json_error("null content"),
@@ -244,7 +246,7 @@ pub extern "C" fn aphrodite_classify(content:*const c_char) -> *mut c_char {
 /// instead. This stub keeps the ABI symbol alive for any legacy consumer that
 /// hasn't migrated yet.
 #[no_mangle]
-pub extern "C" fn aphrodite_call_hook(_hook:*const c_char, _args:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_call_hook(_hook: *const c_char, _args: *const c_char) -> *mut c_char {
 	to_json_error("aphrodite_call_hook is stateless and deprecated; use aphrodite_init + aphrodite_dispatch")
 }
 
@@ -263,7 +265,7 @@ macro_rules! stateful {
     };
 }
 
-stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
+stateful!(aphrodite_compress, |s, content: *const c_char, hint: *const c_char| {
 	if content.is_empty() {
 		return serde_json::json!({"error":"empty"});
 	}
@@ -281,13 +283,13 @@ stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 	let preview = crate::build_preview(&t, &content);
 	let marker = marker::ccr_marker(&hash, &t, content.len(), &preview, None, None, None);
 	s.record_marker(state::MarkerEntry {
-		hash:hash.clone(),
-		ccr_type:t.clone(),
-		size:content.len(),
-		preview:preview.clone(),
-		turn:s.turn_counter,
-		center:None,
-		meta:None,
+		hash: hash.clone(),
+		ccr_type: t.clone(),
+		size: content.len(),
+		preview: preview.clone(),
+		turn: s.turn_counter,
+		center: None,
+		meta: None,
 	});
 	serde_json::json!({"hash":hash,"type":t,"size":content.len(),"preview":preview,"marker":marker})
 });
@@ -296,7 +298,7 @@ stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 
 // Override: retrieve returns raw content, not JSON-wrapped
 #[no_mangle]
-pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_retrieve(handle: *const c_char, hash: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -315,14 +317,14 @@ pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -
 	}))
 }
 
-stateful!(aphrodite_transform, |s, content:*const c_char, tool:*const c_char| {
+stateful!(aphrodite_transform, |s, content: *const c_char, tool: *const c_char| {
 	if content.len() > MAX_CONTENT {
 		return serde_json::json!({"error":"content exceeds 16MB limit"});
 	}
 	hooks::transform_tool_result(s, &content, &tool)
 });
 
-stateful!(aphrodite_terminal, |s, content:*const c_char| {
+stateful!(aphrodite_terminal, |s, content: *const c_char| {
 	if content.len() > MAX_CONTENT {
 		return serde_json::json!({"error":"content exceeds 16MB limit"});
 	}
@@ -330,7 +332,7 @@ stateful!(aphrodite_terminal, |s, content:*const c_char| {
 });
 
 #[no_mangle]
-pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_session_start(handle: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -342,7 +344,7 @@ pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_catalog(handle: *const c_char, mode: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -358,7 +360,7 @@ pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) ->
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_stats(handle: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -378,7 +380,7 @@ pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_reload(handle: *const c_char, path: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -411,7 +413,7 @@ pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> 
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_search(handle: *const c_char, query: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -420,7 +422,7 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 	guarded(std::panic::AssertUnwindSafe(move || match get_handle(hid) {
 		Some(session) => {
 			let s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-			let results:Vec<serde_json::Value> = s
+			let results: Vec<serde_json::Value> = s
 				.recent_markers
 				.iter()
 				.filter(|m| m.preview.to_lowercase().contains(&q) || m.ccr_type.to_lowercase().contains(&q))
@@ -434,7 +436,11 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_directive(handle:*const c_char, action:*const c_char, name:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_directive(
+	handle: *const c_char,
+	action: *const c_char,
+	name: *const c_char,
+) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -451,7 +457,7 @@ pub extern "C" fn aphrodite_directive(handle:*const c_char, action:*const c_char
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_config_get(handle: *const c_char, key: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -475,7 +481,7 @@ pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) 
 }
 
 #[no_mangle]
-pub extern "C" fn aphrodite_config_set(handle:*const c_char, key:*const c_char, value:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_config_set(handle: *const c_char, key: *const c_char, value: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
@@ -519,9 +525,9 @@ pub use preview::{build_preview, detect_type};
 /// Returns JSON-wrapped result or raw string if content-only.
 #[no_mangle]
 pub extern "C" fn aphrodite_dispatch(
-	handle:*const c_char,
-	hook_name:*const c_char,
-	args_json:*const c_char,
+	handle: *const c_char,
+	hook_name: *const c_char,
+	args_json: *const c_char,
 ) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -530,7 +536,7 @@ pub extern "C" fn aphrodite_dispatch(
 	let name = unsafe { cstr(hook_name) }.unwrap_or_default();
 	let args_str = unsafe { cstr(args_json) }.unwrap_or_default();
 
-	let args:serde_json::Value = match serde_json::from_str(&args_str) {
+	let args: serde_json::Value = match serde_json::from_str(&args_str) {
 		Ok(v) => v,
 		Err(e) => return to_json_error(&format!("invalid args: {}", e)),
 	};
@@ -552,7 +558,7 @@ pub extern "C" fn aphrodite_dispatch(
 	// arm take it through a shared capture instead.
 	let prefetch_outcomes = std::cell::RefCell::new(if name == "prefetch" {
 		let paths = args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-		let path_strings:Vec<String> = paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+		let path_strings: Vec<String> = paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
 		Some(crate::prefetch::read_paths(&path_strings))
 	} else {
 		None
@@ -586,7 +592,7 @@ pub extern "C" fn aphrodite_dispatch(
 			"search" => {
 				let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
 				let type_filter = args.get("type").and_then(|v| v.as_str());
-				let results:Vec<serde_json::Value> = s
+				let results: Vec<serde_json::Value> = s
 					.recent_markers
 					.iter()
 					.filter(|m| {
@@ -602,7 +608,7 @@ pub extern "C" fn aphrodite_dispatch(
 				serde_json::json!({"total":results.len(),"results":results})
 			},
 			"diff" => {
-				let turns:Vec<serde_json::Value> = s
+				let turns: Vec<serde_json::Value> = s
 					.conv_index
 					.iter()
 					.map(
@@ -612,7 +618,7 @@ pub extern "C" fn aphrodite_dispatch(
 				serde_json::json!({"turns":turns,"total":turns.len()})
 			},
 			"files" => {
-				let files:Vec<serde_json::Value> = s
+				let files: Vec<serde_json::Value> = s
 					.referenced_files
 					.iter()
 					.map(|(path, tool)| serde_json::json!({"path":path,"tool":tool}))
@@ -645,7 +651,7 @@ pub extern "C" fn aphrodite_dispatch(
 
 /// Filter lines by query - port of _resolve.py _filter_lines
 #[no_mangle]
-pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_filter_lines(content: *const c_char, query: *const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
 		None => return to_json_error("null content"),
@@ -659,17 +665,15 @@ pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_c
 
 /// Resolve hash with full recursive expansion - port of _resolve.py
 #[no_mangle]
-pub extern "C" fn aphrodite_resolve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_resolve(handle: *const c_char, hash: *const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
 		Err(_) => return to_json_error("invalid handle"),
 	};
 	let h = unsafe { cstr(hash) }.unwrap_or_default();
-	match with_state(hid, |s| {
-		match crate::resolve::expand(s, &h) {
-			Some(content) => serde_json::json!({"found":true,"content":content}),
-			None => serde_json::json!({"found":false}),
-		}
+	match with_state(hid, |s| match crate::resolve::expand(s, &h) {
+		Some(content) => serde_json::json!({"found":true,"content":content}),
+		None => serde_json::json!({"found":false}),
 	}) {
 		Ok(v) => to_json_ok(&v),
 		Err(e) => to_json_error(&e),
@@ -678,7 +682,7 @@ pub extern "C" fn aphrodite_resolve(handle:*const c_char, hash:*const c_char) ->
 
 /// Generate preview for content - port of _marker/preview.py
 #[no_mangle]
-pub extern "C" fn aphrodite_preview(content:*const c_char, ccr_type:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_preview(content: *const c_char, ccr_type: *const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
 		None => return to_json_error("null content"),
@@ -692,7 +696,7 @@ pub extern "C" fn aphrodite_preview(content:*const c_char, ccr_type:*const c_cha
 
 /// Stage 2 semantic reduction - port of _stage2.py
 #[no_mangle]
-pub extern "C" fn aphrodite_stage2(content:*const c_char, ccr_type:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_stage2(content: *const c_char, ccr_type: *const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
 		None => return to_json_error("null content"),
@@ -708,7 +712,7 @@ pub extern "C" fn aphrodite_stage2(content:*const c_char, ccr_type:*const c_char
 
 /// Code structure extraction - port of _core/struct.py
 #[no_mangle]
-pub extern "C" fn aphrodite_struct_extract(content:*const c_char, language:*const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_struct_extract(content: *const c_char, language: *const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
 		None => return to_json_error("null content"),
@@ -749,9 +753,11 @@ mod ffi_tests {
 		);
 	}
 
-	fn cs(s:&str) -> CString { CString::new(s).unwrap() }
+	fn cs(s: &str) -> CString {
+		CString::new(s).unwrap()
+	}
 
-	unsafe fn take(ptr:*mut c_char) -> String {
+	unsafe fn take(ptr: *mut c_char) -> String {
 		assert!(!ptr.is_null(), "expected non-null C string");
 		let s = CStr::from_ptr(ptr).to_string_lossy().into_owned();
 		aphrodite_free_string(ptr);
@@ -766,8 +772,8 @@ mod ffi_tests {
 	// quickly while handle 1's call is still sleeping inside its own lock.
 	#[test]
 	fn with_state_does_not_serialize_across_different_handles() {
-		let h1:usize = unsafe { take(aphrodite_init(std::ptr::null())) }.parse().unwrap();
-		let h2:usize = unsafe { take(aphrodite_init(std::ptr::null())) }.parse().unwrap();
+		let h1: usize = unsafe { take(aphrodite_init(std::ptr::null())) }.parse().unwrap();
+		let h2: usize = unsafe { take(aphrodite_init(std::ptr::null())) }.parse().unwrap();
 
 		let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
 		let b1 = barrier.clone();
@@ -813,7 +819,7 @@ mod ffi_tests {
 				cs("text").as_ptr(),
 			))
 		};
-		let v:serde_json::Value = serde_json::from_str(&compress_json).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&compress_json).unwrap();
 		let hash = v["hash"].as_str().unwrap().to_string();
 		assert!(!hash.is_empty());
 
@@ -831,7 +837,7 @@ mod ffi_tests {
 		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
 		let handle = cs(&h);
 		let out = unsafe { take(aphrodite_retrieve(handle.as_ptr(), cs("deadbeef00000000").as_ptr())) };
-		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&out).unwrap();
 		assert!(v["error"].as_str().unwrap().contains("hash not found"));
 		aphrodite_destroy(handle.as_ptr());
 	}
@@ -864,7 +870,7 @@ mod ffi_tests {
 	#[test]
 	fn classify_null_content_returns_error() {
 		let out = unsafe { take(aphrodite_classify(std::ptr::null())) };
-		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&out).unwrap();
 		assert_eq!(v["error"].as_str().unwrap(), "null content");
 	}
 
@@ -889,14 +895,16 @@ mod ffi_tests {
 				cs("{}").as_ptr(),
 			))
 		};
-		let v:serde_json::Value = serde_json::from_str(&unknown).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&unknown).unwrap();
 		assert!(v["error"].as_str().unwrap().contains("unknown hook"));
 
 		aphrodite_destroy(handle.as_ptr());
 	}
 
 	#[test]
-	fn free_string_null_is_a_no_op() { aphrodite_free_string(std::ptr::null_mut()); }
+	fn free_string_null_is_a_no_op() {
+		aphrodite_free_string(std::ptr::null_mut());
+	}
 
 	#[test]
 	fn oversize_content_is_rejected() {
@@ -904,7 +912,7 @@ mod ffi_tests {
 		let handle = cs(&h);
 		let big = "a".repeat(MAX_CONTENT + 1);
 		let out = unsafe { take(aphrodite_compress(handle.as_ptr(), cs(&big).as_ptr(), cs("text").as_ptr())) };
-		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&out).unwrap();
 		assert!(v["error"].as_str().unwrap().contains("16MB"));
 		aphrodite_destroy(handle.as_ptr());
 	}
@@ -916,7 +924,7 @@ mod ffi_tests {
 	fn guarded_helper_converts_panic_to_error_json() {
 		let ptr = guarded(|| panic!("deliberate test panic"));
 		let out = unsafe { take(ptr) };
-		let v:serde_json::Value = serde_json::from_str(&out).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&out).unwrap();
 		assert!(v["error"].as_str().unwrap().contains("panicked"));
 	}
 
@@ -947,7 +955,7 @@ mod ffi_tests {
 				args.as_ptr(),
 			))
 		};
-		let v:serde_json::Value = serde_json::from_str(&dispatched).unwrap();
+		let v: serde_json::Value = serde_json::from_str(&dispatched).unwrap();
 		let hash = v["hash"].as_str().expect("compression should have produced a hash").to_string();
 		// Must not panic even though the stored content contains a NUL byte.
 		let retrieved = unsafe { take(aphrodite_retrieve(handle.as_ptr(), cs(&hash).as_ptr())) };

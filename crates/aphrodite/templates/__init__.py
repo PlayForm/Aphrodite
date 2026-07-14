@@ -3,6 +3,7 @@
 All logic in libaphrodite_hermes.dylib. This file is a thin registration shim.
 Architecture: __init__.py → ctypes → libaphrodite_hermes.dylib → aphrodite crate (rlib)
 """
+import contextlib
 import ctypes
 import itertools
 import json
@@ -114,10 +115,8 @@ def _load_dylib() -> ctypes.CDLL:
         # so deleting it here is safe and keeps `.hotreload/` from growing
         # unboundedly across a long dev session.
         if _dylib_copy_path is not None:
-            try:
+            with contextlib.suppress(OSError):
                 os.remove(_dylib_copy_path)
-            except OSError:
-                pass
 
         try:
             # c_void_p avoids Python 3.14 c_char_p malloc mismatch → SIGABRT
@@ -273,20 +272,18 @@ def _start_proxy():
     # to DEVNULL, making every startup failure silent.
     log_dir = Path.home() / ".hermes" / "aphrodite"
     log_dir.mkdir(parents=True, exist_ok=True)
-    stderr_log = open(log_dir / "proxy-stderr.log", "a")
-
     try:
-        subprocess.Popen(
-            [binary],
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=stderr_log,
-            cwd=os.getcwd(),
-        )
+        with open(log_dir / "proxy-stderr.log", "a") as stderr_log:
+            subprocess.Popen(
+                [binary],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=stderr_log,
+                cwd=os.getcwd(),
+            )
         _log.info("aphrodite proxy started (%s)", binary)
     except Exception as e:
         _log.warning("failed to start aphrodite proxy: %s", e)
-        stderr_log.close()
         return
 
     # ── Health check: poll both proxies for up to 5 seconds ──────
