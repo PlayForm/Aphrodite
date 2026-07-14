@@ -227,6 +227,23 @@ fn verify_hermes() -> Result<(), SetupError> {
 }
 
 /// Copy dylibs from cargo build target to binaries dir.
+///
+/// Searches local paths first; falls back to downloading from the GitHub
+/// release matching this binary's version so that `cargo install aphrodite
+/// && aphrodite setup` works without a source checkout.
+///
+/// ## Release asset naming
+///
+/// `cargo build` produces:
+///   - `target/release/libaphrodite.dylib`
+///   - `target/release/libaphrodite_hermes.dylib`
+///
+/// GitHub Release assets are suffixed with the target triple:
+///   - `libaphrodite-aarch64-apple-darwin.dylib`
+///   - `libaphrodite_hermes-aarch64-apple-darwin.dylib`
+///
+/// The download path fetches the tripled name and saves it as the
+/// un-tripled name the plugin expects.
 fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let dylib_names:&[&str] = if cfg!(target_os = "macos") {
 		&["libaphrodite.dylib", "libaphrodite_hermes.dylib"]
@@ -298,14 +315,94 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 			}
 		}
 		if !found {
-			return Err(SetupError::DylibNotFound(format!(
-				"dylib '{name}' not found. Build from source or download from GitHub Releases."
-			)));
+			// Local search exhausted — try downloading from the GitHub
+			// release matching this binary's version.  `cargo install`
+			// only delivers [[bin]] targets, never cdylib artifacts, so
+			// a `cargo install aphrodite && aphrodite setup` user will
+			// always land here.  This download path bridges that gap
+			// without requiring a full source checkout.
+			if let Err(e) = download_dylib(name, &dest) {
+				return Err(SetupError::DylibNotFound(format!(
+					"dylib '{name}' not found locally and download failed: {e}.  \
+					 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
+					 or download manually from \
+					 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",
+					version = env!("CARGO_PKG_VERSION"),
+				)));
+			}
+			copied += 1;
 		}
 	}
 
 	println!("copied {copied} dylib(s)");
 	Ok(())
+}
+
+/// Download a single dylib from the GitHub release matching this binary's
+/// version.  `dest_name` is the bare filename (e.g. `libaphrodite.dylib`);
+/// the remote asset is named with a target-triple suffix (e.g.
+/// `libaphrodite-aarch64-apple-darwin.dylib`).
+fn download_dylib(dest_name:&str, dest:&Path) -> Result<(), String> {
+	// ── Determine the target triple ──────────────────────────────
+	let triple = target_triple();
+	// Build the remote asset name from the destination filename.
+	// e.g. libaphrodite.dylib → libaphrodite-aarch64-apple-darwin.dylib
+	let ext = if cfg!(windows) {
+		"dll"
+	} else if cfg!(target_os = "macos") {
+		"dylib"
+	} else {
+		"so"
+	};
+	let base = dest_name.strip_suffix(&format!(".{ext}")).unwrap_or(dest_name);
+	let remote_name = format!("{base}-{triple}.{ext}");
+
+	let version = env!("CARGO_PKG_VERSION");
+	let url = format!("https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite/v{version}/{remote_name}");
+
+	println!("downloading {remote_name} from GitHub Releases...");
+	println!("  url: {url}");
+
+	// Use curl (available on macOS + Linux by default; Windows has it
+	// in Git Bash / winget).  Fall back to PowerShell on Windows.
+	let status = if cfg!(windows) {
+		Command::new("powershell")
+			.args([
+				"-Command",
+				&format!("Invoke-WebRequest -Uri '{url}' -OutFile '{}'", dest.display()),
+			])
+			.status()
+	} else {
+		Command::new("curl")
+			.args(["-fsSL", "--retry", "3", "-o", dest.to_str().unwrap_or("dylib"), &url])
+			.status()
+	};
+
+	match status {
+		Ok(s) if s.success() => {
+			println!("  downloaded -> {}", dest.display());
+			#[cfg(unix)]
+			secure_perms(dest, 0o755).map_err(|e| e.to_string())?;
+			Ok(())
+		},
+		Ok(s) => Err(format!("download failed with exit code {}", s.code().unwrap_or(-1))),
+		Err(e) => Err(format!("could not run download command: {e}")),
+	}
+}
+
+/// Return the Rust target triple for the current platform.
+fn target_triple() -> &'static str {
+	if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+		"aarch64-apple-darwin"
+	} else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+		"x86_64-apple-darwin"
+	} else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+		"x86_64-unknown-linux-gnu"
+	} else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+		"x86_64-pc-windows-msvc"
+	} else {
+		"unknown"
+	}
 }
 
 /// Write plugin.yaml manifest.

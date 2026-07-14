@@ -33,6 +33,19 @@ GIT_EDITOR=true Maintain/scripts/release/auto-release.sh "descriptive message"
 Handles: stage → commit → bump version → cargo build → cargo test → tag → push
 to `Source` remote.
 
+### crates.io publishing goes through Publish.yml, never manually
+
+Do NOT run `cargo publish` locally. `.github/workflows/Publish.yml` builds and
+publishes `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` (in that
+dependency order) - but only on an explicit `workflow_dispatch` with
+`publish_crates: true`; a plain `Aphrodite/v*` tag push alone does NOT publish
+to crates.io (it only triggers `Build.yml`'s GitHub Release artifacts). This
+gate exists because crates.io versions are immutable - a version number burned
+by a bad manual `cargo publish` can never be reused (see the v1.3.1 incident in
+`Maintain/CHANGELOG.md`'s "Why 1.3.2, not 1.3.1" note). Trigger it deliberately
+via `gh workflow run Publish.yml -f publish_crates=true` (or the Actions UI)
+only once the tagged release's artifacts are verified.
+
 ## Version Sync
 
 The Aphrodite project has two independent version tracks:
