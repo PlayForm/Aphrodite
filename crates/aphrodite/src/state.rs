@@ -5,7 +5,7 @@
 use std::collections::{HashMap, VecDeque};
 
 /// Maximum inline store entries before LRU eviction.
-const INLINE_MAX: usize = 500;
+const INLINE_MAX:usize = 500;
 
 /// Default byte budget for the inline store (report 05 F11): entry-count
 /// alone (`INLINE_MAX`) doesn't bound memory - `aphrodite_prefetch` admits
@@ -14,121 +14,117 @@ const INLINE_MAX: usize = 500;
 /// 256MB is a conservative default for a single agent session's compression
 /// cache; exposed via `AphroditeState::inline_store_byte_budget` so a config
 /// layer can override it.
-pub const DEFAULT_INLINE_BYTE_BUDGET: usize = 256 * 1024 * 1024;
+pub const DEFAULT_INLINE_BYTE_BUDGET:usize = 256 * 1024 * 1024;
 
 /// Session state - one per loaded dylib instance.
 pub struct AphroditeState {
 	/// Inline content store: {hash: content}, LRU-ordered.
-	pub inline_store: VecDeque<(String, String)>,
+	pub inline_store:VecDeque<(String, String)>,
 	/// Running total of `content.len()` across every entry in `inline_store`,
 	/// maintained incrementally by `inline_store_put` so eviction doesn't
 	/// need an O(n) rescan on every insert (report 05 F11).
-	inline_store_bytes: usize,
+	inline_store_bytes:usize,
 	/// Byte budget for `inline_store`; entries are evicted from the back
 	/// (oldest/least-recently-used) until the running total is at or under
 	/// this, in addition to the existing `INLINE_MAX` entry-count cap.
 	/// Defaults to [`DEFAULT_INLINE_BYTE_BUDGET`]; see
 	/// `inline_store_byte_budget`/`set_inline_store_byte_budget`.
-	inline_store_byte_budget: usize,
+	inline_store_byte_budget:usize,
 	/// Recent CCR markers for catalog: [{hash, type, size, preview, turn}]
-	pub recent_markers: Vec<MarkerEntry>,
+	pub recent_markers:Vec<MarkerEntry>,
 	/// Conversation index: {turn_num: (hash, summary, size)} - the last
 	/// marker archived per turn by `session::archive_turn`, called from
 	/// `hooks::post_llm_call` (report 06 F11/T13: previously `archive_turn`
 	/// was never called from any hook, so this stayed empty forever and
 	/// `aphrodite_diff` always returned zero turns).
-	pub conv_index: HashMap<usize, (String, String, usize)>,
+	pub conv_index:HashMap<usize, (String, String, usize)>,
 	/// Referenced files: {filepath: last_tool_name}
-	pub referenced_files: VecDeque<(String, String)>,
+	pub referenced_files:VecDeque<(String, String)>,
 	/// Turn counter.
-	pub turn_counter: usize,
+	pub turn_counter:usize,
 	/// Scanned message index for incremental marker scan.
-	pub scanned_msg_idx: usize,
+	pub scanned_msg_idx:usize,
 	/// File tools set.
-	pub file_tools: Vec<String>,
+	pub file_tools:Vec<String>,
 	// ── Config values (mirrored from aphrodite.toml) ──
-	pub api_url: String,
-	pub model: String,
-	pub engine_threshold_pct: u64,
+	pub api_url:String,
+	pub model:String,
+	pub engine_threshold_pct:u64,
 	// RESERVED: write-only today (loaded from aphrodite.toml, never read back
 	// by the proxy) - candidate consumers for the context-engine work
 	// (13-P2), not deleted since that work may land on them directly
 	// (01-F9, user decision: keep-reserved over delete).
-	pub engine_min_msgs: usize,
-	pub engine_protect_first: usize,
-	pub engine_protect_last: usize,
-	pub context_engine_enabled: bool,
-	pub tool_threshold: usize,
-	pub terminal_threshold: usize,
+	pub engine_min_msgs:usize,
+	pub engine_protect_first:usize,
+	pub engine_protect_last:usize,
+	pub context_engine_enabled:bool,
+	pub tool_threshold:usize,
+	pub terminal_threshold:usize,
 	// RESERVED: same as engine_min_msgs above (01-F9).
-	pub catalog_mode: String,
-	pub expand_guidance: bool,
-	pub dev_mode: bool,
+	pub catalog_mode:String,
+	pub expand_guidance:bool,
+	pub dev_mode:bool,
 	// ── Conversational Directives ──
 	/// All loaded directives (name → content).
-	pub directives: std::collections::HashMap<String, crate::directives::Directive>,
+	pub directives:std::collections::HashMap<String, crate::directives::Directive>,
 	/// Currently active directive names (the ones injected into context).
-	pub active_directives: Vec<String>,
+	pub active_directives:Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MarkerEntry {
-	pub hash: String,
-	pub ccr_type: String,
-	pub size: usize,
-	pub preview: String,
-	pub turn: usize,
-	pub center: Option<String>,
-	pub meta: Option<HashMap<String, String>>,
+	pub hash:String,
+	pub ccr_type:String,
+	pub size:usize,
+	pub preview:String,
+	pub turn:usize,
+	pub center:Option<String>,
+	pub meta:Option<HashMap<String, String>>,
 }
 
 impl Default for AphroditeState {
 	fn default() -> Self {
 		Self {
-			inline_store: VecDeque::with_capacity(INLINE_MAX),
-			inline_store_bytes: 0,
-			inline_store_byte_budget: DEFAULT_INLINE_BYTE_BUDGET,
-			recent_markers: Vec::new(),
-			conv_index: HashMap::new(),
-			referenced_files: VecDeque::new(),
-			turn_counter: 0,
-			scanned_msg_idx: 0,
-			file_tools: vec!["read_file".into(), "write_file".into(), "patch".into(), "search_files".into()],
-			api_url: String::new(),
-			model: "gpt-4o".into(),
-			engine_threshold_pct: 45,
-			engine_min_msgs: 8,
-			engine_protect_first: 2,
-			engine_protect_last: 5,
-			context_engine_enabled: true,
-			tool_threshold: 4096,
-			terminal_threshold: 1024,
-			catalog_mode: "tool".into(),
-			expand_guidance: false,
-			dev_mode: false,
-			directives: std::collections::HashMap::new(),
-			active_directives: Vec::new(),
+			inline_store:VecDeque::with_capacity(INLINE_MAX),
+			inline_store_bytes:0,
+			inline_store_byte_budget:DEFAULT_INLINE_BYTE_BUDGET,
+			recent_markers:Vec::new(),
+			conv_index:HashMap::new(),
+			referenced_files:VecDeque::new(),
+			turn_counter:0,
+			scanned_msg_idx:0,
+			file_tools:vec!["read_file".into(), "write_file".into(), "patch".into(), "search_files".into()],
+			api_url:String::new(),
+			model:"gpt-4o".into(),
+			engine_threshold_pct:45,
+			engine_min_msgs:8,
+			engine_protect_first:2,
+			engine_protect_last:5,
+			context_engine_enabled:true,
+			tool_threshold:4096,
+			terminal_threshold:1024,
+			catalog_mode:"tool".into(),
+			expand_guidance:false,
+			dev_mode:false,
+			directives:std::collections::HashMap::new(),
+			active_directives:Vec::new(),
 		}
 	}
 }
 
 impl AphroditeState {
 	/// Current byte budget for the inline store (report 05 F11).
-	pub fn inline_store_byte_budget(&self) -> usize {
-		self.inline_store_byte_budget
-	}
+	pub fn inline_store_byte_budget(&self) -> usize { self.inline_store_byte_budget }
 
 	/// Override the inline store's byte budget (e.g. from config); evicts
 	/// immediately if the new budget is lower than the current usage.
-	pub fn set_inline_store_byte_budget(&mut self, budget: usize) {
+	pub fn set_inline_store_byte_budget(&mut self, budget:usize) {
 		self.inline_store_byte_budget = budget;
 		self.evict_over_budget();
 	}
 
 	/// Current total bytes held across every entry in the inline store.
-	pub fn inline_store_bytes(&self) -> usize {
-		self.inline_store_bytes
-	}
+	pub fn inline_store_bytes(&self) -> usize { self.inline_store_bytes }
 
 	/// Evict from the back (oldest/least-recently-used) until both the
 	/// entry-count cap (`INLINE_MAX`) and the byte budget
@@ -149,7 +145,7 @@ impl AphroditeState {
 	/// F11: previously bounded by entry count only - `aphrodite_prefetch`
 	/// admits files up to 10MB each and the ABI admits blobs up to 16MB, so
 	/// 500 entries at the large end is a multi-GB worst case).
-	pub fn inline_store_put(&mut self, hash: String, content: String) {
+	pub fn inline_store_put(&mut self, hash:String, content:String) {
 		// Remove existing entry if present (will be re-added at front),
 		// keeping the running byte total in sync.
 		if let Some(pos) = self.inline_store.iter().position(|(h, _)| h == &hash) {
@@ -163,7 +159,7 @@ impl AphroditeState {
 	}
 
 	/// Retrieve from inline store with LRU promotion.
-	pub fn inline_store_get(&mut self, hash: &str) -> Option<String> {
+	pub fn inline_store_get(&mut self, hash:&str) -> Option<String> {
 		if let Some(pos) = self.inline_store.iter().position(|(h, _)| h == hash) {
 			let (h, c) = self.inline_store.remove(pos).unwrap();
 			self.inline_store.push_front((h, c.clone()));
@@ -174,7 +170,7 @@ impl AphroditeState {
 	}
 
 	/// Record a compression marker.
-	pub fn record_marker(&mut self, entry: MarkerEntry) {
+	pub fn record_marker(&mut self, entry:MarkerEntry) {
 		self.recent_markers.push(entry);
 		// Keep last 200 markers
 		while self.recent_markers.len() > 200 {
@@ -183,7 +179,7 @@ impl AphroditeState {
 	}
 
 	/// Record a referenced file.
-	pub fn record_file(&mut self, path: String, tool: String) {
+	pub fn record_file(&mut self, path:String, tool:String) {
 		self.referenced_files.retain(|(p, _)| p != &path);
 		self.referenced_files.push_front((path, tool));
 		while self.referenced_files.len() > 100 {
@@ -289,13 +285,13 @@ mod tests {
 		let mut s = AphroditeState::default();
 		for i in 0..250 {
 			s.record_marker(MarkerEntry {
-				hash: format!("h{}", i),
-				ccr_type: "text".into(),
-				size: 100,
-				preview: "[text]".into(),
-				turn: i,
-				center: None,
-				meta: None,
+				hash:format!("h{}", i),
+				ccr_type:"text".into(),
+				size:100,
+				preview:"[text]".into(),
+				turn:i,
+				center:None,
+				meta:None,
 			});
 		}
 		assert!(s.recent_markers.len() <= 200);

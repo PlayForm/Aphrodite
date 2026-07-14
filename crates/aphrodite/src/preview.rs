@@ -9,16 +9,14 @@ use headroom_core::transforms;
 /// Detect the CCR content-type string for a blob (e.g. `source_code`, `build`,
 /// `json_array`). Thin wrapper over the Headroom classifier so downstream
 /// crates (aphrodite-hermes) don't need a direct headroom-core dependency.
-pub fn detect_type(content: &str) -> String {
-	transforms::detect(content).as_str().to_string()
-}
+pub fn detect_type(content:&str) -> String { transforms::detect(content).as_str().to_string() }
 
 /// Build a compact, human-readable preview string for compressed content,
 /// shaped per content type (e.g. error/warning counts for build output,
 /// +/- line counts for diffs, fn/struct counts for source code) so the LLM
 /// gets a useful summary instead of a generic byte/line count wherever a
 /// richer signal is available.
-pub fn build_preview(type_str: &str, content: &str) -> String {
+pub fn build_preview(type_str:&str, content:&str) -> String {
 	let lines = content.lines().count();
 	let bytes = content.len();
 	match type_str {
@@ -38,7 +36,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			// + first signature) so the dylib/hook path matches the proxy's preview
 			// quality, instead of a bare substring count.
 			let st = crate::struct_extract::extract_code_structure(content, "");
-			let mut parts: Vec<String> = Vec::new();
+			let mut parts:Vec<String> = Vec::new();
 			for (key, label) in [
 				("fns", "fns"),
 				("structs", "structs"),

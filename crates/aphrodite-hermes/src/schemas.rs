@@ -24,9 +24,7 @@ pub fn all_schemas() -> Vec<serde_json::Value> {
 }
 
 /// Get a single tool schema by name.
-pub fn get_schema(name: &str) -> Option<serde_json::Value> {
-	all_schemas().into_iter().find(|s| s["name"] == name)
-}
+pub fn get_schema(name:&str) -> Option<serde_json::Value> { all_schemas().into_iter().find(|s| s["name"] == name) }
 
 fn schema_compress() -> serde_json::Value {
 	json!({

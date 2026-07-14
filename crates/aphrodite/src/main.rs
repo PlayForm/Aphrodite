@@ -23,14 +23,21 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 use aphrodite::{
 	config::{Cli, Command, MultiConfig, ProxyMode, SetupArgs},
 	proxy::{
-		self, handle_ccr_create, handle_ccr_delete, handle_ccr_list, handle_ccr_reload, handle_tool_relay, health_check,
+		self,
+		handle_ccr_create,
+		handle_ccr_delete,
+		handle_ccr_list,
+		handle_ccr_reload,
+		handle_tool_relay,
+		health_check,
 	},
-	retrieve, setup,
+	retrieve,
+	setup,
 };
 
 fn main() -> anyhow::Result<()> {
 	// Handle --version / --help early to avoid starting the runtime.
-	let args: Vec<String> = std::env::args().collect();
+	let args:Vec<String> = std::env::args().collect();
 	if args.iter().any(|a| a == "--version" || a == "-V") {
 		println!(
 			"aphrodite v{}",
@@ -74,13 +81,15 @@ fn main() -> anyhow::Result<()> {
 	// this early, see `run()`'s matching comment) on a malformed value
 	// instead of silently falling back, mirroring `apply_port_override`.
 	let worker_threads = match std::env::var("APHRODITE_WORKER_THREADS") {
-		Ok(v) => match v.parse::<usize>() {
-			Ok(n) => n,
-			Err(_) => {
-				eprintln!("APHRODITE_WORKER_THREADS={v:?} is not a valid number; using the computed default");
-				let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
-				(cpus * 4).max(32)
-			},
+		Ok(v) => {
+			match v.parse::<usize>() {
+				Ok(n) => n,
+				Err(_) => {
+					eprintln!("APHRODITE_WORKER_THREADS={v:?} is not a valid number; using the computed default");
+					let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
+					(cpus * 4).max(32)
+				},
+			}
 		},
 		Err(_) => {
 			let cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
@@ -149,7 +158,7 @@ async fn run() -> anyhow::Result<()> {
 	// `resolve_thresholds`.
 	let compression = multi_config.as_ref().and_then(|c| c.compression.clone());
 
-	let proxies: Vec<(String, Cli)> = if let Some(config) = multi_config {
+	let proxies:Vec<(String, Cli)> = if let Some(config) = multi_config {
 		config
 			.proxies
 			.iter()
@@ -238,11 +247,11 @@ async fn run() -> anyhow::Result<()> {
 		}
 	};
 	let watch_path_str = watch_path.to_string_lossy().to_string();
-	let states_for_watcher: Vec<_> = bound.iter().map(|(_, _, _, s)| s.clone()).collect();
+	let states_for_watcher:Vec<_> = bound.iter().map(|(_, _, _, s)| s.clone()).collect();
 	tokio::spawn(async move {
 		use notify::{Event, EventKind, RecursiveMode, Watcher};
 		let (tx, mut rx) = tokio::sync::mpsc::channel(16);
-		let mut watcher = match notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+		let mut watcher = match notify::recommended_watcher(move |res:Result<Event, notify::Error>| {
 			if let Ok(event) = res {
 				let is_modify = matches!(event.kind, EventKind::Modify(_));
 				if is_modify && event.paths.iter().any(|p| p.to_string_lossy().contains("aphrodite.toml")) {
@@ -318,7 +327,7 @@ async fn run() -> anyhow::Result<()> {
 
 	// Clone abort handles so we can force-kill after handles are moved into
 	// join_all
-	let abort_handles: Vec<_> = handles.iter().map(|h| h.abort_handle()).collect();
+	let abort_handles:Vec<_> = handles.iter().map(|h| h.abort_handle()).collect();
 
 	// Listen for a second Ctrl+C to force immediate shutdown
 	let second_signal = async {
@@ -360,11 +369,11 @@ async fn run() -> anyhow::Result<()> {
 }
 
 async fn run_single(
-	name: String,
-	cli: Cli,
-	listener: tokio::net::TcpListener,
-	state: Arc<proxy::AppState>,
-	mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+	name:String,
+	cli:Cli,
+	listener:tokio::net::TcpListener,
+	state:Arc<proxy::AppState>,
+	mut shutdown_rx:tokio::sync::watch::Receiver<bool>,
 ) -> anyhow::Result<()> {
 	let task_tracker = state.task_tracker.clone();
 
@@ -648,11 +657,11 @@ async fn run_single(
 /// header carries the attacker's own domain. Requiring `Host` to name the
 /// loopback address itself closes that gap; real clients (Hermes, the
 /// Python plugin, `curl`) already address the proxy this way.
-const ALLOWED_LOOPBACK_HOSTS: &[&str] = &["localhost", "127.0.0.1", "[::1]", "::1"];
+const ALLOWED_LOOPBACK_HOSTS:&[&str] = &["localhost", "127.0.0.1", "[::1]", "::1"];
 
 /// Strip an optional trailing `:port` from a `Host` header value - but not
 /// from a bracketed IPv6 literal's own colons (`[::1]:9797` -> `[::1]`).
-fn host_header_to_hostname(host: &str) -> String {
+fn host_header_to_hostname(host:&str) -> String {
 	if let Some(rest) = host.strip_prefix('[') {
 		rest.split(']').next().map(|h| format!("[{h}]")).unwrap_or_default()
 	} else {
@@ -664,7 +673,7 @@ fn host_header_to_hostname(host: &str) -> String {
 /// a pure function so it's directly unit-testable without constructing a
 /// real axum `Request`/`Next` - the middleware below is a thin wrapper that
 /// only translates this `Result` into an HTTP response.
-fn check_loopback_request(addr: SocketAddr, host_header: &str) -> Result<(), &'static str> {
+fn check_loopback_request(addr:SocketAddr, host_header:&str) -> Result<(), &'static str> {
 	if !addr.ip().is_loopback() {
 		return Err("only loopback clients allowed");
 	}
@@ -684,9 +693,9 @@ fn check_loopback_request(addr: SocketAddr, host_header: &str) -> Result<(), &'s
 /// Middleware that rejects non-loopback clients on all routes except /health.
 /// /health is intentionally exempt so external load-balancer probes work.
 async fn loopback_only(
-	ConnectInfo(addr): ConnectInfo<SocketAddr>,
-	request: Request,
-	next: Next,
+	ConnectInfo(addr):ConnectInfo<SocketAddr>,
+	request:Request,
+	next:Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
 	let host = request
 		.headers()
@@ -719,14 +728,12 @@ async fn loopback_only(
 /// Back-compat default: if `APHRODITE_MGMT_TOKEN` is unset, every request
 /// passes (unchanged behavior) - `run_single` logs one startup `warn!` so an
 /// operator relying on that default isn't silently unprotected.
-fn mgmt_token() -> Option<String> {
-	std::env::var("APHRODITE_MGMT_TOKEN").ok().filter(|s| !s.is_empty())
-}
+fn mgmt_token() -> Option<String> { std::env::var("APHRODITE_MGMT_TOKEN").ok().filter(|s| !s.is_empty()) }
 
 /// The actual allow/reject decision, pulled out as a pure function per the
 /// same pattern as [`check_loopback_request`] - directly unit-testable.
 /// `configured = None` means auth is disabled; always `Ok`.
-fn check_bearer_token(configured: Option<&str>, auth_header: &str) -> Result<(), &'static str> {
+fn check_bearer_token(configured:Option<&str>, auth_header:&str) -> Result<(), &'static str> {
 	let Some(token) = configured else {
 		return Ok(());
 	};
@@ -738,8 +745,8 @@ fn check_bearer_token(configured: Option<&str>, auth_header: &str) -> Result<(),
 }
 
 async fn require_mgmt_token(
-	request: Request,
-	next: Next,
+	request:Request,
+	next:Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
 	if request.uri().path() == "/metrics" {
 		return Ok(next.run(request).await);
@@ -819,12 +826,12 @@ mod tests {
 	// function the middleware calls, not a reimplementation - covering
 	// every real caller in this repo plus the attack the change closes. ──
 
-	fn loopback_v4(port: u16) -> SocketAddr {
+	fn loopback_v4(port:u16) -> SocketAddr {
 		use std::net::{Ipv4Addr, SocketAddrV4};
 		SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port))
 	}
 
-	fn lan_v4(port: u16) -> SocketAddr {
+	fn lan_v4(port:u16) -> SocketAddr {
 		use std::net::{Ipv4Addr, SocketAddrV4};
 		SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 50), port))
 	}

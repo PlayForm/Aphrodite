@@ -13,14 +13,14 @@ use aphrodite::state::{AphroditeState, MarkerEntry};
 
 use crate::{proxy_health, with_shared};
 
-type ToolHandler = fn(args: &serde_json::Value) -> serde_json::Value;
+type ToolHandler = fn(args:&serde_json::Value) -> serde_json::Value;
 
 /// Dispatch a tool by name. Returns `{"error": "..."}` for unknown tools.
-pub fn dispatch(name: &str, args_json: &str) -> serde_json::Value {
+pub fn dispatch(name:&str, args_json:&str) -> serde_json::Value {
 	let registry = tool_registry();
 	match registry.get(name) {
 		Some(handler) => {
-			let args: serde_json::Value = match serde_json::from_str(args_json) {
+			let args:serde_json::Value = match serde_json::from_str(args_json) {
 				Ok(v) => v,
 				Err(e) => return serde_json::json!({"error": format!("invalid args: {}", e)}),
 			};
@@ -32,19 +32,17 @@ pub fn dispatch(name: &str, args_json: &str) -> serde_json::Value {
 
 // ── Shared helpers ─────────────────────────────────────────
 
-fn str_arg<'a>(args: &'a serde_json::Value, key: &str) -> &'a str {
-	args.get(key).and_then(|v| v.as_str()).unwrap_or("")
-}
+fn str_arg<'a>(args:&'a serde_json::Value, key:&str) -> &'a str { args.get(key).and_then(|v| v.as_str()).unwrap_or("") }
 
 /// Largest file `aphrodite_retrieve(path=…)` will read directly.
-const MAX_PATH_READ: u64 = 10 * 1024 * 1024;
+const MAX_PATH_READ:u64 = 10 * 1024 * 1024;
 
 /// Read a file requested via `aphrodite_retrieve(path=…)`, confined to the
 /// current workspace and capped at [`MAX_PATH_READ`]. Returns `Err(reason)` if
 /// the path escapes the workspace, is too large, or can't be read - so the tool
 /// can't be coerced into exfiltrating arbitrary files (e.g. /etc/passwd,
 /// ~/.ssh).
-fn read_path_guarded(path: &str) -> Result<String, String> {
+fn read_path_guarded(path:&str) -> Result<String, String> {
 	let root = std::env::current_dir().map_err(|e| format!("cwd: {e}"))?;
 	let root = root.canonicalize().unwrap_or(root);
 	let canon = std::path::Path::new(path)
@@ -65,12 +63,12 @@ fn read_path_guarded(path: &str) -> Result<String, String> {
 /// {"total_count":N,"matches":[...]}, etc. The aphrodite classifier
 /// sees '{' and returns json_array - hiding the real content behind a
 /// useless preview. This extracts the meaningful content and reclassifies.
-pub(crate) fn unwrap_hermes_result(content: &str) -> Option<(String, String)> {
+pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 	// Only attempt unwrapping if the content looks like a JSON object.
 	if !content.trim_start().starts_with('{') {
 		return None;
 	}
-	let v: serde_json::Value = serde_json::from_str(content).ok()?;
+	let v:serde_json::Value = serde_json::from_str(content).ok()?;
 	let obj = v.as_object()?;
 
 	// ── Terminal: {"output":"...","exit_code":N,"error":null} ──
@@ -83,7 +81,7 @@ pub(crate) fn unwrap_hermes_result(content: &str) -> Option<(String, String)> {
 			// Terminal outputs are often short and don't trigger the headroom
 			// classifier's build_output pattern. Add explicit heuristics so
 			// cargo output, test runs, and shell traces get meaningful previews.
-			let ct: String = if output.contains("exit code:") || output.contains("Error:") {
+			let ct:String = if output.contains("exit code:") || output.contains("Error:") {
 				"terminal".into()
 			} else if output.contains("   Compiling")
 				|| output.contains("    Finished")
@@ -182,7 +180,7 @@ pub(crate) fn unwrap_hermes_result(content: &str) -> Option<(String, String)> {
 /// dropped (F11); now threaded through to both the recorded catalog entry
 /// and the rendered marker.
 /// Returns `{hash, type, size, preview, marker}`.
-fn compress_into(state: &mut AphroditeState, content: &str, hint: &str, center: Option<&str>) -> serde_json::Value {
+fn compress_into(state:&mut AphroditeState, content:&str, hint:&str, center:Option<&str>) -> serde_json::Value {
 	// Hermes wraps tool results in JSON. Unwrap to find real content for
 	// classification/preview (terminal output, diffs, etc.) instead of a
 	// meaningless "[json:1items 1L]" - but always hash and store the
@@ -204,13 +202,13 @@ fn compress_into(state: &mut AphroditeState, content: &str, hint: &str, center: 
 
 	state.inline_store_put(hash.clone(), content.to_string());
 	state.record_marker(MarkerEntry {
-		hash: hash.clone(),
-		ccr_type: eff_type.clone(),
-		size: content.len(),
-		preview: preview.clone(),
-		turn: state.turn_counter,
-		center: center.map(|c| c.to_string()),
-		meta: None,
+		hash:hash.clone(),
+		ccr_type:eff_type.clone(),
+		size:content.len(),
+		preview:preview.clone(),
+		turn:state.turn_counter,
+		center:center.map(|c| c.to_string()),
+		meta:None,
 	});
 
 	serde_json::json!({
@@ -223,7 +221,7 @@ fn compress_into(state: &mut AphroditeState, content: &str, hint: &str, center: 
 }
 
 fn tool_registry() -> HashMap<&'static str, ToolHandler> {
-	let mut m: HashMap<&'static str, ToolHandler> = HashMap::new();
+	let mut m:HashMap<&'static str, ToolHandler> = HashMap::new();
 
 	// ── compress: store content, return a resolvable CCR marker ──
 	m.insert("aphrodite_compress", |args| {
@@ -259,16 +257,18 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 			return serde_json::json!({"error": "hash or path is required"});
 		}
 		let query = str_arg(args, "query").to_string();
-		with_shared(|state| match aphrodite::resolve::expand(state, hash) {
-			Some(content) => {
-				let body = if query.is_empty() {
-					content
-				} else {
-					aphrodite::resolve::filter_lines(&content, &query)
-				};
-				serde_json::json!({"found": true, "source": "ccr", "hash": hash, "content": body})
-			},
-			None => serde_json::json!({"found": false, "hash": hash, "error": "hash not found in session store"}),
+		with_shared(|state| {
+			match aphrodite::resolve::expand(state, hash) {
+				Some(content) => {
+					let body = if query.is_empty() {
+						content
+					} else {
+						aphrodite::resolve::filter_lines(&content, &query)
+					};
+					serde_json::json!({"found": true, "source": "ccr", "hash": hash, "content": body})
+				},
+				None => serde_json::json!({"found": false, "hash": hash, "error": "hash not found in session store"}),
+			}
 		})
 	});
 
@@ -300,7 +300,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 			if m.is_empty() { "full" } else { m }
 		};
 		with_shared(|state| {
-			let items: Vec<serde_json::Value> = state
+			let items:Vec<serde_json::Value> = state
 				.recent_markers
 				.iter()
 				.rev()
@@ -327,7 +327,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		let query = str_arg(args, "query").to_lowercase();
 		let type_filter = args.get("type").and_then(|v| v.as_str());
 		with_shared(|state| {
-			let results: Vec<serde_json::Value> = state
+			let results:Vec<serde_json::Value> = state
 				.recent_markers
 				.iter()
 				.rev()
@@ -372,7 +372,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 	// ── files: file paths referenced this session ──
 	m.insert("aphrodite_files", |_args| {
 		with_shared(|state| {
-			let files: Vec<serde_json::Value> = state
+			let files:Vec<serde_json::Value> = state
 				.referenced_files
 				.iter()
 				.map(|(path, tool)| serde_json::json!({"path": path, "tool": tool}))
@@ -383,7 +383,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 
 	// ── prefetch: read + compress files now, return markers ──
 	m.insert("aphrodite_prefetch", |args| {
-		let paths: Vec<String> = args
+		let paths:Vec<String> = args
 			.get("paths")
 			.and_then(|v| v.as_array())
 			.map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
@@ -404,7 +404,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 	// Prefetch is synchronous here, so anything loaded is already "ready".
 	m.insert("aphrodite_prefetch_status", |_args| {
 		with_shared(|state| {
-			let ready: Vec<serde_json::Value> = state
+			let ready:Vec<serde_json::Value> = state
 				.recent_markers
 				.iter()
 				.filter_map(|mk| {
@@ -427,7 +427,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		with_shared(|state| {
 			// Collect (hash, fresh content) for markers we will touch, then
 			// recompute type + preview from the stored content.
-			let targets: Vec<String> = state
+			let targets:Vec<String> = state
 				.recent_markers
 				.iter()
 				.filter(|mk| only_hash.is_none_or(|h| mk.hash == h))
@@ -456,13 +456,15 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 			let m = str_arg(args, "mode");
 			if m.is_empty() { "quick" } else { m }
 		};
-		let samples: &[(&str, &str)] = match mode {
+		let samples:&[(&str, &str)] = match mode {
 			"quick" => &[("fn main() { println!(\"hi\"); }\n", "source_code")],
-			_ => &[
-				("fn main() { println!(\"hi\"); }\n", "source_code"),
-				("error[E0382]: borrow of moved value\nwarning: unused\n", "build"),
-				("{\"a\":1,\"b\":2,\"c\":3}\n", "json_array"),
-			],
+			_ => {
+				&[
+					("fn main() { println!(\"hi\"); }\n", "source_code"),
+					("error[E0382]: borrow of moved value\nwarning: unused\n", "build"),
+					("{\"a\":1,\"b\":2,\"c\":3}\n", "json_array"),
+				]
+			},
 		};
 		let mut checks = Vec::new();
 		let mut passed = 0usize;
@@ -527,7 +529,7 @@ mod tests {
 	// being rewritten three times (bf181d7 -> 9e52762 -> 8f138c1).
 	#[test]
 	fn test_unwrap_hermes_result_table() {
-		let cases: Vec<(&str, serde_json::Value, Option<(&str, &str)>)> = vec![
+		let cases:Vec<(&str, serde_json::Value, Option<(&str, &str)>)> = vec![
 			(
 				"terminal output+exit_code",
 				serde_json::json!({"output": "hello\n", "exit_code": 0}),
@@ -690,7 +692,7 @@ mod tests {
 			state.active_directives.clear();
 			state.directives.insert(
 				"focus".into(),
-				aphrodite::directives::Directive { name: "focus".into(), content: "stay focused".into() },
+				aphrodite::directives::Directive { name:"focus".into(), content:"stay focused".into() },
 			);
 		});
 
@@ -811,12 +813,12 @@ mod tests {
 		// which is an internal hook handler registered via
 		// `ctx.register_context_engine` - never exposed as a callable tool
 		// to Hermes, so it has no schema by design).
-		let registry_names: std::collections::HashSet<&str> = tool_registry()
+		let registry_names:std::collections::HashSet<&str> = tool_registry()
 			.keys()
 			.copied()
 			.filter(|n| *n != "context_engine_pre_llm")
 			.collect();
-		let schema_names: std::collections::HashSet<String> = crate::schemas::all_schemas()
+		let schema_names:std::collections::HashSet<String> = crate::schemas::all_schemas()
 			.iter()
 			.map(|s| s["name"].as_str().unwrap().to_string())
 			.collect();

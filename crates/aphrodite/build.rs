@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Formats a Unix timestamp (seconds) as UTC ISO 8601, e.g.
 /// `2026-07-13T00:00:00Z`. Implemented by hand (civil-from-days algorithm) to
 /// avoid adding a chrono/time build-dependency just for this.
-fn format_iso8601(secs: u64) -> String {
+fn format_iso8601(secs:u64) -> String {
 	let days = (secs / 86400) as i64;
 	let rem = secs % 86400;
 	let (hour, minute, second) = (rem / 3600, (rem % 3600) / 60, rem % 60);

@@ -7,14 +7,12 @@ use std::{collections::HashMap, path::PathBuf};
 
 /// Config value resolution: env var → TOML → default
 pub struct Config {
-	raw: toml::Table,
-	overrides: HashMap<String, String>,
+	raw:toml::Table,
+	overrides:HashMap<String, String>,
 }
 
 impl Default for Config {
-	fn default() -> Self {
-		Self { raw: toml::Table::new(), overrides: HashMap::new() }
-	}
+	fn default() -> Self { Self { raw:toml::Table::new(), overrides:HashMap::new() } }
 }
 
 impl Config {
@@ -32,7 +30,7 @@ impl Config {
 		for path in &search_paths {
 			if let Ok(content) = std::fs::read_to_string(path) {
 				if let Ok(table) = content.parse::<toml::Table>() {
-					return Self { raw: table, overrides: HashMap::new() };
+					return Self { raw:table, overrides:HashMap::new() };
 				}
 			}
 		}
@@ -41,9 +39,7 @@ impl Config {
 	}
 
 	/// Reload from disk
-	pub fn reload(&mut self) {
-		*self = Self::load();
-	}
+	pub fn reload(&mut self) { *self = Self::load(); }
 
 	/// Load from an explicit TOML file path, bypassing `load()`'s search
 	/// paths - used by `aphrodite_init` (01-F4/F9) so the handle-based C ABI
@@ -51,27 +47,23 @@ impl Config {
 	/// instead of hand-parsing four `[compression]` keys directly (which had
 	/// silently drifted from `apply_compression`'s own key names and never
 	/// honored env var overrides at all).
-	pub fn load_from(path: &str) -> Self {
+	pub fn load_from(path:&str) -> Self {
 		if let Ok(content) = std::fs::read_to_string(path) {
 			if let Ok(table) = content.parse::<toml::Table>() {
-				return Self { raw: table, overrides: HashMap::new() };
+				return Self { raw:table, overrides:HashMap::new() };
 			}
 		}
 		Self::default()
 	}
 
 	/// Set a runtime override (equivalent to Python's _settings store)
-	pub fn set_override(&mut self, key: &str, value: &str) {
-		self.overrides.insert(key.to_string(), value.to_string());
-	}
+	pub fn set_override(&mut self, key:&str, value:&str) { self.overrides.insert(key.to_string(), value.to_string()); }
 
 	/// Get a TOML section as a table, or empty if missing
-	fn section(&self, name: &str) -> Option<&toml::Table> {
-		self.raw.get(name).and_then(|v| v.as_table())
-	}
+	fn section(&self, name:&str) -> Option<&toml::Table> { self.raw.get(name).and_then(|v| v.as_table()) }
 
 	/// Resolve bool: override → env → toml[section][key] → default
-	pub fn get_bool(&self, env_key: &str, section: &str, key: &str, default: bool) -> bool {
+	pub fn get_bool(&self, env_key:&str, section:&str, key:&str, default:bool) -> bool {
 		if let Some(v) = self.overrides.get(env_key) {
 			return v == "true" || v == "1";
 		}
@@ -85,7 +77,7 @@ impl Config {
 	}
 
 	/// Resolve u64: override → env → toml[section][key] → default
-	pub fn get_u64(&self, env_key: &str, section: &str, key: &str, default: u64) -> u64 {
+	pub fn get_u64(&self, env_key:&str, section:&str, key:&str, default:u64) -> u64 {
 		if let Some(v) = self.overrides.get(env_key) {
 			return v.parse().unwrap_or(default);
 		}
@@ -100,12 +92,12 @@ impl Config {
 	}
 
 	/// Resolve usize: same as u64 but for sizes
-	pub fn get_usize(&self, env_key: &str, section: &str, key: &str, default: usize) -> usize {
+	pub fn get_usize(&self, env_key:&str, section:&str, key:&str, default:usize) -> usize {
 		self.get_u64(env_key, section, key, default as u64) as usize
 	}
 
 	/// Resolve String
-	pub fn get_string(&self, env_key: &str, section: &str, key: &str, default: &str) -> String {
+	pub fn get_string(&self, env_key:&str, section:&str, key:&str, default:&str) -> String {
 		if let Some(v) = self.overrides.get(env_key) {
 			return v.clone();
 		}
@@ -120,7 +112,7 @@ impl Config {
 	}
 
 	/// Resolve a TOML array of strings.
-	pub fn get_string_list(&self, section: &str, key: &str) -> Vec<String> {
+	pub fn get_string_list(&self, section:&str, key:&str) -> Vec<String> {
 		self.section(section)
 			.and_then(|s| s.get(key))
 			.and_then(|v| v.as_array())
@@ -129,7 +121,7 @@ impl Config {
 	}
 
 	/// Load compression settings into an AphroditeState
-	pub fn apply_compression(&self, state: &mut crate::state::AphroditeState) {
+	pub fn apply_compression(&self, state:&mut crate::state::AphroditeState) {
 		state.context_engine_enabled = self.get_bool("APHRODITE_CONTEXT_ENGINE", "compression", "context_engine", true);
 		state.engine_threshold_pct =
 			self.get_u64("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45);
@@ -214,8 +206,8 @@ mod tests {
 	#[test]
 	fn test_apply_compression_from_toml_table() {
 		let cfg = Config {
-			raw: "[compression]\ntool_threshold_token = 321\n".parse().unwrap(),
-			overrides: HashMap::new(),
+			raw:"[compression]\ntool_threshold_token = 321\n".parse().unwrap(),
+			overrides:HashMap::new(),
 		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
