@@ -79,10 +79,26 @@ echo "[bump] aphrodite-hermes Cargo.toml → $NEW"
 # to the new binary version. These track the binary version track (not the
 # plugin version track), so they're bumped unconditionally here rather than
 # inside the plugin-version block below.
-sed -i '' "s/release-v$CURRENT-blue/release-v$NEW-blue/" README.md
-sed -i '' "s/\"version\":\"v$CURRENT\"/\"version\":\"v$NEW\"/" README.md
+#
+# Pattern-based, not $CURRENT-based (F15): a $CURRENT-anchored sed silently
+# matches nothing - not an error, just a no-op - the moment a string has
+# already drifted out of sync with Cargo.toml's version (e.g. from a manual
+# edit, or a prior run of this same script that missed a spot). Matching the
+# version-shaped pattern instead means every run self-heals any prior drift,
+# rather than permanently orphaning whatever string wasn't $CURRENT.
+sed -i '' -E "s/release-v[0-9]+\.[0-9]+\.[0-9]+-blue/release-v$NEW-blue/" README.md
+sed -i '' -E "s/\"version\":\"v[0-9]+\.[0-9]+\.[0-9]+\"/\"version\":\"v$NEW\"/" README.md
 sed -i '' "3s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$REPO_ROOT/package.json"
 echo "[bump] README release badge + package.json → $NEW"
+
+# Post-bump stale-string guard: catch any $CURRENT reference the sed passes
+# above should have caught but somehow didn't (a genuine bug in this script),
+# rather than letting it silently ship - a stale version string in a shipped
+# release is exactly the failure mode F15 exists to prevent.
+if grep -rn "v$CURRENT" README.md "$REPO_ROOT/package.json" 2>/dev/null; then
+	echo "ERROR: stale v$CURRENT reference(s) found above after bumping to v$NEW - fix the sed pattern that missed them" >&2
+	exit 1
+fi
 
 # Always keep BINARY_VERSION tracking the binary version, regardless of
 # whether a plugin version source was found below.
@@ -102,12 +118,17 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 	# Sync plugin.yaml - version field + install_message
 	sed -i '' "s/version: $PLUGIN_CURRENT/version: $PLUGIN_NEW/" plugins/aphrodite/plugin.yaml
 	sed -i '' "s/aphrodite v$PLUGIN_CURRENT -/aphrodite v$PLUGIN_NEW -/" plugins/aphrodite/plugin.yaml
-	# Sync the README plugin badge to the new plugin version
-	sed -i '' "s|plugin-v$PLUGIN_CURRENT-purple|plugin-v$PLUGIN_NEW-purple|" README.md
+	# Sync the README plugin badge to the new plugin version (pattern-based,
+	# not $PLUGIN_CURRENT-based - see the F15 note above the binary-track bump).
+	sed -i '' -E "s|plugin-v[0-9]+\.[0-9]+\.[0-9]+-purple|plugin-v$PLUGIN_NEW-purple|" README.md
 	# Optional submodule files - skip silently if absent
 	[[ -f plugins/aphrodite/pyproject.toml ]] && sed -i '' "s/version = \"$PLUGIN_CURRENT\"/version = \"$PLUGIN_NEW\"/" plugins/aphrodite/pyproject.toml
 	[[ -f plugins/aphrodite/__init__.py ]] && sed -i '' "s/aphrodite v$PLUGIN_CURRENT -/aphrodite v$PLUGIN_NEW -/" plugins/aphrodite/__init__.py
 	echo "[bump] plugin $PLUGIN_CURRENT → $PLUGIN_NEW"
+	if grep -rn "plugin-v$PLUGIN_CURRENT-purple" README.md 2>/dev/null; then
+		echo "ERROR: stale plugin-v$PLUGIN_CURRENT-purple badge found after bumping to v$PLUGIN_NEW" >&2
+		exit 1
+	fi
 
 	# ── Commit + tag + push submodule ──
 	# The plugin lives in a git submodule (Aphrodite-Hermes repo).
