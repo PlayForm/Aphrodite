@@ -43,7 +43,7 @@ libaphrodite.dylib         ← Core engine
 
 The bridge provides:
 
-1. **Tool schemas** - 12 JSON Schema definitions for `aphrodite_*` tools
+1. **Tool schemas** - 13 JSON Schema definitions for `aphrodite_*` tools
 2. **Tool dispatch** - Routes Hermes tool calls to core engine functions
 3. **Skill registration** - Bundled skills exposed to Hermes agents
 4. **Hook dispatch** - Forwards hook calls (pre_llm, post_tool, etc.) to engine

@@ -80,7 +80,7 @@ A generic proxy compresses HTTP response bodies. That helps, but:
    history to decide which messages to offload to CCR. A proxy sees individual
    HTTP requests, not the full context.
 
-4. **Agent augmentation** - The 12 `aphrodite_*` tools and 9 bundled skills
+4. **Agent augmentation** - The 13 `aphrodite_*` tools and 9 bundled skills
    teach the agent HOW to use compression. A proxy is opaque - the agent doesn't
    know compression exists.
 

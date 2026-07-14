@@ -155,7 +155,7 @@ pub fn main() -> Result<()> {
 ### Build Output (matched after error fail)
 
 ```
-   Compiling aphrodite v0.5.69
+   Compiling aphrodite v1.3.2
    Compiling headroom-core v1.0.0
     Finished release [optimized] target(s) in 12.34s
 ```

@@ -67,10 +67,10 @@ mode = "token"
 tool_relay = true
 ```
 
-Also accepted at the top level: `[compression]`, `[previews]`, and
-`[prompts]` tables (see below) - omitted from this example because their
-defaults are almost always fine. The repo's own root `aphrodite.toml` sets
-them explicitly as a worked example.
+Also accepted at the top level: `[compression]`, `[previews]`, `[prompts]`,
+and `[directives]` tables (see below) - omitted from this example because
+their defaults are almost always fine. The repo's own root `aphrodite.toml`
+sets them explicitly as a worked example.
 
 ## `[[proxies]]` fields
 
@@ -150,6 +150,22 @@ appear to have any effect on proxy behavior - the values parse cleanly but
 nothing in the current codebase reads them back out. Don't assume changing
 these values changes preview or prompt output; treat them as reserved until
 that's confirmed.
+
+## `[directives]`
+
+```toml
+[directives]
+active = []                        # e.g. ["focus", "foresight"]
+```
+
+| Field    | Meaning                                                                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `active` | Which loaded directives start active. Directive `.md` files are discovered from `./directives/` or `~/.hermes/directives/` **whenever the directory exists** - loading is not gated on this list being non-empty. Names not found in the loaded set are silently filtered out |
+
+Read by the Hermes-plugin dylib session (`config_loader`), not the Rust
+proxy. The active set is then fully runtime-mutable via the
+`aphrodite_directive` tool - see
+[Directives](../plugin/directives.md) for the complete feature reference.
 
 ## `[templates.*]`
 

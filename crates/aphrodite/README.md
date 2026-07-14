@@ -1,7 +1,7 @@
 # aphrodite 💋 Core Engine
 
 > **CCR compression proxy + cdylib - classify, compress, store, preview.**
-> **Sub-ms, 28 content types, 12,800× max ratio.**
+> **Sub-ms, 26 content types, 12,800× max ratio.**
 
 The core compression engine. Produces both the `aphrodite` binary (HTTP proxy on
 `:9797`/`:9798`) and `libaphrodite.dylib` (loaded by the Hermes plugin via C ABI).
@@ -52,22 +52,26 @@ src/
 ├── state.rs             ← AphroditeState, inline store, LRU, markers
 ├── marker.rs            ← CCR marker formatting + parsing (<<<CCR:…>>>)
 ├── catalog.rs           ← Full/compact/TOC catalog display
-├── resolve.rs           ← Recursive CCR expansion (3 levels deep)
+├── resolve.rs           ← Recursive CCR expansion (5 levels deep)
 ├── stage2.rs            ← Semantic reduction for JSON, build, diff, code
 ├── struct_extract.rs    ← Code structure maps (Rust, Python, Go, JS/TS)
 ├── config.rs            ← CLI args + TOML multi-config
 ├── config_loader.rs     ← TOML + env var loading
+├── directives.rs        ← Conversational directives: load, inject, list/swap/add/remove/reset
+├── setup.rs             ← `aphrodite setup` one-shot bootstrap (Gatekeeper-safe artifact install)
 ├── prefetch.rs          ← Background file read + compress threads
 ├── preview.rs           ← detect_type, build_preview (shared across proxy + dylib)
 ├── main.rs              ← Binary entry point
-└── retrieve.rs          ← POST /retrieve - hash → content, zstd decode, filter, paginate
+└── retrieve.rs          ← POST /retrieve - hash → content, filter, paginate, truncated flag
 ```
 
-## C ABI (22 functions)
+## C ABI (25 functions)
 
-The 22 `#[no_mangle] extern "C"` exports in `lib.rs` serve both the
-`aphrodite-hermes` bridge crate (which re-exports a higher-level ABI - see
-`crates/aphrodite-hermes/README.md`) and the Python plugin's ctypes bindings.
+The 25 `#[no_mangle] extern "C"` exports in `lib.rs` (22 written out plus 3
+macro-generated: `aphrodite_compress`, `aphrodite_transform`,
+`aphrodite_terminal`) serve both the `aphrodite-hermes` bridge crate (which
+re-exports a higher-level ABI - see `crates/aphrodite-hermes/README.md`) and
+the Python plugin's ctypes bindings.
 
 ---
 

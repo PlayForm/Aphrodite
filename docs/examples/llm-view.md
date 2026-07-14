@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-### Compressed (what the LLM sees - v0.5.78)
+### Compressed (what the LLM sees - v1.3.2)
 
 ```
 use std::sync::Arc;

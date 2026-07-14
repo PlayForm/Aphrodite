@@ -57,10 +57,17 @@ rate(aphrodite_upstream_errors_total{code="5xx"}[5m])
 # Upstream timeout rate
 rate(aphrodite_upstream_timeouts_total[5m])
 
+# Non-timeout transport failures (connect refused, DNS, TLS)
+rate(aphrodite_upstream_connect_errors_total[5m])
+
+# Mid-stream SSE chunk errors (streams that died mid-answer)
+rate(aphrodite_sse_stream_errors_total[5m])
+
 # Total error rate
 rate(aphrodite_upstream_errors_total{code="4xx"}[5m]) +
 rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) +
-rate(aphrodite_upstream_timeouts_total[5m])
+rate(aphrodite_upstream_timeouts_total[5m]) +
+rate(aphrodite_upstream_connect_errors_total[5m])
 ```
 
 ## Tool Relay

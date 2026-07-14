@@ -55,6 +55,18 @@ Agents on one machine, each pointed at its own port pair), `--no-launch`
 (skip auto-starting the proxy after setup), `--force` (re-run setup over an
 existing install).
 
+### macOS Gatekeeper handling
+
+On macOS, every artifact copy in `aphrodite setup` (binary, dylibs, and the
+`target/release` dev-build fallback) goes through one Gatekeeper-safe path
+(v1.3.2): `ditto` (metadata-preserving copy), falling back to `fs::copy` +
+`xattr -c` (clear quarantine), then `install_name_tool -id @rpath/<name>`
+and an explicit ad-hoc `codesign -f -s -` re-sign for dylibs. Every step
+that fails prints a specific warning instead of being silently swallowed -
+a machine missing Xcode Command Line Tools previously got a
+Gatekeeper-SIGKILLed binary with zero diagnostic, and a failed `ditto` used
+to be treated as success.
+
 ## Option 3: From source (monorepo, full dev setup)
 
 ```bash
