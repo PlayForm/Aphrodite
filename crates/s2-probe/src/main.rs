@@ -1,96 +1,56 @@
-// s2-probe: S2 as a LEVEL GENERATOR for different SHAPES of context, used to
-// analyze and figure out better PLACEMENTS for context blocks.
+// s2-probe: graph the per-task context shapes and store them all.
 //
-// The user's framing (2026-07-18): "look at S2 as a level generator for
-// different shapes of context, since this is how we'd like to analyse and
-// figure out better placements for context blocks."
+// The user's framing (2026-07-18): S2 is a level generator for different
+// shapes of context. The goal is NOT to find better placements - it is to
+// GRAPH each task's context shape and keep a DATABASE of all the different
+// shapes as they accumulate.
 //
-// What that means concretely:
-//   - A context block (directives / recall catalog / plain-data / conversation)
-//     has a token budget. We can render it at many S2 *levels*: low level =
-//     a few big coarse cells (cheap, blurry shape); high level = many small
-//     fine cells (expensive, sharp shape). The level GENERATES the shape.
-//   - Different *placements* (which latitude band, which longitude slice = where
-//     in the window) of the same blocks produce different superimposed shapes.
-//   - We score each placement on contiguity / contention / locality / balance
-//     and recommend the best one. That's "figure out better placements."
-//
-// This binary is a demo driver; the logic lives in lib.rs with unit tests.
+// Usage: s2-probe [shape-db-path]   (default: .bench/s2-shapes.jsonl)
 
-use s2_probe::{
-    analyze_placements, generate_block_shapes, recommend, Block, Placement, Scorer,
-};
+use s2_probe::{generate_block_shapes, render_task, task_profiles, ShapeStore};
 
 fn main() {
-    // The Aphrodite per-turn context blocks with approximate token budgets
-    // (from report 08 P6's char-cost breakdown; tokens ≈ chars/4).
-    let blocks = [
-        Block::new("system",  120,  3),   // system prompt: small, coarse
-        Block::new("directives", 420, 5),
-        Block::new("nudges",   80,  7),
-        Block::new("plain",   1000, 8),
-        Block::new("recall",  1200, 10),  // catalog: big, fine
-        Block::new("hint",     60,  6),
-        Block::new("convo",   1600, 12),  // conversation: biggest, finest
-    ];
+    let db_path = std::env::args().nth(1).unwrap_or_else(|| ".bench/s2-shapes.jsonl".to_string());
+    let store = ShapeStore::open(&db_path).expect("open shape store");
 
-    // 1. LEVEL GENERATOR - sweep S2 levels for one block, show how the SHAPE
-    // changes with level. This is "S2 as a level generator for different shapes."
-    println!("=== LEVEL GENERATOR: shape of 'recall' (1200 tok) across S2 levels ===");
-    let shapes = generate_block_shapes(&blocks[4]);
-    for sh in &shapes {
-        println!(
-            "  L{:2}: {:4} cells, area={:7.4}, contig={:.3}, span={:.1}°x{:.1}°",
-            sh.level, sh.cells, sh.area, sh.contiguity, sh.lng_span, sh.lat_span,
-        );
-    }
-    // Find the "knee": the lowest level where the shape is still contiguous and
-    // bounded - the cheapest adequate shape.
-    let knee = shapes
-        .iter()
-        .find(|s| s.contiguity > 0.9 && s.cells <= 64)
-        .map(|s| s.level)
-        .unwrap_or(99);
-    println!("  -> recommended level for 'recall' (knee): L{}", knee);
+    for profile in task_profiles() {
+        let r = render_task(&profile);
 
-    // 2. PLACEMENT ANALYZER - score candidate placements of all blocks.
-    println!("\n=== PLACEMENT ANALYZER: score candidate placements ===");
-    let placements = analyze_placements(&blocks);
-    let scorer = Scorer::new();
-    let mut scored: Vec<(Placement, f64)> = placements
-        .iter()
-        .map(|p| (p.clone(), scorer.score(p)))
-        .collect();
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        // 1. THE GRAPH - one lat band per block, lng = position in window,
+        // glyph = the block's S2 level (hex digit). Coarse blocks render as
+        // sparse low digits, fine blocks as dense high digits.
+        println!("=== task: {} ({} tok) ===", r.task, r.total_tokens);
+        print!("{}", r.grid);
 
-    println!(
-        "{:28} {:>8} {:>8} {:>8} {:>8} {:>8}",
-        "placement", "contig", "noCont", "local", "balnce", "SCORE",
-    );
-    for (p, s) in &scored {
-        let (c, n, l, b) = scorer.parts(p);
-        println!(
-            "{:28} {:8.3} {:8.3} {:8.3} {:8.3} {:8.3}",
-            p.name, c, n, l, b, s,
-        );
+        // 2. THE SUPERIMPOSITION - normalized union of every block's cover,
+        // differentiated by cell level.
+        let hist:Vec<String> = r
+            .level_histogram
+            .iter()
+            .map(|(l, c)| format!("L{}:{}", l, c))
+            .collect();
+        println!("  superimposition: {} cells [{}]", r.union_cells, hist.join(" "));
+
+        // 3. THE DATABASE - persist this task's shapes at their native levels
+        // plus the full level sweep per block (all the shapes each block CAN
+        // take), so the corpus accumulates across runs.
+        let mut batch = r.shapes.clone();
+        for b in &profile.blocks {
+            batch.extend(generate_block_shapes(profile.task, b));
+        }
+        let n = store.append(&batch).expect("append shapes");
+        println!("  stored {} shapes -> {}\n", n, store.path().display());
     }
 
-    // 3. RECOMMEND - the best placement.
-    let best = recommend(&blocks, &scorer);
-    println!("\n=== RECOMMENDED placement: {} (score {:.3}) ===", best.name, scorer.score(&best));
-    for (blk, slot) in best.blocks.iter().zip(0..) {
-        println!(
-            "  slot {} lat[{:+5.1},{:+5.1}] lng[{:5.1},{:5.1}]  {} @ L{}",
-            slot, blk.lat_lo, blk.lat_hi, blk.lng_lo, blk.lng_hi, blk.name, blk.level,
-        );
+    println!("=== shape database summary ===");
+    match store.summary() {
+        Ok(rows) => {
+            let total:usize = rows.iter().map(|(_, c)| c).sum();
+            for (task, count) in &rows {
+                println!("  {:>10}: {:5} shapes", task, count);
+            }
+            println!("  {:>10}: {:5} shapes total (all runs)", "ALL", total);
+        }
+        Err(e) => println!("  (summary unavailable: {})", e),
     }
-
-    // 4. WHY this placement wins: print its contiguity / contention / locality /
-    //    balance so the user can see what "better" means.
-    let (c, n, l, b) = scorer.parts(&best);
-    println!(
-        "\n  contiguity={:.3} (one region per block), no-contention={:.3}, locality={:.3} (Hilbert-adjacent), balance={:.3}",
-        c, n, l, b,
-    );
-    println!("\nSee lib.rs unit tests for the level generator + scorer + analyzer invariants.");
 }

@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "s2-probe: S2-geometry level generator + placement analyzer for context-block shapes - experimental probe behind the future `aphrodite doctor` context-shape viewer"
+description = "s2-probe: S2-geometry level generator for per-task context shapes - graphs them and stores every generated shape in an append-only shape database; experimental probe behind the future `aphrodite doctor` context-shape viewer"
 publish = false
 
 [dependencies]
