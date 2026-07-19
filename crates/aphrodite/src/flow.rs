@@ -48,6 +48,9 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	// ── Droppable section: the recall catalog ──
 	let recall = crate::session::catalog_summary(state);
 
+	// ── Poll-worker status (above recall, dropped after recall) ──
+	let bg_status = crate::poll_worker::render_bg_task_status(state);
+
 	// Assemble top-down, then drop from the bottom until within budget.
 	let mut sections:Vec<String> = Vec::new();
 	if !directives.is_empty() {
@@ -55,6 +58,10 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	}
 	if !nudges.is_empty() {
 		sections.push(nudges);
+	}
+	// Poll-worker status: rendered above recall, below nudges.
+	if !bg_status.is_empty() {
+		sections.push(bg_status);
 	}
 	// The recall block + its retrieve hint are one droppable unit.
 	let mut recall_block = String::new();

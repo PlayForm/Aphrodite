@@ -85,6 +85,10 @@ pub struct AphroditeState {
 	/// Bounded ring of per-tool-call events (cap 200, evict front). Feeds phase
 	/// detection, error-loop breaking, delta previews, checkpoints (P6-P11).
 	pub tool_events:VecDeque<ToolEvent>,
+	// ── Poll-worker auto-backgrounding ──
+	/// Background tasks created by the poll-worker auto-backgrounding
+	/// heuristic (cap 4, evict oldest completed/stale on overflow).
+	pub bg_tasks:VecDeque<crate::poll_worker::BgTask>,
 }
 
 /// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
@@ -163,6 +167,7 @@ impl Default for AphroditeState {
 			flow_budget_chars:4000,
 			manual_directive_turn:None,
 			tool_events:VecDeque::new(),
+			bg_tasks:VecDeque::new(),
 		}
 	}
 }

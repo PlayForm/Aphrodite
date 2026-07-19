@@ -96,6 +96,20 @@ pub fn catalog_summary(state:&AphroditeState) -> String {
 		parts.push(format!("{} referenced files: {}", file_count, files.join(", ")));
 	}
 
+	// Append active poll-worker count if any.
+	let active_polls:Vec<_> = state
+		.bg_tasks
+		.iter()
+		.filter(|t| t.status == crate::poll_worker::BgStatus::Running)
+		.collect();
+	if !active_polls.is_empty() {
+		let poll_line = format!(
+			"{} active poll worker(s). Use process(action='poll').",
+			active_polls.len()
+		);
+		parts.push(poll_line);
+	}
+
 	parts.join(" ")
 }
 

@@ -25,6 +25,7 @@ pub mod directives;
 pub mod flow;
 pub mod hooks;
 pub mod marker;
+pub mod poll_worker;
 pub mod prefetch;
 pub mod resolve;
 pub mod session;
