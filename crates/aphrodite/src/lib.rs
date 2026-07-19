@@ -189,6 +189,7 @@ pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 	CString::new(
 		serde_json::json!([
 			"on_session_start",
+			"pre_tool_call",
 			"transform_tool_result",
 			"transform_terminal_output",
 			"pre_llm_call",

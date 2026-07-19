@@ -49,7 +49,11 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	let recall = crate::session::catalog_summary(state);
 
 	// ── Poll-worker status (above recall, dropped after recall) ──
-	let bg_status = crate::poll_worker::render_bg_task_status(state);
+	let bg_status = if state.poll_worker_enabled {
+		crate::poll_worker::render_bg_task_status(state)
+	} else {
+		String::new()
+	};
 
 	// Assemble top-down, then drop from the bottom until within budget.
 	let mut sections:Vec<String> = Vec::new();
@@ -396,5 +400,43 @@ mod tests {
 		assert_eq!(w.errors, 1);
 		assert_eq!(w.distinct_error_sigs, 1);
 		assert_eq!(w.total_calls, 3, "the turn-2 event is outside the 5-turn window");
+	}
+
+	#[test]
+	fn test_build_turn_context_omits_poll_status_when_disabled() {
+		let mut s = AphroditeState::default();
+		s.poll_worker_enabled = false;
+		s.turn_counter = 5;
+		crate::poll_worker::insert_bg_task(
+			&mut s,
+			"t1".into(),
+			"terminal".into(),
+			"cargo build".into(),
+			1,
+		);
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[poll workers]"),
+			"disabled flag must omit poll worker status: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_build_turn_context_includes_poll_status_when_enabled() {
+		let mut s = AphroditeState::default();
+		s.poll_worker_enabled = true;
+		s.turn_counter = 5;
+		crate::poll_worker::insert_bg_task(
+			&mut s,
+			"t1".into(),
+			"terminal".into(),
+			"cargo build".into(),
+			1,
+		);
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[poll workers]"),
+			"enabled flag must include poll worker status: {ctx}"
+		);
 	}
 }

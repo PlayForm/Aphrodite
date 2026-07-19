@@ -167,58 +167,6 @@ fn transform_tool_result_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	// ── Poll-worker auto-backgrounding ──────────────────────────
-	// Terminal and process calls that look long-running get replaced with
-	// a poll-worker marker instead of immediate compression — the agent
-	// polls for progress asynchronously via `process(action='poll')`.
-	if tool_name == "process" {
-		// Poll results: update any running background tasks BEFORE normal
-		// compression, so the poll output feeds the task's accumulated
-		// state.  If consumed (a BgTask matched), return ok — the poll
-		// worker module already compressed the final output for Done/Failed.
-		if crate::poll_worker::update_from_poll(state, tool_name, content) {
-			return serde_json::json!({"status": "ok", "compressed": false, "reason": "poll_result_consumed"});
-		}
-	}
-
-	if tool_name == "terminal" || tool_name == "process" {
-		let command = meta.args_json.and_then(|a| a.get("command").and_then(|v| v.as_str()));
-		if let Some((task_id, cmd_summary)) =
-			crate::poll_worker::should_background(tool_name, content, command, meta.args_json)
-		{
-			crate::poll_worker::insert_bg_task(
-				state,
-				task_id.clone(),
-				tool_name.to_string(),
-				cmd_summary.clone(),
-				state.turn_counter,
-			);
-			let marker = crate::poll_worker::create_poll_marker(
-				&task_id,
-				&cmd_summary,
-				state.turn_counter,
-			);
-			crate::flow::push_nudge(
-				state,
-				&format!(
-					"poll worker: `{}` started on turn {}. Use process(action='poll') to check progress.",
-					cmd_summary, state.turn_counter
-				),
-				1,
-			);
-			let poll_preview = format!("[poll:running {} | turn {}]", cmd_summary, state.turn_counter);
-			return serde_json::json!({
-				"status": "ok",
-				"compressed": true,
-				"hash": task_id,
-				"type": "poll",
-				"size": content.len(),
-				"preview": poll_preview,
-				"marker": marker,
-			});
-		}
-	}
-
 	let (type_str, classify_content):(String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
 		None => {
@@ -337,45 +285,6 @@ fn transform_terminal_output_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	// ── Poll-worker auto-backgrounding for terminal output ─────
-	// Terminal calls that look long-running get the same poll-worker
-	// treatment as tool results.  The `command` parameter carries the
-	// actual shell command from Hermes.
-	if let Some((task_id, cmd_summary)) =
-		crate::poll_worker::should_background("terminal", content, command, None)
-	{
-		crate::poll_worker::insert_bg_task(
-			state,
-			task_id.clone(),
-			"terminal".to_string(),
-			cmd_summary.clone(),
-			state.turn_counter,
-		);
-		let marker = crate::poll_worker::create_poll_marker(
-			&task_id,
-			&cmd_summary,
-			state.turn_counter,
-		);
-		crate::flow::push_nudge(
-			state,
-			&format!(
-				"poll worker: `{}` started on turn {}. Use process(action='poll') to check progress.",
-				cmd_summary, state.turn_counter
-			),
-			1,
-		);
-		let poll_preview = format!("[poll:running {} | turn {}]", cmd_summary, state.turn_counter);
-		return serde_json::json!({
-			"status": "ok",
-			"compressed": true,
-			"hash": task_id,
-			"type": "poll",
-			"size": content.len(),
-			"preview": poll_preview,
-			"marker": marker,
-		});
-	}
-
 	let (type_str, classify_content):(String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
 		None => {
@@ -439,8 +348,11 @@ pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value { crate:
 /// `context_engine_pre_llm` return only `{"context": ...}`; core keeps the
 /// richer shape for back-compat.
 pub fn pre_llm_call(state:&mut AphroditeState) -> serde_json::Value {
-	// Poll-worker checkpoint: push nudges for running/completed/failed tasks.
-	crate::poll_worker::check_bg_tasks(state);
+	// Poll-worker checkpoint: push nudges for running/completed/failed tasks
+	// (only when the master flag is enabled).
+	if state.poll_worker_enabled {
+		crate::poll_worker::check_bg_tasks(state);
+	}
 	let summary = crate::session::catalog_summary(state);
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
 	let context = crate::flow::build_turn_context(state, None);
@@ -616,66 +528,10 @@ mod tests {
 	}
 
 	// ── Poll-worker integration tests ──────────────────────────
-
-	#[test]
-	fn test_tool_result_auto_backgrounds_large_cargo_build() {
-		let mut s = AphroditeState::default();
-		s.tool_threshold = 0; // always consider for compression
-		let content = "Compiling aphrodite v1.3.4\n   Compiling serde v1.0.228\n".repeat(50);
-		let args = serde_json::json!({"command": "cargo build --release"});
-		let meta = ToolCallMeta {
-			args_json: Some(&args),
-			..Default::default()
-		};
-		let r = transform_tool_result_with_meta(&mut s, &content, "terminal", None, &meta);
-		assert_eq!(r["compressed"], true);
-		assert_eq!(r["type"], "poll", "large cargo build should be poll-worker'd");
-		assert!(r["preview"].as_str().unwrap().contains("[poll:running"));
-		assert_eq!(s.bg_tasks.len(), 1, "should have one bg task");
-		assert_eq!(s.bg_tasks[0].status, crate::poll_worker::BgStatus::Running);
-	}
-
-	#[test]
-	fn test_tool_result_does_not_background_short_output() {
-		let mut s = AphroditeState::default();
-		s.tool_threshold = 0;
-		let content = "ok\n";
-		let args = serde_json::json!({"command": "cargo build"});
-		let meta = ToolCallMeta {
-			args_json: Some(&args),
-			..Default::default()
-		};
-		let _ = transform_tool_result_with_meta(&mut s, content, "terminal", None, &meta);
-		// Short output passes through normal compression (or below threshold).
-		assert_eq!(s.bg_tasks.len(), 0, "short cargo output should not be backgrounded");
-	}
-
-	#[test]
-	fn test_process_poll_updates_bg_task() {
-		let mut s = AphroditeState::default();
-		s.tool_threshold = 512;
-		s.turn_counter = 5;
-		// First: simulate a backgrounded cargo build
-		crate::poll_worker::insert_bg_task(
-			&mut s,
-			headroom_core::ccr::compute_key(b"cargo build"),
-			"terminal".into(),
-			"cargo build".into(),
-			1,
-		);
-		assert_eq!(s.bg_tasks.len(), 1);
-
-		// Then: simulate a process poll result with exit code
-		let poll_output = serde_json::json!({
-			"output": "Compiling...\n    Finished dev\nexit code: 0",
-			"exit_code": 0,
-		}).to_string();
-		let r = transform_tool_result(&mut s, &poll_output, "process");
-		assert_eq!(r["compressed"], false);
-		assert_eq!(r["reason"], "poll_result_consumed");
-		assert_eq!(s.bg_tasks[0].status, crate::poll_worker::BgStatus::Done { exit_code: 0 });
-		assert!(s.bg_tasks[0].output_hash.is_some());
-	}
+	// Agent-agnostic tests: check_bg_tasks in pre_llm_call and
+	// expire_stale_tasks in post_llm_call.  Agent-specific trigger
+	// tests (auto-backgrounding from tool results) live in
+	// aphrodite-hermes.
 
 	#[test]
 	fn test_pre_llm_call_pushes_poll_nudges() {
@@ -710,9 +566,9 @@ mod tests {
 			"old-task".into(),
 			"terminal".into(),
 			"old-build".into(),
-			1,
+			10, // started at turn 10, gap=10 < 16 so retain won't drop it
 		);
-		s.bg_tasks[0].last_poll_turn = 1; // never polled
+		s.bg_tasks[0].last_poll_turn = 10; // never polled after start, gap=10 > 8
 		let _ = post_llm_call(&mut s);
 		// Should be marked stale.
 		assert_eq!(
@@ -720,6 +576,49 @@ mod tests {
 			crate::poll_worker::BgStatus::Stale,
 			"unpolled task should be expired as stale after {} turns",
 			crate::poll_worker::STALE_TURN_AGE
+		);
+	}
+
+	#[test]
+	fn test_pre_llm_call_skips_nudges_when_poll_worker_disabled() {
+		let mut s = AphroditeState::default();
+		s.poll_worker_enabled = false;
+		s.turn_counter = 3;
+		crate::poll_worker::insert_bg_task(
+			&mut s,
+			"task1".into(),
+			"terminal".into(),
+			"cargo build".into(),
+			1,
+		);
+		let before = s.ephemeral_directives.len();
+		let _ = pre_llm_call(&mut s);
+		assert_eq!(
+			s.ephemeral_directives.len(),
+			before,
+			"disabled flag must prevent poll-worker nudges in pre_llm_call"
+		);
+	}
+
+	#[test]
+	fn test_post_llm_call_still_expires_when_poll_worker_disabled() {
+		let mut s = AphroditeState::default();
+		s.poll_worker_enabled = false;
+		s.turn_counter = 20;
+		crate::poll_worker::insert_bg_task(
+			&mut s,
+			"old-task".into(),
+			"terminal".into(),
+			"old-build".into(),
+			10,
+		);
+		s.bg_tasks[0].last_poll_turn = 10;
+		let _ = post_llm_call(&mut s);
+		// Expiry is a cleanup concern — should still run even when disabled.
+		assert_eq!(
+			s.bg_tasks[0].status,
+			crate::poll_worker::BgStatus::Stale,
+			"expire_stale_tasks must still run when disabled (cleanup)"
 		);
 	}
 }

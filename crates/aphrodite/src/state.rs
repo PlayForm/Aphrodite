@@ -89,6 +89,11 @@ pub struct AphroditeState {
 	/// Background tasks created by the poll-worker auto-backgrounding
 	/// heuristic (cap 4, evict oldest completed/stale on overflow).
 	pub bg_tasks:VecDeque<crate::poll_worker::BgTask>,
+	/// Master on/off for poll-worker auto-backgrounding. When false,
+	/// no tool output is auto-backgrounded (existing bg_tasks still
+	/// receive lifecycle nudges and expiry). Default true. Env:
+	/// `APHRODITE_POLL_WORKER`, TOML: `[compression] poll_worker`.
+	pub poll_worker_enabled:bool,
 }
 
 /// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
@@ -168,6 +173,7 @@ impl Default for AphroditeState {
 			manual_directive_turn:None,
 			tool_events:VecDeque::new(),
 			bg_tasks:VecDeque::new(),
+			poll_worker_enabled:true,
 		}
 	}
 }

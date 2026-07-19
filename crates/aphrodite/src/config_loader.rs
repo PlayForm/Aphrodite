@@ -150,6 +150,10 @@ impl Config {
 		// threshold so the catalog never gets spill-mangled.
 		state.flow_budget_chars = self.get_usize("APHRODITE_FLOW_BUDGET_CHARS", "flow", "budget_chars", 4000);
 
+		// ── Poll-worker auto-backgrounding ──
+		state.poll_worker_enabled =
+			self.get_bool("APHRODITE_POLL_WORKER", "compression", "poll_worker", true);
+
 		// ── Directives ──
 		// 01-F4: load whenever a directives/ dir exists, not gated on `active`
 		// being non-empty - the shipped template default is `active = []`, so
@@ -279,5 +283,35 @@ mod tests {
 			"directives must load even when [directives] active is empty"
 		);
 		assert!(state.active_directives.is_empty(), "empty active must seed no activation");
+	}
+
+	// ── Poll-worker config flag ──────────────────────────────
+
+	#[test]
+	fn test_poll_worker_enabled_default_true() {
+		let cfg = Config::default();
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert!(state.poll_worker_enabled, "poll_worker must default to true");
+	}
+
+	#[test]
+	fn test_poll_worker_disabled_via_env_override() {
+		let mut cfg = Config::default();
+		cfg.set_override("APHRODITE_POLL_WORKER", "false");
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert!(!state.poll_worker_enabled);
+	}
+
+	#[test]
+	fn test_poll_worker_disabled_via_toml() {
+		let cfg = Config {
+			raw: "[compression]\npoll_worker = false\n".parse().unwrap(),
+			overrides: HashMap::new(),
+		};
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert!(!state.poll_worker_enabled);
 	}
 }

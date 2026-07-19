@@ -315,7 +315,54 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 			match name.as_str() {
 				// Accept both the canonical Hermes name and the legacy alias.
 				"on_session_start" | "session_start" => aphrodite::session::on_session_start(state),
+			"pre_tool_call" => {
+				// ── Auto-backgrounding: intercept BEFORE execution ──
+				// Returns {"action":"modify","args":{"background":true,"notify_on_complete":true}}
+				// so Hermes runs the tool in background instead of blocking.
+				if state.poll_worker_enabled {
+					let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+					if call_tool == "terminal" || call_tool == "process" {
+						let command = parsed.get("args")
+							.and_then(|a| a.get("command"))
+							.and_then(|v| v.as_str());
+						// For `process(action='poll')`, don't background — it's a check call.
+						let is_poll = call_tool == "process"
+							&& parsed.get("args")
+								.and_then(|a| a.get("action"))
+								.and_then(|v| v.as_str())
+								.map(|a| a == "poll")
+								.unwrap_or(false);
+						if !is_poll {
+							if let Some((_task_id, cmd_summary)) =
+								aphrodite::poll_worker::should_background_pre(command)
+							{
+								// We don't create a BgTask here — Hermes handles the
+								// process lifecycle. We'll track completion via
+								// transform_tool_result when the agent polls.
+								return serde_json::json!({
+									"action": "modify",
+									"args": {
+										"background": true,
+										"notify_on_complete": true,
+									},
+									"message": format!(
+										"aphrodite: auto-backgrounding `{}`", cmd_summary
+									),
+								});
+							}
+						}
+					}
+				}
+				serde_json::Value::Null // pass through
+			},
 				"transform_tool_result" => {
+					// Poll-result tracking: update running BgTasks from
+					// process(action='poll') results. Only active when
+					// poll_worker is enabled.
+					if state.poll_worker_enabled && tool == "process" {
+						aphrodite::poll_worker::update_from_poll(state, tool, tool_content);
+					}
+
 					// Hermes wraps every tool result in JSON (`{"output":...,
 					// "exit_code":...}`, `{"total_count":...,"matches":[...]}`,
 					// etc.) - unwrap it to classify/preview the real payload,
@@ -413,6 +460,7 @@ pub extern "C" fn aphrodite_hermes_get_hooks() -> *mut c_char {
 		to_c_string(
 			&serde_json::json!([
 				"on_session_start",
+				"pre_tool_call",
 				"transform_tool_result",
 				"transform_terminal_output",
 				"pre_llm_call",
@@ -752,5 +800,78 @@ mod tests {
 		let ptr = aphrodite_hermes_dispatch_tool(name.as_ptr(), args.as_ptr());
 		assert!(!ptr.is_null());
 		aphrodite_hermes_free_string(ptr);
+	}
+	// ── Poll-worker: pre_tool_call auto-backgrounding tests ──
+
+	#[test]
+	fn test_pre_tool_call_auto_backgrounds_terminal() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		with_shared(|state| state.poll_worker_enabled = true);
+
+		let args = serde_json::json!({
+			"tool_name": "terminal",
+			"args": {"command": "cargo build --release"},
+		}).to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+
+		let v: serde_json::Value = serde_json::from_str(&result).unwrap();
+		assert_eq!(v["action"], "modify", "pre_tool_call must return modify action: {result}");
+		assert_eq!(v["args"]["background"], true);
+		assert_eq!(v["args"]["notify_on_complete"], true);
+	}
+
+	#[test]
+	fn test_pre_tool_call_does_not_background_poll_action() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		with_shared(|state| state.poll_worker_enabled = true);
+
+		let args = serde_json::json!({
+			"tool_name": "process",
+			"args": {"action": "poll"},
+		}).to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+
+		assert_eq!(result, "null", "process poll must pass through unchanged");
+	}
+
+	#[test]
+	fn test_pre_tool_call_disabled_passes_through() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		with_shared(|state| state.poll_worker_enabled = false);
+
+		let args = serde_json::json!({
+			"tool_name": "terminal",
+			"args": {"command": "cargo build --release"},
+		}).to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+
+		assert_eq!(result, "null", "disabled flag must pass through: {result}");
 	}
 }
