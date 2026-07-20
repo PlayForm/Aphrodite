@@ -353,12 +353,12 @@ pub fn pre_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 	if state.poll_worker_enabled {
 		crate::poll_worker::check_bg_tasks(state);
 	}
-	let summary = crate::session::catalog_summary(state);
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
+	// catalog_summary is now called inside build_turn_context — don't call
+	// it separately (04-F3: double call skipped delta tracking every other turn).
 	let context = crate::flow::build_turn_context(state, None);
 	serde_json::json!({
 		"status": "ok",
-		"catalog": summary,
 		"compressed_count": state.recent_markers.len(),
 		"directives": if directives.is_empty() { None } else { Some(directives) },
 		"context": if context.is_empty() { None } else { Some(context) },
