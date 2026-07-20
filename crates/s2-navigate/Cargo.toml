@@ -1,0 +1,20 @@
+[package]
+name = "s2-navigate"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "s2-navigate: S2-geometry context navigation library — maps conversation context onto S2 cell IDs for hierarchical zoom-in/zoom-out retrieval"
+publish = false
+
+[dependencies]
+s2 = "0.1.0"
+s2-probe = { path = "../s2-probe" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = "1.7"
+
+[[example]]
+name = "bench_navigate_01"
+path = "../../bench/navigate/bench_navigate_01.rs"
