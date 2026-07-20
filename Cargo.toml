@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/aphrodite", "crates/aphrodite-hermes", "crates/s2-probe"]
+members = ["crates/aphrodite", "crates/aphrodite-hermes", "crates/s2-probe", "crates/s2-navigate"]
 exclude = ["Maintain/dynamic_hooks"]
 
 [workspace.package]
