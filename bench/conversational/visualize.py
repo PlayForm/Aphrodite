@@ -199,6 +199,7 @@ COLORS = {
     "full":          "#2ecc71",  # Green
     "hermes_proxy": "#e67e22",  # Orange
     "proxy_api":    "#9b59b6",  # Purple
+    "s2_navigate":  "#e74c3c",  # Red
 }
 
 SCENARIO_LABELS = {
@@ -206,6 +207,7 @@ SCENARIO_LABELS = {
     "full":          "Full Compression",
     "hermes_proxy": "Hermes↔Proxy (cache)",
     "proxy_api":    "Proxy↔API (token)",
+    "s2_navigate":  "S2 Navigation (cache + index)",
 }
 
 
