@@ -15,7 +15,7 @@ types, and extraction patterns. The single source of truth for the absorptive
 CCR preview pipeline. When new tools or output shapes appear, they get
 documented here first - the classifier follows.
 
-> **Preview shapes:** the `[type:...]` strings below illustrate the *fields*
+> **Preview shapes:** the `[type:...]` strings below illustrate the _fields_
 > each tool's preview surfaces. The exact enriched shapes emitted by default
 > (git status, git log, grep, ls, test, build-with-first-error, diff-with-file-
 > names, code-with-signature, terminal, first-line text fallback) are the ones

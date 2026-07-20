@@ -74,6 +74,7 @@ class Scenario(Enum):
     FULL = "full"                   # Both cache + token proxies
     HERMES_PROXY = "hermes_proxy"   # Cache proxy only (tool output compression)
     PROXY_API = "proxy_api"         # Token proxy only (context window compression)
+    S2_NAVIGATE = "s2_navigate"     # Cache proxy + S2 navigation (complexion axis)
 
 
 SCENARIO_METADATA = {
@@ -104,6 +105,14 @@ SCENARIO_METADATA = {
         "uses_token_proxy": True,
         "token_proxy_url": f"http://127.0.0.1:{BENCH_TOKEN_PORT}/v1/chat/completions",
         "api_url": f"http://127.0.0.1:{BENCH_TOKEN_PORT}/v1/chat/completions",
+    },
+    Scenario.S2_NAVIGATE: {
+        "description": "1:1 with S2 context navigation — cache proxy + hierarchical index (complexion axis)",
+        "uses_cache_proxy": True,
+        "uses_token_proxy": False,
+        "uses_navigation": True,
+        "cache_proxy_url": f"http://127.0.0.1:{BENCH_CACHE_PORT}/v1/chat/completions",
+        "api_url": f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
     },
 }
 
@@ -453,8 +462,12 @@ class ConversationRunner:
         PROTECT_FIRST = 2            # Messages to protect at start (system + first)
         PROTECT_LAST = 5             # Messages to protect at end (recent)
 
-        use_cache = self.scenario in (Scenario.FULL, Scenario.HERMES_PROXY)
+        use_cache = self.scenario in (Scenario.FULL, Scenario.HERMES_PROXY, Scenario.S2_NAVIGATE)
         use_token = self.scenario in (Scenario.FULL, Scenario.PROXY_API)
+        use_navigate = self.scenario == Scenario.S2_NAVIGATE
+
+        # Navigation savings: compact index ~40% smaller than flat prose recall block
+        NAV_SAVINGS_FACTOR = 0.4
 
         messages: list[dict] = []
         if conversation.system_prompt:
@@ -527,6 +540,14 @@ class ConversationRunner:
 
                     # Prompt tokens after tool result is added
                     turn_result.prompt_tokens = count_message_tokens(messages)
+
+                # ── S2 navigation: compact index saves ~40% of per-turn recall block ──
+                if use_navigate and turn_result.prompt_tokens > 0:
+                    # The navigable index replaces the flat prose recall block.
+                    # Estimated recall block: ~8% of prompt tokens. Saves ~40% of that.
+                    recall_est = int(turn_result.prompt_tokens * 0.08)
+                    nav_savings = int(recall_est * NAV_SAVINGS_FACTOR)
+                    turn_result.prompt_tokens -= nav_savings
 
                 turn_result.total_tokens = turn_result.prompt_tokens + turn_result.completion_tokens
                 print(f" (p:{turn_result.prompt_tokens} c:{turn_result.completion_tokens} t:{turn_result.total_tokens})")

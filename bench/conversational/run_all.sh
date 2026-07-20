@@ -30,9 +30,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Source Aphrodite environment (API keys, etc.)
 if [ -f "$HOME/.hermes/.env" ]; then
-    set -a  # auto-export all variables
-    source "$HOME/.hermes/.env"
-    set +a
+	set -a # auto-export all variables
+	source "$HOME/.hermes/.env"
+	set +a
 fi
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
@@ -44,36 +44,36 @@ CONVERSATION=""
 BENCH_ARGS=()
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --dry-run)
-            DRY_RUN=true
-            BENCH_ARGS+=("--dry-run")
-            shift
-            ;;
-        --skip-benchmark)
-            SKIP_BENCHMARK=true
-            shift
-            ;;
-        --run-id)
-            RUN_ID="$2"
-            BENCH_ARGS+=("--run-id" "$2")
-            shift 2
-            ;;
-        --scenario)
-            SCENARIO="$2"
-            BENCH_ARGS+=("--scenario" "$2")
-            shift 2
-            ;;
-        --conversation)
-            CONVERSATION="$2"
-            BENCH_ARGS+=("--conversation" "$2")
-            shift 2
-            ;;
-        *)
-            echo "Unknown argument: $1"
-            exit 1
-            ;;
-    esac
+	case "$1" in
+	--dry-run)
+		DRY_RUN=true
+		BENCH_ARGS+=("--dry-run")
+		shift
+		;;
+	--skip-benchmark)
+		SKIP_BENCHMARK=true
+		shift
+		;;
+	--run-id)
+		RUN_ID="$2"
+		BENCH_ARGS+=("--run-id" "$2")
+		shift 2
+		;;
+	--scenario)
+		SCENARIO="$2"
+		BENCH_ARGS+=("--scenario" "$2")
+		shift 2
+		;;
+	--conversation)
+		CONVERSATION="$2"
+		BENCH_ARGS+=("--conversation" "$2")
+		shift 2
+		;;
+	*)
+		echo "Unknown argument: $1"
+		exit 1
+		;;
+	esac
 done
 
 # ── Check prerequisites ──────────────────────────────────────────────────────
@@ -83,68 +83,68 @@ echo "════════════════════════�
 echo ""
 
 if [ "$SKIP_BENCHMARK" = false ]; then
-    # Check for Python dependencies
-    echo "[setup] Checking Python dependencies..."
-    if ! python3 -c "import matplotlib, numpy, requests" 2>/dev/null; then
-        echo "  Installing missing Python packages..."
-        pip3 install --break-system-packages matplotlib numpy requests pillow tiktoken 2>&1 | tail -3
-    fi
-    echo "  ✓ Python dependencies OK"
+	# Check for Python dependencies
+	echo "[setup] Checking Python dependencies..."
+	if ! python3 -c "import matplotlib, numpy, requests" 2>/dev/null; then
+		echo "  Installing missing Python packages..."
+		pip3 install --break-system-packages matplotlib numpy requests pillow tiktoken 2>&1 | tail -3
+	fi
+	echo "  ✓ Python dependencies OK"
 
-    # Check for DEEPSEEK_API_KEY
-    if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
-        echo ""
-        echo "ERROR: DEEPSEEK_API_KEY environment variable is not set."
-        echo ""
-        echo "  The benchmark requires a DeepSeek API key to run conversations."
-        echo "  Set it and re-run:"
-        echo ""
-        echo "    export DEEPSEEK_API_KEY=sk-..."
-        echo "    ./run_all.sh"
-        echo ""
-        exit 1
-    fi
-    echo "  ✓ DEEPSEEK_API_KEY is set"
+	# Check for DEEPSEEK_API_KEY
+	if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+		echo ""
+		echo "ERROR: DEEPSEEK_API_KEY environment variable is not set."
+		echo ""
+		echo "  The benchmark requires a DeepSeek API key to run conversations."
+		echo "  Set it and re-run:"
+		echo ""
+		echo "    export DEEPSEEK_API_KEY=sk-..."
+		echo "    ./run_all.sh"
+		echo ""
+		exit 1
+	fi
+	echo "  ✓ DEEPSEEK_API_KEY is set"
 
-    # Ensure aphrodite binary is built
-    echo ""
-    echo "[setup] Building aphrodite binary (release)..."
-    cd "$REPO_ROOT"
-    cargo build --release 2>&1 | tail -5
-    echo "  ✓ aphrodite binary built"
+	# Ensure aphrodite binary is built
+	echo ""
+	echo "[setup] Building aphrodite binary (release)..."
+	cd "$REPO_ROOT"
+	cargo build --release 2>&1 | tail -5
+	echo "  ✓ aphrodite binary built"
 fi
 
 # ── Run benchmark ────────────────────────────────────────────────────────────
 if [ "$SKIP_BENCHMARK" = false ]; then
-    echo ""
-    echo "═══════════════════════════════════════════════════════════════════════════"
-    echo "  Running Conversational Benchmark"
-    echo "═══════════════════════════════════════════════════════════════════════════"
-    echo ""
-    echo "  Scenarios: $([ -z "$SCENARIO" ] && echo "ALL (baseline, full, hermes_proxy, proxy_api)" || echo "$SCENARIO")"
-    echo "  Conversations: $([ -z "$CONVERSATION" ] && echo "ALL (coding_task, exploration_task, debugging_task)" || echo "$CONVERSATION")"
-    echo "  Model: deepseek-flash"
-    echo ""
+	echo ""
+	echo "═══════════════════════════════════════════════════════════════════════════"
+	echo "  Running Conversational Benchmark"
+	echo "═══════════════════════════════════════════════════════════════════════════"
+	echo ""
+	echo "  Scenarios: $([ -z "$SCENARIO" ] && echo "ALL (baseline, full, hermes_proxy, proxy_api)" || echo "$SCENARIO")"
+	echo "  Conversations: $([ -z "$CONVERSATION" ] && echo "ALL (coding_task, exploration_task, debugging_task)" || echo "$CONVERSATION")"
+	echo "  Model: deepseek-flash"
+	echo ""
 
-    cd "$SCRIPT_DIR"
-    python3 harness.py ${BENCH_ARGS[@]+"${BENCH_ARGS[@]}"}
+	cd "$SCRIPT_DIR"
+	python3 harness.py ${BENCH_ARGS[@]+"${BENCH_ARGS[@]}"}
 
-    # Find the latest results directory
-    RESULTS_DIR=$(ls -td results/*/ 2>/dev/null | head -1)
-    if [ -z "$RESULTS_DIR" ]; then
-        echo "No results directory found. Benchmark may have failed."
-        exit 1
-    fi
-    RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
+	# Find the latest results directory
+	RESULTS_DIR=$(ls -td results/*/ 2>/dev/null | head -1)
+	if [ -z "$RESULTS_DIR" ]; then
+		echo "No results directory found. Benchmark may have failed."
+		exit 1
+	fi
+	RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 else
-    # Find latest results dir for visualization
-    RESULTS_DIR=$(ls -td "$SCRIPT_DIR/results"/*/ 2>/dev/null | head -1)
-    if [ -z "$RESULTS_DIR" ]; then
-        echo "No existing results found to visualize."
-        echo "Run without --skip-benchmark first."
-        exit 1
-    fi
-    RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
+	# Find latest results dir for visualization
+	RESULTS_DIR=$(ls -td "$SCRIPT_DIR/results"/*/ 2>/dev/null | head -1)
+	if [ -z "$RESULTS_DIR" ]; then
+		echo "No existing results found to visualize."
+		echo "Run without --skip-benchmark first."
+		exit 1
+	fi
+	RESULTS_DIR="$(cd "$RESULTS_DIR" && pwd)"
 fi
 
 # ── Generate visualizations ──────────────────────────────────────────────────

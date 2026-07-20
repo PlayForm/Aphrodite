@@ -193,20 +193,20 @@ the preview is built. Detection is conservative (line-prefix / marker
 patterns, majority votes) so ordinary prose is never mis-tagged. An explicit
 non-generic type from the classifier is always honored as-is.
 
-| Content type                           | Enriched preview shape                                                     |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| build / build_output / build_error     | `[build:1E 1W 142L \| error[E0432]: unresolved import ...]` (first error msg) |
-| diff                                   | `[diff:2F +7/-3 12L \| src/main.rs Cargo.toml +N more]` (first file names)  |
-| git status (`git`)                     | `[git:2M 2A 1D 3?? \| src/x.rs src/y.rs +5 more]` (code tallies + paths)    |
-| git log (`gitlog`)                     | `[gitlog:2 commits \| abc1234 fix… → def5678 feat…]` (first→last hash/subj) |
-| directory listing (`ls`)               | `[ls:3 files 2 dirs \| .rs×2 .md×1]` (file/dir counts + top extensions)     |
-| test output (`test`)                   | `[test:220 pass 0 fail 1 ignored \| 0.31s]` (or `\| FAIL name` on failure)  |
-| grep / ripgrep (`grep`)                | `[grep:4 hits in 3 files \| src/preview.rs:12 …]` (hits, files, first loc)  |
-| source_code / code_* (`code`)          | `[code:3fns\|2structs fn main() 414L]` (structure map + first signature)    |
-| search (`search`)                      | `[search:Nhits ML]`                                                         |
-| json_array (`json`)                    | `[json:5items 3L]`                                                          |
-| terminal (`terminal`)                  | `[terminal:14L exit code: 0]` (exit-code / last-output-line context)        |
-| plain text / unrecognized (fallback)   | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)    |
+| Content type                         | Enriched preview shape                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| build / build_output / build_error   | `[build:1E 1W 142L \| error[E0432]: unresolved import ...]` (first error msg) |
+| diff                                 | `[diff:2F +7/-3 12L \| src/main.rs Cargo.toml +N more]` (first file names)    |
+| git status (`git`)                   | `[git:2M 2A 1D 3?? \| src/x.rs src/y.rs +5 more]` (code tallies + paths)      |
+| git log (`gitlog`)                   | `[gitlog:2 commits \| abc1234 fix… → def5678 feat…]` (first→last hash/subj)   |
+| directory listing (`ls`)             | `[ls:3 files 2 dirs \| .rs×2 .md×1]` (file/dir counts + top extensions)       |
+| test output (`test`)                 | `[test:220 pass 0 fail 1 ignored \| 0.31s]` (or `\| FAIL name` on failure)    |
+| grep / ripgrep (`grep`)              | `[grep:4 hits in 3 files \| src/preview.rs:12 …]` (hits, files, first loc)    |
+| source_code / code_* (`code`)        | `[code:3fns\|2structs fn main() 414L]` (structure map + first signature)      |
+| search (`search`)                    | `[search:Nhits ML]`                                                           |
+| json_array (`json`)                  | `[json:5items 3L]`                                                            |
+| terminal (`terminal`)                | `[terminal:14L exit code: 0]` (exit-code / last-output-line context)          |
+| plain text / unrecognized (fallback) | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)      |
 
 The semantic-detection upgrade (`git`, `gitlog`, `grep`, `ls`, `test`) landed
 in commit `c53cb5e`; the terminal arm and the first-line text fallback are

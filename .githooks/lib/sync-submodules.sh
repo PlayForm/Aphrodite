@@ -126,5 +126,5 @@ sync_submodules() {
 # Allow direct invocation (e.g. `sh .githooks/lib/sync-submodules.sh` from
 # package.json's `prepare` script) as well as sourcing from another hook.
 case "$0" in
-	*sync-submodules.sh) sync_submodules ;;
+*sync-submodules.sh) sync_submodules ;;
 esac

@@ -402,21 +402,21 @@ Standard corpus (`bench_01`, 20 samples, 106,256 B, measured 2026-07-14).
 Ratio scales with input size and drops with entropy - tiny/high-entropy
 inputs compress little, large low-entropy prose compresses a lot:
 
-| Sample (size)                 |        Ratio        |
-| :---------------------------- | :-----------------: |
-| `tiny_text` (120 B)           |        3.00×        |
-| `json_tool` (675 B)           |       16.88×        |
-| `rust_code` (2,673 B)         |       66.83×        |
-| `linter_output` (4,014 B)     |       100.35×       |
-| `log_output` (4,943 B)        |       123.58×       |
-| `code_go` (5,712 B)           |       142.80×       |
-| `unicode_cjk` (6,720 B)       |       168.00×       |
-| `build_error` (6,949 B)       |       173.72×       |
-| `code_js` (7,212 B)           |       180.30×       |
-| `search_results` (10,080 B)   |       252.00×       |
-| `large_prose` (11,400 B)      |       285.00×       |
-| `huge_prose` (24,400 B)       |     **610.00×**     |
-| **Overall (106,256 → 800 B)** |     **132.82×**     |
+| Sample (size)                 |    Ratio    |
+| :---------------------------- | :---------: |
+| `tiny_text` (120 B)           |    3.00×    |
+| `json_tool` (675 B)           |   16.88×    |
+| `rust_code` (2,673 B)         |   66.83×    |
+| `linter_output` (4,014 B)     |   100.35×   |
+| `log_output` (4,943 B)        |   123.58×   |
+| `code_go` (5,712 B)           |   142.80×   |
+| `unicode_cjk` (6,720 B)       |   168.00×   |
+| `build_error` (6,949 B)       |   173.72×   |
+| `code_js` (7,212 B)           |   180.30×   |
+| `search_results` (10,080 B)   |   252.00×   |
+| `large_prose` (11,400 B)      |   285.00×   |
+| `huge_prose` (24,400 B)       | **610.00×** |
+| **Overall (106,256 → 800 B)** | **132.82×** |
 
 Range: **3.00×** (120 B) to **610.00×** (24 KB prose); overall **132.82×**.
 Cache and token modes measured identical ratios. 20/20 compressed, 20/20
