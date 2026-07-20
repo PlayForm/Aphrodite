@@ -25,6 +25,7 @@ pub mod directives;
 pub mod flow;
 pub mod hooks;
 pub mod marker;
+#[cfg(feature = "navigation")]
 pub mod navigate;
 pub mod poll_worker;
 pub mod prefetch;

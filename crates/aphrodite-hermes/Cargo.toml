@@ -16,5 +16,5 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-aphrodite = { path = "../aphrodite", version = "1.3.5", default-features = false }
+aphrodite = { path = "../aphrodite", version = "1.3.5", default-features = false, features = ["navigation"] }
 serde_json = { workspace = true }

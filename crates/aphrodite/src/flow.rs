@@ -41,12 +41,15 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	let nudges = render_nudges(state);
 
 	// ── Droppable section: recall catalog, delta-only (04-F1) ──
-	// If navigation is enabled, use the S2 navigable index instead of prose.
-	let recall = if state.navigation_enabled {
-		crate::navigate::build_navigable_context(state)
-	} else {
-		crate::session::catalog_summary(state)
-	};
+		// If navigation is enabled, use the S2 navigable index instead of prose.
+		let recall = if state.navigation_enabled {
+			#[cfg(feature = "navigation")]
+			{ crate::navigate::build_navigable_context(state) }
+			#[cfg(not(feature = "navigation"))]
+			{ crate::session::catalog_summary(state) }
+		} else {
+			crate::session::catalog_summary(state)
+		};
 
 	// ── Poll-worker status (above recall, dropped after recall) ──
 	let bg_status = if state.poll_worker_enabled {
