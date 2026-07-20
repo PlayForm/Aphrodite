@@ -99,7 +99,10 @@ pub struct AphroditeState {
 			/// delta line only when new markers arrived this turn. Zero-initialized;
 			/// reset on session start. Stops the prompt-cache-poisoning repetition of
 			/// the same 5 previews every turn.
-			pub last_emitted_marker_count:usize,
+				pub last_emitted_marker_count:usize,
+		/// Number of referenced files the last time catalog_summary rendered,
+		/// for delta-only file listing (04-F4: stops re-listing same 5 files).
+		pub last_emitted_file_count:usize,
 			// ── S2 context navigation ──
 		/// Master on/off for S2 context navigation. When true, the per-turn
 		/// context and aphrodite_navigate tool emit a navigable index instead
@@ -191,7 +194,8 @@ impl Default for AphroditeState {
 						poll_worker_enabled:true,
 												navigation_enabled:false,
 												navigation_default_level:4,
-												last_emitted_marker_count:0,
+															last_emitted_marker_count:0,
+						last_emitted_file_count:0,
 								}
 	}
 }
