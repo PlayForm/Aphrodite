@@ -15,6 +15,7 @@ pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value {
 	state.tool_events.clear();
 	state.ephemeral_directives.clear();
 	state.manual_directive_turn = None;
+	state.last_emitted_marker_count = 0;
 
 	serde_json::json!({
 		"status": "ok",
@@ -61,22 +62,41 @@ pub fn get_conv_index(state:&AphroditeState) -> Vec<serde_json::Value> {
 		.collect()
 }
 
-/// Generate a catalog summary for the context engine prompt injection.
-pub fn catalog_summary(state:&AphroditeState) -> String {
-	if state.recent_markers.is_empty() && state.conv_index.is_empty() {
-		return String::new();
-	}
+/// Per-turn catalog summary — delta-only emission (04-F1 fix).
+///
+/// Before: re-emitted the same 5 marker previews every turn — prompt-cache
+/// poison, ~200-600 chars of pure repetition per turn, 15k chars over 50 turns
+/// with zero information gain.
+///
+/// After: emits a delta line only when new markers landed this turn. When
+/// nothing changed, emits a short cache-stable count line. Tracks via
+/// `state.last_emitted_marker_count`.
+pub fn catalog_summary(state:&mut AphroditeState) -> String {
+	let current_count = state.recent_markers.len();
+	let prev_count = state.last_emitted_marker_count;
+
+	// Update the tracker for next turn
+	state.last_emitted_marker_count = current_count;
 
 	let mut parts = vec![];
 
-	let marker_count = state.recent_markers.len();
-	if marker_count > 0 {
-		let last_few:Vec<_> = state.recent_markers.iter().rev().take(5).collect();
-		let previews:Vec<String> = last_few.iter().map(|m| m.preview.clone()).collect();
+	// ── Delta markers: only show what's new this turn ──
+	let new_count = current_count.saturating_sub(prev_count);
+	if new_count > 0 && current_count > 0 {
+		let new_markers:Vec<_> = state.recent_markers.iter().rev().take(new_count).collect();
+		let previews:Vec<String> = new_markers.iter().map(|m| m.preview.clone()).collect();
 		parts.push(format!(
-			"[Aphrodite] {} compressions this session. Recent: {}",
-			marker_count,
-			previews.join(", ")
+			"[Aphrodite] +{} new compression{} this turn: {}. {} total.",
+			new_count,
+			if new_count == 1 { "" } else { "s" },
+			previews.join(", "),
+			current_count,
+		));
+	} else if current_count > 0 {
+		// No new markers this turn — cache-stable line
+		parts.push(format!(
+			"[Aphrodite] {} compressions (no change this turn).",
+			current_count,
 		));
 	}
 
@@ -171,5 +191,34 @@ mod tests {
 		assert_eq!(turns[0]["hash"], "hash1");
 		assert_eq!(turns[1]["turn"], 2);
 		assert_eq!(turns[1]["hash"], "hash2");
+	}
+
+	#[test]
+	fn test_catalog_summary_delta_on_new_markers() {
+		let mut s = AphroditeState::default();
+		// No markers yet — should be empty
+		let r0 = catalog_summary(&mut s);
+		assert!(r0.is_empty());
+
+		// Add one marker — delta should show +1
+		s.record_marker(crate::state::MarkerEntry {
+			hash:"abc".into(), ccr_type:"text".into(), size:100,
+			preview:"[text] hello".into(), turn:1, center:None, meta:None,
+		});
+		let r1 = catalog_summary(&mut s);
+		assert!(r1.contains("+1 new compression"));
+		assert!(r1.contains("[text] hello"));
+
+		// Same markers, next turn — should say "no change"
+		let r2 = catalog_summary(&mut s);
+		assert!(r2.contains("no change this turn"));
+	}
+
+	#[test]
+	fn test_catalog_summary_reset_on_session_start() {
+		let mut s = AphroditeState::default();
+		s.last_emitted_marker_count = 10;
+		on_session_start(&mut s);
+		assert_eq!(s.last_emitted_marker_count, 0);
 	}
 }

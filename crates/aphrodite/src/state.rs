@@ -89,11 +89,26 @@ pub struct AphroditeState {
 	/// Background tasks created by the poll-worker auto-backgrounding
 	/// heuristic (cap 4, evict oldest completed/stale on overflow).
 	pub bg_tasks:VecDeque<crate::poll_worker::BgTask>,
-	/// Master on/off for poll-worker auto-backgrounding. When false,
-	/// no tool output is auto-backgrounded (existing bg_tasks still
-	/// receive lifecycle nudges and expiry). Default true. Env:
-	/// `APHRODITE_POLL_WORKER`, TOML: `[compression] poll_worker`.
-	pub poll_worker_enabled:bool,
+		/// Master on/off for poll-worker auto-backgrounding. When false,
+		/// no tool output is auto-backgrounded (existing bg_tasks still
+		/// receive lifecycle nudges and expiry). Default true. Env:
+		/// `APHRODITE_POLL_WORKER`, TOML: `[compression] poll_worker`.
+			pub poll_worker_enabled:bool,
+			// ── Delta catalog (04-F1) ──
+			/// Number of markers the last time catalog_summary rendered, so we emit a
+			/// delta line only when new markers arrived this turn. Zero-initialized;
+			/// reset on session start. Stops the prompt-cache-poisoning repetition of
+			/// the same 5 previews every turn.
+			pub last_emitted_marker_count:usize,
+			// ── S2 context navigation ──
+		/// Master on/off for S2 context navigation. When true, the per-turn
+		/// context and aphrodite_navigate tool emit a navigable index instead
+		/// of flat prose (the complexion axis, report 08+10 tied together).
+		/// Default false. Env: `APHRODITE_NAVIGATION`, TOML: `[flow] navigation`.
+		pub navigation_enabled:bool,
+		/// Default S2 level for navigable index rendering when the model
+		/// doesn't specify one. Lower = coarser = fewer tokens. Default 4.
+		pub navigation_default_level:u8,
 }
 
 /// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
@@ -172,9 +187,12 @@ impl Default for AphroditeState {
 			flow_budget_chars:4000,
 			manual_directive_turn:None,
 			tool_events:VecDeque::new(),
-			bg_tasks:VecDeque::new(),
-			poll_worker_enabled:true,
-		}
+						bg_tasks:VecDeque::new(),
+						poll_worker_enabled:true,
+												navigation_enabled:false,
+												navigation_default_level:4,
+												last_emitted_marker_count:0,
+								}
 	}
 }
 

@@ -15,10 +15,6 @@
 
 use crate::state::{ActiveDirective, AphroditeState};
 
-/// Terminal retrieval-hint line, emitted exactly once when at least one recall
-/// line rendered (S6's "how to retrieve, once" requirement).
-const RETRIEVE_HINT:&str = "retrieve: aphrodite_retrieve(hash) · list: aphrodite_catalog";
-
 /// Assemble the complete per-turn injected context, in fixed order, hard-capped
 /// at `state.flow_budget_chars`.
 ///
@@ -30,7 +26,6 @@ const RETRIEVE_HINT:&str = "retrieve: aphrodite_retrieve(hash) · list: aphrodit
 /// [directives: focus] ...        (build_directive_context - never dropped)
 /// [nudge: ...]                   (ephemeral one-shots, at most 2 - never dropped)
 /// [recall] <catalog summary>     (dropped first under budget pressure)
-/// retrieve: aphrodite_retrieve(hash) · list: aphrodite_catalog
 /// ```
 ///
 /// `est_request_bytes` is reserved for the P9 telemetry line (chars/4 estimate)
@@ -45,8 +40,13 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
 	let nudges = render_nudges(state);
 
-	// ── Droppable section: the recall catalog ──
-	let recall = crate::session::catalog_summary(state);
+	// ── Droppable section: recall catalog, delta-only (04-F1) ──
+	// If navigation is enabled, use the S2 navigable index instead of prose.
+	let recall = if state.navigation_enabled {
+		crate::navigate::build_navigable_context(state)
+	} else {
+		crate::session::catalog_summary(state)
+	};
 
 	// ── Poll-worker status (above recall, dropped after recall) ──
 	let bg_status = if state.poll_worker_enabled {
@@ -63,25 +63,15 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	if !nudges.is_empty() {
 		sections.push(nudges);
 	}
-	// Poll-worker status: rendered above recall, below nudges.
 	if !bg_status.is_empty() {
 		sections.push(bg_status);
 	}
-	// The recall block + its retrieve hint are one droppable unit.
-	let mut recall_block = String::new();
+	// The recall block — RETRIEVE_HINT removed per 04-F2 (tool schemas
+	// in the system prompt already teach retrieval; repeating it every
+	// turn was 56 chars of pure noise, ~2.8k chars over 50 turns).
 	if !recall.is_empty() {
-		recall_block.push_str("[recall]\n");
-		recall_block.push_str(recall.trim_end());
-		recall_block.push('\n');
-		recall_block.push_str(RETRIEVE_HINT);
+		sections.push(format!("[recall]\n{}\n", recall.trim_end()));
 	}
-	if !recall_block.is_empty() {
-		sections.push(recall_block);
-	}
-
-	// Bottom-up drop: while the joined output exceeds the budget and there is
-	// more than the always-survive prefix, drop the last section. Directives +
-	// nudges (the leading sections) are never dropped, so we stop before them.
 	let always_survive = directives.is_empty() as usize + nudges_present(state) as usize;
 	let always_survive = always_survive.min(sections.len());
 	while join_sections(&sections).len() > budget && sections.len() > always_survive {
@@ -302,24 +292,19 @@ mod tests {
 		);
 	}
 
-	// ── T1: the retrieve hint appears exactly once, only when a recall line
-	// rendered. ──
+	// ── T2: the retrieve-hint boilerplate is no longer emitted per turn
+	// (04-F2 fix). Tool schemas in the system prompt already teach retrieval. ──
 	#[test]
-	fn test_retrieve_hint_rendered_exactly_once() {
+	fn test_retrieve_hint_not_in_per_turn_context() {
 		let mut s = AphroditeState::default();
 		add_marker(&mut s, &"a".repeat(40), 0);
 		s.flow_budget_chars = 4000;
 		let ctx = build_turn_context(&mut s, None);
 		assert_eq!(
 			ctx.matches("retrieve: aphrodite_retrieve").count(),
-			1,
-			"retrieve hint must render exactly once: {ctx}"
+			0,
+			"retrieve hint must NOT appear in per-turn context (04-F2): {ctx}"
 		);
-
-		// No markers => no recall block => no retrieve hint.
-		let mut empty = AphroditeState::default();
-		let ctx2 = build_turn_context(&mut empty, None);
-		assert_eq!(ctx2.matches("retrieve: aphrodite_retrieve").count(), 0);
 	}
 
 	#[test]
