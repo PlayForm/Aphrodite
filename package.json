@@ -15,7 +15,7 @@
     "prepare": "git config core.hooksPath .githooks && sh .githooks/lib/sync-submodules.sh"
   },
   "devDependencies": {
-    "prettier": "3.9.5"
+    "prettier": "3.9.6"
   },
   "engines": {
     "node": ">=20",
