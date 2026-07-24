@@ -1,6 +1,39 @@
 # Changelog
 
-## v1.3.4 - Preview Intelligence & Release Hardening (2026-07-14, unreleased)
+## v1.3.6 - Preview Pipe Sanitization Fix (2026-07-24)
+
+### Fixed
+
+- **`|` → `-` sanitization removed from CCR previews** — the `ccr_marker` function
+  was replacing all pipe characters in preview strings with hyphens to prevent
+  confusion with the outer `<<<CCR:hash|type|size>>>` format. Since the marker
+  line is always on its own line, there is no collision risk. The pipe is a
+  deliberate visual separator in enriched previews (`[ls:29 files 4 dirs | .rs×18]`,
+  `[git:2M 2A | src/x.rs]`, `[test:220 pass | 0.31s]`), and replacing it with a
+  hyphen made the preview grammar harder to parse. The `extract_hashes` regex
+  already rejects non-hex hash tokens, so literal marker-shaped text in content
+  remains correctly filtered.
+
+## v1.3.5 - S2 Context Navigation & Delta Catalog (2026-07-22)
+
+### Added
+
+- **S2 context navigation** (`aphrodite_navigate` tool) — zoomable hierarchical
+  context index with navigation state fields, feature-gated behind optional
+  `navigation` feature.
+- **s2-navigate crate** — S2 context navigation library with aphrodite bridge.
+- **Conversational benchmark suite** with multi-scenario simulation.
+
+### Fixed
+
+- **Delta-only file listing in catalog_summary** (04-F4) — files are now emitted
+  delta-only like markers, instead of re-emitting the full list every turn.
+- **Double catalog_summary call removed** (04-F3) — `pre_llm_call` no longer
+  calls catalog_summary twice, fixing delta tracking skip every other turn.
+- **Navigation feature-gated** behind optional `navigation` feature to avoid
+  pulling S2 deps when unused.
+
+## v1.3.4 - Preview Intelligence & Release Hardening (2026-07-14)
 
 ### Added
 
