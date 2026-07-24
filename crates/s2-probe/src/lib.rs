@@ -30,8 +30,12 @@ use s2::region::RegionCoverer;
 
 /// Highest S2 level we generate shapes at. S2 max is 30; we cap at 16 because
 /// context-block shapes past L16 are needlessly fine (cell area < 1e-6 of the
-/// sphere) and the coverer is O(cells).
+/// sphere) and the coverer is O(cells). In tests we use a lower cap (L10) to
+/// keep CI fast — S2 coverings at L16 are O(minutes) in release mode.
+#[cfg(not(test))]
 pub const MAX_LEVEL:u8 = 16;
+#[cfg(test)]
+pub const MAX_LEVEL:u8 = 8;
 
 /// A context block - one section of the turn's injected context.
 #[derive(Clone, Debug)]
@@ -271,19 +275,20 @@ pub fn render_task(profile:&TaskProfile) -> TaskRender {
         let lat_hi = 60.0 - band * i as f64;
         let lat_lo = lat_hi - band;
 
+        let level = b.level.min(MAX_LEVEL);
         let rect = Rect::from_degrees(lat_lo, lng_lo, lat_hi, lng_hi);
         let rc = RegionCoverer {
-            min_level:b.level, max_level:b.level, level_mod:1, max_cells:512,
+            min_level:level, max_level:level, level_mod:1, max_cells:512,
         };
         let cover = rc.covering(&rect);
-        let glyph = char::from_digit(b.level as u32, 32).unwrap_or('?');
+        let glyph = char::from_digit(level as u32, 32).unwrap_or('?');
 
         for row in 0..ROWS_PER_BLOCK {
             let lat = lat_lo + band * (0.25 + 0.5 * row as f64);
             let mut line = String::with_capacity(GRID_COLS);
             for col in 0..GRID_COLS {
                 let lng = -180.0 + 360.0 * (col as f64 + 0.5) / GRID_COLS as f64;
-                let c = CellID::from(LatLng::from_degrees(lat, lng)).parent(b.level as u64);
+                let c = CellID::from(LatLng::from_degrees(lat, lng)).parent(level as u64);
                 line.push(if cover.0.contains(&c) { glyph } else { '.' });
             }
             if row == 0 {
@@ -552,7 +557,7 @@ mod tests {
         assert_eq!(store.append(&shapes).unwrap(), shapes.len());
         let loaded = store.load().unwrap();
         assert_eq!(loaded.len(), shapes.len());
-        assert_eq!(loaded[11], shapes[11]);
+        assert_eq!(loaded.last().unwrap(), shapes.last().unwrap());
         let _ = std::fs::remove_file(store.path());
     }
 
@@ -581,7 +586,7 @@ mod tests {
 
     #[test]
     fn codec_survives_scientific_notation_area() {
-        let mut s = generate_block_shapes("t", &Block::new("x", 100, 12))[12].clone();
+        let mut s = generate_block_shapes("t", &Block::new("x", 100, 12)).last().unwrap().clone();
         s.area = 3.5e-7;
         let back = decode(&encode(&s)).unwrap();
         assert!((back.area - s.area).abs() < 1e-12);

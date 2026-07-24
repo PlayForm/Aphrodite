@@ -6,6 +6,8 @@
 
 use headroom_core::transforms;
 
+use serde_json::Value as JsonValue;
+
 /// Detect the CCR content-type string for a blob (e.g. `source_code`, `build`,
 /// `json_array`). Thin wrapper over the Headroom classifier so downstream
 /// crates (aphrodite-hermes) don't need a direct headroom-core dependency.
@@ -229,7 +231,7 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		"test" | "test_output" => build_test_preview(content, lines),
 		// grep/ripgrep: hit count, files touched, first location.
 		"grep" | "ripgrep" => build_grep_preview(content, lines),
-		"source_code" | "code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" => {
+		"source_code" | "code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
 			// Enrich with the structure map (fns/structs/traits/impls/classes/types
 			// + first signature) so the dylib/hook path matches the proxy's preview
 			// quality, instead of a bare substring count.
@@ -262,12 +264,13 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 			format!("[code:{}{} {}L]", summary, sig, lines)
 		},
 		"search" => {
-			let h = content.lines().filter(|l| l.contains(':')).count();
-			format!("[search:{}hits {}L]", h, lines)
+			build_search_preview(content, lines)
 		},
-		"json_array" => {
-			let i = content.matches("{\"").count();
-			format!("[json:{}items {}L]", i, lines)
+		"html" => {
+			build_html_preview(content, lines)
+		},
+		"json_array" | "json" | "json_list" => {
+			build_json_preview(content, lines)
 		},
 		// `hooks::transform_terminal_output` overrides the classified type to
 		// "terminal" when the content looks like a shell/exit-code trace, but
@@ -566,6 +569,127 @@ fn num_before(line:&str, keyword:&str) -> usize {
 static DUR_RE:std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"(\d+\.\d+s|\d+ms)").unwrap());
 
+/// JSON preview: parse content and show item/object count with top-level keys,
+/// matching the quality of stage2's `reduce_json`. Falls back to a crude `{"`
+/// count when parsing fails (e.g. truncated or malformed JSON).
+fn build_json_preview(content:&str, lines:usize) -> String {
+	match serde_json::from_str::<JsonValue>(content) {
+		Ok(JsonValue::Array(arr)) => {
+			let keys = arr
+				.first()
+				.and_then(|v| v.as_object())
+				.map(|obj| {
+					let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+					let more = if ks.len() < obj.len() {
+						format!(" +{} more", obj.len() - ks.len())
+					} else {
+						String::new()
+					};
+					format!(" | keys: {}{}", ks.join(", "), more)
+				})
+				.unwrap_or_default();
+			format!("[json:{}items {}L{}]", arr.len(), lines, keys)
+		},
+		Ok(JsonValue::Object(obj)) => {
+			let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+			let more = if ks.len() < obj.len() {
+				format!(" +{} more", obj.len() - ks.len())
+			} else {
+				String::new()
+			};
+			format!("[json:{}keys {}L | {}{}]", obj.len(), lines, ks.join(", "), more)
+		},
+		_ => {
+			// Fallback: crude `{"` count for unparseable content.
+			let i = content.matches("{\"").count();
+			format!("[json:~{}items {}L]", i, lines)
+		},
+	}
+}
+
+/// Search preview: grep/ripgrep hit count, distinct files, first match location.
+/// Uses the same regex pattern as `content_detector::SEARCH_RESULT_PATTERN`
+/// (`file:line:` format).
+fn build_search_preview(content:&str, lines:usize) -> String {
+	use std::collections::BTreeSet;
+	static SEARCH_RE:std::sync::LazyLock<regex::Regex> =
+		std::sync::LazyLock::new(|| regex::Regex::new(r"^[^\s:]+:\d+:").unwrap());
+	let mut hits = 0usize;
+	let mut files:BTreeSet<String> = BTreeSet::new();
+	let mut first:Option<String> = None;
+	for line in content.lines() {
+		if line.trim().is_empty() {
+			continue;
+		}
+		if !SEARCH_RE.is_match(line) {
+			continue;
+		}
+		hits += 1;
+		if let Some((path, rest)) = line.split_once(':') {
+			files.insert(path.to_string());
+			if first.is_none() {
+				let lno = rest.split(':').next().unwrap_or("");
+				first = Some(format!("{}:{}", path, lno).chars().take(48).collect());
+			}
+		}
+	}
+	if hits == 0 {
+		return format!("[search:{}L]", lines);
+	}
+	match first {
+		Some(loc) => format!("[search:{} hits in {} files | {} …]", hits, files.len(), loc),
+		None => format!("[search:{} hits in {} files]", hits, files.len()),
+	}
+}
+
+/// HTML preview: title, heading count, link count, body size estimate.
+fn build_html_preview(content:&str, lines:usize) -> String {
+	// Extract <title>…</title> text (anywhere on a line, case-insensitive).
+	let title = content
+		.lines()
+		.find_map(|l| {
+			let lower = l.to_lowercase();
+			let start = lower.find("<title>")? + 7;
+			let end = lower[start..].find("</title>")?;
+			Some(l[start..start + end].trim().chars().take(60).collect::<String>())
+		});
+	// Count common structural elements.
+	let headings = content.matches("<h1").count()
+		+ content.matches("<h2").count()
+		+ content.matches("<h3").count()
+		+ content.matches("<H1").count()
+		+ content.matches("<H2").count()
+		+ content.matches("<H3").count();
+	let links = content.matches("<a ").count() + content.matches("<A ").count();
+	let imgs = content.matches("<img ").count() + content.matches("<IMG ").count();
+	let scripts = content.matches("<script").count() + content.matches("<SCRIPT").count();
+
+	let mut parts:Vec<String> = Vec::new();
+	if let Some(t) = title {
+		parts.push(t);
+	}
+	let mut stats:Vec<String> = Vec::new();
+	if headings > 0 {
+		stats.push(format!("{}h", headings));
+	}
+	if links > 0 {
+		stats.push(format!("{}a", links));
+	}
+	if imgs > 0 {
+		stats.push(format!("{}img", imgs));
+	}
+	if scripts > 0 {
+		stats.push(format!("{}script", scripts));
+	}
+	stats.push(format!("{}L", lines));
+	let stats_str = stats.join(" ");
+	if parts.is_empty() {
+		format!("[html:{}]", stats_str)
+	} else {
+		format!("[html:{} | {}]", stats_str, parts.join(" | "))
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -582,7 +706,7 @@ mod tests {
 	#[test]
 	fn test_build_preview_never_panics_on_interior_nul_across_type_branches() {
 		let content = "line one\0line two\0\0error: boom\nwarning: also this";
-		for ty in ["build", "diff", "code_rust", "search", "json_array", "terminal", "text"] {
+		for ty in ["build", "diff", "code_rust", "code_sh", "code", "search", "html", "json_array", "json", "json_list", "terminal", "text"] {
 			let _ = build_preview(ty, content); // must not panic for any branch
 		}
 	}
@@ -604,7 +728,7 @@ mod tests {
 	#[test]
 	fn test_build_preview_never_panics_on_multibyte_utf8_every_type() {
 		let content = "a\u{00e9}\u{4e2d}\u{1f600}b".repeat(30);
-		for ty in ["build", "diff", "code_rust", "search", "json_array", "terminal", "text"] {
+		for ty in ["build", "diff", "code_rust", "code_sh", "code", "search", "html", "json_array", "json", "json_list", "terminal", "text"] {
 			let _ = build_preview(ty, &content);
 		}
 	}
@@ -616,7 +740,7 @@ mod tests {
 		// panic in any branch - build_preview only ever summarizes, it never
 		// re-parses content as a marker.
 		let content = "before <<<CCR:fake000|text|1>>> after\nerror: boom";
-		for ty in ["build", "diff", "code_rust", "search", "json_array", "terminal", "text"] {
+		for ty in ["build", "diff", "code_rust", "code_sh", "code", "search", "html", "json_array", "json", "json_list", "terminal", "text"] {
 			let out = build_preview(ty, content);
 			assert!(!out.is_empty());
 		}
@@ -740,6 +864,60 @@ mod tests {
 	fn test_semantic_detector_leaves_prose_alone() {
 		let prose = "The quick brown fox jumps over the lazy dog.\nAnother sentence of ordinary prose.";
 		assert_eq!(detect_semantic_type(prose), None);
+	}
+
+	// ── JSON preview (intelligent parsing, not crude `{"` count) ──
+
+	#[test]
+	fn test_json_preview_array_shows_keys() {
+		let c = "[{\"status\":\"ok\",\"count\":42},{\"status\":\"err\",\"count\":0}]";
+		let p = build_preview("json_array", c);
+		assert_eq!(p, "[json:2items 1L | keys: status, count]");
+	}
+
+	#[test]
+	fn test_json_preview_object_shows_keys() {
+		let c = "{\"status\":\"in_progress\",\"conclusion\":null,\"jobs\":[{\"name\":\"Test\"}]}";
+		let p = build_preview("json", c);
+		assert!(p.starts_with("[json:3keys"));
+		assert!(p.contains("status"));
+		assert!(p.contains("conclusion"));
+		assert!(p.contains("jobs"));
+	}
+
+	#[test]
+	fn test_json_preview_fallback_on_unparseable() {
+		let c = "not valid json {at all";
+		let p = build_preview("json_array", c);
+		assert!(p.starts_with("[json:~"));
+	}
+
+	// ── Search preview (proper regex, not bare `:` count) ──
+
+	#[test]
+	fn test_search_preview_counts_hits_and_files() {
+		let c = "src/main.rs:12:    let x = 1;\nsrc/main.rs:42:    println!();\nsrc/lib.rs:7:    pub fn foo()";
+		let p = build_preview("search", c);
+		assert!(p.starts_with("[search:3 hits in 2 files | "), "got {p}");
+	}
+
+	#[test]
+	fn test_search_preview_ignores_non_search_lines() {
+		let c = "src/main.rs:12:    let x = 1;\njust some prose here\nsrc/lib.rs:7:    pub fn foo()";
+		let p = build_preview("search", c);
+		assert!(p.contains("2 hits"), "got {p}");
+	}
+
+	// ── HTML preview (title, headings, links, images) ──
+
+	#[test]
+	fn test_html_preview_extracts_title_and_counts() {
+		let c = "<!DOCTYPE html>\n<html>\n<head><title>My Page</title></head>\n<body>\n<h1>Hello</h1>\n<h2>Section</h2>\n<a href=\"/x\">link</a>\n<a href=\"/y\">link2</a>\n<img src=\"a.png\">\n</body>\n</html>";
+		let p = build_preview("html", c);
+		assert!(p.contains("My Page"), "must include title, got {p}");
+		assert!(p.contains("2h"), "got {p}");
+		assert!(p.contains("2a"), "got {p}");
+		assert!(p.contains("1img"), "got {p}");
 	}
 
 	#[test]
