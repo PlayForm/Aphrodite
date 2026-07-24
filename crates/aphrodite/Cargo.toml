@@ -81,7 +81,6 @@ notify = { version = "8.2.0", optional = true }
 regex = "1.12.4"
 blake3 = "1.7"
 s2 = "0.1.0"
-s2-navigate = { path = "../s2-navigate", optional = true }
 
 [features]
 default = ["proxy"]
@@ -101,7 +100,6 @@ proxy = [
 	"lru",
 	"notify",
 ]
-navigation = ["s2-navigate"]
 
 [dev-dependencies]
 proptest = "1"
