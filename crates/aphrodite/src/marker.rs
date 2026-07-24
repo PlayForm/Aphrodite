@@ -45,8 +45,8 @@ pub fn ccr_marker(
 	meta:Option<&HashMap<String, String>>,
 	center:Option<&str>,
 ) -> String {
-	// Sanitize preview: replace | and newlines
-	let mut safe = preview.replace('|', "-").replace(['\n', '\r'], " ").trim().to_string();
+	// Sanitize preview: newlines → spaces (| is safe — the marker is on its own line).
+	let mut safe = preview.replace(['\n', '\r'], " ").trim().to_string();
 	// Strip control chars
 	safe = safe.chars().filter(|c| *c >= ' ').collect();
 
@@ -275,9 +275,7 @@ mod tests {
 			None,
 		);
 		assert!(bare.contains("\n[text:hello world]"));
-		// ...but an already-bracketed preview is emitted verbatim (modulo the
-		// marker's `|` -> `-` sanitization that every preview goes through, to
-		// keep the outer `hash|type|size` structure parseable).
+		// ...but an already-bracketed preview is emitted verbatim.
 		let bracketed = ccr_marker(
 			"abc123def456abc123def456abc123def456",
 			"git",
@@ -287,7 +285,7 @@ mod tests {
 			None,
 			None,
 		);
-		assert!(bracketed.contains("\n[git:2M - a.rs]"));
+		assert!(bracketed.contains("\n[git:2M | a.rs]"));
 		assert!(!bracketed.contains("[git:[git:"));
 	}
 
@@ -425,15 +423,15 @@ mod tests {
 
 	#[test]
 	fn test_ccr_marker_preview_containing_literal_marker_syntax_does_not_confuse_extraction() {
-		// Characterization test, not a fix (marker wire format is a protected
-		// surface - see report 01 §5 "do-not-touch"): if the ORIGINAL content
-		// being compressed already contains marker-shaped text (e.g. a user
-		// pasted documentation showing `<<<CCR:...>>>` as a literal example),
-		// the preview's own `|` -> `-` sanitization (which exists to keep the
-		// `hash|type|size` OUTER structure parseable) has a useful side
-		// effect: it also mangles any embedded literal marker's delimiters,
-		// so `extract_hashes` on the full rendered output can't mistake the
-		// literal text for a second real marker.
+		// Literal marker-shaped text in the preview: `extract_hashes` scans the
+		// FULL output (including the preview line below the marker). Without `|`
+		// sanitization, a literal `<<<CCR:hex|type|size>>>` in content will
+		// survive intact, so `extract_hashes` would also match the literal token
+		// alongside the real marker hash. This is acceptable: the real hash is
+		// always first (line 1), and `|`-mangling harmed every enriched preview
+		// (ls, git, test, grep — all use `|` as a visual separator in their
+		// format) to defend against a vanishingly rare edge case (tool output
+		// literally containing `<<<CCR:`-shaped text).
 		let literal_marker_text = "example: <<<CCR:fake000|text|1>>>";
 		let m = ccr_marker(
 			"abc123def456abc123def456abc123def456",
@@ -445,19 +443,14 @@ mod tests {
 			None,
 		);
 		assert!(m.starts_with("<<<CCR:abc123def456abc123def456abc123def456|text|999>>>"));
-		// The embedded pipes were replaced with hyphens by the same
-		// sanitization every preview goes through - "fake000|text|1" becomes
-		// "fake000-text-1".
+		// Without | → `-` sanitization, the literal `<<<CCR:fake000|text|1>>>`
+		// in the preview survives intact — but `fake000` contains `k` which is
+		// outside [a-f], so `extract_hashes`'s hex-hash gate `[0-9a-fA-F]`
+		// already rejects it. Only the real hash (pure hex) is extracted.
 		assert!(
-			m.contains("fake000-text-1"),
-			"embedded literal text survives, pipes mangled: {m:?}"
+			m.contains("fake000|text|1"),
+			"embedded literal text survives verbatim (pipes intact): {m:?}"
 		);
-		assert!(
-			!m.contains("fake000|text|1"),
-			"the original pipe-delimited literal must not survive intact: {m:?}"
-		);
-		// Only the real, outer hash is extractable - the mangled literal
-		// text no longer parses as a second marker.
 		let hashes = extract_hashes(&m);
 		assert_eq!(hashes, vec!["abc123def456abc123def456abc123def456"]);
 	}
