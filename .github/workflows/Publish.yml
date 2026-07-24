@@ -76,7 +76,7 @@ jobs:
           restore-keys: cargo-test-${{ runner.os }}-
 
       - name: Cargo test
-        run: cargo test --workspace
+        run: cargo test --workspace --release
 
   Publish-Headroom-Core:
     name: Publish aphrodite-headroom-core
