@@ -356,7 +356,7 @@ aphrodite
 
 # Verify
 curl http://127.0.0.1:9798/health
-# -> {"status":"healthy","ccr":true,"mode":"token","version":"1.3.6","fill_pct":90.0}
+# -> {"status":"healthy","ccr":true,"mode":"token","version":"1.3.7","fill_pct":90.0}
 
 # Dev loop with auto-reload (also rebuilds aphrodite-hermes's dylib, not just
 # the proxy binary - see "Developer Workflow" above)
