@@ -28,14 +28,18 @@ directive named after its file stem - the built-ins aren't special-cased.
 
 ## Discovery and loading
 
-| Rule           | Behavior                                                                                                                                                                                                                                      |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+## Discovery and loading
+
+| Rule       | Behavior                                                                                                                                                                                                                                    |
+|---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Search order   | `./directives/` (working directory), then `~/.hermes/directives/` - the **first directory that exists** wins; they are not merged                                                                                                             |
 | File filter    | Only `*.md` files; anything else is silently skipped                                                                                                                                                                                          |
-| Naming         | Directive name = file stem (`focus.md` → `focus`)                                                                                                                                                                                             |
-| Per-file cap   | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                                                                                                                           |
+| Naming         | Directive name = file stem (`focus.md` → `focus`)                                                                                                                                                                                           |
+| Per-file cap   | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                                                                                                                         |
 | Combined cap   | 4,000 chars across all active directives' injected text combined - several active directives can't blow past the context budget together                                                                                                      |
-| Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty (it was before v1.3.2, which made runtime `add`/`swap` impossible from a cold start with the shipped `active = []` default) |
+| Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty (it was before v1.3.2, which made runtime `add`/`swap` impossible from a cold start with the shipped `active = []` default)    |
+| Built-in fallback | When no `directives/` directory exists on disk, 5 directives baked into the binary via `include_str!` are loaded automatically: `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore` |
+| Active default | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` are seeded as active automatically                                                                                                                       |
 
 ## `[directives]` in aphrodite.toml
 
