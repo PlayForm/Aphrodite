@@ -12,6 +12,43 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+/// Built-in directives baked into the binary via `include_str!`.
+/// These ship with every installation and are used as fallbacks when no
+/// `directives/` directory exists on disk — so a fresh install gets
+/// `focus`, `foresight`, `ccr-handling`, `cleanup`, and `explore` without
+/// any filesystem setup.
+///
+/// The on-disk `directives/*.md` files (if any) take precedence: if the
+/// directory exists, its `.md` files replace these defaults entirely.
+/// Users can also `aphrodite_directive("add", "ccr-handling")` to
+/// activate the shipped defaults discovered from the embedded set.
+fn builtin_directives() -> Vec<(&'static str, &'static str)> {
+	vec![
+		("focus", include_str!("builtin_directives/focus.md")),
+		("foresight", include_str!("builtin_directives/foresight.md")),
+		("ccr-handling", include_str!("builtin_directives/ccr-handling.md")),
+		("cleanup", include_str!("builtin_directives/cleanup.md")),
+		("explore", include_str!("builtin_directives/explore.md")),
+	]
+}
+
+/// Load built-in directives from the binary (via `include_str!`), applying the
+/// same `MAX_DIRECTIVE_CHARS` cap as `load_directives` does for disk-loaded
+/// directives. Returns a `HashMap` ready for `state.directives`.
+pub fn loaded_builtins() -> HashMap<String, Directive> {
+	let mut directives = HashMap::new();
+	for (name, content) in builtin_directives() {
+		let content = if content.len() > MAX_DIRECTIVE_CHARS {
+			let trunc:String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
+			format!("{}…", trunc)
+		} else {
+			content.to_string()
+		};
+		directives.insert(name.to_string(), Directive { name:name.to_string(), content });
+	}
+	directives
+}
+
 /// A loaded directive - name and content.
 #[derive(Debug, Clone)]
 pub struct Directive {
@@ -31,30 +68,50 @@ pub const MAX_COMBINED_CHARS:usize = 4000;
 /// Load all `.md` files from a `directives/` directory.
 /// Returns a map of name → Directive. Files without `.md` extension are
 /// silently skipped.
+///
+/// If the directory doesn't exist or contains no `.md` files, the built-in
+/// directives (baked into the binary via `include_str!`) are used as
+/// fallbacks, so a fresh install without a `directives/` directory still
+/// gets `focus`, `foresight`, `ccr-handling`, `cleanup`, and `explore`.
 pub fn load_directives(dir:&PathBuf) -> HashMap<String, Directive> {
 	let mut directives = HashMap::new();
-	let Ok(entries) = std::fs::read_dir(dir) else {
-		return directives;
-	};
-	for entry in entries.flatten() {
-		let path = entry.path();
-		if path.extension().map(|e| e != "md").unwrap_or(true) {
-			continue;
+	let mut loaded_from_disk = false;
+	if let Ok(entries) = std::fs::read_dir(dir) {
+		for entry in entries.flatten() {
+			let path = entry.path();
+			if path.extension().map(|e| e != "md").unwrap_or(true) {
+				continue;
+			}
+			let Some(name) = path.file_stem().and_then(|n| n.to_str()) else {
+				continue;
+			};
+			let Ok(content) = std::fs::read_to_string(&path) else {
+				continue;
+			};
+			// Trim each directive to a reasonable size.
+			let content = if content.len() > MAX_DIRECTIVE_CHARS {
+				let trunc:String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
+				format!("{}…", trunc)
+			} else {
+				content
+			};
+			directives.insert(name.to_string(), Directive { name:name.to_string(), content });
+			loaded_from_disk = true;
 		}
-		let Some(name) = path.file_stem().and_then(|n| n.to_str()) else {
-			continue;
-		};
-		let Ok(content) = std::fs::read_to_string(&path) else {
-			continue;
-		};
-		// Trim each directive to a reasonable size.
-		let content = if content.len() > MAX_DIRECTIVE_CHARS {
-			let trunc:String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
-			format!("{}…", trunc)
-		} else {
-			content
-		};
-		directives.insert(name.to_string(), Directive { name:name.to_string(), content });
+	}
+	// Fallback: if no `directives/` dir on disk (or it's empty), use the
+	// built-in directives baked into the binary so a fresh install gets
+	// shipped defaults without any filesystem setup.
+	if !loaded_from_disk {
+		for (name, content) in builtin_directives() {
+			let content = if content.len() > MAX_DIRECTIVE_CHARS {
+				let trunc:String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
+				format!("{}…", trunc)
+			} else {
+				content.to_string()
+			};
+			directives.insert(name.to_string(), Directive { name:name.to_string(), content });
+		}
 	}
 	directives
 }
@@ -405,10 +462,31 @@ mod tests {
 	}
 
 	#[test]
-	fn test_load_directives_missing_dir_returns_empty() {
+	fn test_load_directives_missing_dir_returns_builtins() {
 		let missing = std::env::temp_dir().join("aphrodite-directives-test-does-not-exist");
 		let loaded = load_directives(&missing);
-		assert!(loaded.is_empty());
+		// Built-in directives are now returned as fallback when no
+		// `directives/` directory exists on disk.
+		assert!(
+			!loaded.is_empty(),
+			"missing dir should fall back to baked-in built-in directives"
+		);
+		assert!(
+			loaded.contains_key("focus"),
+			"built-in directives must include 'focus'"
+		);
+	}
+
+	// ── Built-in directives: baked into the binary via include_str! ──
+	#[test]
+	fn test_loaded_builtins_contains_all_five() {
+		let builtins = loaded_builtins();
+		assert_eq!(builtins.len(), 5, "should have 5 baked-in directives");
+		assert!(builtins.contains_key("focus"));
+		assert!(builtins.contains_key("foresight"));
+		assert!(builtins.contains_key("ccr-handling"));
+		assert!(builtins.contains_key("cleanup"));
+		assert!(builtins.contains_key("explore"));
 	}
 
 	#[test]

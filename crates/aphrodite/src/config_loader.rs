@@ -162,6 +162,10 @@ impl Config {
 		// (`aphrodite_directive("add"|"swap", name)`) impossible unless the
 		// user pre-activates at least one directive in TOML first. `active`
 		// now only seeds which loaded directives start active.
+		//
+		// Built-in directives (baked into the binary via include_str!) are
+		// used as fallbacks when no `directives/` directory exists on disk,
+		// so a fresh install gets shipped defaults without filesystem setup.
 		let dirs = vec![
 			std::path::PathBuf::from("directives"),
 			dirs::home_dir().unwrap_or_default().join(".hermes").join("directives"),
@@ -172,8 +176,22 @@ impl Config {
 				break;
 			}
 		}
+		if state.directives.is_empty() {
+			// No directives/ directory found on disk — use baked-in defaults.
+			state.directives = crate::directives::loaded_builtins();
+		}
+		// Seed active directives: from TOML [directives] active list, filtered
+		// to those that actually loaded. If the TOML list is empty AND we fell
+		// back to builtins, default to focus + foresight.
 		let active = self.get_string_list("directives", "active");
 		state.active_directives = active.into_iter().filter(|name| state.directives.contains_key(name)).collect();
+		if state.active_directives.is_empty() && !state.directives.is_empty() {
+			for name in ["focus", "foresight"] {
+				if state.directives.contains_key(name) {
+					state.active_directives.push(name.to_string());
+				}
+			}
+		}
 
 		// ── First-turn session injection (templates.prompts.session_inject) ──
 		// Loaded from the TOML's [prompts] section; defaults to the compiled-in
@@ -291,7 +309,13 @@ mod tests {
 			state.directives.contains_key("focus"),
 			"directives must load even when [directives] active is empty"
 		);
-		assert!(state.active_directives.is_empty(), "empty active must seed no activation");
+		// With empty TOML `active` and directives loaded from disk, the
+		// fallback seeds focus + foresight as defaults.
+		assert!(
+			!state.active_directives.is_empty(),
+			"empty active list should seed focus + foresight defaults"
+		);
+		assert!(state.active_directives.contains(&"focus".to_string()));
 	}
 
 	// ── Poll-worker config flag ──────────────────────────────
