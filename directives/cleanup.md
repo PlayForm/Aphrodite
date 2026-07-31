@@ -1,8 +1,24 @@
-# cleanup — summarize and prune
+# cleanup — catalog, summarize, verify nothing left behind
 
-# After significant work: summarize what was done, prune old markers.
+# After significant work: verify all CCR content was retrieved, summarize, catalog.
 
-- Every 5 turns: summarize progress in a single message
-- Use aphrodite_catalog(mode="toc") to see what's stored
-- Markers are auto-evicted by the inline store LRU — no manual cleanup needed
-- Archive key decisions for future reference
+# CCR CLEANUP CHECKLIST:
+
+- Scan the turn history: any <<<CCR:hash...>>> markers you never retrieved? Retrieve them now before summarizing.
+
+- Run aphrodite_catalog(mode="toc") to see what's in the store. Anything you read but didn't use? Note it for next session.
+
+- Run aphrodite_stats to check compression ratios and store health.
+
+- Markers auto-evict via LRU — no manual deletion needed. But verify you didn't miss any before archiving.
+
+# EVERY 5 TURNS:
+
+- Summarize progress in a single message
+- Check aphrodite_catalog for stale entries
+- Verify all retrieved content was actually used
+
+# BEFORE SESSION END:
+
+- Run aphrodite_stats
+- Note any un-retrieved CCR markers for the next session

@@ -11,10 +11,16 @@
 > `crates/aphrodite/src/hooks.rs` (actual transform/threshold logic,
 > `state.rs` for current default thresholds) for the real implementation.
 >
-> One behavior the Rust implementation added that this page's Python-era
-> lifecycle never had: `pre_llm_call` now also injects the active
-> **directives** block (behavioral instructions) alongside the catalog
-> summary - see [Directives](directives.md).
+|> One behavior the Rust implementation added that this page's Python-era
+|> lifecycle never had: `pre_llm_call` now also injects the active
+|> **directives** block (behavioral instructions) alongside the catalog
+|> summary - see [Directives](directives.md).
+|>
+|> The Rust implementation also restores the first-turn session injection that
+|> the Python-era docstring described: `flow::build_turn_context` injects a
+|> one-shot orientation block on turn 0 (from the `[prompts] session_inject`
+|> TOML key, defaulting to `SHIPPED_SESSION_INJECT`) — see
+|> [First-Turn Injection](#1-on_session_start) below for the Rust behavior.
 
 The aphrodite Python plugin is a thin loader that delegates to the Rust dylib
 (`libaphrodite_hermes.dylib`) for all compression logic. Hooks registered in
@@ -76,22 +82,45 @@ LLM Response
 
 ## 1. on_session_start
 
-Not directly implemented as a hook handler - instead,
-`_inject_session_instruction()` fires on the _first_ `pre_llm_call` invocation
-(guarded by `_session_instruction_injected` flag).
+**Rust implementation (current):** `session::on_session_start` resets all per-session
+state (`turn_counter`, `conv_index`, `recent_markers`, `referenced_files`,
+`tool_events`, `ephemeral_directives`, etc.) to a clean baseline. It does NOT
+inject anything — the first-turn orientation is injected lazily by
+`flow::build_turn_context` on the **first** `pre_llm_call` (when
+`turn_counter == 0`).
 
-### Injected Message
+**First-turn session injection:** On turn 0, `build_turn_context` prepends a
+`[aphrodite: first-turn orientation]` section built from the
+`session_inject` string loaded from `[prompts]` in `aphrodite.toml`. The string
+is interpolated with `{VERSION}` → the compiled-in `CARGO_PKG_VERSION`. This
+section has the highest survival priority (always-survive, top of the budget
+drop order) so it always reaches the model on the first turn, then vanishes
+forever after.
+
+The default template (compiled into `flow::SHIPPED_SESSION_INJECT`) reads:
 
 ```
-[APHRODITE] v{PLUGIN_VERSION} active.
-  Token proxy :9798 active | engine threshold={pct}% | tools auto-expand inline (<{AUTO_EXPAND_LIMIT})
-  Use <<<CCR:hash|type|size>>> markers for compressed context.
-  Call aphrodite_retrieve(hash) to fetch content, aphrodite_catalog to list available entries.
-  ─ Layer 2: per-turn catalog injected below each turn ─
-  ─ Layer 3: load aphrodite-tool-guide skill for full tool reference ─
+[APHRODITE] v{VERSION} active.
+  This session is running with CCR compression. Tool outputs larger than a
+  few hundred bytes are replaced with markers like <<<CCR:hash|type|size>>>.
+  The marker IS the content — retrieve it before acting on it:
+  aphrodite_retrieve(hash) → full original content (sub-ms, local).
+  After EVERY tool call: scan for <<<CCR: and retrieve ALL markers first.
+  NEVER re-read a file you already have a marker for. Use aphrodite_catalog
+  to see stored entries, aphrodite_prefetch for background file loads, and
+  aphrodite_directive("list") for active behavioral directives.
+  Layer 2: per-turn catalog injected below each turn.
+  Layer 3: load the aphrodite-tool-guide skill for full tool reference.
 ```
 
-Ephemeral: true - not persisted in conversation.
+Set `[prompts] session_inject = ""` in `aphrodite.toml` to suppress it entirely.
+The compiled default is used when the key is absent, so even a minimal config
+gets orientation on the first turn.
+
+> **Historical note:** The Python-era docs described a `_inject_session_instruction()`
+> function guarded by a `_session_instruction_injected` flag. That code no longer
+> exists; the Rust flow assembler (`flow::build_turn_context` →
+> `build_first_turn_injection`) is the current implementation.
 
 ## 2. transform_tool_result
 

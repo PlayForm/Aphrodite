@@ -15,6 +15,33 @@
 
 use crate::state::{ActiveDirective, AphroditeState};
 
+/// Default first-turn session injection. Loaded from `[prompts] session_inject`
+/// in aphrodite.toml; this constant is the fallback when the key is absent.
+/// Rendered once (turn_counter == 0) by `build_first_turn_injection`, then
+/// dropped. Empty string disables it entirely.
+pub const SHIPPED_SESSION_INJECT: &str = "\
+[APHRODITE] v{VERSION} active.
+  This session is running with CCR compression. Tool outputs larger than a
+  few hundred bytes are replaced with markers like <<<CCR:hash|type|size>>>.
+  The marker IS the content — retrieve it before acting on it:
+  aphrodite_retrieve(hash) → full original content (sub-ms, local).
+  After EVERY tool call: scan for <<<CCR: and retrieve ALL markers first.
+  NEVER re-read a file you already have a marker for. Use aphrodite_catalog
+  to see stored entries, aphrodite_prefetch for background file loads, and
+  aphrodite_directive(\"list\") for active behavioral directives.
+  Layer 2: per-turn catalog injected below each turn.
+  Layer 3: load the aphrodite-tool-guide skill for full tool reference.";
+
+/// Build the one-shot first-turn injection from the configured `session_inject`
+/// template. Returns empty string if `state.session_inject` is empty or the
+/// turn has advanced past 0 (first-turn only).
+pub fn build_first_turn_injection(state: &AphroditeState) -> String {
+	if state.session_inject.is_empty() || state.turn_counter > 0 {
+		return String::new();
+	}
+	state.session_inject.replace("{VERSION}", env!("CARGO_PKG_VERSION"))
+}
+
 /// Assemble the complete per-turn injected context, in fixed order, hard-capped
 /// at `state.flow_budget_chars`.
 ///
@@ -35,6 +62,9 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	let _ = est_request_bytes; // reserved for P9/T27 telemetry line
 
 	let budget = state.flow_budget_chars;
+
+	// ── First-turn session injection (always-survive, top priority) ──
+	let session_inject = build_first_turn_injection(state);
 
 	// ── Always-survive sections (top priority) ──
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
@@ -60,6 +90,9 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 
 	// Assemble top-down, then drop from the bottom until within budget.
 	let mut sections:Vec<String> = Vec::new();
+	if !session_inject.is_empty() {
+		sections.push(format!("[aphrodite: first-turn orientation]\n{}", session_inject.trim_end()));
+	}
 	if !directives.is_empty() {
 		sections.push(directives.trim_end().to_string());
 	}
@@ -75,7 +108,9 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	if !recall.is_empty() {
 		sections.push(format!("[recall]\n{}\n", recall.trim_end()));
 	}
-	let always_survive = directives.is_empty() as usize + nudges_present(state) as usize;
+	let always_survive = session_inject.is_empty() as usize
+		+ directives.is_empty() as usize
+		+ nudges_present(state) as usize;
 	let always_survive = always_survive.min(sections.len());
 	while join_sections(&sections).len() > budget && sections.len() > always_survive {
 		sections.pop();
@@ -425,6 +460,63 @@ mod tests {
 		assert!(
 			ctx.contains("[poll workers]"),
 			"enabled flag must include poll worker status: {ctx}"
+		);
+	}
+
+	// ── First-turn session injection: rendered only on turn 0, dropped after ──
+	#[test]
+	fn test_first_turn_injection_renders_on_turn_zero() {
+		let mut s = AphroditeState::default();
+		s.session_inject = SHIPPED_SESSION_INJECT.to_string();
+		s.turn_counter = 0;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[aphrodite: first-turn orientation]"),
+			"session inject must appear on turn 0: {ctx}"
+		);
+		assert!(
+			ctx.contains("<<<CCR:hash|type|size>>>"),
+			"session inject must contain CCR marker example: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_first_turn_injection_suppressed_after_turn_zero() {
+		let mut s = AphroditeState::default();
+		s.session_inject = SHIPPED_SESSION_INJECT.to_string();
+		s.turn_counter = 1;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[aphrodite: first-turn orientation]"),
+			"session inject must NOT appear after turn 0: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_first_turn_injection_disabled_when_empty() {
+		let mut s = AphroditeState::default();
+		s.session_inject = String::new();
+		s.turn_counter = 0;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[aphrodite: first-turn orientation]"),
+			"empty session_inject must produce no injection: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_first_turn_injection_replaces_version_placeholder() {
+		let mut s = AphroditeState::default();
+		s.session_inject = "aphrodite v{VERSION} ready".to_string();
+		s.turn_counter = 0;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains(&format!("aphrodite v{}", env!("CARGO_PKG_VERSION"))),
+			"{{VERSION}} must be replaced: {ctx}"
+		);
+		assert!(
+			!ctx.contains("{VERSION}"),
+			"unreplaced {{VERSION}} placeholder: {ctx}"
 		);
 	}
 }

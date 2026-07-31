@@ -174,6 +174,15 @@ impl Config {
 		}
 		let active = self.get_string_list("directives", "active");
 		state.active_directives = active.into_iter().filter(|name| state.directives.contains_key(name)).collect();
+
+		// ── First-turn session injection (templates.prompts.session_inject) ──
+		// Loaded from the TOML's [prompts] section; defaults to the compiled-in
+		// SHIPPED_SESSION_INJECT constant when the key is absent so a bare/minimal
+		// config still gets a first-turn orientation. Empty string disables it.
+		state.session_inject = self.get_string(
+			"APHRODITE_SESSION_INJECT", "prompts", "session_inject",
+			crate::flow::SHIPPED_SESSION_INJECT,
+		);
 	}
 }
 

@@ -77,6 +77,10 @@ pub struct AphroditeState {
 	/// Hard cap for ALL per-turn injected context assembled by
 	/// `flow::build_turn_context` (default 4000 chars, `[flow] budget_chars`).
 	pub flow_budget_chars:usize,
+	/// First-turn session instruction loaded from `[prompts] session_inject`
+	/// in aphrodite.toml — rendered once via `build_first_turn_injection`,
+	/// then dropped (turn_counter > 0). Empty = no injection (default).
+	pub session_inject:String,
 	/// Turn number of the most recent MANUAL `aphrodite_directive` mutation
 	/// (swap/add/remove/reset). Latches phase-aware auto-swaps out (P6); set by
 	/// `directives::handle_action` on any successful mutation.
@@ -188,6 +192,7 @@ impl Default for AphroditeState {
 			active_directives:Vec::new(),
 			ephemeral_directives:Vec::new(),
 			flow_budget_chars:4000,
+			session_inject:String::new(),
 			manual_directive_turn:None,
 			tool_events:VecDeque::new(),
 						bg_tasks:VecDeque::new(),

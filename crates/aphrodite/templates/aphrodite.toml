@@ -71,6 +71,9 @@ preview_max_chars = 120     # max chars per preview line
 retrieve_guidance = "verbose" # minimal | standard | verbose
 ccr_marker_hint = true        # append "…(use aphrodite_retrieve)"?
 catalog_intent_hints = true   # show intent=read with hashes?
+# First-turn orientation: injected once on turn 0 by pre_llm_call.
+# Ships a default when this key is absent; set to "" to disable.
+session_inject = "CCR markers (<<<CCR:hash|type|size>>>) are compressed content the engine stored. aphrodite_retrieve(hash) returns the original. After EVERY tool call: scan for <<<CCR: and retrieve ALL markers before acting. NEVER re-read a file you already have a marker for. Use aphrodite_catalog to see stored entries, aphrodite_prefetch for background loads, and aphrodite_directive(\"list\") for active behavioral directives."
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  DIRECTIVES  -  conversational behavioral context (swappable .md files)
