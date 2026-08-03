@@ -88,6 +88,11 @@ echo "[bump] aphrodite-hermes Cargo.toml → $NEW"
 # rather than permanently orphaning whatever string wasn't $CURRENT.
 sed -i '' -E "s/release-v[0-9]+\.[0-9]+\.[0-9]+-blue/release-v$NEW-blue/" README.md
 sed -i '' -E "s/\"version\":\"v[0-9]+\.[0-9]+\.[0-9]+\"/\"version\":\"v$NEW\"/" README.md
+# The proxy /health example prints a bare version (no `v` prefix), so the
+# `v`-anchored pattern above skips it. Bumped separately rather than by
+# loosening that pattern - dropping the `v` there would also rewrite unrelated
+# `"version":"..."` JSON samples elsewhere in the README.
+sed -i '' -E "s/\"version\":\"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\":\"$NEW\"/" README.md
 sed -i '' "3s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$REPO_ROOT/package.json"
 echo "[bump] README release badge + package.json → $NEW"
 
@@ -95,8 +100,11 @@ echo "[bump] README release badge + package.json → $NEW"
 # above should have caught but somehow didn't (a genuine bug in this script),
 # rather than letting it silently ship - a stale version string in a shipped
 # release is exactly the failure mode F15 exists to prevent.
-if grep -rn "v$CURRENT" README.md "$REPO_ROOT/package.json" 2>/dev/null; then
-	echo "ERROR: stale v$CURRENT reference(s) found above after bumping to v$NEW - fix the sed pattern that missed them" >&2
+# Matches bare $CURRENT too, not just v$CURRENT: the /health example that
+# escaped the `v`-anchored sed above would also have escaped a `v`-anchored
+# guard, which is how it survived several releases unnoticed.
+if grep -rn "$CURRENT" README.md "$REPO_ROOT/package.json" 2>/dev/null; then
+	echo "ERROR: stale $CURRENT reference(s) found above after bumping to v$NEW - fix the sed pattern that missed them" >&2
 	exit 1
 fi
 

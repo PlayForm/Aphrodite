@@ -1,9 +1,20 @@
 # Tool Relay Tools
 
 Aphrodite exposes 13 tools to the Hermes agent for compression, retrieval,
-stats, and session management. All 13 dispatch entirely inside the Rust
+stats, and session management (14 when the optional `navigation` feature is
+compiled in, which adds `aphrodite_navigate`). All of them dispatch entirely
+inside the Rust
 dylib - the Python plugin shim forwards tool calls in and returns the JSON
 result verbatim; there's no separate Python-side tool logic to know about.
+
+> **Schema detail lives in the schema, not here.** Since v1.3.8 every tool's
+> registered `description` documents its own return shape, and every parameter
+> carries a type, a description and (where applicable) `enum`/`default`
+> constraints. `tool_describe` is a verbatim passthrough of
+> `{name, description, parameters}`, so what an agent sees is exactly what
+> `crates/aphrodite-hermes/src/schemas.rs` defines. Run
+> `python3 Maintain/scripts/verify_tool_schemas.py` to print the live records.
+
 
 ## Tool registry
 
@@ -92,8 +103,8 @@ Returns `{found, source: "path"|"ccr", content}` or `{found: false, error}`.
 ```json
 {
 	"name": "aphrodite_stats",
-	"description": "Check aphrodite proxy health, CCR stats, engine compression status.",
-	"parameters": { "type": "object", "properties": {} }
+	"description": "Session and proxy health counters for the CCR engine. One call covers both halves of the system: session state held by the dylib, and a live TCP poll of the two proxy ports. Takes no arguments. Returns {version, engine, inline_entries, markers, referenced_files, archived_turns, turn, engine_enabled, threshold_pct, tool_threshold, terminal_threshold, proxies: {token: {port, alive}, cache: {port, alive}}}. `alive: false` means nothing answered on that port within 400ms - the plugin still works, it just is not proxying.",
+	"parameters": { "type": "object", "properties": {}, "additionalProperties": false }
 }
 ```
 

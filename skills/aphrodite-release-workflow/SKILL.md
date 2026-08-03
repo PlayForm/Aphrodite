@@ -2,7 +2,7 @@
 name: aphrodite-release-workflow
 description: "Auto-release, version sync, pre-release verification, and release notes for
     aphrodite."
-version: 1.3.0
+version: 1.4.0
 platforms: [macos]
 ---
 
@@ -50,26 +50,35 @@ only once the tagged release's artifacts are verified.
 
 The Aphrodite project has two independent version tracks:
 
-- **Binary version** (`1.0.4`) - Rust crates, must match across Cargo.toml files
-- **Plugin version** (`2.0.1`) - Hermes plugin, lives in the `plugins/aphrodite` submodule
+- **Binary version** (`1.3.8` as of this writing) - Rust crates, must match across Cargo.toml files
+- **Plugin version** (`2.0.9` as of this writing) - Hermes plugin, lives in the `plugins/aphrodite` submodule
+
+Treat the numbers below as *shape*, not as current truth - read the live value
+from `crates/aphrodite/Cargo.toml` (binary) and `plugins/aphrodite/plugin.yaml`
+(plugin) before bumping. `auto-release.sh` reads both itself and its seds are
+version-pattern-based precisely so a stale number in this document can never
+misdirect a release.
 
 **Binary version locations** (monorepo - bump these together):
 
-1. `crates/aphrodite/Cargo.toml` - `version = "1.0.4"` (line 3)
-2. `crates/aphrodite-hermes/Cargo.toml` - `version = "1.0.4"` (line 3, package)
-3. `crates/aphrodite-hermes/Cargo.toml` - `aphrodite = { ..., version = "1.0.4" }` (line 15, dependency)
+1. `crates/aphrodite/Cargo.toml` - `version = "<bin>"` (line 3)
+2. `crates/aphrodite-hermes/Cargo.toml` - `version = "<bin>"` (line 3, package)
+3. `crates/aphrodite-hermes/Cargo.toml` - `aphrodite = { ..., version = "<bin>" }` (dependency)
+4. `plugins/aphrodite/BINARY_VERSION` - plain-text `<bin>`, read by `download.sh`
+5. `package.json` - `"version": "<bin>"` (line 3)
 
 **Plugin version locations** (submodule `plugins/aphrodite/`):
 
-4. `plugin.yaml` - `version: 2.0.1` (line 2)
-5. `plugin.yaml` - `install_message:` block contains `aphrodite v2.0.1 -` (line 31)
-6. `pyproject.toml` - `version = "2.0.1"` (if file exists)
-7. `__init__.py` - docstring `aphrodite v2.0.1 - ...` (if version appears there)
-8. `_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION` constants (if file exists)
+6. `plugin.yaml` - `version: <plugin>` (line 2)
+7. `plugin.yaml` - `install_message:` block contains `aphrodite v<plugin> -`
+8. `pyproject.toml` - `version = "<plugin>"` (if file exists)
+9. `__init__.py` - docstring `aphrodite v<plugin> - ...` (if version appears there)
+10. `_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION` constants (if file exists)
 
 **Documentation:**
 
-9. `README.md` - example output shows `"version":"v1.0.4"` (line ~258)
+11. `README.md` - release badge `release-v<bin>-blue`, plugin badge
+    `plugin-v<plugin>-purple`, and the example health output `"version":"v<bin>"`
 
 **What `auto-release.sh` bumps** (complete list):
 

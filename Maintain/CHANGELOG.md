@@ -1,10 +1,64 @@
 # Changelog
 
+## v1.3.8 - Tool Schema Self-Documentation (2026-08-03)
+
+### Fixed
+
+- **`tool_describe` returned near-useless records for every aphrodite tool.**
+  Hermes' `tool_describe` (`tools/tool_search.py:dispatch_tool_describe`) is a
+  verbatim passthrough of the registered `{name, description, parameters}` -
+  it adds nothing. Aphrodite was registering one-line descriptions and, for
+  eight of the thirteen tools, a literally empty `"properties": {}`, so an
+  agent asking what `aphrodite_stats` does got back a sentence and no return
+  shape, and an agent asking about `aphrodite_retrieve` got no parameter names
+  at all. Every schema in `crates/aphrodite-hermes/src/schemas.rs` is rewritten:
+
+  - Each `description` now documents the tool's **return shape** inline
+    (`Returns {found, source, content}`, etc.). It has to live in the
+    description - a top-level `returns` key is dropped by `tool_describe` AND
+    spliced into the OpenAI `function` object by `registry.get_definitions()`,
+    where strict providers reject unknown fields.
+  - Every parameter carries a `type`, a description, and where applicable
+    `enum`, `default`, `pattern`, `minItems` / `minLength` constraints.
+  - Every tool declares `additionalProperties: false` - the only thing that
+    stops a model inventing arguments for an argument-less tool.
+  - First sentences are held under 60 characters, because the deferred-tool
+    catalog listing (`tool_search._short_desc`) shows only the first sentence,
+    clipped to 60 chars, and silently ellipsizes anything longer.
+
+- **README `/health` example version never bumped.** `auto-release.sh`'s sed
+  and its stale-string guard were both anchored on `v$CURRENT`, while the
+  example prints a bare `"version":"1.3.7"` with no `v` - so the sed skipped
+  it and the guard failed to notice. Both now handle the bare form.
+
+### Added
+
+- **Schema regression tests** (`schemas.rs`, 4 new): well-formedness across
+  every tool (type/description per parameter, `additionalProperties: false`,
+  no unsupported top-level keys, `required` names that actually exist in
+  `properties`), the 60-char catalog-listing budget, `get_schema` round-trip,
+  and a schema↔dispatch drift guard that fails if a schema advertises a tool
+  with no handler.
+- **`Maintain/scripts/verify_tool_schemas.py`** - loads the built dylib over
+  its real C ABI and prints exactly what Hermes sees at registration and what
+  `tool_describe` returns per tool.
+
+### Changed
+
+- `skills/aphrodite-release-workflow` (→ v1.4.0) - the version-sync section
+  documented binary `1.0.4` / plugin `2.0.1` against a reality of `1.3.7` /
+  `2.0.8`. Rewritten to reference the live files as the source of truth, with
+  `BINARY_VERSION`, `package.json` and both README badges added to the
+  location list.
+- `docs/tool-relay/tools.md` - notes that schema detail is now authoritative
+  in `schemas.rs`, and that the tool count is 14 with the optional
+  `navigation` feature compiled in.
+
 ## v1.3.6 - Preview Pipe Sanitization Fix (2026-07-24)
 
 ### Fixed
 
-- **`|` → `-` sanitization removed from CCR previews** — the `ccr_marker` function
+- **`|` → `-` sanitization removed from CCR previews** - the `ccr_marker` function
   was replacing all pipe characters in preview strings with hyphens to prevent
   confusion with the outer `<<<CCR:hash|type|size>>>` format. Since the marker
   line is always on its own line, there is no collision risk. The pipe is a
@@ -18,17 +72,17 @@
 
 ### Added
 
-- **S2 context navigation** (`aphrodite_navigate` tool) — zoomable hierarchical
+- **S2 context navigation** (`aphrodite_navigate` tool) - zoomable hierarchical
   context index with navigation state fields, feature-gated behind optional
   `navigation` feature.
-- **s2-navigate crate** — S2 context navigation library with aphrodite bridge.
+- **s2-navigate crate** - S2 context navigation library with aphrodite bridge.
 - **Conversational benchmark suite** with multi-scenario simulation.
 
 ### Fixed
 
-- **Delta-only file listing in catalog_summary** (04-F4) — files are now emitted
+- **Delta-only file listing in catalog_summary** (04-F4) - files are now emitted
   delta-only like markers, instead of re-emitting the full list every turn.
-- **Double catalog_summary call removed** (04-F3) — `pre_llm_call` no longer
+- **Double catalog_summary call removed** (04-F3) - `pre_llm_call` no longer
   calls catalog_summary twice, fixing delta tracking skip every other turn.
 - **Navigation feature-gated** behind optional `navigation` feature to avoid
   pulling S2 deps when unused.
