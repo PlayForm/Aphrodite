@@ -358,7 +358,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		})
 	});
 
-	// ── directive: list/swap/add/remove/reset active behavioral directives ──
+	// ── directive: list/swap/add/load/remove/reset active behavioral directives ──
 	// (01-F3) - delegates to the same `directives::handle_action` the core
 	// crate's `aphrodite_directive`/`aphrodite_dispatch` C ABI entry points
 	// use, so this bridge exposes the identical action set/error shape.
@@ -517,7 +517,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		})
 	});
 
-	// ── navigate: S2 context navigation — zoomable hierarchical context index ──
+	// ── navigate: S2 context navigation - zoomable hierarchical context index ──
 	#[cfg(feature = "navigation")]
 	m.insert("aphrodite_navigate", |args| {
 		with_shared(|state| aphrodite::navigate::handle_navigate_tool(state, args))

@@ -4,16 +4,16 @@
 
 ---
 
-## 1. CCR Marker Handling — The #1 Thing Agents Get Wrong
+## 1. CCR Marker Handling - The #1 Thing Agents Get Wrong
 
 ### What a CCR marker looks like:
 ```
 <<<CCR:hash|type|size>>>
 ```
 
-- `hash` — BLAKE3 hash (SQLite primary key), 40 hex chars
-- `type` — content type: `code`, `log`, `diff`, `error`, `json`, `build_output`, `text`
-- `size` — byte size of the original uncompressed content
+- `hash` - BLAKE3 hash (SQLite primary key), 40 hex chars
+- `type` - content type: `code`, `log`, `diff`, `error`, `json`, `build_output`, `text`
+- `size` - byte size of the original uncompressed content
 
 ### The rules (non-negotiable):
 
@@ -40,7 +40,7 @@
    any other action. Batch the `aphrodite_retrieve` calls together.
 
 7. **Nested markers:** after calling `aphrodite_retrieve`, the result itself
-   may contain nested CCR markers. Retrieve those too — recursively, up to 5
+   may contain nested CCR markers. Retrieve those too - recursively, up to 5
    levels deep. `resolve::expand` handles this automatically.
 
 ### Consequences of ignoring CCR:
@@ -103,8 +103,8 @@ Before relying on CCR tools in a session:
 ## 4. Auto-Expand vs. Manual Retrieval
 
 With `auto_expand = true` (the default in shipped configs):
-- **Tool outputs** are auto-expanded inline — you see the full content, no markers
-- **Raw terminal/proxy output** may still produce CCR markers — retrieve with
+- **Tool outputs** are auto-expanded inline - you see the full content, no markers
+- **Raw terminal/proxy output** may still produce CCR markers - retrieve with
   `aphrodite_retrieve(hash)`
 
 Even with auto-expand, when you SEE a `<<<CCR:hash|type|size>>>` marker in any
@@ -117,7 +117,7 @@ markers can appear from:
 
 ---
 
-## 5. Prefetch — Anticipate the Next Turn
+## 5. Prefetch - Anticipate the Next Turn
 
 Prefetching is about loading files you **WILL need next turn**. Retrieval is
 about loading files you need **NOW**.
@@ -132,7 +132,7 @@ about loading files you need **NOW**.
 - **Use `aphrodite_prefetch` for any batch of 3+ files.** A single prefetch
   call is cheaper than 3 sequential reads.
 - **If you prefetch a file and get a CCR marker back, retrieve that marker
-  IMMEDIATELY** — don't wait for "next turn."
+  IMMEDIATELY** - don't wait for "next turn."
 
 ---
 
@@ -159,7 +159,7 @@ about loading files you need **NOW**.
 
 **Maximum 2-way concurrent LLM API calls.**
 
-- 5-way parallel batches cause severe API contention — workers take 2-3x
+- 5-way parallel batches cause severe API contention - workers take 2-3x
   longer and fail frequently (timeouts, empty outputs, 502s)
 - 2-way parallel maintains normal worker completion times (~55-90s each)
 - Use sequential chains for multi-batch runs: launch multiple chain
@@ -202,12 +202,12 @@ content, corrupt indentation, and insert fragments at wrong locations.
   `git add -A` to stage all files including previously-ignored ones
 - **Manual commit as fallback:** when a script's internal `git commit` fails
   due to `.gitignore`, run `git add -A path/to/files && git commit -m "..."`
-  manually — the script's `git add` + `git commit` calls fail silently on
+  manually - the script's `git add` + `git commit` calls fail silently on
   ignored files
 
 ---
 
-## 10. Directives — Behavioral Context Injection
+## 10. Directives - Behavioral Context Injection
 
 Aphrodite ships five built-in directives baked into the binary via
 `include_str!`:
@@ -216,7 +216,7 @@ Aphrodite ships five built-in directives baked into the binary via
 |---|---|
 | `focus` | Stay targeted: at most 1-2 tools per turn, prefer `aphrodite_retrieve` over re-reading files |
 | `foresight` | Anticipate I/O, prefetch files you'll need next turn. After search_files, prefetch top 5-10 results |
-| `ccr-handling` | CCR marker handling rules — the core retrieval discipline from sections 1-2 above |
+| `ccr-handling` | CCR marker handling rules - the core retrieval discipline from sections 1-2 above |
 | `cleanup` | Summarize and prune: progress summary every 5 turns, catalog sweeps, verify nothing left behind |
 | `explore` | Read broadly: 2-3 related files per turn, prefetch batches of related paths |
 
@@ -224,12 +224,12 @@ Aphrodite ships five built-in directives baked into the binary via
 
 | Rule | Behavior |
 |---|---|
-| Search order | `./directives/` (working directory), then `~/.hermes/directives/` — first directory that exists wins; they are NOT merged |
+| Search order | `./directives/` (working directory), then `~/.hermes/directives/` - first directory that exists wins; they are NOT merged |
 | File filter | Only `*.md` files; anything else is silently skipped |
 | Naming | Directive name = file stem (`focus.md` → `focus`) |
 | Per-file cap | 2,000 chars per directive body (char-safe truncation, `…` appended) |
 | Combined cap | 4,000 chars across all active directives' injected text combined |
-| Load condition | Directories load **unconditionally** when present — loading is not gated on `[directives] active` being non-empty |
+| Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty |
 | Built-in fallback | When no `directives/` directory exists, the 5 baked-in directives are loaded automatically |
 | Active default | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` are seeded as active |
 
@@ -240,11 +240,12 @@ Use `aphrodite_directive` to manage directives at runtime:
 aphrodite_directive(action="list")                    # list active/available
 aphrodite_directive(action="swap", name="explore")    # replace active set
 aphrodite_directive(action="add", name="ccr-handling")  # append to active set
+aphrodite_directive(action="load", name="focus")     # activate on demand (errors on unknown)
 aphrodite_directive(action="remove", name="cleanup")   # drop from active set
 aphrodite_directive(action="reset")                    # clear active set
 ```
 
-- The active set persists across a session reset — it's per-process state
+- The active set persists across a session reset - it's per-process state
 - Unknown directive names are filtered out (not errors)
 - A `swap`/`add`/`remove`/`reset` latches `manual_directive_turn` to suppress
   phase-aware auto-swaps until the user explicitly re-enables them
@@ -265,10 +266,10 @@ focus:
 
 | Detail | Behavior |
 |---|---|
-| Header line | `[directives: name1, name2]` — active names, comma-joined |
-| Body | Each active directive's **full** (per-file-capped) body, not just its title line — leading `#` markers stripped, blank lines dropped, remaining lines indented |
+| Header line | `[directives: name1, name2]` - active names, comma-joined |
+| Body | Each active directive's **full** (per-file-capped) body, not just its title line - leading `#` markers stripped, blank lines dropped, remaining lines indented |
 | Placement | Appended after the catalog summary in the hook's returned context string; empty when no directives are active |
-| Frequency | Every `pre_llm_call` — the block reflects the active set at that moment |
+| Frequency | Every `pre_llm_call` - the block reflects the active set at that moment |
 
 ---
 
@@ -284,7 +285,7 @@ session_inject = """
 [APHRODITE] v{VERSION} active.
   This session is running with CCR compression. Tool outputs larger than a
   few hundred bytes are replaced with markers like <<<CCR:hash|type|size>>>.
-  The marker IS the content — retrieve it before acting on it:
+  The marker IS the content - retrieve it before acting on it:
   aphrodite_retrieve(hash) → full original content (sub-ms, local).
   After EVERY tool call: scan for <<<CCR: and retrieve ALL markers first.
   NEVER re-read a file you already have a marker for. Use aphrodite_catalog
@@ -300,7 +301,7 @@ session_inject = """
 - When the key is absent, a compiled-in default (`SHIPPED_SESSION_INJECT`)
   is used so even a minimal config gets orientation
 - The block has the **highest survival priority** in the per-turn context
-  assembler — it always reaches the model on turn 0, then vanishes forever
+  assembler - it always reaches the model on turn 0, then vanishes forever
 
 ---
 
@@ -326,20 +327,20 @@ session_inject = """
 
 > **Correction:** `linter`, `build_output`, and `log` are pinned at BASE
 > threshold, not halved. `proxy.rs::threshold_for` returns `base` for these
-> three types immediately — before the auto-tune multiplier is applied.
+> three types immediately - before the auto-tune multiplier is applied.
 
 ---
 
 ## 13. Proxy Architecture
 
-- **Token proxy** (`:9798`) — token-level compression, requires API key for
+- **Token proxy** (`:9798`) - token-level compression, requires API key for
   management endpoints
-- **Cache proxy** (`:9797`) — cache-mode compression, management endpoints
+- **Cache proxy** (`:9797`) - cache-mode compression, management endpoints
   accept any loopback caller (no credential needed)
 - Both proxies share the same CCR database at `$HOME/.hermes/aphrodite/ccr.db`
   (SQLite)
 - Binary: `$HOME/.hermes/aphrodite/binaries/aphrodite` (auto-updated)
-- Dylib hot-reloads on file modification — rebuild Rust code and the plugin
+- Dylib hot-reloads on file modification - rebuild Rust code and the plugin
   picks it up without restart
 
 ---
@@ -352,15 +353,15 @@ output are valid checks. Rely on the retry mechanism (up to 3 attempts) rather
 than weakening the gate.
 
 **Triple blank lines in raw extraction output are acceptable** at the
-extraction stage — they will be addressed during refinement.
+extraction stage - they will be addressed during refinement.
 
 ---
 
 ## Related Resources
 
 - **Built-in directives:** `crates/aphrodite/src/builtin_directives/` (baked into binary via `include_str!`)
-- **Plugin hooks:** `docs/plugin/hooks.md` — the `pre_llm_call` lifecycle
-- **Directive reference:** `docs/plugin/directives.md` — full directive system documentation
-- **CCR lifecycle:** `docs/ccr/lifecycle.md` — compression, caching, retrieval, expiry
-- **Tool reference:** `docs/tool-relay/tools.md` — full 13-tool reference
-- **Config schema:** `docs/config/aphrodite-toml.md` — the `[prompts]` and `[directives]` sections
+- **Plugin hooks:** `docs/plugin/hooks.md` - the `pre_llm_call` lifecycle
+- **Directive reference:** `docs/plugin/directives.md` - full directive system documentation
+- **CCR lifecycle:** `docs/ccr/lifecycle.md` - compression, caching, retrieval, expiry
+- **Tool reference:** `docs/tool-relay/tools.md` - full 13-tool reference
+- **Config schema:** `docs/config/aphrodite-toml.md` - the `[prompts]` and `[directives]` sections

@@ -180,17 +180,17 @@ Case-insensitive match against preview text or type, newest first, capped at
 ```json
 {
 	"name": "aphrodite_directive",
-	"description": "List, activate, or deactivate behavioral directives - short instructions injected into context via pre_llm_call (e.g. 'focus' for minimal tool usage, 'explore' for broad reading).",
+	"description": "List, activate, or deactivate behavioral directives - short instructions injected into context via pre_llm_call (e.g. 'focus' for minimal tool usage, 'explore' for broad reading, 'lazy' for defer-until-needed execution).",
 	"parameters": {
 		"type": "object",
 		"properties": {
 			"action": {
 				"type": "string",
-				"description": "list (default) | swap | add | remove | reset"
+				"description": "list (default) | swap | add | load | remove | reset"
 			},
 			"name": {
 				"type": "string",
-				"description": "Directive name - required for swap/add/remove"
+				"description": "Directive name - required for swap/add/load/remove"
 			}
 		}
 	}

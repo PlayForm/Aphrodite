@@ -184,16 +184,18 @@ impl Config {
 			}
 		}
 		if state.directives.is_empty() {
-			// No directives/ directory found on disk — use baked-in defaults.
+			// No directives/ directory found on disk - use baked-in defaults.
 			state.directives = crate::directives::loaded_builtins();
 		}
 		// Seed active directives: from TOML [directives] active list, filtered
 		// to those that actually loaded. If the TOML list is empty AND we fell
-		// back to builtins, default to focus + foresight.
+		// back to builtins, default to focus + foresight + lazy (lazy keeps the
+		// session from over-eagerly stacking directives until a later turn
+		// proves it needs focus/explore/foresight/cleanup).
 		let active = self.get_string_list("directives", "active");
 		state.active_directives = active.into_iter().filter(|name| state.directives.contains_key(name)).collect();
 		if state.active_directives.is_empty() && !state.directives.is_empty() {
-			for name in ["focus", "foresight"] {
+			for name in ["focus", "foresight", "lazy"] {
 				if state.directives.contains_key(name) {
 					state.active_directives.push(name.to_string());
 				}

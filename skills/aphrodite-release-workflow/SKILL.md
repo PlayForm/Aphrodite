@@ -50,8 +50,8 @@ only once the tagged release's artifacts are verified.
 
 The Aphrodite project has two independent version tracks:
 
-- **Binary version** (`1.3.8` as of this writing) - Rust crates, must match across Cargo.toml files
-- **Plugin version** (`2.0.9` as of this writing) - Hermes plugin, lives in the `plugins/aphrodite` submodule
+- **Binary version** (`1.3.9` as of this writing) - Rust crates, must match across Cargo.toml files
+- **Plugin version** (`2.0.10` as of this writing) - Hermes plugin, lives in the `plugins/aphrodite` submodule
 
 Treat the numbers below as *shape*, not as current truth - read the live value
 from `crates/aphrodite/Cargo.toml` (binary) and `plugins/aphrodite/plugin.yaml`

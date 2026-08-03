@@ -13,9 +13,9 @@
 > 26-type classifier, TOML-driven.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.3.8-blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/badge/release-v1.3.9-blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/crates/v/aphrodite?color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/badge/plugin-v2.0.9-purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/badge/plugin-v2.0.10-purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 ![rust](https://img.shields.io/badge/rust-1.88+-orange)
 [![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
 
@@ -386,7 +386,10 @@ Two more knobs worth knowing about:
 
 - **Directives** - `[directives] active = ["focus"]` seeds short behavioral
   instructions (`directives/*.md`) injected into the LLM's context every
-  turn, swappable mid-conversation via the `aphrodite_directive` tool. See
+  turn, swappable mid-conversation via the `aphrodite_directive` tool. The
+  shipped set includes `focus`, `foresight`, `ccr-handling`, `cleanup`,
+  `explore`, and `lazy` (defer-until-needed execution). Use
+  `aphrodite_directive("load", name)` to activate one on demand. See
   [`docs/plugin/directives.md`](docs/plugin/directives.md).
 - **Management auth** - set `APHRODITE_MGMT_TOKEN` to require
   `Authorization: Bearer <token>` on the proxy's management routes

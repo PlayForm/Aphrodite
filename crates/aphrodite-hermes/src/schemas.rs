@@ -204,25 +204,28 @@ fn schema_directive() -> serde_json::Value {
 		"description": "Inspect or change the active behavioral directives. \
 			Directives are short instruction files injected into every turn through \
 			pre_llm_call - \"focus\" for terse, minimal-tool execution, \"explore\" for \
-			broad reading, and whatever else ships in directives/. \
+			broad reading, \"lazy\" for defer-until-needed execution, and whatever else ships in directives/. \
 			`list` returns {available, active, ephemeral: [{name, inline, \
 			expires_after_turn}]}; `swap` replaces the whole active set with one \
-			directive and returns {swapped, active}; `add` and `remove` mutate the set \
-			and return {active}; `reset` clears actives, ephemerals and the manual latch, \
-			handing control back to automatic selection. An unknown directive name \
-			returns {error} and changes nothing.",
+			directive and returns {swapped, active}; `add` appends to the set (silent \
+			if already active) and returns {active}; `load` activates a directive from \
+			the available set on demand and returns {loaded, active} (errors on an \
+			unknown name, unlike `add`); `remove` drops one and returns {active}; \
+			`reset` clears actives, ephemerals and the manual latch, handing control \
+			back to automatic selection. An unknown directive name returns {error} \
+			and changes nothing.",
 		"parameters": {
 			"type": "object",
 			"properties": {
 				"action": {
 					"type": "string",
-					"enum": ["list", "swap", "add", "remove", "reset"],
+					"enum": ["list", "swap", "add", "load", "remove", "reset"],
 					"default": "list",
-					"description": "What to do. Defaults to `list`."
+					"description": "What to do. Defaults to `list`. `load` activates a directive just-in-time (lazy activation)."
 				},
 				"name": {
 					"type": "string",
-					"description": "Directive name. Required for swap, add and remove; ignored by list and reset."
+					"description": "Directive name. Required for swap, add, load and remove; ignored by list and reset."
 				}
 			},
 			"additionalProperties": false

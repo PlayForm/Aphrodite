@@ -14,7 +14,7 @@ dispatchable Hermes tool.
 
 ## Built-in directives
 
-The repo ships four directives under `directives/`:
+The repo ships five directives under `directives/`:
 
 | Directive   | Behavior                                                                                     |
 | ----------- | -------------------------------------------------------------------------------------------- |
@@ -22,6 +22,7 @@ The repo ships four directives under `directives/`:
 | `explore`   | Read broadly: 2-3 related files per turn, `aphrodite_prefetch` batches of related paths      |
 | `foresight` | Anticipate next steps: prefetch imports/references after reads, top search results ahead     |
 | `cleanup`   | Summarize and prune: progress summary every 5 turns, `aphrodite_catalog(mode="toc")` sweeps  |
+| `lazy`      | Defer work: one deliverable per turn, load heavier directives on demand via `load`           |
 
 Any `.md` file you drop into a discovered directives directory becomes a
 directive named after its file stem - the built-ins aren't special-cased.
@@ -38,8 +39,8 @@ directive named after its file stem - the built-ins aren't special-cased.
 | Per-file cap   | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                                                                                                                         |
 | Combined cap   | 4,000 chars across all active directives' injected text combined - several active directives can't blow past the context budget together                                                                                                      |
 | Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty (it was before v1.3.2, which made runtime `add`/`swap` impossible from a cold start with the shipped `active = []` default)    |
-| Built-in fallback | When no `directives/` directory exists on disk, 5 directives baked into the binary via `include_str!` are loaded automatically: `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore` |
-| Active default | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` are seeded as active automatically                                                                                                                       |
+| Built-in fallback | When no `directives/` directory exists on disk, 6 directives baked into the binary via `include_str!` are loaded automatically: `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy` |
+| Active default | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` + `lazy` are seeded as active automatically (`lazy` keeps the session from over-eagerly stacking directives until a later turn proves it needs one) |
 
 ## `[directives]` in aphrodite.toml
 
@@ -90,22 +91,28 @@ place in the full 13-tool reference):
 {
 	"name": "aphrodite_directive",
 	"parameters": {
-		"action": "list (default) | swap | add | remove | reset",
-		"name": "Directive name - required for swap/add/remove"
+		"action": "list (default) | swap | add | load | remove | reset",
+		"name": "Directive name - required for swap/add/load/remove"
 	}
 }
 ```
 
 | Action   | Effect                                            | Response                                                                 |
 | -------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
-| `list`   | Enumerate loaded + active directives (default)    | `{available: [...], active: [...]}`                                      |
-| `swap`   | Replace the active set with one directive         | `{swapped: name, active: [name]}` or `{error: "unknown directive: ..."}` |
+| `list`   | Enumerate loaded + active directives (default)    | `{available: [...], active: [...], ephemeral: [...]}`                   |
+| `swap`   | Replace the active set with one directive         | `{swapped: name, active: [name]}` or `{error: "unknown directive: ...}"}` |
 | `add`    | Append a directive to the active set (idempotent) | `{active: [...]}`                                                        |
+| `load`   | Activate a directive on demand (lazy)             | `{loaded: name, active: [...]}` or `{error: "unknown directive: ...}"}`  |
 | `remove` | Drop a directive from the active set              | `{active: [...]}`                                                        |
 | `reset`  | Clear the active set                              | `{active: []}`                                                           |
 
+`load` is the lazy-activation action: unlike `add` (which is silent when the
+name is unknown or already active), `load` returns a distinct `{loaded, active}`
+shape and **errors** on an unknown name, so a lazy-load typo surfaces instead of
+being swallowed. It is idempotent when the directive is already active.
+
 An unknown action returns
-`{error: "unknown action: ... (use list|swap|add|remove|reset)"}`.
+`{error: "unknown action: ... (use list|swap|add|load|remove|reset)"}`.
 
 ### Dispatch paths
 

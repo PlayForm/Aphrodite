@@ -14,9 +14,9 @@ use std::{collections::HashMap, path::PathBuf};
 
 /// Built-in directives baked into the binary via `include_str!`.
 /// These ship with every installation and are used as fallbacks when no
-/// `directives/` directory exists on disk — so a fresh install gets
-/// `focus`, `foresight`, `ccr-handling`, `cleanup`, and `explore` without
-/// any filesystem setup.
+/// `directives/` directory exists on disk - so a fresh install gets
+/// `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, and `lazy`
+/// without any filesystem setup.
 ///
 /// The on-disk `directives/*.md` files (if any) take precedence: if the
 /// directory exists, its `.md` files replace these defaults entirely.
@@ -29,6 +29,7 @@ fn builtin_directives() -> Vec<(&'static str, &'static str)> {
 		("ccr-handling", include_str!("builtin_directives/ccr-handling.md")),
 		("cleanup", include_str!("builtin_directives/cleanup.md")),
 		("explore", include_str!("builtin_directives/explore.md")),
+		("lazy", include_str!("builtin_directives/lazy.md")),
 	]
 }
 
@@ -72,7 +73,8 @@ pub const MAX_COMBINED_CHARS: usize = 4000;
 /// If the directory doesn't exist or contains no `.md` files, the built-in
 /// directives (baked into the binary via `include_str!`) are used as
 /// fallbacks, so a fresh install without a `directives/` directory still
-/// gets `focus`, `foresight`, `ccr-handling`, `cleanup`, and `explore`.
+/// gets `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, and
+/// `lazy`.
 pub fn load_directives(dir: &PathBuf) -> HashMap<String, Directive> {
 	let mut directives = HashMap::new();
 	let mut loaded_from_disk = false;
@@ -160,14 +162,14 @@ pub fn build_directive_context(all: &HashMap<String, Directive>, active: &[Strin
 	out
 }
 
-/// Handle a directive action (`list`/`swap`/`add`/`remove`/`reset`) against
-/// live state. Both `aphrodite_directive` (extern fn) and `aphrodite_dispatch`'s
-/// `"directive"` arm delegate here (01-F8) - previously ~40 lines of this
-/// logic were duplicated between the two, with divergent error shapes (the
-/// extern fn returned an error via a separate top-level `to_json_error` call,
-/// the dispatch arm embedded `{"error": ...}` inside an otherwise-success
-/// value). This always returns the latter shape - callers pass the result
-/// straight through their own success serializer.
+/// Handle a directive action (`list`/`swap`/`add`/`remove`/`reset`/`load`)
+/// against live state. Both `aphrodite_directive` (extern fn) and
+/// `aphrodite_dispatch`'s `"directive"` arm delegate here (01-F8) - previously
+/// ~40 lines of this logic were duplicated between the two, with divergent
+/// error shapes (the extern fn returned an error via a separate top-level
+/// `to_json_error` call, the dispatch arm embedded `{"error": ...}` inside an
+/// otherwise-success value). This always returns the latter shape - callers
+/// pass the result straight through their own success serializer.
 pub fn handle_action(state: &mut crate::state::AphroditeState, action: &str, name: &str) -> serde_json::Value {
 	match action {
 		"list" => {
@@ -206,6 +208,22 @@ pub fn handle_action(state: &mut crate::state::AphroditeState, action: &str, nam
 			state.manual_directive_turn = Some(state.turn_counter);
 			serde_json::json!({"active": &state.active_directives})
 		},
+		// ── "load" (lazy directive activation, 06-T?) - activate a directive
+		// from the *available* set on demand, returning a distinct shape so
+		// the caller can tell a lazy load apart from a pre-seeded `add`.
+		// Unlike `add` it is NOT silent on an unknown name: it errors, since a
+		// lazy load is an explicit, intentional activation and a typo should
+		// surface rather than be swallowed. Idempotent if already active.
+		"load" => {
+			if !state.directives.contains_key(name) {
+				return serde_json::json!({"error": format!("unknown directive: {}", name)});
+			}
+			if !state.active_directives.contains(&name.to_string()) {
+				state.active_directives.push(name.to_string());
+			}
+			state.manual_directive_turn = Some(state.turn_counter);
+			serde_json::json!({"loaded": name, "active": &state.active_directives})
+		},
 		"remove" => {
 			state.active_directives.retain(|d| d != name);
 			state.manual_directive_turn = Some(state.turn_counter);
@@ -219,7 +237,7 @@ pub fn handle_action(state: &mut crate::state::AphroditeState, action: &str, nam
 			state.manual_directive_turn = None;
 			serde_json::json!({"active": &state.active_directives})
 		},
-		_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|remove|reset)", action)}),
+		_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|load|remove|reset)", action)}),
 	}
 }
 
@@ -277,7 +295,7 @@ mod tests {
 
 	// ── 01-F8: `handle_action` is the single implementation both
 	// `aphrodite_directive` and `aphrodite_dispatch`'s `"directive"` arm now
-	// delegate to - cover all five actions plus an unknown one directly. ──
+	// delegate to - cover all six actions plus an unknown one directly. ──
 	#[test]
 	fn test_handle_action_all_actions_and_unknown() {
 		let mut state = crate::state::AphroditeState::default();
@@ -285,9 +303,12 @@ mod tests {
 			"focus".into(),
 			Directive { name: "focus".into(), content: "stay focused".into() },
 		);
+		state
+			.directives
+			.insert("lazy".into(), Directive { name: "lazy".into(), content: "defer work".into() });
 
 		let r = handle_action(&mut state, "list", "");
-		assert_eq!(r["available"], serde_json::json!(["focus"]));
+		assert_eq!(r["available"], serde_json::json!(["focus", "lazy"]));
 		assert_eq!(r["active"], serde_json::json!([]));
 
 		let r = handle_action(&mut state, "swap", "focus");
@@ -300,8 +321,20 @@ mod tests {
 		let r = handle_action(&mut state, "remove", "focus");
 		assert_eq!(r["active"], serde_json::json!([]));
 
+		// ── "load" activates a known directive and returns {loaded, active};
+		// loading an already-active directive is idempotent and still
+		// reports success (no error). ──
+		let r = handle_action(&mut state, "load", "lazy");
+		assert_eq!(r["loaded"], "lazy");
+		assert_eq!(r["active"], serde_json::json!(["lazy"]));
+		let r = handle_action(&mut state, "load", "lazy");
+		assert_eq!(r["loaded"], "lazy", "re-loading must be idempotent");
+		// "load" errors on an unknown directive (unlike "add", which is silent).
+		let r = handle_action(&mut state, "load", "ghost");
+		assert!(r["error"].as_str().unwrap().contains("unknown directive"));
+
 		let r = handle_action(&mut state, "add", "focus");
-		assert_eq!(r["active"], serde_json::json!(["focus"]));
+		assert_eq!(r["active"], serde_json::json!(["lazy", "focus"]));
 
 		let r = handle_action(&mut state, "reset", "");
 		assert_eq!(r["active"], serde_json::json!([]));
@@ -483,14 +516,15 @@ mod tests {
 
 	// ── Built-in directives: baked into the binary via include_str! ──
 	#[test]
-	fn test_loaded_builtins_contains_all_five() {
+	fn test_loaded_builtins_contains_all_six() {
 		let builtins = loaded_builtins();
-		assert_eq!(builtins.len(), 5, "should have 5 baked-in directives");
+		assert_eq!(builtins.len(), 6, "should have 6 baked-in directives");
 		assert!(builtins.contains_key("focus"));
 		assert!(builtins.contains_key("foresight"));
 		assert!(builtins.contains_key("ccr-handling"));
 		assert!(builtins.contains_key("cleanup"));
 		assert!(builtins.contains_key("explore"));
+		assert!(builtins.contains_key("lazy"));
 	}
 
 	#[test]

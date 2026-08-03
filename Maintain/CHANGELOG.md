@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.3.9 - Lazy Directive (2026-08-03)
+
+### Added
+
+- **`lazy` built-in directive** - a new shipped directive (`builtin_directives/lazy.md`)
+  that teaches defer-until-needed execution: one concrete deliverable per turn, no
+  speculative pre-read/pre-fetch/directive-stacking, minimum tools to make progress,
+  and lazy loading of heavier behavior only when a later turn proves it's needed.
+  Registered in `builtin_directives()` so it ships baked into the binary (6 built-ins
+  now: `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy`).
+- **`load` action on `aphrodite_directive`** - lazy, on-demand activation of a
+  directive from the available set. Returns a distinct `{loaded, active}` shape and
+  **errors on an unknown name** (unlike `add`, which is silent). Idempotent when the
+  directive is already active. Wired through all three entry points: core
+  `aphrodite_directive` FFI, `aphrodite_dispatch`'s `"directive"` arm, and the
+  Hermes bridge tool - all delegate to `directives::handle_action`, so the action set
+  and error shape are identical everywhere. Use it as `aphrodite_directive("load", "explore")`.
+- **`lazy` seeded as a default active directive** (alongside `focus` + `foresight`)
+  when no `[directives] active` is configured and no on-disk `directives/` dir exists,
+  so a fresh session starts in defer-until-needed mode rather than over-eagerly stacking
+  directives before any turn demonstrates the need.
+
+### Changed
+
+- `aphrodite_directive` tool schema: `action` enum now `list|swap|add|load|remove|reset`;
+  description and the `name` parameter note document `load` and `lazy`.
+- Default active set in `config_loader` seeds `focus` + `foresight` + `lazy`.
+- Docs: `docs/plugin/directives.md` (built-in table, action table, `load` semantics,
+  JSON schema block, fallback/default notes), `docs/tool-relay/tools.md` (schema +
+  description), `docs/agent-feedback.md` (`load` example), `README.md` (directive list),
+  `plugin.yaml` install message and version.
+
+### Fixed
+
+- `test_loaded_builtins_contains_all_five` → `..._all_six` (asserts the new `lazy`
+  built-in). `handle_action` tests cover the `load` action (success, idempotency,
+  unknown-name error) and the unknown-action error string.
+
 ## v1.3.8 - Tool Schema Self-Documentation (2026-08-03)
 
 ### Fixed
