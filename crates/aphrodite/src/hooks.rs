@@ -18,18 +18,20 @@ use crate::{
 /// [`transform_tool_result_with_meta`] into the `tool_events` telemetry ring.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ToolCallMeta<'a> {
-	pub args_json:Option<&'a serde_json::Value>,
-	pub status:Option<&'a str>,
-	pub error_type:Option<&'a str>,
-	pub error_message:Option<&'a str>,
-	pub duration_ms:Option<u64>,
+	pub args_json: Option<&'a serde_json::Value>,
+	pub status: Option<&'a str>,
+	pub error_type: Option<&'a str>,
+	pub error_message: Option<&'a str>,
+	pub duration_ms: Option<u64>,
 }
 
 /// Compute a CCR hash for content using BLAKE3 (40 hex chars).
-pub fn compute_hash(content:&str) -> String { headroom_core::ccr::compute_key(content.as_bytes()) }
+pub fn compute_hash(content: &str) -> String {
+	headroom_core::ccr::compute_key(content.as_bytes())
+}
 
 /// Essential tools that must NOT be compressed - agent needs raw output.
-const ESSENTIAL_TOOLS:&[&str] = &[
+const ESSENTIAL_TOOLS: &[&str] = &[
 	"skill_view",
 	"skills_list",
 	"skill_manage",
@@ -40,7 +42,7 @@ const ESSENTIAL_TOOLS:&[&str] = &[
 ];
 
 /// Transform tool output - full compression pipeline.
-pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:&str) -> serde_json::Value {
+pub fn transform_tool_result(state: &mut AphroditeState, content: &str, tool_name: &str) -> serde_json::Value {
 	transform_tool_result_inner(state, content, tool_name, None, &ToolCallMeta::default())
 }
 
@@ -52,10 +54,10 @@ pub fn transform_tool_result(state:&mut AphroditeState, content:&str, tool_name:
 /// `aphrodite_retrieve` always returns exactly what was passed in; `classify`
 /// affects only the reported `type` and the generated preview.
 pub fn transform_tool_result_classified(
-	state:&mut AphroditeState,
-	content:&str,
-	tool_name:&str,
-	classify:Option<(&str, &str)>,
+	state: &mut AphroditeState,
+	content: &str,
+	tool_name: &str,
+	classify: Option<(&str, &str)>,
 ) -> serde_json::Value {
 	transform_tool_result_inner(state, content, tool_name, classify, &ToolCallMeta::default())
 }
@@ -65,11 +67,11 @@ pub fn transform_tool_result_classified(
 /// telemetry ring. This is the entry point the Hermes bridge routes to so the
 /// error/args/duration signals Hermes ships on every call stop being dropped.
 pub fn transform_tool_result_with_meta(
-	state:&mut AphroditeState,
-	content:&str,
-	tool_name:&str,
-	classify:Option<(&str, &str)>,
-	meta:&ToolCallMeta,
+	state: &mut AphroditeState,
+	content: &str,
+	tool_name: &str,
+	classify: Option<(&str, &str)>,
+	meta: &ToolCallMeta,
 ) -> serde_json::Value {
 	transform_tool_result_inner(state, content, tool_name, classify, meta)
 }
@@ -77,7 +79,7 @@ pub fn transform_tool_result_with_meta(
 /// Record a per-call telemetry event from the supplied metadata (P2/T6).
 /// `ok` is fail-open: a missing `status` means success. `wrote_path` is
 /// inferred from the args of `write_file`/`patch`-style tools.
-fn record_tool_event_from_meta(state:&mut AphroditeState, tool_name:&str, content:&str, meta:&ToolCallMeta) {
+fn record_tool_event_from_meta(state: &mut AphroditeState, tool_name: &str, content: &str, meta: &ToolCallMeta) {
 	let ok = meta.status.map(|s| s != "error").unwrap_or(true);
 	let error_sig = if ok {
 		None
@@ -87,12 +89,12 @@ fn record_tool_event_from_meta(state:&mut AphroditeState, tool_name:&str, conten
 	let wrote_path = wrote_path_from(tool_name, meta.args_json, content);
 	let sig = crate::flow::normalize_args_sig(tool_name, meta.args_json);
 	state.record_tool_event(ToolEvent {
-		turn:state.turn_counter,
-		tool:tool_name.to_string(),
+		turn: state.turn_counter,
+		tool: tool_name.to_string(),
 		sig,
 		ok,
 		error_sig,
-		bytes:content.len(),
+		bytes: content.len(),
 		wrote_path,
 	});
 }
@@ -100,7 +102,7 @@ fn record_tool_event_from_meta(state:&mut AphroditeState, tool_name:&str, conten
 /// Infer the written path for a write-style tool (P2/T6, feeds P11). Reads a
 /// `path`/`file` arg for `write_file`/`patch`; falls back to the first-line
 /// path heuristic used by `extract_file_path`.
-fn wrote_path_from(tool_name:&str, args:Option<&serde_json::Value>, content:&str) -> Option<String> {
+fn wrote_path_from(tool_name: &str, args: Option<&serde_json::Value>, content: &str) -> Option<String> {
 	if !matches!(tool_name, "write_file" | "patch") {
 		return None;
 	}
@@ -117,11 +119,11 @@ fn wrote_path_from(tool_name:&str, args:Option<&serde_json::Value>, content:&str
 }
 
 fn transform_tool_result_inner(
-	state:&mut AphroditeState,
-	content:&str,
-	tool_name:&str,
-	classify:Option<(&str, &str)>,
-	meta:&ToolCallMeta,
+	state: &mut AphroditeState,
+	content: &str,
+	tool_name: &str,
+	classify: Option<(&str, &str)>,
+	meta: &ToolCallMeta,
 ) -> serde_json::Value {
 	// Record the telemetry event first (P2/T6): it must happen even when the
 	// content is empty or the tool is essential/self/below-threshold - the
@@ -167,7 +169,7 @@ fn transform_tool_result_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let (type_str, classify_content):(String, &str) = match classify {
+	let (type_str, classify_content): (String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
 		None => {
 			// Extend the "terminal" override pattern: let Aphrodite's own
@@ -177,11 +179,9 @@ fn transform_tool_result_inner(
 			// layer - the vendored classifier is untouched.
 			let base = transforms::detect(content).as_str().to_string();
 			let t = match base.as_str() {
-				"text" | "log" | "plain" | "" => {
-					crate::preview::detect_semantic_type(content)
-						.map(|s| s.to_string())
-						.unwrap_or(base)
-				},
+				"text" | "log" | "plain" | "" => crate::preview::detect_semantic_type(content)
+					.map(|s| s.to_string())
+					.unwrap_or(base),
 				_ => base,
 			};
 			(t, content)
@@ -195,13 +195,13 @@ fn transform_tool_result_inner(
 	let marker = ccr_marker(&hash, &type_str, content.len(), &preview, None, None, None);
 
 	state.record_marker(MarkerEntry {
-		hash:hash.clone(),
-		ccr_type:type_str.clone(),
-		size:content.len(),
-		preview:preview.clone(),
-		turn:state.turn_counter,
-		center:None,
-		meta:None,
+		hash: hash.clone(),
+		ccr_type: type_str.clone(),
+		size: content.len(),
+		preview: preview.clone(),
+		turn: state.turn_counter,
+		center: None,
+		meta: None,
 	});
 
 	serde_json::json!({
@@ -216,16 +216,16 @@ fn transform_tool_result_inner(
 }
 
 /// Transform terminal output - exit code aware.
-pub fn transform_terminal_output(state:&mut AphroditeState, content:&str) -> serde_json::Value {
+pub fn transform_terminal_output(state: &mut AphroditeState, content: &str) -> serde_json::Value {
 	transform_terminal_output_classified(state, content, None)
 }
 
 /// Same as [`transform_terminal_output`], with the same `classify` contract
 /// as [`transform_tool_result_classified`].
 pub fn transform_terminal_output_classified(
-	state:&mut AphroditeState,
-	content:&str,
-	classify:Option<(&str, &str)>,
+	state: &mut AphroditeState,
+	content: &str,
+	classify: Option<(&str, &str)>,
 ) -> serde_json::Value {
 	transform_terminal_output_inner(state, content, classify, None, None)
 }
@@ -234,21 +234,21 @@ pub fn transform_terminal_output_classified(
 /// `command` and `returncode` (report 05, P2/T6/T8) recorded into the
 /// `tool_events` telemetry ring. `returncode == 0` (or absent) is `ok`.
 pub fn transform_terminal_output_with_meta(
-	state:&mut AphroditeState,
-	content:&str,
-	classify:Option<(&str, &str)>,
-	command:Option<&str>,
-	returncode:Option<i64>,
+	state: &mut AphroditeState,
+	content: &str,
+	classify: Option<(&str, &str)>,
+	command: Option<&str>,
+	returncode: Option<i64>,
 ) -> serde_json::Value {
 	transform_terminal_output_inner(state, content, classify, command, returncode)
 }
 
 fn transform_terminal_output_inner(
-	state:&mut AphroditeState,
-	content:&str,
-	classify:Option<(&str, &str)>,
-	command:Option<&str>,
-	returncode:Option<i64>,
+	state: &mut AphroditeState,
+	content: &str,
+	classify: Option<(&str, &str)>,
+	command: Option<&str>,
+	returncode: Option<i64>,
 ) -> serde_json::Value {
 	// Telemetry (P2/T6): record before threshold/empty gating - a failing
 	// command with tiny output is exactly what the error-loop breaker needs.
@@ -268,13 +268,13 @@ fn transform_terminal_output_inner(
 			Some(crate::flow::error_sig(command, first_err))
 		};
 		state.record_tool_event(ToolEvent {
-			turn:state.turn_counter,
-			tool:"terminal".to_string(),
+			turn: state.turn_counter,
+			tool: "terminal".to_string(),
 			sig,
 			ok,
 			error_sig,
-			bytes:content.len(),
-			wrote_path:None,
+			bytes: content.len(),
+			wrote_path: None,
 		});
 	}
 	if content.is_empty() {
@@ -285,7 +285,7 @@ fn transform_terminal_output_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let (type_str, classify_content):(String, &str) = match classify {
+	let (type_str, classify_content): (String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
 		None => {
 			let ct = transforms::detect(content);
@@ -297,11 +297,9 @@ fn transform_terminal_output_inner(
 				// so the preview is high-signal on the terminal path too.
 				let base = ct.as_str().to_string();
 				match base.as_str() {
-					"text" | "log" | "plain" | "" => {
-						crate::preview::detect_semantic_type(content)
-							.map(|s| s.to_string())
-							.unwrap_or(base)
-					},
+					"text" | "log" | "plain" | "" => crate::preview::detect_semantic_type(content)
+						.map(|s| s.to_string())
+						.unwrap_or(base),
 					_ => base,
 				}
 			};
@@ -316,13 +314,13 @@ fn transform_terminal_output_inner(
 	let marker = ccr_marker(&hash, &type_str, content.len(), &preview, None, None, None);
 
 	state.record_marker(MarkerEntry {
-		hash:hash.clone(),
-		ccr_type:type_str.to_string(),
-		size:content.len(),
-		preview:preview.clone(),
-		turn:state.turn_counter,
-		center:None,
-		meta:None,
+		hash: hash.clone(),
+		ccr_type: type_str.to_string(),
+		size: content.len(),
+		preview: preview.clone(),
+		turn: state.turn_counter,
+		center: None,
+		meta: None,
 	});
 
 	serde_json::json!({
@@ -337,7 +335,9 @@ fn transform_terminal_output_inner(
 }
 
 /// Session start hook - full reset.
-pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value { crate::session::on_session_start(state) }
+pub fn on_session_start(state: &mut AphroditeState) -> serde_json::Value {
+	crate::session::on_session_start(state)
+}
 
 /// Pre-LLM call hook - inject catalog + active directives into context.
 ///
@@ -347,7 +347,7 @@ pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value { crate:
 /// bridge path can never fork on what the model actually sees. The bridge and
 /// `context_engine_pre_llm` return only `{"context": ...}`; core keeps the
 /// richer shape for back-compat.
-pub fn pre_llm_call(state:&mut AphroditeState) -> serde_json::Value {
+pub fn pre_llm_call(state: &mut AphroditeState) -> serde_json::Value {
 	// Poll-worker checkpoint: push nudges for running/completed/failed tasks
 	// (only when the master flag is enabled).
 	if state.poll_worker_enabled {
@@ -372,7 +372,7 @@ pub fn pre_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 /// was never called from any hook, so `conv_index` stayed empty forever and
 /// `aphrodite_diff` always returned zero turns despite compressions
 /// happening every turn.
-pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
+pub fn post_llm_call(state: &mut AphroditeState) -> serde_json::Value {
 	if let Some(last) = state.recent_markers.iter().rev().find(|m| m.turn == state.turn_counter) {
 		let (hash, summary, size) = (last.hash.clone(), last.preview.clone(), last.size);
 		crate::session::archive_turn(state, &hash, &summary, size);
@@ -389,7 +389,7 @@ pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 }
 
 /// Extract file path from tool output - heuristic.
-fn extract_file_path(content:&str, tool:&str) -> Option<String> {
+fn extract_file_path(content: &str, tool: &str) -> Option<String> {
 	match tool {
 		"read_file" | "write_file" | "patch" => {
 			// First line often contains path
@@ -407,16 +407,14 @@ fn extract_file_path(content:&str, tool:&str) -> Option<String> {
 		// first `:` on the first result line (F10: this tool is listed in
 		// `state.file_tools` but was previously never actually matched here,
 		// so every search result silently went untracked).
-		"search_files" => {
-			content.lines().next().and_then(|line| {
-				let path = line.split(':').next().unwrap_or("").trim();
-				if path.starts_with('/') || path.starts_with("./") {
-					Some(path.to_string())
-				} else {
-					None
-				}
-			})
-		},
+		"search_files" => content.lines().next().and_then(|line| {
+			let path = line.split(':').next().unwrap_or("").trim();
+			if path.starts_with('/') || path.starts_with("./") {
+				Some(path.to_string())
+			} else {
+				None
+			}
+		}),
 		_ => None,
 	}
 }
@@ -537,19 +535,10 @@ mod tests {
 	fn test_pre_llm_call_pushes_poll_nudges() {
 		let mut s = AphroditeState::default();
 		s.turn_counter = 3;
-		crate::poll_worker::insert_bg_task(
-			&mut s,
-			"task1".into(),
-			"terminal".into(),
-			"cargo build".into(),
-			1,
-		);
+		crate::poll_worker::insert_bg_task(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
 		let _ = pre_llm_call(&mut s);
 		// The nudge should have been pushed into ephemeral_directives.
-		assert!(
-			s.ephemeral_directives.len() >= 1,
-			"pre_llm_call should push poll-worker nudge"
-		);
+		assert!(s.ephemeral_directives.len() >= 1, "pre_llm_call should push poll-worker nudge");
 		let nudge = s.ephemeral_directives.last().unwrap();
 		assert!(
 			nudge.inline.as_deref().unwrap().contains("cargo build"),
@@ -584,13 +573,7 @@ mod tests {
 		let mut s = AphroditeState::default();
 		s.poll_worker_enabled = false;
 		s.turn_counter = 3;
-		crate::poll_worker::insert_bg_task(
-			&mut s,
-			"task1".into(),
-			"terminal".into(),
-			"cargo build".into(),
-			1,
-		);
+		crate::poll_worker::insert_bg_task(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
 		let before = s.ephemeral_directives.len();
 		let _ = pre_llm_call(&mut s);
 		assert_eq!(
@@ -605,13 +588,7 @@ mod tests {
 		let mut s = AphroditeState::default();
 		s.poll_worker_enabled = false;
 		s.turn_counter = 20;
-		crate::poll_worker::insert_bg_task(
-			&mut s,
-			"old-task".into(),
-			"terminal".into(),
-			"old-build".into(),
-			10,
-		);
+		crate::poll_worker::insert_bg_task(&mut s, "old-task".into(), "terminal".into(), "old-build".into(), 10);
 		s.bg_tasks[0].last_poll_turn = 10;
 		let _ = post_llm_call(&mut s);
 		// Expiry is a cleanup concern — should still run even when disabled.

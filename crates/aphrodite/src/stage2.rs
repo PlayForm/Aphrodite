@@ -27,26 +27,26 @@
 use std::collections::HashMap;
 
 /// Minimum content size before attempting reduction.
-const MIN_STAGE2_SIZE:usize = 80;
+const MIN_STAGE2_SIZE: usize = 80;
 
 type Reducer = fn(&str) -> Option<String>;
 
 /// Reduce JSON content: minify + extract structural keys.
-fn reduce_json(content:&str) -> Option<String> {
-	let data:serde_json::Value = match serde_json::from_str(content) {
+fn reduce_json(content: &str) -> Option<String> {
+	let data: serde_json::Value = match serde_json::from_str(content) {
 		Ok(v) => v,
 		Err(_) => return None,
 	};
 	let structural = match &data {
 		serde_json::Value::Object(map) => {
-			let keys:Vec<&str> = map.keys().map(|k| k.as_str()).take(10).collect();
+			let keys: Vec<&str> = map.keys().map(|k| k.as_str()).take(10).collect();
 			format!("[json:{} keys: {}]", map.len(), keys.join(", "))
 		},
 		serde_json::Value::Array(arr) => {
 			let mut s = format!("[json_list:{} items]", arr.len());
 			if let Some(first) = arr.first() {
 				if let Some(obj) = first.as_object() {
-					let keys:Vec<&str> = obj.keys().map(|k| k.as_str()).take(10).collect();
+					let keys: Vec<&str> = obj.keys().map(|k| k.as_str()).take(10).collect();
 					s.push_str(&format!(" schema: {}", keys.join(", ")));
 				}
 			}
@@ -59,7 +59,7 @@ fn reduce_json(content:&str) -> Option<String> {
 	Some(format!("{}\n{}", structural, minified))
 }
 
-fn type_name(v:&serde_json::Value) -> &'static str {
+fn type_name(v: &serde_json::Value) -> &'static str {
 	match v {
 		serde_json::Value::Null => "null",
 		serde_json::Value::Bool(_) => "bool",
@@ -71,10 +71,10 @@ fn type_name(v:&serde_json::Value) -> &'static str {
 }
 
 /// Reduce build/log output: extract errors, warnings, summaries.
-fn reduce_build(content:&str) -> Option<String> {
-	let mut errors:Vec<String> = Vec::new();
-	let mut warnings:Vec<String> = Vec::new();
-	let mut summary_lines:Vec<String> = Vec::new();
+fn reduce_build(content: &str) -> Option<String> {
+	let mut errors: Vec<String> = Vec::new();
+	let mut warnings: Vec<String> = Vec::new();
+	let mut summary_lines: Vec<String> = Vec::new();
 
 	let summary_kw = ["compiling", "finished", "running", "test result", "passed", "failed"];
 
@@ -94,7 +94,7 @@ fn reduce_build(content:&str) -> Option<String> {
 		}
 	}
 
-	let mut parts:Vec<String> = Vec::new();
+	let mut parts: Vec<String> = Vec::new();
 	if !summary_lines.is_empty() {
 		parts.push("[build summary]".into());
 		parts.extend(summary_lines.into_iter().take(10));
@@ -112,10 +112,10 @@ fn reduce_build(content:&str) -> Option<String> {
 }
 
 /// Reduce diff content: file-level summary with hunk counts.
-fn reduce_diff(content:&str) -> Option<String> {
-	let mut files:Vec<(String, usize)> = Vec::new();
-	let mut current_file:Option<String> = None;
-	let mut hunks:usize = 0;
+fn reduce_diff(content: &str) -> Option<String> {
+	let mut files: Vec<(String, usize)> = Vec::new();
+	let mut current_file: Option<String> = None;
+	let mut hunks: usize = 0;
 
 	for line in content.lines() {
 		if line.starts_with("diff --git ") {
@@ -144,31 +144,31 @@ fn reduce_diff(content:&str) -> Option<String> {
 }
 
 /// Reduce code: extract function/struct/class signatures.
-fn reduce_code(content:&str) -> Option<String> {
+fn reduce_code(content: &str) -> Option<String> {
 	#[derive(Debug)]
 	struct SigPattern {
-		kind:&'static str,
-		pattern:&'static str,
+		kind: &'static str,
+		pattern: &'static str,
 	}
 
 	let patterns = [
-		SigPattern { kind:"fn", pattern:r"^(pub\s+)?(async\s+)?fn\s+(\w+)" },
-		SigPattern { kind:"struct", pattern:r"^(pub\s+)?struct\s+(\w+)" },
-		SigPattern { kind:"enum", pattern:r"^(pub\s+)?enum\s+(\w+)" },
-		SigPattern { kind:"trait", pattern:r"^(pub\s+)?trait\s+(\w+)" },
-		SigPattern { kind:"impl", pattern:r"^(pub\s+)?impl\b" },
-		SigPattern { kind:"def", pattern:r"^def\s+(\w+)\s*\(" },
-		SigPattern { kind:"class", pattern:r"^class\s+(\w+)" },
-		SigPattern { kind:"func", pattern:r"^func\s+(\w+)\s*\(" },
-		SigPattern { kind:"function", pattern:r"^export\s+(?:async\s+)?function\s+(\w+)" },
+		SigPattern { kind: "fn", pattern: r"^(pub\s+)?(async\s+)?fn\s+(\w+)" },
+		SigPattern { kind: "struct", pattern: r"^(pub\s+)?struct\s+(\w+)" },
+		SigPattern { kind: "enum", pattern: r"^(pub\s+)?enum\s+(\w+)" },
+		SigPattern { kind: "trait", pattern: r"^(pub\s+)?trait\s+(\w+)" },
+		SigPattern { kind: "impl", pattern: r"^(pub\s+)?impl\b" },
+		SigPattern { kind: "def", pattern: r"^def\s+(\w+)\s*\(" },
+		SigPattern { kind: "class", pattern: r"^class\s+(\w+)" },
+		SigPattern { kind: "func", pattern: r"^func\s+(\w+)\s*\(" },
+		SigPattern { kind: "function", pattern: r"^export\s+(?:async\s+)?function\s+(\w+)" },
 	];
 
-	let mut sigs:Vec<String> = Vec::new();
+	let mut sigs: Vec<String> = Vec::new();
 	for sp in &patterns {
 		for line in content.lines() {
 			let trimmed = line.trim();
 			if let Some(_caps) = regex_match(trimmed, sp.pattern) {
-				let sig_line:String = trimmed.chars().take(120).collect();
+				let sig_line: String = trimmed.chars().take(120).collect();
 				sigs.push(format!("  [{}] {}", sp.kind, sig_line));
 			}
 		}
@@ -187,7 +187,7 @@ fn reduce_code(content:&str) -> Option<String> {
 }
 
 /// Lightweight regex-like matching using simple prefix + word boundary checks.
-fn regex_match(line:&str, pattern:&str) -> Option<Vec<String>> {
+fn regex_match(line: &str, pattern: &str) -> Option<Vec<String>> {
 	// Simplified: just check if line matches the pattern's intent
 	let lower = line.to_lowercase();
 
@@ -235,7 +235,7 @@ fn regex_match(line:&str, pattern:&str) -> Option<Vec<String>> {
 
 /// Registry mapping CCR types to their reducer functions.
 fn reducer_registry() -> HashMap<&'static str, Reducer> {
-	let mut m:HashMap<&'static str, Reducer> = HashMap::new();
+	let mut m: HashMap<&'static str, Reducer> = HashMap::new();
 	m.insert("json", reduce_json);
 	m.insert("json_list", reduce_json);
 	m.insert("json_array", reduce_json);
@@ -261,7 +261,7 @@ fn reducer_registry() -> HashMap<&'static str, Reducer> {
 /// Returns `Some(reduced_string)` if reduction was beneficial,
 /// or `None` if the content is too small, no reducer exists for the type,
 /// or the reducer produced no savings.
-pub fn compress_stage2(content:&str, ccr_type:&str) -> Option<String> {
+pub fn compress_stage2(content: &str, ccr_type: &str) -> Option<String> {
 	if content.len() < MIN_STAGE2_SIZE {
 		return None;
 	}

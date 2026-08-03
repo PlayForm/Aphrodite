@@ -15,7 +15,7 @@ use clap::{Parser, ValueEnum};
 /// (Python's `APHRODITE_CONTEXT_ENGINE` check), and presence-only
 /// (`APHRODITE_LOG_COMPACT=0` used to still enable compact logging, since
 /// `.is_ok()` doesn't look at the value at all).
-pub fn env_bool(var:&str) -> bool {
+pub fn env_bool(var: &str) -> bool {
 	match std::env::var(var) {
 		Ok(v) => matches!(v.to_lowercase().as_str(), "1" | "true"),
 		Err(_) => false,
@@ -30,16 +30,14 @@ pub fn env_bool(var:&str) -> bool {
 /// override didn't apply" from "I didn't set an override". Single shared
 /// implementation so every numeric env-var read in the crate uses the same
 /// rule (report 07 §7 generalization note).
-pub fn env_parse_warn<T:std::str::FromStr>(var:&str) -> Option<T> {
+pub fn env_parse_warn<T: std::str::FromStr>(var: &str) -> Option<T> {
 	match std::env::var(var) {
-		Ok(v) => {
-			match v.parse::<T>() {
-				Ok(parsed) => Some(parsed),
-				Err(_) => {
-					tracing::warn!("{}={:?} could not be parsed; ignoring override", var, v);
-					None
-				},
-			}
+		Ok(v) => match v.parse::<T>() {
+			Ok(parsed) => Some(parsed),
+			Err(_) => {
+				tracing::warn!("{}={:?} could not be parsed; ignoring override", var, v);
+				None
+			},
 		},
 		Err(_) => None,
 	}
@@ -66,33 +64,33 @@ pub enum Command {
 	Setup {
 		/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
 		#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true)]
-		api_key:Option<String>,
+		api_key: Option<String>,
 
 		/// Upstream API base URL.
 		#[arg(long, env = "APHRODITE_API_URL", default_value = "https://api.deepseek.com")]
-		api_url:String,
+		api_url: String,
 
 		/// Model name to forward.
 		#[arg(long, env = "APHRODITE_MODEL", default_value = "deepseek-v4-pro")]
-		model:String,
+		model: String,
 
 		/// Cache proxy listen port. Override per-instance to run multiple
 		/// concurrent Hermes Agents on the same machine.
 		#[arg(long, env = "APHRODITE_CACHE_PORT", default_value = "9797")]
-		cache_port:u16,
+		cache_port: u16,
 
 		/// Token proxy listen port. Override per-instance to run multiple
 		/// concurrent Hermes Agents on the same machine.
 		#[arg(long, env = "APHRODITE_TOKEN_PORT", default_value = "9798")]
-		token_port:u16,
+		token_port: u16,
 
 		/// Skip launching the proxy after setup.
 		#[arg(long)]
-		no_launch:bool,
+		no_launch: bool,
 
 		/// Force re-setup even if already installed.
 		#[arg(long)]
-		force:bool,
+		force: bool,
 	},
 }
 
@@ -100,37 +98,35 @@ pub enum Command {
 #[derive(Debug, Clone)]
 pub struct SetupArgs {
 	/// API key for the upstream LLM provider (uses APHRODITE_API_KEY env).
-	pub api_key:Option<String>,
+	pub api_key: Option<String>,
 	/// Upstream API base URL.
-	pub api_url:String,
+	pub api_url: String,
 	/// Model name to forward.
-	pub model:String,
+	pub model: String,
 	/// Cache proxy listen port.
-	pub cache_port:u16,
+	pub cache_port: u16,
 	/// Token proxy listen port.
-	pub token_port:u16,
+	pub token_port: u16,
 	/// Skip launching the proxy after setup.
-	pub no_launch:bool,
+	pub no_launch: bool,
 	/// Force re-setup even if already installed.
-	pub force:bool,
+	pub force: bool,
 }
 
 impl From<Command> for SetupArgs {
-	fn from(cmd:Command) -> Self {
+	fn from(cmd: Command) -> Self {
 		match cmd {
 			Command::Setup { api_key, api_url, model, cache_port, token_port, no_launch, force } => {
 				Self { api_key, api_url, model, cache_port, token_port, no_launch, force }
 			},
-			_ => {
-				Self {
-					api_key:None,
-					api_url:"https://api.deepseek.com".into(),
-					model:"deepseek-v4-pro".into(),
-					cache_port:9797,
-					token_port:9798,
-					no_launch:false,
-					force:false,
-				}
+			_ => Self {
+				api_key: None,
+				api_url: "https://api.deepseek.com".into(),
+				model: "deepseek-v4-pro".into(),
+				cache_port: 9797,
+				token_port: 9798,
+				no_launch: false,
+				force: false,
 			},
 		}
 	}
@@ -144,148 +140,148 @@ impl From<Command> for SetupArgs {
 pub struct Cli {
 	/// Subcommand: `setup` to bootstrap, or omitted to run the proxy.
 	#[command(subcommand)]
-	pub command:Option<Command>,
+	pub command: Option<Command>,
 	/// Proxy mode: cache or token
 	#[arg(long, default_value = "token", env = "APHRODITE_MODE")]
-	pub mode:ProxyMode,
+	pub mode: ProxyMode,
 
 	/// Listen address
 	#[arg(long, default_value = "127.0.0.1:9797", env = "APHRODITE_LISTEN")]
-	pub listen:SocketAddr,
+	pub listen: SocketAddr,
 
 	/// Upstream API base URL
 	#[arg(long, default_value = "https://api.openai.com", env = "APHRODITE_API_URL")]
-	pub api_url:String,
+	pub api_url: String,
 
 	/// Upstream API key
 	#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true)]
-	pub api_key:String,
+	pub api_key: String,
 
 	/// Model name to forward (set via APHRODITE_MODEL env or --model)
 	#[arg(long, default_value = "default-model", env = "APHRODITE_MODEL")]
-	pub model:String,
+	pub model: String,
 
 	/// Max context tokens
 	#[arg(long, default_value = "1000000")]
-	pub max_context:usize,
+	pub max_context: usize,
 
 	/// Max output tokens
 	#[arg(long, default_value = "384000")]
-	pub max_output:usize,
+	pub max_output: usize,
 
 	/// SQLite database path for CCR storage
 	#[arg(long, env = "APHRODITE_DB")]
-	pub ccr_db_path:Option<PathBuf>,
+	pub ccr_db_path: Option<PathBuf>,
 
 	/// CCR TTL in seconds (default: 3600 = 1 hour)
 	#[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
-	pub ccr_ttl_seconds:u64,
+	pub ccr_ttl_seconds: u64,
 
 	/// Disable CCR markers in compressed output
 	#[arg(long)]
-	pub no_ccr_marker:bool,
+	pub no_ccr_marker: bool,
 
 	/// Enable tool relay endpoint (POST /tool/relay)
 	#[arg(long)]
-	pub tool_relay:bool,
+	pub tool_relay: bool,
 
 	/// Hermes callback URL for CCR notifications
 	#[arg(long, env = "APHRODITE_NOTIFY_URL")]
-	pub notify_url:Option<String>,
+	pub notify_url: Option<String>,
 
 	/// Hermes API key for callback auth
 	#[arg(long, env = "APHRODITE_NOTIFY_KEY", hide_env_values = true)]
-	pub notify_key:Option<String>,
+	pub notify_key: Option<String>,
 
 	/// Enable dev mode - verbose request/response logging
 	#[arg(long)]
-	pub dev:bool,
+	pub dev: bool,
 
 	/// Use compact log format (no timestamps, no targets)
 	#[arg(long, env = "APHRODITE_LOG_COMPACT")]
-	pub log_compact:bool,
+	pub log_compact: bool,
 
 	/// Upstream request timeout in seconds (default: 300)
 	#[arg(long, default_value = "300")]
-	pub timeout:u64,
+	pub timeout: u64,
 }
 
 /// Multi-proxy configuration loaded from aphrodite.toml.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MultiConfig {
-	pub defaults:Option<Defaults>,
-	pub proxies:Vec<ProxyConfig>,
-	pub compression:Option<CompressionConfig>,
-	pub previews:Option<PreviewsConfig>,
-	pub prompts:Option<PromptsConfig>,
+	pub defaults: Option<Defaults>,
+	pub proxies: Vec<ProxyConfig>,
+	pub compression: Option<CompressionConfig>,
+	pub previews: Option<PreviewsConfig>,
+	pub prompts: Option<PromptsConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Defaults {
-	pub api_url:Option<String>,
-	pub model:Option<String>,
-	pub ccr_ttl_seconds:Option<u64>,
-	pub api_key:Option<String>,
+	pub api_url: Option<String>,
+	pub model: Option<String>,
+	pub ccr_ttl_seconds: Option<u64>,
+	pub api_key: Option<String>,
 }
 
 /// Compression knobs - thresholds, engine, auto-expand, classifier poll.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct CompressionConfig {
-	pub engine_threshold_pct:Option<u32>,
-	pub engine_protect_first:Option<u32>,
-	pub engine_protect_last:Option<u32>,
-	pub engine_min_msgs:Option<u32>,
-	pub tool_threshold_token:Option<u32>,
-	pub tool_threshold_cache:Option<u32>,
-	pub terminal_threshold:Option<u32>,
-	pub inline_threshold:Option<u32>,
-	pub auto_expand:Option<bool>,
-	pub auto_expand_limit:Option<u32>,
-	pub catalog_mode:Option<String>,
-	pub classifier_poll:Option<bool>,
-	pub code_multiplier:Option<f64>,
+	pub engine_threshold_pct: Option<u32>,
+	pub engine_protect_first: Option<u32>,
+	pub engine_protect_last: Option<u32>,
+	pub engine_min_msgs: Option<u32>,
+	pub tool_threshold_token: Option<u32>,
+	pub tool_threshold_cache: Option<u32>,
+	pub terminal_threshold: Option<u32>,
+	pub inline_threshold: Option<u32>,
+	pub auto_expand: Option<bool>,
+	pub auto_expand_limit: Option<u32>,
+	pub catalog_mode: Option<String>,
+	pub classifier_poll: Option<bool>,
+	pub code_multiplier: Option<f64>,
 }
 
 /// Preview knobs - model-aware templates, code structure maps.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PreviewsConfig {
-	pub model_family:Option<String>,
-	pub code_structure_map:Option<bool>,
-	pub preview_max_chars:Option<u32>,
-	pub rust_preview_lines:Option<u32>,
+	pub model_family: Option<String>,
+	pub code_structure_map: Option<bool>,
+	pub preview_max_chars: Option<u32>,
+	pub rust_preview_lines: Option<u32>,
 }
 
 /// Prompt knobs - how the system instructs the LLM about CCR.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PromptsConfig {
-	pub retrieve_guidance:Option<String>,
-	pub ccr_marker_hint:Option<bool>,
-	pub catalog_intent_hints:Option<bool>,
+	pub retrieve_guidance: Option<String>,
+	pub ccr_marker_hint: Option<bool>,
+	pub catalog_intent_hints: Option<bool>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ProxyConfig {
-	pub name:Option<String>,
+	pub name: Option<String>,
 	#[serde(default)]
-	pub listen:Option<String>,
-	pub mode:Option<String>,
-	pub api_key:Option<String>,
-	pub api_url:Option<String>,
-	pub model:Option<String>,
-	pub tool_relay:Option<bool>,
-	pub dev:Option<bool>,
-	pub ccr_ttl_seconds:Option<u64>,
-	pub ccr_db_path:Option<String>,
-	pub notify_url:Option<String>,
-	pub notify_key:Option<String>,
-	pub timeout:Option<u64>,
-	pub max_context:Option<usize>,
-	pub max_output:Option<usize>,
+	pub listen: Option<String>,
+	pub mode: Option<String>,
+	pub api_key: Option<String>,
+	pub api_url: Option<String>,
+	pub model: Option<String>,
+	pub tool_relay: Option<bool>,
+	pub dev: Option<bool>,
+	pub ccr_ttl_seconds: Option<u64>,
+	pub ccr_db_path: Option<String>,
+	pub notify_url: Option<String>,
+	pub notify_key: Option<String>,
+	pub timeout: Option<u64>,
+	pub max_context: Option<usize>,
+	pub max_output: Option<usize>,
 }
 
 impl MultiConfig {
 	/// Load from the given aphrodite.toml path.
-	pub fn load(path:&str) -> anyhow::Result<Self> {
+	pub fn load(path: &str) -> anyhow::Result<Self> {
 		let content = std::fs::read_to_string(path)?;
 		Ok(toml::from_str(&content)?)
 	}
@@ -294,9 +290,9 @@ impl MultiConfig {
 	/// API key fallback chain: `proxy.api_key` → `defaults.api_key` →
 	/// `APHRODITE_API_KEY` → `DEEPSEEK_API_KEY` → `HEADROOM_DEEPSEEK_KEY`.
 	/// Returns an error if no API key is found after all fallbacks.
-	pub fn resolve(&self, cfg:&ProxyConfig) -> anyhow::Result<Cli> {
+	pub fn resolve(&self, cfg: &ProxyConfig) -> anyhow::Result<Cli> {
 		let d = self.defaults.as_ref();
-		let api_key:String = cfg
+		let api_key: String = cfg
 			// API key fallback chain: explicit config → APHRODITE_API_KEY → DEEPSEEK_API_KEY → HEADROOM_DEEPSEEK_KEY
 		.api_key
 			.clone()
@@ -312,7 +308,7 @@ impl MultiConfig {
 		// explicitly set).  After parsing, override with env var if set - this
 		// lets multiple concurrent Hermes Agent instances each point at their
 		// own proxy pair without editing aphrodite.toml.
-		let listen:SocketAddr = match cfg.listen.as_deref() {
+		let listen: SocketAddr = match cfg.listen.as_deref() {
 			Some(s) => s.parse().map_err(|_| anyhow::anyhow!("invalid listen address: {s}"))?,
 			None => "127.0.0.1:9797".parse().unwrap(),
 		};
@@ -328,8 +324,8 @@ impl MultiConfig {
 			anyhow::bail!("max_output ({max_output}) must be less than max_context ({max_context})");
 		}
 		Ok(Cli {
-			command:None,
-			mode:match cfg.mode.as_deref() {
+			command: None,
+			mode: match cfg.mode.as_deref() {
 				Some("token") => ProxyMode::Token,
 				Some("cache") => ProxyMode::Cache,
 				None => {
@@ -353,13 +349,13 @@ impl MultiConfig {
 			// dual-proxy split that the existing per-mode
 			// `APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT` overrides above
 			// are already careful to respect.
-			api_url:std::env::var("APHRODITE_API_URL")
+			api_url: std::env::var("APHRODITE_API_URL")
 				.ok()
 				.or_else(|| cfg.api_url.clone())
 				.or_else(|| d.and_then(|d| d.api_url.clone()))
 				.unwrap_or_else(|| "https://api.openai.com".into()),
 			api_key,
-			model:std::env::var("APHRODITE_MODEL")
+			model: std::env::var("APHRODITE_MODEL")
 				.ok()
 				.or_else(|| cfg.model.clone())
 				.or_else(|| d.and_then(|d| d.model.clone()))
@@ -367,22 +363,22 @@ impl MultiConfig {
 			max_context,
 			max_output,
 			// Resolve from toml - proxy.rs handles None default
-			ccr_db_path:std::env::var("APHRODITE_DB")
+			ccr_db_path: std::env::var("APHRODITE_DB")
 				.ok()
 				.or_else(|| cfg.ccr_db_path.clone())
 				.filter(|s| !s.is_empty())
 				.map(Into::into),
-			ccr_ttl_seconds:env_parse_warn::<u64>("APHRODITE_CCR_TTL")
+			ccr_ttl_seconds: env_parse_warn::<u64>("APHRODITE_CCR_TTL")
 				.or(cfg.ccr_ttl_seconds)
 				.or_else(|| d.and_then(|d| d.ccr_ttl_seconds))
 				.unwrap_or(3600),
-			no_ccr_marker:false,
-			tool_relay:cfg.tool_relay.unwrap_or(false),
-			notify_url:std::env::var("APHRODITE_NOTIFY_URL").ok().or_else(|| cfg.notify_url.clone()),
-			notify_key:std::env::var("APHRODITE_NOTIFY_KEY").ok().or_else(|| cfg.notify_key.clone()),
-			dev:cfg.dev.unwrap_or(false),
-			log_compact:false,
-			timeout:{
+			no_ccr_marker: false,
+			tool_relay: cfg.tool_relay.unwrap_or(false),
+			notify_url: std::env::var("APHRODITE_NOTIFY_URL").ok().or_else(|| cfg.notify_url.clone()),
+			notify_key: std::env::var("APHRODITE_NOTIFY_KEY").ok().or_else(|| cfg.notify_key.clone()),
+			dev: cfg.dev.unwrap_or(false),
+			log_compact: false,
+			timeout: {
 				let t = cfg.timeout.unwrap_or(300);
 				if t > 600 {
 					tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
@@ -403,26 +399,24 @@ impl MultiConfig {
 	/// no way to tell "my override didn't apply" from "I didn't set an
 	/// override", the same silent-failure class as the missing-CCR-
 	/// directory bug this override was added alongside.
-	fn apply_port_override(listen:SocketAddr, env_var:&str) -> SocketAddr {
+	fn apply_port_override(listen: SocketAddr, env_var: &str) -> SocketAddr {
 		match std::env::var(env_var) {
-			Ok(p) => {
-				match p.parse::<u16>() {
-					Ok(port) => {
-						let mut addr = listen;
-						addr.set_port(port);
-						tracing::info!("{}={} overriding listen to {}", env_var, port, addr);
-						addr
-					},
-					Err(_) => {
-						tracing::warn!(
-							"{}={:?} is not a valid port (1-65535); ignoring override, using {}",
-							env_var,
-							p,
-							listen,
-						);
-						listen
-					},
-				}
+			Ok(p) => match p.parse::<u16>() {
+				Ok(port) => {
+					let mut addr = listen;
+					addr.set_port(port);
+					tracing::info!("{}={} overriding listen to {}", env_var, port, addr);
+					addr
+				},
+				Err(_) => {
+					tracing::warn!(
+						"{}={:?} is not a valid port (1-65535); ignoring override, using {}",
+						env_var,
+						p,
+						listen,
+					);
+					listen
+				},
 			},
 			Err(_) => listen,
 		}
@@ -437,7 +431,7 @@ mod tests {
 	/// (`APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT`), since `cargo test`
 	/// runs this module's tests concurrently by default.
 	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
-		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+		static G: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
 		G.get_or_init(|| std::sync::Mutex::new(()))
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -465,7 +459,9 @@ mod tests {
 		assert!(!env_bool("APHRODITE_TEST_BOOL"), "absent should be false");
 	}
 
-	fn multi_config_from_toml(toml_str:&str) -> MultiConfig { toml::from_str(toml_str).expect("valid test TOML") }
+	fn multi_config_from_toml(toml_str: &str) -> MultiConfig {
+		toml::from_str(toml_str).expect("valid test TOML")
+	}
 
 	#[test]
 	fn test_resolve_default_ports_per_mode() {

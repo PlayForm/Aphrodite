@@ -11,11 +11,13 @@ use std::collections::HashMap;
 /// everything from the first `|` onward and trim surrounding whitespace so
 /// every retrieval site tolerates the same inputs `resolve_one` already does.
 /// Idempotent: normalizing an already-bare hash is a no-op.
-pub fn normalize_hash(raw:&str) -> &str { raw.split('|').next().unwrap_or(raw).trim() }
+pub fn normalize_hash(raw: &str) -> &str {
+	raw.split('|').next().unwrap_or(raw).trim()
+}
 
 /// Check if a string is a valid CCR hash (>=24 hex chars, or `i:` prefix with
 /// >=6 hex chars).
-pub fn is_valid_ccr_hash(h:&str) -> bool {
+pub fn is_valid_ccr_hash(h: &str) -> bool {
 	if h.len() < 8 {
 		return false;
 	}
@@ -37,13 +39,13 @@ pub fn is_valid_ccr_hash(h:&str) -> bool {
 /// - `meta`: optional metadata key-value pairs
 /// - `center`: optional center annotation
 pub fn ccr_marker(
-	hash_val:&str,
-	ccr_type:&str,
-	size:usize,
-	preview:&str,
-	headroom_budget:Option<u32>,
-	meta:Option<&HashMap<String, String>>,
-	center:Option<&str>,
+	hash_val: &str,
+	ccr_type: &str,
+	size: usize,
+	preview: &str,
+	headroom_budget: Option<u32>,
+	meta: Option<&HashMap<String, String>>,
+	center: Option<&str>,
 ) -> String {
 	// Sanitize preview: newlines → spaces (| is safe — the marker is on its own line).
 	let mut safe = preview.replace(['\n', '\r'], " ").trim().to_string();
@@ -65,7 +67,7 @@ pub fn ccr_marker(
 
 	// Metadata string
 	let meta_str = if let Some(m) = meta {
-		let parts:Vec<String> = m
+		let parts: Vec<String> = m
 			.iter()
 			.filter_map(|(k, v)| {
 				let sv = v.replace('|', "/").replace('\n', " ").trim().to_string();
@@ -94,7 +96,7 @@ pub fn ccr_marker(
 /// is already a `[label:...]`-shaped string, emit it verbatim on the preview
 /// line; only wrap bare previews (e.g. cache-mode raw excerpts) in the
 /// `[{center_str}:...]` frame. A preview is thus produced exactly once.
-fn render_marker(preview:&str, ccr_type:&str, meta:&str, center:Option<&str>, hash:&str, size:usize) -> String {
+fn render_marker(preview: &str, ccr_type: &str, meta: &str, center: Option<&str>, hash: &str, size: usize) -> String {
 	let center_str = center.unwrap_or(ccr_type);
 	let meta_part = if meta.is_empty() { String::new() } else { format!("\n[meta:{}]", meta) };
 
@@ -112,7 +114,7 @@ fn render_marker(preview:&str, ccr_type:&str, meta:&str, center:Option<&str>, ha
 /// Requires a leading `[`, a matching trailing `]`, and a `[word:` label head
 /// (`\[\w+:`) so a bare excerpt that merely happens to start with `[` isn't
 /// mistaken for a preview.
-fn is_self_bracketed_preview(preview:&str) -> bool {
+fn is_self_bracketed_preview(preview: &str) -> bool {
 	let p = preview.trim();
 	if !p.starts_with('[') || !p.ends_with(']') {
 		return false;
@@ -128,7 +130,7 @@ fn is_self_bracketed_preview(preview:&str) -> bool {
 }
 
 /// Parse the preview field from a marker line.
-pub fn parse_preview(marker_line:&str) -> Option<String> {
+pub fn parse_preview(marker_line: &str) -> Option<String> {
 	let start = marker_line.find('[')?;
 	let colon = marker_line[start..].find(':')?;
 	let end = marker_line.rfind(']')?;
@@ -157,12 +159,12 @@ pub fn parse_preview(marker_line:&str) -> Option<String> {
 /// the `⫷` opener (previously accepted `⫸` as a closer but never `⫷` as an
 /// opener) meant the Unicode-glyph marker style was silently never
 /// extracted at all.
-static HASH_RE:std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+static HASH_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
 	regex::Regex::new(r"(?:<<<|\[|\u{2af7})CCR:([0-9a-fA-F:i]{6,64})(?:\|[^\]>\n]*?)?(?:\]|>>>|\u{2af8})").unwrap()
 });
 
 /// Extract all CCR hashes from text.
-pub fn extract_hashes(text:&str) -> Vec<String> {
+pub fn extract_hashes(text: &str) -> Vec<String> {
 	HASH_RE
 		.captures_iter(text)
 		.filter_map(|cap| cap.get(1))

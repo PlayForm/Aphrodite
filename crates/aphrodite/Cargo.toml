@@ -84,6 +84,12 @@ s2 = "0.1.0"
 
 [features]
 default = ["proxy"]
+# S2 context navigation (`aphrodite_navigate`). Off by default: it pulls in the
+# s2-navigate crate and adds a tool most sessions never call. Declared here even
+# though nothing in `default` enables it - `cfg(feature = "navigation")` appears
+# in flow.rs/lib.rs, and an undeclared feature makes `unexpected_cfg_condition`
+# fire, which is a hard error under CI's `-D warnings`.
+navigation = []
 proxy = [
 	"axum",
 	"tokio",
