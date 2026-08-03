@@ -1,9 +1,10 @@
 # Tool Relay Tools
 
 Aphrodite exposes 13 tools to the Hermes agent for compression, retrieval,
-stats, and session management (14 when the optional `navigation` feature is
-compiled in, which adds `aphrodite_navigate`). All of them dispatch entirely
-inside the Rust
+stats, and session management. A 14th, `aphrodite_navigate`, is gated behind an
+optional `navigation` feature that does not currently build - `s2-navigate` was
+dropped as a dependency for crates.io publishing and the feature has not been
+restored. All of them dispatch entirely inside the Rust
 dylib - the Python plugin shim forwards tool calls in and returns the JSON
 result verbatim; there's no separate Python-side tool logic to know about.
 

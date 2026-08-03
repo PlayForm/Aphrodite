@@ -84,11 +84,13 @@ s2 = "0.1.0"
 
 [features]
 default = ["proxy"]
-# S2 context navigation (`aphrodite_navigate`). Off by default: it pulls in the
-# s2-navigate crate and adds a tool most sessions never call. Declared here even
-# though nothing in `default` enables it - `cfg(feature = "navigation")` appears
-# in flow.rs/lib.rs, and an undeclared feature makes `unexpected_cfg_condition`
-# fire, which is a hard error under CI's `-D warnings`.
+# S2 context navigation (`aphrodite_navigate`). DECLARED BUT NOT CURRENTLY
+# BUILDABLE: 8e9a8c3 removed the unpublishable `s2-navigate` dependency for
+# crates.io, but left the `cfg(feature = "navigation")` gates in flow.rs/lib.rs
+# behind, so enabling this fails with an unresolved `s2_navigate` import.
+# It must still be DECLARED: an undeclared feature makes
+# `unexpected_cfg_condition` fire on the cfg gates, which is a hard error under
+# CI's `-D warnings`. Restore the dependency before enabling.
 navigation = []
 proxy = [
 	"axum",

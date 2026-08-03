@@ -51,8 +51,19 @@
   `BINARY_VERSION`, `package.json` and both README badges added to the
   location list.
 - `docs/tool-relay/tools.md` - notes that schema detail is now authoritative
-  in `schemas.rs`, and that the tool count is 14 with the optional
-  `navigation` feature compiled in.
+  in `schemas.rs`, and that the optional `navigation` feature (a 14th tool,
+  `aphrodite_navigate`) does not currently build.
+
+### Known issues
+
+- **The `navigation` feature does not compile.** `8e9a8c3` removed the
+  unpublishable `s2-navigate` dependency but left the
+  `cfg(feature = "navigation")` gates in `flow.rs` / `lib.rs` behind, so
+  `--features navigation` fails on an unresolved `s2_navigate` import. The
+  feature is now *declared* in both `Cargo.toml`s - without a declaration,
+  `unexpected_cfg_condition` fires on those gates and hard-fails CI's
+  `-D warnings`, which is what broke the `Check` run on `13d9738`. Restoring
+  the dependency (or deleting the gates) is still outstanding.
 
 ## v1.3.6 - Preview Pipe Sanitization Fix (2026-07-24)
 
