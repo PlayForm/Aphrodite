@@ -75,7 +75,7 @@ pub fn insert_outcomes(state: &mut AphroditeState, outcomes: Vec<(String, ReadOu
 				}));
 			},
 			ReadOutcome::Loaded { content, size } => {
-				let ct = headroom_core::transforms::detect(&content);
+				let ct = headroom_core::transforms::content_detector::detect_content_type(&content).content_type;
 				let hash = headroom_core::ccr::compute_key(content.as_bytes());
 				let type_str = ct.as_str();
 				let preview = crate::build_preview(type_str, &content);

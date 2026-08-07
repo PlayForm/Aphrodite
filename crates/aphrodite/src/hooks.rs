@@ -177,7 +177,10 @@ fn transform_tool_result_inner(
 			// ls, test, grep, git log) so the reported `type` AND the preview
 			// both carry the high-signal shape. Detection stays in Aphrodite's
 			// layer - the vendored classifier is untouched.
-			let base = transforms::detect(content).as_str().to_string();
+			let base = transforms::content_detector::detect_content_type(content)
+				.content_type
+				.as_str()
+				.to_string();
 			let t = match base.as_str() {
 				"text" | "log" | "plain" | "" => crate::preview::detect_semantic_type(content)
 					.map(|s| s.to_string())
@@ -288,7 +291,7 @@ fn transform_terminal_output_inner(
 	let (type_str, classify_content): (String, &str) = match classify {
 		Some((c, t)) => (t.to_string(), c),
 		None => {
-			let ct = transforms::detect(content);
+			let ct = transforms::content_detector::detect_content_type(content).content_type;
 			let t = if content.contains("exit code:") || content.contains("Error:") {
 				"terminal".to_string()
 			} else {

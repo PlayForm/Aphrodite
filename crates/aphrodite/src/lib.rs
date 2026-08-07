@@ -241,7 +241,7 @@ pub extern "C" fn aphrodite_classify(content: *const c_char) -> *mut c_char {
 		if let Err(e) = check_content(&c) {
 			return to_json_error(e);
 		}
-		let ct = transforms::detect(&c);
+		let ct = transforms::content_detector::detect_content_type(&c).content_type;
 		to_json_ok(&serde_json::json!({"type":ct.as_str(),"lines":c.lines().count(),"bytes":c.len()}))
 	}))
 }
@@ -277,7 +277,7 @@ stateful!(aphrodite_compress, |s, content: *const c_char, hint: *const c_char| {
 	if content.len() > MAX_CONTENT {
 		return serde_json::json!({"error":"content exceeds 16MB limit"});
 	}
-	let ct = transforms::detect(&content);
+	let ct = transforms::content_detector::detect_content_type(&content).content_type;
 	let t = if hint.is_empty() || hint == "text" {
 		ct.as_str().to_string()
 	} else {
@@ -631,7 +631,7 @@ pub extern "C" fn aphrodite_dispatch(
 				serde_json::json!({"files":files,"total":files.len()})
 			},
 			"classify" => {
-				let ct = headroom_core::transforms::detect(content);
+				let ct = headroom_core::transforms::content_detector::detect_content_type(content).content_type;
 				serde_json::json!({"type":ct.as_str(),"lines":content.lines().count(),"bytes":content.len()})
 			},
 			"prefetch" => {

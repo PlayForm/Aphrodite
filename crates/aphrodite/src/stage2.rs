@@ -164,10 +164,13 @@ fn reduce_code(content: &str) -> Option<String> {
 	];
 
 	let mut sigs: Vec<String> = Vec::new();
-	for sp in &patterns {
-		for line in content.lines() {
-			let trimmed = line.trim();
-			if let Some(_caps) = regex_match(trimmed, sp.pattern) {
+	for line in content.lines() {
+		let trimmed = line.trim();
+		// Lowercase ONCE per line (was recomputed inside regex_match for
+		// every one of the 9 patterns → 9 allocs/line). Bug 18-P12.
+		let lower = trimmed.to_lowercase();
+		for sp in &patterns {
+			if let Some(_caps) = regex_match(trimmed, &lower, sp.pattern) {
 				let sig_line: String = trimmed.chars().take(120).collect();
 				sigs.push(format!("  [{}] {}", sp.kind, sig_line));
 			}
@@ -187,9 +190,9 @@ fn reduce_code(content: &str) -> Option<String> {
 }
 
 /// Lightweight regex-like matching using simple prefix + word boundary checks.
-fn regex_match(line: &str, pattern: &str) -> Option<Vec<String>> {
-	// Simplified: just check if line matches the pattern's intent
-	let lower = line.to_lowercase();
+fn regex_match(line: &str, lower: &str, pattern: &str) -> Option<Vec<String>> {
+	// `lower` is `line.to_lowercase()` computed once by the caller (per line),
+	// not per pattern, to avoid N allocations per line.
 
 	if pattern.contains(r"fn\s+(\w+)") {
 		// Rust/Go function: "pub fn name" or "fn name" or "async fn name"

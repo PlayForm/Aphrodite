@@ -18,8 +18,13 @@ pub const DEFAULT_INLINE_BYTE_BUDGET: usize = 256 * 1024 * 1024;
 
 /// Session state - one per loaded dylib instance.
 pub struct AphroditeState {
-	/// Inline content store: {hash: content}, LRU-ordered.
-	pub inline_store: VecDeque<(String, String)>,
+	/// Inline content store: {hash: content}. The `HashMap` gives O(1)
+	/// get/put/contains (was an O(n) `VecDeque` linear scan per op — bug
+	/// 18-P14); `inline_order` preserves LRU recency so eviction can drop
+	/// the least-recently-used entry from the back in O(1).
+	pub inline_store: HashMap<String, String>,
+	/// LRU order of `inline_store` keys; front = most-recent, back = LRU.
+	pub inline_order: VecDeque<String>,
 	/// Running total of `content.len()` across every entry in `inline_store`,
 	/// maintained incrementally by `inline_store_put` so eviction doesn't
 	/// need an O(n) rescan on every insert (report 05 F11).
@@ -167,7 +172,8 @@ pub struct MarkerEntry {
 impl Default for AphroditeState {
 	fn default() -> Self {
 		Self {
-			inline_store: VecDeque::with_capacity(INLINE_MAX),
+			inline_store: HashMap::with_capacity(INLINE_MAX),
+			inline_order: VecDeque::with_capacity(INLINE_MAX),
 			inline_store_bytes: 0,
 			inline_store_byte_budget: DEFAULT_INLINE_BYTE_BUDGET,
 			recent_markers: Vec::new(),
@@ -230,8 +236,10 @@ impl AphroditeState {
 		while self.inline_store.len() > INLINE_MAX
 			|| (self.inline_store_bytes > self.inline_store_byte_budget && !self.inline_store.is_empty())
 		{
-			if let Some((_, c)) = self.inline_store.pop_back() {
-				self.inline_store_bytes = self.inline_store_bytes.saturating_sub(c.len());
+			if let Some(lru) = self.inline_order.pop_back() {
+				if let Some(c) = self.inline_store.remove(&lru) {
+					self.inline_store_bytes = self.inline_store_bytes.saturating_sub(c.len());
+				}
 			} else {
 				break;
 			}
@@ -243,24 +251,24 @@ impl AphroditeState {
 	/// admits files up to 10MB each and the ABI admits blobs up to 16MB, so
 	/// 500 entries at the large end is a multi-GB worst case).
 	pub fn inline_store_put(&mut self, hash: String, content: String) {
-		// Remove existing entry if present (will be re-added at front),
-		// keeping the running byte total in sync.
-		if let Some(pos) = self.inline_store.iter().position(|(h, _)| h == &hash) {
-			if let Some((_, old)) = self.inline_store.remove(pos) {
-				self.inline_store_bytes = self.inline_store_bytes.saturating_sub(old.len());
-			}
+		// O(1) upsert: drop any prior entry (map + LRU order) so the
+		// running byte total stays in sync, then re-insert at the front.
+		if self.inline_store.remove(&hash).is_some() {
+			self.inline_order.retain(|h| h != &hash);
 		}
 		self.inline_store_bytes += content.len();
-		self.inline_store.push_front((hash, content));
+		self.inline_store.insert(hash.clone(), content);
+		self.inline_order.push_front(hash);
 		self.evict_over_budget();
 	}
 
-	/// Retrieve from inline store with LRU promotion.
+	/// Retrieve from inline store with LRU promotion (O(1) hash lookup).
 	pub fn inline_store_get(&mut self, hash: &str) -> Option<String> {
-		if let Some(pos) = self.inline_store.iter().position(|(h, _)| h == hash) {
-			let (h, c) = self.inline_store.remove(pos).unwrap();
-			self.inline_store.push_front((h, c.clone()));
-			Some(c)
+		if self.inline_store.contains_key(hash) {
+			// Promote to most-recent (front) without cloning the content.
+			self.inline_order.retain(|h| h != hash);
+			self.inline_order.push_front(hash.to_string());
+			self.inline_store.get(hash).cloned()
 		} else {
 			None
 		}
@@ -289,7 +297,7 @@ impl AphroditeState {
 	/// `inline_store_get`, this does NOT move the entry to the front, so the
 	/// recall renderer can check resolvability without perturbing LRU order.
 	pub fn inline_store_contains(&self, hash: &str) -> bool {
-		self.inline_store.iter().any(|(h, _)| h == hash)
+		self.inline_store.contains_key(hash)
 	}
 
 	/// Record a referenced file.
@@ -324,11 +332,10 @@ mod tests {
 		let mut s = AphroditeState::default();
 		s.inline_store_put("a".into(), "first".into());
 		s.inline_store_put("b".into(), "second".into());
-		// Get "a" promotes it to front
+		// Get "a" promotes it to front (most-recent in `inline_order`)
 		let _ = s.inline_store_get("a");
-		// "a" should now be at front
-		let front = s.inline_store.pop_front();
-		assert_eq!(front, Some(("a".into(), "first".into())));
+		// "a" should now be at the front of the LRU order
+		assert_eq!(s.inline_order.front().map(|h| h.as_str()), Some("a"));
 	}
 
 	#[test]

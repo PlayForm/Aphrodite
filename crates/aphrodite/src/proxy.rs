@@ -1030,6 +1030,13 @@ pub async fn proxy_handler(
 	// 02-F2: a `"stream": true` request goes out on `stream_client` (no
 	// total timeout), not the bounded `client` - see its doc comment.
 	let http_client = if body_wants_stream(&body_vec) { &state.stream_client } else { &state.client };
+	// F10 fix (above) builds `body_vec` once (one Vec alloc). Convert to
+	// `Bytes` here — outside the retry loop — so each attempt clones in O(1)
+	// (refcount) instead of copying the whole payload. The no-retry common
+	// path pays a single buffer move, not the two full copies the prior
+	// `body_vec.clone()` forced on every request (bug 18-P9: up to 4 copies
+	// of a 1MB body under retry load).
+	let body_bytes = bytes::Bytes::from(body_vec);
 	for attempt in 1..=3u32 {
 		let req = http_client
 			.request(method.clone(), &url)
@@ -1061,7 +1068,9 @@ pub async fn proxy_handler(
 				req = req.header(key, val);
 			}
 		}
-		match req.body(body_vec.clone()).send().await {
+	// `body_bytes` is the `Bytes` built once before the loop (see
+	// above); clone per attempt is O(1) refcount, never a full copy.
+	match req.body(body_bytes.clone()).send().await {
 			Ok(r) => {
 				upstream_result = Ok(r);
 				break;
