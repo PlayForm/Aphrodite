@@ -1,193 +1,141 @@
 <p align="center">
-  <img src="assets/aphrodite.png" alt="Aphrodite" width="120">
+  <img src="assets/aphrodite.png" alt="Aphrodite" width="720">
 </p>
 
 ---
 
-# Aphrodite 💋 (`aphrodite`)
+# [Aphrodite] 💋
 
-> **Your LLM burns 90% of its context on output it never reads. We fix that.**
+> [!NOTE]
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.
-> Up to 610× on the standard corpus (132× overall), ~10 ms end-to-end,
-> 26-type classifier, TOML-driven.
+> Up to 610× compression on the standard corpus (132× overall), ~10 ms end-to-end,
+> type-aware classifier, TOML-driven, dylib hot-reload.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/badge/release-v1.3.9-blue)](https://github.com/PlayForm/Aphrodite/releases)
-[![crates.io](https://img.shields.io/crates/v/aphrodite?color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/badge/plugin-v2.0.10-purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
-![rust](https://img.shields.io/badge/rust-1.88+-orange)
-[![license](https://img.shields.io/badge/license-CC0--1.0-lightgrey)](LICENSE)
+[![release](https://img.shields.io/static/v1?label=release&message=v1.3.9&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.0.10&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
+[![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](LICENSE)
 
 ---
 
 ## Install ⚡
 
-Aphrodite ships two build artifacts from two crates: the `aphrodite` proxy
-binary (standalone HTTP proxy, `:9797`/`:9798`) and the
-`libaphrodite_hermes.{dylib,so,dll}` dylib (loaded in-process by the Hermes
-plugin, no CLI of its own). You don't need to know this for the common path
-below - it starts mattering the moment something needs installing by hand.
+Aphrodite ships as a Hermes plugin (Rust dylib + standalone proxy binary).
+No Rust toolchain is required for the common path.
 
 ### As a Hermes plugin (recommended)
 
-```bash
-# Clone the standalone plugin repo
+**`Terminal`**
+
+```sh
 git clone https://github.com/PlayForm/Aphrodite-Hermes.git
 ln -s "$(pwd)/Aphrodite-Hermes" ~/.hermes/plugins/aphrodite
 hermes plugins enable aphrodite
 hermes
 ```
 
-On first launch, the plugin auto-downloads the `aphrodite` binary from
-[releases](https://github.com/PlayForm/Aphrodite/releases). No Rust toolchain needed.
+On first launch the plugin auto-downloads the `aphrodite` binary from
+[releases](https://github.com/PlayForm/Aphrodite/releases).
 
-### Via cargo install
+> [!IMPORTANT]
+>
+> Use the Hermes plugin method on Windows too — `download.ps1` is a native
+> PowerShell equivalent. See [docs/install/windows.md](docs/install/windows.md).
 
-```bash
-cargo install aphrodite          # proxy binary only - see note below
-cargo install aphrodite-hermes   # helper bin only - see note below
+### Via cargo
+
+**`Terminal`**
+
+```sh
+cargo install aphrodite          # proxy binary
+cargo install aphrodite-hermes   # dylib + helper bin
 aphrodite setup                  # plugin structure + config + symlink
 ```
 
-`cargo install` only ever copies a crate's `[[bin]]` target into
-`~/.cargo/bin/` - it does not (and cannot) distribute the `libaphrodite.dylib`
-/ `libaphrodite_hermes.dylib` cdylib artifacts these two crates also build.
-`aphrodite setup` will fail loudly ("dylib not found") if it can't locate
-them, and it's honest about that failure - but the dylibs themselves still
-need to come from somewhere: either a full source checkout
-(`cargo build --release -p aphrodite -p aphrodite-hermes`) or the
-release-download flow the "Hermes plugin" method above already uses
-(`plugins/aphrodite/download.sh`). If you only need the proxy binary itself
-(no Hermes plugin), `cargo install aphrodite` alone is sufficient.
+`cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/`.
+The `libaphrodite_hermes` dylib must come from a source checkout or the
+release-download flow above.
 
-> **Windows**: `plugins/aphrodite/download.ps1` is a native PowerShell
-> equivalent of `download.sh` - no Git Bash/WSL needed. See
-> [Windows install](docs/install/windows.md) for the fast path plus a fully
-> manual walkthrough. Full per-platform guides (including which of
-> Aphrodite's two build artifacts you actually need) live under
-> [docs/install/](docs/install/README.md).
+### From source
 
-### `cargo install` + one-shot bootstrap
+**`Terminal`**
 
-```bash
-cargo install aphrodite aphrodite-hermes
-aphrodite setup --api-key sk-... --api-url https://api.deepseek.com --model deepseek-v4-pro
-```
-
-`aphrodite setup` provisions `~/.hermes/aphrodite/` end to end - binaries,
-dylibs, `aphrodite.toml`, `plugin.yaml`, and `hermes plugins enable
-aphrodite` - in one command. **Its plugin-symlink step is currently a no-op
-on Windows** (Unix-only code path); see
-[docs/install/README.md](docs/install/README.md#the-aphrodite-setup-gap-on-windows)
-if you hit that.
-
-### From source (monorepo)
-
-```bash
+```sh
 git clone https://github.com/PlayForm/Aphrodite.git
 cd Aphrodite
-git submodule update --init --recursive  # required - vendored deps live in submodules
+git submodule update --init --recursive
 cargo build --release -p aphrodite -p aphrodite-hermes
-# Binary: target/release/aphrodite
-# Dylibs: target/release/libaphrodite.dylib, target/release/libaphrodite_hermes.dylib
 ```
-
-### What changes after install
-
-```
-~/.hermes/
-├── plugins/
-│   └── aphrodite/          ← symlink to Aphrodite-Hermes
-├── aphrodite/
-│   ├── aphrodite           ← auto-downloaded binary (~12 MB)
-│   └── ccr.db              ← SQLite CCR store (created on first run)
-└── profiles/<name>/
-    └── plugins/
-        └── aphrodite → ~/.hermes/plugins/aphrodite
-```
-
-The plugin registers **13 tools** (`aphrodite_*`), **5 hooks**, and a **context engine** -
-all routed through the Rust dylib. Two proxies launch automatically on `:9797` (cache)
-and `:9798` (token).
 
 ---
 
-## The Problem
+## The Problem 🔥
 
-Every time your agent reads a file, runs a build, searches code, or opens a
-browser - the raw output floods its context window. Thousands of tokens of
-compilation logs. Gigantic accessibility trees. Verbose JSON blobs. Your agent
-spends its precious context budget **reading noise** instead of reasoning.
+Every file read, build, code search, or browser open floods the agent's
+context with raw output — compilation logs, accessibility trees, JSON blobs.
+The agent spends its budget reading noise instead of reasoning.
 
-**Aphrodite intercepts output before it reaches the LLM and replaces it with a
-compact, structured preview.** The agent sees 15 tokens of metadata instead of
-500 tokens of raw text - and retrieves the full content only when it actually
-needs it.
+Aphrodite intercepts output before it reaches the LLM and replaces it with a
+compact, structured preview.
+The agent sees ~15 tokens of metadata instead of hundreds — and retrieves the
+full content only when it actually needs it.
 
 ---
 
 ## How It Works ⚙️
 
-```
+**`Pipeline`**
+
+```text
  ANY OUTPUT ──────► Aphrodite ──────► Agent (preview, not raw)
                        │
-                       ├─ build logs     → [build:1E 1W 142L | error[E0432]: ...]
-                       ├─ terminal       → [terminal:14L exit code: 0]
-                       ├─ file read      → [code:3fns|2structs fn main() 414L]
-                       ├─ grep/ripgrep   → [grep:4 hits in 3 files | src/x.rs:12 …]
-                       ├─ git status     → [git:2M 1A 1D 3?? | src/x.rs +N more]
-                       ├─ git log        → [gitlog:2 commits | abc123 … → def456 …]
-                       ├─ test output    → [test:220 pass 0 fail 1 ignored | 0.31s]
-                       ├─ dir listing    → [ls:3 files 2 dirs | .rs×2 .md×1]
-                       ├─ diff           → [diff:2F +7/-3 12L | src/main.rs Cargo.toml]
-                       ├─ JSON blobs     → [json:5items 3L]
-                       └─ plain text     → [text:3L 50B | first line hint …]
+                       ├─ build logs  → [build:1E 1W 142L | error[E0432]: …]
+                       ├─ terminal    → [terminal:14L exit code: 0]
+                       ├─ file read   → [code:3fns|2structs fn main() 414L]
+                       ├─ grep/ripgrep→ [grep:4 hits in 3 files | src/x.rs:12 …]
+                       ├─ git status  → [git:2M 1A 1D 3?? | src/x.rs +N more]
+                       ├─ diff        → [diff:2F +7/-3 12L | src/main.rs Cargo.toml]
+                       └─ plain text  → [text:3L 50B | first line hint …]
 
     Agent decides:
     • Preview is enough → skip retrieval, keep reasoning
-    • Needs detail     → aphrodite_retrieve(hash) → full content
-
-    Context engine (automatic):
-    • Session hits 45% context → middle turns auto-compressed to CCR
-    • Agent never hits context window ceiling
+    • Needs detail      → aphrodite_retrieve(hash) → full content
 ```
 
-Four layers, all fast (classification 40-123 ns; whole compress step
-sub-millisecond, dwarfed by the HTTP round-trip):
+Four fast layers (classification 40–123 ns; whole compress step sub-millisecond):
 
-1. **Classify** - 26-type regex classifier identifies content (40-123 ns)
-2. **Preview** - enriched, type-aware previews (git/test/grep/log/build/diff/
-   code/ls, etc.) produced by default on both the proxy and hook paths
-3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker
-4. **Decide** - Agent reads preview, retrieves only when needed
+1. **Classify** — type-aware classifier identifies content.
+2. **Preview** — enriched, type-aware previews produced automatically.
+3. **Store** — BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker.
+4. **Decide** — agent reads preview, retrieves only when needed.
 
-The enriched preview shapes are emitted automatically (no flag) - see
-[docs/proxy/compression.md](docs/proxy/compression.md#enriched-preview-catalog)
-for the full content-type → preview catalog.
+The context engine auto-compresses middle turns to CCR as the session fills,
+so the agent never hits the context ceiling.
 
 ---
 
 ## Architecture 🏗️
 
-```
-crates/aphrodite/          ← Core compression engine (binary + cdylib)
-  ├── proxy.rs             ← HTTP proxy: classify → compress → store → preview
-  ├── hooks.rs             ← transform_tool_result, transform_terminal_output
-  ├── resolve.rs           ← CCR marker resolution (nested, recursive)
-  ├── stage2.rs            ← Semantic reduction (JSON, build, diff, code)
-  ├── struct_extract.rs    ← Code structure extraction (Rust, Python, Go, JS/TS)
-  ├── state.rs             ← Session state, inline store, LRU
-  ├── catalog.rs, session.rs, marker.rs, prefetch.rs, config_loader.rs
-  └── lib.rs               ← 25 C ABI functions for dylib loading
+**`Layout`**
 
-crates/aphrodite-hermes/   ← Hermes-specific integration (cdylib)
-  ├── tools.rs             ← 13 tool dispatch handlers
-  ├── schemas.rs           ← JSON Schema definitions
-  └── skills.rs            ← Bundled Hermes skills
+```text
+crates/aphrodite/          ← Core engine (binary + cdylib)
+  proxy.rs                 ← HTTP proxy: classify → compress → store → preview
+  hooks.rs                 ← transform_tool_result, transform_terminal_output
+  resolve.rs               ← CCR marker resolution (recursive)
+  stage2.rs                ← Semantic reduction (JSON, build, diff, code)
+  struct_extract.rs        ← Code structure extraction (Rust, Python, Go, JS/TS)
 
-plugins/aphrodite/         ← Thin Python loader (421 lines)
-  └── __init__.py          ← loads dylib, registers hooks/tools/engine via C ABI
+crates/aphrodite-hermes/   ← Hermes bridge (cdylib)
+  tools.rs                 ← 14 tool dispatch handlers
+  schemas.rs               ← JSON Schema definitions
+  skills.rs                ← Bundled Hermes skills
+
+plugins/aphrodite/         ← Thin Python loader (ctypes FFI)
+  __init__.py              ← loads dylib, registers hooks/tools/engine
 ```
 
 | Mode  | Port  | Backend   | Threshold | Best for                  |
@@ -195,33 +143,15 @@ plugins/aphrodite/         ← Thin Python loader (421 lines)
 | Cache | :9797 | In-memory |   >8 KB   | Speed, transient sessions |
 | Token | :9798 | SQLite    |   >1 KB   | Durability, tool relay    |
 
-All compression logic lives in the Rust dylib. Python is a thin FFI loader.
+All compression logic lives in the Rust dylib; Python is a thin FFI loader.
 Hot-reload: rebuild the dylib → mtime change detected → next call picks up new
-code automatically. The two Aphrodite crates carry unit tests (plus the full
-vendored Headroom suite) - run `cargo test --workspace` to see the current
-count and confirm they pass.
+code automatically.
 
----
-
-## What You Save 💰
-
-| Content type              | Without Aphrodite | With Aphrodite |  Savings |
-| :------------------------ | ----------------: | -------------: | -------: |
-| Git diff (42L)            |          ~350 tok |        ~15 tok |  **23×** |
-| Build output (142L)       |        ~1,400 tok |        ~10 tok | **140×** |
-| Traceback                 |           ~45 tok |        ~12 tok | **3.8×** |
-| Terminal output           |          ~200 tok |        ~10 tok |  **20×** |
-| Table (50 rows)           |          ~650 tok |         ~8 tok |  **81×** |
-| JSON blob (30 keys)       |          ~400 tok |        ~10 tok |  **40×** |
-| Web search (10 results)   |          ~800 tok |        ~15 tok |  **53×** |
-| Browser snapshot (342 el) |        ~5,000 tok |        ~12 tok | **416×** |
-
-**Median: 23× fewer tokens on tool output.** In a session with 50+ tool calls,
-that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
-
-**Real example:** a 6-turn dev session (builds, tests, docs, git) compressed
-216 KB of raw tool output into 12 markers - **~54,000 tokens → ~240 tokens**
-(225× reduction), leaving 99.6% of the context window free for reasoning.
+> [!NOTE]
+>
+> `plugins/aphrodite/` is a separate repo
+> ([PlayForm/Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes)),
+> tracked here as a git submodule.
 
 ---
 
@@ -229,7 +159,7 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 
 | Tool                        | Description                                              |
 | :-------------------------- | :------------------------------------------------------- |
-| `aphrodite_retrieve`        | Resolve `<<<CCR:hash\|type>>>` markers                   |
+| `aphrodite_retrieve`        | Resolve `<<<CCR:hash\|type\|size>>>` markers             |
 | `aphrodite_compress`        | Compress content via CCR with type hint                  |
 | `aphrodite_stats`           | Proxy health, engine status, inline store size           |
 | `aphrodite_rebuild`         | Rebuild binary, kill proxies, restart                    |
@@ -242,228 +172,66 @@ that's 15,000-50,000 tokens saved - enough for an entire extra reasoning turn.
 | `aphrodite_reclassify`      | Retroactive metadata enrichment for unclassified CCR     |
 | `aphrodite_prefetch`        | Read + compress files on demand; markers returned inline |
 | `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors           |
+| `aphrodite_navigate`        | S2 context navigation: zoom into stored recall index     |
 
 ---
 
-## Under the Hood 🧩
+## Configuration 🎛️
 
-> **`./plugins/aphrodite/` is a separate repo** - it lives at
-> [PlayForm/Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes).
-> This monorepo tracks it as a git submodule.
+Everything lives in `aphrodite.toml` — no recompile needed.
+Edit + save (or `POST /reload`) applies changes immediately.
 
-```
-plugins/aphrodite/          ← Standalone Hermes plugin (git submodule)
-  __init__.py               ← Python loader (ctypes FFI, thin shim)
-  plugin.yaml               ← 13 tools, 5 hooks, context engine
-  download.sh               ← Binary auto-downloader (macOS/Linux/Git Bash/WSL)
-  download.ps1              ← Binary auto-downloader (native Windows PowerShell)
-  binaries/                 ← Platform-native dylib + proxy binary
-  README.md                 ← Standalone install instructions
-
-crates/aphrodite/           ← Core engine (binary + cdylib)
-  src/
-    lib.rs                  ← 25 C ABI functions (session, hooks, catalog, …)
-    proxy.rs                ← HTTP proxy server (:9797/:9798)
-    hooks.rs                ← transform_tool_result, terminal, pre/post LLM
-    session.rs              ← Turn lifecycle, conversation index, git cache
-    state.rs                ← AphroditeState, inline store, LRU, markers
-    marker.rs               ← CCR marker generation + parse (<<<CCR:…>>>)
-    catalog.rs              ← Full/compact/TOC catalog display
-    resolve.rs              ← Recursive CCR marker expansion (5 levels)
-    stage2.rs               ← Semantic reduction for JSON, build, diff, code
-    struct_extract.rs       ← Code structure maps (Rust, Python, Go, JS/TS)
-    config_loader.rs        ← TOML + env var config loading
-    prefetch.rs             ← On-demand file read + compress
-
-crates/aphrodite-hermes/    ← Hermes bridge
-  src/
-    lib.rs                  ← Universal dispatch (5 hooks → Rust functions)
-    tools.rs                ← 13 tool handler implementations
-    schemas.rs              ← JSON Schema for all tools
-    skills.rs               ← Bundled skill registration for Hermes
-
-vendor/headroom/            ← Headroom fork (git submodule)
-  crates/headroom-core/     ← Content transforms, tokenizer, smart crusher
-```
-
-The two Aphrodite crates carry unit tests (the vendored Headroom fork carries
-its own suite) - run `cargo test --workspace` for the current count and
-pass/fail status. CC0-1.0 - public domain.
-
----
-
-## Developer Workflow 🛠️
-
-```bash
-# Terminal 1: cargo watch (rebuilds dylib on change)
-# Build BOTH packages, not just `aphrodite` - `aphrodite-hermes` (the crate
-# that actually produces libaphrodite_hermes.dylib) depends ON `aphrodite`,
-# not the other way around, so `cargo build -p aphrodite` alone never
-# touches the dylib at all, no matter what changed.
-APHRODITE_NO_AUTO_LAUNCH=1 cargo watch -x 'build -p aphrodite -p aphrodite-hermes'
-
-# Terminal 2: Hermes (loads hot-reloaded dylib)
-hermes --profile dev-aphrodite
-```
-
-| What changes   | What happens                                              |
-| -------------- | --------------------------------------------------------- |
-| Any `.rs` file | cargo watch rebuilds → dylib mtime changes                |
-| Next hook call | Plugin detects new mtime → reloads dylib                  |
-| Any `.py` file | `/quit` + `hermes` restart (Hermes caches Python imports) |
-| Proxy binary   | `aphrodite_rebuild` tool → kill + copy + restart          |
-
-### Git hooks
-
-`git config core.hooksPath .githooks` (set automatically by `pnpm install`
-via `package.json`'s `prepare` script, which also runs an initial submodule
-sync - see below) enables `.githooks/post-checkout` and `.githooks/post-merge`.
-Both run `.githooks/lib/sync-submodules.sh`, which floats each of the three
-vendored submodules (`plugins/aphrodite`, `vendor/headroom`, `vendor/rtk`) to
-its configured tracking branch tip (`branch = Current` in `.gitmodules`)
-after every checkout/merge/pull, and auto-commits the resulting pin bump in
-this repo's index (scoped to just the submodule paths - never sweeps up any
-other staged work). The net effect: local checkouts never sit behind
-`Current`, and a fresh clone's plain `git submodule update --init
---recursive` (no `--remote` needed) lands close to `Current`'s tip too,
-since the pin is kept continuously in sync rather than only moving via an
-explicit release action.
-
-Safety: a submodule with uncommitted changes, or with local commits not yet
-pushed to its tracking branch, is skipped (reported on stderr) rather than
-force-reset - the sync only ever performs a fast-forward-equivalent move.
-An in-progress rebase/merge/cherry-pick in this repo also skips the sync
-outright. The remote to fetch from is resolved by matching `.gitmodules`'
-own configured `url` against each submodule's local remotes, rather than
-assuming a remote named `origin` - `vendor/rtk`'s `origin` happens to be the
-upstream `rtk-ai/rtk` repo (no `Current` branch there); the fork this repo
-actually tracks is under a remote named `Source`.
-
-`Maintain/scripts/release/auto-release.sh`'s own `SYNC_SUBMODULES=1` opt-in
-float-at-release-time behavior is unaffected by this and still available for
-an explicit, reviewed pin bump as part of a release.
-
----
-
-## Quick Start 🚀
-
-```bash
-# Build
-cargo build --release -p aphrodite
-
-# Run (both proxies start automatically)
-aphrodite
-
-# Verify
-curl http://127.0.0.1:9798/health
-# -> {"status":"healthy","ccr":true,"mode":"token","version":"1.3.8","fill_pct":90.0}
-
-# Dev loop with auto-reload (also rebuilds aphrodite-hermes's dylib, not just
-# the proxy binary - see "Developer Workflow" above)
-RUST_LOG=aphrodite=info cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x 'run -p aphrodite'
-```
-
-### Configuration - everything in one file
+**`aphrodite.toml`**
 
 ```toml
-# aphrodite.toml - no recompile needed
 [compression]
-tool_threshold_token = 512   # token proxy threshold (bytes)
-tool_threshold_cache = 4096  # cache proxy threshold (bytes)
-inline_threshold = 2048      # inline-vs-durable CCR storage cutoff (bytes)
-code_multiplier = 3.0        # multiply threshold for code_* content types
+tool_threshold_token = 256   # token proxy threshold (bytes)
+tool_threshold_cache = 2048  # cache proxy threshold (bytes)
+terminal_threshold  = 512    # terminal output threshold (bytes)
+inline_threshold    = 1024  # inline-vs-durable CCR storage cutoff (bytes)
+code_multiplier     = 3.0    # multiply threshold for code_* content types
 ```
 
-These four `[compression]` fields are live on the Rust proxy: each is
-overridable via an `APHRODITE_*` env var, and editing + saving the file (or
-`POST /reload`) applies the new value immediately, no restart. Other
-`[compression]`/`[previews]`/`[prompts]` keys exist in the schema but either
-only affect the separate Hermes-plugin dylib session or aren't consumed by
-anything yet - see [`docs/config/aphrodite-toml.md`](docs/config/aphrodite-toml.md)
-for the full, accurate breakdown of what's wired where.
+Each `[compression]` field is overridable via an `APHRODITE_*` env var.
 
-Two more knobs worth knowing about:
-
-- **Directives** - `[directives] active = ["focus"]` seeds short behavioral
-  instructions (`directives/*.md`) injected into the LLM's context every
-  turn, swappable mid-conversation via the `aphrodite_directive` tool. The
-  shipped set includes `focus`, `foresight`, `ccr-handling`, `cleanup`,
-  `explore`, and `lazy` (defer-until-needed execution). Use
-  `aphrodite_directive("load", name)` to activate one on demand. See
-  [`docs/plugin/directives.md`](docs/plugin/directives.md).
-- **Management auth** - set `APHRODITE_MGMT_TOKEN` to require
-  `Authorization: Bearer <token>` on the proxy's management routes
-  (`/stats`, `/retrieve`, `/ccr/*`, `/reload`, ...); `/health` and
-  `/metrics` stay open. Unset = open loopback access (back-compat), with a
-  startup warning. See [`docs/config/env-vars.md`](docs/config/env-vars.md).
+> [!TIP]
+>
+> **Directives** seed short behavioral instructions injected each turn,
+> swappable mid-conversation via `aphrodite_directive`.
+> Shipped set: `focus`, `foresight`, `cleanup`, `explore`, `lazy-eval`.
 
 ---
 
-## Performance ⚡
+## Performance 📊
 
-Standard corpus (`bench_01`, 20 samples, 106,256 B, measured 2026-07-14).
-Ratio scales with input size and drops with entropy - tiny/high-entropy
-inputs compress little, large low-entropy prose compresses a lot:
+Standard corpus: up to **610×** on large low-entropy prose, **132×** overall
+(106 KB → 800 B).
+Cache and token modes measure identical ratios;
+20/20 compressed, 20/20 retrieve round-trips OK.
 
-| Sample (size)                 |    Ratio    |
-| :---------------------------- | :---------: |
-| `tiny_text` (120 B)           |    3.00×    |
-| `json_tool` (675 B)           |   16.88×    |
-| `rust_code` (2,673 B)         |   66.83×    |
-| `linter_output` (4,014 B)     |   100.35×   |
-| `log_output` (4,943 B)        |   123.58×   |
-| `code_go` (5,712 B)           |   142.80×   |
-| `unicode_cjk` (6,720 B)       |   168.00×   |
-| `build_error` (6,949 B)       |   173.72×   |
-| `code_js` (7,212 B)           |   180.30×   |
-| `search_results` (10,080 B)   |   252.00×   |
-| `large_prose` (11,400 B)      |   285.00×   |
-| `huge_prose` (24,400 B)       | **610.00×** |
-| **Overall (106,256 → 800 B)** | **132.82×** |
+| Content type              | Without     | With        |  Savings |
+| :------------------------ | ----------: | ----------: | -------: |
+| Git diff (42L)            |   ~350 tok  |    ~15 tok  |  **23×** |
+| Build output (142L)       | ~1,400 tok  |    ~10 tok  | **140×** |
+| Terminal output           |   ~200 tok  |    ~10 tok  |  **20×** |
+| JSON blob (30 keys)       |   ~400 tok  |    ~10 tok  |  **40×** |
+| Browser snapshot (342 el) | ~5,000 tok  |    ~12 tok  | **416×** |
 
-Range: **3.00×** (120 B) to **610.00×** (24 KB prose); overall **132.82×**.
-Cache and token modes measured identical ratios. 20/20 compressed, 20/20
-retrieve round-trips OK (0 misses).
+**Median: 23× fewer tokens on tool output.**
+End-to-end latency is 8–40 ms (includes the HTTP round-trip);
+classification alone is 40–123 ns.
 
-| Metric                     |           Value           |
-| :------------------------- | :-----------------------: |
-| End-to-end latency (cache) | 9-40 ms (HTTP round-trip) |
-| End-to-end latency (token) |      8-10 ms typical      |
-| Classification latency     |         40-123 ns         |
-
-Latency figures are end-to-end - they include the HTTP round-trip, not just
-the compress call. The compress step itself is sub-millisecond; the corpus
-harness does not isolate it, so we quote the measured wall-clock numbers
-rather than a compress-only figure.
-
-Benchmarks (`cargo run --release -p aphrodite --example bench_0N_*`, see
-`crates/aphrodite/examples/`) and the in-process smoke suite
-(`aphrodite_test`, 3 checks in `full` mode) are reproducible commands - run
-them directly to reproduce the numbers above.
-
-### Real-world savings (Hermes Agent, deepseek-v4-pro)
-
-Measured via `.bench/e2e/hermes_z_ab.sh` - 4 standardized coding prompts,
-A/B testing with aphrodite ON vs OFF, `focus` directive active:
-
-| Prompt             | OFF (tokens) | ON (tokens) |   Saved | API calls OFF/ON |
-| ------------------ | -----------: | ----------: | ------: | :--------------: |
-| Read + summarize   |      444,236 |     178,636 | **60%** |      13 → 7      |
-| Cargo build output |       28,913 |      28,903 |      0% |      2 → 2       |
-| Search codebase    |       68,719 |      30,500 | **56%** |      4 → 2       |
-| Read two docs      |       34,075 |      34,049 |      0% |      2 → 2       |
-| **Total**          |  **575,943** | **272,088** | **53%** |     21 → 13      |
-
-Cost: $0.18 (OFF) → $0.15 (ON) - 18% cheaper, 38% fewer API calls.
+Benchmarks are reproducible: `cargo run --release -p aphrodite --example bench_0N_*`.
 
 ---
 
-## Relationship to Headroom
+## Relationship to Headroom 🔗
 
-Aphrodite embeds Headroom - our custom fork tracked as a git submodule at
-`vendor/headroom/`. Headroom provides the
-content transforms (classifier, smart crusher, tokenizer); Aphrodite adds the
-preview pipeline, CCR storage, Hermes integration, and dual-proxy architecture.
+Aphrodite embeds [Headroom](docs/APHRODITE-HEADROOM.md) — a custom fork tracked
+as a git submodule at `vendor/headroom/`.
+Headroom provides the content transforms (classifier, smart crusher, tokenizer);
+Aphrodite adds the preview pipeline, CCR storage, Hermes integration, and
+dual-proxy architecture.
 
 → [Full comparison: Aphrodite vs Headroom](docs/APHRODITE-HEADROOM.md)
 
@@ -478,8 +246,17 @@ preview pipeline, CCR storage, Hermes integration, and dual-proxy architecture.
 | Submit a PR       | [Fork & open a PR](https://github.com/PlayForm/Aphrodite/pulls)                            |
 | Ask a question    | [Discussions Q&A](https://github.com/PlayForm/Aphrodite/discussions/new?category=q-a)      |
 
-No contribution is too small. First-time contributor? **Especially** welcome.
+No contribution is too small.
+First-time contributors are especially welcome.
+
+---
+
+## License 📜
+
+Released under [CC0-1.0](LICENSE) — public domain.
 
 ---
 
 _Built with ❤️ by PlayForm._
+
+[Aphrodite]: https://github.com/PlayForm/Aphrodite
