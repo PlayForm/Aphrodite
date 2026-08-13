@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/aphrodite.png" alt="Aphrodite" width="720">
+  <img src="assets/aphrodite.png" alt="Aphrodite" width="120">
 </p>
 
 ---
