@@ -72,7 +72,29 @@ sync_submodules() {
 		# at is checked out under a remote named "Source"). Falls back to
 		# "origin" when no remote matches, preserving the common case.
 		sub_url=$(git config -f .gitmodules --get "submodule.$name.url" 2>/dev/null)
-		remote=$(git -C "$path" remote -v 2>/dev/null | awk -v u="$sub_url" '$2==u && $3=="(fetch)"{print $1; exit}')
+		# Resolve the remote scheme-insensitively: .gitmodules declares a
+		# https URL, but a submodule clone may register the same repo as
+		# ssh://git@host/... or git@host:.... The old exact-string match
+		# then fell through to "origin", which does not exist (these
+		# submodules use a "Source" remote), so the fetch failed and the
+		# float silently no-op'd - leaving the recorded pin stale and the
+		# working tree flipping between the pin and an explicit checkout.
+		# Fall back to any remote that already has the tracking branch
+		# fetched, then to the first remote, then to "origin".
+		norm_url() { echo "$1" | sed -E 's#^[a-zA-Z]+://##; s#^git@##; s#(:[0-9]+)?/#/#; s#\.git$##'; }
+		nu=$(norm_url "$sub_url")
+		remote=""
+		for r in $(git -C "$path" remote 2>/dev/null); do
+			ru=$(git -C "$path" remote get-url "$r" 2>/dev/null)
+			[ "$(norm_url "$ru")" = "$nu" ] && { remote="$r"; break; }
+		done
+		if [ -z "$remote" ]; then
+			for r in $(git -C "$path" remote 2>/dev/null); do
+				if git -C "$path" rev-parse --verify -q "refs/remotes/$r/$branch" >/dev/null 2>&1; then
+					remote="$r"; break
+				fi
+			done
+		fi
 		[ -z "$remote" ] && remote="origin"
 
 		if ! git -C "$path" fetch --quiet "$remote" "$branch" 2>/dev/null; then
