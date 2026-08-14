@@ -84,6 +84,25 @@ jobs:
       - name: Cargo test
         run: cargo test -p aphrodite -p aphrodite-hermes --release
 
+      # Packaging guard: the published tarball MUST contain the
+      # builtin_directives/*.md files embedded via include_str! in
+      # src/directives.rs. A recursive `*.md` exclude previously stripped
+      # them from v1.3.8, producing a tarball that failed to compile on
+      # `cargo install`. Fail loudly here (before any publish) if any are
+      # missing. This also catches the broader class of "files present
+      # locally but excluded from the package" regressions.
+      - name: Verify packaged tarball includes embedded assets
+        run: |
+          cargo package -p aphrodite --list --allow-dirty 2>/dev/null | \
+            grep -qE '^src/builtin_directives/focus\.md$' || {
+              echo "::error::src/builtin_directives/focus.md missing from packaged tarball"; exit 1; }
+          for f in focus foresight ccr-handling cleanup explore lazy; do
+            cargo package -p aphrodite --list --allow-dirty 2>/dev/null | \
+              grep -qE "^src/builtin_directives/$f\.md\$" || {
+                echo "::error::src/builtin_directives/$f.md missing from packaged tarball"; exit 1; }
+          done
+          echo "packaging guard: all 6 builtin_directives/*.md present"
+
   Publish-Headroom-Core:
     name: Publish aphrodite-headroom-core
     needs: [Test]

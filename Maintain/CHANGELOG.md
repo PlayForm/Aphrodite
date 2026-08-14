@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.3.9 - Fix packaged crate missing built-in directive files (2026-08-14)
+
+_This is a critical packaging fix for v1.3.8. v1.3.8 published to crates.io but
+was **uninstallable**: `cargo install aphrodite` failed to compile because the
+`src/builtin_directives/*.md` files (embedded into the binary via `include_str!`
+in `src/directives.rs`) were stripped from the published tarball._
+
+### Fixed
+
+- **Published crate missing `src/builtin_directives/*.md`.** `crates/aphrodite/Cargo.toml`
+  had `exclude = [..., "*.md", ...]`. Cargo applies `exclude` at **publish time**,
+  and `"*.md"` is recursive - so it removed `focus.md`, `foresight.md`,
+  `ccr-handling.md`, `cleanup.md`, `explore.md`, and `lazy.md` from the crates.io
+  package. The local checkout still had them, so `cargo build`/`cargo test` passed
+  here and CI's `Test` job passed - but `cargo install` downloads the tarball
+  without them and `include_str!("builtin_directives/focus.md")` failed at compile
+  time. Fixes:
+    - Removed `*.md` from `exclude` (kept `examples/`, `tests/`, `benches/`,
+      `.hermes/`, `.plans/`).
+    - Added `include = ["src/builtin_directives/*.md"]` so the embedded assets
+      ship regardless of `exclude` interactions (`include` overrides `exclude`).
+    - Added a **packaging guard** to `Publish.yml`'s `Test` job that lists the
+      tarball with `cargo package --list` and fails the build if any of the six
+      `builtin_directives/*.md` files are absent - so this class of regression
+      can never reach crates.io again.
+
+> Note: crates.io versions are immutable, so v1.3.8 stays as-is (broken). This
+> v1.3.9 supersedes it as the working release. `cargo install aphrodite` and
+> `cargo install aphrodite-hermes` now succeed.
+
 ## v1.3.8 - Tool Schema Self-Documentation + Lazy Directive + Release Channel Fix (2026-08-14)
 
 _This release consolidates everything between v1.3.7 and Current: the tool-schema

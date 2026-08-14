@@ -1,12 +1,19 @@
 [package]
 name = "aphrodite"
-version = "1.3.8"
+version = "1.3.9"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "aphrodite: Chat Completions proxy with CCR, tool relay, and programmatic CCR for Hermes agent integration."
-exclude = ["examples/", "tests/", "benches/", "*.md", ".hermes/", ".plans/"]
+exclude = ["examples/", "tests/", "benches/", ".hermes/", ".plans/"]
+# `include` overrides `exclude`: the `builtin_directives/*.md` files are
+# embedded into the binary via `include_str!` (see src/directives.rs) and MUST
+# ship in the crates.io tarball. `cargo package` does NOT auto-include
+# `include_str!` targets, and a recursive `*.md` exclude previously stripped
+# them - producing a tarball that failed to compile on `cargo install` for
+# v1.3.8. Listed here explicitly so it can never be excluded again.
+include = ["src/builtin_directives/*.md"]
 
 [[bin]]
 name = "aphrodite"
