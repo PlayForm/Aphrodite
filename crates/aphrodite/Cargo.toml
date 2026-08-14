@@ -7,13 +7,15 @@ license.workspace = true
 repository.workspace = true
 description = "aphrodite: Chat Completions proxy with CCR, tool relay, and programmatic CCR for Hermes agent integration."
 exclude = ["examples/", "tests/", "benches/", ".hermes/", ".plans/"]
-# `include` overrides `exclude`: the `builtin_directives/*.md` files are
-# embedded into the binary via `include_str!` (see src/directives.rs) and MUST
-# ship in the crates.io tarball. `cargo package` does NOT auto-include
-# `include_str!` targets, and a recursive `*.md` exclude previously stripped
-# them - producing a tarball that failed to compile on `cargo install` for
-# v1.3.8. Listed here explicitly so it can never be excluded again.
-include = ["src/builtin_directives/*.md"]
+# NOTE: do NOT add `*.md` here. `src/builtin_directives/*.md` are embedded into
+# the binary via `include_str!` (see src/directives.rs) and MUST ship in the
+# crates.io tarball. Cargo does NOT auto-include `include_str!` targets, so a
+# recursive `*.md` exclude previously stripped them from v1.3.8, producing a
+# tarball that failed to compile on `cargo install`. Removing `*.md` from
+# `exclude` is sufficient - `src/` (including the directive .md files) ships by
+# default. (An `include = [...]` list was tried but cargo then ignores `exclude`
+# entirely and drops src/lib.rs/src/main.rs, breaking the package - so `include`
+# is intentionally NOT used here.)
 
 [[bin]]
 name = "aphrodite"
