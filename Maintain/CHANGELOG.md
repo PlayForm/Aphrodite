@@ -1,6 +1,55 @@
 # Changelog
 
-## v1.3.9 - Lazy Directive (2026-08-03)
+## v1.3.8 - Tool Schema Self-Documentation + Lazy Directive + Release Channel Fix (2026-08-14)
+
+_This release consolidates everything between v1.3.7 and Current: the tool-schema
+self-documentation work, the built-in/lazy directives, and a fix to the release
+pipeline that had left v1.3.8 unpublished on crates.io. Previously v1.3.8 was
+built and released on GitHub but the publish step never ran on tag push, so
+crates.io stayed at v1.3.7 while the tree advanced to v1.3.9. This release
+re-releases the collapsed v1.3.8 with full crates.io publishing restored._
+
+### Fixed
+
+- **Release pipeline never published to crates.io on tag push.** `Publish.yml`
+  gated every `cargo publish` step on `workflow_dispatch` + `publish_crates`,
+  but the `auto-release.sh` path creates `Aphrodite/v*` tags - so the publish
+  steps were always skipped on the real release trigger. The condition now also
+  fires on `refs/tags/Aphrodite/`, so a tag push builds artifacts AND publishes
+  `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` in dependency
+  order. (This is the root cause that left v1.3.8 missing from crates.io.)
+- **`aphrodite setup` required an API key.** The top-level `Cli.api_key` was a
+  required `String`, so clap demanded `--api-key` for _every_ invocation -
+  including `aphrodite setup`, which has its own optional `api_key`. The field
+  is now optional at parse time (`default_value = ""`); the proxy path still
+  enforces a key at launch with a clear error. `setup` now runs without a key.
+- **`tool_describe` returned near-useless records for every aphrodite tool.**
+  Hermes' `tool_describe` is a verbatim passthrough of the registered
+  `{name, description, parameters}` - it adds nothing. Aphrodite was registering
+  one-line descriptions and, for eight of the thirteen tools, a literally empty
+  `"properties": {}`, so an agent asking what `aphrodite_stats` does got back a
+  sentence and no return shape, and an agent asking about `aphrodite_retrieve`
+  got no parameter names at all. Every schema in
+  `crates/aphrodite-hermes/src/schemas.rs` is rewritten:
+    - Each `description` now documents the tool's **return shape** inline
+      (`Returns {found, source, content}`, etc.). It has to live in the
+      description - a top-level `returns` key is dropped by `tool_describe` AND
+      spliced into the OpenAI `function` object by `registry.get_definitions()`,
+      where strict providers reject unknown fields.
+    - Every parameter carries a `type`, a description, and where applicable
+      `enum`, `default`, `pattern`, `minItems` / `minLength` constraints.
+    - Every tool declares `additionalProperties: false` - the only thing that
+      stops a model inventing arguments for an argument-less tool.
+    - First sentences are held under 60 characters, because the deferred-tool
+      catalog listing (`tool_search._short_desc`) shows only the first sentence,
+      clipped to 60 chars, and silently ellipsizes anything longer.
+- **README `/health` example version never bumped.** `auto-release.sh`'s sed
+  and its stale-string guard were both anchored on `v$CURRENT`, while the
+  example prints a bare `"version":"1.3.7"` with no `v` - so the sed skipped
+  it and the guard failed to notice. Both now handle the bare form.
+- **`aphrodite-headroom-core` dependency pin was stale** (`0.1.1` while the
+  vendored tree is `0.1.2`, the version actually published to crates.io).
+  Pin corrected to `0.1.2` so `cargo publish` resolves without a --force.
 
 ### Added
 
@@ -21,56 +70,15 @@
   when no `[directives] active` is configured and no on-disk `directives/` dir exists,
   so a fresh session starts in defer-until-needed mode rather than over-eagerly stacking
   directives before any turn demonstrates the need.
-
-### Changed
-
-- `aphrodite_directive` tool schema: `action` enum now `list|swap|add|load|remove|reset`;
-  description and the `name` parameter note document `load` and `lazy`.
-- Default active set in `config_loader` seeds `focus` + `foresight` + `lazy`.
-- Docs: `docs/plugin/directives.md` (built-in table, action table, `load` semantics,
-  JSON schema block, fallback/default notes), `docs/tool-relay/tools.md` (schema +
-  description), `docs/agent-feedback.md` (`load` example), `README.md` (directive list),
-  `plugin.yaml` install message and version.
-
-### Fixed
-
-- `test_loaded_builtins_contains_all_five` → `..._all_six` (asserts the new `lazy`
-  built-in). `handle_action` tests cover the `load` action (success, idempotency,
-  unknown-name error) and the unknown-action error string.
-
-## v1.3.8 - Tool Schema Self-Documentation (2026-08-03)
-
-### Fixed
-
-- **`tool_describe` returned near-useless records for every aphrodite tool.**
-  Hermes' `tool_describe` (`tools/tool_search.py:dispatch_tool_describe`) is a
-  verbatim passthrough of the registered `{name, description, parameters}` -
-  it adds nothing. Aphrodite was registering one-line descriptions and, for
-  eight of the thirteen tools, a literally empty `"properties": {}`, so an
-  agent asking what `aphrodite_stats` does got back a sentence and no return
-  shape, and an agent asking about `aphrodite_retrieve` got no parameter names
-  at all. Every schema in `crates/aphrodite-hermes/src/schemas.rs` is rewritten:
-
-  - Each `description` now documents the tool's **return shape** inline
-    (`Returns {found, source, content}`, etc.). It has to live in the
-    description - a top-level `returns` key is dropped by `tool_describe` AND
-    spliced into the OpenAI `function` object by `registry.get_definitions()`,
-    where strict providers reject unknown fields.
-  - Every parameter carries a `type`, a description, and where applicable
-    `enum`, `default`, `pattern`, `minItems` / `minLength` constraints.
-  - Every tool declares `additionalProperties: false` - the only thing that
-    stops a model inventing arguments for an argument-less tool.
-  - First sentences are held under 60 characters, because the deferred-tool
-    catalog listing (`tool_search._short_desc`) shows only the first sentence,
-    clipped to 60 chars, and silently ellipsizes anything longer.
-
-- **README `/health` example version never bumped.** `auto-release.sh`'s sed
-  and its stale-string guard were both anchored on `v$CURRENT`, while the
-  example prints a bare `"version":"1.3.7"` with no `v` - so the sed skipped
-  it and the guard failed to notice. Both now handle the bare form.
-
-### Added
-
+- **First-turn session injection + adapted CCR-handling directive** - a
+  `ccr-handling` built-in directive teaches the model to retrieve every
+  `<<<CCR:hash|type|size>>>` marker before any other action.
+- **Built-in directives for CCR handling, cleanup, explore, focus, foresight**
+  shipped as `.md` files in `builtin_directives/` and registered in
+  `builtin_directives()`.
+- **Lazy evaluation for CCR markers** - markers are now evaluated
+  defer-until-needed with deferred retrieval, reducing wasted expansion of
+  markers the model never touches.
 - **Schema regression tests** (`schemas.rs`, 4 new): well-formedness across
   every tool (type/description per parameter, `additionalProperties: false`,
   no unsupported top-level keys, `required` names that actually exist in
@@ -80,9 +88,13 @@
 - **`Maintain/scripts/verify_tool_schemas.py`** - loads the built dylib over
   its real C ABI and prints exactly what Hermes sees at registration and what
   `tool_describe` returns per tool.
+- **`docs/agent-feedback.md`** + documented built-in directive fallback.
 
 ### Changed
 
+- `aphrodite_directive` tool schema: `action` enum now `list|swap|add|load|remove|reset`;
+  description and the `name` parameter note document `load` and `lazy`.
+- Default active set in `config_loader` seeds `focus` + `foresight` + `lazy`.
 - `skills/aphrodite-release-workflow` (→ v1.4.0) - the version-sync section
   documented binary `1.0.4` / plugin `2.0.1` against a reality of `1.3.7` /
   `2.0.8`. Rewritten to reference the live files as the source of truth, with
@@ -92,16 +104,22 @@
   in `schemas.rs`, and that the optional `navigation` feature (a 14th tool,
   `aphrodite_navigate`) does not currently build.
 
+### Fixed (tests)
+
+- `test_loaded_builtins_contains_all_five` → `..._all_six` (asserts the new `lazy`
+  built-in). `handle_action` tests cover the `load` action (success, idempotency,
+  unknown-name error) and the unknown-action error string.
+
 ### Known issues
 
 - **The `navigation` feature does not compile.** `8e9a8c3` removed the
   unpublishable `s2-navigate` dependency but left the
   `cfg(feature = "navigation")` gates in `flow.rs` / `lib.rs` behind, so
   `--features navigation` fails on an unresolved `s2_navigate` import. The
-  feature is now *declared* in both `Cargo.toml`s - without a declaration,
+  feature is now _declared_ in both `Cargo.toml`s - without a declaration,
   `unexpected_cfg_condition` fires on those gates and hard-fails CI's
-  `-D warnings`, which is what broke the `Check` run on `13d9738`. Restoring
-  the dependency (or deleting the gates) is still outstanding.
+  `-D warnings`. Restoring the dependency (or deleting the gates) is still
+  outstanding.
 
 ## v1.3.6 - Preview Pipe Sanitization Fix (2026-07-24)
 
