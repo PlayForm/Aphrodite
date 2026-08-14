@@ -21,7 +21,7 @@ in `src/directives.rs`) were stripped from the published tarball._
       `.hermes/`, `.plans/`). `src/` now ships by default, including the
       directive `.md` files.
     - **Do NOT use `package.include`** to force the `.md` files in: when both
-      `include` and `exclude` are set, cargo *ignores `exclude`* and packages
+      `include` and `exclude` are set, cargo _ignores `exclude`_ and packages
       **only** what `include` lists - which drops `src/lib.rs`/`src/main.rs` and
       yields `error: no targets specified in the manifest`. (`exclude`-only is the
       correct mechanism.)
@@ -31,7 +31,7 @@ in `src/directives.rs`) were stripped from the published tarball._
       can never reach crates.io again.
     - **Durable in-crate regression test.** Added `crates/aphrodite/tests/packaging.rs`
       (runs under `cargo test -p aphrodite`). It shells out to `cargo package
-      --list`, parses every `include_str!` target in `src/directives.rs`, and
+--list`, parses every `include_str!` target in `src/directives.rs`, and
       asserts each is present in the actual tarball - plus asserts
       `src/lib.rs`/`src/main.rs` ship (catches the `include = [...]`-drops-targets
       failure mode too). A `build.rs` was rejected for this: it runs against the
