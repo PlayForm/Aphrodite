@@ -18,17 +18,22 @@ in `src/directives.rs`) were stripped from the published tarball._
   without them and `include_str!("builtin_directives/focus.md")` failed at compile
   time. Fixes:
     - Removed `*.md` from `exclude` (kept `examples/`, `tests/`, `benches/`,
-      `.hermes/`, `.plans/`).
-    - Added `include = ["src/builtin_directives/*.md"]` so the embedded assets
-      ship regardless of `exclude` interactions (`include` overrides `exclude`).
+      `.hermes/`, `.plans/`). `src/` now ships by default, including the
+      directive `.md` files.
+    - **Do NOT use `package.include`** to force the `.md` files in: when both
+      `include` and `exclude` are set, cargo *ignores `exclude`* and packages
+      **only** what `include` lists - which drops `src/lib.rs`/`src/main.rs` and
+      yields `error: no targets specified in the manifest`. (`exclude`-only is the
+      correct mechanism.)
     - Added a **packaging guard** to `Publish.yml`'s `Test` job that lists the
       tarball with `cargo package --list` and fails the build if any of the six
       `builtin_directives/*.md` files are absent - so this class of regression
       can never reach crates.io again.
 
 > Note: crates.io versions are immutable, so v1.3.8 stays as-is (broken). This
-> v1.3.9 supersedes it as the working release. `cargo install aphrodite` and
-> `cargo install aphrodite-hermes` now succeed.
+> v1.3.9 supersedes it as the working release. `cargo install aphrodite` now
+> succeeds. `aphrodite-hermes@1.3.8` is unaffected (it does not embed those
+> files) and needs no replacement.
 
 ## v1.3.8 - Tool Schema Self-Documentation + Lazy Directive + Release Channel Fix (2026-08-14)
 
