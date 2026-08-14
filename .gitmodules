@@ -3,15 +3,18 @@ path = plugins/aphrodite
 url = https://github.com/PlayForm/Aphrodite-Hermes.git
 ignore = dirty
 branch = Current
+remote = Source
 
 [submodule "vendor/headroom"]
 path = vendor/headroom
 url = https://github.com/PlayForm/Headroom.git
 ignore = dirty
 branch = Current
+remote = Source
 
 [submodule "vendor/rtk"]
 path = vendor/rtk
 url = https://github.com/PlayForm/rtk.git
 ignore = dirty
 branch = Current
+remote = Source

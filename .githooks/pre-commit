@@ -5,6 +5,40 @@ set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
+# Guard: refuse to commit if any submodule is checked out BEHIND its
+# configured tracking branch tip (e.g. `Source/Current`). A plain
+# `git submodule update --remote` (which defaults to the non-existent
+# `origin` remote for these submodules and silently falls back to the
+# recorded pin) can leave a submodule on a stale SHA; committing that
+# would persist the downgrade. Re-float first with `git submodule
+# update --remote` (now correct via submodule.<n>.remote = Source) or
+# run the float hook, then re-stage.
+if [ -f "$REPO_ROOT/.gitmodules" ]; then
+  guard_failed=""
+  while IFS= read -r line; do
+    path=$(echo "$line" | awk '{print $2}')
+    [ -e "$REPO_ROOT/$path/.git" ] || continue
+    branch=$(git config -f "$REPO_ROOT/.gitmodules" --get "submodule.$(echo "$line" | awk '{print $1}' | sed -e 's/^submodule\.//' -e 's/\.path$//').branch" 2>/dev/null)
+    [ -n "$branch" ] || continue
+    tip=$("$REPO_ROOT/$path"/../.git 2>/dev/null; git -C "$REPO_ROOT/$path" rev-parse --verify -q "Source/$branch" 2>/dev/null) || continue
+    head=$(git -C "$REPO_ROOT/$path" rev-parse HEAD 2>/dev/null)
+    if [ -n "$tip" ] && [ "$head" != "$tip" ] && ! git -C "$REPO_ROOT/$path" merge-base --is-ancestor "$tip" "$head" 2>/dev/null; then
+      # Allow the case where HEAD is AHEAD of the tip (local commits not yet pushed)
+      if git -C "$REPO_ROOT/$path" merge-base --is-ancestor "$head" "$tip" 2>/dev/null; then
+        guard_failed="$guard_failed $path (behind Source/$branch: $head -> $tip)"
+      fi
+    fi
+  done < <(git config -f "$REPO_ROOT/.gitmodules" --get-regexp '\.path$' 2>/dev/null)
+
+  if [ -n "$guard_failed" ]; then
+    echo "pre-commit: submodule(s) checked out behind their tracking-branch tip:" >&2
+    echo "  $guard_failed" >&2
+    echo "  Fix: re-float with 'git submodule update --remote' (uses Source via .gitmodules)," >&2
+    echo "  then 'git add' the gitlink(s) and commit again." >&2
+    exit 1
+  fi
+fi
+
 # Gate: skip entirely in CI.
 if [ -n "${CI:-}" ]; then
 	exit 0
