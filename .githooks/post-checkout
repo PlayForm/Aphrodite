@@ -8,5 +8,6 @@
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
 [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/.githooks/lib/sync-submodules.sh" ] || exit 0
 # shellcheck source=lib/sync-submodules.sh
+# shellcheck disable=SC1091
 . "$REPO_ROOT/.githooks/lib/sync-submodules.sh"
 sync_submodules

@@ -15,21 +15,18 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 # run the float hook, then re-stage.
 if [ -f "$REPO_ROOT/.gitmodules" ]; then
   guard_failed=""
-  while IFS= read -r line; do
-    path=$(echo "$line" | awk '{print $2}')
+  while IFS=' ' read -r key path; do
     [ -e "$REPO_ROOT/$path/.git" ] || continue
-    branch=$(git config -f "$REPO_ROOT/.gitmodules" --get "submodule.$(echo "$line" | awk '{print $1}' | sed -e 's/^submodule\.//' -e 's/\.path$//').branch" 2>/dev/null)
+    name=$(echo "$key" | sed -e 's/^submodule\.//' -e 's/\.path$//')
+    branch=$(git config -f "$REPO_ROOT/.gitmodules" --get "submodule.$name.branch" 2>/dev/null)
     [ -n "$branch" ] || continue
-    tip=$("$REPO_ROOT/$path"/../.git 2>/dev/null; git -C "$REPO_ROOT/$path" rev-parse --verify -q "Source/$branch" 2>/dev/null) || continue
+    tip=$(git -C "$REPO_ROOT/$path" rev-parse --verify -q "Source/$branch" 2>/dev/null)
+    [ -n "$tip" ] || continue
     head=$(git -C "$REPO_ROOT/$path" rev-parse HEAD 2>/dev/null)
-    if [ -n "$tip" ] && [ "$head" != "$tip" ] && ! git -C "$REPO_ROOT/$path" merge-base --is-ancestor "$tip" "$head" 2>/dev/null; then
-      # Allow the case where HEAD is AHEAD of the tip (local commits not yet pushed)
-      if git -C "$REPO_ROOT/$path" merge-base --is-ancestor "$head" "$tip" 2>/dev/null; then
-        guard_failed="$guard_failed $path (behind Source/$branch: $head -> $tip)"
-      fi
+    if [ "$head" != "$tip" ] && git -C "$REPO_ROOT/$path" merge-base --is-ancestor "$head" "$tip" 2>/dev/null; then
+      guard_failed="$guard_failed $path (behind Source/$branch: $head -> $tip)"
     fi
   done < <(git config -f "$REPO_ROOT/.gitmodules" --get-regexp '\.path$' 2>/dev/null)
-
   if [ -n "$guard_failed" ]; then
     echo "pre-commit: submodule(s) checked out behind their tracking-branch tip:" >&2
     echo "  $guard_failed" >&2
