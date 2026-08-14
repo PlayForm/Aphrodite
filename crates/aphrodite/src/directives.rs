@@ -186,8 +186,14 @@ pub fn handle_action(state: &mut crate::state::AphroditeState, action: &str, nam
 					})
 				})
 				.collect();
+			let mut available: Vec<&String> =
+				state.directives.keys().collect();
+			// Sort for a stable, deterministic ordering - `HashMap` iteration
+			// order is nondeterministic, which made the `list` result flake
+			// between `["focus","lazy"]` and `["lazy","focus"]` across runs.
+			available.sort();
 			serde_json::json!({
-				"available": state.directives.keys().collect::<Vec<&String>>(),
+				"available": available,
 				"active": &state.active_directives,
 				"ephemeral": ephemeral,
 			})
