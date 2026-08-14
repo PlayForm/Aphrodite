@@ -29,6 +29,15 @@ in `src/directives.rs`) were stripped from the published tarball._
       tarball with `cargo package --list` and fails the build if any of the six
       `builtin_directives/*.md` files are absent - so this class of regression
       can never reach crates.io again.
+    - **Durable in-crate regression test.** Added `crates/aphrodite/tests/packaging.rs`
+      (runs under `cargo test -p aphrodite`). It shells out to `cargo package
+      --list`, parses every `include_str!` target in `src/directives.rs`, and
+      asserts each is present in the actual tarball - plus asserts
+      `src/lib.rs`/`src/main.rs` ship (catches the `include = [...]`-drops-targets
+      failure mode too). A `build.rs` was rejected for this: it runs against the
+      checkout (files present) and is skipped under `cargo publish --no-verify`,
+      so it cannot observe the packaged tarball. Verified: the test FAILS when
+      `*.md` is re-added to `exclude`, passes on the fixed manifest.
 
 > Note: crates.io versions are immutable, so v1.3.8 stays as-is (broken). This
 > v1.3.9 supersedes it as the working release. `cargo install aphrodite` now
