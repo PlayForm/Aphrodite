@@ -153,8 +153,11 @@ pub struct Cli {
 	#[arg(long, default_value = "https://api.openai.com", env = "APHRODITE_API_URL")]
 	pub api_url: String,
 
-	/// Upstream API key
-	#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true)]
+	/// Upstream API key (optional at parse time - `setup` and keyless
+	/// launches don't require it; required only when a proxy must forward
+	/// to an upstream). Empty string default so `aphrodite setup` and other
+	/// subcommands parse without `--api-key`.
+	#[arg(long, env = "APHRODITE_API_KEY", hide_env_values = true, default_value = "")]
 	pub api_key: String,
 
 	/// Model name to forward (set via APHRODITE_MODEL env or --model)

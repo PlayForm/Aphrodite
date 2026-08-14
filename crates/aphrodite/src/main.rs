@@ -161,6 +161,15 @@ async fn run() -> anyhow::Result<()> {
 			.collect::<anyhow::Result<Vec<_>>>()?
 	} else {
 		let cli = cli_fallback.expect("cli_fallback set when use_multi_config is false");
+		// A standalone (no aphrodite.toml) proxy launch needs an upstream key.
+		// `api_key` is optional at parse time so `setup`/keyless invocations
+		// don't require it; enforce it here for the proxy path specifically,
+		// with a clear error instead of silently forwarding an empty Bearer.
+		if cli.api_key.trim().is_empty() {
+			anyhow::bail!(
+				"no API key configured - set APHRODITE_API_KEY env var or pass --api-key, or run `aphrodite setup`"
+			);
+		}
 		let name = format!("{}", cli.listen);
 		vec![(name, cli)]
 	};
