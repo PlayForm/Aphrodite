@@ -1,5 +1,51 @@
 # Changelog
 
+## v1.4.0 - Packaging, runtime-cache, and config-default fixes from 1.3.9 feedback (2026-08-15)
+
+Addressing the issues reported against the official Aphrodite 1.3.9 Linux
+x86_64 proxy and Hermes dylib. No CCR engine/compression changes - this is a
+packaging, lifecycle, and configuration-defaults release.
+
+### Fixed
+
+- **Malformed `BINARY_VERSION` (feedback #1).** The committed file contained a
+  stray `1|1.3.9` line-number artifact that `download.sh` reads verbatim, which
+  produced an invalid release URL and broke the normal update path. It now holds
+  exactly `1.3.9`, and `download.sh` validates the version against a strict
+  pattern (`^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$`) before downloading,
+  rejecting malformed values such as `1|1.3.9`.
+- **Broken absolute `directives` symlink (feedback #2).** The plugin repository
+  shipped `directives -> /Users/nikola/.../Aphrodite/directives`, a developer-local
+  macOS path that was broken on other machines and caused `hermes plugins doctor`
+  to fail. It is now a real, portable `directives/` directory committed in the
+  plugin repo. The directive loader was also moved under the Aphrodite namespace
+  (`~/.hermes/aphrodite/directives` instead of bare `~/.hermes/directives`) so
+  Aphrodite never collides with other tools' files; missing/unreadable dirs fall
+  back to the binary-baked built-in directives.
+- **Unbounded `.hotreload` accumulation (feedback #3).** Hot-reload dylib copies
+  previously lived inside the plugin source tree and were only cleaned within the
+  same process, so copies left by terminated Hermes processes grew to ~19 GB and
+  broke `hermes plugins doctor` (ENOSPC). Copies now live in
+  `~/.hermes/aphrodite/hotreload` (outside the plugin tree, so plugin-doctor never
+  stages them), dead-PID copies are reaped on startup, each process keeps only its
+  newest generation, and an `atexit` sweep removes the current process's own copy.
+- **Manifest/runtime registration mismatch (feedback #4).** `plugin.yaml`
+  declared `pre_tool_call` as a hook but it was missing from `provides_hooks`
+  (now added), and declared `aphrodite_navigate` as a tool even though the released
+  dylib does not register it (the `navigation` feature is currently unbuildable) -
+  so `aphrodite_navigate` was removed from `provides_tools` to match the runtime.
+- **Hook-only config failed to start the proxy (feedback #5).** A configuration
+  that enables only in-process CCR hooks and omits `[proxies]` failed with
+  `missing field 'proxies'`. `MultiConfig.proxies` now defaults to an empty list
+  when the table is absent, so hook-only setups parse cleanly.
+
+### Chore
+
+- Added a Python regression test (`plugins/aphrodite/tests/test_hotreload_cleanup.py`)
+  that simulates multiple terminated processes and verifies bounded storage growth.
+- Regenerated the embedded plugin shim template to stay in sync with the live
+  `__init__.py`.
+
 ## v1.3.9 - Fix packaged crate missing built-in directive files (2026-08-14)
 
 _This is a critical packaging fix for v1.3.8. v1.3.8 published to crates.io but
