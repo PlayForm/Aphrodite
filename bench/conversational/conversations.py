@@ -1105,7 +1105,7 @@ error[E0277]: the trait bound `MyStruct: Serialize` is not satisfied
              i128
            and 250 others
 note: required by a bound in `_serde::export::PhantomData`
-  --> /Users/nikola/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.228/src/ser/mod.rs:1234:12
+  --> <cargo-home>/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.228/src/ser/mod.rs:1234:12
    |
 1234| pub trait Serialize {
 
