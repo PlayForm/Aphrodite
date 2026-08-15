@@ -60,7 +60,6 @@
     "**/target": true,
     "**/Target": true,
     "**/node_modules": true,
-    "**/vendor": true,
     "**/.hermes": true,
     "**/profiles": true
   },

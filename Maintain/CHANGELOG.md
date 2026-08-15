@@ -60,7 +60,7 @@ re-releases the collapsed v1.3.8 with full crates.io publishing restored._
   but the `auto-release.sh` path creates `Aphrodite/v*` tags - so the publish
   steps were always skipped on the real release trigger. The condition now also
   fires on `refs/tags/Aphrodite/`, so a tag push builds artifacts AND publishes
-  `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` in dependency
+  `aphrodite-headroom` → `aphrodite` → `aphrodite-hermes` in dependency
   order. (This is the root cause that left v1.3.8 missing from crates.io.)
 - **`aphrodite setup` required an API key.** The top-level `Cli.api_key` was a
   required `String`, so clap demanded `--api-key` for _every_ invocation -
@@ -91,7 +91,7 @@ re-releases the collapsed v1.3.8 with full crates.io publishing restored._
   and its stale-string guard were both anchored on `v$CURRENT`, while the
   example prints a bare `"version":"1.3.7"` with no `v` - so the sed skipped
   it and the guard failed to notice. Both now handle the bare form.
-- **`aphrodite-headroom-core` dependency pin was stale** (`0.1.1` while the
+- **`aphrodite-headroom` dependency pin was stale** (`0.1.1` while the
   vendored tree is `0.1.2`, the version actually published to crates.io).
   Pin corrected to `0.1.2` so `cargo publish` resolves without a --force.
 
@@ -545,7 +545,7 @@ runtime code changes.
 ### Published
 
 - **First crates.io publish** - all three crates published in dependency order:
-  `aphrodite-headroom-core` (0.1.1) → `aphrodite` (1.2.2) → `aphrodite-hermes` (1.2.2)
+  `aphrodite-headroom` (0.1.1) → `aphrodite` (1.2.2) → `aphrodite-hermes` (1.2.2)
 - `aphrodite` publish required moving the `include_str!("../../../plugins/aphrodite/__init__.py")`
   into the crate's `templates/` directory so `cargo publish` could package it
 - Fixed `aphrodite`'s headroom-core version pin from `0.1.0` → `0.1.1` to match the published crate
@@ -570,7 +570,7 @@ runtime code changes.
 
 ### Verified
 
-- `cargo test --workspace`: 1,089+ passed, 0 failed - this command runs both this project's own crates AND the vendored `vendor/headroom` submodule (part of the same Cargo workspace), so the combined figure is not solely a measure of this project's own correctness: 240 in `aphrodite`/`aphrodite-hermes` (the code this changelog actually describes) + 849 in the vendored `aphrodite-headroom-core`
+- `cargo test --workspace`: 1,089+ passed, 0 failed - this command runs both this project's own crates AND the vendored `vendor/headroom` submodule (part of the same Cargo workspace), so the combined figure is not solely a measure of this project's own correctness: 240 in `aphrodite`/`aphrodite-hermes` (the code this changelog actually describes) + 849 in the vendored `aphrodite-headroom`
 - `cargo build --release -p aphrodite -p aphrodite-hermes`: clean (10.8s)
 - GitHub Release `Aphrodite/v1.2.2` auto-created by CI with all 9 cross-platform assets
 - All docs scanned and version badges synced to v1.2.2 / v2.0.6
@@ -662,7 +662,7 @@ Highlights:
   removal - no functional change).
 - CI hardening: pinned `github-push-action` to a specific SHA, macOS x86_64 runner
   switched off the perpetually-queued `macos-13` host, crates.io publish pipeline now
-  publishes `aphrodite-headroom-core` before `aphrodite`/`aphrodite-hermes`.
+  publishes `aphrodite-headroom` before `aphrodite`/`aphrodite-hermes`.
 - `--allow-hidden` on `APHRODITE_API_KEY`/`APHRODITE_NOTIFY_KEY` CLI args so secrets
   never leak into process listings or crash logs.
 - 16MB content-size guard added to the C ABI's `aphrodite_compress`/

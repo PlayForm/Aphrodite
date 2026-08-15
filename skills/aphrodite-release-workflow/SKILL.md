@@ -36,7 +36,7 @@ to `Source` remote.
 ### crates.io publishing goes through Publish.yml, never manually
 
 Do NOT run `cargo publish` locally. `.github/workflows/Publish.yml` builds and
-publishes `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` (in that
+publishes `aphrodite-headroom` → `aphrodite` → `aphrodite-hermes` (in that
 dependency order) - but only on an explicit `workflow_dispatch` with
 `publish_crates: true`; a plain `Aphrodite/v*` tag push alone does NOT publish
 to crates.io (it only triggers `Build.yml`'s GitHub Release artifacts). This
