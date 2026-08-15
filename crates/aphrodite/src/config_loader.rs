@@ -170,21 +170,48 @@ impl Config {
 		// user pre-activates at least one directive in TOML first. `active`
 		// now only seeds which loaded directives start active.
 		//
+		// Namespace: every Aphrodite artifact under `~/.hermes/` lives under
+		// `~/.hermes/aphrodite/` (never a bare `~/.hermes/<thing>` that could
+		// collide with other tools). Directives therefore resolve from
+		// `~/.hermes/aphrodite/directives`, not `~/.hermes/directives`.
+		//
 		// Built-in directives (baked into the binary via include_str!) are
-		// used as fallbacks when no `directives/` directory exists on disk,
-		// so a fresh install gets shipped defaults without filesystem setup.
+		// used as fallbacks when no `directives/` directory exists on disk -
+		// or when the on-disk directory is missing/unreadable - so a fresh
+		// install (or a missing `~/.hermes/aphrodite/directives`) gets
+		// shipped defaults without any filesystem setup and never errors.
+		let home_aphrodite = dirs::home_dir()
+			.unwrap_or_default()
+			.join(".hermes")
+			.join("aphrodite");
 		let dirs = vec![
+			// 1. cwd (explicit, local override for dev/testing).
 			std::path::PathBuf::from("directives"),
-			dirs::home_dir().unwrap_or_default().join(".hermes").join("directives"),
+			// 2. binary-relative (portable install: shipped directives/ next
+			//    to the executable, e.g. the Hermes plugin dir).
+			std::env::current_exe()
+				.ok()
+				.and_then(|p| p.parent().map(|d| d.join("directives"))),
+			// 3. home namespace (user-customizable): ~/.hermes/aphrodite/directives.
+			Some(home_aphrodite.join("directives")),
 		];
-		for dir in &dirs {
+		for dir in dirs.into_iter().flatten() {
 			if dir.is_dir() {
-				state.directives = crate::directives::load_directives(dir);
-				break;
+				// `load_directives` swallows per-file read errors and falls
+				// back to builtins if the directory yields nothing usable, so
+				// an unreadable directory here is harmless.
+				let loaded = crate::directives::load_directives(&dir);
+				if !loaded.is_empty() {
+					state.directives = loaded;
+					break;
+				}
 			}
 		}
 		if state.directives.is_empty() {
-			// No directives/ directory found on disk - use baked-in defaults.
+			// No usable directives/ directory found on disk - use baked-in
+			// defaults. This is the defensive path: a missing
+			// `~/.hermes/aphrodite/directives` (or an unreadable one) never
+			// breaks startup.
 			state.directives = crate::directives::loaded_builtins();
 		}
 		// Seed active directives: from TOML [directives] active list, filtered
