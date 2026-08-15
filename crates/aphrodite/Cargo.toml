@@ -89,7 +89,7 @@ toml = "1.1"
 notify = { version = "8.2.0", optional = true }
 regex = "1.12.4"
 blake3 = "1.7"
-s2 = "0.1.0"
+s2 = { version = "0.1.0", optional = true }
 
 [features]
 default = ["proxy"]
@@ -100,7 +100,7 @@ default = ["proxy"]
 # It must still be DECLARED: an undeclared feature makes
 # `unexpected_cfg_condition` fire on the cfg gates, which is a hard error under
 # CI's `-D warnings`. Restore the dependency before enabling.
-navigation = []
+navigation = ["s2"]
 proxy = [
 	"axum",
 	"tokio",
