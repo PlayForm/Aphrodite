@@ -210,9 +210,14 @@ pub struct Cli {
 }
 
 /// Multi-proxy configuration loaded from aphrodite.toml.
+///
+/// `proxies` defaults to an empty list when the `[proxies]` table is
+/// absent, so a hook-only configuration (no proxy definitions) parses
+/// cleanly instead of failing with `missing field 'proxies'`.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct MultiConfig {
 	pub defaults: Option<Defaults>,
+	#[serde(default)]
 	pub proxies: Vec<ProxyConfig>,
 	pub compression: Option<CompressionConfig>,
 	pub previews: Option<PreviewsConfig>,
