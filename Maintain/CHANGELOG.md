@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.4.1 - Release-tooling fixes (clippy build break + headroom crate-name rename misses) (2026-08-15)
+
+A corrective release over v1.4.0 that fixes two issues found after tagging:
+
+- **Fix (build):** `crates/aphrodite/src/config_loader.rs` chained
+  `bin_relative.into_iter()` where `bin_relative` is already an `Option`
+  (which implements `IntoIterator`). Under CI's `clippy -D warnings` this
+  tripped `clippy::useless_conversion` and failed the release build. Removed
+  the redundant `.into_iter()`.
+- **Fix (release tooling):** corrected every leftover reference to the
+  headroom core crate by its wrong bare name `aphrodite-headroom` to the
+  actual published name `aphrodite-headroom-core`:
+  - `.github/workflows/Publish.yml` — the `Publish-Headroom-Core` job's
+    `cargo publish -p aphrodite-headroom`, crates.io index URL, check step,
+    job name, and comments (this would have broken the crates.io publish).
+  - `deny.toml` comment, `Maintain/CHANGELOG.md` package-name references,
+    `references/headroom-publish.md`, and
+    `skills/aphrodite-release-workflow/{SKILL.md,references/headroom-publish.md}`.
+  No crate `name`/version changed; the vendored `vendor/headroom` manifests
+  already used `aphrodite-headroom-core` correctly.
+
 ## v1.4.0 - Packaging, runtime-cache, and config-default fixes from 1.3.9 feedback (2026-08-15)
 
 Addressing the issues reported against the official Aphrodite 1.3.9 Linux

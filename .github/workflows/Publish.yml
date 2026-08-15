@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_crates:
-        description: "Attempt `cargo publish` to crates.io (publishes aphrodite-headroom first, then aphrodite, then aphrodite-hermes)"
+        description: "Attempt `cargo publish` to crates.io (publishes aphrodite-headroom-core first, then aphrodite, then aphrodite-hermes)"
         type: boolean
         default: false
 
