@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.4.2 - Exclude experimental `s2` from the release workspace (cgmath advisory) (2026-08-15)
+
+A corrective release over v1.4.1 that stops the experimental `s2` crates from
+breaking CI's dependency-advisory gate:
+
+- **Fix (CI/audit):** `s2` (`crates/s2-probe`, `crates/s2-navigate`) was a
+  workspace member and a hard, unconditional dependency of `aphrodite`
+  (`s2 = "0.1.0"`), so the release workspace transitively pulled in
+  `cgmath 0.18.0`, which carries RUSTSEC-2026-0196 (unmaintained, "no safe
+  upgrade"). This failed the `cargo audit`/`cargo-deny` gate in `Check.yml`.
+  - `s2` is now an **optional** dependency of `aphrodite`, gated behind the
+    (still-disabled) `navigation` feature — it is no longer pulled into the
+    default/proxy build.
+  - `crates/s2-probe` and `crates/s2-navigate` are moved from
+    `workspace.members` to `workspace.exclude`, so they are not built or
+    audited as part of the release workspace (they remain in the repo as
+    experimental code).
+  - `cargo build -p aphrodite` is clean and `cgmath` is absent from the resolved
+    dependency graph.
+
+No CCR engine/compression changes, no shipped-code changes beyond the `s2`
+exclusion, and no crate `name`/`version` changes beyond the normal release
+bump (binary `1.4.1 → 1.4.2`, plugin `2.1.1 → 2.1.2`).
+
 ## v1.4.1 - Release-tooling fixes (clippy build break + headroom crate-name rename misses) (2026-08-15)
 
 A corrective release over v1.4.0 that fixes two issues found after tagging:
