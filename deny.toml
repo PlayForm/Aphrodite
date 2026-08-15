@@ -59,9 +59,9 @@ skip-tree = [
 	# headroom-core is vendored; its dep tree is under our control, but
 	# cargo-deny doesn't track "vendored" as a source distinction. Skip
 	# tree checks for it so we don't double-count its internal dev-deps.
-	# Published package name is aphrodite-headroom (see
+	# Published package name is aphrodite-headroom-core (see
 	# vendor/headroom/crates/headroom-core/Cargo.toml).
-	{ name = "aphrodite-headroom", version = "*" },
+	{ name = "aphrodite-headroom-core", version = "*" },
 ]
 
 [sources]

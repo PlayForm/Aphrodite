@@ -104,7 +104,7 @@ jobs:
           echo "packaging guard: all 6 builtin_directives/*.md present"
 
   Publish-Headroom-Core:
-    name: Publish aphrodite-headroom
+    name: Publish aphrodite-headroom-core
     needs: [Test]
     runs-on: ubuntu-latest
     environment: Release
@@ -132,31 +132,31 @@ jobs:
       # submodule, which declares its own `[workspace]` and is therefore a
       # separate Cargo workspace root, not a member of this one) using a
       # `path + version` dependency, aliased to the published package name
-      # `aphrodite-headroom` (we publish under our own namespace rather
+      # `aphrodite-headroom-core` (we publish under our own namespace rather
       # than the upstream `headroom-core` name - see crates/aphrodite/Cargo.toml
       # and vendor/headroom/crates/headroom-core/Cargo.toml). `cargo publish`
       # strips the `path` key and keeps only `package`/`version`, so publishing
-      # aphrodite only succeeds once a matching aphrodite-headroom version
+      # aphrodite only succeeds once a matching aphrodite-headroom-core version
       # actually exists on crates.io. crates.io versions are immutable -
       # re-publishing one that's already live errors - so check first and skip
       # if it's already there.
-      - name: Check if aphrodite-headroom version is already published
+      - name: Check if aphrodite-headroom-core version is already published
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_crates) || startsWith(github.ref, 'refs/tags/Aphrodite/') }}
         id: check
         working-directory: vendor/headroom
         run: |
           VERSION=$(grep '^version' crates/headroom-core/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if curl -sL "https://index.crates.io/ap/hr/aphrodite-headroom" | grep -q "\"vers\":\"$VERSION\""; then
+          if curl -sL "https://index.crates.io/ap/hr/aphrodite-headroom-core" | grep -q "\"vers\":\"$VERSION\""; then
             echo "published=true" >> "$GITHUB_OUTPUT"
           else
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish aphrodite-headroom to crates.io (opt-in)
+      - name: Publish aphrodite-headroom-core to crates.io (opt-in)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates && steps.check.outputs.published == 'false' }}
         working-directory: vendor/headroom
-        run: cargo publish -p aphrodite-headroom --no-verify
+        run: cargo publish -p aphrodite-headroom-core --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -191,7 +191,7 @@ jobs:
       # crates.io publishing is opt-in - run it only on an explicit
       # `workflow_dispatch` with publish_crates=true (so it can fail loudly
       # rather than annotating every tag-push release as red). Once
-      # Publish-Headroom-Core has run, aphrodite-headroom is live on
+      # Publish-Headroom-Core has run, aphrodite-headroom-core is live on
       # crates.io and this succeeds.
       - name: Publish to crates.io (opt-in)
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_crates) || startsWith(github.ref, 'refs/tags/Aphrodite/') }}
@@ -228,7 +228,7 @@ jobs:
         run: cargo build --release -p aphrodite-hermes
 
       # Opt-in (see the Publish-Aphrodite job): needs aphrodite published
-      # first, which needs aphrodite-headroom published first
+      # first, which needs aphrodite-headroom-core published first
       # (Publish-Headroom-Core). Runs only on explicit workflow_dispatch with
       # publish_crates.
       - name: Publish to crates.io (opt-in)

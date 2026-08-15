@@ -196,7 +196,7 @@ impl Config {
 			home_aphrodite.join("directives"),
 		]
 		.into_iter()
-		.chain(bin_relative.into_iter())
+		.chain(bin_relative)
 		.collect();
 		for dir in dirs.into_iter() {
 			if dir.is_dir() {
