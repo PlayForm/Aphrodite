@@ -36,7 +36,7 @@ to `Source` remote.
 ### crates.io publishing goes through Publish.yml, never manually
 
 Do NOT run `cargo publish` locally. `.github/workflows/Publish.yml` builds and
-publishes `aphrodite-headroom` → `aphrodite` → `aphrodite-hermes` (in that
+publishes `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` (in that
 dependency order) - but only on an explicit `workflow_dispatch` with
 `publish_crates: true`; a plain `Aphrodite/v*` tag push alone does NOT publish
 to crates.io (it only triggers `Build.yml`'s GitHub Release artifacts). This
@@ -49,16 +49,16 @@ only once the tagged release's artifacts are verified.
 > **Dispatch-name note:** the workflow file is `Publish.yml` but it dispatches
 > as `Publish` (no extension). `gh workflow run Publish ...` is correct.
 
-#### Publishing the `vendor/headroom` submodule crate (`aphrodite-headroom`)
+#### Publishing the `vendor/headroom` submodule crate (`aphrodite-headroom-core`)
 
 `vendor/headroom` is a **git submodule** (`PlayForm/Headroom.git`, branch
 `Current`). Its publishable crate lives at `crates/headroom-core/Cargo.toml` and
-is published under the package name `aphrodite-headroom` (set via that file's
-`name = "aphrodite-headroom"`; sibling crates reference it through
-`package = "aphrodite-headroom"`). The parent repo's `Publish.yml` publishes it
+is published under the package name `aphrodite-headroom-core` (set via that file's
+`name = "aphrodite-headroom-core"`; sibling crates reference it through
+`package = "aphrodite-headroom-core"`). The parent repo's `Publish.yml` publishes it
 via the `Publish-Headroom-Core` job, which runs `working-directory: vendor/headroom`
 and is a hard `needs:` prerequisite for `Publish-Aphrodite` (because `aphrodite`
-path-depends on `aphrodite-headroom`).
+path-depends on `aphrodite-headroom-core`).
 
 **GITLINK TRAP (repeatable, easy to miss):** CI checks out the submodule at the
 **recorded gitlink commit** in the parent repo - NOT the locally checked-out
@@ -72,7 +72,7 @@ the OLD crate name.
 
 **Verify before triggering (read-only):**
 - Already on crates.io? Hit the index:
-  `https://index.crates.io/ap/hr/aphrodite-headroom` (path = first 2 / next 2
+  `https://index.crates.io/ap/hr/aphrodite-headroom-core` (path = first 2 / next 2
   chars of the crate name). `404` = not published (CI will attempt it);
   `200` containing `"vers":"X.Y.Z"` = that version is live (CI's check step
   skips). Use this to confirm you're not re-publishing an immutable version.
