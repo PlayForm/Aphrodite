@@ -46,6 +46,88 @@ _dylib_gen = itertools.count()
 _dylib_lock = threading.Lock()
 
 
+def _hotreload_dir() -> str:
+    """Location for hot-reload dylib copies.
+
+    Lives under the Aphrodite namespace in the OS user directory
+    (~/.hermes/aphrodite/hotreload) rather than inside the plugin source
+    tree. This keeps the copies out of the plugin checkout so `hermes
+    plugins doctor` never stages/copies them into tmpfs (which previously
+    caused ENOSPC failures) and so they don't accumulate in version
+    control or released artifacts.
+    """
+    d = Path.home() / ".hermes" / "aphrodite" / "hotreload"
+    d.mkdir(parents=True, exist_ok=True)
+    return str(d)
+
+
+def _pid_alive(pid: int) -> bool:
+    """Best-effort "is this PID still running?" check, cross-platform."""
+    if pid <= 0:
+        return False
+    # Linux: /proc/<pid> exists iff the process is alive.
+    if os.path.isdir(f"/proc/{pid}"):
+        return True
+    # macOS/BSD/Windows: signal 0 probes existence without side effects.
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # PID exists but isn't ours - treat as alive (don't reap it).
+        return True
+    except OSError:
+        return False
+
+
+def _reap_stale_hotreloads() -> None:
+    """Delete hot-reload copies left behind by processes that are no longer
+    running, and trim generations for live PIDs to the most recent few.
+
+    A copy filename is `<base>.<pid>.<gen>` (e.g.
+    `libaphrodite_hermes.dylib.4242.3`). Copies whose PID is dead are
+    unconditionally removed; for each live PID we keep only the newest
+    generation so a long-lived process can't grow unbounded either.
+    """
+    try:
+        d = _hotreload_dir()
+    except Exception:
+        return
+    by_pid: dict[int, list[tuple[int, str]]] = {}
+    prefix = os.path.basename(_DYLIB_PATH)
+    try:
+        entries = os.listdir(d)
+    except OSError:
+        return
+    for name in entries:
+        if not name.startswith(prefix + "."):
+            continue
+        # <prefix>.<pid>.<gen>
+        rest = name[len(prefix) + 1 :]
+        parts = rest.split(".")
+        if len(parts) != 2:
+            continue
+        try:
+            pid = int(parts[0])
+            gen = int(parts[1])
+        except ValueError:
+            continue
+        by_pid.setdefault(pid, []).append((gen, os.path.join(d, name)))
+    for pid, gens in by_pid.items():
+        if not _pid_alive(pid):
+            # Process is gone - every generation it left is garbage.
+            for _, path in gens:
+                with contextlib.suppress(OSError):
+                    os.remove(path)
+        else:
+            # Still alive: keep only the newest generation for that PID.
+            gens.sort(reverse=True)
+            for _, path in gens[1:]:
+                with contextlib.suppress(OSError):
+                    os.remove(path)
+
+
 def _load_fresh_copy(src_path: str) -> str:
     """Copy `src_path` to a uniquely-named file so a subsequent
     `ctypes.CDLL()` genuinely loads the new bytes instead of a cached image.
@@ -61,9 +143,16 @@ def _load_fresh_copy(src_path: str) -> str:
     via `ctypes.CDLL()` on the same live process, kept returning the OLD
     constant and the identical `_handle` value. Loading each generation from
     a fresh path sidesteps the path-keyed cache entirely.
+
+    Copies are written to the relocated hotreload cache
+    (~/.hermes/aphrodite/hotreload), NOT inside the plugin tree, and are
+    named `<base>.<pid>.<gen>` so stale copies from terminated processes can
+    be reaped by `_reap_stale_hotreloads`.
     """
-    hotreload_dir = os.path.join(os.path.dirname(src_path), ".hotreload")
-    os.makedirs(hotreload_dir, exist_ok=True)
+    hotreload_dir = _hotreload_dir()
+    # Reap first so we don't pile generations on top of dead processes'
+    # leftovers, and so a fresh start can't grow unbounded.
+    _reap_stale_hotreloads()
     dst = os.path.join(
         hotreload_dir, f"{os.path.basename(src_path)}.{os.getpid()}.{next(_dylib_gen)}"
     )
@@ -127,11 +216,17 @@ def _load_dylib() -> ctypes.CDLL:
         # The previous generation's copy is no longer needed - its mapped
         # pages stay valid for any in-flight call even after the directory
         # entry is removed (standard POSIX unlink-while-mapped semantics),
-        # so deleting it here is safe and keeps `.hotreload/` from growing
-        # unboundedly across a long dev session.
+        # so deleting it here is safe and keeps this process's own copies
+        # from growing unboundedly across a long dev session.
         if _dylib_copy_path is not None:
             with contextlib.suppress(OSError):
                 os.remove(_dylib_copy_path)
+
+        # Register a one-shot shutdown sweep for THIS process's own copy.
+        # Copies from terminated processes are reaped at startup via
+        # `_reap_stale_hotreloads`; this guarantees our own final
+        # generation is removed on a clean exit too. Idempotent.
+        _register_atexit_cleanup()
 
         try:
             # c_void_p avoids Python 3.14 c_char_p malloc mismatch → SIGABRT
@@ -347,6 +442,41 @@ def _start_proxy():
 
 
 # ── Plugin registration ──
+
+_atexit_registered = False
+
+
+def _register_atexit_cleanup() -> None:
+    """Register a one-shot atexit handler that removes this process's own
+    hot-reload copy on interpreter shutdown, and reaps any copies left by
+    processes that have since died. Idempotent."""
+    global _atexit_registered
+    if _atexit_registered:
+        return
+    _atexit_registered = True
+    import atexit
+
+    def _cleanup() -> None:
+        # Remove our own final-generation copy.
+        if _dylib_copy_path is not None:
+            with contextlib.suppress(OSError):
+                os.remove(_dylib_copy_path)
+        # And sweep up anything abandoned by dead processes.
+        _reap_stale_hotreloads()
+
+    atexit.register(_cleanup)
+
+
+# Startup sweep: reclaim hot-reload copies abandoned by processes that died
+# before they could clean up (e.g. crashed/terminated Hermes sessions). This
+# replaces the old in-tree `.hotreload/` (which grew to ~19 GB across many
+# terminated processes) with a bounded, reaped cache.
+try:
+    _reap_stale_hotreloads()
+except Exception:
+    pass
+
+
 def register(ctx: Any) -> None:
     """Register hooks, tools, and (optionally) a context engine with Hermes.
 
