@@ -184,18 +184,21 @@ impl Config {
 			.unwrap_or_default()
 			.join(".hermes")
 			.join("aphrodite");
-		let dirs = vec![
+		// 2. binary-relative (portable install: shipped directives/ next to
+		//    the executable, e.g. the Hermes plugin dir).
+		let bin_relative = std::env::current_exe()
+			.ok()
+			.and_then(|p| p.parent().map(|d| d.join("directives")));
+		let dirs: Vec<std::path::PathBuf> = vec![
 			// 1. cwd (explicit, local override for dev/testing).
 			std::path::PathBuf::from("directives"),
-			// 2. binary-relative (portable install: shipped directives/ next
-			//    to the executable, e.g. the Hermes plugin dir).
-			std::env::current_exe()
-				.ok()
-				.and_then(|p| p.parent().map(|d| d.join("directives"))),
 			// 3. home namespace (user-customizable): ~/.hermes/aphrodite/directives.
-			Some(home_aphrodite.join("directives")),
-		];
-		for dir in dirs.into_iter().flatten() {
+			home_aphrodite.join("directives"),
+		]
+		.into_iter()
+		.chain(bin_relative.into_iter())
+		.collect();
+		for dir in dirs.into_iter() {
 			if dir.is_dir() {
 				// `load_directives` swallows per-file read errors and falls
 				// back to builtins if the directory yields nothing usable, so
