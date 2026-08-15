@@ -43,8 +43,46 @@ to crates.io (it only triggers `Build.yml`'s GitHub Release artifacts). This
 gate exists because crates.io versions are immutable - a version number burned
 by a bad manual `cargo publish` can never be reused (see the v1.3.1 incident in
 `Maintain/CHANGELOG.md`'s "Why 1.3.2, not 1.3.1" note). Trigger it deliberately
-via `gh workflow run Publish.yml -f publish_crates=true` (or the Actions UI)
+via `gh workflow run Publish -f publish_crates=true` (or the Actions UI)
 only once the tagged release's artifacts are verified.
+
+> **Dispatch-name note:** the workflow file is `Publish.yml` but it dispatches
+> as `Publish` (no extension). `gh workflow run Publish ...` is correct.
+
+#### Publishing the `vendor/headroom` submodule crate (`aphrodite-headroom`)
+
+`vendor/headroom` is a **git submodule** (`PlayForm/Headroom.git`, branch
+`Current`). Its publishable crate lives at `crates/headroom-core/Cargo.toml` and
+is published under the package name `aphrodite-headroom` (set via that file's
+`name = "aphrodite-headroom"`; sibling crates reference it through
+`package = "aphrodite-headroom"`). The parent repo's `Publish.yml` publishes it
+via the `Publish-Headroom-Core` job, which runs `working-directory: vendor/headroom`
+and is a hard `needs:` prerequisite for `Publish-Aphrodite` (because `aphrodite`
+path-depends on `aphrodite-headroom`).
+
+**GITLINK TRAP (repeatable, easy to miss):** CI checks out the submodule at the
+**recorded gitlink commit** in the parent repo - NOT the locally checked-out
+submodule HEAD. If you rename/revert/bump the headroom crate and want CI to
+publish that new state, you MUST update the parent's gitlink and push it:
+`git add vendor/headroom && git commit -m "..." && git push Source Current`.
+Otherwise CI publishes the *previously recorded* commit's tree. This bit us:
+the parent gitlink still pointed at the pre-rename commit while the local
+submodule had the renamed tree, so a naive `Publish` run would have published
+the OLD crate name.
+
+**Verify before triggering (read-only):**
+- Already on crates.io? Hit the index:
+  `https://index.crates.io/ap/hr/aphrodite-headroom` (path = first 2 / next 2
+  chars of the crate name). `404` = not published (CI will attempt it);
+  `200` containing `"vers":"X.Y.Z"` = that version is live (CI's check step
+  skips). Use this to confirm you're not re-publishing an immutable version.
+- `cargo publish` needs `CARGO_REGISTRY_TOKEN` (a CI secret). Do NOT run it
+  locally unless you have that token.
+
+**Trigger:** `gh workflow run Publish -f publish_crates=true`. The headroom
+publish step is gated on `publish_crates == true` - without it the step is
+skipped and the downstream `Publish-Aphrodite` job fails (missing dependency).
+See `references/headroom-publish.md` for the rename procedure and checklist.
 
 ## Version Sync
 
@@ -115,7 +153,26 @@ ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/aphrodite
 ## Release Notes - Content Standards
 
 Every release MUST include: Summary, Changes, Infrastructure, What Ships, and Links.
-See `.hermes/RELEASE-TEMPLATE.md` for the canonical template.
+See `.hermes/RELEASE-TEMPLATE.md` for the canonical template (it defines **Live**
+vs **Retrospective** modes).
+
+- **Drafts live in `.plans/release-notes/`** (e.g. `v1.3.4-draft.md`,
+  `vNEXT-draft.md`, `headroom-fork-vNEXT-draft.md`). The active version's notes
+  may also be staged as `Maintain/release-notes-vX.Y.Z.md` - verify it is
+  actually tracked/committed; it can drop out between `git add` and commit.
+- **Two template modes:** *Live* (cutting the release now) requires a real
+  `### Infrastructure` section with commands you actually ran. *Retrospective*
+  (rewriting an already-shipped release) replaces `### Infrastructure` with
+  `### Verification` describing what was analyzed (commit range, diffstat), not
+  re-tested. Both modes require Summary + Changes (grouped Feature/Fix/Chore/Docs)
+  + What Ships + Links.
+- **Placeholders are by-design for drafts:** `{PENDING}` in Infrastructure,
+  `{VERSION}` / `{PLUGIN_VERSION}` in the title/compare link, and a
+  `DO NOT PUBLISH` header. These are NOT template violations - fill them at
+  release time. Never publish a note that still contains `{PENDING}`.
+- **Headroom-fork notes** (`headroom-fork-vNEXT-draft.md`) are retrospective and
+  separate from the Aphrodite binary notes; they reference the fork's own
+  `aphrodite-vX.Y.Z` tag scheme and the `aphrodite-headroom-core` package name.
 
 Anti-pattern (DO NOT): bare compare link with zero description.
 30+ releases (v0.8.13-v0.8.43) currently ship with only:
@@ -171,6 +228,28 @@ EOF
 gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md \
   staging/aphrodite-* staging/libaphrodite_hermes-* staging/SHA256SUMS-*.txt
 ```
+
+## Commit & Sync Workflow
+
+This repo's intended commit/sync path (project convention):
+
+- **Commit:** `git gcommit-hermes` (LLM-generated message; alias →
+  `~/Developer/Maintain/Save/Target/release/Save --hermes ...`),
+  `git gcommit`, or `git ecommit` (empty message). These call a local `Save`
+  binary that synthesizes the commit message.
+- **Sync:** `git sync` - alias for
+  `git pull --no-edit --allow-unrelated-histories; git push --recurse-submodules=on-demand`.
+
+**Reliability caveats (learned the hard way):**
+- `gcommit-hermes` can **fail to commit without a clear error**: its `Save`
+  backend calls an LLM provider, and when that provider is unavailable (e.g.
+  credits exhausted) the command exits but the staged change stays uncommitted.
+  It also excludes `vendor` (and other dirs) from its diff view, so a
+  submodule-pointer-only change can report "No staged changes found" even when
+  staged. **Always verify the commit landed** (`git log -1`, `git status`) and
+  fall back to a plain `git commit -m "..."` if `gcommit-hermes` didn't land it.
+- For submodule-pointer updates, `git add <submodule-path>` explicitly and
+  confirm with `git diff --cached` before relying on `gcommit-hermes`.
 
 ## Cross-Module Import Pitfall
 
