@@ -11,7 +11,9 @@ platforms: [macos]
 ## Pre-Release Verification
 
 **MANDATORY before every release.** Missing symbols silently kill the plugin -
-`Failed to load plugin` with no error.
+`Failed to load plugin` with no error. But the release ALSO fails in CI on
+**four independent gates** that are NOT caught by a local `cargo build`. Run
+ALL of these before tagging - every one of them has burned a release:
 
 ```bash
 cd /path/to/Aphrodite
@@ -19,7 +21,29 @@ python3 -c "import sys; sys.path.insert(0, 'plugins'); import aphrodite; print('
 ruff check plugins/aphrodite/ Maintain/scripts/ crates/
 npx pyright plugins/aphrodite/
 cargo check -p aphrodite
+# GATE 1 - clippy with -D warnings (CI uses this; a plain build hides it):
+cargo clippy -p aphrodite --lib -- -D warnings
+# GATE 3 - cargo audit / unmaintained-advisory scan (CI Check.yml gates on this):
+cargo audit            # or: cargo deny check advisories
 ```
+
+- **GATE 1 (clippy `-D warnings`):** CI compiles with `clippy -D warnings`.
+  A `cargo build` that is green locally will STILL fail release. Common trap:
+  `clippy::useless_conversion` on a redundant `.into_iter()` (e.g. chaining an
+  `Option`, which is already `IntoIterator`). Remove the `.into_iter()`.
+- **GATE 2 (ruff on the Hermes plugin `plugins/aphrodite/`):** `AGENTS.md`
+  requires `ruff check plugins/aphrodite/ → 0 errors`. The recurring violations
+  are `SIM105` (`try/except/pass` → `with contextlib.suppress(...)`) and `F401`
+  (unused import). Fix in the plugin source + tests before releasing.
+- **GATE 3 (cargo audit / unmaintained advisory):** `Check.yml` fails the
+  release on advisories like `RUSTSEC-2026-0196` (`cgmath` unmaintained, "no safe
+  upgrade"). `cgmath` enters only through the **experimental `s2` crate**
+  (`crates/s2-probe`, `crates/s2-navigate`), which is NOT shipped. Keep `s2`
+  out of the release: it must be an `optional` dep gated behind the `navigation`
+  feature (off by default) AND excluded from `workspace.members` (put it in
+  `exclude`). After that, `cargo tree -p aphrodite -i cgmath` returns nothing.
+- **GATE 4 (version discipline, see below):** once a version is tagged/pushing,
+  you do NOT re-tag to fix it - you cut a new version.
 
 If any step fails, fix BEFORE releasing. A broken plugin means zero tools, no
 compression, no context engine - a silent degradation users won't notice.
