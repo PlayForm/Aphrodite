@@ -714,4 +714,33 @@ mod tests {
 		assert_eq!(cli.api_url, "https://default.example.com");
 		assert_eq!(cli.model, "default-model-name");
 	}
+
+	// ── Point 5 (feedback): a hook-only configuration that omits the
+	// `[proxies]` table entirely must parse, defaulting `proxies` to an
+	// empty Vec - not fail with `missing field 'proxies'`. ──
+	#[test]
+	fn test_multi_config_without_proxies_table_defaults_to_empty() {
+		let mc = multi_config_from_toml(
+			r#"
+			[compression]
+			engine_threshold_pct = 45
+			"#,
+		);
+		assert!(
+			mc.proxies.is_empty(),
+			"missing [proxies] table must default to an empty Vec, got {} entries",
+			mc.proxies.len()
+		);
+	}
+
+	// ── Point 5 (feedback): an explicit empty `proxies = []` also parses. ──
+	#[test]
+	fn test_multi_config_explicit_empty_proxies() {
+		let mc = multi_config_from_toml(
+			r#"
+			proxies = []
+			"#,
+		);
+		assert!(mc.proxies.is_empty());
+	}
 }
