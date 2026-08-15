@@ -471,10 +471,8 @@ def _register_atexit_cleanup() -> None:
 # before they could clean up (e.g. crashed/terminated Hermes sessions). This
 # replaces the old in-tree `.hotreload/` (which grew to ~19 GB across many
 # terminated processes) with a bounded, reaped cache.
-try:
+with contextlib.suppress(Exception):
     _reap_stale_hotreloads()
-except Exception:
-    pass
 
 
 def register(ctx: Any) -> None:
