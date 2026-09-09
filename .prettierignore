@@ -1,5 +1,4 @@
 # Aphrodite Prettier ignore
-# Modeled after REPxREP/Repository + Land conventions
 # Designed for VS Code `**/*` glob — excludes everything Prettier can't parse
 
 # ═══════════════════════════════════════════════

@@ -1,6 +1,3 @@
-# Aphrodite EditorConfig
-# Modeled after REPxREP/Repository convention
-
 root = true
 
 [*]
