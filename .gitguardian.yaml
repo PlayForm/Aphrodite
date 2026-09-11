@@ -17,5 +17,3 @@ secret:
   ignored_detectors:
     - jwt
     - generic-key
-
-  high_entropy_threshold: 4.5
