@@ -224,13 +224,13 @@ Aphrodite ships five built-in directives baked into the binary via
 
 | Rule | Behavior |
 |---|---|
-| Search order | `./directives/` (working directory), then `~/.hermes/directives/` - first directory that exists wins; they are NOT merged |
+| Search order | `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` → `~/.hermes/aphrodite/directives/` → binary-relative; first directory that exists wins, NOT merged. An empty directives dir = intentionally empty (no custom directives) |
 | File filter | Only `*.md` files; anything else is silently skipped |
 | Naming | Directive name = file stem (`focus.md` → `focus`) |
 | Per-file cap | 2,000 chars per directive body (char-safe truncation, `…` appended) |
 | Combined cap | 4,000 chars across all active directives' injected text combined |
 | Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty |
-| Built-in fallback | When no `directives/` directory exists, the 5 baked-in directives are loaded automatically |
+| Built-in fallback | When no directives directory is found, the 5 baked-in directives are loaded automatically - activation is **logged** |
 | Active default | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` are seeded as active |
 
 ### Runtime management

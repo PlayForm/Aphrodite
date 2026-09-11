@@ -189,32 +189,70 @@ impl Config {
 		let bin_relative = std::env::current_exe()
 			.ok()
 			.and_then(|p| p.parent().map(|d| d.join("directives")));
-		let dirs: Vec<std::path::PathBuf> = vec![
-			// 1. cwd (explicit, local override for dev/testing).
-			std::path::PathBuf::from("directives"),
-			// 3. home namespace (user-customizable): ~/.hermes/aphrodite/directives.
-			home_aphrodite.join("directives"),
-		]
-		.into_iter()
-		.chain(bin_relative)
-		.collect();
-		for dir in dirs.into_iter() {
-			if dir.is_dir() {
-				// `load_directives` swallows per-file read errors and falls
-				// back to builtins if the directory yields nothing usable, so
-				// an unreadable directory here is harmless.
-				let loaded = crate::directives::load_directives(&dir);
-				if !loaded.is_empty() {
-					state.directives = loaded;
-					break;
-				}
+		// Candidate discovery order (first existing directory wins):
+		//   0. $APHRODITE_DIRECTIVES_DIR - explicit env override, checked FIRST
+		//      (issue #6): plugin/host setups export this so the plugin's own
+		//      directives/ dir is found even though a ctypes-loaded dylib's
+		//      current_exe points at the host process exe and cwd is rarely the
+		//      plugin checkout.
+		//   1. cwd (explicit, local override for dev/testing).
+		//   2. home namespace (user-customizable): ~/.hermes/aphrodite/directives.
+		//   3. binary-relative (portable install: shipped directives/ next to
+		//      the executable, e.g. the Hermes plugin dir).
+		let mut dirs: Vec<std::path::PathBuf> = Vec::new();
+		if let Ok(env_dir) = std::env::var("APHRODITE_DIRECTIVES_DIR") {
+			if !env_dir.trim().is_empty() {
+				dirs.push(std::path::PathBuf::from(env_dir));
 			}
 		}
-		if state.directives.is_empty() {
-			// No usable directives/ directory found on disk - use baked-in
-			// defaults. This is the defensive path: a missing
-			// `~/.hermes/aphrodite/directives` (or an unreadable one) never
-			// breaks startup.
+		dirs.push(std::path::PathBuf::from("directives"));
+		dirs.push(home_aphrodite.join("directives"));
+		if let Some(bin_dir) = bin_relative {
+			dirs.push(bin_dir);
+		}
+		// Candidates that were probed but unusable, kept for the builtin
+		// fallback's warn log - the old path failed silently.
+		let mut probed_unusable: Vec<String> = Vec::new();
+		let mut selected: Option<std::path::PathBuf> = None;
+		for dir in dirs {
+			let exists = dir.is_dir();
+			tracing::info!(
+				directive_source = "none",
+				path = %dir.display(),
+				exists = exists,
+				"probing directives candidate"
+			);
+			if exists {
+				// An existing directory wins even when it yields zero readable .md
+				// files: `load_directives` returns an intentionally-empty map for that
+				// case (an *existing* directory means an intentional directive set), so
+				// the baked-in defaults must NOT be substituted here.
+				let loaded = crate::directives::load_directives(&dir);
+				tracing::info!(
+					directive_source = "disk",
+					path = %dir.display(),
+					count = loaded.len(),
+					"selected directives source: {} ({} directive(s) loaded)",
+					dir.display(),
+					loaded.len()
+				);
+				state.directives = loaded;
+				selected = Some(dir);
+				break;
+			}
+			probed_unusable.push(dir.display().to_string());
+		}
+		if selected.is_none() {
+			// No usable directives/ directory found on disk - use baked-in defaults.
+			// This is the defensive path: a missing `~/.hermes/aphrodite/directives`
+			// (or an unreadable one) never breaks startup. Warns instead of failing
+			// silently so a setup that expected a custom set learns it got defaults.
+			tracing::warn!(
+				directive_source = "builtins",
+				probed = ?probed_unusable,
+				"no usable directives directory found (probed: {}); falling back to built-in directives",
+				probed_unusable.join(", ")
+			);
 			state.directives = crate::directives::loaded_builtins();
 		}
 		// Seed active directives: from TOML [directives] active list, filtered
@@ -248,6 +286,11 @@ impl Config {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	// Tests that mutate the process cwd / env serialize on this guard -
+	// `apply_compression`'s directives discovery reads cwd + env vars, so two
+	// such tests running in parallel could observe each other's state.
+	static CWD_GUARD: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
 
 	#[test]
 	fn test_defaults() {
@@ -321,9 +364,7 @@ mod tests {
 	// from a temp cwd containing a `directives/` dir so it is hermetic. ──
 	#[test]
 	fn test_directives_loaded_even_when_active_empty() {
-		use std::sync::{Mutex, OnceLock};
-		static CWD_GUARD: OnceLock<Mutex<()>> = OnceLock::new();
-		let _g = CWD_GUARD.get_or_init(|| Mutex::new(())).lock().unwrap();
+		let _g = CWD_GUARD.get_or_init(|| std::sync::Mutex::new(())).lock().unwrap();
 
 		let tmp = std::env::temp_dir().join(format!(
 			"aphrodite-cfg-directives-{}",
@@ -357,6 +398,46 @@ mod tests {
 			"empty active list should seed focus + foresight defaults"
 		);
 		assert!(state.active_directives.contains(&"focus".to_string()));
+	}
+
+	// ── Issue #6: $APHRODITE_DIRECTIVES_DIR is the FIRST candidate and
+	// must win over a cwd `directives/` dir. Shares CWD_GUARD with the other
+	// cwd-mutating test since both set_current_dir. ──
+	#[test]
+	fn test_directives_env_override_wins_over_cwd() {
+		let _g = CWD_GUARD.get_or_init(|| std::sync::Mutex::new(())).lock().unwrap();
+
+		let stamp = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_nanos();
+		let env_dir = std::env::temp_dir().join(format!("aphrodite-cfg-envdir-{stamp}"));
+		let cwd_dir = std::env::temp_dir().join(format!("aphrodite-cfg-env-cwd-{stamp}"));
+		std::fs::create_dir_all(&env_dir).unwrap();
+		std::fs::create_dir_all(cwd_dir.join("directives")).unwrap();
+		std::fs::write(env_dir.join("envwin.md"), "# envwin\nfrom env override").unwrap();
+		std::fs::write(cwd_dir.join("directives").join("cwdwin.md"), "# cwdwin\nfrom cwd").unwrap();
+
+		let original = std::env::current_dir().unwrap();
+		std::env::set_current_dir(&cwd_dir).unwrap();
+		std::env::set_var("APHRODITE_DIRECTIVES_DIR", &env_dir);
+
+		let mut state = crate::state::AphroditeState::default();
+		Config::default().apply_compression(&mut state);
+
+		std::env::remove_var("APHRODITE_DIRECTIVES_DIR");
+		std::env::set_current_dir(&original).unwrap();
+		let _ = std::fs::remove_dir_all(&env_dir);
+		let _ = std::fs::remove_dir_all(&cwd_dir);
+
+		assert!(
+			state.directives.contains_key("envwin"),
+			"$APHRODITE_DIRECTIVES_DIR must win as the first candidate"
+		);
+		assert!(
+			!state.directives.contains_key("cwdwin"),
+			"the cwd directives/ candidate must not beat the env override"
+		);
 	}
 
 	// ── Poll-worker config flag ──────────────────────────────

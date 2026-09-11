@@ -160,7 +160,7 @@ active = []                        # e.g. ["focus", "foresight"]
 
 | Field    | Meaning                                                                                                                                                                                                                                                                       |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `active` | Which loaded directives start active. Directive `.md` files are discovered from `./directives/` or `~/.hermes/directives/` **whenever the directory exists** - loading is not gated on this list being non-empty. Names not found in the loaded set are silently filtered out |
+| `active` | Which loaded directives start active. Directive `.md` files are discovered from `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` → `~/.hermes/aphrodite/directives/` → binary-relative - the **first directory that exists** wins, and an empty directives dir is intentional (no custom directives). Loading is not gated on this list being non-empty. Names not found in the loaded set are silently filtered out |
 
 Read by the Hermes-plugin dylib session (`config_loader`), not the Rust
 proxy. The active set is then fully runtime-mutable via the

@@ -70,50 +70,67 @@ pub const MAX_COMBINED_CHARS: usize = 4000;
 /// Returns a map of name → Directive. Files without `.md` extension are
 /// silently skipped.
 ///
-/// If the directory doesn't exist or contains no `.md` files, the built-in
-/// directives (baked into the binary via `include_str!`) are used as
-/// fallbacks, so a fresh install without a `directives/` directory still
-/// gets `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, and
-/// `lazy`.
+/// Issue #6 semantics: an existing directory that yields zero readable `.md`
+/// files is an **intentionally empty** directive set - the returned map is
+/// empty and NO built-in fallback is applied, so a caller can honor "I want
+/// zero directives". Only when the directory itself is missing or unreadable
+/// (`read_dir` fails) do the built-in directives (baked into the binary via
+/// `include_str!`) come back as a fallback, so a fresh install without a
+/// `directives/` directory still gets `focus`, `foresight`, `ccr-handling`,
+/// `cleanup`, `explore`, and `lazy`.
 pub fn load_directives(dir: &PathBuf) -> HashMap<String, Directive> {
+	let entries = match std::fs::read_dir(dir) {
+		Ok(entries) => entries,
+		Err(e) => {
+			// Missing/unreadable directory: fall back to the baked-in set so a
+			// fresh install (or a missing `~/.hermes/aphrodite/directives`)
+			// still gets shipped defaults without any filesystem setup.
+			tracing::warn!(
+				directive_source = "builtins",
+				path = %dir.display(),
+				error = %e,
+				"directives directory missing or unreadable; falling back to built-in directives"
+			);
+			return loaded_builtins();
+		}
+	};
+
 	let mut directives = HashMap::new();
-	let mut loaded_from_disk = false;
-	if let Ok(entries) = std::fs::read_dir(dir) {
-		for entry in entries.flatten() {
-			let path = entry.path();
-			if path.extension().map(|e| e != "md").unwrap_or(true) {
-				continue;
-			}
-			let Some(name) = path.file_stem().and_then(|n| n.to_str()) else {
-				continue;
-			};
-			let Ok(content) = std::fs::read_to_string(&path) else {
-				continue;
-			};
-			// Trim each directive to a reasonable size.
-			let content = if content.len() > MAX_DIRECTIVE_CHARS {
-				let trunc: String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
-				format!("{}…", trunc)
-			} else {
-				content
-			};
-			directives.insert(name.to_string(), Directive { name: name.to_string(), content });
-			loaded_from_disk = true;
+	for entry in entries.flatten() {
+		let path = entry.path();
+		if path.extension().map(|e| e != "md").unwrap_or(true) {
+			continue;
 		}
+		let Some(name) = path.file_stem().and_then(|n| n.to_str()) else {
+			continue;
+		};
+		let Ok(content) = std::fs::read_to_string(&path) else {
+			continue;
+		};
+		// Trim each directive to a reasonable size.
+		let content = if content.len() > MAX_DIRECTIVE_CHARS {
+			let trunc: String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
+			format!("{}…", trunc)
+		} else {
+			content
+		};
+		directives.insert(name.to_string(), Directive { name: name.to_string(), content });
 	}
-	// Fallback: if no `directives/` dir on disk (or it's empty), use the
-	// built-in directives baked into the binary so a fresh install gets
-	// shipped defaults without any filesystem setup.
-	if !loaded_from_disk {
-		for (name, content) in builtin_directives() {
-			let content = if content.len() > MAX_DIRECTIVE_CHARS {
-				let trunc: String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
-				format!("{}…", trunc)
-			} else {
-				content.to_string()
-			};
-			directives.insert(name.to_string(), Directive { name: name.to_string(), content });
-		}
+	tracing::info!(
+		directive_source = "disk",
+		path = %dir.display(),
+		count = directives.len(),
+		"loaded {} directive(s) from disk",
+		directives.len()
+	);
+	if directives.is_empty() {
+		// The directory exists but yields no readable `.md` files - this is an
+		// *intentional* empty directive set, NOT a builtin-fallback trigger.
+		tracing::info!(
+			directive_source = "disk",
+			path = %dir.display(),
+			"directives directory exists but contains no readable .md files - treating as intentionally empty"
+		);
 	}
 	directives
 }
@@ -505,6 +522,49 @@ mod tests {
 		let loaded = load_directives(&dir.path());
 		assert_eq!(loaded.len(), 1);
 		assert!(loaded.contains_key("focus"));
+	}
+
+	// ── Issue #6: an existing-but-empty directives directory is an
+	// INTENTIONAL empty set - empty map, NO built-in fallback (a missing
+	// directory still falls back to builtins, see
+	// test_load_directives_missing_dir_returns_builtins). ──
+	#[test]
+	fn test_load_directives_existing_empty_dir_returns_empty_map() {
+		let dir = TempDir::new("empty-dir");
+		// Non-.md files must not count as a usable directive either.
+		std::fs::write(dir.path().join("README.txt"), "not a directive").unwrap();
+
+		let loaded = load_directives(&dir.path());
+		assert!(
+			loaded.is_empty(),
+			"an existing empty directives dir must yield an empty map, not builtins"
+		);
+	}
+
+	// ── Issue #6: an empty .md file is a *readable* .md file, so it wins
+	// over builtins and loads as a directive with empty content. ──
+	#[test]
+	fn test_load_directives_empty_md_file_loads_empty_content() {
+		let dir = TempDir::new("empty-md");
+		std::fs::write(dir.path().join("empty.md"), "").unwrap();
+
+		let loaded = load_directives(&dir.path());
+		assert_eq!(loaded.len(), 1, "the empty .md file must load, not builtins");
+		assert!(loaded.contains_key("empty"));
+		assert_eq!(loaded["empty"].content, "");
+	}
+
+	// ── Issue #6: whitespace-only .md content loads verbatim (no trimming
+	// beyond the size cap). ──
+	#[test]
+	fn test_load_directives_whitespace_only_loads_verbatim() {
+		let dir = TempDir::new("whitespace-md");
+		let ws = "   \n\t\n  \n";
+		std::fs::write(dir.path().join("ws.md"), ws).unwrap();
+
+		let loaded = load_directives(&dir.path());
+		assert_eq!(loaded.len(), 1);
+		assert_eq!(loaded["ws"].content, ws, "whitespace-only content must load verbatim");
 	}
 
 	#[test]
