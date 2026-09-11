@@ -1,20 +1,19 @@
 ---
 name: aphrodite-cargo-upgrade
-description: "Cargo upgrade breakpoints for aphrodite + headroom - reqwest features, axum
-    ConnectInfo+fallback, tokio-tungstenite Messages, pyo3 allow_threads,
-    workspace pinning. What breaks and how to fix."
-version: 1.0.0
+description: "Use when running cargo upgrade on aphrodite + headroom. Reqwest/axum/tokio-tungstenite/pyo3/sha2 breakpoints and workspace pinning fixes."
+version: 1.1.0
 platforms: [macos]
+tags: [aphrodite, cargo, upgrade, rust, breakpoints]
 ---
 
-# Cargo Upgrade Breakpoints
+# Aphrodite Cargo Upgrade Breakpoints
 
 After `cargo upgrade` (via `~/Developer/Maintain/Fn/Update/Cargo.sh`), verify
-these before assuming clean build.
+every breakpoint below before assuming a clean build. Each entry: symptom →
+fix. (Rebuild-path, `--version`-flag, and standalone-repo breakpoints live in
+`aphrodite-upgrade-breakpoints`.)
 
-## Reqwest 0.12 → 0.13
-
-### Feature rename: `rustls-tls` → `rustls`
+## Reqwest 0.12 → 0.13: feature rename `rustls-tls` → `rustls`
 
 **Symptom**:
 `package depends on reqwest with feature rustls-tls but reqwest does not have that feature`
@@ -48,11 +47,9 @@ reqwest = { features = ["stream", "rustls", "http2", "json"] }
 **Cause**: `any(catch_all)` with `ConnectInfo<SocketAddr>` extractor fails the
 Handler trait bound in axum 0.8's stricter `fallback()`.
 
-**Fix**: Pin axum to 0.7 in workspace Cargo.toml.
+**Fix**: Pin axum to 0.7 in the workspace Cargo.toml.
 
-## Tokio-Tungstenite 0.24 → 0.29
-
-### Message type changes
+## Tokio-Tungstenite 0.24 → 0.29: Message type changes
 
 **Symptom**: `mismatched types: expected Bytes, found Vec<u8>` and
 `expected Utf8Bytes, found String`
@@ -75,15 +72,13 @@ AxMsg::Text(t) => TgMsg::Text(t.to_string().into()),  // → Utf8Bytes
 TgMsg::Text(t) => AxMsg::Text(t.as_str().to_string().into()),
 ```
 
-## PyO3 0.24 → 0.29
-
-### allow_threads removed
+## PyO3 0.24 → 0.29: allow_threads removed
 
 **Symptom**: `no method named allow_threads found for struct pyo3::Python`
 
-**Fix**: Major migration needed. Pin pyo3 to 0.24 until migration is done.
+**Fix**: Major migration needed. Pin pyo3 to 0.24 until the migration is done.
 
-## SHA2 0.10 → 0.11
+## SHA2 0.10 → 0.11: LowerHex removed
 
 **Symptom**: `LowerHex is not satisfied` on `Array<u8, ...>`
 
@@ -109,7 +104,7 @@ Cargo resolves crate-local versions independently.
 
 ## ExpandVersions.rs
 
-**Warning**: `Document` deprecated → `DocumentMut` in toml_edit. Cosmetic only.
+`Document` deprecated → `DocumentMut` in toml_edit (cosmetic only):
 
 ```rust
 use toml_edit::{DocumentMut, Item, Value};  // was Document
