@@ -42,7 +42,7 @@ On first launch the plugin auto-downloads the `aphrodite` binary from
 
 > [!IMPORTANT]
 >
-> Use the Hermes plugin method on Windows too — `download.ps1` is a native
+> Use the Hermes plugin method on Windows too - `download.ps1` is a native
 > PowerShell equivalent. See [docs/install/windows.md](docs/install/windows.md).
 
 ### Via cargo
@@ -75,12 +75,12 @@ cargo build --release -p aphrodite -p aphrodite-hermes
 ## The Problem 🔥
 
 Every file read, build, code search, or browser open floods the agent's
-context with raw output — compilation logs, accessibility trees, JSON blobs.
+context with raw output - compilation logs, accessibility trees, JSON blobs.
 The agent spends its budget reading noise instead of reasoning.
 
 Aphrodite intercepts output before it reaches the LLM and replaces it with a
 compact, structured preview.
-The agent sees ~15 tokens of metadata instead of hundreds — and retrieves the
+The agent sees ~15 tokens of metadata instead of hundreds - and retrieves the
 full content only when it actually needs it.
 
 ---
@@ -105,12 +105,12 @@ full content only when it actually needs it.
     • Needs detail      → aphrodite_retrieve(hash) → full content
 ```
 
-Four fast layers (classification 40–123 ns; whole compress step sub-millisecond):
+Four fast layers (classification 40-123 ns; whole compress step sub-millisecond):
 
-1. **Classify** — type-aware classifier identifies content.
-2. **Preview** — enriched, type-aware previews produced automatically.
-3. **Store** — BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker.
-4. **Decide** — agent reads preview, retrieves only when needed.
+1. **Classify** - type-aware classifier identifies content.
+2. **Preview** - enriched, type-aware previews produced automatically.
+3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker.
+4. **Decide** - agent reads preview, retrieves only when needed.
 
 The context engine auto-compresses middle turns to CCR as the session fills,
 so the agent never hits the context ceiling.
@@ -178,7 +178,7 @@ code automatically.
 
 ## Configuration 🎛️
 
-Everything lives in `aphrodite.toml` — no recompile needed.
+Everything lives in `aphrodite.toml` - no recompile needed.
 Edit + save (or `POST /reload`) applies changes immediately.
 
 **`aphrodite.toml`**
@@ -218,8 +218,8 @@ Cache and token modes measure identical ratios;
 | Browser snapshot (342 el) | ~5,000 tok  |    ~12 tok  | **416×** |
 
 **Median: 23× fewer tokens on tool output.**
-End-to-end latency is 8–40 ms (includes the HTTP round-trip);
-classification alone is 40–123 ns.
+End-to-end latency is 8-40 ms (includes the HTTP round-trip);
+classification alone is 40-123 ns.
 
 Benchmarks are reproducible: `cargo run --release -p aphrodite --example bench_0N_*`.
 
@@ -227,7 +227,7 @@ Benchmarks are reproducible: `cargo run --release -p aphrodite --example bench_0
 
 ## Relationship to Headroom 🔗
 
-Aphrodite embeds [Headroom](docs/APHRODITE-HEADROOM.md) — a custom fork tracked
+Aphrodite embeds [Headroom](docs/APHRODITE-HEADROOM.md) - a custom fork tracked
 as a git submodule at `vendor/headroom/`.
 Headroom provides the content transforms (classifier, smart crusher, tokenizer);
 Aphrodite adds the preview pipeline, CCR storage, Hermes integration, and
@@ -253,7 +253,7 @@ First-time contributors are especially welcome.
 
 ## License 📜
 
-Released under [CC0-1.0](LICENSE) — public domain.
+Released under [CC0-1.0](LICENSE) - public domain.
 
 ---
 
