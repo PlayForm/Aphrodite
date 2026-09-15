@@ -1,17 +1,17 @@
 # Aphrodite Prettier ignore
-# Designed for VS Code `**/*` glob — excludes everything Prettier can't parse
+# Designed for VS Code `**/*` glob - excludes everything Prettier can't parse
 
 # ═══════════════════════════════════════════════
 # Formatters that own their own file types
 # ═══════════════════════════════════════════════
 
-# Rust — rustfmt owns .rs formatting
+# Rust - rustfmt owns .rs formatting
 *.rs
 
-# TOML — taplo / even-better-toml owns .toml
+# TOML - taplo / even-better-toml owns .toml
 *.toml
 
-# Python — ruff/black owns .py
+# Python - ruff/black owns .py
 *.py
 *.pyi
 *.pyc
@@ -21,7 +21,7 @@ __pycache__/
 .venv/
 venv/
 
-# Shell — shfmt owns .sh / .bash
+# Shell - shfmt owns .sh / .bash
 *.sh
 *.bash
 *.env.sh
@@ -263,7 +263,7 @@ desktop.ini
 .circleci
 
 # ═══════════════════════════════════════════════
-# Misc — files Prettier chokes on
+# Misc - files Prettier chokes on
 # ═══════════════════════════════════════════════
 
 # Compiled/bundled JS (not source)
@@ -303,7 +303,7 @@ NOTICE
 *.puml
 
 # ═══════════════════════════════════════════════
-# Test fixtures — intentionally invalid/malformed
+# Test fixtures - intentionally invalid/malformed
 # ═══════════════════════════════════════════════
 
 *fixture*
