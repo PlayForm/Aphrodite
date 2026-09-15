@@ -20,6 +20,13 @@ MSG="${1:-}"
 
 cd "$REPO_ROOT"
 
+# Release branch is derived from the current HEAD, NOT hardcoded - the
+# release pipeline (commit/tag/push) follows the branch it was started on
+# (Development, Current, ...). Override with RELEASE_BRANCH env var; falls
+# back to Current on a detached HEAD rather than pushing nothing.
+RELEASE_BRANCH="${RELEASE_BRANCH:-$(git symbolic-ref --short HEAD 2>/dev/null || echo Current)}"
+echo "[release] branch: $RELEASE_BRANCH"
+
 # Sync submodules to their remote tracking branches - OPT-IN ONLY
 # (report 08 F3/T4): floating all three submodules to their remote branch
 # tips at release time meant a release's actual contents (whatever landed
@@ -146,7 +153,7 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 	# unconditionally above so download.sh always finds the correct binary
 	# version, whether or not a plugin version source exists.
 	SUBMODULE_REMOTE="${SUBMODULE_REMOTE:-Source}"
-	SUBMODULE_BRANCH="${SUBMODULE_BRANCH:-Current}"
+	SUBMODULE_BRANCH="${SUBMODULE_BRANCH:-$RELEASE_BRANCH}"
 	(
 		cd plugins/aphrodite
 		git add plugin.yaml BINARY_VERSION
