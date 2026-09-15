@@ -90,15 +90,24 @@ full content only when it actually needs it.
 **`Pipeline`**
 
 ```text
- ANY OUTPUT ──────► Aphrodite ──────► Agent (preview, not raw)
-                       │
-                       ├─ build logs  → [build:1E 1W 142L | error[E0432]: …]
-                       ├─ terminal    → [terminal:14L exit code: 0]
-                       ├─ file read   → [code:3fns|2structs fn main() 414L]
-                       ├─ grep/ripgrep→ [grep:4 hits in 3 files | src/x.rs:12 …]
-                       ├─ git status  → [git:2M 1A 1D 3?? | src/x.rs +N more]
-                       ├─ diff        → [diff:2F +7/-3 12L | src/main.rs Cargo.toml]
-                       └─ plain text  → [text:3L 50B | first line hint …]
+ ANY OUTPUT ────────► Aphrodite ────────► Agent (preview, not raw)
+                        │
+                        ├─ build log    → [build:2E 5W 210L | error[E0432]: …]
+                        ├─ cargo test   → [test:220 pass 0 fail 1 ignored | 0.31s]
+                        ├─ terminal     → [terminal:14L exit code: 0]
+                        ├─ Rust file    → [code:3fns|2structs fn main() 414L]
+                        ├─ Python file  → [code:2fns|1class def handle() 87L]
+                        ├─ grep/ripgrep → [grep:4 hits in 3 files | src/x.rs:12 …]
+                        ├─ search_files → [search:15 hits in 3 files | src/x.rs:12 …]
+                        ├─ git status   → [git:2M 1A 1D 3?? | src/x.rs +N more]
+                        ├─ git log      → [gitlog:2 commits | abc1234 fix… → def5678 feat…]
+                        ├─ diff         → [diff:2F +7/-3 12L | src/main.rs Cargo.toml]
+                        ├─ ls / find    → [ls:12 files 0 dirs | .rs×10]
+                        ├─ JSON blob    → [json:30 keys 1L | status, error, …]
+                        ├─ web page     → [html:8h 42a 3img 342L | Aphrodite Docs]
+                        ├─ compiler err → [error:2L 120B | error: could not compile …]
+                        ├─ app log      → [log:12L 540B | [INFO aphrodite] proxy starting]
+                        └─ plain text   → [text:3L 50B | first line hint …]
 
     Agent decides:
     • Preview is enough → skip retrieval, keep reasoning
