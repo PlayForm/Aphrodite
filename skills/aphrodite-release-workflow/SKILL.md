@@ -2,7 +2,7 @@
 name: aphrodite-release-workflow
 description: Use when releasing Aphrodite. Pre-release verification gates,
     auto-release, version sync, submodule flow, release notes, commit/sync.
-version: 1.5.0
+version: 1.6.0
 platforms: [macos]
 tags: [aphrodite, release, cargo, crates-io, submodule, release-notes]
 ---
@@ -15,9 +15,9 @@ tags: [aphrodite, release, cargo, crates-io, submodule, release-notes]
 - Publishing crates to crates.io, syncing the standalone plugin repo, or
   writing release notes.
 
-## Pre-Release Verification (mandatory — four gates)
+## Pre-Release Verification (mandatory - four gates)
 
-Missing symbols silently kill the plugin — `Failed to load plugin` with no
+Missing symbols silently kill the plugin - `Failed to load plugin` with no
 error. The release ALSO fails in CI on four gates that a local `cargo build`
 does not catch. Run all of them before tagging; every one has burned a release:
 
@@ -31,19 +31,19 @@ cargo clippy -p aphrodite --lib -- -D warnings   # GATE 1
 cargo audit                                     # GATE 3 (or: cargo deny check advisories)
 ```
 
-1. **GATE 1 — clippy `-D warnings`**: CI compiles with `-D warnings`; a green
+1. **GATE 1 - clippy `-D warnings`**: CI compiles with `-D warnings`; a green
    local build still fails release. Recurring trap: `clippy::useless_conversion`
-   on a redundant `.into_iter()` — remove the `.into_iter()`.
-2. **GATE 2 — ruff on `plugins/aphrodite/`**: AGENTS.md requires 0 errors.
+   on a redundant `.into_iter()` - remove the `.into_iter()`.
+2. **GATE 2 - ruff on `plugins/aphrodite/`**: AGENTS.md requires 0 errors.
    Recurring violations: `SIM105` (`try/except/pass` → `contextlib.suppress`)
    and `F401` unused imports. Fix in plugin source + tests before releasing.
-3. **GATE 3 — cargo audit / unmaintained advisory**: `Check.yml` fails on
+3. **GATE 3 - cargo audit / unmaintained advisory**: `Check.yml` fails on
    advisories. `cgmath` (unmaintained) enters only through the experimental
    `s2` crates (`crates/s2-probe`, `crates/s2-navigate`) which are NOT shipped.
    Keep `s2` an `optional` dep behind the `navigation` feature (off by default)
    AND excluded from `workspace.members`. Verify with
-   `cargo tree -p aphrodite -i cgmath` — must return nothing.
-4. **GATE 4 — version discipline**: never re-tag a released version to fix it;
+   `cargo tree -p aphrodite -i cgmath` - must return nothing.
+4. **GATE 4 - version discipline**: never re-tag a released version to fix it;
    cut a new version.
 
 If any gate fails, fix BEFORE releasing. A broken plugin means zero tools, no
@@ -51,16 +51,23 @@ compression, no context engine.
 
 ## Auto-Release
 
+> **Branch model**: release PREPARATION (bump/build/test/commit) runs on
+> `Development`; tags + GitHub releases are created on `Current` only.
+> Follow `aphrodite-branch-release-flow` for the full sync-down ceremony
+> and the protected paths (.gitmodules, workflows, plugin gitlink).
+
 ```bash
 GIT_EDITOR=true Maintain/scripts/release/auto-release.sh "descriptive message"
 ```
 
 Handles: stage → commit → bump version → cargo build → cargo test → tag → push
-to the `Source` remote.
+to the `Source` remote. The script is branch-aware (RELEASE_BRANCH from HEAD),
+so it pushes the branch it runs on; when run from Development, defer the tag
+step to the Current-side ceremony instead of tagging Development.
 
 ## crates.io Publishing (Publish.yml only)
 
-Never run `cargo publish` locally — crates.io versions are immutable; a version
+Never run `cargo publish` locally - crates.io versions are immutable; a version
 burned by a bad publish can never be reused. `.github/workflows/Publish.yml`
 publishes `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` in
 dependency order, but ONLY on `workflow_dispatch` with `publish_crates: true`;
@@ -73,10 +80,10 @@ gh workflow run Publish -f publish_crates=true
 ```
 
 Dispatch-name note: the file is `Publish.yml` but it dispatches as `Publish`
-(no extension). `cargo publish` needs `CARGO_REGISTRY_TOKEN` (a CI secret) —
+(no extension). `cargo publish` needs `CARGO_REGISTRY_TOKEN` (a CI secret) -
 never run it locally without that token.
 
-### Headroom core crate — the gitlink trap
+### Headroom core crate - the gitlink trap
 
 `vendor/headroom` is a git submodule (`PlayForm/Headroom.git`, branch
 `Current`). Its publishable crate is `crates/headroom-core/Cargo.toml`,
@@ -85,14 +92,14 @@ reference it via `package = "aphrodite-headroom-core"`). Publish.yml's
 `Publish-Headroom-Core` job runs `working-directory: vendor/headroom` and is a
 hard `needs:` prerequisite for `Publish-Aphrodite`.
 
-Never assume CI publishes the locally checked-out submodule HEAD — CI checks
+Never assume CI publishes the locally checked-out submodule HEAD - CI checks
 out the RECORDED GITLINK commit in the parent repo. After renaming/reverting/
 bumping the headroom crate, always update and push the parent gitlink so CI
 publishes the new state: `git add vendor/headroom && git commit -m "..." &&
 git push Source Current`. Otherwise CI publishes the previously recorded
 commit's tree.
 
-Verify before triggering (read-only): check the crates.io index —
+Verify before triggering (read-only): check the crates.io index -
 `https://index.crates.io/ap/hr/aphrodite-headroom-core` (path = first 2 / next
 2 chars of the crate name). `404` = not published (CI will attempt it); `200`
 containing `"vers":"X.Y.Z"` = that version is live (CI skips it). Never
@@ -102,31 +109,31 @@ See `references/headroom-publish.md` for the rename procedure and checklist.
 
 ## Version Sync (two independent tracks)
 
-- **Binary version** — Rust crates; must match across Cargo.toml files.
-- **Plugin version** — Hermes plugin, lives in the `plugins/aphrodite`
+- **Binary version** - Rust crates; must match across Cargo.toml files.
+- **Plugin version** - Hermes plugin, lives in the `plugins/aphrodite`
   submodule.
 
-Never trust a stale number in this document — read the live value from
+Never trust a stale number in this document - read the live value from
 `crates/aphrodite/Cargo.toml` (binary) and `plugins/aphrodite/plugin.yaml`
 (plugin) before bumping. `auto-release.sh` reads both itself via
 version-pattern seds, so a stale doc number can never misdirect a release.
 
-**Binary version locations** (monorepo — bump together):
+**Binary version locations** (monorepo - bump together):
 
-1. `crates/aphrodite/Cargo.toml` — `version`
-2. `crates/aphrodite-hermes/Cargo.toml` — package `version` + the
+1. `crates/aphrodite/Cargo.toml` - `version`
+2. `crates/aphrodite-hermes/Cargo.toml` - package `version` + the
    `aphrodite = { ..., version }` dependency
-3. `plugins/aphrodite/BINARY_VERSION` — plain text, read by `download.sh`
-4. `package.json` — `"version"`
+3. `plugins/aphrodite/BINARY_VERSION` - plain text, read by `download.sh`
+4. `package.json` - `"version"`
 
 **Plugin version locations** (submodule `plugins/aphrodite/`):
 
-5. `plugin.yaml` — `version` + the `install_message` block
-6. `pyproject.toml` — `version` (if the file exists)
-7. `__init__.py` — docstring version (if present)
-8. `_core/config.py` — `BIN_VERSION` + `PLUGIN_VERSION` constants (if exists)
+5. `plugin.yaml` - `version` + the `install_message` block
+6. `pyproject.toml` - `version` (if the file exists)
+7. `__init__.py` - docstring version (if present)
+8. `_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION` constants (if exists)
 
-**Documentation**: `README.md` — release badge, plugin badge, and the example
+**Documentation**: `README.md` - release badge, plugin badge, and the example
 health output `"version":"v<bin>"`.
 
 ## Submodule Release Flow
@@ -151,7 +158,7 @@ Manually verify after release: grep README example output for `"version":"v`
 ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/aphrodite
 ```
 
-## Release Notes — Content Standards
+## Release Notes - Content Standards
 
 Every release MUST include: Summary, Changes, Infrastructure, What Ships, and
 Links. Canonical template: `.hermes/RELEASE-TEMPLATE.md` (defines **Live** vs
@@ -159,20 +166,20 @@ Links. Canonical template: `.hermes/RELEASE-TEMPLATE.md` (defines **Live** vs
 
 - Drafts live in `.plans/release-notes/` (`vNEXT-draft.md`,
   `headroom-fork-vNEXT-draft.md`). Stage `Maintain/release-notes-vX.Y.Z.md`
-  explicitly — verify it is actually committed; it can drop out between
+  explicitly - verify it is actually committed; it can drop out between
   `git add` and commit.
 - **Live mode** (cutting the release now) requires a real `### Infrastructure`
   section with commands you actually ran. **Retrospective** (rewriting an
   already-shipped release) replaces Infrastructure with `### Verification`
-  describing what was analyzed (commit range, diffstat) — never re-test.
+  describing what was analyzed (commit range, diffstat) - never re-test.
 - Draft placeholders (`{PENDING}` in Infrastructure, `{VERSION}` /
   `{PLUGIN_VERSION}` in title/compare link, `DO NOT PUBLISH` header) are
-  by-design for drafts — never publish a note still containing `{PENDING}`.
+  by-design for drafts - never publish a note still containing `{PENDING}`.
 - Headroom-fork notes are retrospective and separate from the binary notes;
   they use the fork's `aphrodite-vX.Y.Z` tag scheme and the
   `aphrodite-headroom-core` package name.
 - Never ship a bare compare link with zero description.
-- Never use backticks with `gh release create --notes` — the shell interprets
+- Never use backticks with `gh release create --notes` - the shell interprets
   them as command substitution. Always `--notes-file` with a heredoc:
 
 ```bash
@@ -221,12 +228,12 @@ gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md \
 
 - **Commit:** `git gcommit-hermes` (LLM-generated message; alias → the local
   `Save` binary), `git gcommit`, or `git ecommit` (empty message).
-- **Sync:** `git sync` — alias for
+- **Sync:** `git sync` - alias for
   `git pull --no-edit --allow-unrelated-histories; git push --recurse-submodules=on-demand`.
 
 Reliability caveats:
 
-- Never assume `gcommit-hermes` landed the commit — its `Save` backend calls an
+- Never assume `gcommit-hermes` landed the commit - its `Save` backend calls an
   LLM provider; when the provider is unavailable the command exits with the
   change still staged. It also excludes `vendor` (and other dirs) from its diff
   view, so a submodule-pointer-only change can report "No staged changes
@@ -238,6 +245,6 @@ Reliability caveats:
 ## Cross-Module Import Pitfall
 
 Never add a cross-module import of a symbol without defining it in the target
-module — `from .live import _is_live_tool` with no `_is_live_tool` in `.live`
+module - `from .live import _is_live_tool` with no `_is_live_tool` in `.live`
 silently kills the plugin at session start. Always test the full import chain
 before releasing: `python3 -c "import aphrodite"`.

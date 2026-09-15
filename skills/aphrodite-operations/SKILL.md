@@ -99,11 +99,11 @@ cd $STANDALONE && git add -A && git commit -m "sync: v$NEW" && git push
 
 Pin all dependencies to exact versions — never semver ranges:
 
-| Lang   | Wrong            | Right                |
-| ------ | ---------------- | -------------------- |
-| Python | `ruff>=0.13`     | `ruff==0.15.17`      |
-| Cargo  | `tower = "0.5"`  | `tower = "0.5.3"`    |
-| Cargo  | `anyhow = "1"`   | `anyhow = "1.0.102"` |
+| Lang   | Wrong           | Right                |
+| ------ | --------------- | -------------------- |
+| Python | `ruff>=0.13`    | `ruff==0.15.17`      |
+| Cargo  | `tower = "0.5"` | `tower = "0.5.3"`    |
+| Cargo  | `anyhow = "1"`  | `anyhow = "1.0.102"` |
 
 Check the latest version before bumping: `pip3 index versions <pkg>` or
 `cargo search <pkg> --limit 1`. Let Dependabot drive future updates.

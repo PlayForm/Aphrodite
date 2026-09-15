@@ -28,7 +28,7 @@ provides_hooks:
     - transform_tool_result
 ```
 
-In __init__.py register():
+In **init**.py register():
 
 ```python
 ctx.register_hook("on_session_start", on_start)        # NOT "session_start"
@@ -178,12 +178,12 @@ non-None string wins.
 
 ## Known Mismatches (wrong param -> correct param)
 
-| Hook                      | Wrong Param                         | Correct Param                                     | Effect                            |
-| ------------------------- | ----------------------------------- | ------------------------------------------------- | --------------------------------- |
-| transform_terminal_output | stdout, stderr, exit_code           | output, returncode                                | ALL terminal output empty         |
-| pre_llm_call              | api_messages, response              | conversation_history, user_message                | Hook returned early (None guard)  |
+| Hook                      | Wrong Param                         | Correct Param                                     | Effect                           |
+| ------------------------- | ----------------------------------- | ------------------------------------------------- | -------------------------------- |
+| transform_terminal_output | stdout, stderr, exit_code           | output, returncode                                | ALL terminal output empty        |
+| pre_llm_call              | api_messages, response              | conversation_history, user_message                | Hook returned early (None guard) |
 | post_llm_call             | api_messages, response, turn_number | conversation_history, assistant_response, turn_id | Hook returned early              |
-| on_session_start          | session_start (hook name)           | on_session_start                                  | Proxy never auto-launched         |
+| on_session_start          | session_start (hook name)           | on_session_start                                  | Proxy never auto-launched        |
 
 ## CCR Marker Format
 
