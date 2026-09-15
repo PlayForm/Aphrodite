@@ -42,6 +42,11 @@ name = "bench_04_ema"
 path = "examples/bench_04_ema.rs"
 required-features = ["proxy"]
 
+[[example]]
+name = "bench_05_type_coverage"
+path = "examples/bench_05_type_coverage.rs"
+required-features = ["proxy"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
