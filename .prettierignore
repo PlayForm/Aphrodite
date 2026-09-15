@@ -389,7 +389,10 @@ coverage/
 plugins/aphrodite/**
 !plugins/aphrodite/README.md
 
+# .hermes is the dev archive: formattable markdown only, categorized by
+# .hermes/<category>/<thing>.md (gitignore negation: un-exclude the dir +
+# subdirs, re-exclude everything, then re-include md files only).
 !.hermes/
-!.hermes/release-notes/
-.hermes/release-notes/**
-!.hermes/release-notes/*.md
+!.hermes/**/
+.hermes/**
+!.hermes/**/*.md
