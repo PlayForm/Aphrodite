@@ -92,7 +92,7 @@ pub fn load_directives(dir: &PathBuf) -> HashMap<String, Directive> {
 				"directives directory missing or unreadable; falling back to built-in directives"
 			);
 			return loaded_builtins();
-		}
+		},
 	};
 
 	let mut directives = HashMap::new();
@@ -203,8 +203,7 @@ pub fn handle_action(state: &mut crate::state::AphroditeState, action: &str, nam
 					})
 				})
 				.collect();
-			let mut available: Vec<&String> =
-				state.directives.keys().collect();
+			let mut available: Vec<&String> = state.directives.keys().collect();
 			// Sort for a stable, deterministic ordering - `HashMap` iteration
 			// order is nondeterministic, which made the `list` result flake
 			// between `["focus","lazy"]` and `["lazy","focus"]` across runs.

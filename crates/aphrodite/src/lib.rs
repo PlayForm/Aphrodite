@@ -20,6 +20,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 pub mod catalog;
+pub mod chain_split;
 pub mod config_loader;
 pub mod directives;
 pub mod flow;

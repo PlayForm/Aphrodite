@@ -104,6 +104,13 @@ pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// through). So return the CCR marker string when compression happened, and
 /// `null` otherwise to leave the original output untouched.
 pub(crate) fn replacement_from(r: &serde_json::Value) -> serde_json::Value {
+	if r.get("chain_split").and_then(|v| v.as_bool()).unwrap_or(false) {
+		// Fine-grained chain split: the summary is the compact replacement;
+		// per-segment markers stay in the store and are retrievable by hash.
+		if let Some(summary) = r.get("summary").and_then(|v| v.as_str()) {
+			return serde_json::Value::String(summary.to_string());
+		}
+	}
 	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false) {
 		if let Some(marker) = r.get("marker").and_then(|v| v.as_str()) {
 			return serde_json::Value::String(marker.to_string());
@@ -321,7 +328,7 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name: *const c_char, args_json
 						let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 						if call_tool == "terminal" || call_tool == "process" {
 							let command = parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str());
-							// For `process(action='poll')`, don't background — it's a check call.
+							// For `process(action='poll')`, don't background - it's a check call.
 							let is_poll = call_tool == "process"
 								&& parsed
 									.get("args")
@@ -333,7 +340,7 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name: *const c_char, args_json
 								if let Some((_task_id, cmd_summary)) =
 									aphrodite::poll_worker::should_background_pre(command)
 								{
-									// We don't create a BgTask here — Hermes handles the
+									// We don't create a BgTask here - Hermes handles the
 									// process lifecycle. We'll track completion via
 									// transform_tool_result when the agent polls.
 									return serde_json::json!({
@@ -346,6 +353,35 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name: *const c_char, args_json
 											"aphrodite: auto-backgrounding `{}`", cmd_summary
 										),
 									});
+								}
+							}
+						}
+					}
+					// ── Fine-grained chain splitting: rewrite chained commands ──
+					// LLMs chain (`cd x && cargo build && cargo test`) into one call;
+					// rewriting with segment markers lets transform_tool_result split
+					// the output into per-segment CCR entries (N compact previews).
+					if state.chain_split_enabled {
+						let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+						if call_tool == "terminal" {
+							if let Some(command) =
+								parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str())
+							{
+								if let Some(segments) = aphrodite::chain_split::split_chain(command) {
+									let rewritten = aphrodite::chain_split::build_marked_command(&segments);
+									if rewritten != command {
+										let mut args =
+											parsed.get("args").cloned().unwrap_or_else(|| serde_json::json!({}));
+										args["command"] = serde_json::Value::String(rewritten.clone());
+										return serde_json::json!({
+											"action": "modify",
+											"args": args,
+											"message": format!(
+												"aphrodite: split chained command into {} segments (fine-grained CCR)",
+												segments.len()
+											),
+										});
+									}
 								}
 							}
 						}

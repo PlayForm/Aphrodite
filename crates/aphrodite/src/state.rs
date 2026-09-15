@@ -19,7 +19,7 @@ pub const DEFAULT_INLINE_BYTE_BUDGET: usize = 256 * 1024 * 1024;
 /// Session state - one per loaded dylib instance.
 pub struct AphroditeState {
 	/// Inline content store: {hash: content}. The `HashMap` gives O(1)
-	/// get/put/contains (was an O(n) `VecDeque` linear scan per op — bug
+	/// get/put/contains (was an O(n) `VecDeque` linear scan per op - bug
 	/// 18-P14); `inline_order` preserves LRU recency so eviction can drop
 	/// the least-recently-used entry from the back in O(1).
 	pub inline_store: HashMap<String, String>,
@@ -83,7 +83,7 @@ pub struct AphroditeState {
 	/// `flow::build_turn_context` (default 4000 chars, `[flow] budget_chars`).
 	pub flow_budget_chars: usize,
 	/// First-turn session instruction loaded from `[prompts] session_inject`
-	/// in aphrodite.toml — rendered once via `build_first_turn_injection`,
+	/// in aphrodite.toml - rendered once via `build_first_turn_injection`,
 	/// then dropped (turn_counter > 0). Empty = no injection (default).
 	pub session_inject: String,
 	/// Turn number of the most recent MANUAL `aphrodite_directive` mutation
@@ -103,6 +103,12 @@ pub struct AphroditeState {
 	/// receive lifecycle nudges and expiry). Default true. Env:
 	/// `APHRODITE_POLL_WORKER`, TOML: `[compression] poll_worker`.
 	pub poll_worker_enabled: bool,
+	/// Fine-grained chain splitting: rewrite chained shell commands
+	/// (`a && b && c`) with segment markers and split the output into
+	/// per-segment CCR entries, so the agent sees N compact previews
+	/// instead of one giant blob. Default true. Env:
+	/// `APHRODITE_CHAIN_SPLIT`, TOML: `[compression] chain_split`.
+	pub chain_split_enabled: bool,
 	// ── Delta catalog (04-F1) ──
 	/// Number of markers the last time catalog_summary rendered, so we emit a
 	/// delta line only when new markers arrived this turn. Zero-initialized;
@@ -203,6 +209,7 @@ impl Default for AphroditeState {
 			tool_events: VecDeque::new(),
 			bg_tasks: VecDeque::new(),
 			poll_worker_enabled: true,
+			chain_split_enabled: true,
 			navigation_enabled: false,
 			navigation_default_level: 4,
 			last_emitted_marker_count: 0,

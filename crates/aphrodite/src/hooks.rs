@@ -284,6 +284,63 @@ fn transform_terminal_output_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
 	}
 
+	// ── Fine-grained chain splitting ──
+	// Runs BEFORE the threshold gate: marked output must never leak raw
+	// (below-threshold chained output would otherwise pass through with the
+	// segment markers still in it, polluting what the LLM sees). Splitting
+	// marked content is unconditional when the feature is enabled.
+	if state.chain_split_enabled && content.contains(crate::chain_split::SEG_MARKER) {
+		let parts = crate::chain_split::split_marked_output(content);
+		if parts.len() >= 2 {
+			let mut segments = Vec::with_capacity(parts.len());
+			let mut total_orig = 0usize;
+			let mut total_marker = 0usize;
+			for (idx, seg_text) in &parts {
+				total_orig += seg_text.len();
+				let ct = transforms::content_detector::detect_content_type(seg_text).content_type;
+				let type_str = ct.as_str().to_string();
+				let seg_hash = headroom_core::ccr::compute_key(seg_text.as_bytes());
+				state.inline_store_put(seg_hash.clone(), seg_text.to_string());
+				let preview = crate::build_preview(&type_str, seg_text);
+				let marker = ccr_marker(&seg_hash, &type_str, seg_text.len(), &preview, None, None, None);
+				total_marker += marker.len();
+				state.record_marker(MarkerEntry {
+					hash: seg_hash.clone(),
+					ccr_type: type_str.clone(),
+					size: seg_text.len(),
+					preview: preview.clone(),
+					turn: state.turn_counter,
+					center: None,
+					meta: None,
+				});
+				segments.push(serde_json::json!({
+					"index": idx,
+					"type": type_str,
+					"size": seg_text.len(),
+					"hash": seg_hash,
+					"preview": preview,
+					"marker": marker,
+				}));
+			}
+			let summary = format!(
+				"[chain:{} segs | {} orig → {} markers]",
+				segments.len(),
+				total_orig,
+				total_marker
+			);
+			return serde_json::json!({
+				"status": "ok",
+				"compressed": true,
+				"chain_split": true,
+				"segments": segments.len(),
+				"summary": summary,
+				"markers": segments,
+			});
+		}
+	}
+
+	// Threshold gate for UNMARKED output only: below-threshold content
+	// passes through untouched (no markers to leak, nothing worth splitting).
 	if state.terminal_threshold > 0 && content.len() < state.terminal_threshold {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
@@ -357,7 +414,7 @@ pub fn pre_llm_call(state: &mut AphroditeState) -> serde_json::Value {
 		crate::poll_worker::check_bg_tasks(state);
 	}
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
-	// catalog_summary is now called inside build_turn_context — don't call
+	// catalog_summary is now called inside build_turn_context - don't call
 	// it separately (04-F3: double call skipped delta tracking every other turn).
 	let context = crate::flow::build_turn_context(state, None);
 	serde_json::json!({
@@ -594,7 +651,7 @@ mod tests {
 		crate::poll_worker::insert_bg_task(&mut s, "old-task".into(), "terminal".into(), "old-build".into(), 10);
 		s.bg_tasks[0].last_poll_turn = 10;
 		let _ = post_llm_call(&mut s);
-		// Expiry is a cleanup concern — should still run even when disabled.
+		// Expiry is a cleanup concern - should still run even when disabled.
 		assert_eq!(
 			s.bg_tasks[0].status,
 			crate::poll_worker::BgStatus::Stale,

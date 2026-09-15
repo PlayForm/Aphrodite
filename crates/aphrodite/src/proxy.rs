@@ -1068,9 +1068,9 @@ pub async fn proxy_handler(
 				req = req.header(key, val);
 			}
 		}
-	// `body_bytes` is the `Bytes` built once before the loop (see
-	// above); clone per attempt is O(1) refcount, never a full copy.
-	match req.body(body_bytes.clone()).send().await {
+		// `body_bytes` is the `Bytes` built once before the loop (see
+		// above); clone per attempt is O(1) refcount, never a full copy.
+		match req.body(body_bytes.clone()).send().await {
 			Ok(r) => {
 				upstream_result = Ok(r);
 				break;

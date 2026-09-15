@@ -161,6 +161,13 @@ impl Config {
 		// ── Poll-worker auto-backgrounding ──
 		state.poll_worker_enabled = self.get_bool("APHRODITE_POLL_WORKER", "compression", "poll_worker", true);
 
+		// ── Fine-grained chain splitting ──
+		// Default OFF for release: the segment markers (`echo __APHRODITE_SEG__`)
+		// pollute captured stdout when commands are redirected to files, and
+		// every split also adds marker lines to live tool output. Opt in per
+		// session with APHRODITE_CHAIN_SPLIT=1 (or TOML chain_split = true).
+		state.chain_split_enabled = self.get_bool("APHRODITE_CHAIN_SPLIT", "compression", "chain_split", false);
+
 		// ── Directives ──
 		// 01-F4: load whenever a directives/ dir exists, not gated on `active`
 		// being non-empty - the shipped template default is `active = []`, so
@@ -180,10 +187,7 @@ impl Config {
 		// or when the on-disk directory is missing/unreadable - so a fresh
 		// install (or a missing `~/.hermes/aphrodite/directives`) gets
 		// shipped defaults without any filesystem setup and never errors.
-		let home_aphrodite = dirs::home_dir()
-			.unwrap_or_default()
-			.join(".hermes")
-			.join("aphrodite");
+		let home_aphrodite = dirs::home_dir().unwrap_or_default().join(".hermes").join("aphrodite");
 		// 2. binary-relative (portable install: shipped directives/ next to
 		//    the executable, e.g. the Hermes plugin dir).
 		let bin_relative = std::env::current_exe()
