@@ -13,6 +13,13 @@ if [[ -z "$SUPER" ]]; then
 	exit 0
 fi
 
+# Git exports GIT_DIR/GIT_WORK_TREE to hooks, pointing at THIS submodule.
+# They would hijack every `git -C "$SUPER"` call below (the parent
+# operations would run against the submodule repo and fail with
+# "fatal: pathspec '<submodule>' did not match any files"). Unset them so
+# git re-discovers each repo from the -C directory.
+unset GIT_DIR GIT_WORK_TREE 2>/dev/null || true
+
 SUB_TOP="$(git rev-parse --show-toplevel)"
 NEW_HASH="$(git rev-parse HEAD)"
 
