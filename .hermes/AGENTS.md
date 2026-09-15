@@ -29,14 +29,14 @@ running old code indefinitely.
 
 ## Key Paths
 
-| What | Where |
-|------|-------|
-| Binary | `target/release/aphrodite` |
-| Plugin | `plugins/aphrodite/` (thin Python ctypes loader → Rust dylib) |
-| Environment | `~/.hermes/.env` (`APHRODITE_API_KEY`) |
-| Plans | `.hermes/plans/` |
-| Templates | `.hermes/RELEASE-TEMPLATE.md` |
-| Maintenance | `Maintain/scripts/`, `Maintain/CHANGELOG.md` |
+| What        | Where                                                         |
+| ----------- | ------------------------------------------------------------- |
+| Binary      | `target/release/aphrodite`                                    |
+| Plugin      | `plugins/aphrodite/` (thin Python ctypes loader → Rust dylib) |
+| Environment | `~/.hermes/.env` (`APHRODITE_API_KEY`)                        |
+| Plans       | `.hermes/plans/`                                              |
+| Templates   | `.hermes/RELEASE-TEMPLATE.md`                                 |
+| Maintenance | `Maintain/scripts/`, `Maintain/CHANGELOG.md`                  |
 
 ## Agent Team - Your Digital Colleagues
 
