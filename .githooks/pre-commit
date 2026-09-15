@@ -43,7 +43,11 @@ fi
 
 # Always run the repo-specific guard (no external dependency, fast) -
 # runtime-state/profile tracking + credential-pattern content scan.
-"$REPO_ROOT/Maintain/scripts/ops/check-no-runtime-state.sh"
+# Skipped when the script is absent (e.g. this hook running inside a
+# submodule, whose root has no Maintain/ tree).
+if [ -x "$REPO_ROOT/Maintain/scripts/ops/check-no-runtime-state.sh" ]; then
+	"$REPO_ROOT/Maintain/scripts/ops/check-no-runtime-state.sh"
+fi
 
 # ggshield is a broader, optional secret scan on top - skip gracefully if
 # not installed rather than blocking every commit on it.

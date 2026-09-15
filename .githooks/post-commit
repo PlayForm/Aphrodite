@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# post-commit - after every commit in a submodule, bump the parent's
+# gitlink so the parent always records the latest submodule commit.
+# No-op in a plain repo (no superproject).
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$DIR/lib/bump-submodule-gitlink.sh"

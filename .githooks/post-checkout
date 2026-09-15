@@ -1,13 +1,22 @@
-#!/bin/sh
-# Float submodules (plugins/aphrodite, vendor/headroom, vendor/rtk) to their
-# tracking branch tip (`branch = Current` in .gitmodules) after every
-# checkout, auto-committing the resulting pin bump - see
-# .githooks/lib/sync-submodules.sh for the full design and the safety
-# guards (dirty + not-yet-pushed-commit checks) that replace the old
-# "always reset to whatever's pinned" behavior this hook used to have.
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-[ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/.githooks/lib/sync-submodules.sh" ] || exit 0
-# shellcheck source=lib/sync-submodules.sh
-# shellcheck disable=SC1091
-. "$REPO_ROOT/.githooks/lib/sync-submodules.sh"
-sync_submodules
+#!/usr/bin/env bash
+# post-checkout - keep this submodule ON Current and the parent's gitlink
+# in sync. Runs for BOTH repos (they share .githooks/). In a submodule:
+#   1. If HEAD is detached and a `Current` branch exists, jump back onto it
+#      (parent checkouts / `git submodule update` detach the submodule HEAD;
+#      we always work on Current so commits can never dangle).
+#   2. Then bump the parent's gitlink to HEAD (no stale "+" / "M submodule").
+# In a plain repo: no-op. The force-Current rule deliberately overrides
+# ad-hoc detaches in this working copy - use `git show`/worktrees to inspect
+# old commits.
+set -euo pipefail
+
+if [[ -z "$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)" ]]; then
+	exit 0
+fi
+
+if ! git symbolic-ref -q HEAD >/dev/null 2>&1 && git show-ref --verify --quiet refs/heads/Current; then
+	git checkout Current >/dev/null 2>&1 || true
+fi
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$DIR/lib/bump-submodule-gitlink.sh"
