@@ -111,6 +111,7 @@ because the handle-based core ABI has no Hermes `status`/`error_type` telemetry
 to plumb.
 
 ## Key call sites
+
 - Python: `_load_dylib` (hot-reload), `_call_json`, `_hook_dispatch`, `register` - `crates/aphrodite/templates/__init__.py:74,172,368,350` (mirror: `plugins/aphrodite/__init__.py`)
 - `aphrodite_hermes_call_hook` (bridge hooks) / `replacement_from` - `crates/aphrodite-hermes/src/lib.rs:289,106`
 - `tools::unwrap_hermes_result` / `tools::dispatch` - `crates/aphrodite-hermes/src/tools.rs:66,19`

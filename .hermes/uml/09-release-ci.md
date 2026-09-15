@@ -74,6 +74,7 @@ each gated behind the same opt-in flag so a normal tag push never turns red on a
 publish attempt.
 
 ## Key call sites
+
 - release-once + matrix + Finalize - `.github/workflows/Build.yml:52,72,205`
 - Windows checksum PowerShell step - `.github/workflows/Build.yml:154`
 - test → 3-stage publish chain - `.github/workflows/Publish.yml:55,81,138,177`

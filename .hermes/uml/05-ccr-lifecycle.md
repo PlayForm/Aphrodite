@@ -38,6 +38,7 @@ stateDiagram-v2
 ```
 
 Notes on eviction tiers (from `state.rs` + backends):
+
 - **inline_store** (AphroditeState): dual bound - `INLINE_MAX = 500` entries
   AND `DEFAULT_INLINE_BYTE_BUDGET = 256MB`; `evict_over_budget` pops oldest
   from the back until both hold (state.rs:187).
@@ -77,6 +78,7 @@ stateDiagram-v2
 ```
 
 ## Key call sites
+
 - inline_store eviction (`evict_over_budget`, `inline_store_put`) - `crates/aphrodite/src/state.rs:187,203`
 - `record_marker` (cap 200) / `record_tool_event` (cap 200) - `crates/aphrodite/src/state.rs:228,239`
 - `archive_turn` (conv_index cap 50) - `crates/aphrodite/src/session.rs:39`

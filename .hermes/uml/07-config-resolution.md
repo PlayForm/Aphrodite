@@ -2,6 +2,7 @@
 
 Two independent resolution stacks share the same **env > TOML > default**
 precedence but live in different modules:
+
 - `config.rs` - the proxy's `MultiConfig::resolve` (CLI/`Cli` struct per listener).
 - `config_loader.rs` - the FFI/Hermes `Config` loader (`apply_compression` into
   `AphroditeState`).
@@ -61,6 +62,7 @@ flowchart LR
 ```
 
 Precedence subtleties:
+
 - The proxy's `resolve` deliberately does **not** give `mode`/`listen` a blanket
   env override - a single process-wide `APHRODITE_MODE`/`APHRODITE_LISTEN` would
   clobber every `[[proxies]]` entry, breaking the cache/token split. Port
@@ -74,6 +76,7 @@ Precedence subtleties:
   defaulting.
 
 ## Key call sites
+
 - `MultiConfig::resolve` (env>TOML>default chains) - `crates/aphrodite/src/config.rs:297`
 - `env_bool` / `env_parse_warn` / `apply_port_override` - `crates/aphrodite/src/config.rs:18,33,406`
 - `Config::{load,get_bool,get_u64,get_string}` - `crates/aphrodite/src/config_loader.rs:20,66,80,100`

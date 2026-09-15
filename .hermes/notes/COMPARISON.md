@@ -64,14 +64,14 @@ filling up in ~30 minutes.
 
 ## When to Use Which
 
-| Use Case                          | Best Choice       | Why                                                    |
-| --------------------------------- | ----------------- | ------------------------------------------------------ |
-| Deep coding session (30+ turns)   | **Aphrodite CCR** | 47% context reduction prevents early window exhaustion |
-| Rapid prototyping / debugging     | **Headroom only** | Simpler, no compression layer to debug                 |
-| Benchmarking / A/B testing        | **Both**          | Headroom = control group, CCR = treatment              |
-| Ad-hoc 1-5 turn queries           | **Either**        | Context fill is negligible either way                  |
-| File-heavy session (20+ reads)    | **Aphrodite CCR** | Deduplication saves 5-10x on repeated file reads       |
-| Error investigation (long traces) | **Aphrodite CCR** | 80x compression on backtraces, full content on demand  |
+| Use Case                          | Best Choice       | Why                                                       |
+| --------------------------------- | ----------------- | --------------------------------------------------------- |
+| Deep coding session (30+ turns)   | **Aphrodite CCR** | 47% context reduction prevents early window exhaustion    |
+| Rapid prototyping / debugging     | **Headroom only** | Simpler, no compression layer to debug                    |
+| Benchmarking / A/B testing        | **Both**          | Headroom = control group, CCR = treatment                 |
+| Ad-hoc 1-5 turn queries           | **Either**        | Context fill is negligible either way                     |
+| File-heavy session (20+ reads)    | **Aphrodite CCR** | Deduplication saves 5-10x on repeated file reads          |
+| Error investigation (long traces) | **Aphrodite CCR** | 80x compression on backtraces, full content on demand     |
 | CI / automated runs               | **Aphrodite CCR** | Persistent stats, 4-bench suite (63 checks), restart-safe |
 
 ## Bottom Line

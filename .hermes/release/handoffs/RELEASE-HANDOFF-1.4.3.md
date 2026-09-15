@@ -16,12 +16,12 @@ remaining step. Follow `aphrodite-branch-release-flow` skill.
 
 ## What's committed (release-relevant)
 
-| Commit | Content |
-|---|---|
-| `5d8c09a` | bump v1.4.3 + real-corpus benchmark tooling (benchmark-report.py) |
-| `8afe8e0` | release notes `Maintain/release-notes-v1.4.3.md` (full: Summary/Changes/Infrastructure/What Ships/Links), CHANGELOG moved to root |
-| `db12c86` | draft release notes |
-| `48abe46` | gitignore/prettierignore refinements |
+| Commit    | Content                                                                                                                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `5d8c09a` | bump v1.4.3 + real-corpus benchmark tooling (benchmark-report.py)                                                                                                                             |
+| `8afe8e0` | release notes `Maintain/release-notes-v1.4.3.md` (full: Summary/Changes/Infrastructure/What Ships/Links), CHANGELOG moved to root                                                             |
+| `db12c86` | draft release notes                                                                                                                                                                           |
+| `48abe46` | gitignore/prettierignore refinements                                                                                                                                                          |
 | `5effa73` | **standalone CCR benchmark suite** - bench/corpus (16 files), bench/compression (crate, 6/6 crash tests), bench/proxy, bench/agents, bench/conversational (5 tasks + migrated 2026-07-20 run) |
 
 ## UNCOMMITTED - the chain-split feature (must be committed before release)

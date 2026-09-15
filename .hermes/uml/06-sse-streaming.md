@@ -64,6 +64,7 @@ compressed. `sse_stream_errors` surfaces in `/stats` and `/metrics`
 (`aphrodite_sse_stream_errors_total`).
 
 ## Key call sites
+
 - `body_wants_stream` (request-side detection) - `crates/aphrodite/src/proxy.rs:768`
 - `stream_client` construction (no total timeout) - `crates/aphrodite/src/proxy.rs:655`
 - client selection in handler - `crates/aphrodite/src/proxy.rs:1019`

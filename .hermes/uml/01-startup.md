@@ -94,6 +94,7 @@ flowchart TD
 ```
 
 ## Key call sites
+
 - `main()` runtime + subcommand dispatch - `crates/aphrodite/src/main.rs:38`
 - `run()` config path resolution + bind-before-spawn - `crates/aphrodite/src/main.rs:107,206`
 - config hot-reload watcher - `crates/aphrodite/src/main.rs:251`

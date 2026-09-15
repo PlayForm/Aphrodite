@@ -55,6 +55,7 @@ otherwise race through `_load_dylib`. Hooks and tools call `_load_dylib()`
 hot-reloaded image is picked up on the very next call.
 
 ## Key call sites
+
 - `_load_dylib` (mtime check, warning, reload) - `crates/aphrodite/templates/__init__.py:74`
 - `_load_fresh_copy` (unique temp-path copy) - `crates/aphrodite/templates/__init__.py:49`
 - `_dylib_lock` + module globals - `crates/aphrodite/templates/__init__.py:38`

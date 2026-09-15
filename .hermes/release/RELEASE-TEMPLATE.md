@@ -11,7 +11,7 @@ test the commit being described.
   Replace `### Infrastructure` with `### Verification` describing how you
   derived the notes (commit range analyzed, diffstat), and `### What Ships`
   reflects only what was actually attached to the GitHub release at the time
-  - never invent artifacts that weren't there.
+    - never invent artifacts that weren't there.
 
 Replace `{BIN_VERSION}` / `{PLUGIN_VERSION}` / `{PREV_VERSION}` with actual
 values. Omit `Plugin v{PLUGIN_VERSION}` from the title and `plugins/aphrodite`
@@ -46,13 +46,13 @@ One paragraph. What this release is, why it matters, 2-3 sentences max.
 
 ### What Ships
 
-| Artifact | Platform |
-|----------|----------|
-| `aphrodite-aarch64-apple-darwin` | macOS ARM64 |
-| `aphrodite-x86_64-apple-darwin` | macOS Intel |
-| `aphrodite-x86_64-unknown-linux-gnu` | Linux x86_64 |
-| `aphrodite-x86_64-pc-windows-msvc` | Windows x86_64 |
-| Plugin v{PLUGIN_VERSION} | Hermes (standalone repo) |
+| Artifact                             | Platform                 |
+| ------------------------------------ | ------------------------ |
+| `aphrodite-aarch64-apple-darwin`     | macOS ARM64              |
+| `aphrodite-x86_64-apple-darwin`      | macOS Intel              |
+| `aphrodite-x86_64-unknown-linux-gnu` | Linux x86_64             |
+| `aphrodite-x86_64-pc-windows-msvc`   | Windows x86_64           |
+| Plugin v{PLUGIN_VERSION}             | Hermes (standalone repo) |
 
 > **Always list all four targets above - do NOT trim from a live asset count.**
 > `Build.yml`'s matrix always produces the full set, and the `Finalize` job

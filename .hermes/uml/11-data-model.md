@@ -123,6 +123,7 @@ classDiagram
 ```
 
 Relationships / invariants:
+
 - `MarkerEntry.hash` is the BLAKE3 `compute_key` (40 hex) that also keys
   `inline_store`; `conv_index[turn] = (hash, summary, size)` is the last marker
   of that turn, written by `archive_turn`.
@@ -136,6 +137,7 @@ Relationships / invariants:
   They are **separate structs in separate processes**.
 
 ## Key call sites
+
 - `AphroditeState`, `MarkerEntry`, `ToolEvent`, `ActiveDirective` - `crates/aphrodite/src/state.rs:20,93,116,126`
 - `Directive` - `crates/aphrodite/src/directives.rs:17`
 - `WindowStats` / `normalize_args_sig` / `turn_window` - `crates/aphrodite/src/flow.rs:205,164,216`

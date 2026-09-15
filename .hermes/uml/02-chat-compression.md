@@ -110,6 +110,7 @@ flowchart TD
 ```
 
 ## Key call sites
+
 - `proxy_handler` request/response orchestration - `crates/aphrodite/src/proxy.rs:913`
 - `compress_chat_completion` - `crates/aphrodite/src/proxy.rs:2075`
 - `proxy_detect_content_type` (classify) - `crates/aphrodite/src/proxy.rs:1316`

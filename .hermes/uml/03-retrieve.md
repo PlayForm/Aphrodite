@@ -92,6 +92,7 @@ regex whose hash class is anchored to `[0-9a-fA-F:i]{6,64}` (can't cross a
 newline).
 
 ## Key call sites
+
 - `handle_retrieve` - `crates/aphrodite/src/retrieve.rs:45`
 - `filter_content` / `paginate` - `crates/aphrodite/src/retrieve.rs:155,188`
 - `resolve::expand` / `resolve_recursive` / `resolve_one` - `crates/aphrodite/src/resolve.rs:178,108,60`

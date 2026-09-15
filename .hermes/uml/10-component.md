@@ -75,6 +75,7 @@ graph TB
 ```
 
 Boundary notes:
+
 - **C-ABI (dashed ctypes edges):** `aphrodite-hermes` exposes
   `aphrodite_hermes_*` process-global functions; the core crate additionally
   exposes handle-based `aphrodite_*` functions. Both guard panics via
@@ -89,6 +90,7 @@ Boundary notes:
   separate processes with separate CCR state.
 
 ## Key call sites
+
 - bridge crate exports - `crates/aphrodite-hermes/src/lib.rs`
 - core C-ABI + hook bodies - `crates/aphrodite/src/{lib.rs,hooks.rs,flow.rs}`
 - proxy listeners + handler - `crates/aphrodite/src/{main.rs,proxy.rs}`

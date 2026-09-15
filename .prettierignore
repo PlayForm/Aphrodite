@@ -390,11 +390,13 @@ plugins/aphrodite/**
 !plugins/aphrodite/README.md
 
 # .hermes is the dev archive: formattable markdown only, categorized by
-# .hermes/<category>/<thing>.md (gitignore negation: un-exclude the dir +
-# subdirs, re-exclude everything, then re-include md files only).
+# .hermes/<category>/<thing>.md. Order matters (gitignore semantics): the
+# blanket re-exclude must come FIRST, then dirs re-included (so prettier can
+# descend), then md files re-included LAST. A negation for a file inside an
+# excluded dir is a no-op, so dirs must never end up excluded.
 !.hermes/
-!.hermes/**/
 .hermes/**
+!.hermes/**/
 !.hermes/**/*.md
 
 # Benchmark suite - machine-generated corpora, results, harnesses; not
