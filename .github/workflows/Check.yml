@@ -9,10 +9,10 @@ permissions:
 
 on:
   push:
-    branches: [Current]
+    branches: [Current, Development]
     paths-ignore: [".github/Update.md"]
   pull_request:
-    branches: [Current]
+    branches: [Current, Development]
   workflow_dispatch:
   workflow_call:
 

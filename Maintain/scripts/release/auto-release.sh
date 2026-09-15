@@ -188,8 +188,8 @@ GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2>/dev/null || git tag "
 echo "[release] Aphrodite/v$NEW tagged"
 
 # Push - always sync with remote
-git push "$REMOTE" Current 2>&1 | tail -1 || true
-[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push Current")
+git push "$REMOTE" "$RELEASE_BRANCH" 2>&1 | tail -1 || true
+[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push $RELEASE_BRANCH")
 git push "$REMOTE" "Aphrodite/v$NEW" 2>&1 | tail -1 || true
 [ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push tag Aphrodite/v$NEW")
 echo "[push] done"
@@ -198,7 +198,7 @@ echo "[push] done"
 SUBMODULE_SHA=$(cd plugins/aphrodite && git rev-parse HEAD)
 git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2>/dev/null
 git commit -m "chore: sync aphrodite submodule → plugin v$PLUGIN_NEW" 2>/dev/null || echo "[sync] submodule pointer already current"
-git push "$REMOTE" Current 2>&1 | tail -1 || true
+git push "$REMOTE" "$RELEASE_BRANCH" 2>&1 | tail -1 || true
 [ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push submodule sync")
 echo "[sync] submodules done"
 
