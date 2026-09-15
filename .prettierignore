@@ -39,6 +39,15 @@ plugins/
 **/plugins/
 **/plugins/**
 
+# The plugin README is authored in the monorepo style - re-include exactly
+# that one file (gitignore semantics: the directory exclusions above must be
+# undone first, then everything under plugins/aphrodite re-excluded, then the
+# README re-included - a bare !file inside an excluded dir is a no-op).
+!plugins/
+!plugins/aphrodite/
+plugins/aphrodite/**
+!plugins/aphrodite/README.md
+
 # Generated / codegen
 **/Generated/
 **/Generated/**
