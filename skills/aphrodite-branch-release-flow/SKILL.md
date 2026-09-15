@@ -178,6 +178,8 @@ Current, delete the branch.
 
 ## Related
 
+- `branch-flow-protocol` - the general protocol this skill is the first
+  concrete instance of (axioms, state machine, verifier).
 - `aphrodite-release-workflow` - version-sync locations, release notes
   standards, crates.io publishing.
 - `aphrodite-development-lessons` - dev session setup, hook pitfalls.
