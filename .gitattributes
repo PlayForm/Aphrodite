@@ -7,6 +7,8 @@
 *.yml text eol=lf
 *.md text eol=lf
 *.sh text eol=lf
+.githooks/* text eol=lf
+.githooks/lib/* text eol=lf
 
 # Binary
 *.png binary
