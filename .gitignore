@@ -79,7 +79,3 @@ id_rsa*
 
 placeholder/
 .plans
-.bench
-
-bench/conversational/results/
-bench/conversational/__pycache__/
