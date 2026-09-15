@@ -1,0 +1,140 @@
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).
+Documentation about the marker format.
+A full marker looks like <<<CCR:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|source_code|4096>>>
+and the short form is [CCR:cafebabecafebabecafebabe|text].
+Unicode glyph form: ⫷CCR:0123456789abcdef0123⫸ is also parsed.
+None of these hashes exist in any store - retrieval/expansion must
+leave this text byte-identical, never substitute or corrupt it.
+Edge cases: <<<CCR: (unclosed), <<<CCR:>>> (empty), <<<CCR:a<<<CCR:bbbbbbbbbbbbbbbbbbbbbbbb|t|1>>> (nested prefix).

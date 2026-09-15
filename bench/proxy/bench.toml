@@ -1,0 +1,28 @@
+# Benchmark-only proxy config. Loaded via APHRODITE_CONFIG_PATH by
+# bench_proxy.sh / bench_proxy.py. Uses override ports 19797/19798 so a live
+# instance on 9797/9798 is never disturbed. The upstream API is a dummy
+# (never contacted: the bench only exercises management endpoints, which do
+# not call upstream).
+
+[[proxies]]
+name = "bench-cache"
+listen = "127.0.0.1:19797"
+mode = "cache"
+tool_relay = false
+timeout = 30
+
+[[proxies]]
+name = "bench-token"
+listen = "127.0.0.1:19798"
+mode = "token"
+tool_relay = false
+timeout = 30
+# Absolute path set by bench_proxy.py at runtime via a rendered copy; this
+# placeholder is replaced with <REPO>/bench/results/tmp/ccr-bench.db.
+ccr_db_path = "@CCR_DB_PATH@"
+
+[defaults]
+api_url = "http://127.0.0.1:1"
+model = "bench-dummy"
+api_key = "bench-dummy-key"
+ccr_ttl_seconds = 3600

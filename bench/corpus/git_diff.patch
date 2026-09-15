@@ -1,0 +1,270 @@
+diff --git a/crates/aphrodite/src/compressor.rs b/crates/aphrodite/src/compressor.rs
+index 01a2b3c..05d6e7f 100644
+--- a/crates/aphrodite/src/compressor.rs
++++ b/crates/aphrodite/src/compressor.rs
+@@ -198,40 +198,46 @@ impl Compressor {
+-        let old_0 = self.compute_0(0);
++        let new_0 = self.compute_0_fast(0, &ctx);
+         let keep_1 = self.value(1);
+         let keep_2 = self.value(2);
+         let keep_3 = self.value(3);
+         let keep_4 = self.value(4);
+-        let old_5 = self.compute_0(5);
++        let new_5 = self.compute_0_fast(5, &ctx);
+         let keep_6 = self.value(6);
+         let keep_7 = self.value(7);
+         let keep_8 = self.value(8);
+         let keep_9 = self.value(9);
+-        let old_10 = self.compute_0(10);
++        let new_10 = self.compute_0_fast(10, &ctx);
+         let keep_11 = self.value(11);
+         let keep_12 = self.value(12);
+         let keep_13 = self.value(13);
+         let keep_14 = self.value(14);
+-        let old_15 = self.compute_0(15);
++        let new_15 = self.compute_0_fast(15, &ctx);
+         let keep_16 = self.value(16);
+         let keep_17 = self.value(17);
+         let keep_18 = self.value(18);
+         let keep_19 = self.value(19);
+-        let old_20 = self.compute_0(20);
++        let new_20 = self.compute_0_fast(20, &ctx);
+         let keep_21 = self.value(21);
+         let keep_22 = self.value(22);
+         let keep_23 = self.value(23);
+         let keep_24 = self.value(24);
+-        let old_25 = self.compute_0(25);
++        let new_25 = self.compute_0_fast(25, &ctx);
+         let keep_26 = self.value(26);
+         let keep_27 = self.value(27);
+         let keep_28 = self.value(28);
+         let keep_29 = self.value(29);
+-        let old_30 = self.compute_0(30);
++        let new_30 = self.compute_0_fast(30, &ctx);
+         let keep_31 = self.value(31);
+         let keep_32 = self.value(32);
+         let keep_33 = self.value(33);
+         let keep_34 = self.value(34);
+-        let old_35 = self.compute_0(35);
++        let new_35 = self.compute_0_fast(35, &ctx);
+         let keep_36 = self.value(36);
+         let keep_37 = self.value(37);
+         let keep_38 = self.value(38);
+         let keep_39 = self.value(39);
+
+diff --git a/crates/aphrodite/src/marker.rs b/crates/aphrodite/src/marker.rs
+index 01b3c4d..05f90a1 100644
+--- a/crates/aphrodite/src/marker.rs
++++ b/crates/aphrodite/src/marker.rs
+@@ -64,40 +64,46 @@ impl Compressor {
+-        let old_0 = self.compute_1(0);
++        let new_0 = self.compute_1_fast(0, &ctx);
+         let keep_1 = self.value(1);
+         let keep_2 = self.value(2);
+         let keep_3 = self.value(3);
+         let keep_4 = self.value(4);
+-        let old_5 = self.compute_1(5);
++        let new_5 = self.compute_1_fast(5, &ctx);
+         let keep_6 = self.value(6);
+         let keep_7 = self.value(7);
+         let keep_8 = self.value(8);
+         let keep_9 = self.value(9);
+-        let old_10 = self.compute_1(10);
++        let new_10 = self.compute_1_fast(10, &ctx);
+         let keep_11 = self.value(11);
+         let keep_12 = self.value(12);
+         let keep_13 = self.value(13);
+         let keep_14 = self.value(14);
+-        let old_15 = self.compute_1(15);
++        let new_15 = self.compute_1_fast(15, &ctx);
+         let keep_16 = self.value(16);
+         let keep_17 = self.value(17);
+         let keep_18 = self.value(18);
+         let keep_19 = self.value(19);
+-        let old_20 = self.compute_1(20);
++        let new_20 = self.compute_1_fast(20, &ctx);
+         let keep_21 = self.value(21);
+         let keep_22 = self.value(22);
+         let keep_23 = self.value(23);
+         let keep_24 = self.value(24);
+-        let old_25 = self.compute_1(25);
++        let new_25 = self.compute_1_fast(25, &ctx);
+         let keep_26 = self.value(26);
+         let keep_27 = self.value(27);
+         let keep_28 = self.value(28);
+         let keep_29 = self.value(29);
+-        let old_30 = self.compute_1(30);
++        let new_30 = self.compute_1_fast(30, &ctx);
+         let keep_31 = self.value(31);
+         let keep_32 = self.value(32);
+         let keep_33 = self.value(33);
+         let keep_34 = self.value(34);
+-        let old_35 = self.compute_1(35);
++        let new_35 = self.compute_1_fast(35, &ctx);
+         let keep_36 = self.value(36);
+         let keep_37 = self.value(37);
+         let keep_38 = self.value(38);
+         let keep_39 = self.value(39);
+
+diff --git a/crates/aphrodite/src/config.rs b/crates/aphrodite/src/config.rs
+index 01c4d5e..061b2c3 100644
+--- a/crates/aphrodite/src/config.rs
++++ b/crates/aphrodite/src/config.rs
+@@ -30,40 +30,46 @@ impl Compressor {
+-        let old_0 = self.compute_2(0);
++        let new_0 = self.compute_2_fast(0, &ctx);
+         let keep_1 = self.value(1);
+         let keep_2 = self.value(2);
+         let keep_3 = self.value(3);
+         let keep_4 = self.value(4);
+-        let old_5 = self.compute_2(5);
++        let new_5 = self.compute_2_fast(5, &ctx);
+         let keep_6 = self.value(6);
+         let keep_7 = self.value(7);
+         let keep_8 = self.value(8);
+         let keep_9 = self.value(9);
+-        let old_10 = self.compute_2(10);
++        let new_10 = self.compute_2_fast(10, &ctx);
+         let keep_11 = self.value(11);
+         let keep_12 = self.value(12);
+         let keep_13 = self.value(13);
+         let keep_14 = self.value(14);
+-        let old_15 = self.compute_2(15);
++        let new_15 = self.compute_2_fast(15, &ctx);
+         let keep_16 = self.value(16);
+         let keep_17 = self.value(17);
+         let keep_18 = self.value(18);
+         let keep_19 = self.value(19);
+-        let old_20 = self.compute_2(20);
++        let new_20 = self.compute_2_fast(20, &ctx);
+         let keep_21 = self.value(21);
+         let keep_22 = self.value(22);
+         let keep_23 = self.value(23);
+         let keep_24 = self.value(24);
+-        let old_25 = self.compute_2(25);
++        let new_25 = self.compute_2_fast(25, &ctx);
+         let keep_26 = self.value(26);
+         let keep_27 = self.value(27);
+         let keep_28 = self.value(28);
+         let keep_29 = self.value(29);
+-        let old_30 = self.compute_2(30);
++        let new_30 = self.compute_2_fast(30, &ctx);
+         let keep_31 = self.value(31);
+         let keep_32 = self.value(32);
+         let keep_33 = self.value(33);
+         let keep_34 = self.value(34);
+-        let old_35 = self.compute_2(35);
++        let new_35 = self.compute_2_fast(35, &ctx);
+         let keep_36 = self.value(36);
+         let keep_37 = self.value(37);
+         let keep_38 = self.value(38);
+         let keep_39 = self.value(39);
+
+diff --git a/crates/aphrodite/src/proxy.rs b/crates/aphrodite/src/proxy.rs
+index 01d5e6f..063d4e5 100644
+--- a/crates/aphrodite/src/proxy.rs
++++ b/crates/aphrodite/src/proxy.rs
+@@ -141,40 +141,46 @@ impl Compressor {
+-        let old_0 = self.compute_3(0);
++        let new_0 = self.compute_3_fast(0, &ctx);
+         let keep_1 = self.value(1);
+         let keep_2 = self.value(2);
+         let keep_3 = self.value(3);
+         let keep_4 = self.value(4);
+-        let old_5 = self.compute_3(5);
++        let new_5 = self.compute_3_fast(5, &ctx);
+         let keep_6 = self.value(6);
+         let keep_7 = self.value(7);
+         let keep_8 = self.value(8);
+         let keep_9 = self.value(9);
+-        let old_10 = self.compute_3(10);
++        let new_10 = self.compute_3_fast(10, &ctx);
+         let keep_11 = self.value(11);
+         let keep_12 = self.value(12);
+         let keep_13 = self.value(13);
+         let keep_14 = self.value(14);
+-        let old_15 = self.compute_3(15);
++        let new_15 = self.compute_3_fast(15, &ctx);
+         let keep_16 = self.value(16);
+         let keep_17 = self.value(17);
+         let keep_18 = self.value(18);
+         let keep_19 = self.value(19);
+-        let old_20 = self.compute_3(20);
++        let new_20 = self.compute_3_fast(20, &ctx);
+         let keep_21 = self.value(21);
+         let keep_22 = self.value(22);
+         let keep_23 = self.value(23);
+         let keep_24 = self.value(24);
+-        let old_25 = self.compute_3(25);
++        let new_25 = self.compute_3_fast(25, &ctx);
+         let keep_26 = self.value(26);
+         let keep_27 = self.value(27);
+         let keep_28 = self.value(28);
+         let keep_29 = self.value(29);
+-        let old_30 = self.compute_3(30);
++        let new_30 = self.compute_3_fast(30, &ctx);
+         let keep_31 = self.value(31);
+         let keep_32 = self.value(32);
+         let keep_33 = self.value(33);
+         let keep_34 = self.value(34);
+-        let old_35 = self.compute_3(35);
++        let new_35 = self.compute_3_fast(35, &ctx);
+         let keep_36 = self.value(36);
+         let keep_37 = self.value(37);
+         let keep_38 = self.value(38);
+         let keep_39 = self.value(39);
+
+diff --git a/crates/aphrodite/src/lib.rs b/crates/aphrodite/src/lib.rs
+index 01e6f80..065f707 100644
+--- a/crates/aphrodite/src/lib.rs
++++ b/crates/aphrodite/src/lib.rs
+@@ -17,40 +17,46 @@ impl Compressor {
+-        let old_0 = self.compute_4(0);
++        let new_0 = self.compute_4_fast(0, &ctx);
+         let keep_1 = self.value(1);
+         let keep_2 = self.value(2);
+         let keep_3 = self.value(3);
+         let keep_4 = self.value(4);
+-        let old_5 = self.compute_4(5);
++        let new_5 = self.compute_4_fast(5, &ctx);
+         let keep_6 = self.value(6);
+         let keep_7 = self.value(7);
+         let keep_8 = self.value(8);
+         let keep_9 = self.value(9);
+-        let old_10 = self.compute_4(10);
++        let new_10 = self.compute_4_fast(10, &ctx);
+         let keep_11 = self.value(11);
+         let keep_12 = self.value(12);
+         let keep_13 = self.value(13);
+         let keep_14 = self.value(14);
+-        let old_15 = self.compute_4(15);
++        let new_15 = self.compute_4_fast(15, &ctx);
+         let keep_16 = self.value(16);
+         let keep_17 = self.value(17);
+         let keep_18 = self.value(18);
+         let keep_19 = self.value(19);
+-        let old_20 = self.compute_4(20);
++        let new_20 = self.compute_4_fast(20, &ctx);
+         let keep_21 = self.value(21);
+         let keep_22 = self.value(22);
+         let keep_23 = self.value(23);
+         let keep_24 = self.value(24);
+-        let old_25 = self.compute_4(25);
++        let new_25 = self.compute_4_fast(25, &ctx);
+         let keep_26 = self.value(26);
+         let keep_27 = self.value(27);
+         let keep_28 = self.value(28);
+         let keep_29 = self.value(29);
+-        let old_30 = self.compute_4(30);
++        let new_30 = self.compute_4_fast(30, &ctx);
+         let keep_31 = self.value(31);
+         let keep_32 = self.value(32);
+         let keep_33 = self.value(33);
+         let keep_34 = self.value(34);
+-        let old_35 = self.compute_4(35);
++        let new_35 = self.compute_4_fast(35, &ctx);
+         let keep_36 = self.value(36);
+         let keep_37 = self.value(37);
+         let keep_38 = self.value(38);
+         let keep_39 = self.value(39);
+

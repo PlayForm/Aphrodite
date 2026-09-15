@@ -10,7 +10,10 @@ Each script is a list of turns. Each turn has:
 
 The scripts exercise different content types that trigger different
 compression paths: code, diffs, build output, errors, search results,
-terminal output, JSON.
+terminal output, JSON, git output, and CCR marker/preview traffic.
+Scripts 4 and 5 additionally exercise the Development release ritual
+(git/build/tool-output content) and deliberate context minimization
+(CCR markers, prefetch, previews over raw output).
 """
 
 from dataclasses import dataclass, field
@@ -44,7 +47,7 @@ class Conversation:
 # ═══════════════════════════════════════════════════════════════════════════════
 CODING_TASK = Conversation(
     name="coding_task",
-    description="Multi-file Rust refactoring — extract trait, fix errors, run build",
+    description="Multi-file Rust refactoring - extract trait, fix errors, run build",
     system_prompt="""You are a Rust programming assistant. The user needs help refactoring a multi-module Rust project. Use tools to read files, make edits, and verify builds. Be thorough and check your work.""",
     turns=[
         # Turn 1: User describes the task
@@ -58,9 +61,9 @@ CODING_TASK = Conversation(
                  ToolCall(id="call_3", name="read_file", arguments='{"path": "src/main.rs"}'),
              ]),
 
-        # Turn 3: Tool results — large code files that exercise compression
+        # Turn 3: Tool results - large code files that exercise compression
         Turn(role="tool", tool_call_id="call_1",
-             content="""// src/parser.rs — Tokenizer + AST + Error types (~180 lines)
+             content="""// src/parser.rs - Tokenizer + AST + Error types (~180 lines)
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -199,7 +202,7 @@ impl Parser {
 """),
 
         Turn(role="tool", tool_call_id="call_2",
-             content="""// src/codegen.rs — LLVM IR generation + Error types (~160 lines)
+             content="""// src/codegen.rs - LLVM IR generation + Error types (~160 lines)
 use std::fmt;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -295,7 +298,7 @@ impl<'ctx> Codegen<'ctx> {
 """),
 
         Turn(role="tool", tool_call_id="call_3",
-             content="""// src/main.rs — CLI driver (~50 lines)
+             content="""// src/main.rs - CLI driver (~50 lines)
 use std::env;
 use std::fs;
 use std::process;
@@ -377,7 +380,7 @@ Let me make these changes now."""),
                  ToolCall(id="call_5", name="terminal", arguments='{"command": "cd /tmp/test_project && cargo build 2>&1"}'),
              ]),
 
-        # Turn 7: Build output — large to exercise compression
+        # Turn 7: Build output - large to exercise compression
         Turn(role="tool", tool_call_id="call_5",
              content="""   Compiling mylang v0.1.0 (/tmp/test_project)
 warning: unused import: `std::fmt`
@@ -469,7 +472,7 @@ The shared error type eliminates the duplication between `ParserError` and `Code
 # ═══════════════════════════════════════════════════════════════════════════════
 EXPLORATION_TASK = Conversation(
     name="exploration_task",
-    description="Explore an unfamiliar codebase — search, read many files, understand architecture",
+    description="Explore an unfamiliar codebase - search, read many files, understand architecture",
     system_prompt="""You are a software exploration assistant. Help the user understand an unfamiliar codebase by searching for relevant code, reading files, and explaining the architecture. Use search and read tools systematically.""",
     turns=[
         Turn(role="user", content="""I just joined a project and need to understand its HTTP proxy implementation. The codebase is at `/tmp/proxy_project/`. It seems to handle API requests, compression, and has multiple proxy modes. Can you explore it and give me an architectural overview? Start by finding the main entry points."""),
@@ -540,7 +543,7 @@ Total: 47 files, ~240 KB of Rust source"""),
              ]),
 
         Turn(role="tool", tool_call_id="call_e2",
-             content="""// src/main.rs — Binary entry point for the Aphrodite proxy
+             content="""// src/main.rs - Binary entry point for the Aphrodite proxy
 //
 // Two modes: `cache` (compress tool results → CCR) and `token`
 // (compress chat completions → CCR offload). Both accept the
@@ -557,7 +560,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 use aphrodite::{config, proxy, session, state};
 use aphrodite::config_loader::ConfigSource;
 
-/// CLI arguments parsed by clap — env vars like APHRODITE_MODE /
+/// CLI arguments parsed by clap - env vars like APHRODITE_MODE /
 /// APHRODITE_LISTEN / APHRODITE_API_URL / APHRODITE_API_KEY take
 /// precedence over flags; the config file is the fallback.
 #[derive(Parser, Debug)]
@@ -590,7 +593,7 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize structured JSON logging — RUST_LOG controls filter level.
+    // Initialize structured JSON logging - RUST_LOG controls filter level.
     // In production, this feeds into the operator's log aggregator.
     fmt().json().with_env_filter(EnvFilter::from_default_env()).init();
 
@@ -606,12 +609,12 @@ async fn main() -> anyhow::Result<()> {
     );
     let cfg = config::load(source, &cli).await?;
 
-    // Shared application state — one instance per process.
+    // Shared application state - one instance per process.
     // In `cache` mode this is just a HashMap; in `token` mode it
     // wraps a SQLite-backed CCR store with TTL-based expiry.
     let state = state::AppState::new(&cfg).await?;
 
-    // Session manager — handles per-connection session state,
+    // Session manager - handles per-connection session state,
     // including the catalog of compressed content available to
     // each conversation.
     let session_mgr = session::SessionManager::new();
@@ -634,7 +637,7 @@ async fn main() -> anyhow::Result<()> {
 """),
 
         Turn(role="tool", tool_call_id="call_e3",
-             content="""// src/proxy.rs — HTTP proxy: routes, middleware, compression pipeline
+             content="""// src/proxy.rs - HTTP proxy: routes, middleware, compression pipeline
 //
 // Architecture:
 // ┌──────────────┐     POST /v1/chat/completions      ┌──────────────────┐
@@ -742,7 +745,7 @@ pub async fn chat_completions(
 """),
 
         Turn(role="tool", tool_call_id="call_e4",
-             content="""// src/config.rs — Configuration types and loading
+             content="""// src/config.rs - Configuration types and loading
 //
 // Loads from aphrodite.toml, CLI flags, and environment variables.
 // Supports hot-reload via POST /reload and filesystem watcher.
@@ -826,7 +829,7 @@ pub struct DefaultsConfig {
     pub ccr_ttl_seconds: u64,
 }
 
-/// Compression thresholds — these are the knobs that determine
+/// Compression thresholds - these are the knobs that determine
 /// when and how content gets compressed. Hot-reloadable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompressionConfig {
@@ -984,7 +987,7 @@ impl Config {
 
 ### Two Operating Modes
 
-1. **Cache Proxy** (port 9797): Compresses tool outputs (file reads, terminal results, search output) into CCR markers. The LLM sees `<<<CCR:hash|type|size>>>` instead of large tool outputs. Includes tool relay — forwards tool calls to the upstream API.
+1. **Cache Proxy** (port 9797): Compresses tool outputs (file reads, terminal results, search output) into CCR markers. The LLM sees `<<<CCR:hash|type|size>>>` instead of large tool outputs. Includes tool relay - forwards tool calls to the upstream API.
 
 2. **Token Proxy** (port 9798): Monitors context window utilization. When approaching capacity (45% by default), offloads older messages to CCR and injects retrieval guidance. Only the most recent messages stay in context.
 
@@ -1002,7 +1005,7 @@ Client (Hermes) → POST /v1/chat/completions → Aphrodite Proxy
 |--------|------|
 | `proxy.rs` | HTTP server, routing, main handlers |
 | `handlers/` | Provider-specific request/response adapters (OpenAI, Anthropic, Gemini, Bedrock) |
-| `compression/engine.rs` | Core compression pipeline — classifier + marker generation + retrieval |
+| `compression/engine.rs` | Core compression pipeline - classifier + marker generation + retrieval |
 | `compression/store.rs` | CCR storage backend (in-memory for cache, SQLite for token) |
 | `config.rs` | TOML config loading, hot-reload support |
 | `session.rs` | Per-connection session tracking, catalog management |
@@ -1015,7 +1018,7 @@ Client (Hermes) → POST /v1/chat/completions → Aphrodite Proxy
 4. **Storage** (`store.rs`): Stores original content, keyed by content hash (BLAKE3)
 5. **Retrieval** (`retrieve.rs`): Resolves markers back to original content
 
-The architecture is clean and modular — new API providers can be added by implementing a handler in the `handlers/` directory, and new compression strategies go in `compression/`."""),
+The architecture is clean and modular - new API providers can be added by implementing a handler in the `handlers/` directory, and new compression strategies go in `compression/`."""),
     ]
 )
 
@@ -1026,7 +1029,7 @@ The architecture is clean and modular — new API providers can be added by impl
 # ═══════════════════════════════════════════════════════════════════════════════
 DEBUGGING_TASK = Conversation(
     name="debugging_task",
-    description="Debug a failing build — search for errors, read files, fix, rebuild, iterate",
+    description="Debug a failing build - search for errors, read files, fix, rebuild, iterate",
     system_prompt="""You are a debugging assistant. Help the user diagnose and fix build errors, test failures, and runtime issues. Use search, file reading, and terminal commands systematically. Always verify fixes by re-running the failing command.""",
     turns=[
         Turn(role="user", content="""My Rust project won't compile. I'm getting dozens of errors from `cargo build`. The project is at `/tmp/rust_project/`. Can you help me figure out what's wrong? Start by running the build and then we'll fix the errors one by one."""),
@@ -1136,7 +1139,7 @@ error: could not compile `myproject` (bin "myproject") due to 7 previous errors;
 
         Turn(role="assistant", content="""We have 7 errors and 1 warning. Let me tackle them in order of dependency (fixing root causes first, since they often cascade). Let me read the affected files:
 
-1. **E0432 + E0425** in `main.rs`: Missing config module — likely the root cause
+1. **E0432 + E0425** in `main.rs`: Missing config module - likely the root cause
 2. **E0277** in `models/output.rs`: Missing Serialize derive
 3. **E0061** in `api/handlers.rs`: Wrong number of arguments
 4. **E0308** in `db/repository.rs`: Option unwrapping
@@ -1176,7 +1179,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    // FIXME: CONFIG is not defined — should load from args[1]
+    // FIXME: CONFIG is not defined - should load from args[1]
     let config = config::load_from_file(&args[1])?;
 
     let db_pool = connect_to_database(&CONFIG.database).await?;
@@ -1198,7 +1201,7 @@ use serde::{Serialize, Deserialize};
 
 // ERROR: MyStruct uses #[derive(Serialize)] but contains a field
 // whose type doesn't implement Serialize. The HashMap import is
-// unused — the actual HashMap is std's.
+// unused - the actual HashMap is std's.
 
 pub struct MyStruct {
     pub id: i64,
@@ -1245,6 +1248,666 @@ The build is green. Your project is ready to use!"""),
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Script 4: Development → Current Release Ritual
+# Exercises: git status/log output, version-file reads, gate/build output,
+#            sync/merge/tag/push output, submodule status
+# ═══════════════════════════════════════════════════════════════════════════════
+RELEASE_FLOW_TASK = Conversation(
+    name="release_flow_task",
+    description="Run the Development → Current release ritual - version parity, gates, sync commit, tag, restore",
+    system_prompt="""You are a release engineering assistant for a two-branch project (Development = workshop, Current = distributed branch). Releases are snapshot transplants, never merges: prepare the bump on Development, run the gates, sync the plugin submodule first, then the parent, restore protected paths (.gitmodules, .github/workflows, the submodule gitlink), float the submodule to the Current tip, tag on Current only, and end with the working copy back on Development. Verify every step with machine-checkable exit codes and never tag on Development.""",
+    turns=[
+        # Turn 1: User requests the release ritual
+        Turn(role="user", content="""We need to cut the next release: sync Development → Current for Aphrodite v1.4.3 (plugin v2.1.3). The repo is at `/tmp/aphrodite-release/` with the plugin submodule at `plugins/aphrodite`. Walk the full ritual: verify version parity, run the gate set, sync the plugin first, then the parent with the protected-path restore and submodule float, tag on Current only, and end with the working copy back on Development. Keep commands machine-checkable - echo exit codes so we can verify each step."""),
+
+        # Turn 2: Assistant checks version parity and tree state
+        Turn(role="assistant", content="Starting the ritual. First verify version parity and a clean tree on Development.",
+             tool_calls=[
+                 ToolCall(id="call_r1", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && git status --short 2>&1; echo EXIT:$?"}'),
+                 ToolCall(id="call_r2", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && grep -n \\\"version\\\" crates/aphrodite/Cargo.toml crates/aphrodite-hermes/Cargo.toml plugins/aphrodite/plugin.yaml plugins/aphrodite/BINARY_VERSION package.json 2>/dev/null; echo EXIT:$?"}'),
+                 ToolCall(id="call_r3", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && git log --oneline -3; echo EXIT:$?"}'),
+             ]),
+
+        # Turn 3: Tool results - clean tree, version parity, recent commits
+        Turn(role="tool", tool_call_id="call_r1",
+             content="""On branch Development
+Your branch is up to date with 'Source/Development'.
+
+nothing to commit, working tree clean
+
+EXIT:0
+"""),
+
+        Turn(role="tool", tool_call_id="call_r2",
+             content="""crates/aphrodite/Cargo.toml:1:[package]
+crates/aphrodite/Cargo.toml:3:version = "1.4.3"
+crates/aphrodite-hermes/Cargo.toml:3:version = "1.4.3"
+crates/aphrodite-hermes/Cargo.toml:18:aphrodite = { version = "1.4.3", path = "../aphrodite" }
+plugins/aphrodite/plugin.yaml:7:version: 2.1.3
+plugins/aphrodite/BINARY_VERSION:1:2.1.3
+package.json:3:"version": "1.4.3"
+
+Version parity OK: binary 1.4.3, plugin 2.1.3 (monotonic vs 1.4.2 / 2.1.2 on Current)
+EXIT:0
+"""),
+
+        Turn(role="tool", tool_call_id="call_r3",
+             content="""a1b2c3d (HEAD -> Development) chore: bump v1.4.3 (binary) + v2.1.3 (plugin)
+e4f5a6b feat: add classifier pre-filter for clean outputs
+9c8d7e6 fix: poll worker reconnects on proxy restart
+EXIT:0
+"""),
+
+        # Turn 4: Assistant runs the gate set
+        Turn(role="assistant", content="Versions match and the tree is clean - the bump commit is on Development. Running the gates: clippy with -D warnings, advisory scan, and the import check.",
+             tool_calls=[
+                 ToolCall(id="call_r4", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && cargo clippy -p aphrodite -p aphrodite-hermes -- -D warnings 2>&1 | tail -40; echo EXIT:${PIPESTATUS[0]}"}'),
+                 ToolCall(id="call_r5", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && cargo deny check advisories 2>&1; echo EXIT:$?"}'),
+                 ToolCall(id="call_r6", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && python3 -c \\\"import aphrodite\\\" 2>&1; echo EXIT:$?"}'),
+             ]),
+
+        # Turn 5: Tool results - large clippy build output, deny scan, import check
+        Turn(role="tool", tool_call_id="call_r4",
+             content="""   Compiling proc-macro2 v1.0.86
+   Compiling quote v1.0.36
+   Compiling syn v2.0.72
+   Compiling unicode-ident v1.0.12
+   Compiling autocfg v1.3.0
+   Compiling libc v0.2.158
+   Compiling cfg-if v1.0.0
+   Compiling version_check v0.9.5
+   Compiling once_cell v1.20.1
+   Compiling lazy_static v1.5.0
+   Compiling memchr v2.7.4
+   Compiling regex-syntax v0.8.4
+   Compiling regex-automata v0.4.7
+   Compiling regex v1.10.5
+   Compiling serde v1.0.228
+   Compiling serde_derive v1.0.228
+   Compiling serde_json v1.0.150
+   Compiling itoa v1.0.11
+   Compiling ryu v1.0.18
+   Compiling indexmap v2.5.0
+   Compiling hashbrown v0.15.2
+   Compiling ahash v0.8.11
+   Compiling zerocopy v0.7.35
+   Compiling byteorder v1.5.0
+   Compiling subtle v2.6.1
+   Compiling zeroize v1.8.1
+   Compiling digest v0.10.7
+   Compiling crypto-common v0.1.6
+   Compiling generic-array v0.14.7
+   Compiling typenum v1.17.0
+   Compiling cpufeatures v0.2.14
+   Compiling ppv-lite86 v0.2.20
+   Compiling getrandom v0.2.15
+   Compiling rand_core v0.6.4
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.8.5
+   Compiling blake3 v1.5.4
+   Compiling constant_time_eq v0.3.1
+   Compiling arrayref v0.3.9
+   Compiling arrayvec v0.7.6
+   Compiling hex v0.4.3
+   Compiling base64 v0.22.1
+   Compiling sha2 v0.10.8
+   Compiling hmac v0.12.1
+   Compiling num-bigint v0.4.6
+   Compiling num-traits v0.2.19
+   Compiling num-integer v0.1.46
+   Compiling chrono v0.4.39
+   Compiling time v0.3.36
+   Compiling time-core v0.1.2
+   Compiling uuid v1.11.0
+   Compiling bytes v1.7.1
+   Compiling pin-project-lite v0.2.15
+   Compiling pin-project v1.1.7
+   Compiling futures-core v0.3.31
+   Compiling futures-channel v0.3.31
+   Compiling futures-sink v0.3.31
+   Compiling futures-util v0.3.31
+   Compiling futures v0.3.31
+   Compiling parking_lot_core v0.9.10
+   Compiling parking_lot v0.12.3
+   Compiling mio v1.0.2
+   Compiling socket2 v0.5.8
+   Compiling tokio v1.52.3
+   Compiling tokio-util v0.7.13
+   Compiling async-trait v0.1.83
+   Compiling http v1.2.0
+   Compiling http-body v0.4.6
+   Compiling httparse v1.9.4
+   Compiling h2 v0.4.6
+   Compiling tower v0.5.1
+   Compiling tower-layer v0.3.3
+   Compiling tower-http v0.6.2
+   Compiling axum v0.8.9
+   Compiling axum-core v0.5.0
+   Compiling mime v0.3.17
+   Compiling percent-encoding v2.3.1
+   Compiling url v2.5.2
+   Compiling tracing v0.1.40
+   Compiling tracing-core v0.1.32
+   Compiling tracing-subscriber v0.3.18
+   Compiling clap v4.5.20
+   Compiling clap_builder v4.5.20
+   Compiling clap_derive v4.5.18
+   Compiling anyhow v1.0.89
+   Compiling thiserror v1.0.64
+   Compiling dashmap v6.1.0
+   Compiling sqlx v0.8.3
+   Compiling ed25519-dalek v2.1.1
+   Compiling curve25519-dalek v4.1.3
+   Compiling rustls v0.23.16
+   Compiling rustls-pki-types v1.8.0
+   Compiling x509-parser v0.16.0
+   Checking serde v1.0.228
+   Checking serde_json v1.0.150
+   Checking tokio v1.52.3
+   Checking hyper v1.8.1
+   Checking axum v0.8.9
+   Checking tower v0.5.1
+   Checking tower-http v0.6.2
+   Checking tracing v0.1.40
+   Checking tracing-subscriber v0.3.18
+   Checking clap v4.5.20
+   Checking blake3 v1.5.4
+   Checking sqlx v0.8.3
+   Checking uuid v1.11.0
+   Checking chrono v0.4.39
+   Checking regex v1.10.5
+   Checking anyhow v1.0.89
+   Checking thiserror v1.0.64
+   Checking reqwest v0.12.9
+   Checking mime v0.3.17
+   Checking h2 v0.4.6
+   Checking http-body-util v0.1.2
+   Checking serde_urlencoded v0.7.1
+   Checking form_urlencoded v1.2.1
+   Checking tokio-stream v0.1.16
+   Checking tokio-util v0.7.13
+   Checking futures-io v0.3.31
+   Checking slab v0.4.9
+   Checking mio v1.0.2
+   Checking socket2 v0.5.8
+   Checking parking_lot v0.12.3
+   Checking smallvec v1.13.2
+   Checking once_cell v1.20.1
+   Checking dashmap v6.1.0
+   Checking tracing-appender v0.2.3
+   Checking rustls v0.23.16
+   Checking ed25519-dalek v2.1.1
+   Checking curve25519-dalek v4.1.3
+   Checking aphrodite-core v1.4.3 (/tmp/aphrodite-release/crates/aphrodite-core)
+   Checking aphrodite v1.4.3 (/tmp/aphrodite-release/crates/aphrodite)
+   Checking aphrodite-hermes v1.4.3 (/tmp/aphrodite-release/crates/aphrodite-hermes)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.2s
+
+clippy gate: PASS (-D warnings, 0 warnings emitted)
+EXIT:0
+"""),
+
+        Turn(role="tool", tool_call_id="call_r5",
+             content="""[fetch] advisory DB: crates.io-advisories (frozen)
+[fetch] lock file: /tmp/aphrodite-release/Cargo.lock
+[analyze] Scanning 214 crates for vulnerabilities...
+[analyze] Found 0 vulnerabilities
+[analyze] 0 ignored, 0 error-level, 0 warning-level
+deny gate: PASS (0 advisories)
+EXIT:0
+"""),
+
+        Turn(role="tool", tool_call_id="call_r6",
+             content="""aphrodite loaded from /tmp/aphrodite-release/target/release
+import gate: PASS
+EXIT:0
+"""),
+
+        # Turn 6: User approves the sync
+        Turn(role="user", content="All gates are green. Proceed with the sync: plugin first, then the parent. Remember the protected-path restore and submodule float, and keep the tag on Current only."),
+
+        # Turn 7: Assistant syncs the plugin submodule (S-Dev → S-Current)
+        Turn(role="assistant", content="Syncing the plugin first - the parent's gitlink must reference the released plugin.",
+             tool_calls=[
+                 ToolCall(id="call_r7", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release/plugins/aphrodite && git checkout Current 2>&1 && git merge --squash Development 2>&1 && git commit -m \\\"release: sync v2.1.3 from Development\\\" 2>&1 && git tag v2.1.3 2>&1 && git push Source Current --tags 2>&1; echo EXIT:$?"}'),
+             ]),
+
+        # Turn 8: Tool result - plugin sync output
+        Turn(role="tool", tool_call_id="call_r7",
+             content="""Switched to branch 'Current'
+Your branch is up to date with 'Source/Current'.
+Squash commit -- not updating HEAD
+ Automatic merge went well; stopped before committing as requested
+ 12 files changed, 340 insertions(+), 52 deletions(-)
+[Current 5f6e7d8] release: sync v2.1.3 from Development
+ 12 files changed, 340 insertions(+), 52 deletions(-)
+To /tmp/mirrors/aphrodite-hermes.git
+ * [new tag]         v2.1.3 -> v2.1.3
+ * [new branch]      Current -> Current
+
+plugin sync: PASS (v2.1.3 tagged on S-Current)
+EXIT:0
+"""),
+
+        # Turn 9: Assistant syncs the parent (P-Dev → P-Current) + tag
+        Turn(role="assistant", content="Plugin is on Current at v2.1.3. Now the parent sync: clean-tree check, squash Development into Current, restore protected paths, float the submodule to S-Current, verify, commit, tag, push, and return to Development.",
+             tool_calls=[
+                 ToolCall(id="call_r8", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && test -z \\\"$(git status --porcelain)\\\" && echo TREE_CLEAN && git checkout Current 2>&1 && git pull --ff-only Source Current 2>&1 && git merge --squash Development 2>&1 && git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite && git -C plugins/aphrodite fetch Source Current 2>&1 && git -C plugins/aphrodite checkout -B Current Source/Current 2>&1 && git add plugins/aphrodite && test -z \\\"$(git diff --cached --name-only -- .gitmodules .github/workflows)\\\" && echo PROTECTED_PATHS_RESTORED && git commit -m \\\"release: sync v1.4.3 from Development\\\" 2>&1 && git tag Aphrodite/v1.4.3 2>&1 && git push Source Current --tags 2>&1 && git checkout Development 2>&1; echo EXIT:$?"}'),
+             ]),
+
+        # Turn 10: Tool result - large parent sync output with diffstat
+        Turn(role="tool", tool_call_id="call_r8",
+             content="""TREE_CLEAN
+Switched to branch 'Current'
+Your branch is up to date with 'Source/Current'.
+Squash commit -- not updating HEAD
+ Automatic merge went well; stopped before committing as requested
+ 55 files changed, 1682 insertions(+), 141 deletions(-)
+
+ .gitmodules                                          |  2 +-
+ .github/workflows/build.yml                          |  4 +-
+ .github/workflows/release.yml                        |  2 +-
+ README.md                                            | 12 ++++--
+ CHANGELOG.md                                         |  8 ++++
+ docs/release-notes.md                                | 15 ++++++++
+ package.json                                         |  2 +-
+ crates/aphrodite/Cargo.toml                          |  3 +-
+ crates/aphrodite-core/Cargo.toml                     |  3 +-
+ crates/aphrodite-hermes/Cargo.toml                   |  5 ++--
+ crates/aphrodite-hermes/src/lib.rs                    | 24 +++++++----
+ crates/aphrodite/src/main.rs                          |  6 ++--
+ src/compression/classifier.rs                         | 28 ++++++++++++-
+ src/compression/engine.rs                             | 18 ++++++---
+ src/compression/preview.rs                            | 12 ++++---
+ src/compression/marker.rs                             |  4 +-
+ src/compression/store.rs                              |  9 +++--
+ src/compression/retrieve.rs                           |  7 ++--
+ src/compression/catalog.rs                            |  5 ++-
+ src/compression/inline.rs                             |  3 +-
+ src/config.rs                                        | 21 +++++++++--
+ src/session.rs                                       | 10 +++++-
+ src/flow.rs                                          |  8 +++--
+ src/hooks.rs                                         |  6 ++--
+ src/poll_worker.rs                                   |  9 +++--
+ src/state.rs                                         |  4 +-
+ src/directives.rs                                    |  5 ++-
+ src/resolve.rs                                       |  6 ++--
+ src/setup.rs                                         |  4 +-
+ src/tools/aphrodite_catalog.rs                       |  3 +-
+ src/tools/aphrodite_prefetch.rs                      |  7 ++--
+ src/tools/aphrodite_stats.rs                         |  3 +-
+ src/tools/aphrodite_retrieve.rs                      |  5 ++-
+ src/tools/aphrodite_search.rs                        |  4 +-
+ src/tools/aphrodite_reclassify.rs                    |  6 ++--
+ src/tools/aphrodite_directive.rs                     |  3 +-
+ src/proxy.rs                                        | 34 +++++++++++++---
+ src/lib.rs                                          | 16 ++++++---
+ plugins/aphrodite/BINARY_VERSION                     |  2 +-
+ plugins/aphrodite/plugin.yaml                        |  3 +-
+ plugins/aphrodite/install_message.md                 |  6 ++--
+ tests/integration_proxy.rs                           | 42 +++++++++++++++++--
+ tests/integration_ccr.rs                             | 25 ++++++++++--
+ tests/unit_classifier.rs                             | 14 +++++---
+ tests/unit_preview.rs                                | 10 ++++--
+ src/handlers/openai.rs                               | 12 ++++++--
+ src/handlers/anthropic.rs                            | 8 ++++---
+ src/handlers/gemini.rs                               | 5 ++--
+ src/handlers/streaming.rs                            | 14 ++++++---
+ src/handlers/batch.rs                                | 4 +-
+ src/tools/aphrodite_compress.rs                      | 6 ++--
+ src/tools/aphrodite_diff.rs                          | 3 +-
+ src/tools/aphrodite_files.rs                         | 3 +-
+ src/tools/aphrodite_rebuild.rs                       | 3 +-
+ src/tools/aphrodite_test.rs                          | 4 +-
+ plugins/aphrodite (submodule)                        | 1 +
+ create mode 100644 docs/release-notes.md
+ delete mode 100644 docs/archive/notes-1.3.4.md
+
+Restored from HEAD (Current-owned): .gitmodules, .github/workflows, plugins/aphrodite
+Fetching Source Current
+Branch 'Current' set up to track 'Source/Current'.
+HEAD is now at 5f6e7d8 release: sync v2.1.3 from Development (S-Current tip)
+PROTECTED_PATHS_RESTORED
+[Current 9a8b7c6] release: sync v1.4.3 from Development
+ 55 files changed, 1682 insertions(+), 141 deletions(-)
+To /tmp/mirrors/aphrodite.git
+ * [new tag]         Aphrodite/v1.4.3 -> Aphrodite/v1.4.3
+ * [new branch]      Current -> Current
+Switched to branch 'Development'
+Your branch is up to date with 'Source/Development'.
+
+parent sync: PASS (Aphrodite/v1.4.3 tagged on Current, worktree back on Development)
+EXIT:0
+"""),
+
+        # Turn 11: Assistant runs final invariant verification
+        Turn(role="assistant", content="Sync complete. Final verification pass - branch, submodule pin, and tag placement.",
+             tool_calls=[
+                 ToolCall(id="call_r9", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && git branch --show-current && git submodule status && git -C plugins/aphrodite describe --tags --exact-match HEAD 2>/dev/null; git describe --tags 2>/dev/null || echo NO_TAGS_ON_DEVELOPMENT; echo EXIT:$?"}'),
+             ]),
+
+        # Turn 12: Tool result - verification output
+        Turn(role="tool", tool_call_id="call_r9",
+             content="""Development
+ 5f6e7d8... plugins/aphrodite (v2.1.3)
+v2.1.3
+NO_TAGS_ON_DEVELOPMENT
+
+verify: PASS (worktree on Development, submodule pinned with no '+', tags live on Current only)
+EXIT:0
+"""),
+
+        # Turn 13: Final release summary
+        Turn(role="assistant", content="""The Development → Current release ritual is complete. Summary:
+
+1. **Version parity** - binary 1.4.3 (Cargo.toml, package.json), plugin 2.1.3 (plugin.yaml, BINARY_VERSION); monotonic vs 1.4.2/2.1.2 on Current.
+2. **Gates** - clippy `-D warnings` PASS, `cargo deny check advisories` PASS (0 of 214 crates vulnerable), import check PASS.
+3. **Plugin sync** (S-Dev → S-Current) - squash of Development into Current, commit `5f6e7d8 release: sync v2.1.3`, tagged `v2.1.3`, pushed.
+4. **Parent sync** (P-Dev → P-Current) - clean tree confirmed, Development squashed into Current (55 files), protected paths (`.gitmodules`, `.github/workflows`, submodule gitlink) restored from HEAD, submodule floated to S-Current tip, commit `9a8b7c6 release: sync v1.4.3`, tagged `Aphrodite/v1.4.3`, pushed.
+5. **Invariants** - worktree on Development (I10), submodule status clean with no `+` (I2), tags on Current only (V5), versions monotonic (I8).
+
+Ready for the GitHub release from the `Aphrodite/v1.4.3` tag."""),
+    ]
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Script 5: Compression-Aware Session
+# Exercises: CCR marker/preview output, prefetch status, compact catalog,
+#            search hits with previews, targeted retrieve (retrieve-only-when-needed)
+# ═══════════════════════════════════════════════════════════════════════════════
+COMPRESSION_AWARE_TASK = Conversation(
+    name="compression_aware_task",
+    description="Deliberately minimize context - CCR prefetch, previews over raw output, retrieve only when needed",
+    system_prompt="""You are a context-frugal assistant operating under an aggressive token budget. CCR (context compression) is available: aphrodite_prefetch stores whole files as markers, aphrodite_search returns compact hits with previews, aphrodite_catalog lists stored entries, and aphrodite_retrieve expands a marker only when its content is actually needed. Never pull raw content you do not need - prefer markers and previews, and retrieve at most the exact entries required to answer. State explicitly what you chose NOT to expand.""",
+    turns=[
+        # Turn 1: User requests exploration under a tight context budget
+        Turn(role="user", content="""I need to understand how the Aphrodite compression pipeline classifies tool output - the content types, the thresholds, and how previews are generated. The source is at `/tmp/aphrodite-src/` (compression module under `src/compression/`). I am on a tight context budget, so treat every token as expensive: use CCR aggressively - prefetch whole files as markers, show previews instead of raw output, and retrieve only the exact entry you need. Do not dump full file contents into context."""),
+
+        # Turn 2: Assistant prefetches into CCR and searches
+        Turn(role="assistant", content="Understood - strategy: prefetch the core pipeline files into CCR as markers, search for the classification logic to find the exact entry, then retrieve only that one entry when answering.",
+             tool_calls=[
+                 ToolCall(id="call_c1", name="aphrodite_prefetch", arguments='{"files": ["/tmp/aphrodite-src/src/compression/classifier.rs", "/tmp/aphrodite-src/src/compression/engine.rs", "/tmp/aphrodite-src/src/compression/marker.rs", "/tmp/aphrodite-src/src/compression/store.rs"]}'),
+                 ToolCall(id="call_c2", name="aphrodite_search", arguments='{"query": "classify content type threshold preview", "type": "code"}'),
+             ]),
+
+        # Turn 3: Tool results - markers + previews, compact search hits
+        Turn(role="tool", tool_call_id="call_c1",
+             content="""Prefetched 4 files → CCR markers (no raw content pulled into context):
+
+  src/compression/classifier.rs   → <<<CCR:a3f9c21e7b04d5f8a6c3e2d1b9f8472a|code|5231>>>   [preview: ContentType enum, threshold table, preview generation]
+  src/compression/engine.rs       → <<<CCR:7e2b8d4f6a1c9e3b5d7f8a2c4e6b1d9f0|code|12440>>>  [preview: pipeline orchestration, classifier → marker → store]
+  src/compression/marker.rs       → <<<CCR:1c4e7a9b2d5f8e0a3b6c9d1e4f7a2b8c|code|3208>>>   [preview: <<<CCR:hash|type|size>>> marker + preview templates]
+  src/compression/store.rs        → <<<CCR:9d2f5a8b1c4e7d0a3b6f9c2e5a8d1b4f|code|8941>>>   [preview: hash-keyed storage, BLAKE3, TTL expiry]
+
+Stored 4 markers: ~29.9 KB raw → ~600 B of markers/previews in context.
+"""),
+
+        Turn(role="tool", tool_call_id="call_c2",
+             content="""Search 'classify content type threshold preview' (type=code) - 6 hits:
+
+  src/compression/classifier.rs:12    ContentType enum: Code, Diff, BuildOutput, Error, Json, Terminal, Git, Text
+  src/compression/classifier.rs:41    fn classify(&self, output: &str) -> ContentType
+  src/compression/classifier.rs:87    per-type thresholds: code=4096, diff=3072, build=2048, error=1536, terminal=1024, json=4096
+  src/compression/classifier.rs:118   preview generation: first N chars + structure map (function/struct names)
+  src/compression/engine.rs:203       classifier.classify() → threshold check → marker → store
+  src/compression/preview.rs:15       preview_max_chars default 400
+
+Hits 1-4 are inside the prefetched classifier.rs marker - retrieve that one entry if needed.
+"""),
+
+        # Turn 4: Assistant checks catalog + stats without expanding anything
+        Turn(role="assistant", content="Prefetch returned markers only (~29.9 KB of raw source stayed out of context) and search returned compact hits with line numbers. Checking the catalog and session stats to confirm what is storable.",
+             tool_calls=[
+                 ToolCall(id="call_c3", name="aphrodite_catalog", arguments='{"mode": "compact"}'),
+                 ToolCall(id="call_c4", name="aphrodite_stats", arguments="{}"),
+             ]),
+
+        # Turn 5: Tool results - compact catalog + stats
+        Turn(role="tool", tool_call_id="call_c3",
+             content="""CCR catalog (compact, 4 entries):
+
+  # | type | size  | marker                                                              | source
+  1 | code | 5231  | <<<CCR:a3f9c21e7b04d5f8a6c3e2d1b9f8472a|code|5231>>>                 | classifier.rs
+  2 | code | 12440 | <<<CCR:7e2b8d4f6a1c9e3b5d7f8a2c4e6b1d9f0|code|12440>>>              | engine.rs
+  3 | code | 3208  | <<<CCR:1c4e7a9b2d5f8e0a3b6c9d1e4f7a2b8c|code|3208>>>               | marker.rs
+  4 | code | 8941  | <<<CCR:9d2f5a8b1c4e7d0a3b6f9c2e5a8d1b4f|code|8941>>>              | store.rs
+
+All four entries already stored; engine.rs is the largest (12.4 KB) - left as a marker unless needed.
+"""),
+
+        Turn(role="tool", tool_call_id="call_c4",
+             content="""Session stats:
+
+  entries_created:       4
+  entries_retrieved:     0
+  bytes_compressed:      29920
+  bytes_retrieved:       0
+  markers_in_context:    4
+  raw_bytes_in_context:  0
+  estimated_tokens_saved: ~7000
+"""),
+
+        # Turn 6: User asks a specific question
+        Turn(role="user", content="Good. Specifically - how does classifier.rs decide the content type at the threshold boundary, and what does a generated preview look like?"),
+
+        # Turn 7: Assistant does ONE targeted retrieve
+        Turn(role="assistant", content="One targeted retrieve - the classifier entry only. engine.rs, marker.rs, and store.rs stay as markers.",
+             tool_calls=[
+                 ToolCall(id="call_c5", name="aphrodite_retrieve", arguments='{"hash": "a3f9c21e7b04d5f8a6c3e2d1b9f8472a"}'),
+             ]),
+
+        # Turn 8: Tool result - retrieved classifier.rs (large, gets CCR'd again under the cache proxy)
+        Turn(role="tool", tool_call_id="call_c5",
+             content="""// src/compression/classifier.rs - content-type detection for CCR
+//
+// The classifier is the pre-filter of the compression pipeline. It looks
+// at a tool output and decides (a) which ContentType it is and (b) whether
+// it is large enough to justify CCR compression. Small or "clean" outputs
+// skip CCR entirely (classifier_poll pre-filter).
+
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ContentType {
+    Code,
+    Diff,
+    BuildOutput,
+    Error,
+    Json,
+    Terminal,
+    Git,
+    Text,
+}
+
+impl ContentType {
+    /// Default per-type compression threshold in bytes. An output is
+    /// compressed only when size >= threshold[type].
+    pub fn default_threshold(self) -> usize {
+        match self {
+            ContentType::Code => 4096,
+            ContentType::Diff => 3072,
+            ContentType::BuildOutput => 2048,
+            ContentType::Error => 1536,
+            ContentType::Json => 4096,
+            ContentType::Terminal => 1024,
+            ContentType::Git => 2048,
+            ContentType::Text => 4096,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ContentType::Code => "code",
+            ContentType::Diff => "diff",
+            ContentType::BuildOutput => "build_output",
+            ContentType::Error => "error",
+            ContentType::Json => "json",
+            ContentType::Terminal => "terminal",
+            ContentType::Git => "git",
+            ContentType::Text => "text",
+        }
+    }
+}
+
+pub struct Classifier {
+    /// Overrides applied on top of the defaults (hot-reloadable).
+    overrides: HashMap<ContentType, usize>,
+    /// Skip CCR for outputs that look "clean" (no markers of heavy content).
+    poll_filter: bool,
+}
+
+impl Classifier {
+    pub fn new(overrides: HashMap<ContentType, usize>, poll_filter: bool) -> Self {
+        Classifier { overrides, poll_filter }
+    }
+
+    /// Score-based type detection. Each rule adds weight; the type with the
+    /// highest score wins. Ties resolve to Text.
+    pub fn classify(&self, output: &str) -> ContentType {
+        let mut scores: HashMap<ContentType, usize> = HashMap::new();
+
+        for line in output.lines().take(200) {
+            let line = line.trim_start();
+            if line.is_empty() {
+                continue;
+            }
+
+            // Code: leading `//`, `use `, `fn `, `pub `, braces, keywords.
+            if line.starts_with("//")
+                || line.starts_with("use ")
+                || line.starts_with("fn ")
+                || line.starts_with("pub ")
+                || line.starts_with("impl ")
+                || line.starts_with("struct ")
+                || line.starts_with("enum ")
+            {
+                *scores.entry(ContentType::Code).or_insert(0) += 1;
+            }
+
+            // Diff: unified diff headers and hunks.
+            if line.starts_with("diff --git")
+                || line.starts_with("+++ ")
+                || line.starts_with("--- ")
+                || line.starts_with("@@ ")
+            {
+                *scores.entry(ContentType::Diff).or_insert(0) += 2;
+            }
+
+            // Build output: cargo/rustc markers.
+            if line.starts_with("Compiling ")
+                || line.starts_with("Checking ")
+                || line.starts_with("Finished ")
+                || line.starts_with("error[E")
+                || line.starts_with("warning: unused")
+            {
+                *scores.entry(ContentType::BuildOutput).or_insert(0) += 1;
+            }
+
+            // Errors: rustc/panic/backtrace shapes.
+            if line.starts_with("error[")
+                || line.starts_with("panicked at ")
+                || line.starts_with("thread 'main' panicked")
+            {
+                *scores.entry(ContentType::Error).or_insert(0) += 3;
+            }
+
+            // JSON: object/array starters, quote-heavy lines.
+            if line.starts_with('{') || line.starts_with('[') || line.starts_with('"') {
+                *scores.entry(ContentType::Json).or_insert(0) += 1;
+            }
+
+            // Git: porcelain/status/log shapes.
+            if line.starts_with("On branch ")
+                || line.starts_with("nothing to commit")
+                || line.starts_with("Switched to branch")
+                || line.starts_with(" * [new tag]")
+                || line.starts_with("EXIT:")
+            {
+                *scores.entry(ContentType::Git).or_insert(0) += 1;
+            }
+
+            // Terminal: shell prompt / command echo shapes.
+            if line.starts_with("$ ") || line.starts_with("~/") || line.starts_with("EXIT:$?") {
+                *scores.entry(ContentType::Terminal).or_insert(0) += 1;
+            }
+        }
+
+        if self.poll_filter && scores.is_empty() {
+            return ContentType::Text; // clean output - skip CCR
+        }
+
+        scores
+            .into_iter()
+            .max_by_key(|(_, v)| *v)
+            .map(|(ty, _)| ty)
+            .unwrap_or(ContentType::Text)
+    }
+
+    /// Threshold check: does this output qualify for CCR compression?
+    pub fn should_compress(&self, ty: ContentType, size: usize) -> bool {
+        let threshold = self.overrides.get(&ty).copied().unwrap_or_else(|| ty.default_threshold());
+        size >= threshold
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classifies_code() {
+        let c = Classifier::new(HashMap::new(), true);
+        assert_eq!(c.classify("// header\npub fn main() {}"), ContentType::Code);
+    }
+
+    #[test]
+    fn classifies_diff() {
+        let c = Classifier::new(HashMap::new(), true);
+        let d = "diff --git a/src/main.rs b/src/main.rs\n@@ -1,3 +1,4 @@\n+let x = 1;";
+        assert_eq!(c.classify(d), ContentType::Diff);
+    }
+
+    #[test]
+    fn threshold_boundary() {
+        let c = Classifier::new(HashMap::new(), true);
+        assert!(!c.should_compress(ContentType::Code, 4095));
+        assert!(c.should_compress(ContentType::Code, 4096));
+        assert!(c.should_compress(ContentType::Diff, 3072));
+        assert!(!c.should_compress(ContentType::Terminal, 1023));
+    }
+}
+"""),
+
+        # Turn 9: Assistant answers from the single retrieved entry
+        Turn(role="assistant", content="""Retrieved classifier.rs only (5.2 KB). From it:
+
+**Classification:** `classify()` scores each line by shape - leading tokens (`//` → code, `diff --git` → diff, `error[E...]` → error, `{`-heavy → json, `Compiling`/`Finished` → build_output, `On branch`/`EXIT:` → git) and picks the highest-scoring ContentType; ties and clean outputs fall back to Text (the poll pre-filter).
+
+**Threshold boundary:** an output is compressed only when `size >= threshold[type]` - code/json 4096, diff 3072, build/git 2048, error 1536, terminal 1024. So a 3 KB diff gets compressed; a 3 KB code block does not. Overrides come from the hot-reloadable config map.
+
+**Preview:** the first `preview_max_chars` (default 400) chars plus a structure map of function/struct names. The preview is what a marker expands to in prompts - the full body stays in CCR until `aphrodite_retrieve`.
+
+Not expanded: engine.rs (12.4 KB), store.rs (8.9 KB), marker.rs (3.2 KB) - all still markers. One entry retrieved out of four."""),
+
+        # Turn 10: User asks for the token-saving summary
+        Turn(role="user", content="That answers it. Now summarize the token-saving decisions you made this session."),
+
+        # Turn 11: Final summary of context-minimization choices
+        Turn(role="assistant", content="""Token-frugal decisions, in order:
+
+1. **Prefetch, not read** - 4 files (~29.9 KB raw) became 4 CCR markers + previews (~600 B in context). Raw content never entered context.
+2. **Search with previews** - `aphrodite_search` returned 6 compact hits with line numbers instead of grepping full files.
+3. **Compact catalog + stats** - confirmed what was storable and how much was saved without expanding anything.
+4. **Retrieve-only-when-needed** - exactly one `aphrodite_retrieve` (classifier.rs, the entry the question needed); the other 3 markers stayed unexpanded.
+5. **Preview-over-raw reporting** - answered from the preview plus the single retrieved body; quoted only the needed lines.
+
+Net effect: ~29.9 KB of source stayed out of context - roughly 7000 tokens saved versus reading the files raw. This is the behavior the compression proxy is designed to enable: markers replace bulk, retrieval is opt-in per question."""),
+    ]
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # All scripts registry
 # ═══════════════════════════════════════════════════════════════════════════════
-ALL_CONVERSATIONS = [CODING_TASK, EXPLORATION_TASK, DEBUGGING_TASK]
+ALL_CONVERSATIONS = [CODING_TASK, EXPLORATION_TASK, DEBUGGING_TASK, RELEASE_FLOW_TASK, COMPRESSION_AWARE_TASK]

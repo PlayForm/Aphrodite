@@ -1,0 +1,38 @@
+# Standalone compression bench crate - intentionally NOT part of the root
+# workspace (the empty [workspace] table below opts out), so `cargo build`
+# here never mutates the product workspace's Cargo.lock or member set.
+# Build/run from this directory only.
+#
+# Adaptation (migrated from the archived .bench/compression crate):
+#   - targets aphrodite 1.4.3 (crates/aphrodite) via path dep
+#   - corpus fixtures resolved relative to ../corpus (bench/corpus/ twin set)
+[package]
+name = "aphrodite-bench-compression"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Opt out of the parent workspace.
+[workspace]
+
+[dependencies]
+aphrodite = { path = "../../crates/aphrodite" }
+# Direct dep on the vendored headroom-core for compute_key/transforms::detect
+# (aphrodite does not re-export them). Same path the product crate uses.
+headroom-core = { package = "aphrodite-headroom-core", path = "../../vendor/headroom/crates/headroom-core" }
+# Feature set replicated from the root workspace Cargo.toml (preserve_order /
+# arbitrary_precision / raw_value): headroom-core's smart_crusher anchor
+# matching depends on preserve_order, and Cargo unifies serde_json features
+# across this standalone graph too - see the root Cargo.toml comment.
+serde_json = { version = "1.0.150", features = [
+	"preserve_order",
+	"arbitrary_precision",
+	"raw_value",
+] }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "stages"
+harness = false

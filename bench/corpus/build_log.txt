@@ -1,0 +1,893 @@
+$ rustc --version && cargo build --release
+rustc 1.88.0
+   Compiling autocfg v1.4.0
+   Compiling libc v0.2.177
+   Compiling memchr v2.7.4
+   Compiling serde_derive v1.0.219
+   Compiling aphrodite-types v1.4.3
+error[E0308]: mismatched types
+  --> crates/aphrodite/src/compressor.rs:90:17
+   |
+  90 |     let size: usize = marker.size();
+   |                 ^^^^^^^ expected `usize`, found `Option<usize>`
+   |
+
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:40:9
+   |
+  40 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:51:9
+   |
+  51 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+error[E0599]: no method named `compress2` found for struct `Compressor`
+  --> crates/aphrodite/src/proxy.rs:97:18
+   |
+  97 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: items from traits can only be used if the trait is in scope
+   |
+
+   Compiling aphrodite-http v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:62:9
+   |
+  62 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:73:9
+   |
+  73 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+error[E0433]: failed to resolve: use of undeclared crate or module `http`
+  --> crates/aphrodite/src/marker.rs:104:19
+   |
+ 104 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: a similar name exists in the crate root: `http_extra`
+   |
+
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:84:9
+   |
+  84 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:95:9
+   |
+  95 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+error[E0502]: cannot borrow `self.state` as mutable because it is also borrowed as immutable
+  --> crates/aphrodite/src/lib.rs:111:20
+   |
+ 111 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: consider cloning the value or using a different borrow scope
+   |
+
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:106:9
+   |
+ 106 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:117:9
+   |
+ 117 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+error[E0308]: mismatched types
+  --> crates/aphrodite/src/config.rs:118:21
+   |
+ 118 |     let size: usize = marker.size();
+   |                 ^^^^^^^ expected `usize`, found `Option<usize>`
+   |
+
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:128:9
+   |
+ 128 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:139:9
+   |
+ 139 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+error[E0599]: no method named `compress2` found for struct `Compressor`
+  --> crates/aphrodite/src/compressor.rs:125:22
+   |
+ 125 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: items from traits can only be used if the trait is in scope
+   |
+
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:150:9
+   |
+ 150 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:161:9
+   |
+ 161 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling headroom-proxy v0.3.2
+error[E0433]: failed to resolve: use of undeclared crate or module `http`
+  --> crates/aphrodite/src/proxy.rs:132:23
+   |
+ 132 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: a similar name exists in the crate root: `http_extra`
+   |
+
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:172:9
+   |
+ 172 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+error[E0502]: cannot borrow `self.state` as mutable because it is also borrowed as immutable
+  --> crates/aphrodite/src/marker.rs:139:24
+   |
+ 139 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: consider cloning the value or using a different borrow scope
+   |
+
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:183:9
+   |
+ 183 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:194:9
+   |
+ 194 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+error[E0308]: mismatched types
+  --> crates/aphrodite/src/lib.rs:146:25
+   |
+ 146 |     let size: usize = marker.size();
+   |                 ^^^^^^^ expected `usize`, found `Option<usize>`
+   |
+
+   Compiling serde_json v1.0.145
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:205:9
+   |
+ 205 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:216:9
+   |
+ 216 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+error[E0599]: no method named `compress2` found for struct `Compressor`
+  --> crates/aphrodite/src/config.rs:153:26
+   |
+ 153 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: items from traits can only be used if the trait is in scope
+   |
+
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:227:9
+   |
+ 227 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:238:9
+   |
+ 238 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+error[E0433]: failed to resolve: use of undeclared crate or module `http`
+  --> crates/aphrodite/src/compressor.rs:160:27
+   |
+ 160 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: a similar name exists in the crate root: `http_extra`
+   |
+
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:249:9
+   |
+ 249 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:260:9
+   |
+ 260 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+error[E0502]: cannot borrow `self.state` as mutable because it is also borrowed as immutable
+  --> crates/aphrodite/src/proxy.rs:167:28
+   |
+ 167 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: consider cloning the value or using a different borrow scope
+   |
+
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:271:9
+   |
+ 271 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:282:9
+   |
+ 282 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+error[E0308]: mismatched types
+  --> crates/aphrodite/src/marker.rs:174:29
+   |
+ 174 |     let size: usize = marker.size();
+   |                 ^^^^^^^ expected `usize`, found `Option<usize>`
+   |
+
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:293:9
+   |
+ 293 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:304:9
+   |
+ 304 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-core v1.4.3
+error[E0599]: no method named `compress2` found for struct `Compressor`
+  --> crates/aphrodite/src/lib.rs:181:30
+   |
+ 181 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: items from traits can only be used if the trait is in scope
+   |
+
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:315:9
+   |
+ 315 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+error[E0433]: failed to resolve: use of undeclared crate or module `http`
+  --> crates/aphrodite/src/config.rs:188:31
+   |
+ 188 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: a similar name exists in the crate root: `http_extra`
+   |
+
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:326:9
+   |
+ 326 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:337:9
+   |
+ 337 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+error[E0502]: cannot borrow `self.state` as mutable because it is also borrowed as immutable
+  --> crates/aphrodite/src/compressor.rs:195:32
+   |
+ 195 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: consider cloning the value or using a different borrow scope
+   |
+
+   Compiling aphrodite v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:348:9
+   |
+ 348 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:359:9
+   |
+ 359 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+error[E0308]: mismatched types
+  --> crates/aphrodite/src/proxy.rs:202:33
+   |
+ 202 |     let size: usize = marker.size();
+   |                 ^^^^^^^ expected `usize`, found `Option<usize>`
+   |
+
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:370:9
+   |
+ 370 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:381:9
+   |
+ 381 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+error[E0599]: no method named `compress2` found for struct `Compressor`
+  --> crates/aphrodite/src/marker.rs:209:34
+   |
+ 209 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: items from traits can only be used if the trait is in scope
+   |
+
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:392:9
+   |
+ 392 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:403:9
+   |
+ 403 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+error[E0433]: failed to resolve: use of undeclared crate or module `http`
+  --> crates/aphrodite/src/lib.rs:216:35
+   |
+ 216 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: a similar name exists in the crate root: `http_extra`
+   |
+
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:414:9
+   |
+ 414 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:425:9
+   |
+ 425 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+error[E0502]: cannot borrow `self.state` as mutable because it is also borrowed as immutable
+  --> crates/aphrodite/src/config.rs:223:36
+   |
+ 223 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: consider cloning the value or using a different borrow scope
+   |
+
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:436:9
+   |
+ 436 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:447:9
+   |
+ 447 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde v1.0.219
+error[E0308]: mismatched types
+  --> crates/aphrodite/src/compressor.rs:230:37
+   |
+ 230 |     let size: usize = marker.size();
+   |                 ^^^^^^^ expected `usize`, found `Option<usize>`
+   |
+
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:458:9
+   |
+ 458 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+error[E0599]: no method named `compress2` found for struct `Compressor`
+  --> crates/aphrodite/src/proxy.rs:237:38
+   |
+ 237 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: items from traits can only be used if the trait is in scope
+   |
+
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:469:9
+   |
+ 469 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:480:9
+   |
+ 480 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+error[E0433]: failed to resolve: use of undeclared crate or module `http`
+  --> crates/aphrodite/src/marker.rs:244:39
+   |
+ 244 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: a similar name exists in the crate root: `http_extra`
+   |
+
+   Compiling thiserror v2.0.12
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:491:9
+   |
+ 491 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:502:9
+   |
+ 502 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+error[E0502]: cannot borrow `self.state` as mutable because it is also borrowed as immutable
+  --> crates/aphrodite/src/lib.rs:251:40
+   |
+ 251 |     let size: usize = marker.size();
+   |                 ^^^^^^^ help: consider cloning the value or using a different borrow scope
+   |
+
+   Compiling aphrodite-types v1.4.3
+   Compiling aphrodite-core v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:513:9
+   |
+ 513 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+   Compiling serde v1.0.219
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:524:9
+   |
+ 524 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling serde_json v1.0.145
+   Compiling clap v4.5.41
+   Compiling thiserror v2.0.12
+   Compiling aphrodite-types v1.4.3
+error[E0308]: mismatched types
+  --> crates/aphrodite/src/config.rs:258:41
+   |
+ 258 |     let size: usize = marker.size();
+   |                 ^^^^^^^ expected `usize`, found `Option<usize>`
+   |
+
+   Compiling aphrodite-core v1.4.3
+   Compiling aphrodite-http v1.4.3
+   Compiling aphrodite-cache v1.4.3
+warning: unused variable: `pending`
+  --> crates/aphrodite/src/compressor.rs:535:9
+   |
+ 535 |     let pending = batch.drain(..window);
+   |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+   Compiling aphrodite v1.4.3
+   Compiling headroom-core v0.3.2
+   Compiling headroom-proxy v0.3.2
+   Compiling tokio v1.45.0
+error: could not compile `aphrodite` (lib) due to 25 previous errors; 46 warnings emitted
+
+$ cargo test --lib
+   Compiling aphrodite v1.4.3 (crates/aphrodite)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.41s
+     Running unittests src/lib.rs (target/debug/deps/aphrodite-9f0c2a41)
+running 214 tests
+test compressor::tests::case_00 ... ok
+test compressor::tests::case_01 ... ok
+test compressor::tests::case_02 ... ok
+test compressor::tests::case_03 ... ok
+test compressor::tests::case_04 ... ok
+test compressor::tests::case_05 ... ok
+test compressor::tests::case_06 ... ok
+test compressor::tests::case_07 ... ok
+test compressor::tests::case_08 ... ok
+test compressor::tests::case_09 ... ok
+test compressor::tests::case_10 ... ok
+test compressor::tests::case_11 ... ok
+test result: ok. 214 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+   Doc-tests aphrodite
+running 12 tests
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s

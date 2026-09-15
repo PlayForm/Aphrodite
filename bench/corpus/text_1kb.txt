@@ -1,0 +1,13 @@
+000000 latency token budget build pipeline nested
+000001 classifier cache store extraction resolve token store
+000002 reduction extraction resolve inline latency proxy token inline
+000003 token stage semantic cache reduction semantic threshold stage nested
+000004 nested stage compression classifier engine threshold classifier structured diff structured
+000005 store pipeline hash diff build inline threshold classifier stage retrieve inline
+000006 semantic extraction classifier resolve store retrieve build eviction resolve cache cache reduction
+000007 expand preview corpus pipeline extraction store retrieve eviction diff reduction corpus budget engine
+000008 context baseline signature pipeline retrieve compression token compression threshold classifier build structured signature extraction
+000009 corpus budget signature threshold nested proxy
+000010 nested recursive baseline classifier latency inline engine
+000011 inline compression structured semantic signature resolve compression resolve
+000012 resolve stage 

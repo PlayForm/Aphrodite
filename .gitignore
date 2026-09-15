@@ -91,3 +91,8 @@ placeholder/
 
 bench/conversational/results/
 bench/conversational/__pycache__/
+
+bench/results/tmp/bench-rendered.toml
+bench/results/tmp/ccr-bench.db
+bench/results/proxy-bench-*-*.json
+bench/results/wire-compat-*-*.json

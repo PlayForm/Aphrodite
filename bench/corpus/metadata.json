@@ -1,0 +1,98 @@
+{
+  "schema": "aphrodite-bench-corpus-metadata/1",
+  "detector_vocabulary": [
+    "json_array",
+    "source_code",
+    "search",
+    "build",
+    "diff",
+    "html",
+    "tabular",
+    "structured_config",
+    "text"
+  ],
+  "detector_source": "vendored headroom detector: vendor/headroom/headroom/transforms/content_detector.py (labels match benchmark-eval.py classify + benchmark-report.py)",
+  "note": "Fixtures are synthetic samples of content types, not benchmark measurements. All content anonymized; generated deterministically by gen_corpus.py (seed 0xCC12).",
+  "files": {
+    "build_log.txt": {
+      "content_type": "build",
+      "size_bytes": 30982,
+      "description": "Modern cargo build log for the aphrodite v1.4.3 workspace (rustc 1.88): errors, warnings, failure summary, then a passing cargo test run."
+    },
+    "code_go.go": {
+      "content_type": "source_code",
+      "size_bytes": 10626,
+      "description": "Idiomatic modern Go source (structs, error returns) for the struct_extract benches."
+    },
+    "code_python.py": {
+      "content_type": "source_code",
+      "size_bytes": 22538,
+      "description": "Modern Python source (annotations, classes) for the struct_extract benches."
+    },
+    "code_rust.rs": {
+      "content_type": "source_code",
+      "size_bytes": 2673,
+      "description": "Rust source payload copied from crates/aphrodite/examples/bench_payloads/sample.rs."
+    },
+    "code_ts.ts": {
+      "content_type": "source_code",
+      "size_bytes": 20310,
+      "description": "Modern TypeScript source (interfaces, async/await, generics) for the struct_extract benches."
+    },
+    "deep_nested_20.json": {
+      "content_type": "json_array",
+      "size_bytes": 2215,
+      "description": "JSON object nested 20 levels deep; stress-tests recursive parsing."
+    },
+    "gen_corpus.py": {
+      "content_type": "source_code",
+      "size_bytes": 14878,
+      "description": "Deterministic generator for all corpus fixtures (seed 0xCC12)."
+    },
+    "git_diff.patch": {
+      "content_type": "diff",
+      "size_bytes": 11024,
+      "description": "Unified git diff touching current crates/aphrodite/src/*.rs paths."
+    },
+    "interior_nul.json": {
+      "content_type": "json_array",
+      "size_bytes": 4201,
+      "description": "Valid JSON whose decoded strings contain interior NUL bytes, plus raw 0x00 trailing bytes."
+    },
+    "marker_literal.txt": {
+      "content_type": "text",
+      "size_bytes": 10100,
+      "description": "Literal CCR marker-syntax documentation; must pass through byte-identical."
+    },
+    "text_1kb.txt": {
+      "content_type": "text",
+      "size_bytes": 1024,
+      "description": "1 KiB deterministic plain-text blob."
+    },
+    "text_10kb.txt": {
+      "content_type": "text",
+      "size_bytes": 10240,
+      "description": "10 KiB deterministic plain-text blob."
+    },
+    "text_100kb.txt": {
+      "content_type": "text",
+      "size_bytes": 102400,
+      "description": "100 KiB deterministic plain-text blob."
+    },
+    "text_500kb.txt": {
+      "content_type": "text",
+      "size_bytes": 512000,
+      "description": "500 KiB deterministic plain-text blob."
+    },
+    "utf8_boundary.txt": {
+      "content_type": "text",
+      "size_bytes": 18808,
+      "description": "Pathological UTF-8: multibyte runs straddling 500-byte boundaries (slice-panic regression class)."
+    },
+    "wide_5k_keys.json": {
+      "content_type": "json_array",
+      "size_bytes": 219014,
+      "description": "JSON object with 5000 top-level keys; stress-tests wide-map handling."
+    }
+  }
+}

@@ -297,11 +297,7 @@ fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<Row> {
 			let ratio = v.get("token_savings_ratio").and_then(|r| r.as_f64()).unwrap_or(1.0);
 			row.marker = v.get("compressed_size").and_then(|c| c.as_u64()).unwrap_or(row.orig as u64) as usize;
 			row.compressed = ratio > 1.05;
-			row.ratio = if row.compressed {
-				row.orig as f64 / row.marker.max(1) as f64
-			} else {
-				1.0
-			};
+			row.ratio = if row.compressed { row.orig as f64 / row.marker.max(1) as f64 } else { 1.0 };
 			if row.compressed {
 				if let Some(hash) = v.get("hash").and_then(|h| h.as_str()) {
 					row.retrieve_ok = ccr_retrieve(proxy.port, hash);
@@ -358,11 +354,7 @@ fn print_report(rows: &[Row]) {
 			r.orig,
 			if r.compressed { r.marker } else { 0 },
 			if r.compressed { format!("{:.2}x", r.ratio) } else { "-".into() },
-			if r.compressed {
-				if r.retrieve_ok { "OK" } else { "MISS" }
-			} else {
-				"skip"
-			},
+			if r.compressed { if r.retrieve_ok { "OK" } else { "MISS" } } else { "skip" },
 			r.latency_ms
 		);
 	}
@@ -408,10 +400,7 @@ fn main() {
 	let failures: usize = rows.iter().filter(|r| !r.compressed).count();
 	drop(proxy);
 	if misses > 0 || failures > 0 {
-		eprintln!(
-			"\n[bench_05] FAILED - uncompressed={} retrieve miss(es)={}",
-			failures, misses
-		);
+		eprintln!("\n[bench_05] FAILED - uncompressed={} retrieve miss(es)={}", failures, misses);
 		std::process::exit(1);
 	}
 	eprintln!("\n[bench_05] OK");
