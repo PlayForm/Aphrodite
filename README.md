@@ -15,7 +15,7 @@
 
 [![release](https://img.shields.io/static/v1?label=release&message=v1.4.2&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.0.10&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.1.2&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
 [![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](LICENSE)
 
@@ -117,35 +117,197 @@ so the agent never hits the context ceiling.
 
 ---
 
+## What Gets Compressed 📦
+
+Aphrodite classifies every blob of tool output before compressing it - errors
+stay visible while verbose logs get squeezed. The classifier (`preview.rs`,
+wrapping the Headroom `content_detector`) returns one type per invocation,
+first match wins, and each type carries its own compression threshold tier.
+
+### Output Type Catalog
+
+| Content type                             | Detected from                                                | Enriched preview shape                                                            |
+| :--------------------------------------- | :----------------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| `build` / `build_output` / `build_error` | `Compiling` / `Finished` / `running` / `test` first line     | `[build:1E 1W 142L \| error[E0432]: unresolved import ...]` (first error message) |
+| `diff`                                   | `diff --git` / `@@ -` / `+++` / `---` headers                | `[diff:2F +7/-3 12L \| src/main.rs Cargo.toml +N more]` (first file names)        |
+| `git` (status)                           | porcelain status codes (`M`/`A`/`D`/`R`/`??`/`UU`, majority) | `[git:2M 2A 1D 3?? \| src/x.rs src/y.rs +5 more]` (code tallies + paths)          |
+| `gitlog`                                 | `commit <hash>` blocks + `Author:`                           | `[gitlog:2 commits \| abc1234 fix… → def5678 feat…]` (first→last hash/subject)    |
+| `ls` / `dir`                             | `ls -l` mode strings / bare path tokens (majority)           | `[ls:3 files 2 dirs \| .rs×2 .md×1]` (counts + top extensions)                    |
+| `test` / `test_output`                   | `test result:` / `=== RUN` / pytest / jest summaries         | `[test:220 pass 0 fail 1 ignored \| 0.31s]` (or `\| FAIL name` on failure)        |
+| `grep` / `ripgrep`                       | `path:line:match` hits (majority)                            | `[grep:4 hits in 3 files \| src/preview.rs:12 …]` (hits, files, first location)   |
+| `code_rust`                              | `fn`/`impl`/`struct`/`enum` + (`->` or `&` or `use`)         | `[code:3fns\|2structs fn main() 414L]` (structure map + first signature)          |
+| `code_python`                            | `def` + (`import`/`class`/`from`/`self.`)                    | `[code:2fns\|1class def handle() 87L]`                                            |
+| `code_go`                                | (`func`/`package`) + `import (`                              | `[code:4fns func main() 210L]`                                                    |
+| `code_js` / `code_ts`                    | (`function`/`const`/`=>`) + (`import`/`export`)              | `[code:3fns export default 145L]`                                                 |
+| `code` (generic)                         | `fn`/`def`/`class`/`import` fallback                         | `[code:2fns 96L]`                                                                 |
+| `search`                                 | search-result JSON (`total_count` + `query`)                 | `[search:15 hits in 3 files \| src/x.rs:12 …]`                                    |
+| `json` / `json_array`                    | starts with `{` / `[` and parses as JSON                     | `[json:5items 3L]` or `[json:30 keys 1L \| status, error, …]`                     |
+| `tool_output`                            | JSON containing `exit_code` or `"status"`                    | `[tool_output:1L 58B \| {"exit_code": 0, "output": "ok"}]`                        |
+| `terminal`                               | shell/exit-code traces (hook override)                       | `[terminal:14L exit code: 0]` (exit code / last output line)                      |
+| `error`                                  | first-line `error`/`Error`/`Traceback`/`panic`               | `[error:2L 120B \| error: could not compile \`aphrodite\`]`                       |
+| `log`                                    | `[INFO/WARN/ERROR/DEBUG/TRACE]` or timestamp prefix          | `[log:12L 540B \| [2026-09-15T10:00:00Z INFO aphrodite] …]`                       |
+| `linter`                                 | `error[E`/`error:`/`warning:`/`clippy`/`tsc`                 | `[linter:4L 260B \| error[E0308]: mismatched types]`                              |
+| `text` (fallback)                        | unrecognized content                                         | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)          |
+
+> [!NOTE]
+>
+> When the classifier only reaches a generic bucket (`text`/`terminal`/`log`),
+> an Aphrodite-side semantic detector (`detect_semantic_type`) upgrades it to
+> the high-signal shapes - `git`, `gitlog`, `grep`, `ls`, `test` - before the
+> preview is built. Detection is conservative (line-prefix patterns, majority
+> votes), so ordinary prose is never mis-tagged.
+> Full taxonomy: [docs/ccr/content-types.md](docs/ccr/content-types.md).
+
+### Threshold Tiers
+
+Each type maps to a compression threshold group - the higher the multiplier,
+the longer content stays visible in context before being compressed:
+
+| Tier           | Types                                                    |    Multiplier     |
+| :------------- | :------------------------------------------------------- | :---------------: |
+| Error          | `error`                                                  |        ×8         |
+| Code           | `code_rust`, `code_python`, `code_go`, `code_js`, `code` |        ×4         |
+| Diff / tracked | `diff`, `git`, `text`                                    |        ×2         |
+| Default        | `tool_output`, `json`, everything else                   |        ×1         |
+| Noisy (BASE)   | `linter`, `build_output`, `log`                          | ×1 (never halved) |
+
+### Marker Format
+
+Compressed content becomes a CCR marker. Every retrieval entry point
+(`aphrodite_retrieve`, `/retrieve`, `resolve`) accepts the marker body
+directly, with or without the `|type|size` suffix:
+
+```text
+[build:1E 1W 142L | error[E0432]: unresolved import ...]
+<<<CCR:0e3a5c9f2b8d4e6a1c3f5b7d9e0a2c4b6d8f0a1e|build|1420>>>
+```
+
+- **Hash** - full 40-char lowercase BLAKE3 digest (`[0-9a-f]{40}`).
+- **Type** - one of the content types above.
+- **Size** - original byte count.
+- **Preview** - the enriched preview line above the marker, so the agent can
+  decide without retrieving.
+
+---
+
 ## Architecture 🏗️
 
-**`Layout`**
+### Two modes
+
+Aphrodite compresses output in **two modes**:
+
+| Mode   | How it intercepts                                                                                                                  | Coverage                                                                          |
+| :----- | :--------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| Plugin | Hermes hooks (`transform_tool_result`, `transform_terminal_output`, context engine) intercept output directly - no API round-trip  | File reads, terminal output, search results, browser snapshots, every tool result |
+| Proxy  | Reverse proxy between any client and an LLM API; Chat Completions responses compressed via CCR; tool relay for bidirectional calls | OpenAI-compatible clients, Claude, any LLM API                                    |
+
+### Layout
+
+**`Repository`**
 
 ```text
 crates/aphrodite/          ← Core engine (binary + cdylib)
-  proxy.rs                 ← HTTP proxy: classify → compress → store → preview
-  hooks.rs                 ← transform_tool_result, transform_terminal_output
-  resolve.rs               ← CCR marker resolution (recursive)
-  stage2.rs                ← Semantic reduction (JSON, build, diff, code)
+  main.rs                  ← CLI entry, version intercept, config bootstrap
+  proxy.rs                 ← HTTP proxy: classify → compress → store → preview; SSE pass-through; tool relay
+  hooks.rs                 ← transform_tool_result, transform_terminal_output, session/LLM hooks
+  preview.rs               ← Type detection + enriched preview builder (all types)
+  resolve.rs               ← CCR marker resolution (recursive, nested markers)
+  retrieve.rs              ← /retrieve endpoint + retrieval plumbing
+  marker.rs                ← Marker parsing, hash normalization, validity checks
+  stage2.rs                ← Semantic reduction (JSON minify, build, diff, code)
   struct_extract.rs        ← Code structure extraction (Rust, Python, Go, JS/TS)
+  config.rs / config_loader.rs ← TOML schema, hot-reload, multi-proxy resolution
+  state.rs                 ← AppState: counters, caches, adaptive EMA state
+  directives.rs            ← Behavioral directive registry
+  session.rs               ← Session state, turn history
+  catalog.rs               ← CCR catalog listing (TOC, tool formats)
+  prefetch.rs              ← Background file prefetch → CCR
+  poll_worker.rs           ← Auto-backgrounding of slow tool calls
+  navigate.rs              ← S2 context navigation (experimental)
+  flow.rs / setup.rs       ← Plugin bootstrap, `aphrodite setup` installer
+  builtin_directives/      ← Shipped directive markdown (focus, foresight, cleanup, explore, lazy, ccr-handling)
 
 crates/aphrodite-hermes/   ← Hermes bridge (cdylib)
-  tools.rs                 ← 14 tool dispatch handlers
+  lib.rs                   ← FFI surface, hook dispatch
+  tools.rs                 ← 13 tool dispatch handlers
   schemas.rs               ← JSON Schema definitions
   skills.rs                ← Bundled Hermes skills
+  bin/                     ← Helper binaries
 
-plugins/aphrodite/         ← Thin Python loader (ctypes FFI)
+plugins/aphrodite/         ← Thin Python loader (ctypes FFI) + plugin manifest
   __init__.py              ← loads dylib, registers hooks/tools/engine
+  plugin.yaml              ← Manifest: 6 hooks, 13 tools, context engine
+  download.sh / download.ps1 ← Binary + dylib fetch from GitHub Releases
+  directives/              ← Plugin-side directive set
+  binaries/                ← Cached prebuilt binaries
 ```
 
-| Mode  | Port  | Backend   | Threshold | Best for                  |
-| :---- | :---: | :-------- | :-------: | :------------------------ |
-| Cache | :9797 | In-memory |   >8 KB   | Speed, transient sessions |
-| Token | :9798 | SQLite    |   >1 KB   | Durability, tool relay    |
+### Data flow
 
-All compression logic lives in the Rust dylib; Python is a thin FFI loader.
-Hot-reload: rebuild the dylib → mtime change detected → next call picks up new
-code automatically.
+**`Plugin mode`**
+
+```text
+ Tool executes → output intercepted by hook
+      ↓
+ classify → preview → store (SQLite / in-memory / inline)
+      ↓
+ Agent ← [type:enriched preview] (not raw output)
+      ↓
+ aphrodite_retrieve(hash) → full content (only when needed)
+```
+
+**`Proxy mode`**
+
+```text
+ Client → Aphrodite (:9797 / :9798) → Upstream LLM API
+              ↓
+     compress Chat Completions response
+              ↓
+ Client ← CCR markers replace raw content
+```
+
+### Dual listeners
+
+| Listener | Port  | CCR backend                      | Threshold | Tool relay | Best for                  |
+| :------- | :---: | :------------------------------- | :-------: | :--------: | :------------------------ |
+| Cache    | :9797 | In-memory (DashMap, 10K entries) |   >8 KB   |     No     | Speed, transient sessions |
+| Token    | :9798 | SQLite (persistent)              |   >1 KB   |    Yes     | Durability, tool relay    |
+
+### Hooks
+
+Six Hermes hooks drive the plugin (`provides_hooks` in `plugin.yaml`):
+
+| Hook                        | Role                                                    |
+| :-------------------------- | :------------------------------------------------------ |
+| `on_session_start`          | Engine bootstrap, directive seeding, proxy health check |
+| `transform_tool_result`     | Compress every tool result before it reaches the LLM    |
+| `transform_terminal_output` | Compress terminal output with exit-code context         |
+| `pre_llm_call`              | Inject directives, compress overflowing middle turns    |
+| `post_llm_call`             | Capture savings, update adaptive thresholds             |
+| `pre_tool_call`             | Prefetch-aware dispatch, auto-background slow calls     |
+
+### Management endpoints
+
+The proxy exposes loopback-only management routes (auth via
+`APHRODITE_MGMT_TOKEN` when set; `/health` and `/metrics` are exempt):
+
+| Route         | Method | Role                                         |
+| :------------ | :----: | :------------------------------------------- |
+| `/health`     |  GET   | Liveness probe (public)                      |
+| `/stats`      |  GET   | JSON counters, EMA, per-type compression     |
+| `/metrics`    |  GET   | Prometheus text format (loopback only)       |
+| `/retrieve`   |  POST  | Resolve `<<<CCR:hash\|type\|size>>>` markers |
+| `/ccr/create` |  POST  | Programmatic CCR creation                    |
+| `/ccr/list`   |  GET   | Catalog listing                              |
+| `/ccr/{hash}` | DELETE | Evict an entry                               |
+| `/reload`     |  POST  | Hot-reload `aphrodite.toml`                  |
+| `/tool/relay` |  POST  | Bidirectional tool relay (token mode)        |
+
+> [!NOTE]
+>
+> All compression logic lives in the Rust dylib; Python is a thin FFI loader.
+> Hot-reload: rebuild the dylib → mtime change detected → next call picks up
+> new code automatically.
 
 > [!NOTE]
 >
@@ -156,6 +318,8 @@ code automatically.
 ---
 
 ## Tools 🔧
+
+Thirteen tools ship with the plugin:
 
 | Tool                        | Description                                              |
 | :-------------------------- | :------------------------------------------------------- |
@@ -172,7 +336,6 @@ code automatically.
 | `aphrodite_reclassify`      | Retroactive metadata enrichment for unclassified CCR     |
 | `aphrodite_prefetch`        | Read + compress files on demand; markers returned inline |
 | `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors           |
-| `aphrodite_navigate`        | S2 context navigation: zoom into stored recall index     |
 
 ---
 
@@ -188,11 +351,12 @@ Edit + save (or `POST /reload`) applies changes immediately.
 tool_threshold_token = 256   # token proxy threshold (bytes)
 tool_threshold_cache = 2048  # cache proxy threshold (bytes)
 terminal_threshold  = 512    # terminal output threshold (bytes)
-inline_threshold    = 1024  # inline-vs-durable CCR storage cutoff (bytes)
+inline_threshold    = 1024   # inline-vs-durable CCR storage cutoff (bytes)
 code_multiplier     = 3.0    # multiply threshold for code_* content types
 ```
 
-Each `[compression]` field is overridable via an `APHRODITE_*` env var.
+Each `[compression]` field is overridable via an `APHRODITE_*` env var
+(see [docs/config/env-vars.md](docs/config/env-vars.md)).
 
 > [!TIP]
 >
@@ -209,19 +373,21 @@ Standard corpus: up to **610×** on large low-entropy prose, **132×** overall
 Cache and token modes measure identical ratios;
 20/20 compressed, 20/20 retrieve round-trips OK.
 
-| Content type              | Without     | With        |  Savings |
-| :------------------------ | ----------: | ----------: | -------: |
-| Git diff (42L)            |   ~350 tok  |    ~15 tok  |  **23×** |
-| Build output (142L)       | ~1,400 tok  |    ~10 tok  | **140×** |
-| Terminal output           |   ~200 tok  |    ~10 tok  |  **20×** |
-| JSON blob (30 keys)       |   ~400 tok  |    ~10 tok  |  **40×** |
-| Browser snapshot (342 el) | ~5,000 tok  |    ~12 tok  | **416×** |
+| Content type              |    Without |    With |  Savings |
+| :------------------------ | ---------: | ------: | -------: |
+| Git diff (42L)            |   ~350 tok | ~15 tok |  **23×** |
+| Build output (142L)       | ~1,400 tok | ~10 tok | **140×** |
+| Terminal output           |   ~200 tok | ~10 tok |  **20×** |
+| JSON blob (30 keys)       |   ~400 tok | ~10 tok |  **40×** |
+| Browser snapshot (342 el) | ~5,000 tok | ~12 tok | **416×** |
 
 **Median: 23× fewer tokens on tool output.**
 End-to-end latency is 8-40 ms (includes the HTTP round-trip);
 classification alone is 40-123 ns.
 
-Benchmarks are reproducible: `cargo run --release -p aphrodite --example bench_0N_*`.
+Benchmarks are reproducible:
+`cargo run --release -p aphrodite --example bench_01_corpus`
+(`bench_02_threshold`, `bench_03_retrieve`, `bench_04_ema`).
 
 ---
 
