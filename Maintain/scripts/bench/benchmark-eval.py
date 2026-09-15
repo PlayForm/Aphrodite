@@ -65,7 +65,9 @@ SAMPLES = {
 print("# Aphrodite Compression Evaluation Report")
 print()
 print("⚠️  SIMULATED — preview sizes are static assumptions, not runtime measurements.")
-print("    For live metrics: .bench/proxy/bench_proxy.sh or cargo bench in .bench/compression/")
+print(
+    "    For live metrics: .bench/proxy/bench_proxy.sh or cargo bench in .bench/compression/"
+)
 print()
 print(f"## Content Types Tested: {len(SAMPLES)}")
 print()
@@ -119,7 +121,9 @@ results.sort(key=lambda x: x[3], reverse=True)
 print("| Content Type | Before (tok) | After (tok) | Saved | Ratio | % Saved |")
 print("|-------------|-------------|------------|-------|-------|---------|")
 for ctype, before, after, saved, ratio, pct in results:
-    print(f"| {ctype:13} | {before:11,} | {after:10,} | {saved:5,} | {ratio:4.0f}× | {pct:5.1f}% |")
+    print(
+        f"| {ctype:13} | {before:11,} | {after:10,} | {saved:5,} | {ratio:4.0f}× | {pct:5.1f}% |"
+    )
 
 total_saved = total_before - total_after
 total_ratio = total_before / total_after if total_after else 999
@@ -140,10 +144,18 @@ print("| Content Type | Always Retrieved? | Net Effect |")
 print("|-------------|------------------|------------|")
 net_analysis = [
     ("build_output", "No - 0E/0W = clean, skip", "+20-25 tok saved"),
-    ("build_error", "Yes - need error details to fix", "~0 (preview + retrieve = net neutral)"),
+    (
+        "build_error",
+        "Yes - need error details to fix",
+        "~0 (preview + retrieve = net neutral)",
+    ),
     ("diff", "Sometimes - preview shows files/changes", "+15-20 tok when skipped"),
     ("terminal", "No - exit=0 = pass, skip", "+15-20 tok saved"),
-    ("search_files", "Sometimes - preview shows match count", "+15-25 tok when skipped"),
+    (
+        "search_files",
+        "Sometimes - preview shows match count",
+        "+15-25 tok when skipped",
+    ),
     ("json", "Depends - keys visible in preview", "+20-30 tok when skipped"),
     ("tabular", "Yes - need all rows", "~0 (preview + retrieve = net neutral)"),
     ("code_rust", "Depends - signatures visible in preview", "+30 tok when skipped"),
@@ -157,28 +169,32 @@ for ctype, decision, effect in net_analysis:
 print()
 print("## Key Findings")
 print()
-print(f"1. **Lossless compression alone**: {total_pct:.1f}% token reduction across all types")
 print(
-    f"2. **Preview-based decision**: The structured preview gives the agent enough info to skip retrieval for ~60% of outputs"
+    f"1. **Lossless compression alone**: {total_pct:.1f}% token reduction across all types"
 )
 print(
-    f"3. **Net-positive for clean outputs**: Build passes (0E/0W), terminal exits (exit=0), and classifier-polled outputs never generate CCR markers at all"
+    "2. **Preview-based decision**: The structured preview gives the agent enough info to skip retrieval for ~60% of outputs"
 )
 print(
-    f"4. **Net-neutral for actionable outputs**: Errors, tabular data, and code are retrieved when needed - no net loss"
+    "3. **Net-positive for clean outputs**: Build passes (0E/0W), terminal exits (exit=0), and classifier-polled outputs never generate CCR markers at all"
 )
 print(
-    f"5. **No ML inference required**: All classification is regex-based (<0.1ms), no API calls, no token cost"
+    "4. **Net-neutral for actionable outputs**: Errors, tabular data, and code are retrieved when needed - no net loss"
+)
+print(
+    "5. **No ML inference required**: All classification is regex-based (<0.1ms), no API calls, no token cost"
 )
 print()
 print("## Comparison to Headroom (from PR #47866)")
 print()
 print("| Metric | Headroom | Aphrodite |")
 print("|--------|----------|-----------|")
-print(f"| Content types | 8 | 28 |")
-print(f"| Classification | ML + regex | Pure regex (<0.1ms) |")
-print(f"| CCR approach | Remove-and-retrieve | Preview-and-decide |")
-print(f"| Net savings (all traffic) | 0.34% | {total_pct:.1f}% (lossless) + preview skip bonus |")
-print(f"| Best single case | 58% (search_files JSON) | 88% (build_output) |")
-print(f"| Dependency | Heavy (Python + ML) | Zero (regex only) |")
+print("| Content types | 8 | 28 |")
+print("| Classification | ML + regex | Pure regex (<0.1ms) |")
+print("| CCR approach | Remove-and-retrieve | Preview-and-decide |")
+print(
+    f"| Net savings (all traffic) | 0.34% | {total_pct:.1f}% (lossless) + preview skip bonus |"
+)
+print("| Best single case | 58% (search_files JSON) | 88% (build_output) |")
+print("| Dependency | Heavy (Python + ML) | Zero (regex only) |")
 print("| Agent reads own output? | ❌ Net-negative | ✅ Net-positive (preview first) |")
