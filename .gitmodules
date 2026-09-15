@@ -2,7 +2,7 @@
 path = plugins/aphrodite
 url = https://github.com/PlayForm/Aphrodite-Hermes.git
 ignore = dirty
-branch = Current
+branch = Development
 remote = Source
 
 [submodule "vendor/headroom"]
