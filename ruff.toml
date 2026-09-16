@@ -1,5 +1,12 @@
+# Ruff: lint + format (explicit; the single source of truth for Python style)
 line-length = 100
 target-version = "py311"
+# Generated/mirror files that must stay byte-identical to their source -
+# NEVER format (crates/aphrodite/templates/__init__.py is a copy of the live
+# plugins/aphrodite/__init__.py; setup.rs asserts the byte match).
+extend-exclude = [
+	"crates/aphrodite/templates/**",
+]
 
 [lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
@@ -8,3 +15,7 @@ ignore = ["E501"]
 [format]
 quote-style = "double"
 indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+preview = false

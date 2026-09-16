@@ -1,5 +1,5 @@
 {
-	// Aphrodite uses nightly-only rustfmt options (rustfmt.toml:
+	// Rust: Aphrodite uses nightly-only rustfmt options (rustfmt.toml:
 	// space_after_colon = false, imports_granularity, group_imports, ...).
 	// Stable rustfmt and rust-analyzer's internal formatter silently IGNORE
 	// those, producing space-after-colon output that diverges from CI
@@ -13,5 +13,17 @@
 		"rustfmt",
 		"--edition",
 		"2024"
-	]
+	],
+	// Python: use the repo's ruff (single formatter, explicit config in
+	// ruff.toml). This is the formatter CI's Check.yml uses, so Alt+F and CI
+	// produce identical output. Requires the Ruff VSCode extension
+	// (charliermarsh.ruff).
+	"[python]": {
+		"editor.defaultFormatter": "charliermarsh.ruff",
+		"editor.formatOnSave": true,
+		"editor.formatOnPaste": true
+	},
+	"ruff.lineLength": 100,
+	"ruff.organizeImports": true,
+	"ruff.showSyntaxErrors": true
 }
