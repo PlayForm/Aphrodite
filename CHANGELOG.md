@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.4.4 - Setup reliability hotfix (2026-09-16)
+
+Hotfix over v1.4.3 that un-breaks `aphrodite setup` for `cargo install` users:
+setup hard-required the core `libaphrodite` cdylib, which GitHub Releases does
+not publish (Build.yml ships only the `aphrodite-<target>` binary and the
+`libaphrodite_hermes-<target>` plugin dylib) - so the download fallback 404'd
+and aborted setup before the Hermes registration could complete. The core dylib
+is now best-effort. Binary `1.4.3 → 1.4.4`, plugin `BINARY_VERSION 1.4.3 →
+1.4.4`.
+
+- **Fix (setup):** `copy_dylibs` treats the core `libaphrodite` cdylib as
+  optional - copied when found locally, otherwise a clear warning is printed
+  and setup continues. Only `libaphrodite_hermes` is hard-required: it is the
+  dylib the Hermes plugin actually loads via ctypes. The core cdylib exists
+  only for external embedders and is not published on Releases, so requiring
+  it made every `cargo install` → `aphrodite setup` run fail with a 404.
+- **Chore (plugin tree):** dropped the phantom self-referential gitlink
+  `plugins/aphrodite` (a stray 160000 entry pointing at its own commit, swept
+  into the tree alongside the ruff reformat) - the plugin repo no longer
+  contains a `plugins/` folder.
+- **Chore (version):** plugin `BINARY_VERSION` 1.4.3 → 1.4.4 so the plugin
+  auto-downloads the hotfixed binary.
+
 ## v1.4.3 - Development-branch release pipeline, directives override, and plugin hardening (2026-09-15)
 
 A feature and hardening release over v1.4.2 that moves release preparation onto
@@ -9,10 +32,10 @@ side-effect-free PID probe, install-flow auto-download), and lands real-corpus
 benchmark tooling. Binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
 
 - **Feature (release pipeline):** release preparation now runs on `Development`
-  - the release script derives `RELEASE_BRANCH` from the current HEAD instead of
-  hardcoding a branch, and `Check.yml`/`Build.yml` workflow triggers are
-  restricted to the `Development` branch (tags + GitHub releases remain a
-  `Current`-side ceremony).
+    - the release script derives `RELEASE_BRANCH` from the current HEAD instead of
+      hardcoding a branch, and `Check.yml`/`Build.yml` workflow triggers are
+      restricted to the `Development` branch (tags + GitHub releases remain a
+      `Current`-side ceremony).
 - **Feature (directives):** `APHRODITE_DIRECTIVES_DIR` environment override is
   now the first candidate in directives discovery (`config_loader.rs`), with
   intentional-empty semantics in `directives.rs` - an empty-but-set dir is a
@@ -22,7 +45,7 @@ benchmark tooling. Binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
 - **Feature (hooks):** branch-aware git hooks - `post-checkout` reads the
   submodule's configured branch from `.gitmodules` instead of hardcoding
   `Current`, `bump-submodule-gitlink.sh` gained the `unset GIT_DIR
-  GIT_WORK_TREE` fix so it can never hijack parent-repo operations, plus
+GIT_WORK_TREE` fix so it can never hijack parent-repo operations, plus
   `post-commit`/`post-merge` submodule-sync hooks and the `pre-commit`
   submodule-pin guard.
 - **Feature (benchmarking):** `Maintain/scripts/bench/benchmark-eval.py`
@@ -71,15 +94,15 @@ breaking CI's dependency-advisory gate:
   (`s2 = "0.1.0"`), so the release workspace transitively pulled in
   `cgmath 0.18.0`, which carries RUSTSEC-2026-0196 (unmaintained, "no safe
   upgrade"). This failed the `cargo audit`/`cargo-deny` gate in `Check.yml`.
-  - `s2` is now an **optional** dependency of `aphrodite`, gated behind the
-    (still-disabled) `navigation` feature - it is no longer pulled into the
-    default/proxy build.
-  - `crates/s2-probe` and `crates/s2-navigate` are moved from
-    `workspace.members` to `workspace.exclude`, so they are not built or
-    audited as part of the release workspace (they remain in the repo as
-    experimental code).
-  - `cargo build -p aphrodite` is clean and `cgmath` is absent from the resolved
-    dependency graph.
+    - `s2` is now an **optional** dependency of `aphrodite`, gated behind the
+      (still-disabled) `navigation` feature - it is no longer pulled into the
+      default/proxy build.
+    - `crates/s2-probe` and `crates/s2-navigate` are moved from
+      `workspace.members` to `workspace.exclude`, so they are not built or
+      audited as part of the release workspace (they remain in the repo as
+      experimental code).
+    - `cargo build -p aphrodite` is clean and `cgmath` is absent from the resolved
+      dependency graph.
 
 No CCR engine/compression changes, no shipped-code changes beyond the `s2`
 exclusion, and no crate `name`/`version` changes beyond the normal release
@@ -97,14 +120,14 @@ A corrective release over v1.4.0 that fixes two issues found after tagging:
 - **Fix (release tooling):** corrected every leftover reference to the
   headroom core crate by its wrong bare name `aphrodite-headroom` to the
   actual published name `aphrodite-headroom-core`:
-  - `.github/workflows/Publish.yml` - the `Publish-Headroom-Core` job's
-    `cargo publish -p aphrodite-headroom`, crates.io index URL, check step,
-    job name, and comments (this would have broken the crates.io publish).
-  - `deny.toml` comment, `Maintain/CHANGELOG.md` package-name references,
-    `references/headroom-publish.md`, and
-    `skills/aphrodite-release-workflow/{SKILL.md,references/headroom-publish.md}`.
-  No crate `name`/version changed; the vendored `vendor/headroom` manifests
-  already used `aphrodite-headroom-core` correctly.
+    - `.github/workflows/Publish.yml` - the `Publish-Headroom-Core` job's
+      `cargo publish -p aphrodite-headroom`, crates.io index URL, check step,
+      job name, and comments (this would have broken the crates.io publish).
+    - `deny.toml` comment, `Maintain/CHANGELOG.md` package-name references,
+      `references/headroom-publish.md`, and
+      `skills/aphrodite-release-workflow/{SKILL.md,references/headroom-publish.md}`.
+      No crate `name`/version changed; the vendored `vendor/headroom` manifests
+      already used `aphrodite-headroom-core` correctly.
 
 ## v1.4.0 - Packaging, runtime-cache, and config-default fixes from 1.3.9 feedback (2026-08-15)
 

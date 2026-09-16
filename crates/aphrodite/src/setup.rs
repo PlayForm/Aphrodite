@@ -245,12 +245,18 @@ fn verify_hermes() -> Result<(), SetupError> {
 /// The download path fetches the tripled name and saves it as the
 /// un-tripled name the plugin expects.
 fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
-	let dylib_names:&[&str] = if cfg!(target_os = "macos") {
-		&["libaphrodite.dylib", "libaphrodite_hermes.dylib"]
+	// The core `libaphrodite` cdylib is BEST-EFFORT: it exists for external
+	// embedders, is not published on GitHub Releases (Build.yml ships only
+	// `aphrodite-<target>` + `libaphrodite_hermes-<target>`), and the Hermes
+	// plugin loads only `libaphrodite_hermes`.  A missing core dylib must
+	// never abort setup - warn and continue.  `libaphrodite_hermes` is
+	// hard-required: without it the plugin cannot load.
+	let dylib_names:&[(&str, bool)] = if cfg!(target_os = "macos") {
+		&[("libaphrodite.dylib", false), ("libaphrodite_hermes.dylib", true)]
 	} else if cfg!(target_os = "linux") {
-		&["libaphrodite.so", "libaphrodite_hermes.so"]
+		&[("libaphrodite.so", false), ("libaphrodite_hermes.so", true)]
 	} else {
-		&["aphrodite.dll", "aphrodite_hermes.dll"]
+		&[("aphrodite.dll", false), ("aphrodite_hermes.dll", true)]
 	};
 
 	let exe_dir = ctx.own_path.parent().unwrap_or(Path::new("."));
@@ -262,7 +268,7 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 	];
 
 	let mut copied = 0u32;
-	for name in dylib_names {
+	for &(name, required) in dylib_names {
 		let dest = ctx.binaries_dir.join(name);
 
 		let mut found = false;
@@ -322,13 +328,23 @@ fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
 			// always land here.  This download path bridges that gap
 			// without requiring a full source checkout.
 			if let Err(e) = download_dylib(name, &dest) {
-				return Err(SetupError::DylibNotFound(format!(
-					"dylib '{name}' not found locally and download failed: {e}.  \
-					 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
-					 or download manually from \
-					 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",
-					version = env!("CARGO_PKG_VERSION"),
-				)));
+				if required {
+					return Err(SetupError::DylibNotFound(format!(
+						"dylib '{name}' not found locally and download failed: {e}.  \
+						 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
+						 or download manually from \
+						 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",
+						version = env!("CARGO_PKG_VERSION"),
+					)));
+				}
+				// Optional core dylib: degrade gracefully (F9) - the
+				// Hermes plugin runtime never loads it, so setup can
+				// complete without it.
+				eprintln!(
+					"WARNING: optional dylib '{name}' could not be located or downloaded ({e}); continuing without it \
+					 - the Hermes plugin loads only the *_hermes dylib"
+				);
+				continue;
 			}
 			copied += 1;
 		}
