@@ -37,19 +37,21 @@ content. Dev changed `.github/workflows/Check.yml`, `.gitmodules`, and 68
 
 ## 2. Decision (a) - the selective-promotion boundary
 
-**1.4.3 ships WITH the chain-split core feature (opt-in, default OFF) and
-WITHOUT the Tier-1 teaching loop and WITHOUT Tier-3 error hints. 1.5.0 carries
-the tiers.**
+**1.4.3 ships ONLY the pure 1.4.2→1.4.3 prep (release pipeline, directives,
+hooks, plugin hardening, benchmark tooling, docs) - WITHOUT chain-split,
+WITHOUT Tier-1 teaching loop, WITHOUT Tier-3 error hints. All of those ship
+in 1.5.0.**
 
-The 1.4.3 prep freeze is the handoff state (`RELEASE-HANDOFF-1.4.3.md`): HEAD
-`5effa73` + the then-uncommitted chain-split core. Commits after that freeze
-split as follows - the boundary commit is **`8521b27`** (the last
-chain-split-core/doc commit before the tiers landed):
+The 1.4.3 prep freeze is the handoff state (`RELEASE-HANDOFF-1.4.3.md`): the
+prep commits up to and including **`73b3272`** (docs refactor) - the last
+commit BEFORE chain-split landed. Commits after that freeze split as follows -
+the boundary commit is **`73b3272`** (chain-split core `475917d` and
+everything after it belongs to 1.5.0):
 
 | Track | P commits (oldest → newest) | Content |
 |---|---|---|
-| **1.4.3** (through cutoff `8521b27`) | `9288d9e ad010af 6d6287e 405817c 5056669 4408ea4 c1ad84a 208f8c8 46f1107 ccd8074 5d8c09a 8afe8e0 db12c86 48abe46 5effa73 6f531a5 fb63aa5 4b06e79 aa10794 73b3272 475917d 5e18dd3 d26dd89 8521b27` | frozen prep (bump, notes, scope/handoff docs), fixes, hooks, **chain-split core `475917d`** (`chain_split.rs` + wiring, `chain_split = false` default - verified `config_loader.rs:169` + `aphrodite.toml:55`), output-invisibility refactor `d26dd89`, directive prose `8521b27` |
-| **1.5.0** (after cutoff, current tip) | `85771ee 50ff098 d798c4f 2f5dfea 4f14235` | **Tier-1 teaching loop `85771ee`** (state.rs +214, hermes lib.rs +84, tools.rs, resolve.rs), **Tier-3 error hints `50ff098`** (chain_split.rs +91, hooks.rs), `d798c4f` (empty-message commit, no tree effect), gitlink bookkeeping `2f5dfea`/`4f14235` (ceremony-overridden) |
+| **1.4.3** (through cutoff `73b3272`) | `9288d9e ad010af 6d6287e 405817c 5056669 4408ea4 c1ad84a 208f8c8 46f1107 ccd8074 5d8c09a 8afe8e0 db12c86 48abe46 5effa73 6f531a5 fb63aa5 4b06e79 aa10794 73b3272` | frozen prep (bump `5d8c09a`, notes `8afe8e0`, draft `db12c86`, gitignore `48abe46`, bench suite `5effa73`, handoff `6f531a5`, CCR notes `fb63aa5`, AGENTS.md `4b06e79`, scope `aa10794`, docs `73b3272`) - **NO chain-split** (verified: `git grep chain_split 73b3272 -- crates/` empty; no `chain_split.rs` at that tree) |
+| **1.5.0** (after cutoff, current tip) | `475917d d26dd89 8521b27 85771ee 50ff098 5e18dd3 da57c79 9f70cc0 f94c4fa` + gitlink bumps | **chain-split core `475917d`** (`chain_split.rs` + wiring, `chain_split = false` default), output-invisibility `d26dd89`, directive prose `8521b27`, continuation notes `5e18dd3`, **Tier-1 teaching loop `85771ee`**, **Tier-3 error hints `50ff098`**, retrieve round-trip fix `da57c79`, .gitignore commits |
 
 S-side has **no dual track**: all 6 post-v2.1.2 S commits (`1086c4a 350e8c2
 4238b38 15e03d8 90e7c9f b6fecad`) ship in plugin **v2.1.3** with 1.4.3. The

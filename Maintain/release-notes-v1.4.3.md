@@ -11,6 +11,7 @@ multi-home dylib reuse, side-effect-free PID probe, install-flow auto-download
 with POSIX `od` magic check - and lands real-corpus benchmark tooling
 (`benchmark-report.py` + the Rust `bench_05_type_coverage` example). No CCR
 engine/compression changes; binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
+(The chain-split feature and its teaching loop land in v1.5.0.)
 
 ### Changes
 
