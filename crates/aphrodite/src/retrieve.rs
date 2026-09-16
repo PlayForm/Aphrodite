@@ -32,10 +32,12 @@ pub struct RetrieveResponse {
 	pub source: String,
 	pub error: Option<String>,
 	/// `true` when `content` is a partial window of a larger stored
-	/// document - because of `offset`/`limit`, or because `limit` (including
-	/// `0`, which is NOT "unlimited") hit the 10,000-line server cap (02-F5).
-	/// A `[lines a-b/total]` header is also prepended to `content` in that
-	/// case; this field lets a caller detect truncation without parsing it.
+	/// document - because of `offset`/`limit`, or because an explicit `limit`
+	/// hit the 10,000-line server cap (02-F5). `limit: 0` requests the FULL
+	/// document (round-trip contract: retrieval must return the exact original
+	/// bytes so the body hashes to its own marker hash). A `[lines a-b/total]`
+	/// header is also prepended to `content` in that case; this field lets a
+	/// caller detect truncation without parsing it.
 	pub truncated: bool,
 }
 
@@ -185,16 +187,20 @@ fn filter_content(content: &str, query: Option<&str>) -> String {
 
 /// Slice `content` to the requested line window.
 ///
-/// `limit == 0` does NOT mean unlimited (02-F5) - it clamps to a 10_000-line
-/// server default cap, same as any `limit` above that. Returns
-/// `Err(message)` when `offset` is at or past the end of the document
-/// (mirrors the previous inline `BAD_REQUEST` behavior in
-/// [`handle_retrieve`]). Returns `(content, truncated)`: a `[lines a-b/total]`
-/// header is prepended to `content`, and `truncated` is `true`, whenever the
-/// window doesn't cover the whole document.
-fn paginate(content: &str, offset: usize, limit: usize) -> Result<(String, bool), String> {
-	// Clamp limit: 0 = server default cap, max 10_000 lines for safety
-	let limit = if limit == 0 { 10_000 } else { limit.min(10_000) };
+/// `limit == 0` means the FULL document (no cap) - this is what preserves
+/// the round-trip content-addressing contract: `retrieve(hash)` must return
+/// the exact original bytes, which then hash back to the marker's own hash.
+/// Any explicit `limit` (including one above 10_000) is clamped to a
+/// 10,000-line server cap (02-F5). Returns `Err(message)` when `offset` is
+/// at or past the end of the document (mirrors the previous inline
+/// `BAD_REQUEST` behavior in [`handle_retrieve`]). Returns
+/// `(content, truncated)`: a `[lines a-b/total]` header is prepended to
+/// `content`, and `truncated` is `true`, whenever the window doesn't cover
+/// the whole document.
+pub fn paginate(content: &str, offset: usize, limit: usize) -> Result<(String, bool), String> {
+	// Clamp explicit limits: 0 = full document (round-trip contract), any
+	// nonzero limit capped at 10_000 lines for safety (02-F5).
+	let limit = if limit == 0 { usize::MAX } else { limit.min(10_000) };
 	let lines: Vec<&str> = content.lines().collect();
 	let total = lines.len();
 	// F20: a zero-line (empty) document is a valid stored entry (e.g.
@@ -208,11 +214,14 @@ fn paginate(content: &str, offset: usize, limit: usize) -> Result<(String, bool)
 		return Err(format!("[offset {} out of range; document has {} lines]", offset, total));
 	}
 	let start = offset.min(total);
-	let end = (start + limit).min(total);
+	// `limit: 0` maps to `usize::MAX` (full document) - saturating add so a
+	// nonzero `start` + `usize::MAX` never overflows (it saturates to MAX,
+	// then `.min(total)` lands on `total` = full document).
+	let end = start.saturating_add(limit).min(total);
 	// 02-F5: signals to the caller that `content` is a partial window - via
-	// `offset`, `limit`, or `limit`'s 10_000-line cap (`limit:0` does NOT
-	// mean unlimited) - so truncation is detectable without parsing the
-	// `[lines a-b/total]` header below.
+	// `offset`, an explicit `limit`, or an explicit `limit`'s 10_000-line cap
+	// (`limit:0` means the FULL document and never truncates), so truncation
+	// is detectable without parsing the `[lines a-b/total]` header below.
 	let truncated = start > 0 || end < total;
 
 	// F4: `str::lines()` discards the final line terminator and `join`
@@ -322,17 +331,50 @@ mod tests {
 		assert!(err.contains("3 lines"));
 	}
 
-	// ── 02-F5: `limit:0` is NOT "unlimited" - it clamps to the 10_000-line
-	// server cap, same as any limit above 10_000. This test's own name says
-	// so; the doc comment above `paginate` and `docs/api/retrieve.md` must
-	// keep agreeing with this behavior, not the literal "no limit" wording. ──
+	// ── 02-F5: an explicit `limit` is clamped to the 10_000-line server cap;
+	// `limit:0` requests the FULL document (the round-trip contract: a
+	// full-document retrieval must return the exact original bytes, so they
+	// hash back to the marker's own hash). The wide_5k_keys.json bench
+	// finding was a 20,002-line document being windowed to the first 10,000
+	// lines with a `[lines 1-10000/20002]` header, i.e. NOT the original. ──
 	#[test]
-	fn test_paginate_limit_zero_clamps_to_10000() {
+	fn test_paginate_limit_zero_returns_full_document_under_cap() {
 		let content = (0..5).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
 		let (result, truncated) = paginate(&content, 0, 0).unwrap();
-		// All 5 lines returned, no windowing header since the whole doc fits.
 		assert_eq!(result, content);
 		assert!(!truncated);
+	}
+
+	#[test]
+	fn test_paginate_limit_zero_returns_full_document_over_10000_lines_verbatim() {
+		// Regression for the wide_5k_keys.json finding: limit:0 (the bench's
+		// "no pagination" request) must return the whole 20,002-line document
+		// byte-identical, with no `[lines ...]` header and truncated=false.
+		let content = (0..20_002).map(|i| format!("key_{i:05} = {}", i)).collect::<Vec<_>>().join("\n");
+		assert!(content.lines().count() > 10_000);
+		let (result, truncated) = paginate(&content, 0, 0).unwrap();
+		assert_eq!(result, content, "full-document retrieval must return the exact original bytes");
+		assert!(!truncated, "limit:0 never truncates");
+	}
+
+	#[test]
+	fn test_paginate_explicit_limit_clamped_to_10000_max() {
+		let content = (0..5).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
+		// A huge explicit limit must behave the same as 10_000 (capped).
+		let (result, truncated) = paginate(&content, 0, 999_999).unwrap();
+		assert_eq!(result, content);
+		assert!(!truncated);
+	}
+
+	#[test]
+	fn test_paginate_explicit_limit_over_cap_truncates_wide_document() {
+		// An EXPLICIT limit above the cap still truncates: the safety cap
+		// (02-F5) applies to explicit limits, not to limit:0.
+		let content = (0..20_002).map(|i| format!("key_{i:05} = {}", i)).collect::<Vec<_>>().join("\n");
+		let (result, truncated) = paginate(&content, 0, 999_999).unwrap();
+		assert!(truncated);
+		assert!(result.starts_with("[lines 1-10000/20002]"));
+		assert!(result.len() < content.len());
 	}
 
 	#[test]
@@ -343,14 +385,11 @@ mod tests {
 		assert!(truncated);
 	}
 
-	#[test]
-	fn test_paginate_limit_clamped_to_10000_max() {
-		let content = (0..5).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
-		// A huge limit must behave the same as 0 (unlimited, capped at 10_000).
-		let (result, truncated) = paginate(&content, 0, 999_999).unwrap();
-		assert_eq!(result, content);
-		assert!(!truncated);
-	}
+	// The old 02-F5 `limit: 999_999 == limit: 0` equivalence test is replaced
+	// above by `test_paginate_explicit_limit_clamped_to_10000_max` +
+	// `test_paginate_explicit_limit_over_cap_truncates_wide_document`: an
+	// explicit limit is still clamped to 10_000, but `limit:0` now returns
+	// the full document.
 
 	// ── T9: filter_content ────────────────────────────────────────
 	#[test]
