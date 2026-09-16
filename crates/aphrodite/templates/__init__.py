@@ -82,7 +82,9 @@ def _process_state() -> types.ModuleType:
         # Defensive: never crash registration on a poisoned sys.modules -
         # fall back to a private holder (each shim copy then loads its own
         # image; dlopen memoizes by path so handles still converge).
-        _log.warning("_process_state: sys.modules unavailable (%s); using a private holder", e)
+        _log.warning(
+            "_process_state: sys.modules unavailable (%s); using a private holder", e
+        )
         return holder
 
 
@@ -151,7 +153,9 @@ def _pid_alive(pid: int) -> bool:
             k32.GetExitCodeProcess.restype = wt.BOOL
             k32.CloseHandle.argtypes = [wt.HANDLE]
             k32.CloseHandle.restype = wt.BOOL
-            h = k32.OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            h = k32.OpenProcess(
+                SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, False, pid
+            )
             if not h:
                 # NULL handle: process not found (or access denied).
                 # ERROR_ACCESS_DENIED: exists but isn't ours - treat as alive
@@ -167,7 +171,9 @@ def _pid_alive(pid: int) -> bool:
         except Exception:
             # Defensive: never reap what we cannot probe. NEVER fall back to
             # os.kill on Windows (it is TerminateProcess and kills the target).
-            _log.warning("_pid_alive: win32 probe failed for pid %s; treating as alive", pid)
+            _log.warning(
+                "_pid_alive: win32 probe failed for pid %s; treating as alive", pid
+            )
             return True
     # macOS/BSD: signal 0 probes existence without side effects.
     try:
@@ -499,13 +505,16 @@ def _ensure_binaries() -> None:
         )
     except Exception as e:
         _log.warning(
-            "failed to run %s (%s) - run download.sh manually to fetch the aphrodite binaries",
+            "failed to run %s (%s) - run download.sh manually to fetch the "
+            "aphrodite binaries",
             _PLUGIN_DIR / "download.sh",
             e,
         )
         return
     if result.returncode != 0:
-        tail = "\n".join(((result.stdout or "") + (result.stderr or "")).splitlines()[-15:])
+        tail = "\n".join(
+            ((result.stdout or "") + (result.stderr or "")).splitlines()[-15:]
+        )
         _log.warning(
             "download.sh exited %d - run download.sh manually to fetch the "
             "aphrodite binaries; output tail:\n%s",
@@ -538,7 +547,9 @@ def _proxy_healthy(port: int) -> bool:
     global _health_opener
     if _health_opener is None:
         try:
-            _health_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            _health_opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({})
+            )
         except Exception as e:
             # Defensive: never skip on an opener failure - report and treat
             # as unhealthy so the launch still proceeds.
@@ -637,7 +648,8 @@ def _start_proxy():
         # registration - fall back to the default location, then give up
         # with a warning rather than raising.
         _log.warning(
-            "aphrodite data dir %s unusable (%s); falling back to ~/.hermes/aphrodite",
+            "aphrodite data dir %s unusable (%s); falling back to "
+            "~/.hermes/aphrodite",
             log_dir,
             e,
         )
@@ -645,7 +657,9 @@ def _start_proxy():
         try:
             log_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e2:
-            _log.warning("cannot create %s either (%s) - skipping proxy launch", log_dir, e2)
+            _log.warning(
+                "cannot create %s either (%s) - skipping proxy launch", log_dir, e2
+            )
             return
     try:
         with open(log_dir / "proxy-stderr.log", "a") as stderr_log:
@@ -671,7 +685,9 @@ def _start_proxy():
         with contextlib.suppress(subprocess.TimeoutExpired):
             rc = proc.wait(timeout=0.25)
     if rc is not None:
-        _log.warning("aphrodite proxy exited immediately (rc=%s); last stderr:", rc)
+        _log.warning(
+            "aphrodite proxy exited immediately (rc=%s); last stderr:", rc
+        )
         tail = _tail_log(log_dir / "proxy-stderr.log")
         _log.warning("%s", tail)
         if "API key" in tail:

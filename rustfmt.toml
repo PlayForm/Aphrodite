@@ -80,4 +80,9 @@ ignore = [
 	"**/Generated/",
 	"**/.generated/",
 	"**/gen/",
+
+	# Plugin shim template - MUST stay byte-identical to the live
+	# plugins/aphrodite/__init__.py (setup.rs asserts the match); rustfmt
+	# would reformat it and drift the two apart.
+	"crates/aphrodite/templates/",
 ]

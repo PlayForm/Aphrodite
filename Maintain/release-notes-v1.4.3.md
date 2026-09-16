@@ -47,8 +47,9 @@ engine/compression changes; binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
 
 - Build: `cargo build --release -p aphrodite -p aphrodite-hermes` ✅
   (verified in release-prep, `BUILD_EXIT:0`)
-- Tests: `cargo test -p aphrodite -p aphrodite-hermes` ✅
-  (387 passed, 0 failed, 1 ignored)
+- Tests: `cargo test -p aphrodite -p aphrodite-hermes --lib` ✅
+  (367 passed, 0 failed, 1 ignored; integration tests run on Development
+  only - Current ships test-free, so the Test CI job is removed there)
 - Lint: `cargo clippy -p aphrodite -p aphrodite-hermes --lib -- -D warnings` ✅
   (finished clean)
 - Python: ruff + pyright gates per release workflow (run in CI `Check.yml`)
