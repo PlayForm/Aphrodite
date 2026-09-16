@@ -8,10 +8,12 @@ v1.4.3 moves release preparation onto the `Development` branch (tags remain a
 `Current`-side ceremony), adds an `APHRODITE_DIRECTIVES_DIR` override for
 directives discovery, ships the full plugin hardening layer - Windows
 multi-home dylib reuse, side-effect-free PID probe, install-flow auto-download
-with POSIX `od` magic check - and lands real-corpus benchmark tooling
-(`benchmark-report.py` + the Rust `bench_05_type_coverage` example). No CCR
-engine/compression changes; binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
-(The chain-split feature and its teaching loop land in v1.5.0.)
+with POSIX `od` magic check - and reformats every built-in + root directive to
+common-markdown (proper headings/paragraphs, never the `#`-comment style).
+Current is a **test-free release line**: no test files, no test CI jobs (all
+verification lives on Development), no benchmark/dev tooling. Dependencies
+bumped to latest across the workspace. Binary `1.4.2 → 1.4.3`, plugin
+`2.1.2 → 2.1.3`.
 
 ### Changes
 
@@ -19,15 +21,13 @@ engine/compression changes; binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
   from the current HEAD; `Check.yml`/`Build.yml` triggers restricted to
   `Development`; release prep now runs on `Development`, tags on `Current`.
 - **Feature (directives)**: `APHRODITE_DIRECTIVES_DIR` env override is the
-  first discovery candidate; intentional-empty semantics in `directives.rs`.
+  first discovery candidate; intentional-empty semantics in `directives.rs`;
+  all directives (built-in `include_str!` + root `./directives/` + plugin)
+  rewritten to common-markdown and shipped in the release.
 - **Feature (hooks)**: branch-aware git hooks - `post-checkout` reads the
   submodule branch from `.gitmodules`, `bump-submodule-gitlink.sh` gained the
   `unset GIT_DIR GIT_WORK_TREE` fix, plus `post-commit`/`post-merge` sync
   hooks and the `pre-commit` submodule-pin guard.
-- **Feature (benchmarking)**: `benchmark-eval.py` overhauled + new
-  `benchmark-report.py` - per-corpus compression ratio, median/p95 latency
-  (measured or explicitly SKIPPED), per-content-type breakdown, JSON summary.
-  New `bench_05_type_coverage` Rust example.
 - **Feature (plugin install)**: `_ensure_binaries` auto-download with
   `APHRODITE_NO_AUTO_DOWNLOAD` opt-out; `download.sh` `xxd → od`; silent proxy
   failure → stderr capture + API-key hint; `install_message` LLM-provider docs.
@@ -37,12 +37,19 @@ engine/compression changes; binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
   holder + `_proxy_healthy` probe with body validation (PRs #7/#8).
 - **Fix (plugin, hotreload)**: dead-PID copy reaping; hotreload dir moved out
   of the plugin tree; prefix-contract tests.
-- **Chore (deps)**: `dirs` 6→7, `s2` 0.1→0.2, `setup-uv` 9→10.1,
-  `action-gh-release` 3.0.2→3.0.3; GitGuardian `high_entropy_threshold` removed.
+- **Chore (deps)**: workspace deps bumped to latest - serde 1.0.229,
+  serde_json 1.0.151, bytes 1.12.1, thiserror 2.0.20, tokio 1.53.1,
+  reqwest 0.13.5, clap 4.6.7, uuid 1.26.1, blake3 1.8.7, regex 1.13.1, lru
+  0.18.4; headroom `hf-hub`/`fastembed`/`ort` pinned to the known-good ML
+  cluster (0.5 / 5 / rc.12 - the `ml` feature is off in shipped builds).
+- **Chore (release line)**: test files + bench examples removed from Current;
+  `Check.yml` Test job removed (Development runs the full suite); rustfmt
+  aligns VSCode with the nightly CI gate; ruff formatter config made explicit
+  with the plugin-shim template excluded from reformatting.
 - **Docs/skills**: README +273 lines; new `aphrodite-branch-release-flow` +
   `aphrodite-tool-testing` skills; release-workflow/hook-reference/operations/
   development-lessons/benchmarking/cargo-upgrade/auto-expand-testing skills
-  refreshed; `templates/__init__.py` +483.
+  refreshed; `templates/__init__.py` synced byte-identical to the live shim.
 
 ### Infrastructure
 
