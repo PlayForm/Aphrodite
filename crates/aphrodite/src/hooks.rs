@@ -303,12 +303,14 @@ fn transform_terminal_output_inner(
 			let mut segments = Vec::with_capacity(parts.len());
 			let mut total_orig = 0usize;
 			let mut total_marker = 0usize;
+			let mut seg_hashes = Vec::with_capacity(parts.len());
 			for (idx, seg_text) in &parts {
 				total_orig += seg_text.len();
 				let ct = transforms::content_detector::detect_content_type(seg_text).content_type;
 				let type_str = ct.as_str().to_string();
 				let seg_hash = headroom_core::ccr::compute_key(seg_text.as_bytes());
 				state.inline_store_put(seg_hash.clone(), seg_text.to_string());
+				seg_hashes.push(seg_hash.clone());
 				let preview = crate::build_preview(&type_str, seg_text);
 				let marker = ccr_marker(&seg_hash, &type_str, seg_text.len(), &preview, None, None, None);
 				total_marker += marker.len();
@@ -330,6 +332,9 @@ fn transform_terminal_output_inner(
 					"marker": marker,
 				}));
 			}
+			// Tier 1 teaching loop: record the split event so segment
+			// retrievals can be attributed and the split threshold adapted.
+			state.record_chain_split(seg_hashes);
 			let summary = format!(
 				"[chain:{} segs | {} orig → {} markers]",
 				segments.len(),

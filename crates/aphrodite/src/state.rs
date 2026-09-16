@@ -16,6 +16,13 @@ const INLINE_MAX: usize = 500;
 /// layer can override it.
 pub const DEFAULT_INLINE_BYTE_BUDGET: usize = 256 * 1024 * 1024;
 
+/// Cap on the chain-split consequence ledger (events kept for adaptation).
+const SPLIT_EVENT_CAP: usize = 16;
+
+/// Minimum split events recorded before the threshold adapts - avoids
+/// adapting on noise from a single split.
+const SPLIT_ADAPT_MIN_EVENTS: usize = 4;
+
 /// Session state - one per loaded dylib instance.
 pub struct AphroditeState {
 	/// Inline content store: {hash: content}. The `HashMap` gives O(1)
@@ -109,6 +116,33 @@ pub struct AphroditeState {
 	/// instead of one giant blob. Default true. Env:
 	/// `APHRODITE_CHAIN_SPLIT`, TOML: `[compression] chain_split`.
 	pub chain_split_enabled: bool,
+	// ── Tier 1 teaching loop: adaptive split threshold ──
+	/// Current minimum segment count for chain splitting. Only chains with
+	/// at least this many segments are rewritten. Starts at the configured
+	/// floor (default 2, `split_chain` already requires ≥2) and adapts
+	/// within `[chain_split_floor, chain_split_max_segments]` based on
+	/// whether the agent actually retrieves the produced segment markers
+	/// (consequence-driven learning). The threshold is machinery - never
+	/// observable to the LLM (no directive text, no summary changes).
+	pub chain_split_min_segments: usize,
+	/// Lower bound of the adaptive threshold: the configured initial value.
+	pub chain_split_floor: usize,
+	/// Upper bound of the adaptive threshold. Env:
+	/// `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS`, TOML:
+	/// `[compression] chain_split_max_segments`. Default 6.
+	pub chain_split_max_segments: usize,
+	/// Consequence ledger: one entry per chain-split event recording how
+	/// many segment markers were produced and how many distinct ones were
+	/// later retrieved. Bounded ring (cap `SPLIT_EVENT_CAP`); oldest
+	/// evicted. `split_segment_map` maps each produced segment hash to its
+	/// event id so a resolve can be attributed to the right event.
+	pub split_events: VecDeque<SplitEvent>,
+	/// Segment hash → split-event id, for retrieval attribution. A hash
+	/// resolves at most once (removed after counting), so re-retrieving the
+	/// same marker never double-counts.
+	pub split_segment_map: HashMap<String, usize>,
+	/// Monotonic event id counter for `split_events`.
+	pub split_next_event_id: usize,
 	// ── Delta catalog (04-F1) ──
 	/// Number of markers the last time catalog_summary rendered, so we emit a
 	/// delta line only when new markers arrived this turn. Zero-initialized;
@@ -175,6 +209,24 @@ pub struct MarkerEntry {
 	pub meta: Option<HashMap<String, String>>,
 }
 
+/// One chain-split event's consequence record (Tier 1 teaching loop).
+/// `produced` = segment markers stored for this chain; `retrieved` =
+/// how many of those distinct hashes the agent later resolved (counted at
+/// most once per hash). The adaptation rule reads the retrieval ratio
+/// (retrieved/produced) over the recent window to move
+/// `chain_split_min_segments` within its bounds.
+#[derive(Debug, Clone)]
+pub struct SplitEvent {
+	/// Event id (matches `split_segment_map` values).
+	pub id: usize,
+	/// Turn on which the chain output was split.
+	pub turn: usize,
+	/// Segment markers produced for this chain.
+	pub produced: usize,
+	/// Distinct produced hashes resolved since (≤ produced).
+	pub retrieved: usize,
+}
+
 impl Default for AphroditeState {
 	fn default() -> Self {
 		Self {
@@ -209,7 +261,13 @@ impl Default for AphroditeState {
 			tool_events: VecDeque::new(),
 			bg_tasks: VecDeque::new(),
 			poll_worker_enabled: true,
-			chain_split_enabled: true,
+					chain_split_enabled: true,
+					chain_split_min_segments: 2,
+					chain_split_floor: 2,
+					chain_split_max_segments: 6,
+					split_events: VecDeque::new(),
+					split_segment_map: HashMap::new(),
+					split_next_event_id: 0,
 			navigation_enabled: false,
 			navigation_default_level: 4,
 			last_emitted_marker_count: 0,
@@ -297,6 +355,66 @@ impl AphroditeState {
 		self.tool_events.push_back(event);
 		while self.tool_events.len() > 200 {
 			self.tool_events.pop_front();
+		}
+	}
+
+	/// Record a chain-split event (Tier 1 teaching loop): a chain's output
+	/// was split into `produced` segment markers whose hashes are registered
+	/// for retrieval attribution. Bounded ring (cap `SPLIT_EVENT_CAP`), then
+	/// re-adapts the split threshold from the retrieval ratio.
+	pub fn record_chain_split(&mut self, hashes: Vec<String>) {
+		if hashes.is_empty() {
+			return;
+		}
+		self.split_next_event_id += 1;
+		let id = self.split_next_event_id;
+		let produced = hashes.len();
+		for h in &hashes {
+			self.split_segment_map.insert(h.clone(), id);
+		}
+		self.split_events.push_back(SplitEvent { id, turn: self.turn_counter, produced, retrieved: 0 });
+		while self.split_events.len() > SPLIT_EVENT_CAP {
+			self.split_events.pop_front();
+		}
+		self.adapt_chain_split_threshold();
+	}
+
+	/// Attribute a successful resolve to a split event (consequence signal).
+	/// A hash counts at most once - removed from `split_segment_map` after
+	/// attribution, so re-retrieving the same marker never double-counts.
+	/// Returns the event id when the hash belonged to a chain split.
+	pub fn note_split_retrieval(&mut self, hash: &str) -> Option<usize> {
+		let eid = self.split_segment_map.remove(hash)?;
+		if let Some(ev) = self.split_events.iter_mut().find(|e| e.id == eid) {
+			ev.retrieved = ev.retrieved.saturating_add(1);
+		}
+		self.adapt_chain_split_threshold();
+		Some(eid)
+	}
+
+	/// Consequence-driven threshold adaptation (Tier 1, invisible): with at
+	/// least `SPLIT_ADAPT_MIN_EVENTS` split events recorded, compute the
+	/// retrieval ratio (retrieved/produced) over the window. Agents that
+	/// retrieve the segments (> 50%) keep the threshold at the floor (split
+	/// eagerly); agents that ignore them (< 25%) raise it (only split long
+	/// chains), capped by `chain_split_max_segments`. The threshold is
+	/// internal machinery - never rendered to the LLM.
+	fn adapt_chain_split_threshold(&mut self) {
+		if self.split_events.len() < SPLIT_ADAPT_MIN_EVENTS {
+			return;
+		}
+		let produced: usize = self.split_events.iter().map(|e| e.produced).sum();
+		let retrieved: usize = self.split_events.iter().map(|e| e.retrieved).sum();
+		if produced == 0 {
+			return;
+		}
+		let ratio = retrieved as f64 / produced as f64;
+		if ratio >= 0.5 && self.chain_split_min_segments > self.chain_split_floor {
+			// Segments are used - split more eagerly.
+			self.chain_split_min_segments -= 1;
+		} else if ratio < 0.25 && self.chain_split_min_segments < self.chain_split_max_segments {
+			// Segments are ignored - only split very long chains.
+			self.chain_split_min_segments += 1;
 		}
 	}
 
@@ -490,5 +608,99 @@ mod tests {
 		let content = "before <<<CCR:fake000|text|1>>> after";
 		s.inline_store_put("hash".into(), content.into());
 		assert_eq!(s.inline_store_get("hash"), Some(content.to_string()));
+	}
+
+	// ── Tier 1 teaching loop: adaptive split threshold ──
+
+	#[test]
+	fn test_record_chain_split_registers_hashes_and_counts_retrieval_once() {
+		let mut s = AphroditeState::default();
+		let hashes = vec!["h1".into(), "h2".into(), "h3".into()];
+		s.record_chain_split(hashes);
+		assert_eq!(s.split_events.len(), 1);
+		assert_eq!(s.split_events[0].produced, 3);
+		assert_eq!(s.split_events[0].retrieved, 0);
+
+		// Retrieving a segment hash attributes the consequence once.
+		assert_eq!(s.note_split_retrieval("h2"), Some(1));
+		assert_eq!(s.split_events[0].retrieved, 1);
+		// Re-retrieving the same hash must not double-count.
+		assert_eq!(s.note_split_retrieval("h2"), None);
+		assert_eq!(s.split_events[0].retrieved, 1);
+		// Unknown hashes are not attributed.
+		assert_eq!(s.note_split_retrieval("nope"), None);
+	}
+
+	#[test]
+	fn test_split_event_ring_is_bounded() {
+		let mut s = AphroditeState::default();
+		for i in 0..40 {
+			s.record_chain_split(vec![format!("h{i}")]);
+		}
+		assert!(s.split_events.len() <= SPLIT_EVENT_CAP);
+		assert_eq!(s.split_events.len(), SPLIT_EVENT_CAP);
+	}
+
+	#[test]
+	fn test_adapt_raises_threshold_when_segments_ignored() {
+		let mut s = AphroditeState::default();
+		s.chain_split_min_segments = 2;
+		s.chain_split_floor = 2;
+		s.chain_split_max_segments = 6;
+		// 4 splits, all segments ignored: ratio 0/8 = 0.0 < 0.25 → raise.
+		for i in 0..4 {
+			s.record_chain_split(vec![format!("a{i}"), format!("b{i}")]);
+		}
+		assert_eq!(s.chain_split_min_segments, 3);
+	}
+
+	#[test]
+	fn test_adapt_keeps_threshold_when_segments_retrieved() {
+		let mut s = AphroditeState::default();
+		s.chain_split_min_segments = 2;
+		s.chain_split_floor = 2;
+		s.chain_split_max_segments = 6;
+		// 4 splits, all segments retrieved: ratio 8/8 = 1.0 ≥ 0.5 → floor.
+		for i in 0..4 {
+			let hashes = vec![format!("a{i}"), format!("b{i}")];
+			s.record_chain_split(hashes.clone());
+			for h in hashes {
+				s.note_split_retrieval(&h);
+			}
+		}
+		assert_eq!(s.chain_split_min_segments, 2);
+	}
+
+	#[test]
+	fn test_adapt_respects_bounds() {
+		let mut s = AphroditeState::default();
+		s.chain_split_min_segments = 5;
+		s.chain_split_floor = 5;
+		s.chain_split_max_segments = 6;
+		// Ignored segments: threshold rises, but never past max.
+		for i in 0..20 {
+			s.record_chain_split(vec![format!("a{i}"), format!("b{i}")]);
+		}
+		assert_eq!(s.chain_split_min_segments, 6);
+
+		// Fully-retrieved segments: falls, but never below floor.
+		for i in 20..60 {
+			let hashes = vec![format!("a{i}"), format!("b{i}")];
+			s.record_chain_split(hashes.clone());
+			for h in hashes {
+				s.note_split_retrieval(&h);
+			}
+		}
+		assert_eq!(s.chain_split_min_segments, 5);
+	}
+
+	#[test]
+	fn test_adapt_requires_min_events() {
+		let mut s = AphroditeState::default();
+		// Fewer than SPLIT_ADAPT_MIN_EVENTS: no adaptation.
+		for i in 0..(SPLIT_ADAPT_MIN_EVENTS - 1) {
+			s.record_chain_split(vec![format!("a{i}"), format!("b{i}")]);
+		}
+		assert_eq!(s.chain_split_min_segments, 2);
 	}
 }

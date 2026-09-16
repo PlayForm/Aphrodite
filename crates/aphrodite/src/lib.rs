@@ -317,7 +317,12 @@ pub extern "C" fn aphrodite_retrieve(handle: *const c_char, hash: *const c_char)
 		};
 		let mut s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 		match s.inline_store_get(&hash) {
-			Some(content) => CString::new(content.replace('\0', "")).unwrap().into_raw(),
+			Some(content) => {
+				// Tier 1 teaching loop: the FFI retrieve path bypasses
+				// resolve_one, so attribute the consequence here too.
+				s.note_split_retrieval(&hash);
+				CString::new(content.replace('\0', "")).unwrap().into_raw()
+			},
 			None => to_json_error(&format!("hash not found: {}", hash)),
 		}
 	}))

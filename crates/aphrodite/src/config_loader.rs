@@ -168,6 +168,18 @@ impl Config {
 		// session with APHRODITE_CHAIN_SPLIT=1 (or TOML chain_split = true).
 		state.chain_split_enabled = self.get_bool("APHRODITE_CHAIN_SPLIT", "compression", "chain_split", false);
 
+		// ── Tier 1 teaching loop: adaptive split threshold ──
+		// `chain_split_min_segments` is the initial threshold (floor). The
+		// threshold adapts within [floor, max] from the retrieval ratio of
+		// split segments; see `adapt_chain_split_threshold`.
+		state.chain_split_min_segments =
+			self.get_usize("APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS", "compression", "chain_split_min_segments", 2)
+				.max(2);
+		state.chain_split_floor = state.chain_split_min_segments;
+		state.chain_split_max_segments =
+			self.get_usize("APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS", "compression", "chain_split_max_segments", 6)
+				.max(state.chain_split_min_segments);
+
 		// ── Directives ──
 		// 01-F4: load whenever a directives/ dir exists, not gated on `active`
 		// being non-empty - the shipped template default is `active = []`, so

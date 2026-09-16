@@ -287,6 +287,13 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 				"threshold_pct": state.engine_threshold_pct,
 				"tool_threshold": state.tool_threshold,
 				"terminal_threshold": state.terminal_threshold,
+				// Tier 1 teaching loop telemetry: the adaptive split
+				// threshold and the consequence ledger. Diagnostics only -
+				// never rendered into the LLM's conversational view.
+				"chain_split_min_segments": state.chain_split_min_segments,
+				"chain_split_events": state.split_events.len(),
+				"chain_split_produced": state.split_events.iter().map(|e| e.produced).sum::<usize>(),
+				"chain_split_retrieved": state.split_events.iter().map(|e| e.retrieved).sum::<usize>(),
 			})
 		});
 		stats["proxies"] = proxy_health();

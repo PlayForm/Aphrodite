@@ -371,6 +371,9 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name: *const c_char, args_json
 					// LLMs chain (`cd x && cargo build && cargo test`) into one call;
 					// rewriting with segment markers lets transform_tool_result split
 					// the output into per-segment CCR entries (N compact previews).
+					// Tier 1 teaching loop: only chains with at least
+					// `chain_split_min_segments` segments are rewritten - the
+					// threshold adapts from retrieval consequences (invisible).
 					if state.chain_split_enabled {
 						let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 						if call_tool == "terminal" {
@@ -378,19 +381,23 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name: *const c_char, args_json
 								parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str())
 							{
 								if let Some(segments) = aphrodite::chain_split::split_chain(command) {
-									let rewritten = aphrodite::chain_split::build_marked_command(&segments);
-									if rewritten != command {
-										let mut args =
-											parsed.get("args").cloned().unwrap_or_else(|| serde_json::json!({}));
-										args["command"] = serde_json::Value::String(rewritten.clone());
-										return serde_json::json!({
-											"action": "modify",
-											"args": args,
-											"message": format!(
-												"aphrodite: split chained command into {} segments (fine-grained CCR)",
-												segments.len()
-											),
-										});
+									if segments.len() >= state.chain_split_min_segments {
+										let rewritten = aphrodite::chain_split::build_marked_command(&segments);
+										if rewritten != command {
+											let mut args = parsed
+												.get("args")
+												.cloned()
+												.unwrap_or_else(|| serde_json::json!({}));
+											args["command"] = serde_json::Value::String(rewritten.clone());
+											return serde_json::json!({
+												"action": "modify",
+												"args": args,
+												"message": format!(
+													"aphrodite: split chained command into {} segments (fine-grained CCR)",
+													segments.len()
+												),
+											});
+										}
 									}
 								}
 							}
@@ -980,5 +987,56 @@ mod tests {
 		aphrodite_hermes_free_string(ptr);
 
 		assert_eq!(result, "null", "disabled flag must pass through: {result}");
+	}
+
+	// ── Tier 1 teaching loop: the adaptive split threshold gates the
+	// rewrite - chains below `chain_split_min_segments` pass through
+	// untouched (no markers), chains at/above it get rewritten. ──
+	#[test]
+	fn test_pre_tool_call_chain_split_respects_adaptive_threshold() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		with_shared(|state| {
+			state.poll_worker_enabled = false;
+			state.chain_split_enabled = true;
+			// Threshold raised to 3: a 2-segment chain must NOT be split.
+			state.chain_split_min_segments = 3;
+		});
+
+		// Below threshold: 2 segments → pass through (null).
+		let args2 = serde_json::json!({
+			"tool_name": "terminal",
+			"args": {"command": "cd x && cargo build"},
+		})
+		.to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args2).unwrap().as_ptr(),
+		);
+		let result2 = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+		assert_eq!(result2, "null", "2-segment chain below threshold must pass through: {result2}");
+
+		// At/above threshold: 3 segments → rewritten with markers.
+		let args3 = serde_json::json!({
+			"tool_name": "terminal",
+			"args": {"command": "cd x && cargo build && cargo test"},
+		})
+		.to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args3).unwrap().as_ptr(),
+		);
+		let result3 = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+		let v3: serde_json::Value = serde_json::from_str(&result3).unwrap();
+		assert_eq!(v3["action"], "modify", "3-segment chain must be rewritten: {result3}");
+		assert!(
+			v3["args"]["command"].as_str().unwrap().contains("__APHRODITE_SEG__"),
+			"rewritten command must carry segment markers: {result3}"
+		);
 	}
 }

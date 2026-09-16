@@ -76,7 +76,14 @@ pub fn resolve_one(state: &mut AphroditeState, hash_val: &str) -> Option<String>
 	// parameter on retrieve, only consulting `#stage2` at `depth >= 2`) is a
 	// deliberate feature decision, not a bug fix - see
 	// `.plans/05-compression-pipeline.md` §5. Deleted here rather than wired.
-	state.inline_store_get(hash_val)
+	let found = state.inline_store_get(hash_val);
+	// Tier 1 teaching loop: a successful resolve of a chain-split segment
+	// hash is the consequence signal - attribute it to the split event that
+	// produced it (counts once per hash) and let the threshold adapt.
+	if found.is_some() {
+		state.note_split_retrieval(hash_val);
+	}
+	found
 }
 
 /// Filter content to lines containing the query string (case-insensitive).
