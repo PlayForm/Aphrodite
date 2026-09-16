@@ -6,7 +6,8 @@
 # behavior from a 2026-07-13 analysis pass): local dev checkouts should
 # always float each submodule (plugins/aphrodite, vendor/headroom,
 # vendor/rtk) to its configured tracking branch (`submodule.<name>.branch`
-# in .gitmodules, currently `Current` for all three) instead of resetting
+# in .gitmodules: Development for plugins/aphrodite on this branch,
+# Current for the rest) instead of resetting
 # back to whatever SHA happens to be pinned in the superproject's index.
 # Whenever that float actually advances a submodule, the resulting pin
 # bump is auto-committed here (pathspec-scoped, so it never sweeps up any

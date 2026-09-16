@@ -1,17 +1,17 @@
 # Aphrodite Prettier ignore
-# Designed for VS Code `**/*` glob — excludes everything Prettier can't parse
+# Designed for VS Code `**/*` glob - excludes everything Prettier can't parse
 
 # ═══════════════════════════════════════════════
 # Formatters that own their own file types
 # ═══════════════════════════════════════════════
 
-# Rust — rustfmt owns .rs formatting
+# Rust - rustfmt owns .rs formatting
 *.rs
 
-# TOML — taplo / even-better-toml owns .toml
+# TOML - taplo / even-better-toml owns .toml
 *.toml
 
-# Python — ruff/black owns .py
+# Python - ruff/black owns .py
 *.py
 *.pyi
 *.pyc
@@ -21,7 +21,7 @@ __pycache__/
 .venv/
 venv/
 
-# Shell — shfmt owns .sh / .bash
+# Shell - shfmt owns .sh / .bash
 *.sh
 *.bash
 *.env.sh
@@ -263,7 +263,7 @@ desktop.ini
 .circleci
 
 # ═══════════════════════════════════════════════
-# Misc — files Prettier chokes on
+# Misc - files Prettier chokes on
 # ═══════════════════════════════════════════════
 
 # Compiled/bundled JS (not source)
@@ -303,7 +303,7 @@ NOTICE
 *.puml
 
 # ═══════════════════════════════════════════════
-# Test fixtures — intentionally invalid/malformed
+# Test fixtures - intentionally invalid/malformed
 # ═══════════════════════════════════════════════
 
 *fixture*
@@ -379,3 +379,28 @@ coverage/
 *.min.*
 *-min.*
 *.bundle.*
+
+# The plugin README is authored in the monorepo style - re-include exactly
+# that one file (gitignore semantics: the directory exclusions above must be
+# undone first, then everything under plugins/aphrodite re-excluded, then the
+# README re-included - a bare !file inside an excluded dir is a no-op).
+!plugins/
+!plugins/aphrodite/
+plugins/aphrodite/**
+!plugins/aphrodite/README.md
+
+# .hermes is the dev archive: formattable markdown only, categorized by
+# .hermes/<category>/<thing>.md. Order matters (gitignore semantics): the
+# blanket re-exclude must come FIRST, then dirs re-included (so prettier can
+# descend), then md files re-included LAST. A negation for a file inside an
+# excluded dir is a no-op, so dirs must never end up excluded.
+!.hermes/
+.hermes/**
+!.hermes/**/
+!.hermes/**/*.md
+
+# Benchmark suite - machine-generated corpora, results, harnesses; not
+# authored prose (keep out of formatting).
+bench/
+**/bench/
+**/bench/**

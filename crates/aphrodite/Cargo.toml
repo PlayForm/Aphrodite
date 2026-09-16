@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite"
-version = "1.4.2"
+version = "1.4.3"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -40,6 +40,11 @@ required-features = ["proxy"]
 [[example]]
 name = "bench_04_ema"
 path = "examples/bench_04_ema.rs"
+required-features = ["proxy"]
+
+[[example]]
+name = "bench_05_type_coverage"
+path = "examples/bench_05_type_coverage.rs"
 required-features = ["proxy"]
 
 [lib]

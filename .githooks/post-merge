@@ -1,7 +1,8 @@
 #!/bin/sh
 # Float submodules (plugins/aphrodite, vendor/headroom, vendor/rtk) to their
-# tracking branch tip (`branch = Current` in .gitmodules) after every
-# merge/pull, auto-committing the resulting pin bump - see
+# configured tracking branch tip (`submodule.<name>.branch` in .gitmodules:
+# Development for plugins/aphrodite on this branch, Current for the rest)
+# after every merge/pull, auto-committing the resulting pin bump - see
 # .githooks/lib/sync-submodules.sh for the full design and the safety
 # guards (dirty + not-yet-pushed-commit checks) that replace the old
 # "always reset to whatever's pinned" behavior this hook used to have.

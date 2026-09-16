@@ -47,7 +47,7 @@ Headroom is tracked as a git submodule at `vendor/headroom/` and maintained as a
 | **Retrieve**             | Full `POST /retrieve` with query filtering + pagination (no zstd decompression - every backend stores/returns content verbatim, so that branch was unreachable dead code and has been removed)        |
 | **Multi-proxy**          | Dual-proxy spawn from single TOML (`[[proxies]]` with name/mode/listen)                                                                                                                               |
 | **Prometheus**           | 28 metrics, latency histogram, per-type compression counters, EMAs                                                                                                                                    |
-| **Build system**         | Version auto-bump, release automation (`scripts/auto-release.sh`)                                                                                                                                     |
+| **Build system**         | Version auto-bump, release automation (branch-aware release script)                                                                                                                                  |
 | **Testing**              | Smoke test suite, benchmark pipeline, verification checklist                                                                                                                                          |
 | **Cargo deps**           | Upgraded to latest (axum 0.7+, reqwest 0.13+, notify 8+)                                                                                                                                              |
 

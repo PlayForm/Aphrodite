@@ -1,5 +1,66 @@
 # Changelog
 
+## v1.4.3 - Development-branch release pipeline, directives override, and plugin hardening (2026-09-15)
+
+A feature and hardening release over v1.4.2 that moves release preparation onto
+the `Development` branch, adds an environment override for directives
+discovery, ships the plugin hardening layer (Windows multi-home dylib reuse,
+side-effect-free PID probe, install-flow auto-download), and lands real-corpus
+benchmark tooling. Binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
+
+- **Feature (release pipeline):** release preparation now runs on `Development`
+  - the release script derives `RELEASE_BRANCH` from the current HEAD instead of
+  hardcoding a branch, and `Check.yml`/`Build.yml` workflow triggers are
+  restricted to the `Development` branch (tags + GitHub releases remain a
+  `Current`-side ceremony).
+- **Feature (directives):** `APHRODITE_DIRECTIVES_DIR` environment override is
+  now the first candidate in directives discovery (`config_loader.rs`), with
+  intentional-empty semantics in `directives.rs` - an empty-but-set dir is a
+  deliberate "no directives" signal, not a fallback trigger. Docs updated
+  (`docs/plugin/directives.md`, `docs/config/aphrodite-toml.md`,
+  `docs/agent-feedback.md`).
+- **Feature (hooks):** branch-aware git hooks - `post-checkout` reads the
+  submodule's configured branch from `.gitmodules` instead of hardcoding
+  `Current`, `bump-submodule-gitlink.sh` gained the `unset GIT_DIR
+  GIT_WORK_TREE` fix so it can never hijack parent-repo operations, plus
+  `post-commit`/`post-merge` submodule-sync hooks and the `pre-commit`
+  submodule-pin guard.
+- **Feature (benchmarking):** `Maintain/scripts/bench/benchmark-eval.py`
+  overhauled and a new `benchmark-report.py` added - per-corpus compression
+  ratio, median/p95 latency (measured from the real binary when available,
+  explicit SKIPPED otherwise), per-content-type breakdown, and a
+  machine-readable JSON summary. New Rust `bench_05_type_coverage` example
+  classifies and compresses a representative sample of every content type.
+- **Feature (plugin install):** `_ensure_binaries` auto-download with
+  `APHRODITE_NO_AUTO_DOWNLOAD` opt-out; `download.sh` switched from `xxd` to a
+  POSIX `od` magic check; silent proxy failures now capture stderr and print an
+  API-key hint (`_tail_log`); `plugin.yaml` `install_message` documents the LLM
+  provider setup.
+- **Fix (plugin, Windows):** reuse the running proxy pair and share dylib
+  state across multi-home loads (`fc52859`); side-effect-free Windows PID
+  probe (no `TerminateProcess`) with `argtypes` + defensive catch (`7bba3bb`);
+  dylib candidate resolution with a depth guard for shallow paths (`e2330b2`);
+  `_process_state` holder and `_proxy_healthy` health probe with
+  `ProxyHandler({})` bypass + `status == healthy` body validation (PRs #7/#8).
+- **Fix (plugin, hotreload):** dead-PID copy reaping and a
+  `~/.hermes/aphrodite/hotreload` location outside the plugin tree (feedback-3
+  fix from 1.4.0, hardened further with prefix-contract tests); hotreload test
+  prefix now uses the basename of the dylib path.
+- **Chore (deps):** `dirs` 6.0.0 → 7.0.0, `s2` 0.1.0 → 0.2.0, GitHub Actions
+  `astral-sh/setup-uv` 9.0.0 → 10.1.0 and `softprops/action-gh-release`
+  3.0.2 → 3.0.3; `high_entropy_threshold` removed from GitGuardian config.
+- **Docs/skills:** README expanded (+273 lines: compression details, plugin
+  docs, benchmark output descriptions); new `aphrodite-branch-release-flow`
+  and `aphrodite-tool-testing` skills; `aphrodite-release-workflow`,
+  `aphrodite-hook-reference`, `aphrodite-operations`,
+  `aphrodite-development-lessons`, `aphrodite-benchmarking`,
+  `aphrodite-cargo-upgrade`, and `aphrodite-auto-expand-testing` skills
+  refreshed; `crates/aphrodite/templates/__init__.py` (+483) updated.
+
+No CCR engine/compression changes beyond the plugin hardening above; the
+crate `name`s are unchanged, only the normal release bump
+(binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`).
+
 ## v1.4.2 - Exclude experimental `s2` from the release workspace (cgmath advisory) (2026-08-15)
 
 A corrective release over v1.4.1 that stops the experimental `s2` crates from
@@ -11,7 +72,7 @@ breaking CI's dependency-advisory gate:
   `cgmath 0.18.0`, which carries RUSTSEC-2026-0196 (unmaintained, "no safe
   upgrade"). This failed the `cargo audit`/`cargo-deny` gate in `Check.yml`.
   - `s2` is now an **optional** dependency of `aphrodite`, gated behind the
-    (still-disabled) `navigation` feature — it is no longer pulled into the
+    (still-disabled) `navigation` feature - it is no longer pulled into the
     default/proxy build.
   - `crates/s2-probe` and `crates/s2-navigate` are moved from
     `workspace.members` to `workspace.exclude`, so they are not built or
@@ -36,7 +97,7 @@ A corrective release over v1.4.0 that fixes two issues found after tagging:
 - **Fix (release tooling):** corrected every leftover reference to the
   headroom core crate by its wrong bare name `aphrodite-headroom` to the
   actual published name `aphrodite-headroom-core`:
-  - `.github/workflows/Publish.yml` — the `Publish-Headroom-Core` job's
+  - `.github/workflows/Publish.yml` - the `Publish-Headroom-Core` job's
     `cargo publish -p aphrodite-headroom`, crates.io index URL, check step,
     job name, and comments (this would have broken the crates.io publish).
   - `deny.toml` comment, `Maintain/CHANGELOG.md` package-name references,
@@ -148,7 +209,7 @@ re-releases the collapsed v1.3.8 with full crates.io publishing restored._
 
 - **Release pipeline never published to crates.io on tag push.** `Publish.yml`
   gated every `cargo publish` step on `workflow_dispatch` + `publish_crates`,
-  but the `auto-release.sh` path creates `Aphrodite/v*` tags - so the publish
+  but the release-script path creates `Aphrodite/v*` tags - so the publish
   steps were always skipped on the real release trigger. The condition now also
   fires on `refs/tags/Aphrodite/`, so a tag push builds artifacts AND publishes
   `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` in dependency
@@ -178,7 +239,7 @@ re-releases the collapsed v1.3.8 with full crates.io publishing restored._
     - First sentences are held under 60 characters, because the deferred-tool
       catalog listing (`tool_search._short_desc`) shows only the first sentence,
       clipped to 60 chars, and silently ellipsizes anything longer.
-- **README `/health` example version never bumped.** `auto-release.sh`'s sed
+- **README `/health` example version never bumped.** The release script's sed
   and its stale-string guard were both anchored on `v$CURRENT`, while the
   example prints a bare `"version":"1.3.7"` with no `v` - so the sed skipped
   it and the guard failed to notice. Both now handle the bare form.
@@ -640,7 +701,7 @@ runtime code changes.
 - `aphrodite` publish required moving the `include_str!("../../../plugins/aphrodite/__init__.py")`
   into the crate's `templates/` directory so `cargo publish` could package it
 - Fixed `aphrodite`'s headroom-core version pin from `0.1.0` → `0.1.1` to match the published crate
-- Plugin submodule bumped from `v2.0.5` → `v2.0.6`; sync commit fixed after auto-release
+- Plugin submodule bumped from `v2.0.5` → `v2.0.6`; sync commit fixed after the release pipeline ran
   script's `git update-index --cacheinfo` failed silently
 
 ### Benchmarks (headroom-core, release profile, Apple M2 Max)
@@ -933,7 +994,7 @@ version. One call replaces the binary without manual intervention.
 
 ### Release Automation
 
-- `scripts/auto-release.sh --minor` for feature bumps
+- `--minor` flag for feature bumps
 - All 4 version locations auto-bumped: Cargo.toml, \_core/config.py,
   pyproject.toml, **init**.py
 - `scripts/release-notes.sh` - shell-safe template generator
