@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.4.5 - Config template refresh + provider-neutral defaults (2026-09-16)
+
+Follow-up over v1.4.4 (already published to crates.io) that equalizes the
+shipped config artifacts with the current engine schema and removes
+provider-specific defaults. Binary `1.4.4 → 1.4.5`.
+
+- **Chore (config):** refreshed `templates/aphrodite.toml` and
+  `aphrodite.toml.example` to the full current schema (previews/marker/reverse
+  templates, `poll_worker`, `chain_split`, `navigation`, current thresholds and
+  auto-expand defaults) - both are now equal, explicit, pre-configured configs;
+  the repo-root `aphrodite.toml` is removed (gitignored, unused).
+- **Fix (config):** removed the DeepSeek `api_url`/`model` defaults and the
+  provider-specific key fallbacks (`DEEPSEEK_API_KEY`, `HEADROOM_DEEPSEEK_KEY`)
+  from code and configs - the upstream is now fully user-configured via
+  `APHRODITE_API_URL` / `APHRODITE_MODEL` / `APHRODITE_API_KEY`.
+- **Chore (docs):** dropped `references/headroom-publish.md` from Current
+  (Development-only artifact).
+
 ## v1.4.4 - Setup reliability hotfix (2026-09-16)
 
 Hotfix over v1.4.3 that un-breaks `aphrodite setup` for `cargo install` users:

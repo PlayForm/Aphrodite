@@ -69,11 +69,11 @@ pub enum Command {
 		api_key:Option<String>,
 
 		/// Upstream API base URL.
-		#[arg(long, env = "APHRODITE_API_URL", default_value = "https://api.deepseek.com")]
+		#[arg(long, env = "APHRODITE_API_URL", default_value = "")]
 		api_url:String,
 
 		/// Model name to forward.
-		#[arg(long, env = "APHRODITE_MODEL", default_value = "deepseek-v4-pro")]
+		#[arg(long, env = "APHRODITE_MODEL", default_value = "")]
 		model:String,
 
 		/// Cache proxy listen port. Override per-instance to run multiple
@@ -124,8 +124,8 @@ impl From<Command> for SetupArgs {
 			_ => {
 				Self {
 					api_key:None,
-					api_url:"https://api.deepseek.com".into(),
-					model:"deepseek-v4-pro".into(),
+					api_url:String::new(),
+					model:String::new(),
 					cache_port:9797,
 					token_port:9798,
 					no_launch:false,
@@ -300,18 +300,18 @@ impl MultiConfig {
 
 	/// Resolve a ProxyConfig with defaults applied.
 	/// API key fallback chain: `proxy.api_key` → `defaults.api_key` →
-	/// `APHRODITE_API_KEY` → `DEEPSEEK_API_KEY` → `HEADROOM_DEEPSEEK_KEY`.
+	/// `APHRODITE_API_KEY` (no provider-specific key names are probed).
 	/// Returns an error if no API key is found after all fallbacks.
 	pub fn resolve(&self, cfg:&ProxyConfig) -> anyhow::Result<Cli> {
 		let d = self.defaults.as_ref();
 		let api_key:String = cfg
-			// API key fallback chain: explicit config → APHRODITE_API_KEY → DEEPSEEK_API_KEY → HEADROOM_DEEPSEEK_KEY
-		.api_key
+			// API key fallback chain: explicit config → APHRODITE_API_KEY
+			// (no provider-specific key names are probed - the upstream is
+			// whatever APHRODITE_API_URL points at, keyed by APHRODITE_API_KEY)
+			.api_key
 			.clone()
 			.or_else(|| d.and_then(|d| d.api_key.clone()))
 			.or_else(|| std::env::var("APHRODITE_API_KEY").ok())
-			.or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
-			.or_else(|| std::env::var("HEADROOM_DEEPSEEK_KEY").ok())
 			.unwrap_or_default();
 		if api_key.is_empty() {
 			anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml");
