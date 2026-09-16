@@ -6,7 +6,8 @@
 # ────────────────────────────────────────────────────────────────────────────
 
 # ── Rust / Cargo ─────────────────────────────────────────────────────────────
-/target/
+# Bare `target/` (no leading slash) matches build dirs at ANY depth - root,
+# bench/compression, Maintain/dynamic_hooks/rust, etc.
 target/
 **/*.rs.bk
 *.pdb
