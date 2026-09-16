@@ -43,7 +43,7 @@ mirrored under the plugin's `directives/` directory:
 | `foresight`    | Anticipation: prefetch imports/references and top search results ahead of need                                                                    |
 | `cleanup`      | Hygiene: catalog sweep, stats, verify no content was left unresolved before summarizing                                                           |
 | `lazy`         | Deferral: one deliverable per turn, load heavier directives on demand via `load`; markers resolve when (and only when) needed                     |
-| `ccr-handling` | Marker vocabulary: how to read `<<<CCR:hash                                                                                                       | type | size>>>` and when to retrieve vs. skip - the shared reference for the rest |
+| `ccr-handling` | Marker vocabulary: how to read `<<<CCR:hash\|type\|size>>>` and when to retrieve vs. skip - the shared reference for the rest                     |
 
 Any `.md` file you drop into a discovered directives directory becomes a
 directive named after its file stem - the built-ins aren't special-cased.
