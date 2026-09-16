@@ -7,7 +7,7 @@ plugin system. It produces `libaphrodite_hermes.dylib` - loaded by the Python
 plugin to register tools, hooks, and skills with Hermes.
 
 [crates.io](https://crates.io/crates/aphrodite-hermes) ·
-[docs](../../docs/README.md)
+[docs](https://github.com/PlayForm/Aphrodite/tree/Current/docs/README.md)
 
 ---
 
@@ -66,7 +66,7 @@ src/
 
 All 13 tools are registered as closures in one `tool_registry()` HashMap in
 `src/tools.rs` (not separate per-tool modules) - full schemas and handler
-behavior in [Tool Relay: Tools](../../docs/tool-relay/tools.md):
+behavior in [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md):
 
 | Tool                        |
 | :-------------------------- |
@@ -104,11 +104,11 @@ code with zero call sites, so this always returned `{"total": 0}`).
 
 ## See Also
 
-- [Installing Aphrodite](../../docs/install/README.md) - which artifact you
+- [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/README.md) - which artifact you
   need, per-platform install guides, troubleshooting
-- [Tool Relay: Tools](../../docs/tool-relay/tools.md) - full schema +
+- [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md) - full schema +
   handler behavior for all 13 tools this crate dispatches
-- [Hermes Integration](../../docs/hermes-integration.md) - why a native
+- [Hermes Integration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/hermes-integration.md) - why a native
   plugin sees things a generic HTTP proxy can't
 
 ## License
