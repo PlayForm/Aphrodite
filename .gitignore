@@ -1,9 +1,17 @@
-# Rust
+# ────────────────────────────────────────────────────────────────────────────
+# Aphrodite .gitignore
+# Organized by category. Patterns are ordered so re-includes come AFTER the
+# exclusion they override (gitignore semantics: a negation inside an excluded
+# directory is a no-op unless the directory itself is re-included first).
+# ────────────────────────────────────────────────────────────────────────────
+
+# ── Rust / Cargo ─────────────────────────────────────────────────────────────
 /target/
+target/
 **/*.rs.bk
 *.pdb
 
-# Python
+# ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
@@ -17,12 +25,18 @@ build/
 venv/
 env/
 
-# Hermes / dev artifacts - re-include against a machine-global excludesFile
-# that ignores `.hermes` (verified via `git check-ignore -v`: the repo's
-# .gitignore is checked AFTER core.excludesFile, so a repo-level negation can
-# override it - but a leading `./` is not valid gitignore syntax and never
-# matched anything; a prior "restore" of this line kept the same dead
-# pattern under a mistaken diagnosis (see git log for the corrected version).
+# Python tool caches
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# ── Hermes / dev artifacts ───────────────────────────────────────────────────
+# Re-include against a machine-global excludesFile that ignores `.hermes`
+# (verified via `git check-ignore -v`: the repo's .gitignore is checked AFTER
+# core.excludesFile, so a repo-level negation can override it - but a leading
+# `./` is not valid gitignore syntax and never matched anything; a prior
+# "restore" of this line kept the same dead pattern under a mistaken
+# diagnosis). `.hermes` is the tracked dev archive - never ignore it.
 !.hermes/
 !.hermes/**
 
@@ -31,70 +45,71 @@ env/
 *.lock
 *.tar.gz
 
-# Profiles - keep local, ship only examples.
-# `dir/` + `!dir/sub/` never re-includes anything below an excluded
-# directory (report 12 F7) - the correct shape is `dir/*` plus explicit
-# re-includes for both the subdirectory entry and its contents.
+# ── Profiles - keep local, ship only examples ───────────────────────────────
+# `dir/` + `!dir/sub/` never re-includes anything below an excluded directory
+# (report 12 F7) - the correct shape is `dir/*` plus explicit re-includes for
+# both the subdirectory entry and its contents.
 profiles/*
 !profiles/example/
 !profiles/example/**
 
-# Test artifacts
+# ── Test artifacts ──────────────────────────────────────────────────────────
 plugins/aphrodite/.test-results.json
 
-# Aphrodite proxy binary (copied to profile/plugin dirs at build)
+# ── Aphrodite proxy binary (copied to profile/plugin dirs at build) ────────
 plugins/aphrodite/aphrodite
 
-# Local config (not committed)
+# ── Local config (not committed) ────────────────────────────────────────────
 aphrodite.toml
+aphrodite.local.toml
 
-# IDE
+# ── IDE / editors ───────────────────────────────────────────────────────────
 .idea/
-.vscode/
+# .vscode is excluded EXCEPT settings.json, which is shared. The bare
+# `!.vscode/settings.json` under an excluded dir is a no-op; re-include the
+# dir first, re-exclude its contents, then re-include the file.
+!.vscode/
+.vscode/**
 !.vscode/settings.json
 *.swp
 *.swo
 *~
 
-# OS
+# ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Build
-target/
-
-# JS / pnpm
+# ── JS / pnpm ───────────────────────────────────────────────────────────────
 node_modules/
 pnpm-lock.yaml
 
-# Secrets (never commit)
+# ── Secrets (never commit) ──────────────────────────────────────────────────
 .env
 .env.sh
-aphrodite.local.toml
 *.pem
 *.key
 id_rsa*
 
-# Catch-all leaks
+# ── Catch-all leaks / runtime state ──────────────────────────────────────────
 **/state.db*
 **/auth.json
 **/auth.lock
 **/.hermes_*
 **/.skills_*
 **/.update_check
-**/__pycache__/
 **/.DS_Sccp_*.txt
 .cargo_check_output.txt
 
-placeholder/
-.bench
-
+# ── Benchmark outputs (machine-generated; never tracked) ────────────────────
 bench/conversational/results/
 bench/conversational/__pycache__/
-
 bench/results/proxy-bench-*-*.json
 bench/results/tmp/bench-rendered.toml
 bench/results/tmp/ccr-bench.db
 bench/results/tmp/ccr-bench.db-shm
 bench/results/tmp/ccr-bench.db-wal
 bench/results/wire-compat-*-*.json
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+placeholder/
+.bench
