@@ -8,8 +8,8 @@ formatter alignment). Everything below is verified with real tool output.
 
 | Repo | Branch | HEAD | Notes |
 | ---- | ------ | ---- | ----- |
-| Aphrodite (parent) | `Development` | `d70d9f8` | clean tree; vendor/headroom gitlink dirty (`M vendor/headroom` - auto-committer bump pending) |
-| plugins/aphrodite (submodule) | `Development` | `c0bc01d` | clean; phantom gitlink cleared before switch |
+| Aphrodite (parent) | `Development` | `ade4136` | pushed; continuation note + vendor/headroom gitlink → `84c8d117` committed |
+| plugins/aphrodite (submodule) | `Development` | `c0bc01d` | clean |
 | Source/Current (parent) | `Current` | `2f3b461` | fully pushed; tag `Aphrodite/v1.4.3` at `36dec3c` (NOT at final tip - deliberate) |
 | Source/Current (plugin) | `Current` | `f8f4cdf` | pushed (ruff reformat of __init__.py) |
 
@@ -108,6 +108,19 @@ is a generated mirror, never edited directly.
 - Verify with `git log`/`git submodule status`, not just `git status`.
 
 ## NEXT SESSION - immediate steps (in order)
+
+0. **State update (committed after the note was written)**:
+   - Parent Development HEAD is now **`ade4136`** (pushed): committed the continuation note
+     + bumped the `vendor/headroom` gitlink to `84c8d117` (ml-cluster pin). The `+` on
+     vendor/headroom in `git submodule status` is now RESOLVED (parent records 84c8d117).
+   - Plugin submodule: clean, nothing to commit (verified `git ecommit` → "nothing to
+     commit, working tree clean").
+   - **Global gitignore caveat**: the user's machine-global excludesFile intentionally
+     excludes `.hermes` - the repo's `!.hermes/` + `!.hermes/**` negation overrides it
+     (repo .gitignore is checked AFTER core.excludesFile), which is why `git add .`
+     picked up the note. If a future `.hermes` file needs adding and the negation was
+     dropped/not present, use `git add -f <path>` - it's a .gitignore fix, not a content
+     change.
 
 1. **Finish the v1.4.3 release**: watch the tag Build/Publish runs (in_progress at session end).
    Decide whether to move tag `Aphrodite/v1.4.3` from `36dec3c` → `2f3b461` (final tip) and
