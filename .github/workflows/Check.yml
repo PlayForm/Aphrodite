@@ -105,12 +105,11 @@ jobs:
       - name: cargo fmt --check
         run: cargo +nightly-2026-05-01 fmt --all -- --check
 
-  Test:
-    # Test job is REMOVED on Current by design: the release line ships no
-    # tests (cargo test --workspace and pytest tests/ have nothing to run).
-    # All test verification happens on Development, where the full suite
-    # lives. The Rust (check/clippy/fmt) and Python (ruff/pyright) jobs
-    # above/below still verify the shipped tree without needing tests.
+  # Test job is REMOVED on Current by design: the release line ships no
+  # tests (cargo test --workspace and pytest tests/ have nothing to run).
+  # All test verification happens on Development, where the full suite
+  # lives. The Rust (check/clippy/fmt) and Python (ruff/pyright) jobs
+  # still verify the shipped tree without needing tests.
   Python:
     name: ruff + pyright
     runs-on: ubuntu-latest
