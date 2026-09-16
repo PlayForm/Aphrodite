@@ -152,6 +152,51 @@ pub fn split_marked_output(output: &str) -> Vec<(usize, String)> {
 	parts
 }
 
+/// Extract a compact error hint from a segment's output, when it carries an
+/// error signal (exit code, error:/Error:, FAILED/failed, panic, Traceback,
+/// etc.). Returns the first matching line, trimmed to ≤60 chars.
+///
+/// Tier 3: per-segment error hints. This is CONTENT-level vocabulary (what
+/// the segment itself says), never mechanism vocabulary - the invisibility
+/// contract limits hints to the segment's own output, so the LLM learns
+/// "that segment failed" from the hint without any chain/split wording.
+pub fn segment_error_hint(content: &str) -> Option<String> {
+	let mut first_signal: Option<&str> = None;
+	for line in content.lines() {
+		let l = line.trim();
+		if l.is_empty() {
+			continue;
+		}
+		let lower = l.to_lowercase();
+		let is_error = l.contains("exit code:")
+			|| lower.contains("error")
+			|| lower.contains("failed")
+			|| lower.contains("failure")
+			|| lower.contains("panic")
+			|| lower.contains("traceback")
+			|| lower.contains("fatal")
+			|| lower.contains("cannot")
+			|| lower.contains("not found")
+			|| lower.contains("no such file")
+			|| lower.contains("permission denied")
+			|| lower.contains("unresolved import")
+			|| lower.contains("undefined");
+		if !is_error {
+			continue;
+		}
+		// `error[EXXXX]: msg` is the most informative shape - take it and
+		// stop; otherwise remember the first signal and keep scanning for a
+		// richer one.
+		if l.contains("error[") {
+			return Some(l.chars().take(60).collect());
+		}
+		if first_signal.is_none() {
+			first_signal = Some(l);
+		}
+	}
+	first_signal.map(|l| l.chars().take(60).collect())
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -204,5 +249,51 @@ mod tests {
 	fn newline_separator() {
 		let segs = split_chain("cd /tmp\ngit status\necho done").unwrap();
 		assert_eq!(segs.len(), 3);
+	}
+
+	// ── Tier 3: per-segment error hints ──
+
+	#[test]
+	fn error_hint_none_for_clean_output() {
+		assert_eq!(segment_error_hint("everything fine\nno problems here"), None);
+		assert_eq!(segment_error_hint(""), None);
+	}
+
+	#[test]
+	fn error_hint_finds_first_signal() {
+		let out = "compiling...\nerror: could not compile `demo`\nfailed\n";
+		assert_eq!(
+			segment_error_hint(out).as_deref(),
+			Some("error: could not compile `demo`")
+		);
+	}
+
+	#[test]
+	fn error_hint_prefers_error_code_line() {
+		let out = "warning: unused\nfatal: something\nerror[E0432]: unresolved import `x`\n";
+		assert_eq!(
+			segment_error_hint(out).as_deref(),
+			Some("error[E0432]: unresolved import `x`")
+		);
+	}
+
+	#[test]
+	fn error_hint_catches_exit_code() {
+		assert_eq!(
+			segment_error_hint("done\n").as_deref(),
+			None
+		);
+		assert_eq!(
+			segment_error_hint("make: *** [all] Error 2\n").as_deref(),
+			Some("make: *** [all] Error 2")
+		);
+	}
+
+	#[test]
+	fn error_hint_truncates_long_lines() {
+		let long = format!("error: {}", "x".repeat(200));
+		let hint = segment_error_hint(&long).unwrap();
+		assert!(hint.len() <= 60);
+		assert!(hint.starts_with("error: "));
 	}
 }

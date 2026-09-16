@@ -311,7 +311,21 @@ fn transform_terminal_output_inner(
 				let seg_hash = headroom_core::ccr::compute_key(seg_text.as_bytes());
 				state.inline_store_put(seg_hash.clone(), seg_text.to_string());
 				seg_hashes.push(seg_hash.clone());
-				let preview = crate::build_preview(&type_str, seg_text);
+				let mut preview = crate::build_preview(&type_str, seg_text);
+				// Tier 3: per-segment error hint - content-level only. When
+				// this segment's own output carries an error signal, surface
+				// it in the preview so the LLM sees which segment failed and
+				// why, without retrieving. Never mechanism vocabulary.
+				// build-type previews already carry the first `error[...]`
+				// message, so skip the hint there (no duplication). The hint
+				// is merged INSIDE the preview's brackets: `[text:2L 63B |
+				// scanning... ⚠ grep: ...]`, never appended after the `]`.
+				if !preview.contains("error[") {
+					if let Some(hint) = crate::chain_split::segment_error_hint(seg_text) {
+						let inner = preview.trim_end_matches(']');
+						preview = format!("{} ⚠ {}]", inner, hint);
+					}
+				}
 				let marker = ccr_marker(&seg_hash, &type_str, seg_text.len(), &preview, None, None, None);
 				total_marker += marker.len();
 				state.record_marker(MarkerEntry {
