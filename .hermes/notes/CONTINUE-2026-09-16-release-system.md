@@ -4,6 +4,12 @@ Read this FIRST to resume. This session built + tested the COMPLETE dual-track
 release system end-to-end (v1.4.3 released through Current, test-free policy,
 formatter alignment). Everything below is verified with real tool output.
 
+**THE canonical operational spec is `.hermes/notes/RELEASE-METHODOLOGY.md`** -
+every push/pull/tag/release step action-by-action (Phase A release, Phase B
+sync-back, plugin-first ordering, identity-file protection, tagging rules, CI
+triggers, formatter contract, auto-committer handling, invariants). Follow it
+for ALL release work; this continuation note holds the session-specific state.
+
 ## State at session end
 
 | Repo | Branch | HEAD | Notes |
@@ -121,6 +127,30 @@ is a generated mirror, never edited directly.
      picked up the note. If a future `.hermes` file needs adding and the negation was
      dropped/not present, use `git add -f <path>` - it's a .gitignore fix, not a content
      change.
+   - **PHASE B PLUGIN SQUASH IS STAGED, AWAITING VSCode REVIEW** (from the interrupted
+     session): in `plugins/aphrodite` (on Development) the index holds the squash of
+     `Source/Current`: `M __init__.py` (ruff reformat) + `D tests/test_*.py` ×4 (the
+     test-free deletions from Current). **Remember the rule: Development KEEPS tests** -
+     when reviewing in VSCode, UNSTAGE/DISCARD the `D tests/...` entries; keep the
+     `__init__.py` reformat. Phantom gitlink cleared already (`git rm --cached
+     plugins/aphrodite` done). Do NOT commit until the user picks in VSCode (Phase B
+     B1 Actions 3-5 per the methodology).
+   - **CI status on Development is RED (pre-existing, 6+ commits)**: (1) vendored
+     headroom's own `kompress_parity` test won't compile at `84c8d117`
+     (`transforms::kompress` unresolved - headroom-side issue, its own test;
+     `cargo test --workspace` compiles it); (2) `cargo fmt --check` drift
+     (Development source is stable-formatted; CI nightly wants no-space - the
+     formatter alignment from Current fixes this via the Phase B sync-back); (3) ruff
+     violations in a test file. The Phase B sync-back (formatter config + code) cures
+     fmt+ruff; kompress_parity is a vendored-headroom concern (fix in the headroom
+     repo or exclude that test from the workspace).
+   - **Build + Publish on tag `Aphrodite/v1.4.3` (36dec3c): both SUCCESS ✓** (finished
+     clean). Plugin tag `v2.1.3` on S-Current: NOT created yet - user said "tagging is
+     done at the end" and "no tags yet, we're first about the merge Current into
+     Development" → defer to the release-finishing step.
+   - **Methodology spec written**: `.hermes/notes/RELEASE-METHODOLOGY.md` - the
+     canonical action-by-action spec for both phases, tagging, triggers, formatter
+     contract, invariants. Follow it for all release work.
 
 1. **Finish the v1.4.3 release**: watch the tag Build/Publish runs (in_progress at session end).
    Decide whether to move tag `Aphrodite/v1.4.3` from `36dec3c` → `2f3b461` (final tip) and
@@ -144,9 +174,12 @@ is a generated mirror, never edited directly.
 ## Open items / known issues
 
 - Tag `Aphrodite/v1.4.3` at `36dec3c` ≠ final tip `2f3b461` - deliberate, decide next session.
-- Plugin tag `v2.1.3` not yet created on S-Current.
-- `vendor/headroom` gitlink dirty on Development (bump pending).
+- Plugin tag `v2.1.3` not yet created on S-Current (user: defer until release-finishing, AFTER the Phase B merge).
+- Phase B plugin squash staged in `plugins/aphrodite` awaiting VSCode review (see NEXT SESSION 0).
+- Development CI red (kompress_parity in vendored headroom @84c8d117, fmt drift, ruff test-file violations) - pre-existing, cured by Phase B sync-back except kompress_parity (headroom-side).
 - auto-release.sh removed from Current (release works without it - Build.yml fires on tags,
   no script calls); references scrubbed from CHANGELOG/docs/release-notes.
 - Publish workflow on Current tag: fires but no crates published without manual dispatch -
-  verify its in_progress run's conclusion.
+  verify its in_progress run's conclusion (Build+Publish both SUCCESS on 36dec3c).
+- **Methodology spec**: `.hermes/notes/RELEASE-METHODOLOGY.md` is the canonical
+  action-by-action spec (both phases, tagging, triggers, formatter, invariants).
