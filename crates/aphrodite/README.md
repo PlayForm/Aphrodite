@@ -7,7 +7,7 @@ The core compression engine. Produces both the `aphrodite` binary (HTTP proxy on
 `:9797`/`:9798`) and `libaphrodite.dylib` (loaded by the Hermes plugin via C ABI).
 
 [crates.io](https://crates.io/crates/aphrodite) ·
-[docs](../../docs/README.md)
+[docs](https://github.com/PlayForm/Aphrodite/tree/Current/docs/README.md)
 
 ---
 
@@ -86,11 +86,11 @@ the Python plugin's ctypes bindings.
 
 ## See Also
 
-- [Installing Aphrodite](../../docs/install/README.md) - which artifact you
+- [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/README.md) - which artifact you
   need, per-platform install guides, troubleshooting
-- [aphrodite.toml Configuration](../../docs/config/aphrodite-toml.md) - full
+- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md) - full
   TOML schema this crate's `config.rs` deserializes
-- [Hermes Integration](../../docs/hermes-integration.md) - how this binary's
+- [Hermes Integration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/hermes-integration.md) - how this binary's
   sibling dylib crate (`aphrodite-hermes`) plugs into Hermes Agent
 
 ## License
