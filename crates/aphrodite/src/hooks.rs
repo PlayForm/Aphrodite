@@ -289,6 +289,14 @@ fn transform_terminal_output_inner(
 	// (below-threshold chained output would otherwise pass through with the
 	// segment markers still in it, polluting what the LLM sees). Splitting
 	// marked content is unconditional when the feature is enabled.
+	//
+	// Invisibility contract: the JSON payload carries the per-segment
+	// markers array (`markers`) - the Hermes bridge (replacement_from in
+	// aphrodite-hermes) joins those markers into what the LLM sees, so it
+	// reads exactly like any compressed output (N natural `<<<CCR:...>>>`
+	// markers, each retrievable by its own hash). The `summary` string is
+	// telemetry/metrics ONLY and must never be returned to the LLM - it
+	// announces the mechanism.
 	if state.chain_split_enabled && content.contains(crate::chain_split::SEG_MARKER) {
 		let parts = crate::chain_split::split_marked_output(content);
 		if parts.len() >= 2 {

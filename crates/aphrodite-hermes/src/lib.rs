@@ -105,10 +105,20 @@ pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// `null` otherwise to leave the original output untouched.
 pub(crate) fn replacement_from(r: &serde_json::Value) -> serde_json::Value {
 	if r.get("chain_split").and_then(|v| v.as_bool()).unwrap_or(false) {
-		// Fine-grained chain split: the summary is the compact replacement;
-		// per-segment markers stay in the store and are retrievable by hash.
-		if let Some(summary) = r.get("summary").and_then(|v| v.as_str()) {
-			return serde_json::Value::String(summary.to_string());
+		// Fine-grained chain split, invisibility contract: the LLM must see
+		// exactly what it would for any compressed output - the NATURAL
+		// per-segment CCR markers (each segment's own `<<<CCR:hash|type|size>>>`
+		// marker, retrievable by its own hash), one per line. Never the
+		// `summary` string: it announces the mechanism (`[chain:N segs | ...]`)
+		// and stays in the JSON payload for telemetry/metrics only.
+		if let Some(markers) = r.get("markers").and_then(|v| v.as_array()) {
+			let joined: Vec<String> = markers
+				.iter()
+				.filter_map(|m| m.get("marker").and_then(|v| v.as_str()).map(str::to_string))
+				.collect();
+			if !joined.is_empty() {
+				return serde_json::Value::String(joined.join("\n"));
+			}
 		}
 	}
 	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false) {
@@ -546,6 +556,64 @@ mod tests {
 		let (cache, _token) = configured_ports();
 		std::env::remove_var("APHRODITE_CACHE_PORT");
 		assert_eq!(cache, 19797);
+	}
+
+	// ── Chain-split invisibility contract: the LLM sees the natural
+	// per-segment CCR markers (joined, one per line), never the `summary`
+	// string that announces the mechanism. ──
+	#[test]
+	fn test_replacement_from_chain_split_joins_natural_markers() {
+		let r = serde_json::json!({
+			"status": "ok",
+			"compressed": true,
+			"chain_split": true,
+			"segments": 2,
+			"summary": "[chain:2 segs | 200 orig → 90 markers]",
+			"markers": [
+				{
+					"index": 0,
+					"type": "terminal",
+					"size": 120,
+					"hash": "aaaa",
+					"preview": "[terminal:120B] seg one",
+					"marker": "<<<CCR:aaaa|terminal|120>>>\n[terminal:120B] seg one"
+				},
+				{
+					"index": 1,
+					"type": "build",
+					"size": 80,
+					"hash": "bbbb",
+					"preview": "[build:80B] seg two",
+					"marker": "<<<CCR:bbbb|build|80>>>\n[build:80B] seg two"
+				}
+			]
+		});
+		let out = replacement_from(&r);
+		let s = out.as_str().expect("chain_split must yield a string");
+		// Natural markers, one per line.
+		assert!(s.starts_with("<<<CCR:aaaa|terminal|120>>>"));
+		assert!(s.contains("\n<<<CCR:bbbb|build|80>>>"));
+		assert!(s.contains("[terminal:120B] seg one"));
+		assert!(s.contains("[build:80B] seg two"));
+		// The mechanism is invisible: no summary string, no 'chain' word.
+		assert!(!s.contains("[chain:"));
+		assert!(!s.contains("chain"));
+		assert!(!s.contains("orig →"));
+	}
+
+	#[test]
+	fn test_replacement_from_non_chain_uses_single_marker() {
+		let r = serde_json::json!({
+			"status": "ok",
+			"compressed": true,
+			"hash": "cccc",
+			"type": "text",
+			"size": 42,
+			"preview": "[text:42B] hi",
+			"marker": "<<<CCR:cccc|text|42>>>\n[text:42B] hi"
+		});
+		let s = replacement_from(&r);
+		assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
 	}
 
 	#[test]

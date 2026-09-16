@@ -12,35 +12,54 @@ path called them); wired end-to-end in v1.3.2 - the bridge's `pre_llm_call`
 now injects active directives, and `aphrodite_directive` is a registered,
 dispatchable Hermes tool.
 
+## Design principle: usage, not mechanism
+
+Directives teach the LLM **retrieval vocabulary and decision-making only**:
+
+- how to read a `<<<CCR:hash|type|size>>>` marker (hash = the key, type =
+  kind of content, size = how large),
+- when to retrieve vs. skip (retrieve when the next action needs the full
+  content; act on the marker alone when the type/size already answers),
+- how to find content (`aphrodite_search`, `aphrodite_catalog`,
+  `aphrodite_prefetch`) and prefer granular over wholesale retrieval,
+- retrieval fallbacks (a failed `aphrodite_retrieve` falls back to the
+  original tool for that specific item).
+
+They must **never** explain the compression mechanism - no marker-injection
+details, no chain/split/segment vocabulary, no storage internals (SQLite,
+LRU, hot-reload, engine state). The story the LLM sees stays the same; the
+machinery changes underneath, and behavior is learned from consequences, not
+from instructions about the mechanism.
+
 ## Built-in directives
 
-The repo ships five directives under `directives/`:
+The repo ships six directives, baked into the binary (`include_str!`) and
+mirrored under the plugin's `directives/` directory:
 
-| Directive   | Behavior                                                                                     |
-| ----------- | -------------------------------------------------------------------------------------------- |
-| `focus`     | Stay targeted: at most 1-2 tools per turn, prefer `aphrodite_retrieve` over re-reading files |
-| `explore`   | Read broadly: 2-3 related files per turn, `aphrodite_prefetch` batches of related paths      |
-| `foresight` | Anticipate next steps: prefetch imports/references after reads, top search results ahead     |
-| `cleanup`   | Summarize and prune: progress summary every 5 turns, `aphrodite_catalog(mode="toc")` sweeps  |
-| `lazy`      | Defer work: one deliverable per turn, load heavier directives on demand via `load`           |
+| Directive      | Role                                                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `focus`        | Targeted execution: one primary action per turn; read markers by type/size, retrieve when the action needs the content, prefer granular retrieval |
+| `explore`      | Broad context: read 2-3 related files per turn, prefetch batches, resolve the markers that matter                                                 |
+| `foresight`    | Anticipation: prefetch imports/references and top search results ahead of need                                                                    |
+| `cleanup`      | Hygiene: catalog sweep, stats, verify no content was left unresolved before summarizing                                                           |
+| `lazy`         | Deferral: one deliverable per turn, load heavier directives on demand via `load`; markers resolve when (and only when) needed                     |
+| `ccr-handling` | Marker vocabulary: how to read `<<<CCR:hash                                                                                                       | type | size>>>` and when to retrieve vs. skip - the shared reference for the rest |
 
 Any `.md` file you drop into a discovered directives directory becomes a
 directive named after its file stem - the built-ins aren't special-cased.
 
 ## Discovery and loading
 
-## Discovery and loading
-
-| Rule       | Behavior                                                                                                                                                                                                                                    |
-|---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Search order   | `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` (working directory) → `~/.hermes/aphrodite/directives/` → binary-relative - the **first directory that exists** wins; they are not merged. An empty directives directory is intentional (no custom directives) |
-| File filter    | Only `*.md` files; anything else is silently skipped                                                                                                                                                                                          |
-| Naming         | Directive name = file stem (`focus.md` → `focus`)                                                                                                                                                                                           |
-| Per-file cap   | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                                                                                                                         |
-| Combined cap   | 4,000 chars across all active directives' injected text combined - several active directives can't blow past the context budget together                                                                                                      |
-| Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty (it was before v1.3.2, which made runtime `add`/`swap` impossible from a cold start with the shipped `active = []` default)    |
-| Built-in fallback | When no directives directory is found on disk, 6 directives baked into the binary via `include_str!` are loaded automatically: `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy` - the fallback activation is **logged** |
-| Active default | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` + `lazy` are seeded as active automatically (`lazy` keeps the session from over-eagerly stacking directives until a later turn proves it needs one) |
+| Rule              | Behavior                                                                                                                                                                                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search order      | `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` (working directory) → `~/.hermes/aphrodite/directives/` → binary-relative - the **first directory that exists** wins; they are not merged. An empty directives directory is intentional (no custom directives) |
+| File filter       | Only `*.md` files; anything else is silently skipped                                                                                                                                                                                                                 |
+| Naming            | Directive name = file stem (`focus.md` → `focus`)                                                                                                                                                                                                                    |
+| Per-file cap      | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                                                                                                                                                  |
+| Combined cap      | 4,000 chars across all active directives' injected text combined - several active directives can't blow past the context budget together                                                                                                                             |
+| Load condition    | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty (it was before v1.3.2, which made runtime `add`/`swap` impossible from a cold start with the shipped `active = []` default)                        |
+| Built-in fallback | When no directives directory is found on disk, 6 directives baked into the binary via `include_str!` are loaded automatically: `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy` - the fallback activation is **logged**                            |
+| Active default    | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` + `lazy` are seeded as active automatically (`lazy` keeps the session from over-eagerly stacking directives until a later turn proves it needs one)                          |
 
 ## `[directives]` in aphrodite.toml
 
@@ -64,10 +83,11 @@ Hermes injects that string into the conversation each turn:
 ```text
 [directives: focus]
 focus:
-  focus - stay targeted, minimal tool usage
-  Each turn: use at most 1-2 tools. Prefer retrieval over re-reading.
-  One primary action per turn
-  Use aphrodite_retrieve(hash) for any <<<CCR:...>>> you see
+  focus - targeted execution, marker-aware retrieval
+  Stay targeted: at most 1-2 tools per turn.
+  A <<<CCR:hash|type|size>>> marker stands in for content you asked for.
+  Retrieve with aphrodite_retrieve(hash) when the action needs the content;
+  read the type and size to judge whether you need the full content at all.
 ```
 
 | Detail      | Behavior                                                                                                                                                       |
@@ -97,14 +117,14 @@ place in the full 13-tool reference):
 }
 ```
 
-| Action   | Effect                                            | Response                                                                 |
-| -------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
-| `list`   | Enumerate loaded + active directives (default)    | `{available: [...], active: [...], ephemeral: [...]}`                   |
+| Action   | Effect                                            | Response                                                                  |
+| -------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| `list`   | Enumerate loaded + active directives (default)    | `{available: [...], active: [...], ephemeral: [...]}`                     |
 | `swap`   | Replace the active set with one directive         | `{swapped: name, active: [name]}` or `{error: "unknown directive: ...}"}` |
-| `add`    | Append a directive to the active set (idempotent) | `{active: [...]}`                                                        |
-| `load`   | Activate a directive on demand (lazy)             | `{loaded: name, active: [...]}` or `{error: "unknown directive: ...}"}`  |
-| `remove` | Drop a directive from the active set              | `{active: [...]}`                                                        |
-| `reset`  | Clear the active set                              | `{active: []}`                                                           |
+| `add`    | Append a directive to the active set (idempotent) | `{active: [...]}`                                                         |
+| `load`   | Activate a directive on demand (lazy)             | `{loaded: name, active: [...]}` or `{error: "unknown directive: ...}"}`   |
+| `remove` | Drop a directive from the active set              | `{active: [...]}`                                                         |
+| `reset`  | Clear the active set                              | `{active: []}`                                                            |
 
 `load` is the lazy-activation action: unlike `add` (which is silent when the
 name is unknown or already active), `load` returns a distinct `{loaded, active}`

@@ -23,12 +23,15 @@ pub const SHIPPED_SESSION_INJECT: &str = "\
 [APHRODITE] v{VERSION} active.
   This session is running with CCR compression. Tool outputs larger than a
   few hundred bytes are replaced with markers like <<<CCR:hash|type|size>>>.
-  The marker IS the content — retrieve it before acting on it:
-  aphrodite_retrieve(hash) → full original content (sub-ms, local).
-  After EVERY tool call: scan for <<<CCR: and retrieve ALL markers first.
-  NEVER re-read a file you already have a marker for. Use aphrodite_catalog
-  to see stored entries, aphrodite_prefetch for background file loads, and
-  aphrodite_directive(\"list\") for active behavioral directives.
+  The marker is a handle to the content: aphrodite_retrieve(hash) returns
+  the full original (sub-ms, local). Read the marker's type and size to
+  decide whether the full content is needed; retrieve when your next action
+  requires it, skip when the preview or type/size already answers. You can
+  batch pending markers and retrieve selectively.
+  Never re-read a file you already have a marker for. Use aphrodite_catalog
+  to see stored entries, aphrodite_search to locate content by keyword, and
+  aphrodite_prefetch for background file loads. Prefer granular retrieval
+  over wholesale: pull the exact piece you need.
   Layer 2: per-turn catalog injected below each turn.
   Layer 3: load the aphrodite-tool-guide skill for full tool reference.";
 
@@ -106,7 +109,7 @@ pub fn build_turn_context(state: &mut AphroditeState, est_request_bytes: Option<
 	if !bg_status.is_empty() {
 		sections.push(bg_status);
 	}
-	// The recall block — RETRIEVE_HINT removed per 04-F2 (tool schemas
+	// The recall block - RETRIEVE_HINT removed per 04-F2 (tool schemas
 	// in the system prompt already teach retrieval; repeating it every
 	// turn was 56 chars of pure noise, ~2.8k chars over 50 turns).
 	if !recall.is_empty() {

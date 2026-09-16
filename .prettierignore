@@ -389,6 +389,13 @@ coverage/
 plugins/aphrodite/**
 !plugins/aphrodite/README.md
 
+# Plugin directive markdown is authored prose - re-include under the same
+# gitignore semantics as the README above (dir un-excluded first, then
+# contents re-excluded, then .md re-included LAST).
+!plugins/aphrodite/directives/
+plugins/aphrodite/directives/**
+!plugins/aphrodite/directives/**/*.md
+
 # .hermes is the dev archive: formattable markdown only, categorized by
 # .hermes/<category>/<thing>.md. Order matters (gitignore semantics): the
 # blanket re-exclude must come FIRST, then dirs re-included (so prettier can
