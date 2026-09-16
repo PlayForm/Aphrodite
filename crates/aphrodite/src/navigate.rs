@@ -7,11 +7,20 @@
 //! can index and query. Both the Hermes tool path and the proxy HTTP endpoint
 //! call the same functions here.
 
-use crate::state::AphroditeState;
 use s2_navigate::{
-	ContextBand, ContextItem, ContextNavigator, directive_item, error_item, file_item, marker_item, turn_item,
-	render_navigable_index, render_cell_detail,
+	ContextBand,
+	ContextItem,
+	ContextNavigator,
+	directive_item,
+	error_item,
+	file_item,
+	marker_item,
+	render_cell_detail,
+	render_navigable_index,
+	turn_item,
 };
+
+use crate::state::AphroditeState;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // State → ContextItems bridge
@@ -20,7 +29,7 @@ use s2_navigate::{
 /// Build a ContextNavigator from live session state.
 /// This is the single bridge function — everything downstream
 /// (tool handler, proxy endpoint, flow assembler) calls this.
-pub fn build_navigator(state: &AphroditeState) -> ContextNavigator {
+pub fn build_navigator(state:&AphroditeState) -> ContextNavigator {
 	let mut items = Vec::new();
 
 	// ── Directives ──
@@ -55,7 +64,7 @@ pub fn build_navigator(state: &AphroditeState) -> ContextNavigator {
 	}
 
 	// ── Error signatures ──
-	let mut error_counts: std::collections::HashMap<u64, (usize, usize, String)> = std::collections::HashMap::new();
+	let mut error_counts:std::collections::HashMap<u64, (usize, usize, String)> = std::collections::HashMap::new();
 	for ev in &state.tool_events {
 		if let Some(sig) = ev.error_sig {
 			let entry = error_counts.entry(sig).or_insert((0, ev.turn, String::new()));
@@ -79,7 +88,7 @@ pub fn build_navigator(state: &AphroditeState) -> ContextNavigator {
 	}
 
 	// ── Conversation turns ──
-	let mut sorted_turns: Vec<(usize, &(String, String, usize))> =
+	let mut sorted_turns:Vec<(usize, &(String, String, usize))> =
 		state.conv_index.iter().map(|(t, v)| (*t, v)).collect();
 	sorted_turns.sort_by_key(|(t, _)| *t);
 	for (turn, (_hash, summary, size)) in sorted_turns.iter().take(20) {
@@ -101,8 +110,8 @@ pub fn build_navigator(state: &AphroditeState) -> ContextNavigator {
 ///   - band: string (optional) — filter by context band name
 ///
 /// Returns JSON with the rendered navigable index or cell detail.
-pub fn handle_navigate_tool(state: &AphroditeState, args: &serde_json::Value) -> serde_json::Value {
-	let level: u8 = args
+pub fn handle_navigate_tool(state:&AphroditeState, args:&serde_json::Value) -> serde_json::Value {
+	let level:u8 = args
 		.get("level")
 		.and_then(|v| v.as_u64())
 		.map(|n| n.min(16) as u8)
@@ -124,9 +133,11 @@ pub fn handle_navigate_tool(state: &AphroditeState, args: &serde_json::Value) ->
 					"content": rendered,
 				})
 			},
-			None => serde_json::json!({
-				"error": format!("invalid cell ID: {}", cell_hex),
-			}),
+			None => {
+				serde_json::json!({
+					"error": format!("invalid cell ID: {}", cell_hex),
+				})
+			},
 		};
 	}
 
@@ -134,7 +145,7 @@ pub fn handle_navigate_tool(state: &AphroditeState, args: &serde_json::Value) ->
 	if let Some(band_name) = args.get("band").and_then(|v| v.as_str()) {
 		if let Some(band) = parse_band(band_name) {
 			let cells = nav.cells_in_band(band, level);
-			let mut items: Vec<&ContextItem> = Vec::new();
+			let mut items:Vec<&ContextItem> = Vec::new();
 			for cid in &cells {
 				items.extend(nav.navigate_to_cell(*cid));
 			}
@@ -165,7 +176,7 @@ pub fn handle_navigate_tool(state: &AphroditeState, args: &serde_json::Value) ->
 
 /// Build a navigable context string suitable for injection into
 /// build_turn_context (replaces or augments catalog_summary).
-pub fn build_navigable_context(state: &AphroditeState) -> String {
+pub fn build_navigable_context(state:&AphroditeState) -> String {
 	let nav = build_navigator(state);
 	let level = state.navigation_default_level;
 	let view = nav.context_at_level(level);
@@ -176,7 +187,7 @@ pub fn build_navigable_context(state: &AphroditeState) -> String {
 // Helpers
 // ═════════════════════════════════════════════════════════════════════════════
 
-fn parse_cell_hex(hex: &str) -> Option<s2::cellid::CellID> {
+fn parse_cell_hex(hex:&str) -> Option<s2::cellid::CellID> {
 	let hex = hex.trim_start_matches("0x").trim_start_matches("0X");
 	if hex.len() > 16 {
 		return None;
@@ -184,7 +195,7 @@ fn parse_cell_hex(hex: &str) -> Option<s2::cellid::CellID> {
 	u64::from_str_radix(hex, 16).ok().map(s2::cellid::CellID)
 }
 
-fn parse_band(name: &str) -> Option<ContextBand> {
+fn parse_band(name:&str) -> Option<ContextBand> {
 	match name.to_lowercase().as_str() {
 		"system" => Some(ContextBand::System),
 		"directives" => Some(ContextBand::Directives),

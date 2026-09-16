@@ -11,21 +11,21 @@ use std::collections::HashMap;
 use crate::state::AphroditeState;
 
 /// Maximum recursion depth for nested marker resolution.
-const RECURSIVE_DEPTH: usize = 5;
+const RECURSIVE_DEPTH:usize = 5;
 
 /// CCR marker prefix/suffix
-const CCR_PREFIX: &str = "<<<CCR:";
-const CCR_SUFFIX: &str = ">>>";
+const CCR_PREFIX:&str = "<<<CCR:";
+const CCR_SUFFIX:&str = ">>>";
 
 /// Parse a CCR marker string to extract the hash.
 /// Marker format: <<<CCR:hash|type|size>>>
-fn parse_marker_hash(marker: &str) -> Option<String> {
+fn parse_marker_hash(marker:&str) -> Option<String> {
 	let inner = marker.strip_prefix(CCR_PREFIX)?.strip_suffix(CCR_SUFFIX)?;
 	inner.split('|').next().map(|h| h.to_string())
 }
 
 /// Find all CCR markers in content. Returns (full_marker, hash) pairs.
-fn find_markers(content: &str) -> Vec<(String, String)> {
+fn find_markers(content:&str) -> Vec<(String, String)> {
 	let mut markers = Vec::new();
 	let mut search_from = 0;
 
@@ -57,7 +57,7 @@ fn find_markers(content: &str) -> Vec<(String, String)> {
 /// pipe-delimited suffix instead of stripping it) - `parse_marker_hash`
 /// already splits on `|` for markers found in text, so callers that hand us
 /// a raw arg (e.g. `aphrodite_retrieve(hash=...)`) need the same tolerance.
-pub fn resolve_one(state: &mut AphroditeState, hash_val: &str) -> Option<String> {
+pub fn resolve_one(state:&mut AphroditeState, hash_val:&str) -> Option<String> {
 	let hash_val = crate::marker::normalize_hash(hash_val);
 
 	// i: prefix - inline-only hashes
@@ -81,12 +81,12 @@ pub fn resolve_one(state: &mut AphroditeState, hash_val: &str) -> Option<String>
 
 /// Filter content to lines containing the query string (case-insensitive).
 /// Returns filtered lines, or original with prefix if no matches.
-pub fn filter_lines(content: &str, query: &str) -> String {
+pub fn filter_lines(content:&str, query:&str) -> String {
 	if query.is_empty() {
 		return content.to_string();
 	}
 	let query_lower = query.to_lowercase();
-	let matching: Vec<&str> = content
+	let matching:Vec<&str> = content
 		.lines()
 		.filter(|line| line.to_lowercase().contains(&query_lower))
 		.collect();
@@ -106,11 +106,11 @@ pub fn filter_lines(content: &str, query: &str) -> String {
 /// Returns `Some(resolved_content)` on success, or `None` if the
 /// top-level hash could not be found.
 pub fn resolve_recursive(
-	state: &mut AphroditeState,
-	hash_val: &str,
-	depth: usize,
-	resolved: &mut HashMap<String, String>,
-	visited: &mut Vec<String>,
+	state:&mut AphroditeState,
+	hash_val:&str,
+	depth:usize,
+	resolved:&mut HashMap<String, String>,
+	visited:&mut Vec<String>,
 ) -> Option<String> {
 	// Cycle detection
 	if visited.contains(&hash_val.to_string()) {
@@ -143,7 +143,7 @@ pub fn resolve_recursive(
 	// in `resolved` still needs a replacement pushed using the CACHED value
 	// (F4) - previously it was silently skipped, leaving the literal marker
 	// in the output (which F1's write-back would then have persisted).
-	let mut replacements: Vec<(String, Option<String>)> = Vec::new();
+	let mut replacements:Vec<(String, Option<String>)> = Vec::new();
 	for (marker, nested_hash) in &nested_markers {
 		let nested_content = if let Some(cached) = resolved.get(nested_hash) {
 			Some(cached.clone())
@@ -175,7 +175,7 @@ pub fn resolve_recursive(
 }
 
 /// Public entry point: expands a hash through all nesting levels.
-pub fn expand(state: &mut AphroditeState, hash_val: &str) -> Option<String> {
+pub fn expand(state:&mut AphroditeState, hash_val:&str) -> Option<String> {
 	let mut resolved = HashMap::new();
 	let mut visited = Vec::new();
 	resolve_recursive(state, hash_val, 0, &mut resolved, &mut visited)

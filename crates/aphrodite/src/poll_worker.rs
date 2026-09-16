@@ -23,16 +23,16 @@
 use crate::state::{AphroditeState, MarkerEntry};
 
 /// Maximum concurrent background tasks tracked.
-const MAX_BG_TASKS: usize = 4;
+const MAX_BG_TASKS:usize = 4;
 
 /// Tasks older than this many turns without a poll are considered stale
 /// and auto-expired at `post_llm_call`.
-pub const STALE_TURN_AGE: usize = 8;
+pub const STALE_TURN_AGE:usize = 8;
 
 /// Command patterns that strongly suggest long-running work.
 /// Matched case-insensitively against the first whitespace-delimited
 /// token of the command line (or the full args if no token boundary).
-const SLOW_COMMAND_PREFIXES: &[&str] = &[
+const SLOW_COMMAND_PREFIXES:&[&str] = &[
 	"cargo",
 	"npm",
 	"yarn",
@@ -73,9 +73,9 @@ pub enum BgStatus {
 	/// Task is still running - agent should keep polling.
 	Running,
 	/// Task completed successfully.
-	Done { exit_code: i32 },
+	Done { exit_code:i32 },
 	/// Task failed.
-	Failed { exit_code: i32 },
+	Failed { exit_code:i32 },
 	/// Agent hasn't polled in `STALE_TURN_AGE` turns - abandoned.
 	Stale,
 }
@@ -84,26 +84,26 @@ pub enum BgStatus {
 #[derive(Debug, Clone)]
 pub struct BgTask {
 	/// Unique ID: CCR hash of the command string (stable across turns).
-	pub id: String,
+	pub id:String,
 	/// Tool that produced the output: "terminal" or "process".
-	pub tool: String,
+	pub tool:String,
 	/// The command being run (or tool + args summary for non-terminal).
-	pub command: String,
+	pub command:String,
 	/// Turn on which the task was auto-backgrounded.
-	pub started_turn: usize,
+	pub started_turn:usize,
 	/// Last turn the agent polled for this task.
-	pub last_poll_turn: usize,
+	pub last_poll_turn:usize,
 	/// Current status.
-	pub status: BgStatus,
+	pub status:BgStatus,
 	/// CCR hash of the compressed output (set when Done/Failed).
-	pub output_hash: Option<String>,
+	pub output_hash:Option<String>,
 	/// CCR preview of the compressed output (set when Done/Failed).
-	pub output_preview: Option<String>,
+	pub output_preview:Option<String>,
 	/// How many times the agent has polled.
-	pub poll_count: usize,
+	pub poll_count:usize,
 	/// The uncompressed output content (accumulated from polls).
 	/// Capped to avoid memory blow-up from long builds.
-	pub accumulated_output: String,
+	pub accumulated_output:String,
 }
 
 /// Heuristic: should this tool call's output be replaced with a poll-worker
@@ -114,7 +114,7 @@ pub struct BgTask {
 ///
 /// The caller (agent bridge) is responsible for deciding *which* tools to
 /// check - this function only evaluates the command string and content size.
-pub fn should_background(content: &str, command: Option<&str>) -> Option<(String, String)> {
+pub fn should_background(content:&str, command:Option<&str>) -> Option<(String, String)> {
 	// Short output: pass through normally - the agent doesn't need
 	// to poll for a 200-byte `ls`.
 	if content.len() < 2048 {
@@ -126,11 +126,9 @@ pub fn should_background(content: &str, command: Option<&str>) -> Option<(String
 /// Pre-execution heuristic: check only the command prefix, no content
 /// required (we haven't run the tool yet). Used by the `pre_tool_call`
 /// hook to decide whether to auto-inject `background=true`.
-pub fn should_background_pre(command: Option<&str>) -> Option<(String, String)> {
-	should_background_by_command(command)
-}
+pub fn should_background_pre(command:Option<&str>) -> Option<(String, String)> { should_background_by_command(command) }
 
-fn should_background_by_command(command: Option<&str>) -> Option<(String, String)> {
+fn should_background_by_command(command:Option<&str>) -> Option<(String, String)> {
 	let cmd = command.unwrap_or("").trim();
 	if cmd.is_empty() {
 		return None;
@@ -152,7 +150,7 @@ fn should_background_by_command(command: Option<&str>) -> Option<(String, String
 /// The agent sees this marker instead of the original content and knows
 /// to poll for progress rather than retrieve (which would return stale
 /// content).
-pub fn create_poll_marker(task_id: &str, command_summary: &str, turn: usize) -> String {
+pub fn create_poll_marker(task_id:&str, command_summary:&str, turn:usize) -> String {
 	let preview = format!("[poll:running {} | turn {}]", command_summary, turn);
 	let hash = task_id;
 	crate::marker::ccr_marker(hash, "poll", 0, &preview, None, None, None)
@@ -163,7 +161,7 @@ pub fn create_poll_marker(task_id: &str, command_summary: &str, turn: usize) -> 
 ///
 /// Pushes at most 2 nudges (newest-first for active tasks) so the
 /// directive/nudge budget isn't consumed by poll workers.
-pub fn check_bg_tasks(state: &mut AphroditeState) {
+pub fn check_bg_tasks(state:&mut AphroditeState) {
 	let mut nudged = 0usize;
 
 	// Collect indices to nudge (iterate in insertion order = oldest first,
@@ -235,13 +233,13 @@ pub fn check_bg_tasks(state: &mut AphroditeState) {
 ///
 /// Returns `true` if the poll result was consumed (matched a bg task),
 /// `false` if it should pass through to normal compression.
-pub fn update_from_poll(state: &mut AphroditeState, tool_name: &str, content: &str) -> bool {
+pub fn update_from_poll(state:&mut AphroditeState, tool_name:&str, content:&str) -> bool {
 	if tool_name != "process" {
 		return false;
 	}
 
 	// Try to parse the poll result as JSON (Hermes wraps it).
-	let parsed: Option<serde_json::Value> = serde_json::from_str(content).ok();
+	let parsed:Option<serde_json::Value> = serde_json::from_str(content).ok();
 	let output = parsed
 		.as_ref()
 		.and_then(|v| v.get("output").and_then(|o| o.as_str()))
@@ -252,7 +250,7 @@ pub fn update_from_poll(state: &mut AphroditeState, tool_name: &str, content: &s
 		.or_else(|| parsed.as_ref().and_then(|v| v.get("returncode").and_then(|e| e.as_i64())));
 
 	// Parse "exit code: N" from the output text (fallback for non-JSON wrappers).
-	let text_exit_code: Option<i32> = output.lines().rev().find_map(|l| {
+	let text_exit_code:Option<i32> = output.lines().rev().find_map(|l| {
 		l.split("exit code:")
 			.nth(1)
 			.and_then(|s| s.split_whitespace().next())
@@ -290,7 +288,7 @@ pub fn update_from_poll(state: &mut AphroditeState, tool_name: &str, content: &s
 	// Phase 2: check for completions and record CCR markers.
 	// Run AFTER the iter_mut() loop to avoid double-borrowing `state`.
 	// Collect task indices that need completion recording.
-	let mut completions: Vec<(usize, i32, String)> = Vec::new(); // (idx, exit_code, accumulated_output)
+	let mut completions:Vec<(usize, i32, String)> = Vec::new(); // (idx, exit_code, accumulated_output)
 	for (i, task) in state.bg_tasks.iter().enumerate() {
 		if task.status != BgStatus::Running {
 			continue;
@@ -315,20 +313,20 @@ pub fn update_from_poll(state: &mut AphroditeState, tool_name: &str, content: &s
 			task.accumulated_output.clear();
 			let cmd = task.command.clone();
 			match exit_code_val {
-				0 => task.status = BgStatus::Done { exit_code: 0 },
-				_ => task.status = BgStatus::Failed { exit_code: exit_code_val },
+				0 => task.status = BgStatus::Done { exit_code:0 },
+				_ => task.status = BgStatus::Failed { exit_code:exit_code_val },
 			}
 			(sz, cmd)
 		};
 
 		state.record_marker(MarkerEntry {
 			hash,
-			ccr_type: "terminal".to_string(),
-			size: output_size,
+			ccr_type:"terminal".to_string(),
+			size:output_size,
 			preview,
-			turn: state.turn_counter,
-			center: Some(format!("poll:{}", command)),
-			meta: None,
+			turn:state.turn_counter,
+			center:Some(format!("poll:{}", command)),
+			meta:None,
 		});
 	}
 
@@ -337,7 +335,7 @@ pub fn update_from_poll(state: &mut AphroditeState, tool_name: &str, content: &s
 
 /// Expire background tasks that the agent has stopped polling.
 /// Called from `post_llm_call` after turn advancement.
-pub fn expire_stale_tasks(state: &mut AphroditeState) {
+pub fn expire_stale_tasks(state:&mut AphroditeState) {
 	let turn = state.turn_counter;
 	for task in state.bg_tasks.iter_mut() {
 		if task.status == BgStatus::Running && turn.saturating_sub(task.last_poll_turn) > STALE_TURN_AGE {
@@ -358,7 +356,7 @@ pub fn expire_stale_tasks(state: &mut AphroditeState) {
 
 /// Insert a new background task into the state, evicting the oldest
 /// completed/stale task if at capacity.
-pub fn insert_bg_task(state: &mut AphroditeState, task_id: String, tool: String, command: String, turn: usize) {
+pub fn insert_bg_task(state:&mut AphroditeState, task_id:String, tool:String, command:String, turn:usize) {
 	// Deduplicate: don't track the same command twice while it's running.
 	if state.bg_tasks.iter().any(|t| t.id == task_id && t.status == BgStatus::Running) {
 		return;
@@ -382,23 +380,23 @@ pub fn insert_bg_task(state: &mut AphroditeState, task_id: String, tool: String,
 	}
 
 	state.bg_tasks.push_back(BgTask {
-		id: task_id,
+		id:task_id,
 		tool,
 		command,
-		started_turn: turn,
-		last_poll_turn: turn,
-		status: BgStatus::Running,
-		output_hash: None,
-		output_preview: None,
-		poll_count: 0,
-		accumulated_output: String::new(),
+		started_turn:turn,
+		last_poll_turn:turn,
+		status:BgStatus::Running,
+		output_hash:None,
+		output_preview:None,
+		poll_count:0,
+		accumulated_output:String::new(),
 	});
 }
 
 /// Render bg task status lines for injection into `build_turn_context`.
 /// Returns empty string if no active tasks.
-pub fn render_bg_task_status(state: &AphroditeState) -> String {
-	let active: Vec<&BgTask> = state.bg_tasks.iter().filter(|t| t.status == BgStatus::Running).collect();
+pub fn render_bg_task_status(state:&AphroditeState) -> String {
+	let active:Vec<&BgTask> = state.bg_tasks.iter().filter(|t| t.status == BgStatus::Running).collect();
 
 	if active.is_empty() {
 		return String::new();
@@ -542,7 +540,7 @@ mod tests {
 
 		let consumed = update_from_poll(&mut state, "process", &poll_json);
 		assert!(consumed, "poll result should be consumed");
-		assert_eq!(state.bg_tasks[0].status, BgStatus::Done { exit_code: 0 });
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Done { exit_code:0 });
 		assert!(state.bg_tasks[0].output_hash.is_some());
 		assert!(state.bg_tasks[0].output_preview.is_some());
 	}
@@ -567,7 +565,7 @@ mod tests {
 
 		let consumed = update_from_poll(&mut state, "process", &poll_json);
 		assert!(consumed);
-		assert_eq!(state.bg_tasks[0].status, BgStatus::Failed { exit_code: 1 });
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Failed { exit_code:1 });
 	}
 
 	#[test]
@@ -638,7 +636,7 @@ mod tests {
 		let mut state = AphroditeState::default();
 		state.turn_counter = 6;
 		insert_bg_task(&mut state, "t1".into(), "terminal".into(), "cargo build".into(), 1);
-		state.bg_tasks[0].status = BgStatus::Done { exit_code: 0 };
+		state.bg_tasks[0].status = BgStatus::Done { exit_code:0 };
 		state.bg_tasks[0].output_hash = Some("hash123".into());
 		state.bg_tasks[0].output_preview = Some("[build:0E 2W 450L]".into());
 
@@ -701,7 +699,7 @@ mod tests {
 		})
 		.to_string();
 		update_from_poll(&mut state, "process", &poll_done);
-		assert_eq!(state.bg_tasks[0].status, BgStatus::Done { exit_code: 0 });
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Done { exit_code:0 });
 		assert!(state.bg_tasks[0].output_hash.is_some());
 	}
 
@@ -714,7 +712,7 @@ mod tests {
 		// No JSON wrapper - just raw output with "exit code: 2" in text.
 		let consumed = update_from_poll(&mut state, "process", "building...\nfailed!\nexit code: 2\n");
 		assert!(consumed);
-		assert_eq!(state.bg_tasks[0].status, BgStatus::Failed { exit_code: 2 });
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Failed { exit_code:2 });
 	}
 
 	#[test]
@@ -767,20 +765,20 @@ mod tests {
 		// Insert a 5th - should evict the stale t1.
 		insert_bg_task(&mut state, "t5".into(), "terminal".into(), "cmd5".into(), 5);
 		assert_eq!(state.bg_tasks.len(), 4);
-		let ids: Vec<&str> = state.bg_tasks.iter().map(|t| t.id.as_str()).collect();
+		let ids:Vec<&str> = state.bg_tasks.iter().map(|t| t.id.as_str()).collect();
 		assert!(!ids.contains(&"t1"), "stale task t1 must be evicted first");
 		assert!(ids.contains(&"t5"), "new task t5 must be present");
 
 		// Mark t0 as Done, then insert t6 - evicts t0.
-		state.bg_tasks.iter_mut().find(|t| t.id == "t0").unwrap().status = BgStatus::Done { exit_code: 0 };
+		state.bg_tasks.iter_mut().find(|t| t.id == "t0").unwrap().status = BgStatus::Done { exit_code:0 };
 		insert_bg_task(&mut state, "t6".into(), "terminal".into(), "cmd6".into(), 6);
 		assert_eq!(state.bg_tasks.len(), 4);
-		let ids: Vec<&str> = state.bg_tasks.iter().map(|t| t.id.as_str()).collect();
+		let ids:Vec<&str> = state.bg_tasks.iter().map(|t| t.id.as_str()).collect();
 		assert!(!ids.contains(&"t0"), "done task t0 must be evicted second");
 
 		// All running - insert t7, evicts oldest running (t2).
 		insert_bg_task(&mut state, "t7".into(), "terminal".into(), "cmd7".into(), 7);
-		let ids: Vec<&str> = state.bg_tasks.iter().map(|t| t.id.as_str()).collect();
+		let ids:Vec<&str> = state.bg_tasks.iter().map(|t| t.id.as_str()).collect();
 		assert!(!ids.contains(&"t2"), "oldest running task t2 must be evicted last");
 	}
 
@@ -869,7 +867,7 @@ mod tests {
 		insert_bg_task(&mut state, "r1".into(), "terminal".into(), "running1".into(), 1);
 		insert_bg_task(&mut state, "r2".into(), "terminal".into(), "running2".into(), 2);
 		// Mark one as done.
-		state.bg_tasks[1].status = BgStatus::Done { exit_code: 0 };
+		state.bg_tasks[1].status = BgStatus::Done { exit_code:0 };
 		insert_bg_task(&mut state, "r3".into(), "terminal".into(), "running3".into(), 3);
 
 		let rendered = render_bg_task_status(&state);

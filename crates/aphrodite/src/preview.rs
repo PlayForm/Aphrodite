@@ -5,13 +5,12 @@
 //! (via `crate::preview` re-export).
 
 use headroom_core::transforms;
-
 use serde_json::Value as JsonValue;
 
 /// Detect the CCR content-type string for a blob (e.g. `source_code`, `build`,
 /// `json_array`). Thin wrapper over the Headroom classifier so downstream
 /// crates (aphrodite-hermes) don't need a direct headroom-core dependency.
-pub fn detect_type(content: &str) -> String {
+pub fn detect_type(content:&str) -> String {
 	transforms::content_detector::detect_content_type(content)
 		.content_type
 		.as_str()
@@ -30,12 +29,12 @@ pub fn detect_type(content: &str) -> String {
 /// is deliberately conservative (line-prefix / marker patterns, majority votes)
 /// so a random paragraph is never mis-tagged. Char-boundary safe and panic-free
 /// on empty/NUL/multibyte input.
-pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
-	let lines: Vec<&str> = content.lines().collect();
+pub fn detect_semantic_type(content:&str) -> Option<&'static str> {
+	let lines:Vec<&str> = content.lines().collect();
 	if lines.is_empty() {
 		return None;
 	}
-	let non_empty: Vec<&str> = lines.iter().map(|l| l.trim_end()).filter(|l| !l.trim().is_empty()).collect();
+	let non_empty:Vec<&str> = lines.iter().map(|l| l.trim_end()).filter(|l| !l.trim().is_empty()).collect();
 	if non_empty.is_empty() {
 		return None;
 	}
@@ -107,7 +106,7 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 /// Git porcelain / short-status code for a line (`M `, ` M`, `A `, `D `, `R `,
 /// `??`, `UU`, etc.), or `None`. Two leading columns (staged, unstaged) then a
 /// space then a path.
-fn git_status_code(line: &str) -> Option<&str> {
+fn git_status_code(line:&str) -> Option<&str> {
 	let b = line.as_bytes();
 	if b.len() < 4 {
 		return None;
@@ -129,7 +128,7 @@ fn git_status_code(line: &str) -> Option<&str> {
 
 /// True when a line looks like a grep/ripgrep hit: `path:line:match` (with a
 /// numeric line field) or `path:match` where the path has a file-ish shape.
-fn is_grep_line(line: &str) -> bool {
+fn is_grep_line(line:&str) -> bool {
 	let mut it = line.splitn(3, ':');
 	let path = match it.next() {
 		Some(p) if !p.trim().is_empty() && !p.contains(' ') => p,
@@ -148,7 +147,7 @@ fn is_grep_line(line: &str) -> bool {
 
 /// True when a line is a bare path-like token (find output / plain `ls`): a
 /// single whitespace-free token that has an extension or a path separator.
-fn is_path_line(line: &str) -> bool {
+fn is_path_line(line:&str) -> bool {
 	let t = line.trim();
 	if t.is_empty() || t.contains(char::is_whitespace) {
 		return false;
@@ -156,9 +155,9 @@ fn is_path_line(line: &str) -> bool {
 	t.contains('/') || (t.rfind('.').map(|i| i > 0 && i < t.len() - 1).unwrap_or(false))
 }
 
-static REEST_PYTEST: std::sync::LazyLock<regex::Regex> =
+static REEST_PYTEST:std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"\d+ passed|\d+ failed").unwrap());
-static REEST_JEST: std::sync::LazyLock<regex::Regex> =
+static REEST_JEST:std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"Tests:\s+\d+").unwrap());
 
 /// Build a compact, human-readable preview string for compressed content,
@@ -166,7 +165,7 @@ static REEST_JEST: std::sync::LazyLock<regex::Regex> =
 /// +/- line counts for diffs, fn/struct counts for source code) so the LLM
 /// gets a useful summary instead of a generic byte/line count wherever a
 /// richer signal is available.
-pub fn build_preview(type_str: &str, content: &str) -> String {
+pub fn build_preview(type_str:&str, content:&str) -> String {
 	let lines = content.lines().count();
 	let bytes = content.len();
 	// Semantic-detection DEFAULT (no flag): when the classifier only reached a
@@ -175,7 +174,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 	// grep, git log). Both the proxy path and the Hermes hook/FFI path funnel
 	// through this one function, so the enriched preview is emitted identically
 	// on both paths. An explicit non-generic `type_str` is always honored as-is.
-	let effective: &str = match type_str {
+	let effective:&str = match type_str {
 		"text" | "terminal" | "log" | "" | "plain" => detect_semantic_type(content).unwrap_or(type_str),
 		other => other,
 	};
@@ -208,7 +207,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			let d = content.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
 			// Enrich: name the first couple of changed files so the agent sees
 			// WHAT changed, not just how many lines.
-			let files: Vec<String> = content
+			let files:Vec<String> = content
 				.lines()
 				.filter_map(|l| l.strip_prefix("diff --git "))
 				.filter_map(|rest| rest.split_whitespace().next())
@@ -241,7 +240,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			// + first signature) so the dylib/hook path matches the proxy's preview
 			// quality, instead of a bare substring count.
 			let st = crate::struct_extract::extract_code_structure(content, "");
-			let mut parts: Vec<String> = Vec::new();
+			let mut parts:Vec<String> = Vec::new();
 			for (key, label) in [
 				("fns", "fns"),
 				("structs", "structs"),
@@ -308,10 +307,10 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 
 /// git status preview: tally each two-char status code and list the first few
 /// paths. `[git:5M 2A 1D 3?? | src/x.rs src/y.rs +6 more]`.
-fn build_git_status_preview(content: &str, lines: usize) -> String {
+fn build_git_status_preview(content:&str, lines:usize) -> String {
 	use std::collections::BTreeMap;
-	let mut tally: BTreeMap<char, usize> = BTreeMap::new();
-	let mut paths: Vec<String> = Vec::new();
+	let mut tally:BTreeMap<char, usize> = BTreeMap::new();
+	let mut paths:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if let Some(code) = git_status_code(line) {
 			// Collapse the two columns to the most significant status char
@@ -333,14 +332,14 @@ fn build_git_status_preview(content: &str, lines: usize) -> String {
 	}
 	// Emit tallies in a stable, readable order.
 	let order = ['M', 'A', 'D', 'R', 'C', 'U', 'T', '?', '!'];
-	let mut counts: Vec<String> = Vec::new();
+	let mut counts:Vec<String> = Vec::new();
 	for c in order {
 		if let Some(n) = tally.get(&c) {
 			let label = if c == '?' { "??".to_string() } else { c.to_string() };
 			counts.push(format!("{}{}", n, label));
 		}
 	}
-	let total: usize = tally.values().sum();
+	let total:usize = tally.values().sum();
 	let shown = paths.len();
 	let more = if total > shown { format!(" +{} more", total - shown) } else { String::new() };
 	if paths.is_empty() {
@@ -352,13 +351,13 @@ fn build_git_status_preview(content: &str, lines: usize) -> String {
 
 /// git log preview: commit count + first->last short hash and subject.
 /// `[gitlog:20 commits | abc123 fix(x): … → def456 …]`.
-fn build_gitlog_preview(content: &str, lines: usize) -> String {
+fn build_gitlog_preview(content:&str, lines:usize) -> String {
 	// Collect `commit <hash>` entries and, if present, the following subject.
-	let all: Vec<&str> = content.lines().collect();
-	let mut commits: Vec<(String, String)> = Vec::new();
+	let all:Vec<&str> = content.lines().collect();
+	let mut commits:Vec<(String, String)> = Vec::new();
 	for (i, line) in all.iter().enumerate() {
 		if let Some(rest) = line.strip_prefix("commit ") {
-			let hash: String = rest.trim().chars().take(7).collect();
+			let hash:String = rest.trim().chars().take(7).collect();
 			// Subject: first non-empty, non-header line after the commit line.
 			let subject = all[i + 1..]
 				.iter()
@@ -391,11 +390,11 @@ fn build_gitlog_preview(content: &str, lines: usize) -> String {
 
 /// directory-listing preview: file/dir counts + top extensions.
 /// `[ls:42 files 7 dirs | .rs×18 .md×9 …]`.
-fn build_ls_preview(content: &str, lines: usize) -> String {
+fn build_ls_preview(content:&str, lines:usize) -> String {
 	use std::collections::HashMap;
 	let mut files = 0usize;
 	let mut dirs = 0usize;
-	let mut ext: HashMap<String, usize> = HashMap::new();
+	let mut ext:HashMap<String, usize> = HashMap::new();
 	for line in content.lines() {
 		let t = line.trim();
 		if t.is_empty() {
@@ -430,7 +429,7 @@ fn build_ls_preview(content: &str, lines: usize) -> String {
 			let base = name.rsplit('/').next().unwrap_or(name);
 			if let Some(dot) = base.rfind('.') {
 				if dot > 0 && dot < base.len() - 1 {
-					let e: String = base[dot..].chars().take(8).collect();
+					let e:String = base[dot..].chars().take(8).collect();
 					*ext.entry(e).or_insert(0) += 1;
 				}
 			}
@@ -439,7 +438,7 @@ fn build_ls_preview(content: &str, lines: usize) -> String {
 	if files == 0 && dirs == 0 {
 		return format!("[ls:{}L]", lines);
 	}
-	let mut top: Vec<(String, usize)> = ext.into_iter().collect();
+	let mut top:Vec<(String, usize)> = ext.into_iter().collect();
 	top.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 	let ext_str = top
 		.iter()
@@ -456,7 +455,7 @@ fn build_ls_preview(content: &str, lines: usize) -> String {
 
 /// test-output preview: pass/fail/ignored tallies + first failing test.
 /// `[test:220 pass 0 fail 1 ignored | 0.31s]` / names the first failure.
-fn build_test_preview(content: &str, lines: usize) -> String {
+fn build_test_preview(content:&str, lines:usize) -> String {
 	// cargo: `test result: ok. 220 passed; 0 failed; 1 ignored; ... 0.31s`
 	let mut pass = 0usize;
 	let mut fail = 0usize;
@@ -523,11 +522,11 @@ fn build_test_preview(content: &str, lines: usize) -> String {
 
 /// grep/ripgrep preview: hit count, distinct files, first location.
 /// `[grep:38 hits in 9 files | src/x.rs:12 …]`.
-fn build_grep_preview(content: &str, lines: usize) -> String {
+fn build_grep_preview(content:&str, lines:usize) -> String {
 	use std::collections::BTreeSet;
 	let mut hits = 0usize;
-	let mut files: BTreeSet<String> = BTreeSet::new();
-	let mut first: Option<String> = None;
+	let mut files:BTreeSet<String> = BTreeSet::new();
+	let mut first:Option<String> = None;
 	for line in content.lines() {
 		if !is_grep_line(line) {
 			continue;
@@ -552,33 +551,33 @@ fn build_grep_preview(content: &str, lines: usize) -> String {
 
 /// Parse the integer immediately preceding `keyword` on a line (e.g. `220
 /// passed` -> 220). Returns 0 when absent.
-fn num_before(line: &str, keyword: &str) -> usize {
+fn num_before(line:&str, keyword:&str) -> usize {
 	let idx = match line.find(keyword) {
 		Some(i) => i,
 		None => return 0,
 	};
 	line[..idx]
 		.trim_end()
-		.rsplit(|c: char| !c.is_ascii_digit())
+		.rsplit(|c:char| !c.is_ascii_digit())
 		.find(|s| !s.is_empty())
 		.and_then(|s| s.parse().ok())
 		.unwrap_or(0)
 }
 
-static DUR_RE: std::sync::LazyLock<regex::Regex> =
+static DUR_RE:std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"(\d+\.\d+s|\d+ms)").unwrap());
 
 /// JSON preview: parse content and show item/object count with top-level keys,
 /// matching the quality of stage2's `reduce_json`. Falls back to a crude `{"`
 /// count when parsing fails (e.g. truncated or malformed JSON).
-fn build_json_preview(content: &str, lines: usize) -> String {
+fn build_json_preview(content:&str, lines:usize) -> String {
 	match serde_json::from_str::<JsonValue>(content) {
 		Ok(JsonValue::Array(arr)) => {
 			let keys = arr
 				.first()
 				.and_then(|v| v.as_object())
 				.map(|obj| {
-					let ks: Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+					let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
 					let more = if ks.len() < obj.len() {
 						format!(" +{} more", obj.len() - ks.len())
 					} else {
@@ -590,7 +589,7 @@ fn build_json_preview(content: &str, lines: usize) -> String {
 			format!("[json:{}items {}L{}]", arr.len(), lines, keys)
 		},
 		Ok(JsonValue::Object(obj)) => {
-			let ks: Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+			let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
 			let more = if ks.len() < obj.len() {
 				format!(" +{} more", obj.len() - ks.len())
 			} else {
@@ -609,13 +608,13 @@ fn build_json_preview(content: &str, lines: usize) -> String {
 /// Search preview: grep/ripgrep hit count, distinct files, first match location.
 /// Uses the same regex pattern as `content_detector::SEARCH_RESULT_PATTERN`
 /// (`file:line:` format).
-fn build_search_preview(content: &str, lines: usize) -> String {
+fn build_search_preview(content:&str, lines:usize) -> String {
 	use std::collections::BTreeSet;
-	static SEARCH_RE: std::sync::LazyLock<regex::Regex> =
+	static SEARCH_RE:std::sync::LazyLock<regex::Regex> =
 		std::sync::LazyLock::new(|| regex::Regex::new(r"^[^\s:]+:\d+:").unwrap());
 	let mut hits = 0usize;
-	let mut files: BTreeSet<String> = BTreeSet::new();
-	let mut first: Option<String> = None;
+	let mut files:BTreeSet<String> = BTreeSet::new();
+	let mut first:Option<String> = None;
 	for line in content.lines() {
 		if line.trim().is_empty() {
 			continue;
@@ -642,7 +641,7 @@ fn build_search_preview(content: &str, lines: usize) -> String {
 }
 
 /// HTML preview: title, heading count, link count, body size estimate.
-fn build_html_preview(content: &str, lines: usize) -> String {
+fn build_html_preview(content:&str, lines:usize) -> String {
 	// Extract <title>…</title> text (anywhere on a line, case-insensitive).
 	let title = content.lines().find_map(|l| {
 		let lower = l.to_lowercase();
@@ -661,11 +660,11 @@ fn build_html_preview(content: &str, lines: usize) -> String {
 	let imgs = content.matches("<img ").count() + content.matches("<IMG ").count();
 	let scripts = content.matches("<script").count() + content.matches("<SCRIPT").count();
 
-	let mut parts: Vec<String> = Vec::new();
+	let mut parts:Vec<String> = Vec::new();
 	if let Some(t) = title {
 		parts.push(t);
 	}
-	let mut stats: Vec<String> = Vec::new();
+	let mut stats:Vec<String> = Vec::new();
 	if headings > 0 {
 		stats.push(format!("{}h", headings));
 	}
@@ -792,7 +791,8 @@ mod tests {
 	// enriched output. Each preview must be self-describing `[type:...]` and
 	// pack decision-relevant facts. ──
 
-	const GIT_STATUS: &str = " M crates/aphrodite/src/preview.rs\n M crates/aphrodite/src/hooks.rs\nA  src/new_a.rs\nA  src/new_b.rs\nD  \
+	const GIT_STATUS:&str =
+		" M crates/aphrodite/src/preview.rs\n M crates/aphrodite/src/hooks.rs\nA  src/new_a.rs\nA  src/new_b.rs\nD  \
 		 src/old.rs\n?? tmp/scratch\n?? tmp/other\n?? build/log";
 
 	#[test]
@@ -813,7 +813,7 @@ mod tests {
 		assert!(p.starts_with("[git:2R | new/path.rs b.txt"), "got {p}");
 	}
 
-	const CARGO_TEST: &str = "running 221 tests\ntest foo::bar ... ok\ntest result: ok. 220 passed; 0 failed; 1 \
+	const CARGO_TEST:&str = "running 221 tests\ntest foo::bar ... ok\ntest result: ok. 220 passed; 0 failed; 1 \
 	                         ignored; 0 measured; 0 filtered out; finished in 0.31s";
 
 	#[test]
@@ -831,7 +831,7 @@ mod tests {
 		assert!(p.starts_with("[test:2 pass 1 fail 0 ignored | FAIL beta"), "got {p}");
 	}
 
-	const LS_LONG: &str = "total 48\ndrwxr-xr-x  5 nikola staff  160 Jul 14 10:00 src\ndrwxr-xr-x  2 nikola staff   64 \
+	const LS_LONG:&str = "total 48\ndrwxr-xr-x  5 nikola staff  160 Jul 14 10:00 src\ndrwxr-xr-x  2 nikola staff   64 \
 	                      Jul 14 10:00 tests\n-rw-r--r--  1 nikola staff 1913 Jul 14 10:00 preview.rs\n-rw-r--r--  1 \
 	                      nikola staff  820 Jul 14 10:00 hooks.rs\n-rw-r--r--  1 nikola staff  512 Jul 14 10:00 \
 	                      README.md";
@@ -844,7 +844,7 @@ mod tests {
 		assert_eq!(p, "[ls:3 files 2 dirs | .rs×2 .md×1]");
 	}
 
-	const RIPGREP: &str = "src/preview.rs:12:    let lines = content.lines().count();\nsrc/preview.rs:88:    \
+	const RIPGREP:&str = "src/preview.rs:12:    let lines = content.lines().count();\nsrc/preview.rs:88:    \
 	                      format!(\"[terminal...\nsrc/hooks.rs:91:    let preview = \
 	                      crate::build_preview();\nsrc/marker.rs:49:    let mut safe = preview.replace();";
 
@@ -855,7 +855,7 @@ mod tests {
 		assert_eq!(p, "[grep:4 hits in 3 files | src/preview.rs:12 …]");
 	}
 
-	const GIT_LOG: &str = "commit abc1234def5678\nAuthor: Nikola <n@x.io>\nDate:   Mon Jul 14\n\n    fix(preview): \
+	const GIT_LOG:&str = "commit abc1234def5678\nAuthor: Nikola <n@x.io>\nDate:   Mon Jul 14\n\n    fix(preview): \
 	                      stop doubling\n\ncommit def5678abc1234\nAuthor: Nikola <n@x.io>\nDate:   Sun Jul 13\n\n    \
 	                      feat: add detector";
 
@@ -947,7 +947,9 @@ mod tests {
 
 	#[test]
 	fn test_html_preview_extracts_title_and_counts() {
-		let c = "<!DOCTYPE html>\n<html>\n<head><title>My Page</title></head>\n<body>\n<h1>Hello</h1>\n<h2>Section</h2>\n<a href=\"/x\">link</a>\n<a href=\"/y\">link2</a>\n<img src=\"a.png\">\n</body>\n</html>";
+		let c = "<!DOCTYPE html>\n<html>\n<head><title>My \
+		         Page</title></head>\n<body>\n<h1>Hello</h1>\n<h2>Section</h2>\n<a href=\"/x\">link</a>\n<a \
+		         href=\"/y\">link2</a>\n<img src=\"a.png\">\n</body>\n</html>";
 		let p = build_preview("html", c);
 		assert!(p.contains("My Page"), "must include title, got {p}");
 		assert!(p.contains("2h"), "got {p}");

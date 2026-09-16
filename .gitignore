@@ -41,7 +41,11 @@ aphrodite.toml
 
 # IDE
 .idea/
-.vscode/
+# .vscode is excluded EXCEPT settings.json, which is shared. The bare
+# `!.vscode/settings.json` under an excluded dir is a no-op; re-include the
+# dir first, re-exclude its contents, then re-include the file.
+!.vscode/
+.vscode/**
 !.vscode/settings.json
 *.swp
 *.swo

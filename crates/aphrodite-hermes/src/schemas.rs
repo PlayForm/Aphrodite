@@ -33,9 +33,7 @@ use serde_json::json;
 /// `additionalProperties: false` is deliberate: it is the only signal that
 /// stops a model from inventing plausible-looking arguments for an argument-
 /// less tool, and every backend either honors it or strips it harmlessly.
-fn no_params() -> serde_json::Value {
-	json!({"type": "object", "properties": {}, "additionalProperties": false})
-}
+fn no_params() -> serde_json::Value { json!({"type": "object", "properties": {}, "additionalProperties": false}) }
 
 /// Return all tool schemas as a JSON array.
 pub fn all_schemas() -> Vec<serde_json::Value> {
@@ -59,9 +57,7 @@ pub fn all_schemas() -> Vec<serde_json::Value> {
 }
 
 /// Get a single tool schema by name.
-pub fn get_schema(name: &str) -> Option<serde_json::Value> {
-	all_schemas().into_iter().find(|s| s["name"] == name)
-}
+pub fn get_schema(name:&str) -> Option<serde_json::Value> { all_schemas().into_iter().find(|s| s["name"] == name) }
 
 fn schema_compress() -> serde_json::Value {
 	json!({
