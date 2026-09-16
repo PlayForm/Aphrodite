@@ -1,24 +1,24 @@
-# cleanup — catalog, summarize, verify nothing left behind
+# cleanup - catalog, summarize, verify nothing left behind
 
-# After significant work: verify all CCR content was retrieved, summarize, catalog.
+After significant work: make sure nothing you were handed is still unresolved, summarize, and leave the session tidy.
 
-# CCR CLEANUP CHECKLIST:
+## Cleanup checklist
 
-- Scan the turn history: any <<<CCR:hash...>>> markers you never retrieved? Retrieve them now before summarizing.
+- Scan the turn history: any <<<CCR:hash...>>> markers you never retrieved?
+  Retrieve the ones whose content you still need before summarizing.
+- Run aphrodite_catalog(mode="toc") to see what's available this session.
+  Anything you read but didn't use? Note it for next session.
+- Run aphrodite_stats to check session and store health.
+- Stale entries need no manual deletion - but verify you didn't leave any
+  content unresolved before archiving.
 
-- Run aphrodite_catalog(mode="toc") to see what's in the store. Anything you read but didn't use? Note it for next session.
-
-- Run aphrodite_stats to check compression ratios and store health.
-
-- Markers auto-evict via LRU — no manual deletion needed. But verify you didn't miss any before archiving.
-
-# EVERY 5 TURNS:
+## Every 5 turns
 
 - Summarize progress in a single message
-- Check aphrodite_catalog for stale entries
-- Verify all retrieved content was actually used
+- Check aphrodite_catalog for entries you no longer need
+- Verify the retrieved content you kept was actually used
 
-# BEFORE SESSION END:
+## Before session end
 
 - Run aphrodite_stats
-- Note any un-retrieved CCR markers for the next session
+- Note any markers you deliberately left un-retrieved for the next session

@@ -1,20 +1,23 @@
-# focus — targeted execution, CCR-first retrieval
-#
-# Stay targeted: at most 1-2 tools per turn, prefer aphrodite_retrieve over
-# re-reading files. Each turn has one primary action. Use aphrodite_retrieve
-# for any <<<CCR:hash...>>> you see.
+# focus - targeted execution, marker-aware retrieval
+
+Markers are content. A <<<CCR:hash|type|size>>> marker in tool output stands in for the content you asked for. The hash is the key: aphrodite_retrieve(hash) returns the full text.
+
+## Guiding policy
 
 - ONE primary action per turn. At most 1-2 tool calls.
-- EVERY <<<CCR:hash|type|size>>> in tool output IS the compressed content.
-  Retrieve it IMMEDIATELY with aphrodite_retrieve(hash) before any other
-  action. Do not defer. Do not batch other calls first.
-- NEVER re-read a file when you have a live CCR marker. The marker IS the
-  content. Re-reading wastes an API call.
-- NEVER treat a CCR marker as opaque. The hash inside <<<CCR:...>>> is the
-  key to the full content via aphrodite_retrieve.
-- After EVERY tool call: scan output for <<<CCR:. If found, retrieve ALL
-  markers before proceeding. Non-negotiable.
-- If aphrodite_retrieve fails: fall back to read_file or terminal for that
-  specific hash. Do NOT skip retrieval entirely.
-- Retrieval is cheap (sub-ms from local SQLite). Think on the content, not
-  on retrieval.
+- When a marker appears, read it first: type says what kind of content it
+  holds, size says how large. Decide from those whether the full content is
+  needed for the current action.
+- Retrieve the marker with aphrodite_retrieve(hash) when the action needs its
+  full content. Skip when a preview or the marker's type/size already answers
+  the question.
+- Prefer granular retrieval: expand only the markers - or only the lines, via
+  aphrodite_retrieve's query - that the next action needs.
+- When several markers are pending and the turn needs them, batch the retrieve
+  calls into the same turn.
+- Don't re-read with another tool a file you already hold a marker for. The
+  marker is that content; re-reading wastes an API call.
+- Use aphrodite_search to find the right hash when you remember content but not
+  its marker; use aphrodite_catalog to see what's available.
+- If aphrodite_retrieve fails (unknown hash): fall back to read_file or
+  terminal for that specific item. Do not invent content you couldn't see.

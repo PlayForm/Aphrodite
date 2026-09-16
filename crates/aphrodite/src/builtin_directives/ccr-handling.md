@@ -1,28 +1,25 @@
-# ccr-handling — how CCR compression works and how to use it
-#
-# When a tool produces more output than a few hundred bytes, Aphrodite replaces
-# the raw text with a short marker: <<<CCR:hash|type|size>>>. The marker IS the
-# content — compressed and stored by the engine. Retrieving it costs sub-millisecond
-# (local SQLite or in-process inline store). Ignoring it costs tokens, turns, and
-# correctness.
+# ccr-handling - reading markers, retrieving content
 
-- EVERY <<<CCR:hash|type|size>>> in ANY tool output → call aphrodite_retrieve(hash)
-  before you do ANYTHING else. Do not batch other tool calls first. Do not defer
-  to "later." Retrieve ALL markers from ALL tools in the same batch, then proceed.
-- If a tool result contains a CCR marker and you don't retrieve it, you are
-  operating blind on that turn. This is the #1 cause of poor agent performance
-  in compressed sessions.
-- NEVER re-read a file with read_file when you already have a CCR marker for
-  it. The marker IS the content. Re-reading wastes an API call and tokens.
-- NEVER treat a CCR marker as opaque. "<<<CCR:base62hash|code_rust|2847>>>"
-  means aphrodite_retrieve("base62hash") returns the full original content.
-  Use it.
-- After calling aphrodite_retrieve, the result itself may contain nested CCR
-  markers. Retrieve those too — recursively, up to 5 levels deep.
-  resolve::expand handles this automatically.
-- If aphrodite_retrieve returns found=false or errors: fall back to the
-  original tool (read_file, terminal) for that specific hash. Do NOT skip
-  retrieval entirely and hallucinate content.
-- A missing hash usually means the session was reset, the dylib was
-  hot-reloaded (which wipes in-process session state), or the entry was
-  evicted by LRU.
+Some tool output arrives as a short marker instead of inline text: <<<CCR:hash|type|size>>>. The hash identifies the content, the type says what kind it is, the size says how large. That marker IS the content - retrieve it to see the full text.
+
+- When a tool result contains <<<CCR:hash|type|size>>>, the hash is the key:
+  aphrodite_retrieve(hash) returns the full original content.
+- Read the marker's type and size before retrieving: they tell you what the
+  content is and how big. Use them to decide whether you need the full text now
+  or can act on the marker alone.
+- Retrieve when the current action needs the full content. Skip when the
+  marker's type/size already answers the question (e.g. a search result list
+  where only one entry matters).
+- Use aphrodite_search to locate content by keyword or type when you have the
+  idea but not the hash. Use aphrodite_catalog to see what's already available
+  this session.
+- Prefer granular retrieval: expand only the markers - or only the lines, via
+  aphrodite_retrieve's query - the next action needs, not everything at once.
+- When several markers are pending and the turn needs them, batch the retrieve
+  calls in one turn.
+- Retrieved content can itself contain further markers. Expand those the same
+  way when - and only when - the current action needs them.
+- If aphrodite_retrieve returns an unknown hash, fall back to read_file or
+  terminal for that specific item. Never invent content you couldn't see.
+- Never re-read with another tool a file you already hold a marker for - the
+  marker is that content.

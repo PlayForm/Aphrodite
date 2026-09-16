@@ -1,21 +1,23 @@
-# focus — targeted execution, CCR-first retrieval
+# focus - targeted execution, marker-aware retrieval
 
-# CCR MARKERS ARE CONTENT. Every <<<CCR:hash...>>> in tool output IS the file you
-# asked for — compressed. You MUST retrieve it, not ignore it.
+Markers are content. A <<<CCR:hash|type|size>>> marker in tool output stands in for the content you asked for. The hash is the key: aphrodite_retrieve(hash) returns the full text.
 
-# HARD RULES — broken at serious quality cost:
-- EVERY <<<CCR:hash...>>> you receive in tool output: retrieve it with aphrodite_retrieve(hash) IMMEDIATELY. Do not defer, do not batch, do not do other tool calls first. Retrieve ALL markers before your next text response to the user. No exceptions.
-- NEVER re-read a file when you have a live CCR marker for it. The marker IS the content. Re-reading is a wasted API call.
-- NEVER treat a CCR marker as opaque. "<<<CCR:base62hash|type|size>>>" means aphrodite_retrieve("base62hash") will give you the original content. Use it.
-- After EVERY tool call: scan the output for <<<CCR:. If found, retrieve ALL of them before doing anything else. This is non-negotiable.
-- When you see multiple CCR markers from multiple tools in the same batch, retrieve them in the SAME turn (batch the retrieve calls together), but retrieve them BEFORE any other action.
-- If aphrodite_retrieve fails: fall back to the original tool (read_file, terminal) for that specific hash. Do NOT skip retrieval entirely.
+## Guiding policy
 
-# CONSEQUENCES OF IGNORING CCR:
-- You respond with "I got compressed output" instead of the actual content
-- You waste turns re-reading files the engine already fetched
-- The user gets low-quality responses based on missing data
-
-# RETRIEVE NOW, THINK LATER:
-- Retrieval is cheap (sub-ms from local SQLite). Thinking/acting on the content is what costs tokens. Always retrieve first, then decide what to do with the content.
-- If you get a CCR marker and don't retrieve it, you are operating blind. This is the #1 cause of poor agent performance in compressed sessions.
+- ONE primary action per turn. At most 1-2 tool calls.
+- When a marker appears, read it first: type says what kind of content it
+  holds, size says how large. Decide from those whether the full content is
+  needed for the current action.
+- Retrieve the marker with aphrodite_retrieve(hash) when the action needs its
+  full content. Skip when a preview or the marker's type/size already answers
+  the question.
+- Prefer granular retrieval: expand only the markers - or only the lines, via
+  aphrodite_retrieve's query - that the next action needs.
+- When several markers are pending and the turn needs them, batch the retrieve
+  calls into the same turn.
+- Don't re-read with another tool a file you already hold a marker for. The
+  marker is that content; re-reading wastes an API call.
+- Use aphrodite_search to find the right hash when you remember content but not
+  its marker; use aphrodite_catalog to see what's available.
+- If aphrodite_retrieve fails (unknown hash): fall back to read_file or
+  terminal for that specific item. Do not invent content you couldn't see.
