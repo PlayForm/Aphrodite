@@ -29,45 +29,15 @@ exist; nothing committed manually (auto-committer sweeps).
 
 ## 1. Implemented from RESEARCH-UPSTREAM.md
 
-**Report item:** **G1/R1** - `restype = c_char_p` single-line gap
-
-**Implementation:** `_RESTYPE_RE` single-line alternation extended to `ReturnString|String|c_char_p|WideString`. A `const char *`/`char * const` return (upstream `CtypesFunction` rewrites POINTER(c_char)+const to `c_char_p`) and a `wchar_t *` return now normalize to `c_void_p` like every other pointer restype. Tests: `test_single_line_c_char_p`, `test_single_line_widestring`.
-
----
-
-**Report item:** **G2/R3** - single-library `if _libs["X"].has(...)` form
-
-**Implementation:** NOT rewritten (see §4 - deliberately handled by the shape gate instead; safer than the pre-change panic).
-
----
-
-**Report item:** **G3/R2** - variadic `_restype = String`
-
-**Implementation:** NOT implemented: a variadic export can never pass the AST validator anyway (no `NAME.restype/argtypes` assignment lines => missing from the declared set => contract violation, loud). Adding a dead rewrite buys nothing.
-
----
-
-**Report item:** **G6/R7** - stale `char const *` comment
-
-**Implementation:** Fixed: cbindgen emits `const char *tool_name` (pointee const BEFORE the type). Comment-only.
-
----
-
-**Report item:** **R4** - strip the loader head
-
-**Implementation:** `postprocess()` no longer keeps the raw head at all: the entire preamble (string machinery, `c_ptrdiff_t` loop, loader classes, `load_library`, `add_library_search_dirs`, `# Begin libraries` markers) is replaced by a 16-line minimal head - canonical docstring + `__docformat__` + `from ctypes import *` + `_libs = {}`. `_LOAD_LINE_RE` survives as a pure SHAPE check (the replacement line is discarded).
-
----
-
-**Report item:** **R5** - argtypes `String` -> `c_char_p` + strip the String classes
-
-**Implementation:** `_ARGYPES_STRING_RE` rewrites `\bString\b` -> `c_char_p` AFTER the restype/errcheck rewrites (so only argtypes entries still contain `String`; `ReturnString`/`WideString` have no word boundary at the capital). This is what makes the UserString/MutableString/String/ReturnString classes dead code. PLUS a runtime fix the report did not predict (see §2).
-
----
-
-**Report item:** **R6** - `__all__`
-
-**Implementation:** `__all__ = ["bind_to"]` in the minimal head. Verified by executing a real `from _bindings import *`: only `bind_to` is re-exported (the ctypes namespace bleed is contained).
+| Report item                                                         | Implementation                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **G1/R1** - `restype = c_char_p` single-line gap                    | `_RESTYPE_RE` single-line alternation extended to `ReturnString\|String\|c_char_p\|WideString`.<br>A `const char *`/`char * const` return (upstream `CtypesFunction` rewrites POINTER(c_char)+const to `c_char_p`) and a `wchar_t *` return now normalize to `c_void_p` like every other pointer restype.<br>Tests: `test_single_line_c_char_p`, `test_single_line_widestring`.                                       |
+| **G2/R3** - single-library `if _libs["X"].has(...)` form            | NOT rewritten (see §4 - deliberately handled by the shape gate instead; safer than the pre-change panic).                                                                                                                                                                                                                                                                                                             |
+| **G3/R2** - variadic `_restype = String`                            | NOT implemented: a variadic export can never pass the AST validator anyway (no `NAME.restype/argtypes` assignment lines => missing from the declared set => contract violation, loud).<br>Adding a dead rewrite buys nothing.                                                                                                                                                                                         |
+| **G6/R7** - stale `char const *` comment                            | Fixed: cbindgen emits `const char *tool_name` (pointee const BEFORE the type). Comment-only.                                                                                                                                                                                                                                                                                                                          |
+| **R4** - strip the loader head                                      | `postprocess()` no longer keeps the raw head at all: the entire preamble (string machinery, `c_ptrdiff_t` loop, loader classes, `load_library`, `add_library_search_dirs`, `# Begin libraries` markers) is replaced by a 16-line minimal head - canonical docstring + `__docformat__` + `from ctypes import *` + `_libs = {}`.<br>`_LOAD_LINE_RE` survives as a pure SHAPE check (the replacement line is discarded). |
+| **R5** - argtypes `String` -> `c_char_p` + strip the String classes | `_ARGYPES_STRING_RE` rewrites `\bString\b` -> `c_char_p` AFTER the restype/errcheck rewrites (so only argtypes entries still contain `String`; `ReturnString`/`WideString` have no word boundary at the capital).<br>This is what makes the UserString/MutableString/String/ReturnString classes dead code.<br>PLUS a runtime fix the report did not predict (see §2).                                                |
+| **R6** - `__all__`                                                  | `__all__ = ["bind_to"]` in the minimal head.<br>Verified by executing a real `from _bindings import *`: only `bind_to` is re-exported (the ctypes namespace bleed is contained).                                                                                                                                                                                                                                      |
 
 ## 2. Runtime fix beyond the reports (free_string argtypes)
 
@@ -169,69 +139,37 @@ Report items reviewed and NOT actioned (documented, future work):
 
 ## 5. Verification matrix (all after final state)
 
-**Check:** `python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py`
+| Check                                                                               | Result                                                                                                                                 |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py`                 | 23/23 OK                                                                                                                               |
+| `python3 -m py_compile` on all touched .py (+ plugin)                               | OK                                                                                                                                     |
+| Direct finalize run (exact build.rs args, `--required` 9 exports)                   | → P1 (validation message below)                                                                                                        |
+| Full pipeline regen (`cargo build -p aphrodite-hermes` with OUT_DIR header deleted) | exit 0, no warnings (upstream variant -> silent), raw+header regenerated                                                               |
+| Second regen / direct regen                                                         | artifact byte-stable (copy-on-change: unchanged)                                                                                       |
+| `python3 Maintain/check_ffi_contract.py`                                            | PASS, 0 violations / 0 warnings, restype source = generated bindings                                                                   |
+| `python3 repro.py` (the sigserve repro, 6 threads x 300 hammer)                     | SURVIVED: no crash, exit 0                                                                                                             |
+| `cargo test -p aphrodite-hermes`                                                    | 46 passed, 0 failed                                                                                                                    |
+| bind_to replay vs real release dylib                                                | → P2 (signature map below)                                                                                                             |
+| Artifact shape                                                                      | → P3 (grep summary below)                                                                                                              |
+| Drift-guard                                                                         | `crates/aphrodite/templates/__init__.py` still byte-identical to `plugins/aphrodite/__init__.py` (diff -q identical; plugin untouched) |
 
-**Result:** 23/23 OK
+`→ P1` - direct finalize run validation message:
 
----
+```text
+exit 0, "validated 10 exports (9 required pointer-returning) - all pointer restypes are c_void_p, argtypes are c_char_p and match the header"
+```
 
-**Check:** `python3 -m py_compile` on all touched .py (+ plugin)
+`→ P2` - bind_to replay vs real release dylib:
 
-**Result:** OK
+```text
+dispatch_tool/call_hook [c_char_p, c_char_p] + c_void_p; free_string [c_void_p], restype None; version c_void_p; live version() round-trip + free_string(int) OK
+```
 
----
+`→ P3` - artifact shape:
 
-**Check:** Direct finalize run (exact build.rs args, `--required` 9 exports)
-
-**Result:** exit 0, "validated 10 exports (9 required pointer-returning) - all pointer restypes are c_void_p, argtypes are c_char_p and match the header"
-
----
-
-**Check:** Full pipeline regen (`cargo build -p aphrodite-hermes` with OUT_DIR header deleted)
-
-**Result:** exit 0, no warnings (upstream variant -> silent), raw+header regenerated
-
----
-
-**Check:** Second regen / direct regen
-
-**Result:** artifact byte-stable (copy-on-change: unchanged)
-
----
-
-**Check:** `python3 Maintain/check_ffi_contract.py`
-
-**Result:** PASS, 0 violations / 0 warnings, restype source = generated bindings
-
----
-
-**Check:** `python3 repro.py` (the sigserve repro, 6 threads x 300 hammer)
-
-**Result:** SURVIVED: no crash, exit 0
-
----
-
-**Check:** `cargo test -p aphrodite-hermes`
-
-**Result:** 46 passed, 0 failed
-
----
-
-**Check:** bind_to replay vs real release dylib
-
-**Result:** dispatch_tool/call_hook `[c_char_p, c_char_p]` + c_void_p; free_string `[c_void_p]`, restype None; version c_void_p; live version() round-trip + free_string(int) OK
-
----
-
-**Check:** Artifact shape
-
-**Result:** no UserString/load_library/String/ReturnString/`c_ptrdiff_t` (grep 0); `__all__ = ["bind_to"]`; no hardcoded dylib path; no machine paths (docstring canonical, header comments normalized)
-
----
-
-**Check:** Drift-guard
-
-**Result:** `crates/aphrodite/templates/__init__.py` still byte-identical to `plugins/aphrodite/__init__.py` (diff -q identical; plugin untouched)
+```text
+no UserString/load_library/String/ReturnString/c_ptrdiff_t (grep 0); __all__ = ["bind_to"]; no hardcoded dylib path; no machine paths (docstring canonical, header comments normalized)
+```
 
 Artifact size: 31,716 B / 981 lines (committed before this pass) ->
 5,586 B / 133 lines. Generator: 17,075 B / 409 lines -> ~24.5 KB / ~490

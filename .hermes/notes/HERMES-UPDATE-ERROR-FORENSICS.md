@@ -1,9 +1,7 @@
 # HERMES-UPDATE-ERROR-FORENSICS - Aphrodite plugin failure at 2026-09-17 ~20:33
 
 **Date:** 2026-09-17 (EEST, UTC+3)
-
 **Event under investigation:** Aphrodite Hermes plugin errored during a `hermes update`-adjacent gateway fleet restart (~20:33).
-
 **Method:** read-only log forensics of `~/.hermes` (logs, config, plugin dirs, profiles) + macOS crash reports + live verification of the download URL. No repo file was modified; no commit was made.
 
 ---
@@ -80,75 +78,20 @@ Not implicated: no Python traceback / exception in `agent.log`/`errors.log` othe
 
 All times EEST (UTC+3).
 
-**Time:** ~19:27-19:28
-
-**Event:** dylib appears at `~/.hermes/aphrodite/binaries/` (loads switch from repo-checkout path `…/plugins/aphrodite/binaries/` to `~/.hermes/aphrodite/binaries/` in agent.log). First SIGSEGV crash reports begin.
-
----
-
-**Time:** 19:27-20:24
-
-**Event:** **Continuous crash-restart loop:** dylib "loaded" every ~30 s (agent.log), each followed by a SIGSEGV crash report ~2 s later. 40+ crashes, all with the dylib loaded.
-
----
-
-**Time:** 20:24:59-20:26:03
-
-**Event:** `hermes update` (pid 94438): already up to date; runs **pending fleet restart** ("Restarting gateways left on pre-update code... ✓ Service restarted"), restarting gateways per profile. 3 more crashes at 20:24:40/43/45/47 during the restart.
-
----
-
-**Time:** 20:26-20:32
-
-**Event:** Fleet-restart gateway cycles in agent.log (plugin re-registration every ~30 s; dylib loaded at 20:26:04/34, 20:27:04, 20:30:39, 20:31:10, 20:31:40, 20:32:11, 20:32:41).
-
----
-
-**Time:** **20:33:12 / 20:33:38 / 20:33:42**
-
-**Event:** **The 3x "dylib loaded" the user pasted** (`agent.log:14549/14571/14591`, from `~/.hermes/aphrodite/binaries/`) - last successful dlopens of the crash loop.
-
----
-
-**Time:** 20:33:17-33
-
-**Event:** TUI gateway children **SIGSEGV loop** (pids 97516→97592, 6 crashes in 16 s; `tui_gateway_crash.log`); TUI kills next child at 20:33:33 (`app.die`). Crash `203338.ips` (pid 97664) at 20:33:38.
-
----
-
-**Time:** 20:34:12
-
-**Event:** One more successful load (`agent.log:14611`), then the cycle stops.
-
----
-
-**Time:** **20:34:34**
-
-**Event:** `~/.hermes/config.yaml` **replaced** (birth 20:34:34); `aphrodite` now in `plugins.disabled` (`config.yaml:566`); `plugins.entries.aphrodite.allow_tool_override` gone - capability check flips `allow`→`deny (evidence=not granted)` at 20:34:45 (`agent.log:14686`).
-
----
-
-**Time:** **20:34:43**
-
-**Event:** `~/.hermes/plugins/` mtime 20:34:43 - the `aphrodite` symlink is removed (dir now contains only `hermes-achievements`). Gateway pid 98245 starts (`gateway-exit-diag.log` 17:34:43Z).
-
----
-
-**Time:** **20:34:45**
-
-**Event:** `~/.hermes/aphrodite` **deleted and recreated empty** (birth 20:34:45; `binaries/` + `hotreload/` now empty).
-
----
-
-**Time:** **20:34:46**
-
-**Event:** `download.sh exited 1` → curl 404 → **`ERROR aphrodite: ... dylib could not be loaded ... plugin disabled`** (`errors.log:6138-6148`).
-
----
-
-**Time:** 20:34:47-20:35:03
-
-**Event:** Default gateway (pid 98245) comes up cleanly with the plugin gone - telegram connected 20:35:01, no further segfaults.
+| Time                               | Event                                                                                                                                                                                                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~19:27-19:28                       | dylib appears at `~/.hermes/aphrodite/binaries/` (loads switch from repo-checkout path `…/plugins/aphrodite/binaries/` to `~/.hermes/aphrodite/binaries/` in agent.log).<br>First SIGSEGV crash reports begin.                                                            |
+| 19:27-20:24                        | **Continuous crash-restart loop:** dylib "loaded" every ~30 s (agent.log), each followed by a SIGSEGV crash report ~2 s later.<br>40+ crashes, all with the dylib loaded.                                                                                                 |
+| 20:24:59-20:26:03                  | `hermes update` (pid 94438): already up to date; runs **pending fleet restart** ("Restarting gateways left on pre-update code... ✓ Service restarted"), restarting gateways per profile.<br>3 more crashes at 20:24:40/43/45/47 during the restart.                       |
+| 20:26-20:32                        | Fleet-restart gateway cycles in agent.log (plugin re-registration every ~30 s; dylib loaded at 20:26:04/34, 20:27:04, 20:30:39, 20:31:10, 20:31:40, 20:32:11, 20:32:41).                                                                                                  |
+| **20:33:12 / 20:33:38 / 20:33:42** | **The 3x "dylib loaded" the user pasted** (`agent.log:14549/14571/14591`, from `~/.hermes/aphrodite/binaries/`) - last successful dlopens of the crash loop.                                                                                                              |
+| 20:33:17-33                        | TUI gateway children **SIGSEGV loop** (pids 97516→97592, 6 crashes in 16 s; `tui_gateway_crash.log`); TUI kills next child at 20:33:33 (`app.die`).<br>Crash `203338.ips` (pid 97664) at 20:33:38.                                                                        |
+| 20:34:12                           | One more successful load (`agent.log:14611`), then the cycle stops.                                                                                                                                                                                                       |
+| **20:34:34**                       | `~/.hermes/config.yaml` **replaced** (birth 20:34:34); `aphrodite` now in `plugins.disabled` (`config.yaml:566`);<br>`plugins.entries.aphrodite.allow_tool_override` gone - capability check flips `allow`→`deny (evidence=not granted)` at 20:34:45 (`agent.log:14686`). |
+| **20:34:43**                       | `~/.hermes/plugins/` mtime 20:34:43 - the `aphrodite` symlink is removed (dir now contains only `hermes-achievements`).<br>Gateway pid 98245 starts (`gateway-exit-diag.log` 17:34:43Z).                                                                                  |
+| **20:34:45**                       | `~/.hermes/aphrodite` **deleted and recreated empty** (birth 20:34:45; `binaries/` + `hotreload/` now empty).                                                                                                                                                             |
+| **20:34:46**                       | `download.sh exited 1` → curl 404 → **`ERROR aphrodite: ... dylib could not be loaded ... plugin disabled`** (`errors.log:6138-6148`).                                                                                                                                    |
+| 20:34:47-20:35:03                  | Default gateway (pid 98245) comes up cleanly with the plugin gone - telegram connected 20:35:01, no further segfaults.                                                                                                                                                    |
 
 **What changed at the update:** Hermes code did NOT change (already at 64ea66b0). The update's _pending fleet restart_ re-ran every profile gateway through the broken dylib, producing the burst of load lines and crashes the user saw at 20:33. The plugin was then disabled/removed (config rewrite 20:34:34, symlink removal 20:34:43, dir deletion 20:34:45) - consistent with either a deliberate disable to stop the crash loop or an automated cleanup; no log line records which, and the removal itself is not logged (agent.log is silent 20:34:13→20:34:42 apart from plugin-discovery lines).
 
