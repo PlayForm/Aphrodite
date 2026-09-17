@@ -1,4 +1,6 @@
-# HPC Classification - Release Infra + Identity Processes (CUR)
+# HPC Classification - CUR: Release Infra + Identity
+
+See [TAXONOMY.md](TAXONOMY.md) for the code grammar.
 
 **Scope:** Maintain/** (all 47 tracked files), .github/workflows/** (6), .githooks/** (6),
 .gitmodules, .gitattributes, .gitignore, vendor/** (2 gitlinks), profiles/ (deleted),
@@ -10,7 +12,7 @@ Maintain/install.{sh,ps1,bat} (deleted).
 Every row is a _halted process_: opening the file resumes it. Ceremony behavior uses
 the taxonomy grammar `{K}{P}{L}-{N}[annotations]` with →C/→D, +tag/+bump/+float/+guard,
 ∅, @R, and commutative-diagram notation. New codes proposed in this pass are marked
-`[AMEND]` and logged in §5.
+`[AMEND]` and logged in §4.
 
 ---
 
@@ -163,7 +165,9 @@ the taxonomy grammar `{K}{P}{L}-{N}[annotations]` with →C/→D, +tag/+bump/+fl
 
 ---
 
-## 3. Cross-cutting observations (for the advanced methodology)
+## 3. Cross-cutting observations
+
+(for the advanced methodology)
 
 - **Hooks are the identity machinery, not the docs.** The ∅ rules in RELEASE-METHODOLOGY are enforced _mechanically_ by SB5-01 (behind-tip refusal), SB5-03 (detached-HEAD refusal → force tracking branch), SB5-02/04 (auto-bump/floats). The ceremony is now largely self-maintaining; what's left to human discipline is the transplant staging (A4/A9/A10 selective picks) and the tags.
 - **The vendor pin is NOT line-variant; the plugin gitlink IS.** `.gitmodules` on Development: plugin `branch = Development`, vendors `branch = Current` - so "branch field per-branch" (G5-01 ∅) refines to "the plugin's branch field is per-branch; vendor fields are line-fixed to Current". Vendors float to Current tip on both lines, which is why Phase B Action 7 restores `vendor/headroom` (its pin is Current-line-owned) while the plugin gitlink is re-floated per line.
@@ -191,14 +195,7 @@ the taxonomy grammar `{K}{P}{L}-{N}[annotations]` with →C/→D, +tag/+bump/+fl
 
 ---
 
-## 4. Classification summary
-
-- **Tracked files classified: 64** (47 Maintain + 6 workflows + 6 hooks + .gitmodules/.gitattributes/.gitignore + 2 vendor gitlinks).
-- **Absence classifications: 4** (Maintain/install.sh, install.ps1, install.bat, profiles/).
-- **Total entries: 68.**
-- Codes used: G5-01..07, GB4-01/02, SB5-01..06, V7-01/02, SD4-01..13, SB4-01..04, DB4-01..03, CB4-01..03, CD4-01, D@R4-01, PB4-01..04, MB4-01, TD4-01..16, DD4-01, plus ✝ absence codes SD4-97..99 / CD6-99.
-
-## 5. Amendment log (this pass)
+## 4. Amendments (proposed, NOT yet written to TAXONOMY.md)
 
 | Amendment                  | Proposal                                                                                                                                                                                                                     |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -207,3 +204,11 @@ the taxonomy grammar `{K}{P}{L}-{N}[annotations]` with →C/→D, +tag/+bump/+fl
 | `[AMEND] ✝`                | New annotation `✝` = "deleted/absent process; its absence is itself the ceremony rule" (used for install.* and profiles/). Sequence numbers 97-99 reserved for absence entries so they sort apart from live codes.           |
 | `[AMEND] CD6-99 ✝`         | profiles/ deletion coded at layer 6 (meta/process - Hermes agent scaffolding) rather than 4: it was Hermes-profile config, not release infra.                                                                                |
 | `[AMEND] Publish.yml note` | G5-04 carries a documented behavioral discrepancy (tag-push publishes aphrodite/aphrodite-hermes despite Part 4 saying manual opt-in) - pending reconciliation in RELEASE-METHODOLOGY or the workflow.                       |
+
+## 5. Verification
+
+- **Tracked files classified: 64** (47 Maintain + 6 workflows + 6 hooks + .gitmodules/.gitattributes/.gitignore + 2 vendor gitlinks).
+- **Absence classifications: 4** (Maintain/install.sh, install.ps1, install.bat, profiles/).
+- **Total entries: 68.**
+- Codes used: G5-01..07, GB4-01/02, SB5-01..06, V7-01/02, SD4-01..13, SB4-01..04, DB4-01..03, CB4-01..03, CD4-01, D@R4-01, PB4-01..04, MB4-01, TD4-01..16, DD4-01, plus ✝ absence codes SD4-97..99 / CD6-99.
+- `prettier --check` passes.

@@ -1,4 +1,6 @@
-# CUR - Plugin/Loader Classification Pass (plugins/aphrodite submodule)
+# HPC Classification - CUR: Plugin/Loader
+
+See [TAXONOMY.md](TAXONOMY.md) for the code grammar.
 
 **Pass:** CUR (Current-side pass) · **Scope owner:** plugin/loader processes
 **Repo:** Aphrodite monorepo (Development) → `plugins/aphrodite` is a SUBMODULE → PlayForm/Aphrodite-Hermes
@@ -12,7 +14,9 @@ the parent; its tree syncs **FIRST** in both ceremony directions (Phase A1 / Pha
 
 ---
 
-## 1. Per-file classification table
+## 1. Per-file classification
+
+### 1.1 plugins/aphrodite (tracked files)
 
 | Path                                                     | HPC code                                          | Phase                               | Ceremony behavior (annotations + commutative diagram)                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Halted-process resume note (what starts when opened)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | -------------------------------------------------------- | ------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -32,7 +36,7 @@ the parent; its tree syncs **FIRST** in both ceremony directions (Phase A1 / Pha
 | `plugins/aphrodite/tests/test_reaper_prefix_contract.py` | `TD3-04 ∅` _(amendment 11)_                       | Development ONLY                    | Same ∅ rule. Stdlib unittest.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Resumes the **issue-4 cross-platform reaper contract test**: dead-PID tombstones reaped for all three dylib name forms (`.dylib`/`.so`/`.dll`), unrelated prefixes NEVER reaped.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `plugins/aphrodite/tests/test_windows_process_state.py`  | `TD3-05 ∅` _(amendment 12)_                       | Development ONLY                    | Same ∅ rule. Pytest (fixtures + monkeypatch), hermetic via `APHRODITE_HOME`→tmp + `APHRODITE_NO_AUTO_DOWNLOAD=1` + atexit guard.                                                                                                                                                                                                                                                                                                                                                                            | Resumes the **Windows multi-home load-path tests**: second shim exec reuses the mapped handle (no PermissionError on locked DLL), hot-reload still works across shim copies, `_start_proxy` pre-launch health probe (skips only on CONFIRMED aphrodite answer on both ports, never on foreign 200).                                                                                                                                                                                                                                                                                                                                                                            |
 
-**Not-tracked / artifact rows (not counted in files_classified):**
+### 1.2 Not-tracked / artifact rows (not counted in files_classified)
 
 | Path                              | HPC code                                     | Note                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -109,7 +113,7 @@ the parent; its tree syncs **FIRST** in both ceremony directions (Phase A1 / Pha
 
 ---
 
-## 4. Amendment log (this pass - proposals marked, NOT written to TAXONOMY.md)
+## 4. Amendments (proposed, NOT yet written to TAXONOMY.md)
 
 | #    | Amendment                                                                                        | Status   |
 | ---- | ------------------------------------------------------------------------------------------------ | -------- |
@@ -124,3 +128,7 @@ the parent; its tree syncs **FIRST** in both ceremony directions (Phase A1 / Pha
 | 13   | `A-3-01 @R` binaries/** runtime artifacts (untracked, not counted)                               | proposed |
 | 14   | directives/ absence = ceremony rule (directives travel with the binary, materialized at startup) | proposed |
 | 15   | skills NOT shipped = ceremony rule (dev-side `.hermes/skills/`, Development-only)                | proposed |
+
+## 5. Verification
+
+15 tracked files classified in this pass (not-tracked / artifact rows excluded from the count); `prettier --check` passes.

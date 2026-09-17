@@ -1,4 +1,6 @@
-# HPC Classification - DEV: Engine + Build Processes
+# HPC Classification - DEV: Engine + Build
+
+See [TAXONOMY.md](TAXONOMY.md) for the code grammar.
 
 **Scope:** `crates/aphrodite/**` (44 tracked), `crates/aphrodite-hermes/**` (7 tracked),
 root build/config (18 tracked + 3 untracked-but-present), `vendor/**` (2 gitlinks).
@@ -8,13 +10,6 @@ plus `plugins/`, `.github/`, `.githooks/`, `Maintain/`, `directives/` (CUR passe
 **Grammar:** `{K}{P}{L}-{N}[annotations]` - K=kind, P=phase (D/C/B/R), L=layer (1 engine, 2 hermes bridge, 3 plugin, 4 release infra/build, 5 identity, 6 meta, 7 vendor), N=seq.
 Annotations: `→C` (Phase A push-down), `→D` (Phase B sync-back), `+tag`, `+bump`, `+float`, `+guard`, `∅` (never crosses), `@R` (ritual-only).
 All files here are **halted processes**: opening a file resumes the process it halts; the table states what resumes.
-
-**Proposed amendments (marked `[AMEND]`):**
-
-- `[AMEND-1]` Root build/config processes live on **layer 4** (release infra / build), extending the layer map: `CB4-*` configs, `MB4-*` manifests, `GB4-*` git-meta, `AB4-*` artifacts.
-- `[AMEND-2]` Untracked-but-present generated artifacts (lockfiles) get kind `A` + `∅ (untracked)`: they never cross because git never stages them - each line regenerates its own.
-- `[AMEND-3]` Embedded engine templates (`templates/aphrodite.toml`) are `C`-kind with `+tag` (must be refreshed before release); embedded shim copy (`templates/__init__.py`) keeps the taxonomy's existing `MB1-05 +guard`.
-- `[AMEND-4]` `crates/aphrodite/tests/**` and `examples/bench_*` are Development-only **inside the bulk-ship `crates/` dir** - classified `TD1-* ∅`; see cross-cutting #2 for the Phase A hazard.
 
 ---
 
@@ -128,15 +123,24 @@ All files here are **halted processes**: opening a file resumes the process it h
 
 ---
 
-## 3. Cross-cutting observations for the methodology
+## 3. Cross-cutting observations
 
-1. **RELEASE-METHODOLOGY PART 5 (Formatter Contract) is stale against the actual tree.** Three claims don't match reality: (a) `ruff.toml` has **no** `extend-exclude` for `crates/aphrodite/templates/**` (the template is kept ruff-formatted, which is _why_ the byte-identity guard holds); (b) `.vscode/settings.json` has **no** rust-analyzer `rustup run nightly-2026-05-01 rustfmt` override - the only enforcement of the nightly-rustfmt contract lives in CI workflows; (c) `rustfmt.toml` ignores `vendor/`, `target/`, codegen dirs - not `templates/` (irrelevant there since rustfmt only formats `.rs`, but the doc says otherwise). Recommend updating PART 5 to match, or the ceremony will keep "verifying" a config that doesn't exist. Local `cargo fmt` on the stable `rust-toolchain.toml` (1.96.0) silently ignores the unstable options - the drift the contract exists to prevent is currently only caught by CI.
-2. **Dev-only content hides inside the bulk-ship `crates/` dir - Phase A selective-pick hazard.** `crates/aphrodite/tests/**` (4 files) and `examples/bench_*` (6 files) are Development-only (∅) yet sit in the one directory the methodology ships as a unit ("crates/ … ships"). A mechanical `git merge --squash` carries them to Current; only the A2 Action 4 per-file review keeps them off. Recommendation: extend the A3 ships/never-ships table explicitly with `crates/aphrodite/tests/**` and `crates/aphrodite/examples/**`, and consider a `git ls-files crates/ | grep -E 'tests/|examples/'` gate in Action 12.
-3. **The engine is source-in-repo, state-in-`~/.hermes`.** The halted processes in `crates/` _produce_ runtime state but never _hold_ it: `setup.rs` writes `~/.hermes/aphrodite/`, `config_loader.rs` reads it, hermes `directives.rs` materializes directives there, `templates/__init__.py` locates binaries/dylib there. The ceremony therefore never needs to touch user-home state - Current's runtime home is built by its own released binaries (`aphrodite setup`, plugin `download.sh`). Good separation; worth stating explicitly in the methodology so nobody tries to "ship" the runtime home.
-4. **Layer map gap filled (`[AMEND-1]`):** the taxonomy had no home for root build/config processes; this pass places them at layer 4 (`CB4-*`/`MB4-*`/`GB4-*`/`AB4-*`), i.e. layer 4 = "release infra **+ build/config processes**". All root build configs are `→C` (they ship and transfer in both directions via the Phase B selection list: ruff/rustfmt/.vscode/…), none are identity (`G5-* ∅` stays reserved for `.gitmodules`/workflows/gitlink).
-5. **Untracked-artifact convention (`[AMEND-2]`):** lockfiles are real build processes but not repo processes - they get `A` kind + `∅ (untracked)` so the taxonomy is honest that the ceremony has zero relationship with them. Future amendment candidates: `crates/aphrodite/templates/**` dual role (embedded-manifest vs config) could warrant an `E` (embedded) kind; today `M`/`C` with `+guard`/`+tag` suffices.
-6. **The `crates/aphrodite/Cargo.toml` `exclude` NOTE is a packaging guard worth encoding in the taxonomy as `+guard`:** "do NOT add `*.md` to exclude" (builtin directives ship via `include_str!`; v1.3.8 shipped a broken tarball when they were stripped). The comment itself is the guard's documentation - ceremony A0 "gates green" should include a `cargo package --list` sanity check that `src/builtin_directives/*.md` appear.
+1. **Dev-only content hides inside the bulk-ship `crates/` dir - Phase A selective-pick hazard.** `crates/aphrodite/tests/**` (4 files) and `examples/bench_*` (6 files) are Development-only (∅) yet sit in the one directory the methodology ships as a unit ("crates/ … ships"). A mechanical `git merge --squash` carries them to Current; only the A2 Action 4 per-file review keeps them off. Recommendation: extend the A3 ships/never-ships table explicitly with `crates/aphrodite/tests/**` and `crates/aphrodite/examples/**`, and consider a `git ls-files crates/ | grep -E 'tests/|examples/'` gate in Action 12.
+2. **The engine is source-in-repo, state-in-`~/.hermes`.** The halted processes in `crates/` _produce_ runtime state but never _hold_ it: `setup.rs` writes `~/.hermes/aphrodite/`, `config_loader.rs` reads it, hermes `directives.rs` materializes directives there, `templates/__init__.py` locates binaries/dylib there. The ceremony therefore never needs to touch user-home state - Current's runtime home is built by its own released binaries (`aphrodite setup`, plugin `download.sh`). Good separation; worth stating explicitly in the methodology so nobody tries to "ship" the runtime home.
+3. **Layer map gap filled (`[AMEND-1]`):** the taxonomy had no home for root build/config processes; this pass places them at layer 4 (`CB4-*`/`MB4-*`/`GB4-*`/`AB4-*`), i.e. layer 4 = "release infra **+ build/config processes**". All root build configs are `→C` (they ship and transfer in both directions via the Phase B selection list: ruff/rustfmt/.vscode/…), none are identity (`G5-* ∅` stays reserved for `.gitmodules`/workflows/gitlink).
+4. **Untracked-artifact convention (`[AMEND-2]`):** lockfiles are real build processes but not repo processes - they get `A` kind + `∅ (untracked)` so the taxonomy is honest that the ceremony has zero relationship with them. Future amendment candidates: `crates/aphrodite/templates/**` dual role (embedded-manifest vs config) could warrant an `E` (embedded) kind; today `M`/`C` with `+guard`/`+tag` suffices.
+5. **The `crates/aphrodite/Cargo.toml` `exclude` NOTE is a packaging guard worth encoding in the taxonomy as `+guard`:** "do NOT add `*.md` to exclude" (builtin directives ship via `include_str!`; v1.3.8 shipped a broken tarball when they were stripped). The comment itself is the guard's documentation - ceremony A0 "gates green" should include a `cargo package --list` sanity check that `src/builtin_directives/*.md` appear.
 
 ---
 
-**Final count: 74 files/processes classified** (44 `crates/aphrodite`, 7 `crates/aphrodite-hermes`, 21 root build/config incl. 3 untracked lockfiles, 2 vendor gitlinks). No files outside this deliverable were modified. Nothing committed.
+## 4. Amendments (proposed, NOT yet written to TAXONOMY.md)
+
+- `[AMEND-1]` Root build/config processes live on **layer 4** (release infra / build), extending the layer map: `CB4-*` configs, `MB4-*` manifests, `GB4-*` git-meta, `AB4-*` artifacts.
+- `[AMEND-2]` Untracked-but-present generated artifacts (lockfiles) get kind `A` + `∅ (untracked)`: they never cross because git never stages them - each line regenerates its own.
+- `[AMEND-3]` Embedded engine templates (`templates/aphrodite.toml`) are `C`-kind with `+tag` (must be refreshed before release); embedded shim copy (`templates/__init__.py`) keeps the taxonomy's existing `MB1-05 +guard`.
+- `[AMEND-4]` `crates/aphrodite/tests/**` and `examples/bench_*` are Development-only **inside the bulk-ship `crates/` dir** - classified `TD1-* ∅`; see cross-cutting #2 for the Phase A hazard.
+- **RELEASE-METHODOLOGY PART 5 (Formatter Contract) is stale against the actual tree.** Three claims don't match reality: (a) `ruff.toml` has **no** `extend-exclude` for `crates/aphrodite/templates/**` (the template is kept ruff-formatted, which is _why_ the byte-identity guard holds); (b) `.vscode/settings.json` has **no** rust-analyzer `rustup run nightly-2026-05-01 rustfmt` override - the only enforcement of the nightly-rustfmt contract lives in CI workflows; (c) `rustfmt.toml` ignores `vendor/`, `target/`, codegen dirs - not `templates/` (irrelevant there since rustfmt only formats `.rs`, but the doc says otherwise). Recommend updating PART 5 to match, or the ceremony will keep "verifying" a config that doesn't exist. Local `cargo fmt` on the stable `rust-toolchain.toml` (1.96.0) silently ignores the unstable options - the drift the contract exists to prevent is currently only caught by CI.
+
+## 5. Verification
+
+**Final count: 74 files/processes classified** (44 `crates/aphrodite`, 7 `crates/aphrodite-hermes`, 21 root build/config incl. 3 untracked lockfiles, 2 vendor gitlinks). No files outside this deliverable were modified. Nothing committed. `prettier --check` passes on this file.

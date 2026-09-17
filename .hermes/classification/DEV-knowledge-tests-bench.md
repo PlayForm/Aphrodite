@@ -1,4 +1,6 @@
-# HPC Classification Pass 2 - DEV knowledge / tests / bench
+# HPC Classification - DEV: Knowledge / Tests / Bench
+
+See [TAXONOMY.md](TAXONOMY.md) for the code grammar.
 
 **Scope owner:** Development-side knowledge + verification processes (`.hermes/**`, `bench/**`, `tests/**`, `assets/**`, `docs/**`).
 **Taxonomy:** `.hermes/classification/TAXONOMY.md` v0.1. **Methodology:** `.hermes/notes/RELEASE-METHODOLOGY.md` (canonical).
@@ -8,7 +10,7 @@ Reading convention: every row below is a _halted process_. The HPC code says whi
 
 ---
 
-## 1. Per-file classification table
+## 1. Per-file classification
 
 ### 1.1 `.hermes/**` - the Development knowledge layer (all ∅, never crosses)
 
@@ -194,7 +196,7 @@ Reading convention: every row below is a _halted process_. The HPC code says whi
 
 7. **`bench/navigate/` does not exist.** The navigation feature is dead/experimental (`crates/s2-*` excluded from the workspace in v1.4.2); nothing in `bench/` or `tests/` exercises it.
 
-## 3. Cross-cutting observations (for the methodology)
+## 3. Cross-cutting observations
 
 - **The dev-side scope is a one-way knowledge sink.** Everything here is `D*6 ∅` except `docs/**` (`DB6 →C`) and `assets/**` (`AB6 →C`). Knowledge flows _down_ freely (Development accumulates append-only: notes, skills, UML, bench) and _up_ only as finished content (docs). The taxonomy captures this asymmetry exactly: layer 6 is where "which process feeds which process" is mostly one-directional - the processes that _produce_ the release (methodology, strategy, handoff, scope, skills) never ride the artifact they produce.
 - **Every `.hermes/notes/CONTINUE-*` file is a literal halted process.** They open with "Read this FIRST to resume" and carry state tables, next-steps in order, and known-issues - the strongest confirmation of the taxonomy's core framing. `RELEASE-METHODOLOGY.md` is the permanent continuation; the CONTINUE notes are the session-scoped ones. Same pattern at skill granularity: `aphrodite-branch-release-flow` is the ceremony-as-procedure, `aphrodite-release-workflow` is its predecessor (superseded by the methodology, kept as history).
@@ -203,7 +205,9 @@ Reading convention: every row below is a _halted process_. The HPC code says whi
 - **Layer-by-location, not by function.** `.hermes/release/*` and `release-notes/*` are functionally layer 4 (release infra) but sit in `.hermes` → layer 6. The taxonomy's layer map says `.hermes/` = 6, so classification follows location; the functional layer-4 adjacency (RELEASE-SCOPE as `MD6-01 +guard` behaves like a release manifest) is worth a taxonomy note (amendment 2).
 - **Untracked ≠ unprotected.** `.hermes/classification/` is untracked (`??`) - the squash transplant only stages _tracked_ changes, so untracked dev scaffolding would not even reach the staged set; and if committed, the protected-path restore drops it anyway. Two independent layers of protection.
 
-### Amendments (explicit, proposed for TAXONOMY.md v0.2)
+## 4. Amendments (proposed, NOT yet written to TAXONOMY.md)
+
+Explicit, proposed for TAXONOMY.md v0.2:
 
 | #   | Amendment                                                                                                                                                                                                                    | Rationale                                                                                                                                                                                          |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -213,9 +217,10 @@ Reading convention: every row below is a _halted process_. The HPC code says whi
 
 ---
 
-## 4. Count verification
+## 5. Verification
 
 - Tracked files in scope: `.hermes/` 54 · `bench/` 37 · `tests/` 5 · `assets/` 5 · `docs/` 35 = **136** (matches `git ls-files` 136-file inventory).
 - Classification files: `TAXONOMY.md` (1) + this deliverable (1) = **138 file rows** in the table.
 - Directory-as-process row: `.hermes/classification/` (`PD6-01 ∅`) - 1 additional non-file row.
 - **Total files classified: 138.** Every tracked file in the assigned scope is tabled exactly once; nothing unclassified remains (verified against the full `git ls-files` list filtered to the scope prefixes; `references/` and `bench/navigate/` confirmed absent).
+- `prettier --check` passes on this file.
