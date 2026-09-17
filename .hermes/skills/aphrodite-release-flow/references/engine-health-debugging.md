@@ -51,18 +51,18 @@ not just the API tools):
 
 ## Failure-chain decision table
 
-| Symptom | Meaning |
-|---|---|
-| stats `proxies.alive:false` + no processes | proxies never launched; read proxy-stderr.log for why |
-| proxy-stderr.log "no API key configured" | token proxy needs APHRODITE_API_KEY / toml `api_key` (key sourcing in plugin-lifecycle.md) |
-| `aphrodite` binary missing | never downloaded, or dev symlink broken by cargo clean |
-| catalog has entries, ccr.db 0 bytes | inline memory-only mode (proxies down) - expected; entries vanish on restart |
-| `~/Library/Application Support/aphrodite/ccr.db` (large, old mtime) | orphaned legacy db from an old standalone install - not the live store; leave it |
-| `aphrodite_rebuild` version ≠ stats version | stale dylib; rebuild via `cargo build --release -p aphrodite`, hot-reloads on mtime change |
+| Symptom                                                             | Meaning                                                                                    |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| stats `proxies.alive:false` + no processes                          | proxies never launched; read proxy-stderr.log for why                                      |
+| proxy-stderr.log "no API key configured"                            | token proxy needs APHRODITE_API_KEY / toml `api_key` (key sourcing in plugin-lifecycle.md) |
+| `aphrodite` binary missing                                          | never downloaded, or dev symlink broken by cargo clean                                     |
+| catalog has entries, ccr.db 0 bytes                                 | inline memory-only mode (proxies down) - expected; entries vanish on restart               |
+| `~/Library/Application Support/aphrodite/ccr.db` (large, old mtime) | orphaned legacy db from an old standalone install - not the live store; leave it           |
+| `aphrodite_rebuild` version ≠ stats version                         | stale dylib; rebuild via `cargo build --release -p aphrodite`, hot-reloads on mtime change |
 
 ## Path resolution
 
 - `_data_dir()` honors `APHRODITE_HOME` override, else `~/.hermes/aphrodite`
-  - Python side only. The Rust proxy/dylib keep resolving `aphrodite.toml`
-  and `ccr.db` on their own; overrides set for the Python side do not move
-  the Rust paths.
+    - Python side only. The Rust proxy/dylib keep resolving `aphrodite.toml`
+      and `ccr.db` on their own; overrides set for the Python side do not move
+      the Rust paths.

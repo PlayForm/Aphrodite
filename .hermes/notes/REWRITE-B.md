@@ -18,14 +18,14 @@
 
 ## Per-file summary
 
-| File | Wide tables (orig lines) | Rows | Cells before → after | Fenced cells | Backticks before → after | Prettier |
-| --- | --- | --- | --- | --- | --- | --- |
-| ISSUE-11-PREVIEW-SYSTEM-AUDIT.md | 3 (38-42, 46-53, 81-101) | 28 | 122 → 122 | 0 | 794 → 794 | unchanged |
-| RELEASE-METHODOLOGY.md | 2 (163-165, 327-333) | 6 | 17 → 17 | 0 | 278 → 278 | unchanged |
-| RELEASE-STRATEGY-1.4.3-1.5.0.md | 3 (14-22, 51-54, 274-288) | 22 | 66 → 66 | 2 | 404 → 448 | reformatted |
-| RESEARCH-FORK-INTEGRATION.md | 1 (91-98) | 6 | 18 → 18 | 0 | 722 → 722 | unchanged |
-| RESEARCH-UPSTREAM.md | 4 (11-17, 136-148, 158-168, 192-200) | 32 | 112 → 112 | 0 | 804 → 824 | unchanged |
-| **Total** | **13** | **94** | **335 → 335** | **2** | - | exit 0 |
+| File                             | Wide tables (orig lines)             | Rows   | Cells before → after | Fenced cells | Backticks before → after | Prettier    |
+| -------------------------------- | ------------------------------------ | ------ | -------------------- | ------------ | ------------------------ | ----------- |
+| ISSUE-11-PREVIEW-SYSTEM-AUDIT.md | 3 (38-42, 46-53, 81-101)             | 28     | 122 → 122            | 0            | 794 → 794                | unchanged   |
+| RELEASE-METHODOLOGY.md           | 2 (163-165, 327-333)                 | 6      | 17 → 17              | 0            | 278 → 278                | unchanged   |
+| RELEASE-STRATEGY-1.4.3-1.5.0.md  | 3 (14-22, 51-54, 274-288)            | 22     | 66 → 66              | 2            | 404 → 448                | reformatted |
+| RESEARCH-FORK-INTEGRATION.md     | 1 (91-98)                            | 6      | 18 → 18              | 0            | 722 → 722                | unchanged   |
+| RESEARCH-UPSTREAM.md             | 4 (11-17, 136-148, 158-168, 192-200) | 32     | 112 → 112            | 0            | 804 → 824                | unchanged   |
+| **Total**                        | **13**                               | **94** | **335 → 335**        | **2**        | -                        | exit 0      |
 
 Expansion criterion (per spec): any cell over ~140 chars, or line padded beyond ~300 chars (table-alignment padding that breaks rendering). All such tables expanded; all remaining tables are narrow and kept as tables.
 

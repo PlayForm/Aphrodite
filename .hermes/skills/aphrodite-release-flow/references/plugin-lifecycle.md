@@ -67,7 +67,7 @@ created wrong symlinks); the plugin self-installs + self-heals at startup.
    `~/Developer/.playform/Temporary/`.
 2. `rm ~/.hermes/plugins/aphrodite` (the symlink only - never the checkout),
    `rm -rf ~/.hermes/aphrodite` (data dir).
-2b. Sweep for LEGACY symlinks, not just the current paths: an old setup
+   2b. Sweep for LEGACY symlinks, not just the current paths: an old setup
    may have left bare `~/.hermes/directives` → repo `directives/` links
    predating the relocation (directives now live in
    `~/.hermes/aphrodite/directives/`, materialized by the binary - the bare
@@ -78,11 +78,11 @@ created wrong symlinks); the plugin self-installs + self-heals at startup.
    install, nor dev-side skill symlinks under the monorepo's `.hermes/`.
 3. Config refs via the sanctioned CLI - `hermes plugins uninstall` REFUSES
    out-of-tree symlink installs, so use:
-   - `hermes config unset plugins.entries.aphrodite`
-   - `hermes config set plugins.enabled '[...minus aphrodite]'`
-   - `platform_toolsets.*` / `known_plugin_toolsets.*` are dynamic sections;
-     `hermes config set` needs `--force` there ("custom top-level key"
-     notice) or they regenerate on next start without the plugin.
+    - `hermes config unset plugins.entries.aphrodite`
+    - `hermes config set plugins.enabled '[...minus aphrodite]'`
+    - `platform_toolsets.*` / `known_plugin_toolsets.*` are dynamic sections;
+      `hermes config set` needs `--force` there ("custom top-level key"
+      notice) or they regenerate on next start without the plugin.
 4. Cache: remove the aphrodite key from
    `~/.hermes/cache/plugin_toolset_keys.json`.
 5. Remove plugin-shipped skills from `~/.hermes/skills/` (preserve first).

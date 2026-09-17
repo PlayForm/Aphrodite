@@ -18,7 +18,7 @@ declaration and the ceremony.
 
 - **Development** = workshop (accumulates, never rewritten). **Current** =
   distributed line; tags + releases live ONLY here. The two branches are
-different products, not mergeable twins.
+  different products, not mergeable twins.
 - **Branch-owned identity (protected, NEVER cross a transplant):**
   `.gitmodules` branch field, `.github/workflows/*` triggers
   (`[Development]` vs `[Current]`), and the `plugins/aphrodite` gitlink.
@@ -28,7 +28,7 @@ different products, not mergeable twins.
   and S's `BINARY_VERSION` file = which binary release the plugin pairs with
   (what `download.sh` fetches). Bump procedure (verified): the TWO parent
   crates + the `aphrodite-hermes` Cargo.toml's `aphrodite = { path = ..,
-  version = "X" }` dep pin must move TOGETHER in one ceremony (cargo check
+version = "X" }` dep pin must move TOGETHER in one ceremony (cargo check
   fails otherwise); package.json carries the binary version too. Bump all
   parent spots, then plugin.yaml + its install_message + README badges
   (they drift - the badge may lag two minors), then BINARY_VERSION. A LOCAL
@@ -52,7 +52,7 @@ different products, not mergeable twins.
   plugin/loader + release-infra/identity) with disjoint file ownership,
   each writing one `{PHASE}-{scope}.md` into `.hermes/classification/`
   with the shared table schema `Path | HPC code | Phase | Ceremony
-  behavior | Halted-process resume note`. Pass files mark proposals
+behavior | Halted-process resume note`. Pass files mark proposals
   `(proposed, NOT yet written to TAXONOMY.md)`; folds bump TAXONOMY to a
   new minor version (v0.1 → v0.2) and land in the amendment log. When a
   pass flags a discrepancy between RELEASE-METHODOLOGY.md and the actual
@@ -65,15 +65,15 @@ different products, not mergeable twins.
 ## Release ceremony (Development → Current) - submodule first
 
 1. Prep on Development: work, bump binary `1.4.x`, gates (`cargo clippy -p
-   aphrodite -- -D warnings`, `ruff check plugins/aphrodite/`, tests).
+aphrodite -- -D warnings`, `ruff check plugins/aphrodite/`, tests).
    Commit on Development. Do NOT tag here.
 2. S sync first (the parent's gitlink must reference the released plugin):
    S-Current → `git merge --squash Development` → commit `release: sync
-   vX.Y.Z` → push.
+vX.Y.Z` → push.
 3. P sync: `git merge --squash <cutoff>` on Current → restore protected paths
    (`git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite`)
    → float the plugin gitlink to S-Current tip → verify I9 + `git submodule
-   status` shows no `+` → commit `release: sync vX.Y.Z from Development` →
+status` shows no `+` → commit `release: sync vX.Y.Z from Development` →
    push.
 4. Tag **on the release-sync commit**, push the tag. Build.yml fires on
    `refs/tags/Aphrodite/*` (branch-agnostic).
@@ -114,15 +114,15 @@ Current's tree is test-free with dev-scaffolding absent.
 2. Decide per commit: PICK real fixes (setup.rs changes, config-template
    refresh, docs URL fixes, release-notes finalization, version bumps that
    ride the line). SKIP gitlink-only bumps (`chore: bump plugin submodule to
-   <sha>` - the gitlink is branch-owned, Development floats its own),
+<sha>` - the gitlink is branch-owned, Development floats its own),
    style-only commits on files Development has since rewritten, and release
    snapshots that re-add directories Development deliberately removed
    (e.g. `directives/`) or delete test files (Development keeps tests).
 3. No hooks to disable: the entire `.githooks/` set was REMOVED (2026-09-17)
-   - `core.hooksPath` unset in parent AND submodule (default `.git/hooks`),
-   `package.json` `prepare` stripped (it re-installed hooks on every npm
-   install), `.gitattributes` hook lines dropped. Never re-create the hooks
-   or the prepare script: they were the phantom-gitlink resurrection vector.
+    - `core.hooksPath` unset in parent AND submodule (default `.git/hooks`),
+      `package.json` `prepare` stripped (it re-installed hooks on every npm
+      install), `.gitattributes` hook lines dropped. Never re-create the hooks
+      or the prepare script: they were the phantom-gitlink resurrection vector.
 4. Cherry-pick in CHRONOLOGICAL order with `-x` (the version bumps then
    apply in sequence).
 5. Conflict-resolution rule: for a release-line fix take the PICKED side's
@@ -138,7 +138,7 @@ Current's tree is test-free with dev-scaffolding absent.
    `git checkout HEAD -- plugins/aphrodite`.
 8. Verify before pushing: protected paths unchanged vs pre-pick HEAD
    (`git diff <pre-pick-HEAD> HEAD -- .gitmodules .github/workflows
-   plugins/aphrodite` empty); every picked commit's files exist in HEAD
+plugins/aphrodite` empty); every picked commit's files exist in HEAD
    (`git cat-file -e HEAD:<file>`); `git submodule status` shows no '+'; no
    160000 phantom in the submodule.
 9. Push may report "Everything up-to-date" because the auto-committer
@@ -154,7 +154,7 @@ them and verify the remaining diff is empty.
 ## Pre-tag readiness checks (do BEFORE claiming a version or tagging)
 
 - **crates.io may already have your version**: `curl -A <ua>
-  https://crates.io/api/v1/crates/<crate>` → `max_version`. If the number
+https://crates.io/api/v1/crates/<crate>` → `max_version`. If the number
   you are about to bump to is already published (a parallel release won the
   race), claim the NEXT number instead. The crates.io API rejects requests
   without a User-Agent.
@@ -180,7 +180,7 @@ them and verify the remaining diff is empty.
   byte-identical to the live plugin `__init__.py` (setup.rs asserts it).
 - **Verify what a plain tag push triggers**: Publish.yml's publish steps
   for `aphrodite`/`aphrodite-hermes` carry `|| startsWith(github.ref,
-  'refs/tags/Aphrodite/')` - a plain tag push DOES attempt crates.io
+'refs/tags/Aphrodite/')` - a plain tag push DOES attempt crates.io
   publishing; only `headroom-core` is truly dispatch-gated. The
   methodology's 'manual, deliberate only' claim is stale on this point -
   check the workflow's current gates before tagging if opt-in publishing
@@ -222,11 +222,11 @@ orientation banner is NOT the ground truth - `aphrodite_stats` is.
   inside a submodule pointing at its OWN commit, swept in by the
   auto-committer alongside unrelated work. Symptom: `git submodule status`
   INSIDE the submodule fails with `fatal: no submodule mapping found in
-  .gitmodules for path '<submodule-name>'` (the submodule has NO
+.gitmodules for path '<submodule-name>'` (the submodule has NO
   `.gitmodules`, so any 160000 entry is self-referential); the remote shows
   a nested `plugins/aphrodite` folder that should not exist, and
   `git clone --recurse-submodules` dies with `fatal: No url found for
-  submodule path 'X/X' in .gitmodules`. Detect inside the submodule with
+submodule path 'X/X' in .gitmodules`. Detect inside the submodule with
   `git -C <submodule> ls-files -s | grep 160000` (a hit = phantom), then
   `git -C <submodule> rm --cached <path>` + verify the grep is empty +
   `git status` clean. Commit, push; float parent gitlinks OFF any commit
@@ -248,7 +248,7 @@ orientation banner is NOT the ground truth - `aphrodite_stats` is.
   file with TWO conflict regions: resolving the first and continuing commits
   the still-marker'd second region into the branch. Grep the committed file
   set for `<<<<<<<` after every `--continue`; fix + `git commit --amend
-  --no-edit` when one slipped through.
+--no-edit` when one slipped through.
 - **Empty cherry-pick is "already contained", not an error.**
   `nothing to commit, working tree clean` means the change is already in
   HEAD via an earlier pick or merge resolution - verify with
@@ -268,7 +268,7 @@ orientation banner is NOT the ground truth - `aphrodite_stats` is.
   gitlink auto-bump, and the commit gate are gone: submodule pins are
   verified by hand (`git submodule status` shows no '+' = I2), and a
   detached submodule HEAD is fixed manually (`git -C plugins/aphrodite
-  checkout Development`).
+checkout Development`).
 - **Submodule-first ordering is mandatory**: plugin sync before parent, so
   the parent's gitlink references the released plugin in one pass.
 - **Removing a subsystem = sweep the whole tree, then record the absence.**
