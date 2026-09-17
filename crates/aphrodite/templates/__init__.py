@@ -417,6 +417,8 @@ def _load_dylib() -> ctypes.CDLL:
             dylib.aphrodite_hermes_call_hook.restype = ctypes.c_void_p
             dylib.aphrodite_hermes_proxy_health.restype = ctypes.c_void_p
             dylib.aphrodite_hermes_version.restype = ctypes.c_void_p
+            dylib.aphrodite_hermes_materialize_directives.argtypes = [ctypes.c_char_p]
+            dylib.aphrodite_hermes_materialize_directives.restype = ctypes.c_void_p
             dylib.aphrodite_hermes_free_string.argtypes = [ctypes.c_void_p]
         except AttributeError as e:
             # A stale/mismatched dylib (see _check_version) surfacing as a
@@ -447,8 +449,19 @@ def _call_json(dylib: ctypes.CDLL, fn_name: str, *args: bytes) -> Any:
     object that produced the pointer (F4: allocating and freeing through
     different hot-reloaded images is only safe by accident today - benign
     while both use the system allocator, undefined behavior the day a
-    custom global allocator is added)."""
+    custom global allocator is added).
+
+    Every function routed through here returns a *mut c_char. Force
+    restype=c_void_p so a 64-bit pointer return is read at full width:
+    the default restype (c_int) truncates the pointer to 32 bits and
+    sign-extends it, and _read_str then strlen()s a bogus low address -
+    the SIGSEGV in z_get this plugin shipped (materialize_directives was
+    configured everywhere except here). Setting it unconditionally is a
+    no-op for already-configured fns and a correctness clamp for any
+    future one added without a setup-block entry.
+    """
     fn = getattr(dylib, fn_name)
+    fn.restype = ctypes.c_void_p
     ptr = fn(*args)
     result = _read_str(ptr)
     if ptr:
