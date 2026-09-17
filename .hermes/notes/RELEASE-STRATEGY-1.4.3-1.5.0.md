@@ -11,15 +11,45 @@ deviation is explicitly flagged in §10.
 
 ## 1. Verified repository state (2026-09-16, read-only)
 
-|                        | Parent P (`PlayForm/Aphrodite`)                                                                                                                                                            | Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`)   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| HEAD                   | `4f14235` on Development (Source/Development in sync)                                                                                                                                      | `b6fecad` on Development (Source/Development in sync)            |
-| Current tip            | `0028705` (= Source/Current, Source/HEAD)                                                                                                                                                  | `5b62d68` (= Source/Current, Source/HEAD)                        |
-| Merge-base Dev/Current | `3100948`                                                                                                                                                                                  | `0c1f130`                                                        |
-| Tags                   | `Aphrodite/v0.x … Aphrodite/v1.4.2` - **no `Aphrodite/v1.4.3`, no `Aphrodite/v1.5.0`**                                                                                                     | `v1.62.x, v2.0.x, v2.1.0 … v2.1.2` - **no `v2.1.3`**             |
-| Gitlink                | P→S = `b6fecad` (clean, no `+` in `git submodule status`)                                                                                                                                  | S has no submodules                                              |
-| Version state          | binary 1.4.3 (bump `5d8c09a`), plugin 2.1.3 (`plugin.yaml`, bumped in S `350e8c2`)                                                                                                         | `plugin.yaml: 2.1.3`, min_hermes 0.16.0                          |
-| Protected-state        | Current lacks `.hermes/`, `bench/`, `skills/` (Current-only cleanup `cda5d0a`, `c876fbe`); Current-only `.githooks/pre-commit` deletion + `.gitignore`/root `Cargo.toml` trims (`0028705`) | Current has 1 extra commit `5b62d68` (hook-battery test removal) |
+**Property:** HEAD
+**Parent P (`PlayForm/Aphrodite`):** `4f14235` on Development (Source/Development in sync)
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** `b6fecad` on Development (Source/Development in sync)
+
+---
+
+**Property:** Current tip
+**Parent P (`PlayForm/Aphrodite`):** `0028705` (= Source/Current, Source/HEAD)
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** `5b62d68` (= Source/Current, Source/HEAD)
+
+---
+
+**Property:** Merge-base Dev/Current
+**Parent P (`PlayForm/Aphrodite`):** `3100948`
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** `0c1f130`
+
+---
+
+**Property:** Tags
+**Parent P (`PlayForm/Aphrodite`):** `Aphrodite/v0.x … Aphrodite/v1.4.2` - **no `Aphrodite/v1.4.3`, no `Aphrodite/v1.5.0`**
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** `v1.62.x, v2.0.x, v2.1.0 … v2.1.2` - **no `v2.1.3`**
+
+---
+
+**Property:** Gitlink
+**Parent P (`PlayForm/Aphrodite`):** P→S = `b6fecad` (clean, no `+` in `git submodule status`)
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** S has no submodules
+
+---
+
+**Property:** Version state
+**Parent P (`PlayForm/Aphrodite`):** binary 1.4.3 (bump `5d8c09a`), plugin 2.1.3 (`plugin.yaml`, bumped in S `350e8c2`)
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** `plugin.yaml: 2.1.3`, min_hermes 0.16.0
+
+---
+
+**Property:** Protected-state
+**Parent P (`PlayForm/Aphrodite`):** Current lacks `.hermes/`, `bench/`, `skills/` (Current-only cleanup `cda5d0a`, `c876fbe`); Current-only `.githooks/pre-commit` deletion + `.gitignore`/root `Cargo.toml` trims (`0028705`)
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** Current has 1 extra commit `5b62d68` (hook-battery test removal)
 
 Tag collision check: `git tag | grep -E 'Aphrodite/v1\.4\.3|Aphrodite/v1\.5\.0'` and
 `git -C plugins/aphrodite tag | grep 'v2\.1\.3'` are both empty today → all three
@@ -48,10 +78,20 @@ commit BEFORE chain-split landed. Commits after that freeze split as follows -
 the boundary commit is **`73b3272`** (chain-split core `475917d` and
 everything after it belongs to 1.5.0):
 
-| Track                                 | P commits (oldest → newest)                                                                                                                                       | Content                                                                                                                                                                                                                                                                                                                     |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1.4.3** (through cutoff `73b3272`)  | `9288d9e ad010af 6d6287e 405817c 5056669 4408ea4 c1ad84a 208f8c8 46f1107 ccd8074 5d8c09a 8afe8e0 db12c86 48abe46 5effa73 6f531a5 fb63aa5 4b06e79 aa10794 73b3272` | frozen prep (bump `5d8c09a`, notes `8afe8e0`, draft `db12c86`, gitignore `48abe46`, bench suite `5effa73`, handoff `6f531a5`, CCR notes `fb63aa5`, AGENTS.md `4b06e79`, scope `aa10794`, docs `73b3272`) - **NO chain-split** (verified: `git grep chain_split 73b3272 -- crates/` empty; no `chain_split.rs` at that tree) |
-| **1.5.0** (after cutoff, current tip) | `475917d d26dd89 8521b27 85771ee 50ff098 5e18dd3 da57c79 9f70cc0 f94c4fa` + gitlink bumps                                                                         | **chain-split core `475917d`** (`chain_split.rs` + wiring, `chain_split = false` default), output-invisibility `d26dd89`, directive prose `8521b27`, continuation notes `5e18dd3`, **Tier-1 teaching loop `85771ee`**, **Tier-3 error hints `50ff098`**, retrieve round-trip fix `da57c79`, .gitignore commits              |
+**Track:** **1.4.3** (through cutoff `73b3272`)
+**P commits (oldest → newest):**
+
+```text
+9288d9e ad010af 6d6287e 405817c 5056669 4408ea4 c1ad84a 208f8c8 46f1107 ccd8074 5d8c09a 8afe8e0 db12c86 48abe46 5effa73 6f531a5 fb63aa5 4b06e79 aa10794 73b3272
+```
+
+**Content:** frozen prep (bump `5d8c09a`, notes `8afe8e0`, draft `db12c86`, gitignore `48abe46`, bench suite `5effa73`, handoff `6f531a5`, CCR notes `fb63aa5`, AGENTS.md `4b06e79`, scope `aa10794`, docs `73b3272`) - **NO chain-split** (verified: `git grep chain_split 73b3272 -- crates/` empty; no `chain_split.rs` at that tree)
+
+---
+
+**Track:** **1.5.0** (after cutoff, current tip)
+**P commits (oldest → newest):** `475917d d26dd89 8521b27 85771ee 50ff098 5e18dd3 da57c79 9f70cc0 f94c4fa` + gitlink bumps
+**Content:** **chain-split core `475917d`** (`chain_split.rs` + wiring, `chain_split = false` default), output-invisibility `d26dd89`, directive prose `8521b27`, continuation notes `5e18dd3`, **Tier-1 teaching loop `85771ee`**, **Tier-3 error hints `50ff098`**, retrieve round-trip fix `da57c79`, .gitignore commits
 
 S-side has **no dual track**: all 6 post-v2.1.2 S commits (`1086c4a 350e8c2
 4238b38 15e03d8 90e7c9f b6fecad`) ship in plugin **v2.1.3** with 1.4.3. The
@@ -271,21 +311,85 @@ git checkout Development
 
 ## 9. Invariant checklist (run after EACH release ritual - any failure blocks)
 
-| #   | Predicate                                                   | Check (on the released state)                                                                                                                                                                                               |
-| --- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| I1  | Both repos on a named branch; hooks float on detach         | `git symbolic-ref -q HEAD` succeeds in P and S                                                                                                                                                                              |
-| I2  | No stale gitlinks                                           | `git submodule status` shows no `+`; `git status` no `M plugins/aphrodite`                                                                                                                                                  |
-| I3  | Current tree == tagged released content                     | `git diff 8521b27 Aphrodite/v1.4.3 -- . ':(exclude).hermes' ':(exclude)bench' ':(exclude)skills' ':(exclude).github' ':(exclude).gitmodules' ':(exclude)plugins/aphrodite'` empty (same for `Development→Aphrodite/v1.5.0`) |
-| I4  | Development static: append-only, no rebase/reset            | `git reflog` shows no reset/rebase since freeze                                                                                                                                                                             |
-| I5  | `.gitmodules` branch field matches branch                   | `grep branch .gitmodules` → `Current` on Current, `Development` on Development                                                                                                                                              |
-| I6  | Workflow triggers branch-specific                           | `grep -r branches .github/workflows` → `[Current]` on Current, `[Development]` on Development                                                                                                                               |
-| I7  | Every upward pick carries `-x` + manifest entry             | n/a unless a Current hotfix occurred; then `.hermes/picks/` has the entry                                                                                                                                                   |
-| I8  | Versions monotonic                                          | 1.4.3 → 1.5.0, plugin 2.1.3 once; `git log --format=%s                                                                                                                                                                      | grep bump` shows no reuse   |
-| I9  | Protected paths clean after transplant                      | `git diff HEAD -- .gitmodules .github/workflows .hermes bench skills` empty on Current                                                                                                                                      |
-| I10 | Working copy on Development; Current touched only in ritual | `git branch --show-current` == Development at session end (P and S)                                                                                                                                                         |
-| D1  | Selective boundary honored                                  | 1.4.3: `git grep adapt_chain_split_threshold Aphrodite/v1.4.3` and `git grep error_hint Aphrodite/v1.4.3` → nothing; 1.5.0: both present                                                                                    |
-| D2  | chain-split opt-in OFF                                      | `git show Aphrodite/v1.4.3:aphrodite.toml                                                                                                                                                                                   | grep 'chain_split = false'` |
-| D3  | Tracks sequential + parented                                | `git rev-parse Aphrodite/v1.5.0^` == `git rev-parse Aphrodite/v1.4.3`; `git rev-parse Aphrodite/v1.4.3^` == `git rev-parse 0028705`                                                                                         |
+**#:** I1
+**Predicate:** Both repos on a named branch; hooks float on detach
+**Check (on the released state):** `git symbolic-ref -q HEAD` succeeds in P and S
+
+---
+
+**#:** I2
+**Predicate:** No stale gitlinks
+**Check (on the released state):** `git submodule status` shows no `+`; `git status` no `M plugins/aphrodite`
+
+---
+
+**#:** I3
+**Predicate:** Current tree == tagged released content
+**Check (on the released state):** `git diff 8521b27 Aphrodite/v1.4.3 -- . ':(exclude).hermes' ':(exclude)bench' ':(exclude)skills' ':(exclude).github' ':(exclude).gitmodules' ':(exclude)plugins/aphrodite'` empty (same for `Development→Aphrodite/v1.5.0`)
+
+---
+
+**#:** I4
+**Predicate:** Development static: append-only, no rebase/reset
+**Check (on the released state):** `git reflog` shows no reset/rebase since freeze
+
+---
+
+**#:** I5
+**Predicate:** `.gitmodules` branch field matches branch
+**Check (on the released state):** `grep branch .gitmodules` → `Current` on Current, `Development` on Development
+
+---
+
+**#:** I6
+**Predicate:** Workflow triggers branch-specific
+**Check (on the released state):** `grep -r branches .github/workflows` → `[Current]` on Current, `[Development]` on Development
+
+---
+
+**#:** I7
+**Predicate:** Every upward pick carries `-x` + manifest entry
+**Check (on the released state):** n/a unless a Current hotfix occurred; then `.hermes/picks/` has the entry
+
+---
+
+**#:** I8
+**Predicate:** Versions monotonic
+**Check (on the released state):** 1.4.3 → 1.5.0, plugin 2.1.3 once; `git log --format=%s                                                                                                                                                                      | grep bump` shows no reuse
+
+---
+
+**#:** I9
+**Predicate:** Protected paths clean after transplant
+**Check (on the released state):** `git diff HEAD -- .gitmodules .github/workflows .hermes bench skills` empty on Current
+
+---
+
+**#:** I10
+**Predicate:** Working copy on Development; Current touched only in ritual
+**Check (on the released state):** `git branch --show-current` == Development at session end (P and S)
+
+---
+
+**#:** D1
+**Predicate:** Selective boundary honored
+**Check (on the released state):** 1.4.3: `git grep adapt_chain_split_threshold Aphrodite/v1.4.3` and `git grep error_hint Aphrodite/v1.4.3` → nothing; 1.5.0: both present
+
+---
+
+**#:** D2
+**Predicate:** chain-split opt-in OFF
+**Check (on the released state):**
+
+```sh
+git show Aphrodite/v1.4.3:aphrodite.toml                                                                                                                                                                                   | grep 'chain_split = false'
+```
+
+---
+
+**#:** D3
+**Predicate:** Tracks sequential + parented
+**Check (on the released state):** `git rev-parse Aphrodite/v1.5.0^` == `git rev-parse Aphrodite/v1.4.3`; `git rev-parse Aphrodite/v1.4.3^` == `git rev-parse 0028705`
 
 ## 10. Verification vs the skills - deliberate deviations (all intentional)
 

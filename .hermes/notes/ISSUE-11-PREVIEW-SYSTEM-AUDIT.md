@@ -35,22 +35,57 @@ defect classes:
 
 ### Classifiers (three, non-shared vocabularies)
 
-| Classifier                              | Location                                                                                                                        | Outputs                                                                                                                                                               |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Headroom `ContentType` (7)              | `vendor/headroom/crates/headroom-core/src/transforms/content_detector.rs:33` (enum), consumed via `preview.rs:14` `detect_type` | `json_array`, `source_code`, `search`, `build`, `diff`, `html`, `text`                                                                                                |
-| Proxy `proxy_detect_content_type` (~17) | `crates/aphrodite/src/proxy.rs:1336-1480`                                                                                       | `tool_output`, `json`, `code_rust`, `code_python`, `code_go`, `code_js`, `code`, `error`, `build_output`, `linter`, `diff`, `git`, `log`, `text` + semantic overrides |
-| Aphrodite semantic (6)                  | `preview.rs:33-105` `detect_semantic_type`                                                                                      | `git`, `gitlog`, `ls`, `test`, `grep` (upgrades generic buckets)                                                                                                      |
+**Classifier:** Headroom `ContentType` (7)
+**Location:** `vendor/headroom/crates/headroom-core/src/transforms/content_detector.rs:33` (enum), consumed via `preview.rs:14` `detect_type`
+**Outputs:** `json_array`, `source_code`, `search`, `build`, `diff`, `html`, `text`
+
+---
+
+**Classifier:** Proxy `proxy_detect_content_type` (~17)
+**Location:** `crates/aphrodite/src/proxy.rs:1336-1480`
+**Outputs:** `tool_output`, `json`, `code_rust`, `code_python`, `code_go`, `code_js`, `code`, `error`, `build_output`, `linter`, `diff`, `git`, `log`, `text` + semantic overrides
+
+---
+
+**Classifier:** Aphrodite semantic (6)
+**Location:** `preview.rs:33-105` `detect_semantic_type`
+**Outputs:** `git`, `gitlog`, `ls`, `test`, `grep` (upgrades generic buckets)
 
 ### Preview builders
 
-| Builder                                                                    | Location                                                                                         | Used by                                |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| `build_preview(type, content)` - the shared builder                        | `crates/aphrodite/src/preview.rs:169-307`; arms at 182-306                                       | Everything except the proxy's own arms |
-| `proxy_build_preview(content, ct)` - parallel builder                      | `crates/aphrodite/src/proxy.rs:1946-2081`; routes semantic shapes to shared builder at 1954-1960 | Token-mode proxy only                  |
-| `generate_metadata` (structure metadata, separate from preview)            | `proxy.rs:1484-1921`                                                                             | `smart_marker` (proxy token mode)      |
-| `ccr_marker` (renders `<<<CCR:hash                                         | type                                                                                             | size>>>` + preview line)               | `crates/aphrodite/src/marker.rs:41-88`; template `render_marker` 99-110 | All hook/FFI/bridge paths |
-| `proxy_format_ccr_output` (3-line layout: preview / `[ct: meta]` / marker) | `proxy.rs:1926-1936`                                                                             | Proxy token + cache modes              |
-| `cache_marker` - raw 512-char excerpt preview                              | `proxy.rs:2096-2100`                                                                             | Proxy cache mode                       |
+**Builder:** `build_preview(type, content)` - the shared builder
+**Location:** `crates/aphrodite/src/preview.rs:169-307`; arms at 182-306
+**Used by:** Everything except the proxy's own arms
+
+---
+
+**Builder:** `proxy_build_preview(content, ct)` - parallel builder
+**Location:** `crates/aphrodite/src/proxy.rs:1946-2081`; routes semantic shapes to shared builder at 1954-1960
+**Used by:** Token-mode proxy only
+
+---
+
+**Builder:** `generate_metadata` (structure metadata, separate from preview)
+**Location:** `proxy.rs:1484-1921`
+**Used by:** `smart_marker` (proxy token mode)
+
+---
+
+**Builder:** `ccr_marker` (renders `<<<CCR:hash                                         | type                                                                                             | size>>>` + preview line)
+**Location:** `crates/aphrodite/src/marker.rs:41-88`; template `render_marker` 99-110
+**Used by:** All hook/FFI/bridge paths
+
+---
+
+**Builder:** `proxy_format_ccr_output` (3-line layout: preview / `[ct: meta]` / marker)
+**Location:** `proxy.rs:1926-1936`
+**Used by:** Proxy token + cache modes
+
+---
+
+**Builder:** `cache_marker` - raw 512-char excerpt preview
+**Location:** `proxy.rs:2096-2100`
+**Used by:** Proxy cache mode
 
 ### Call sites (each produces a marker whose preview line is what the LLM sees)
 
@@ -78,27 +113,155 @@ Marker layout contract: `docs/ccr/marker-format.md:39-93` documents both layouts
 "hook" = `build_preview` paths (bridge/hook/FFI/prefetch/poll-worker). "proxy" = `proxy_build_preview`.
 Effective type space ≈ **30 tags**.
 
-| Type tag(s)                                                              | Produced by                          | Current preview (hook path)                                                                                                           | Current preview (proxy token path)                                                       | Verdict                                                                                                          |
-| ------------------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `text` / `plain`                                                         | headroom, proxy fallback             | `[text:NL NB \| first 60 chars]` (semantic upgrade may apply first)                                                                   | first line ≤250 chars, no L/B                                                            | **Weak** - first-line truncation hides prose shape; no word/para count                                           |
-| `terminal`                                                               | hooks (exit-code shape), poll_worker | `[terminal:NL \| exit/last line 60]` (`preview.rs:280-289`)                                                                           | same via shared routing (text→semantic only)                                             | **Decent** - exit code + last line, but command not included                                                     |
-| `log`                                                                    | proxy classifier; hook effective     | generic `_` arm → `[log:NL NB \| first line]`                                                                                         | routed to shared builder → generic `_` arm                                               | **Weak** - no level tally, no ERROR/WARN line                                                                    |
-| `error`                                                                  | proxy classifier                     | N/A (headroom never emits `error`; panics land in `text`)                                                                             | first error line ≤300 chars (`proxy.rs:2043-2050`)                                       | **Proxy ok / hook missing arm** - error type has no `build_preview` arm                                          |
-| `linter`                                                                 | proxy classifier                     | N/A                                                                                                                                   | generic `_` arm → first line ≤250                                                        | **Weak** - no error/warning tally                                                                                |
-| `tool_output`                                                            | proxy classifier                     | N/A (bridge unwraps these first)                                                                                                      | json arm: first 150 chars + crude `":` key count (`proxy.rs:2060-2065`)                  | **Weak/crude**                                                                                                   |
-| `build`/`build_output`/`build_error`                                     | headroom, proxy, hooks               | `[build:NE NW NL \| first error 60]` (`preview.rs:183-204`)                                                                           | first Compiling/Finished/error line ≤250 (`proxy.rs:2066-2075`) - **no E/W tallies**     | **Divergent** - proxy hides tallies; hook good                                                                   |
-| `diff`                                                                   | headroom, proxy                      | `[diff:NF +A/-D NL \| file1 file2 +more]` (`preview.rs:205-228`)                                                                      | first 2 `diff --git` lines only (`proxy.rs:2051-2058`)                                   | **Divergent** - proxy hides +/- counts and file count                                                            |
-| `git`/`git_status`                                                       | semantic, proxy                      | `[git:NM NA ND 3?? \| paths +more]` (`preview.rs:311-351`)                                                                            | identical (shared routing)                                                               | **Good**                                                                                                         |
-| `gitlog`/`git_log`                                                       | semantic                             | `[gitlog:N commits \| first → last]` (`preview.rs:355-390`)                                                                           | identical (shared)                                                                       | **Good**                                                                                                         |
-| `ls`/`dir`/`directory`                                                   | semantic                             | `[ls:N files M dirs \| .rs×18 .md×9]` (`preview.rs:394-455`)                                                                          | identical (shared)                                                                       | **Good**                                                                                                         |
-| `test`/`test_output`                                                     | semantic, hooks                      | `[test:NP pass NM fail NK ignored \| FAIL name \| 0.31s]` (`preview.rs:459-522`)                                                      | identical (shared)                                                                       | **Good**                                                                                                         |
-| `grep`/`ripgrep`                                                         | semantic                             | `[grep:N hits in M files \| src/x.rs:12 …]` (`preview.rs:526-551`)                                                                    | identical (shared)                                                                       | **Good**                                                                                                         |
-| `search`                                                                 | headroom                             | `[search:N hits in M files \| loc …]` (`preview.rs:612-642`)                                                                          | never produced by proxy classifier                                                       | **Good, except** the bridge unwrap truncates to 20 matches (defect C2)                                           |
-| `source_code`                                                            | headroom                             | code arm via `struct_extract::extract_code_structure`: `[code:3fns\|2structs NL \| fn sig 48]` (`preview.rs:239-270`)                 | proxy classifies code_rust/etc. instead                                                  | **Good** (label always `code`, even for rust)                                                                    |
-| `code_rust`/`code_python`/`code_go`/`code_js`/`code_ts`/`code_sh`/`code` | proxy classifier, bridge hints       | same code arm (via `code_*` aliases)                                                                                                  | `[ct:3fns\|2structs fn x(); fn y(); NL]` ≤300 chars, first 2 sigs (`proxy.rs:1962-2042`) | **Divergent format** - hook shows 1 sig + counts only; proxy shows 2 sigs; label differs (`code` vs `code_rust`) |
-| `html`                                                                   | headroom                             | `[html:2h 2a 1img 1script NL \| title]` (`preview.rs:645-688`)                                                                        | never detected (falls to text)                                                           | **Hook good / proxy blind**                                                                                      |
-| `json`/`json_array`/`json_list`                                          | headroom, proxy                      | parsed: `[json:2items 1L \| keys: status, count +more]` or `[json:3keys NL \| keys]`; crude `~Nitems` fallback (`preview.rs:574-607`) | first 150 chars + `":`-count key estimate (`proxy.rs:2060-2065`)                         | **Divergent** - proxy key count includes nested keys and can't parse minified JSON                               |
-| (fragment classes)                                                       | bridge `unwrap_hermes_result`        | `[text:1L 2B \| ok]` for `{"success":true,...}`                                                                                       | n/a                                                                                      | **BROKEN - issue #11**                                                                                           |
+**Type tag(s):** `text` / `plain`
+**Produced by:** headroom, proxy fallback
+**Current preview (hook path):** `[text:NL NB \| first 60 chars]` (semantic upgrade may apply first)
+**Current preview (proxy token path):** first line ≤250 chars, no L/B
+**Verdict:** **Weak** - first-line truncation hides prose shape; no word/para count
+
+---
+
+**Type tag(s):** `terminal`
+**Produced by:** hooks (exit-code shape), poll_worker
+**Current preview (hook path):** `[terminal:NL \| exit/last line 60]` (`preview.rs:280-289`)
+**Current preview (proxy token path):** same via shared routing (text→semantic only)
+**Verdict:** **Decent** - exit code + last line, but command not included
+
+---
+
+**Type tag(s):** `log`
+**Produced by:** proxy classifier; hook effective
+**Current preview (hook path):** generic `_` arm → `[log:NL NB \| first line]`
+**Current preview (proxy token path):** routed to shared builder → generic `_` arm
+**Verdict:** **Weak** - no level tally, no ERROR/WARN line
+
+---
+
+**Type tag(s):** `error`
+**Produced by:** proxy classifier
+**Current preview (hook path):** N/A (headroom never emits `error`; panics land in `text`)
+**Current preview (proxy token path):** first error line ≤300 chars (`proxy.rs:2043-2050`)
+**Verdict:** **Proxy ok / hook missing arm** - error type has no `build_preview` arm
+
+---
+
+**Type tag(s):** `linter`
+**Produced by:** proxy classifier
+**Current preview (hook path):** N/A
+**Current preview (proxy token path):** generic `_` arm → first line ≤250
+**Verdict:** **Weak** - no error/warning tally
+
+---
+
+**Type tag(s):** `tool_output`
+**Produced by:** proxy classifier
+**Current preview (hook path):** N/A (bridge unwraps these first)
+**Current preview (proxy token path):** json arm: first 150 chars + crude `":` key count (`proxy.rs:2060-2065`)
+**Verdict:** **Weak/crude**
+
+---
+
+**Type tag(s):** `build`/`build_output`/`build_error`
+**Produced by:** headroom, proxy, hooks
+**Current preview (hook path):** `[build:NE NW NL \| first error 60]` (`preview.rs:183-204`)
+**Current preview (proxy token path):** first Compiling/Finished/error line ≤250 (`proxy.rs:2066-2075`) - **no E/W tallies**
+**Verdict:** **Divergent** - proxy hides tallies; hook good
+
+---
+
+**Type tag(s):** `diff`
+**Produced by:** headroom, proxy
+**Current preview (hook path):** `[diff:NF +A/-D NL \| file1 file2 +more]` (`preview.rs:205-228`)
+**Current preview (proxy token path):** first 2 `diff --git` lines only (`proxy.rs:2051-2058`)
+**Verdict:** **Divergent** - proxy hides +/- counts and file count
+
+---
+
+**Type tag(s):** `git`/`git_status`
+**Produced by:** semantic, proxy
+**Current preview (hook path):** `[git:NM NA ND 3?? \| paths +more]` (`preview.rs:311-351`)
+**Current preview (proxy token path):** identical (shared routing)
+**Verdict:** **Good**
+
+---
+
+**Type tag(s):** `gitlog`/`git_log`
+**Produced by:** semantic
+**Current preview (hook path):** `[gitlog:N commits \| first → last]` (`preview.rs:355-390`)
+**Current preview (proxy token path):** identical (shared)
+**Verdict:** **Good**
+
+---
+
+**Type tag(s):** `ls`/`dir`/`directory`
+**Produced by:** semantic
+**Current preview (hook path):** `[ls:N files M dirs \| .rs×18 .md×9]` (`preview.rs:394-455`)
+**Current preview (proxy token path):** identical (shared)
+**Verdict:** **Good**
+
+---
+
+**Type tag(s):** `test`/`test_output`
+**Produced by:** semantic, hooks
+**Current preview (hook path):** `[test:NP pass NM fail NK ignored \| FAIL name \| 0.31s]` (`preview.rs:459-522`)
+**Current preview (proxy token path):** identical (shared)
+**Verdict:** **Good**
+
+---
+
+**Type tag(s):** `grep`/`ripgrep`
+**Produced by:** semantic
+**Current preview (hook path):** `[grep:N hits in M files \| src/x.rs:12 …]` (`preview.rs:526-551`)
+**Current preview (proxy token path):** identical (shared)
+**Verdict:** **Good**
+
+---
+
+**Type tag(s):** `search`
+**Produced by:** headroom
+**Current preview (hook path):** `[search:N hits in M files \| loc …]` (`preview.rs:612-642`)
+**Current preview (proxy token path):** never produced by proxy classifier
+**Verdict:** **Good, except** the bridge unwrap truncates to 20 matches (defect C2)
+
+---
+
+**Type tag(s):** `source_code`
+**Produced by:** headroom
+**Current preview (hook path):** code arm via `struct_extract::extract_code_structure`: `[code:3fns\|2structs NL \| fn sig 48]` (`preview.rs:239-270`)
+**Current preview (proxy token path):** proxy classifies code_rust/etc. instead
+**Verdict:** **Good** (label always `code`, even for rust)
+
+---
+
+**Type tag(s):** `code_rust`/`code_python`/`code_go`/`code_js`/`code_ts`/`code_sh`/`code`
+**Produced by:** proxy classifier, bridge hints
+**Current preview (hook path):** same code arm (via `code_*` aliases)
+**Current preview (proxy token path):** `[ct:3fns\|2structs fn x(); fn y(); NL]` ≤300 chars, first 2 sigs (`proxy.rs:1962-2042`)
+**Verdict:** **Divergent format** - hook shows 1 sig + counts only; proxy shows 2 sigs; label differs (`code` vs `code_rust`)
+
+---
+
+**Type tag(s):** `html`
+**Produced by:** headroom
+**Current preview (hook path):** `[html:2h 2a 1img 1script NL \| title]` (`preview.rs:645-688`)
+**Current preview (proxy token path):** never detected (falls to text)
+**Verdict:** **Hook good / proxy blind**
+
+---
+
+**Type tag(s):** `json`/`json_array`/`json_list`
+**Produced by:** headroom, proxy
+**Current preview (hook path):** parsed: `[json:2items 1L \| keys: status, count +more]` or `[json:3keys NL \| keys]`; crude `~Nitems` fallback (`preview.rs:574-607`)
+**Current preview (proxy token path):** first 150 chars + `":`-count key estimate (`proxy.rs:2060-2065`)
+**Verdict:** **Divergent** - proxy key count includes nested keys and can't parse minified JSON
+
+---
+
+**Type tag(s):** (fragment classes)
+**Produced by:** bridge `unwrap_hermes_result`
+**Current preview (hook path):** `[text:1L 2B \| ok]` for `{"success":true,...}`
+**Current preview (proxy token path):** n/a
+**Verdict:** **BROKEN - issue #11**
 
 ---
 

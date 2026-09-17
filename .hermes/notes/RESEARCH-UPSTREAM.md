@@ -8,13 +8,33 @@
 
 ## 0. Provenance / what is authoritative
 
-| Source                                  | Path                                                                             | What it is                                                                                                                                                                                                   |
-| --------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Upstream fork (research)                | `ctypesgen/` (Module tree)                                                       | git repo, last commit `a90952d "Add 'bool' to ctypes type map, needed for C23 (#225)"` - the **older** printer (`printer_python/`), retains the single-library shortcut                                      |
-| Installed (what build.rs ACTUALLY runs) | the installed `ctypesgen` package (`site-packages`, Homebrew python 3.14)        | console script self-reports **`2.7.4-27202-gb3625f73d3`** (VERSION file says `1.1.1`); printer emits the **`for _lib in _libs.values():`** loop form for every function (`-l` does not set `source_library`) |
-| pypdfium2 fork                          | `ctypesgen-pypdfium2/` (Module tree)                                             | `src/ctypesgen/` - heavily restructured printer (`printer_python.py`), no preamble classes                                                                                                                   |
-| cbindgen                                | `cbindgen/` (Module tree)                                                        | last commit `2b757a2`; the Aphrodite build uses **cbindgen 0.29** (`crates/aphrodite-hermes/Cargo.toml:28`)                                                                                                  |
-| Real generated artifacts                | the crate's `OUT_DIR` build artifacts (`aphrodite_hermes.h`, `_bindings.raw.py`) | regenerated 2026-09-17 22:33 by the actual build.rs chain - the ground truth for every regex verdict below                                                                                                   |
+**Source:** Upstream fork (research)
+**Path:** `ctypesgen/` (Module tree)
+**What it is:** git repo, last commit `a90952d "Add 'bool' to ctypes type map, needed for C23 (#225)"` - the **older** printer (`printer_python/`), retains the single-library shortcut
+
+---
+
+**Source:** Installed (what build.rs ACTUALLY runs)
+**Path:** the installed `ctypesgen` package (`site-packages`, Homebrew python 3.14)
+**What it is:** console script self-reports **`2.7.4-27202-gb3625f73d3`** (VERSION file says `1.1.1`); printer emits the **`for _lib in _libs.values():`** loop form for every function (`-l` does not set `source_library`)
+
+---
+
+**Source:** pypdfium2 fork
+**Path:** `ctypesgen-pypdfium2/` (Module tree)
+**What it is:** `src/ctypesgen/` - heavily restructured printer (`printer_python.py`), no preamble classes
+
+---
+
+**Source:** cbindgen
+**Path:** `cbindgen/` (Module tree)
+**What it is:** last commit `2b757a2`; the Aphrodite build uses **cbindgen 0.29** (`crates/aphrodite-hermes/Cargo.toml:28`)
+
+---
+
+**Source:** Real generated artifacts
+**Path:** the crate's `OUT_DIR` build artifacts (`aphrodite_hermes.h`, `_bindings.raw.py`)
+**What it is:** regenerated 2026-09-17 22:33 by the actual build.rs chain - the ground truth for every regex verdict below
 
 **Key finding:** the installed ctypesgen's `ctypedescs.py` restype logic is **byte-identical in behavior** to the Module fork (verified by diff of the `CtypesFunction` region - same `CtypesNoErrorCheck`, `CtypesPointerCast`, `void*→POINTER(c_ubyte)+cast`, `c_char_p`/`String` branch). The only divergence that matters for the pipeline is the **loop form**: installed emits `for _lib in _libs.values():` (→ `_BLOCK_START_RE` matches), the Module fork emits `if _libs["X"].has(...)` for a single `-l` library (→ `_BLOCK_START_RE` does NOT match the declaration loops). See §4, gap G3.
 
@@ -133,19 +153,69 @@ Related config (`cbindgen/src/bindgen/config.rs`): `ExportConfig { include: Vec<
 
 ## 3. Divergence table - upstream ctypesgen vs pypdfium2 fork
 
-| Aspect                | Upstream (Module fork + installed 2.7.4)                                                                                                    | pypdfium2 fork (`src/ctypesgen/`)                                                                                                                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `char *` restype      | `String` (plain) / `c_char_p` (const-qualified) - ctypdescs.py:278-283                                                                      | **stays `POINTER(c_char)`** unless `--string-template` given; then `String` (POINTER(c_char)) or `WideString` (POINTER(c_wchar)) - ctypdescs.py:260-267 (the `options`-gated block, replacing the removed upstream 278-283)                                |
-| `c_char_p` branch     | present (const check, line 280-282)                                                                                                         | **removed** - no `c_char_p` restype ever emitted                                                                                                                                                                                                           |
-| `void *` restype      | `POINTER(c_ubyte)` + `errcheck = lambda v,*a : cast(v, c_void_p)` (ctypedescs.py:269-276, 251-256)                                          | **removed** (`CtypesPointerCast` class deleted - upstream 251-258 absent; the 269-276 block absent); `void*` passes through as parser produced it (FIXME comment at ctypdescs.py:260 references `CtypesParser.get_ctypes_type()` as the intended location) |
-| errcheck emission     | fixed fns: only when truthy (`CtypesNoErrorCheck.__bool__` False ⇒ nothing; cast-lambda ⇒ printed); variadic: `_errcheck = None` literal    | same truthiness gate - printer_python.py:208-210 (`if function.errcheck:`)                                                                                                                                                                                 |
-| restype emission      | fixed fns: `NAME.restype = <RT>` + optional `NAME.errcheck`; String ⇒ if/else `ReturnString`/`String`+`errcheck` block (printer.py:333-350) | `NAME.restype = <RT>` + optional errcheck only (printer_python.py:196-210) - **no ReturnString/String if/else block at all**; a `String` restype prints as bare `NAME.restype = String`                                                                    |
-| `ptrdiff_t`/`ssize_t` | `c_ptrdiff_t` + preamble size-selection loop (ctypedescs.py:72-73, preamble.py:5-15)                                                        | `c_ssize_t` builtin (ctypedescs.py:70-71) - no preamble loop                                                                                                                                                                                               |
-| Preamble              | UserString/MutableString/String/ReturnString/UNCHECKED/_variadic_function/ord_if_char + `from ctypes import *` (preamble.py:1-425)          | none of those; `from ctypes import *` + `UNCHECKED` from `T_UNCHECKED` template (`templates.py:4-11`); optional user `--string-template` file injected (printer_python.py:132-136)                                                                         |
-| Variadic fns          | `_variadic_function` wrapper emission (printer.py:355-392)                                                                                  | **no variadic printer path** - `print_function` (printer_python.py:191-215) has no variadic branch; `variadic` flag carried only in descriptions.py:170/183 and printer_json.py:97                                                                         |
-| Output framing        | `r"""Wrapper for ..."""` docstring + `# Begin preamble for Python` markers + full loader embed                                              | `R"""..."""` raw docstring with cmd line (printer_python.py:81) + `# -- Begin/End <section> --` paragraph markers (lines 26-34) + optional external `_ctg_loader.py`                                                                                       |
-| Loop form             | single `-l` ⇒ `if _libs["X"].has(...)` (fork) / always `for _lib in _libs.values():` (installed 2.7.4)                                      | `{PN} = _libs[{L!r}][{CN!r}]` direct subscript (printer_python.py:197) - no loops, no `has/get`                                                                                                                                                            |
-| `__all__`             | absent                                                                                                                                      | absent                                                                                                                                                                                                                                                     |
+**Aspect:** `char *` restype
+**Upstream (Module fork + installed 2.7.4):** `String` (plain) / `c_char_p` (const-qualified) - ctypdescs.py:278-283
+**pypdfium2 fork (`src/ctypesgen/`):** **stays `POINTER(c_char)`** unless `--string-template` given; then `String` (POINTER(c_char)) or `WideString` (POINTER(c_wchar)) - ctypdescs.py:260-267 (the `options`-gated block, replacing the removed upstream 278-283)
+
+---
+
+**Aspect:** `c_char_p` branch
+**Upstream (Module fork + installed 2.7.4):** present (const check, line 280-282)
+**pypdfium2 fork (`src/ctypesgen/`):** **removed** - no `c_char_p` restype ever emitted
+
+---
+
+**Aspect:** `void *` restype
+**Upstream (Module fork + installed 2.7.4):** `POINTER(c_ubyte)` + `errcheck = lambda v,*a : cast(v, c_void_p)` (ctypedescs.py:269-276, 251-256)
+**pypdfium2 fork (`src/ctypesgen/`):** **removed** (`CtypesPointerCast` class deleted - upstream 251-258 absent; the 269-276 block absent); `void*` passes through as parser produced it (FIXME comment at ctypdescs.py:260 references `CtypesParser.get_ctypes_type()` as the intended location)
+
+---
+
+**Aspect:** errcheck emission
+**Upstream (Module fork + installed 2.7.4):** fixed fns: only when truthy (`CtypesNoErrorCheck.__bool__` False ⇒ nothing; cast-lambda ⇒ printed); variadic: `_errcheck = None` literal
+**pypdfium2 fork (`src/ctypesgen/`):** same truthiness gate - printer_python.py:208-210 (`if function.errcheck:`)
+
+---
+
+**Aspect:** restype emission
+**Upstream (Module fork + installed 2.7.4):** fixed fns: `NAME.restype = <RT>` + optional `NAME.errcheck`; String ⇒ if/else `ReturnString`/`String`+`errcheck` block (printer.py:333-350)
+**pypdfium2 fork (`src/ctypesgen/`):** `NAME.restype = <RT>` + optional errcheck only (printer_python.py:196-210) - **no ReturnString/String if/else block at all**; a `String` restype prints as bare `NAME.restype = String`
+
+---
+
+**Aspect:** `ptrdiff_t`/`ssize_t`
+**Upstream (Module fork + installed 2.7.4):** `c_ptrdiff_t` + preamble size-selection loop (ctypedescs.py:72-73, preamble.py:5-15)
+**pypdfium2 fork (`src/ctypesgen/`):** `c_ssize_t` builtin (ctypedescs.py:70-71) - no preamble loop
+
+---
+
+**Aspect:** Preamble
+**Upstream (Module fork + installed 2.7.4):** UserString/MutableString/String/ReturnString/UNCHECKED/_variadic_function/ord_if_char + `from ctypes import *` (preamble.py:1-425)
+**pypdfium2 fork (`src/ctypesgen/`):** none of those; `from ctypes import *` + `UNCHECKED` from `T_UNCHECKED` template (`templates.py:4-11`); optional user `--string-template` file injected (printer_python.py:132-136)
+
+---
+
+**Aspect:** Variadic fns
+**Upstream (Module fork + installed 2.7.4):** `_variadic_function` wrapper emission (printer.py:355-392)
+**pypdfium2 fork (`src/ctypesgen/`):** **no variadic printer path** - `print_function` (printer_python.py:191-215) has no variadic branch; `variadic` flag carried only in descriptions.py:170/183 and printer_json.py:97
+
+---
+
+**Aspect:** Output framing
+**Upstream (Module fork + installed 2.7.4):** `r"""Wrapper for ..."""` docstring + `# Begin preamble for Python` markers + full loader embed
+**pypdfium2 fork (`src/ctypesgen/`):** `R"""..."""` raw docstring with cmd line (printer_python.py:81) + `# -- Begin/End <section> --` paragraph markers (lines 26-34) + optional external `_ctg_loader.py`
+
+---
+
+**Aspect:** Loop form
+**Upstream (Module fork + installed 2.7.4):** single `-l` ⇒ `if _libs["X"].has(...)` (fork) / always `for _lib in _libs.values():` (installed 2.7.4)
+**pypdfium2 fork (`src/ctypesgen/`):** `{PN} = _libs[{L!r}][{CN!r}]` direct subscript (printer_python.py:197) - no loops, no `has/get`
+
+---
+
+**Aspect:** `__all__`
+**Upstream (Module fork + installed 2.7.4):** absent
+**pypdfium2 fork (`src/ctypesgen/`):** absent
 
 **Bottom line for the dev agent:** pypdfium2 is a redesign, not a backport candidate - its shapes (`restype = String` bare single-line, no if/else block, direct `_libs[L][CN]` binding, no loader embed) would need a different finalize_bindings.py. The pipeline is correctly matched to upstream (installed 2.7.4) today.
 
@@ -155,17 +225,66 @@ Related config (`cbindgen/src/bindgen/config.rs`): `ExportConfig { include: Vec<
 
 Verified by executing `finalize_bindings.py`'s own regexes against (a) the real `_bindings.raw.py` (installed 2.7.4 output - what build.rs processes) and (b) the Module-fork probe output; plus a full `postprocess` + `validate` run on the real artifacts → **VALIDATE: PASS, 10 exports, 9 pointer-returning, 0 violations**, final artifact 31,692 B / 982 lines.
 
-| Pattern (file:line)                                | Real-raw count          | Verdict                        | Notes                                                                                                                                                    |
-| -------------------------------------------------- | ----------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_BLOCK_START_RE` (88)                             | 10/10 loops             | ✅ COVERED                     | matches `for _lib in _libs.values():` - installed 2.7.4 always emits this form                                                                           |
-| `_LOAD_LINE_RE` (93-95)                            | 1/1                     | ✅ COVERED                     | → `_libs["__APHRODITE_DYLIB__"] = None  # bound at runtime via bind_to()` (final artifact line 862)                                                      |
-| `_LOOKUP_CALL_RE` (92)                             | 20/20 (10 has + 10 get) | ✅ COVERED                     | → `hasattr/getattr(_lib, "NAME")`; guard at line 242 passes                                                                                              |
-| `_RESTYPE_RE` if/else branch (101-108)             | 9/9                     | ✅ COVERED                     | every `char *` return rewritten to `NAME.restype = c_void_p` (final has 9)                                                                               |
-| `_RESTYPE_RE` single-line (109)                    | 0 (real raw)            | ✅ COVERED (unreachable today) | single-line `restype = String` is structurally unreachable from `print_fixed_function` (String always takes the if/else branch); kept as belt-and-braces |
-| `_ERRCHECK_RE` (122)                               | 9/9                     | ✅ COVERED                     | strips all `errcheck = ReturnString`; also strips `errcheck = lambda v,*a : cast(v, c_void_p)` (verified on probe output - 4/4)                          |
-| `_HEADER_FN_RE` / `_HEADER_PTR_RE` (71-74)         | 10 / 9                  | ✅ COVERED                     | matches real header incl. `void name(void)` and multi-arg lines; param counting correct                                                                  |
-| `_DECLARED_NAME_RE` (124)                          | 10                      | ✅ COVERED                     | post-rewrite `hasattr(_lib, "NAME")` scan equals header set                                                                                              |
-| `_DOCSTRING_RE` (129) / `_HEADER_COMMENT_RE` (130) | 1 / 10                  | ✅ COVERED                     | docstring canonicalized; `# <abs-path>/aphrodite_hermes.h: N` → `# aphrodite_hermes.h: N`                                                                |
+**Pattern (file:line):** `_BLOCK_START_RE` (88)
+**Real-raw count:** 10/10 loops
+**Verdict:** ✅ COVERED
+**Notes:** matches `for _lib in _libs.values():` - installed 2.7.4 always emits this form
+
+---
+
+**Pattern (file:line):** `_LOAD_LINE_RE` (93-95)
+**Real-raw count:** 1/1
+**Verdict:** ✅ COVERED
+**Notes:** → `_libs["__APHRODITE_DYLIB__"] = None  # bound at runtime via bind_to()` (final artifact line 862)
+
+---
+
+**Pattern (file:line):** `_LOOKUP_CALL_RE` (92)
+**Real-raw count:** 20/20 (10 has + 10 get)
+**Verdict:** ✅ COVERED
+**Notes:** → `hasattr/getattr(_lib, "NAME")`; guard at line 242 passes
+
+---
+
+**Pattern (file:line):** `_RESTYPE_RE` if/else branch (101-108)
+**Real-raw count:** 9/9
+**Verdict:** ✅ COVERED
+**Notes:** every `char *` return rewritten to `NAME.restype = c_void_p` (final has 9)
+
+---
+
+**Pattern (file:line):** `_RESTYPE_RE` single-line (109)
+**Real-raw count:** 0 (real raw)
+**Verdict:** ✅ COVERED (unreachable today)
+**Notes:** single-line `restype = String` is structurally unreachable from `print_fixed_function` (String always takes the if/else branch); kept as belt-and-braces
+
+---
+
+**Pattern (file:line):** `_ERRCHECK_RE` (122)
+**Real-raw count:** 9/9
+**Verdict:** ✅ COVERED
+**Notes:** strips all `errcheck = ReturnString`; also strips `errcheck = lambda v,*a : cast(v, c_void_p)` (verified on probe output - 4/4)
+
+---
+
+**Pattern (file:line):** `_HEADER_FN_RE` / `_HEADER_PTR_RE` (71-74)
+**Real-raw count:** 10 / 9
+**Verdict:** ✅ COVERED
+**Notes:** matches real header incl. `void name(void)` and multi-arg lines; param counting correct
+
+---
+
+**Pattern (file:line):** `_DECLARED_NAME_RE` (124)
+**Real-raw count:** 10
+**Verdict:** ✅ COVERED
+**Notes:** post-rewrite `hasattr(_lib, "NAME")` scan equals header set
+
+---
+
+**Pattern (file:line):** `_DOCSTRING_RE` (129) / `_HEADER_COMMENT_RE` (130)
+**Real-raw count:** 1 / 10
+**Verdict:** ✅ COVERED
+**Notes:** docstring canonicalized; `# <abs-path>/aphrodite_hermes.h: N` → `# aphrodite_hermes.h: N`
 
 **Gaps found (none currently active, all fail loudly not silently - except G6 which is cosmetic):**
 
@@ -189,15 +308,52 @@ Verified by executing `finalize_bindings.py`'s own regexes against (a) the real 
 
 Each recommendation names the `finalize_bindings.py` target (file:line = `crates/aphrodite-hermes/codegen/finalize_bindings.py`) and the exact change. All are self-verifying: `validate()` (lines 258-325) executes the artifact and replays `bind_to()` against the stub - a wrong deletion/rewrite fails the build (exit 1), never ships silently.
 
-| #      | Target (file:line)                                                            | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Why / risk                                                                                                                                                                                                                                                    |
-| ------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **R1** | `_RESTYPE_RE` single-line alternation, line 109                               | `(?:ReturnString\|String\|c_char_p)`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Makes G1 textually true: const char* returns normalize to `c_void_p`. Zero risk (`_pointer_width` already accepts both); no current header fn affected.                                                                                                       |
-| **R2** | new pattern after line 112 + a branch in `_restype_repl` (115-121)            | `^[ \t]+_restype = String$` → `_restype = c_void_p` (only the String value; `POINTER(...)`/`None` values stay)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Closes G3: a future variadic pointer-returning export would otherwise panic the build at validate. No behavior change today (no variadic fns).                                                                                                                |
-| **R3** | `_BLOCK_START_RE` (88) and `_LOOKUP_CALL_RE` (92)                             | extend `_BLOCK_START_RE` with alternation `\|^if _libs\[["'][^"']+["']\]\.has\(`; extend `_LOOKUP_CALL_RE` to also match `_libs\[["'][^"']+["']\]\.(has\|get)\(...` → rewrite to `hasattr/getattr(_lib, ...)`                                                                                                                                                                                                                                                                                                                                                                                                                                                | Closes G2 - protects against any ctypesgen that emits the single-library `if _libs["X"].has(...)` form (the Module-tree fork does). Optional if the toolchain stays pinned to installed 2.7.4, but cheap insurance given the fork is the research reference.  |
-| **R4** | new head-strip step in `postprocess` (after line 225, before `_LOAD_LINE_RE`) | Remove from `head`: the `# Begin loader` … `# End loader` block (raw 442-860, ~420 lines incl. all `LibraryLoader` classes, `loaderclass`, `load_library`, `add_library_search_dirs([])`), and `# Begin libraries`/`# End libraries` markers; keep `_libs = {}` (bind_to assigns `_libs[PLACEHOLDER]`) and the rewritten load line. Also `# No modules`/`# No prefix-stripping` markers.                                                                                                                                                                                                                                                                     | Kills ~60% of the 27.5 KB head. **Keep `String`/`MutableString`/`UserString`/`ReturnString` unless R5 lands** - argtypes still reference `String` (raw 875/901/914/988). Do NOT remove `_variadic_function`/`UNCHECKED` while any shape could reference them. |
-| **R5** | new `_ARG_TYPES_RE` step after line 241 + head strip of the String classes    | Rewrite argtypes `[String]` → `[c_char_p]` (`String, String` → `c_char_p, c_char_p`), then delete `class UserString` (preamble.py:19-252), `MutableString` (255-320), `String` (323-372), `ReturnString` (375-376) from the head - but ONLY if R4/R5's argtypes rewrite is in the same change (they must not land separately: a `String` reference with the classes deleted = NameError at validate = build panic, so the sequencing is enforced by validate itself). Behavior note: `c_char_p` argtypes accept bytes/str/None exactly like `String.from_param` for the plugin's usage (plugin passes JSON strings); `None`/0 → NULL is preserved by ctypes. | The 31.7 KB → ~12-14 KB lean-up the "lean-ify" effort wants. Safest ordering: R4 first, then R5.                                                                                                                                                              |
-| **R6** | `BINDER_HEADER`, lines 141-160 (append after line 159)                        | add `\n__all__ = ["bind_to"]\n`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Proposal from the task: no `__all__` exists anywhere in raw/final; plugin currently imports module-qualified (no leak), this makes star-import/introspection safe.                                                                                            |
-| **R7** | comment block lines 66-70                                                     | change `char const *tool_name` → `const char *tool_name`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Stale comment (G6); regexes unaffected.                                                                                                                                                                                                                       |
+**#:** **R1**
+**Target (file:line):** `_RESTYPE_RE` single-line alternation, line 109
+**Change:** `(?:ReturnString\|String\|c_char_p)`
+**Why / risk:** Makes G1 textually true: const char* returns normalize to `c_void_p`. Zero risk (`_pointer_width` already accepts both); no current header fn affected.
+
+---
+
+**#:** **R2**
+**Target (file:line):** new pattern after line 112 + a branch in `_restype_repl` (115-121)
+**Change:** `^[ \t]+_restype = String$` → `_restype = c_void_p` (only the String value; `POINTER(...)`/`None` values stay)
+**Why / risk:** Closes G3: a future variadic pointer-returning export would otherwise panic the build at validate. No behavior change today (no variadic fns).
+
+---
+
+**#:** **R3**
+**Target (file:line):** `_BLOCK_START_RE` (88) and `_LOOKUP_CALL_RE` (92)
+**Change:** extend `_BLOCK_START_RE` with alternation `\|^if _libs\[["'][^"']+["']\]\.has\(`; extend `_LOOKUP_CALL_RE` to also match `_libs\[["'][^"']+["']\]\.(has\|get)\(...` → rewrite to `hasattr/getattr(_lib, ...)`
+**Why / risk:** Closes G2 - protects against any ctypesgen that emits the single-library `if _libs["X"].has(...)` form (the Module-tree fork does). Optional if the toolchain stays pinned to installed 2.7.4, but cheap insurance given the fork is the research reference.
+
+---
+
+**#:** **R4**
+**Target (file:line):** new head-strip step in `postprocess` (after line 225, before `_LOAD_LINE_RE`)
+**Change:** Remove from `head`: the `# Begin loader` … `# End loader` block (raw 442-860, ~420 lines incl. all `LibraryLoader` classes, `loaderclass`, `load_library`, `add_library_search_dirs([])`), and `# Begin libraries`/`# End libraries` markers; keep `_libs = {}` (bind_to assigns `_libs[PLACEHOLDER]`) and the rewritten load line. Also `# No modules`/`# No prefix-stripping` markers.
+**Why / risk:** Kills ~60% of the 27.5 KB head. **Keep `String`/`MutableString`/`UserString`/`ReturnString` unless R5 lands** - argtypes still reference `String` (raw 875/901/914/988). Do NOT remove `_variadic_function`/`UNCHECKED` while any shape could reference them.
+
+---
+
+**#:** **R5**
+**Target (file:line):** new `_ARG_TYPES_RE` step after line 241 + head strip of the String classes
+**Change:** Rewrite argtypes `[String]` → `[c_char_p]` (`String, String` → `c_char_p, c_char_p`), then delete `class UserString` (preamble.py:19-252), `MutableString` (255-320), `String` (323-372), `ReturnString` (375-376) from the head - but ONLY if R4/R5's argtypes rewrite is in the same change (they must not land separately: a `String` reference with the classes deleted = NameError at validate = build panic, so the sequencing is enforced by validate itself). Behavior note: `c_char_p` argtypes accept bytes/str/None exactly like `String.from_param` for the plugin's usage (plugin passes JSON strings); `None`/0 → NULL is preserved by ctypes.
+**Why / risk:** The 31.7 KB → ~12-14 KB lean-up the "lean-ify" effort wants. Safest ordering: R4 first, then R5.
+
+---
+
+**#:** **R6**
+**Target (file:line):** `BINDER_HEADER`, lines 141-160 (append after line 159)
+**Change:** add `\n__all__ = ["bind_to"]\n`
+**Why / risk:** Proposal from the task: no `__all__` exists anywhere in raw/final; plugin currently imports module-qualified (no leak), this makes star-import/introspection safe.
+
+---
+
+**#:** **R7**
+**Target (file:line):** comment block lines 66-70
+**Change:** change `char const *tool_name` → `const char *tool_name`
+**Why / risk:** Stale comment (G6); regexes unaffected.
 
 **Explicitly NOT recommended:** rewriting `restype = None` (void fns) - correct as-is and validate already exempts non-pointer names (line 296 gate); rewriting `POINTER(c_ubyte)`/`POINTER(c_int)` single-lines - already pointer-width; switching the pipeline to pypdfium2 (different shapes entirely, see §3); touching `_variadic_function`/`UNCHECKED`/`ord_if_char` without a full shape audit of macros/callbacks (none in the current header - a future macro/callback would need them).
 
