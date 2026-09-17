@@ -29,13 +29,19 @@ proxy never comes up, see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto
 
 ## Option 2: `cargo install` + `aphrodite setup`
 
-If you have a Rust toolchain and want one command to provision everything
-(binary, dylibs, `aphrodite.toml`, `plugin.yaml`, Hermes registration):
+If you have a Rust toolchain, `aphrodite setup` provisions the binary, dylibs,
+and `aphrodite.toml` under `~/.hermes/aphrodite/`. It never links the plugin
+into Hermes - the Hermes plugin is a git folder (Option 1) by design. The two
+options are alternatives: git clone OR cargo install - you don't need both.
 
 ```bash
 cargo install aphrodite aphrodite-hermes
 aphrodite setup --api-key sk-... --api-url https://api.deepseek.com --model deepseek-v4-pro
 ```
+
+To also use the Hermes plugin, follow Option 1's link step (clone the plugin
+repo and `ln -s` it into `~/.hermes/plugins/aphrodite`); `aphrodite setup`
+prints the exact command.
 
 What `aphrodite setup` does, in order:
 
@@ -47,13 +53,14 @@ What `aphrodite setup` does, in order:
 | 4    | Finds and copies both dylibs from nearby build/install locations - errors out naming the missing one if none are found        |
 | 5    | Writes `~/.hermes/aphrodite/aphrodite.toml` from a template (ports from `--cache-port`/`--token-port`, default `9797`/`9798`) |
 | 6    | Writes `plugin.yaml` and a thin plugin shim                                                                                   |
-| 7    | Links `~/.hermes/plugins/aphrodite` to `~/.hermes/aphrodite/` (symlink on Unix, junction with a copy fallback on Windows)     |
-| 8    | Runs `hermes plugins enable aphrodite`                                                                                        |
+| 7    | Runs `hermes plugins enable aphrodite`                                                                                        |
 
 Useful flags: `--cache-port`/`--token-port` (run multiple concurrent Hermes
 Agents on one machine, each pointed at its own port pair), `--no-launch`
 (skip auto-starting the proxy after setup), `--force` (re-run setup over an
-existing install).
+existing install). The plugin link itself is not part of setup - run the
+`ln -s` from the command block above (or its junction/copy equivalent on
+Windows) after setup completes.
 
 ### macOS Gatekeeper handling
 
@@ -82,7 +89,7 @@ Then either:
 
 | Approach                                     | What it does                                                                                                                                                                                                                                                                                                              |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Run `Maintain/install.sh` from the repo root | Copies the binary into `~/.hermes/aphrodite/`, symlinks the plugin and its skills into `~/.hermes/`, symlinks all 7 `profiles/aphrodite-*` directories into `~/.hermes/profiles/`, and enables the plugin per-profile. Expects `target/release/aphrodite` to already exist - it doesn't build or download anything itself |
+| Run `Maintain/install.sh` from the repo root | Copies the binary into `~/.hermes/aphrodite/`, symlinks the plugin into `~/.hermes/`, symlinks all 7 `profiles/aphrodite-*` directories into `~/.hermes/profiles/`, and enables the plugin per-profile. Expects `target/release/aphrodite` to already exist - it doesn't build or download anything itself |
 | Wire things up manually                      | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                    |
 
 ## What changes after any of these
@@ -90,7 +97,7 @@ Then either:
 ```
 ~/.hermes/
 ├── plugins/
-│   └── aphrodite/          ← symlink (or junction/copy on Windows) to the plugin source
+│   └── aphrodite/          ← manual symlink (or junction/copy on Windows) to the plugin source
 ├── aphrodite/
 │   ├── aphrodite            ← binary (auto-downloaded, hand-placed, or built)
 │   └── ccr.db                ← SQLite CCR store (created on first run)

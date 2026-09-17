@@ -20,7 +20,6 @@ $Repo = if ($env:REPO) { $env:REPO } else { (Resolve-Path (Join-Path $PSScriptRo
 $Hermes = if ($env:HERMES) { $env:HERMES } else { Join-Path $HOME '.hermes' }
 $BinaryDest = Join-Path $Hermes "aphrodite/$BinaryName"
 $PluginSrc = Join-Path $Repo 'plugins/aphrodite'
-$SkillsSrc = Join-Path $PluginSrc 'skills'
 
 Write-Host '=== aphrodite install ==='
 Write-Host "  repo:   $Repo"
@@ -67,11 +66,7 @@ if (Test-Path $BuiltBinary) {
 Set-DirLink -Link (Join-Path $Hermes 'plugins/aphrodite') -Target $PluginSrc | Out-Null
 Write-Host "  plugin: $Hermes/plugins/aphrodite -> $PluginSrc"
 
-# --- 3. Skills (hermes namespace) -----------------------------------------
-Set-DirLink -Link (Join-Path $Hermes 'skills/hermes') -Target $SkillsSrc | Out-Null
-Write-Host "  skills: $Hermes/skills/hermes -> $SkillsSrc"
-
-# --- 4. Profiles -----------------------------------------------------------
+# --- 3. Profiles -----------------------------------------------------------
 # 7 pre-configured profiles ship inside the repo under profiles/. Rather than
 # recreating them from scratch, link the whole directory so config.yaml + any
 # state-driven cache/log stays inside the repo.

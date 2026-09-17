@@ -21,7 +21,6 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 mod schemas;
-mod skills;
 mod tools;
 
 use std::{
@@ -249,15 +248,6 @@ pub extern "C" fn aphrodite_hermes_list_tools() -> *mut c_char {
 	guarded(|| {
 		let schemas = schemas::all_schemas();
 		to_c_string(&serde_json::to_string(&schemas).unwrap_or_default())
-	})
-}
-
-/// List all bundled skill names and descriptions as JSON.
-#[no_mangle]
-pub extern "C" fn aphrodite_hermes_list_skills() -> *mut c_char {
-	guarded(|| {
-		let skills = skills::all_skills();
-		to_c_string(&serde_json::to_string(&skills).unwrap_or_default())
 	})
 }
 
@@ -643,15 +633,6 @@ mod tests {
 		let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 		assert!(v.is_array());
 		assert!(v.as_array().unwrap().len() >= 10);
-		aphrodite_hermes_free_string(json_ptr);
-	}
-
-	#[test]
-	fn test_list_skills_returns_array() {
-		let json_ptr = aphrodite_hermes_list_skills();
-		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
-		let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-		assert!(v.is_array());
 		aphrodite_hermes_free_string(json_ptr);
 	}
 

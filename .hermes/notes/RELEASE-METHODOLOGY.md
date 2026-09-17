@@ -12,7 +12,7 @@ The two lines are **Development** (work/workshop, append-only, all CI+tests) and
 ```
 Development (workshop)          Current (distributed/release)
   work, bump, prep               users download THIS
-  ALL tests + CI here            NO tests, NO bench, NO .hermes, NO skills
+  ALL tests + CI here            NO tests, NO bench, NO .hermes (incl. skills)
   append-only, never rebased     tags + releases live ONLY here
   no release tags                snapshot transplants, not merges
         │                                   ▲
@@ -114,10 +114,10 @@ git merge --squash Development                    # or: git merge --squash <cuto
 Action 10: RESTORE the branch-owned identity files (Current keeps its own)
 
 ```
-git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite .hermes bench skills
+git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite .hermes bench
 # .gitmodules → stays "branch = Current" on Current
 # workflows → stay [Current]-triggered (Check.yml keeps Current's trigger + NO Test job)
-# .hermes/bench/skills → stay OUT of Current (dev scaffolding never ships)
+# .hermes (incl. skills/), bench → stay OUT of Current (dev scaffolding never ships)
 # plugins/aphrodite gitlink → restore, then float below
 ```
 
@@ -132,7 +132,7 @@ git add plugins/aphrodite
 Action 12: VERIFY before committing (any failure = abort)
 
 ```
-git diff HEAD -- .gitmodules .github/workflows .hermes bench skills   # EMPTY (I9)
+git diff HEAD -- .gitmodules .github/workflows .hermes bench   # EMPTY (I9)
 git submodule status                                                    # no '+'
 git grep -c 'chain_split' -- crates/aphrodite/src                      # per track decision
 ```
@@ -160,7 +160,7 @@ git -C plugins/aphrodite checkout Development
 
 | Ships on Current                                                                                                                                             | Never ships (Development-only)                                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| crates/, plugins/ (as gitlink), docs, README, CHANGELOG, Maintain/scripts (non-bench), .githooks, ruff.toml, rustfmt.toml, .prettier*, .vscode/settings.json | .hermes/, bench/, skills/, tests/, test_* files, auto-release.sh, bench examples (`[[example]]` blocks), dev notes |
+| crates/, plugins/ (as gitlink), docs, README, CHANGELOG, Maintain/scripts (non-bench), .githooks, ruff.toml, rustfmt.toml, .prettier*, .vscode/settings.json | .hermes/ (incl. skills/), bench/, tests/, test_* files, auto-release.sh, bench examples (`[[example]]` blocks), dev notes |
 
 ---
 

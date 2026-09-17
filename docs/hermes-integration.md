@@ -39,7 +39,7 @@ All five hooks register in `plugin.yaml`. Zero changes to Hermes core.
 | Context engine          | ✅ Compresses middle messages         | ❌                               |
 | Auto-launch             | ✅ Proxies start automatically        | ❌ Manual `aphrodite` command    |
 | aphrodite\_\* tools     | ✅ 13 tools in agent namespace        | ❌ Agent doesn't know about them |
-| Bundled skills          | ✅ 9 skills auto-loaded               | ❌                               |
+| Bundled skills          | ❌ Dev-side only (`.hermes/skills/`)          | ❌                               |
 | Prompt injection        | ✅ Retrieval guidance added           | ❌                               |
 | CCR storage             | ✅ Token + cache proxy                | ✅ Token + cache proxy           |
 | Works with              | Hermes only                           | Any OpenAI-compatible client     |
@@ -80,9 +80,10 @@ A generic proxy compresses HTTP response bodies. That helps, but:
    history to decide which messages to offload to CCR. A proxy sees individual
    HTTP requests, not the full context.
 
-4. **Agent augmentation** - The 13 `aphrodite_*` tools and 9 bundled skills
-   teach the agent HOW to use compression. A proxy is opaque - the agent doesn't
-   know compression exists.
+4. **Agent augmentation** - The 13 `aphrodite_*` tools teach the agent HOW to
+   use compression (dev-side skills in `.hermes/skills/` support the agent
+   operating this repo). A proxy is opaque - the agent doesn't know
+   compression exists.
 
 ## Setup
 

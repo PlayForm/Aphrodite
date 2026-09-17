@@ -87,8 +87,8 @@ Before development:
 
 ## Pitfalls
 
-- never rely on plugin-shipped skills being editable - they are read-only via
-  skill_manage; keep operational patterns in profile-level skills
+- the repo's dev skills live in `.hermes/skills/` (Development branch only,
+  never shipped with the plugin) - edit the files directly, not via skill_manage
 - never assume a new import is safe - importing a symbol that the target module
   lacks silently kills the plugin at session start; after adding imports, test
   `python3 -c "import aphrodite"`

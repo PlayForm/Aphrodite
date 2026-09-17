@@ -37,7 +37,7 @@ target triple by hand.
 | Path                                             | Best for                                                                                                               | Scripts                                                                                                    |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | **Hermes plugin, auto-download**                 | Everyday users on any platform                                                                                         | `download.sh` / `download.ps1` inside your plugin clone, then `hermes plugins enable aphrodite`            |
-| **`cargo install aphrodite && aphrodite setup`** | Users with a Rust toolchain who want one command to bootstrap everything (binary, dylibs, config, plugin registration) | [macOS/Linux](macos-linux.md#cargo-install--aphrodite-setup)                                               |
+| **`cargo install aphrodite && aphrodite setup`** | Users with a Rust toolchain who want one command to bootstrap the binary, dylibs, and config (the plugin symlink is a manual follow-up) | [macOS/Linux](macos-linux.md#cargo-install--aphrodite-setup)                                               |
 | **Local-clone installer**                        | Working from a full monorepo checkout, building from source                                                            | `Maintain/install.sh` / `Maintain/install.ps1` (`install.bat` delegates to the `.ps1` for `cmd.exe` users) |
 
 ## Guides

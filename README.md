@@ -45,19 +45,24 @@ On first launch the plugin auto-downloads the `aphrodite` binary from
 > Use the Hermes plugin method on Windows too - `download.ps1` is a native
 > PowerShell equivalent. See [docs/install/windows.md](docs/install/windows.md).
 
-### Via cargo
+### Option B: cargo install (standalone binary)
 
-**`Terminal`**
+Prefer a source checkout (Option A above) for the Hermes plugin - it is a git
+folder by design, and `cargo install` alone does not ship the plugin code.
+The two routes are alternatives: if you install via git clone, you do not need
+`cargo install`, and vice versa.
+
+**`Terminal`** (binary + config only)
 
 ```sh
 cargo install aphrodite          # proxy binary
 cargo install aphrodite-hermes   # dylib + helper bin
-aphrodite setup                  # plugin structure + config + symlink
+aphrodite setup                  # config + data dir under ~/.hermes/aphrodite
 ```
 
-`cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/`.
-The `libaphrodite_hermes` dylib must come from a source checkout or the
-release-download flow above.
+`cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/` and never
+links the plugin into Hermes. To use the Hermes plugin, follow Option A (git
+clone + `ln -s`); `aphrodite setup` prints the exact link command.
 
 ### From source
 

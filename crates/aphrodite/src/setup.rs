@@ -9,7 +9,8 @@
 //! `include_str!` - no runtime file dependency for cargo-installed binaries.
 
 use std::{
-	fs, io,
+	fs,
+	io,
 	path::{Path, PathBuf},
 	process::Command,
 };
@@ -19,7 +20,7 @@ use crate::config::SetupArgs;
 /// aphrodite.toml template - embedded at compile time.
 /// Placeholders: `{api_url}`, `{model}`, `{cache_port}`, `{token_port}` -
 /// replaced with user-provided values.
-const CONFIG_TEMPLATE: &str = include_str!("../templates/aphrodite.toml");
+const CONFIG_TEMPLATE:&str = include_str!("../templates/aphrodite.toml");
 
 /// Errors that can occur during setup.
 #[derive(Debug, thiserror::Error)]
@@ -36,14 +37,14 @@ pub enum SetupError {
 
 /// Context gathered during setup.
 struct SetupCtx {
-	aphrodite_dir: PathBuf,
-	binaries_dir: PathBuf,
-	own_path: PathBuf,
-	own_hash: String,
+	aphrodite_dir:PathBuf,
+	binaries_dir:PathBuf,
+	own_path:PathBuf,
+	own_hash:String,
 }
 
 /// Run the setup/bootstrap process.
-pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
+pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	let home =
 		dirs::home_dir().ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?;
 
@@ -51,8 +52,8 @@ pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 	let own_hash = self_hash(&own_path);
 
 	let ctx = SetupCtx {
-		aphrodite_dir: home.join(".hermes").join("aphrodite"),
-		binaries_dir: home.join(".hermes").join("aphrodite").join("binaries"),
+		aphrodite_dir:home.join(".hermes").join("aphrodite"),
+		binaries_dir:home.join(".hermes").join("aphrodite").join("binaries"),
 		own_path,
 		own_hash,
 	};
@@ -105,13 +106,20 @@ pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 	// ── Step 8: Write __init__.py shim ──
 	write_init_py(&ctx)?;
 
-	// ── Step 9: Symlink to hermes plugins dir ──
-	symlink_plugin(&ctx)?;
-
-	// ── Step 10: Register with hermes ──
+	// ── Step 9: Register with hermes ──
 	register_plugin(&ctx)?;
 
 	println!("aphrodite installed -> {}", ctx.aphrodite_dir.display());
+	println!(
+		"plugin data directory ready: {} (setup no longer symlinks the plugin into Hermes automatically)",
+		ctx.aphrodite_dir.display()
+	);
+	println!(
+		"link the plugin into Hermes manually from a checkout of the plugin repo\n  \
+		 (git clone https://github.com/PlayForm/Aphrodite-Hermes.git):\n  \
+		 ln -s <plugin-checkout> {}/plugins/aphrodite",
+		home.display()
+	);
 
 	Ok(())
 }
@@ -141,7 +149,7 @@ pub fn run(args: &SetupArgs) -> Result<(), SetupError> {
 ///   now an explicit, warned-on-failure step too, instead of relying on
 ///   macOS to incidentally re-sign a linker-edited Mach-O.
 #[cfg(target_os = "macos")]
-fn install_macos_artifact(src: &Path, dest: &Path, dylib_id_name: Option<&str>, mode: u32) -> Result<(), SetupError> {
+fn install_macos_artifact(src:&Path, dest:&Path, dylib_id_name:Option<&str>, mode:u32) -> Result<(), SetupError> {
 	let _ = std::fs::remove_file(dest);
 	let ditto_ok = Command::new("ditto")
 		.args([src.to_str().unwrap_or(""), dest.to_str().unwrap_or("")])
@@ -195,7 +203,7 @@ fn install_macos_artifact(src: &Path, dest: &Path, dylib_id_name: Option<&str>, 
 }
 
 /// Compute BLAKE3 hash of the binary for integrity display.
-fn self_hash(path: &Path) -> String {
+fn self_hash(path:&Path) -> String {
 	match fs::read(path) {
 		Ok(bytes) => {
 			let hash = blake3::hash(&bytes);
@@ -217,9 +225,11 @@ fn verify_hermes() -> Result<(), SetupError> {
 			let stderr = String::from_utf8_lossy(&out.stderr);
 			Err(SetupError::HermesNotFound(format!("hermes --version failed: {stderr}")))
 		},
-		Err(_) => Err(SetupError::HermesNotFound(
-			"hermes not found in PATH - install hermes agent first".into(),
-		)),
+		Err(_) => {
+			Err(SetupError::HermesNotFound(
+				"hermes not found in PATH - install hermes agent first".into(),
+			))
+		},
 	}
 }
 
@@ -241,17 +251,23 @@ fn verify_hermes() -> Result<(), SetupError> {
 ///
 /// The download path fetches the tripled name and saves it as the
 /// un-tripled name the plugin expects.
-fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
-	let dylib_names: &[&str] = if cfg!(target_os = "macos") {
-		&["libaphrodite.dylib", "libaphrodite_hermes.dylib"]
+fn copy_dylibs(ctx:&SetupCtx) -> Result<(), SetupError> {
+	// The core `libaphrodite` cdylib is BEST-EFFORT: it exists for external
+	// embedders, is not published on GitHub Releases (Build.yml ships only
+	// `aphrodite-<target>` + `libaphrodite_hermes-<target>`), and the Hermes
+	// plugin loads only `libaphrodite_hermes`.  A missing core dylib must
+	// never abort setup - warn and continue.  `libaphrodite_hermes` is
+	// hard-required: without it the plugin cannot load.
+	let dylib_names:&[(&str, bool)] = if cfg!(target_os = "macos") {
+		&[("libaphrodite.dylib", false), ("libaphrodite_hermes.dylib", true)]
 	} else if cfg!(target_os = "linux") {
-		&["libaphrodite.so", "libaphrodite_hermes.so"]
+		&[("libaphrodite.so", false), ("libaphrodite_hermes.so", true)]
 	} else {
-		&["aphrodite.dll", "aphrodite_hermes.dll"]
+		&[("aphrodite.dll", false), ("aphrodite_hermes.dll", true)]
 	};
 
 	let exe_dir = ctx.own_path.parent().unwrap_or(Path::new("."));
-	let search_paths: Vec<PathBuf> = vec![
+	let search_paths:Vec<PathBuf> = vec![
 		exe_dir.to_path_buf(),
 		exe_dir.join("deps"),
 		PathBuf::from("/usr/local/lib"),
@@ -259,7 +275,7 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 	];
 
 	let mut copied = 0u32;
-	for name in dylib_names {
+	for &(name, required) in dylib_names {
 		let dest = ctx.binaries_dir.join(name);
 
 		let mut found = false;
@@ -319,13 +335,23 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 			// always land here.  This download path bridges that gap
 			// without requiring a full source checkout.
 			if let Err(e) = download_dylib(name, &dest) {
-				return Err(SetupError::DylibNotFound(format!(
-					"dylib '{name}' not found locally and download failed: {e}.  \
-					 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
-					 or download manually from \
-					 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",
-					version = env!("CARGO_PKG_VERSION"),
-				)));
+				if required {
+					return Err(SetupError::DylibNotFound(format!(
+						"dylib '{name}' not found locally and download failed: {e}.  \
+						 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
+						 or download manually from \
+						 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",
+						version = env!("CARGO_PKG_VERSION"),
+					)));
+				}
+				// Optional core dylib: degrade gracefully (F9) - the
+				// Hermes plugin runtime never loads it, so setup can
+				// complete without it.
+				eprintln!(
+					"WARNING: optional dylib '{name}' could not be located or downloaded ({e}); continuing without it \
+					 - the Hermes plugin loads only the *_hermes dylib"
+				);
+				continue;
 			}
 			copied += 1;
 		}
@@ -339,7 +365,7 @@ fn copy_dylibs(ctx: &SetupCtx) -> Result<(), SetupError> {
 /// version.  `dest_name` is the bare filename (e.g. `libaphrodite.dylib`);
 /// the remote asset is named with a target-triple suffix (e.g.
 /// `libaphrodite-aarch64-apple-darwin.dylib`).
-fn download_dylib(dest_name: &str, dest: &Path) -> Result<(), String> {
+fn download_dylib(dest_name:&str, dest:&Path) -> Result<(), String> {
 	// ── Determine the target triple ──────────────────────────────
 	let triple = target_triple();
 	// Build the remote asset name from the destination filename.
@@ -401,7 +427,7 @@ fn download_dylib(dest_name: &str, dest: &Path) -> Result<(), String> {
 /// hashing tool (`shasum`/`sha256sum`/`Get-FileHash`) rather than adding a
 /// crate dependency, matching this function's existing curl/PowerShell
 /// shell-out pattern.
-fn verify_download_checksum(release_dir: &str, triple: &str, asset_name: &str, dest: &Path) -> Result<(), String> {
+fn verify_download_checksum(release_dir:&str, triple:&str, asset_name:&str, dest:&Path) -> Result<(), String> {
 	let sums_url = format!("{release_dir}/SHA256SUMS-{triple}.txt");
 	let sums_text = if cfg!(windows) {
 		Command::new("powershell")
@@ -444,11 +470,13 @@ fn verify_download_checksum(release_dir: &str, triple: &str, asset_name: &str, d
 		Command::new("sha256sum").arg(dest.to_str().unwrap_or("")).output()
 	};
 	let actual = match hash_output {
-		Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
-			.split_whitespace()
-			.next()
-			.unwrap_or("")
-			.to_lowercase(),
+		Ok(o) if o.status.success() => {
+			String::from_utf8_lossy(&o.stdout)
+				.split_whitespace()
+				.next()
+				.unwrap_or("")
+				.to_lowercase()
+		},
 		_ => return Err("no shasum/sha256sum/Get-FileHash available to verify checksum".to_string()),
 	};
 
@@ -481,7 +509,7 @@ fn target_triple() -> &'static str {
 /// `aphrodite setup` (e.g. after `cargo install aphrodite@<newer>`) must
 /// refresh it rather than freeze it at the first-install version. Only the
 /// user-editable `aphrodite.toml` stays `--force`-gated.
-fn write_plugin_yaml(ctx: &SetupCtx, args: &SetupArgs) -> Result<(), SetupError> {
+fn write_plugin_yaml(ctx:&SetupCtx, args:&SetupArgs) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("plugin.yaml");
 
 	let yaml = format!(
@@ -543,9 +571,9 @@ install_message: |
 /// so the two are kept in sync by the
 /// `test_hermes_plugin_shim_template_matches_live` drift guard below (03-F10),
 /// which fails if they diverge.
-const HERMES_PLUGIN_SHIM: &str = include_str!("../templates/__init__.py");
+const HERMES_PLUGIN_SHIM:&str = include_str!("../templates/__init__.py");
 
-fn write_init_py(ctx: &SetupCtx) -> Result<(), SetupError> {
+fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
 	let path = ctx.aphrodite_dir.join("__init__.py");
 
 	// Always overwritten (03-F8): the shim is code, not config - its FFI symbol
@@ -558,74 +586,8 @@ fn write_init_py(ctx: &SetupCtx) -> Result<(), SetupError> {
 	Ok(())
 }
 
-/// Symlink ~/.hermes/plugins/aphrodite -> ~/.hermes/aphrodite/
-fn symlink_plugin(ctx: &SetupCtx) -> Result<(), SetupError> {
-	let plugins_dir = dirs::home_dir()
-		.ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?
-		.join(".hermes")
-		.join("plugins");
-	fs::create_dir_all(&plugins_dir)?;
-	let link = plugins_dir.join("aphrodite");
-
-	if link.exists() {
-		if link.is_symlink() {
-			let target = fs::read_link(&link)?;
-			if target == ctx.aphrodite_dir {
-				return Ok(());
-			}
-			fs::remove_file(&link)?;
-		} else {
-			return Err(SetupError::PluginRegistrationFailed(format!(
-				"{} exists and is not a symlink - manual cleanup required",
-				link.display()
-			)));
-		}
-	}
-
-	#[cfg(unix)]
-	std::os::unix::fs::symlink(&ctx.aphrodite_dir, &link)?;
-	#[cfg(windows)]
-	{
-		// Real symlinks need elevated privileges on Windows; a directory
-		// junction doesn't. Try that first (mirrors Maintain/install.bat),
-		// falling back to a recursive copy if junctions are blocked too.
-		let status = Command::new("cmd")
-			.args(["/C", "mklink", "/J"])
-			.arg(&link)
-			.arg(&ctx.aphrodite_dir)
-			.status();
-		let junction_ok = matches!(status, Ok(s) if s.success());
-		if !junction_ok {
-			copy_dir_recursive(&ctx.aphrodite_dir, &link)?;
-		}
-	}
-	#[cfg(not(any(unix, windows)))]
-	{
-		let _ = (&ctx.aphrodite_dir, &link);
-	}
-	println!("symlinked plugin -> {}", link.display());
-	Ok(())
-}
-
-/// Recursively copy a directory tree - the Windows fallback when a junction
-/// can't be created (e.g. `mklink` disabled by policy).
-#[cfg(windows)]
-fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<()> {
-	fs::create_dir_all(dst)?;
-	for entry in fs::read_dir(src)? {
-		let entry = entry?;
-		let dest_path = dst.join(entry.file_name());
-		if entry.file_type()?.is_dir() {
-			copy_dir_recursive(&entry.path(), &dest_path)?;
-		} else {
-			fs::copy(entry.path(), &dest_path)?;
-		}
-	}
-	Ok(())
-}
-
 /// Register plugin with hermes.
-fn register_plugin(_ctx: &SetupCtx) -> Result<(), SetupError> {
+fn register_plugin(_ctx:&SetupCtx) -> Result<(), SetupError> {
 	let status = Command::new("hermes")
 		.args(["plugins", "enable", "aphrodite"])
 		.output()
@@ -641,7 +603,7 @@ fn register_plugin(_ctx: &SetupCtx) -> Result<(), SetupError> {
 }
 
 /// Set strict file permissions (Unix only).
-fn secure_perms(path: &Path, mode: u32) -> io::Result<()> {
+fn secure_perms(path:&Path, mode:u32) -> io::Result<()> {
 	#[cfg(unix)]
 	{
 		use std::os::unix::fs::PermissionsExt;
@@ -654,9 +616,7 @@ fn secure_perms(path: &Path, mode: u32) -> io::Result<()> {
 	Ok(())
 }
 
-fn binary_name() -> &'static str {
-	if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" }
-}
+fn binary_name() -> &'static str { if cfg!(target_os = "windows") { "aphrodite.exe" } else { "aphrodite" } }
 
 #[cfg(test)]
 mod tests {
@@ -719,7 +679,7 @@ mod tests {
 			// - nothing to compare against, so this guard is a no-op.
 			return;
 		};
-		let normalize = |s: &str| s.replace("\r\n", "\n");
+		let normalize = |s:&str| s.replace("\r\n", "\n");
 		assert_eq!(
 			normalize(&live),
 			normalize(HERMES_PLUGIN_SHIM),

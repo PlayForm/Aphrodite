@@ -100,12 +100,6 @@ def test_list_tools_returns_array_with_known_entries():
     assert "aphrodite_retrieve" in names
 
 
-def test_list_skills_returns_array():
-    ptr = lib.aphrodite_hermes_list_skills()
-    skills = json.loads(_consume(ptr))
-    assert isinstance(skills, list)
-
-
 def test_get_schema_known_tool():
     ptr = lib.aphrodite_hermes_get_schema(b"aphrodite_compress")
     schema = json.loads(_consume(ptr))

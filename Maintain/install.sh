@@ -12,7 +12,6 @@ REPO="${REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
 HERMES="${HERMES:-$HOME/.hermes}"
 BINARY="${HERMES}/aphrodite/aphrodite"
 PLUGIN_SRC="${REPO}/plugins/aphrodite"
-SKILLS_SRC="${PLUGIN_SRC}/skills"
 
 echo "=== aphrodite install ==="
 echo "  repo:   $REPO"
@@ -35,12 +34,7 @@ rm -rf "$HERMES/plugins/aphrodite"
 ln -sf "$PLUGIN_SRC" "$HERMES/plugins/aphrodite"
 echo "  plugin: $HERMES/plugins/aphrodite → $PLUGIN_SRC"
 
-# --- 3. Skills (hermes namespace) --------------------------------------------
-rm -rf "$HERMES/skills/hermes"
-ln -sf "$SKILLS_SRC" "$HERMES/skills/hermes"
-echo "  skills: $HERMES/skills/hermes → $SKILLS_SRC"
-
-# --- 4. Profiles -------------------------------------------------------------
+# --- 3. Profiles -------------------------------------------------------------
 # 7 pre-configured profiles ship inside the repo under profiles/.
 # Rather than recreating them from scratch, symlink the whole directory
 # so config.yaml + any state-driven cache/log stays inside the repo.

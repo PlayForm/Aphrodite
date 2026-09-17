@@ -22,22 +22,22 @@ session and the Aphrodite repo.
 
 ## Compressed-Session Workflow
 
-The engine compresses every read — never fight it by re-reading the same file
+The engine compresses every read - never fight it by re-reading the same file
 with different offsets or tools. The full tool-API doctrine lives in
 `aphrodite-tool-testing`; the operational shape is:
 
-1. **Plan reads ahead** — `aphrodite_prefetch(paths=[...])` reads and
+1. **Plan reads ahead** - `aphrodite_prefetch(paths=[...])` reads and
    compresses files in the background; track progress with
    `aphrodite_prefetch_status`.
-2. **Retrieve, don't re-read** — on `<<<CCR:hash|type|size>>>`, call
+2. **Retrieve, don't re-read** - on `<<<CCR:hash|type|size>>>`, call
    `aphrodite_retrieve(hash)`. Never call `read_file` again on the same file.
-3. **Write terminal output to files** — `cmd > /tmp/out.txt 2>&1`, then
+3. **Write terminal output to files** - `cmd > /tmp/out.txt 2>&1`, then
    prefetch/retrieve the file instead of reading raw output.
-4. **Do other work while waiting** — dispatch prefetches and independent tasks,
+4. **Do other work while waiting** - dispatch prefetches and independent tasks,
    then poll readiness.
 
 Anti-pattern: calling `read_file` 3+ times on the same file with different
-offsets — each call returns a fresh compressed marker.
+offsets - each call returns a fresh compressed marker.
 
 ## Dual-Mode Rebuild (`aphrodite_rebuild`)
 
@@ -46,7 +46,7 @@ offsets — each call returns a fresh compressed marker.
 - **User mode**: no Cargo workspace found (standalone install) → re-downloads
   the binary from GitHub Releases.
 
-Never hardcode `os.path.dirname()` chains in `_hooks/rebuild.py` — they break
+Never hardcode `os.path.dirname()` chains in `_hooks/rebuild.py` - they break
 when directory structure changes. Always use `_find_cargo_toml()`, which walks
 up to 6 levels from the rebuild module:
 
@@ -64,7 +64,7 @@ def _find_cargo_toml():
 
 ## `--version` Must Precede Config Loading
 
-The Rust binary's `--version` is only parsed by clap when `Cli::parse()` runs —
+The Rust binary's `--version` is only parsed by clap when `Cli::parse()` runs -
 which never happens when `aphrodite.toml` exists. Intercept `--version`/`-V` at
 the top of `main()` before config loading, or `_check_binary_version()` (which
 calls `[BINARY, "--version"]`) hangs:
@@ -80,7 +80,7 @@ if args.iter().any(|a| a == "--version" || a == "-V") {
 ## Standalone Plugin Repo Sync
 
 End users install from
-[Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes) — a lightweight
+[Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes) - a lightweight
 repo with Python plugin files only (no binary, no monorepo). The binary is
 auto-downloaded from
 [GitHub Releases](https://github.com/PlayForm/Aphrodite/releases) on first
@@ -97,7 +97,7 @@ cd $STANDALONE && git add -A && git commit -m "sync: v$NEW" && git push
 
 ## Dep Pinning Convention
 
-Pin all dependencies to exact versions — never semver ranges:
+Pin all dependencies to exact versions - never semver ranges:
 
 | Lang   | Wrong           | Right                |
 | ------ | --------------- | -------------------- |
@@ -110,12 +110,11 @@ Check the latest version before bumping: `pip3 index versions <pkg>` or
 
 ## Breakpoint Pitfalls (silent breakage)
 
-- tracing `DisplayValue<T>` requires `fmt::Display` — never format a `PathBuf`
+- tracing `DisplayValue<T>` requires `fmt::Display` - never format a `PathBuf`
   with `%`; use `.display()`.
-- Never import `_headroom_context` from `.env` — it lives in `.health`; the
+- Never import `_headroom_context` from `.env` - it lives in `.health`; the
   wrong import silently kills the plugin at load.
-- axum 0.8 route wildcards: `/*path` is invalid at startup — use `/{*path}`.
+- axum 0.8 route wildcards: `/*path` is invalid at startup - use `/{*path}`.
   See `aphrodite-cargo-upgrade` for the full cargo-upgrade breakpoint list.
-- Never edit plugin-shipped skills through `skill_manage` — they are read-only;
-  write the file directly or create a profile-level skill for operational
-  patterns.
+- The repo's dev skills live in `.hermes/skills/` (Development branch only,
+  never shipped with the plugin) - edit the files directly with `write_file`/`patch`.

@@ -848,46 +848,9 @@ def register(ctx: Any) -> None:
                 _log.warning("failed to register tool %s: %s", name, e)
         _log.info("registered %d tools: %s", len(registered), registered)
 
-    # Register skills - probe candidate layouts in order (Hermes wants a Path):
-    # a `skills/` copied alongside this plugin (the standalone/`aphrodite setup`
-    # install target), the monorepo layout (`<repo>/skills`, two levels up from
-    # `<repo>/plugins/aphrodite`), and one level further for a deeper nesting.
-    # Under a resolved symlink install (`~/.hermes/plugins/aphrodite` ->
-    # `~/.hermes/aphrodite`), the old hardcoded `parent.parent.parent` guess
-    # landed on `~/skills` (never exists) - 0 of the 9 advertised skills ever
-    # registered outside a monorepo checkout, with only an info log to notice.
-    # Slicing never raises: shallow installs (e.g. /opt/Aphrodite-Hermes) have
-    # fewer than 3 parents, and parents[1:3] preserves deep-install semantics
-    # (repo-root skills sit at parents[1] for a plugin at
-    # <repo>/plugins/aphrodite) - issue 5.
-    _skills_dir_candidates = [_PLUGIN_DIR / "skills"] + [
-        p / "skills" for p in _PLUGIN_DIR.parents[1:3]
-    ]
-    _skills_dir = next((p for p in _skills_dir_candidates if p.is_dir()), None)
-    if _skills_dir is None:
-        _log.warning(
-            "no skills/ directory found (tried %s) - 0 skills will register",
-            _skills_dir_candidates,
-        )
-        _skills_dir = _skills_dir_candidates[0]
-    skills = _call_json(dylib, "aphrodite_hermes_list_skills")
-    if skills:
-        count = 0
-        for skill in skills:
-            name = skill["name"]
-            desc = skill.get("description", "")
-            skill_path = _skills_dir / name / "SKILL.md"
-            # Hermes skill identifiers must match [a-zA-Z0-9_-]+ (no dots), so
-            # sanitize names like "aphrodite-v0.8.6-patterns" for registration
-            # while still loading from the real on-disk directory.
-            reg_name = "".join(c if (c.isalnum() or c in "_-") else "-" for c in name)
-            if skill_path.exists():
-                try:
-                    ctx.register_skill(reg_name, skill_path, desc)
-                    count += 1
-                except Exception as e:
-                    _log.warning("failed to register skill %s: %s", name, e)
-        _log.info("registered %d skills from %s", count, _skills_dir)
+    # Skills are NOT shipped with the plugin - they live dev-side in the
+    # monorepo's .hermes/skills/ (Development branch only, never on Current).
+    # The plugin registers tools and hooks only.
 
     # Context engine is opt-in (APHRODITE_CONTEXT_ENGINE=1). Hermes expects a
     # ContextEngine subclass instance here; the per-turn catalog summary is
