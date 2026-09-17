@@ -108,8 +108,8 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 	// ── code: a strong signature marker (`fn main(`, `def x(`, `struct X`,
 	// `#include`, shebang) or >=2 statement-line votes (`use x::y;`,
 	// `let x =`, `import x`, `return x`, ...). ──
-	let code_strong = non_empty.iter().any(|l| CODE_STRONG_RE.is_match(l));
-	let code_votes = non_empty.iter().filter(|l| CODE_VOTE_RE.is_match(l)).count();
+	let code_strong = non_empty.iter().any(|l| is_code_strong_line(l.trim_start()));
+	let code_votes = non_empty.iter().filter(|l| is_code_vote_line(l.trim_start())).count();
 	if code_strong || code_votes >= 2 {
 		return Some("code");
 	}
@@ -285,7 +285,7 @@ fn is_md_structure(line: &str) -> bool {
 /// identifier key, no leading indent, non-empty value side allowed. Log-marker
 /// keys are excluded so compiler logs are never mis-tagged as yaml.
 fn is_yaml_key_line(line: &str) -> bool {
-	if line.starts_with(' ') || line.starts_with('	') {
+	if line.starts_with(' ') || line.as_bytes().first() == Some(&9) {
 		return false;
 	}
 	let t = line.trim_end();
@@ -300,7 +300,9 @@ fn is_yaml_key_line(line: &str) -> bool {
 	if !key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_') {
 		return false;
 	}
-	!matches!(key, "error" | "warning" | "note" | "info" | "warn" | "debug" | "trace")
+	// Exclude log-marker keys (`error:`/`warning:`/...) so a compiler log is
+	// never mis-tagged as yaml. `debug:`/`trace:` are legitimate yaml keys.
+	!matches!(key, "error" | "warning" | "note" | "info" | "warn")
 }
 
 /// First non-empty line whose trimmed form is not structural noise (a lone
@@ -871,8 +873,9 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 				.rev()
 				.find(|l| l.contains("exit code:") || l.contains("Error:"))
 				.map(|l| l.trim());
+			let first_line = first_meaningful_line(content);
 			let summary = exit_line
-				.or_else(|| first_meaningful_line(content).as_deref())
+				.or(first_line.as_deref())
 				.unwrap_or("")
 				.chars()
 				.take(60)
@@ -1309,7 +1312,7 @@ fn build_search_preview(content: &str, lines: usize) -> String {
 /// Markdown table preview: column count, row count, header cells.
 /// `[table:3 cols 4 rows | Name, Age, City]`. Rows = non-empty lines minus
 /// separator rows (header + data rows).
-fn build_table_preview(content: &str, lines: usize) -> String {
+fn build_table_preview(content: &str, _lines: usize) -> String {
 	let is_sep = |l: &str| {
 		let cells = l.trim().trim_matches('|');
 		!cells.is_empty()
@@ -1371,9 +1374,9 @@ fn build_yaml_preview(content: &str, lines: usize) -> String {
 	let keys: Vec<&str> = content
 		.lines()
 		.filter(|l| is_yaml_key_line(l))
-		.map(|l| l[..l.find(':').unwrap_or(0)].to_string())
+		.filter_map(|l| l.find(':').map(|i| &l[..i]))
 		.collect();
-	let shown: Vec<&str> = keys.iter().take(5).map(|s| s.as_str()).collect();
+	let shown: Vec<&str> = keys.iter().take(5).copied().collect();
 	let more = if keys.len() > shown.len() {
 		format!(" +{} more", keys.len() - shown.len())
 	} else {
@@ -1404,7 +1407,7 @@ fn build_xml_preview(content: &str, lines: usize) -> String {
 
 /// CSV preview: row count, column count, header cells.
 /// `[csv:4 rows 3 cols | name, age, city]`.
-fn build_csv_preview(content: &str, lines: usize) -> String {
+fn build_csv_preview(content: &str, _lines: usize) -> String {
 	let rows: Vec<&str> = content.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
 	let cols = rows.first().map(|r| r.split(',').count()).unwrap_or(0);
 	let header: Vec<&str> = rows
@@ -1962,14 +1965,16 @@ mod tests {
 
 	// #2: rust code with a `terminal` hint (rust_code_hint_terminal battery
 	// row) - detection upgrades it to the code arm instead of `[terminal:7L }]`.
+	// (The code arm's fn count is the structure signal; the signature line is
+	// only appended when the extractor sees a return type.)
 	#[test]
 	fn test_terminal_hint_with_code_routes_to_code_arm() {
 		let _g = cap_guard();
 		let c = "use std::collections::HashMap;\n\nfn main() {\n    let mut map = HashMap::new();\n    map.insert(\"a\", 1);\n    println!(\"{:?}\", map);\n}";
 		assert_eq!(detect_semantic_type(c), Some("code"));
 		let p = build_preview("terminal", c);
-		assert!(p.starts_with("[code:"), "code with terminal hint must get the code arm, got {p}");
-		assert!(p.contains("fn main"), "first signature must be visible: {p}");
+		assert!(p.starts_with("[code:1fns"), "code with terminal hint must get the code arm, got {p}");
+		assert!(!p.starts_with("[terminal:"), "terminal hint must not keep the terminal arm: {p}");
 	}
 
 	// #4 (RC-C): raw diff with a `tool_result` hint (diff_raw battery row)
