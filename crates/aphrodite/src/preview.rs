@@ -218,7 +218,8 @@ fn apply_preview_cap(preview: &str, max_chars: usize) -> String {
 
 /// True for a line that is a real compiler/build error line: rustc/clang/gcc
 /// `error[E0432]:` / `error:`, capitalized `Error:`, all-caps `ERROR`, Go
-/// `panicked at`, and `file:line: error[`-style prefixes. Line-based (not
+/// `panicked at`, `file:line: error[`-style prefixes, and Python exception
+/// lines (`ValueError:`, `TypeError:`, `Exception:`). Line-based (not
 /// substring) counting so a word containing "error" (`noerror`, `error-prone`)
 /// or a capitalized variant can never inflate/miss the tally.
 fn is_error_line(line: &str) -> bool {
@@ -230,7 +231,11 @@ fn is_error_line(line: &str) -> bool {
 		|| t.starts_with("panicked at")
 		|| t.contains(": error[")
 		|| t.contains(": error:")
+		|| ERROR_LINE_RE.is_match(t)
 }
+
+static ERROR_LINE_RE: std::sync::LazyLock<regex::Regex> =
+	std::sync::LazyLock::new(|| regex::Regex::new(r"\b\w+(?:Error|Exception):").unwrap());
 
 /// True for a line that is a real compiler warning line (`warning[`/`warning:`
 /// /`Warning:`/`WARNING` or a `file:line: warning:` prefix).
