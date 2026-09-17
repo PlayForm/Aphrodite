@@ -75,10 +75,10 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 		|| content.contains("=== RUN ")
 		|| content.contains("--- FAIL:")
 		|| content.contains("--- PASS:")
-		|| REEST_PYTEST.is_match(content)
-		|| REEST_JEST.is_match(content)
-		|| REEST_RUNNING.is_match(content)
-		|| REEST_TEST_LINE.is_match(content)
+		|| content.lines().any(|l| has_number_before(l, "passed") || has_number_before(l, "failed"))
+		|| content.lines().any(|l| has_number_after(l, "Tests:"))
+		|| content.lines().any(|l| is_running_tests_line(l.trim_start()))
+		|| content.lines().any(|l| is_test_result_line(l.trim_start()))
 	{
 		return Some("test");
 	}
@@ -129,11 +129,13 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 	}
 
 	// ── markdown document: heading lines + list/table/link/fence/quote
-	// structure. Gated so a shell script's `# comment` lines alone cannot
-	// trigger it (needs >=3 heading votes or a non-heading structure). ──
+	// structure or body prose. Gated so comment-only shell scripts cannot
+	// trigger it: a doc needs structure OR non-heading body lines - a file of
+	// bare `# comment` lines has neither. ──
 	let md_heads = non_empty.iter().filter(|l| is_md_heading(l)).count();
 	let md_structure = non_empty.iter().filter(|l| is_md_structure(l)).count();
-	if md_heads >= 2 && (md_heads >= 3 || md_structure >= 1) {
+	let md_body = non_empty.iter().filter(|l| !is_md_heading(l) && !is_md_structure(l)).count();
+	if md_heads >= 2 && (md_structure >= 1 || md_body >= 1) {
 		return Some("markdown");
 	}
 
@@ -388,33 +390,175 @@ fn is_path_line(line: &str) -> bool {
 	t.contains('/') || (t.rfind('.').map(|i| i > 0 && i < t.len() - 1).unwrap_or(false))
 }
 
-static REEST_PYTEST: std::sync::LazyLock<regex::Regex> =
-	std::sync::LazyLock::new(|| regex::Regex::new(r"\d+ passed|\d+ failed").unwrap());
-static REEST_JEST: std::sync::LazyLock<regex::Regex> =
-	std::sync::LazyLock::new(|| regex::Regex::new(r"Tests:\s+\d+").unwrap());
+/// ── Structured detection matchers (Issue #11 residual #4; user directive:
+/// the type-detection layer must NOT use the regex crate - explicit
+/// `strip_prefix`/`starts_with` checks against literal prefixes, testable,
+/// no raw-string escaping). ──
+
 /// `running N tests` header (bare test logs without a summary line).
-static REEST_RUNNING: std::sync::LazyLock<regex::Regex> =
-	std::sync::LazyLock::new(|| regex::Regex::new(r"(?m)^\s*running\s+\d+\s+tests?\b").unwrap());
-/// `test <name> ... ok|FAILED|ignored` lines.
-static REEST_TEST_LINE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-	regex::Regex::new(r"(?m)^\s*test\s+\S+\s+\.\.\.\s+(ok|FAILED|ignored)\b").unwrap()
-});
-/// Strong code-signature markers (one line is enough): `fn main(`, `struct X`,
-/// `impl`, `def x(`, `class X`, `func X(`, `package x`, `#include`, shebang.
-static CODE_STRONG_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-	regex::Regex::new(
-		r"(?m)^\s*(?:fn\s+\w+\s*\(|(?:pub\s+)?(?:struct|enum|trait)\s+\w+|impl\s|def\s+\w+\s*\(|class\s+\w+|func\s+\w+\s*\(|package\s+[a-z]\w*|#!|#include\s*[<\"])",
-	)
-	.unwrap()
-});
-/// Code statement-line votes (`use x::y;`, `let x =`, `import x`,
-/// `from x import y`, `return ...`, `println!`, `print(`, `echo ...`).
-static CODE_VOTE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-	regex::Regex::new(
-		r"(?m)^\s*(?:use\s+[\w:]+;|(?:let|const|static)\s+(?:mut\s+)?[\w:]+\s*=|import\s+\w|from\s+\w+\s+import\b|return\s+|println!|print\s*\(|echo\s+[\w$])",
-	)
-	.unwrap()
-});
+fn is_running_tests_line(t: &str) -> bool {
+	let rest = match t.strip_prefix("running ") {
+		Some(r) => r,
+		None => return false,
+	};
+	let digits = rest.chars().take_while(|c| c.is_ascii_digit()).count();
+	if digits == 0 {
+		return false;
+	}
+	let after = rest[digits..].trim_start();
+	let after = match after.strip_prefix("test") {
+		Some(a) => a,
+		None => return false,
+	};
+	let after = match after.strip_prefix('s') {
+		Some(a) => a,
+		None => after,
+	};
+	// `tests?\b`: the word must end here or be followed by a non-word char.
+	after.chars().next().map(|c| !(c.is_alphanumeric() || c == '_')).unwrap_or(true)
+}
+
+/// `test <name> ... ok|FAILED|ignored` line.
+fn is_test_result_line(t: &str) -> bool {
+	let rest = match t.strip_prefix("test ") {
+		Some(r) => r,
+		None => return false,
+	};
+	let name_len = rest.chars().take_while(|c| !c.is_whitespace()).count();
+	if name_len == 0 {
+		return false;
+	}
+	let after = rest[name_len..].trim_start();
+	let after = match after.strip_prefix("...") {
+		Some(a) => a,
+		None => return false,
+	};
+	let after = after.trim_start();
+	for kw in ["ok", "FAILED", "ignored"] {
+		if let Some(r) = after.strip_prefix(kw) {
+			// word boundary: next char is end or non-word.
+			return r.chars().next().map(|c| !(c.is_alphanumeric() || c == '_')).unwrap_or(true);
+		}
+	}
+	false
+}
+
+/// `N passed` / `N failed` anywhere on a line (pytest summaries).
+fn has_number_before(line: &str, kw: &str) -> bool {
+	match line.find(kw) {
+		Some(i) => line[..i].trim_end().chars().last().map(|c| c.is_ascii_digit()).unwrap_or(false),
+		None => false,
+	}
+}
+
+/// `Tests: N` jest summary line.
+fn has_number_after(line: &str, kw: &str) -> bool {
+	match line.find(kw) {
+		Some(i) => line[i + kw.len()..].trim_start().chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false),
+		None => false,
+	}
+}
+
+/// `fn name(` / `def name(` / `func name(` style signature.
+fn is_fn_style_sig(t: &str, kw: &str) -> bool {
+	let rest = match t.strip_prefix(kw) {
+		Some(r) => r,
+		None => return false,
+	};
+	let rest = rest.trim_start();
+	let name_len = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').count();
+	name_len > 0 && rest[name_len..].trim_start().starts_with('(')
+}
+
+/// `struct Name` / `enum Name` / `trait Name` (optionally `pub`-prefixed).
+fn is_type_decl(t: &str) -> bool {
+	let stripped = t.strip_prefix("pub ").unwrap_or(t);
+	for kw in ["struct ", "enum ", "trait "] {
+		if let Some(rest) = stripped.strip_prefix(kw) {
+			let name_len = rest.trim_start().chars().take_while(|c| c.is_alphanumeric() || *c == '_').count();
+			if name_len > 0 {
+				return true;
+			}
+		}
+	}
+	false
+}
+
+/// `#include <...>` / `#include "..."` / `#include<...>`.
+fn is_include_directive(t: &str) -> bool {
+	let rest = match t.strip_prefix("#include") {
+		Some(r) => r,
+		None => return false,
+	};
+	let rest = rest.trim_start();
+	rest.starts_with('<') || rest.starts_with('"')
+}
+
+/// Strong code-signature line: ONE such line is enough to call content code.
+fn is_code_strong_line(t: &str) -> bool {
+	is_fn_style_sig(t, "fn ")
+		|| is_fn_style_sig(t, "def ")
+		|| is_fn_style_sig(t, "func ")
+		|| is_type_decl(t)
+		|| t.starts_with("impl ")
+		|| t.starts_with("class ")
+		|| t.starts_with("#!")
+		|| is_include_directive(t)
+		|| t.strip_prefix("package ")
+			.map(|r| r.chars().next().map(|c| c.is_ascii_lowercase()).unwrap_or(false))
+			.unwrap_or(false)
+}
+
+/// `let x =` / `const X =` / `static X =` assignment (optional `mut`).
+fn is_let_assign(t: &str) -> bool {
+	let rest = match ["let ", "const ", "static "].iter().find_map(|p| t.strip_prefix(p)) {
+		Some(r) => r,
+		None => return false,
+	};
+	let rest = rest.strip_prefix("mut ").unwrap_or(rest).trim_start();
+	let name_len = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':').count();
+	name_len > 0 && rest[name_len..].trim_start().starts_with('=')
+}
+
+/// `use std::collections::HashMap;` (rust use statement ending in `;`).
+fn is_use_statement(t: &str) -> bool {
+	let rest = match t.strip_prefix("use ") {
+		Some(r) => r,
+		None => return false,
+	};
+	let path_len = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':').count();
+	path_len > 0 && rest[path_len..].starts_with(';')
+}
+
+/// `from x import y` (python).
+fn is_from_import(t: &str) -> bool {
+	let rest = match t.strip_prefix("from ") {
+		Some(r) => r,
+		None => return false,
+	};
+	let mod_len = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').count();
+	mod_len > 0 && rest[mod_len..].trim_start().starts_with("import")
+}
+
+/// Code statement-line vote: `use x::y;`, `let x =`, `import x`,
+/// `from x import y`, `return ...`, `println!`, `print(`, `echo ...`.
+fn is_code_vote_line(t: &str) -> bool {
+	is_use_statement(t)
+		|| is_let_assign(t)
+		|| is_from_import(t)
+		|| t.strip_prefix("import ")
+			.map(|r| r.chars().next().map(|c| c.is_alphanumeric() || c == '_').unwrap_or(false))
+			.unwrap_or(false)
+		|| t.strip_prefix("return")
+			.map(|r| r.chars().next().map(|c| c.is_whitespace()).unwrap_or(false))
+			.unwrap_or(false)
+		|| t.starts_with("println!")
+		|| t.starts_with("print(")
+		|| t.strip_prefix("print").map(|r| r.trim_start().starts_with('(')).unwrap_or(false)
+		|| t.strip_prefix("echo ")
+			.map(|r| r.chars().next().map(|c| c.is_alphanumeric() || c == '$').unwrap_or(false))
+			.unwrap_or(false)
+}
 
 /// Process-wide preview length cap in chars; 0 = unlimited. Set from
 /// `[previews] preview_max_chars` (Issue #11 WS4): the key was declared in
@@ -1760,5 +1904,209 @@ mod tests {
 		assert!(p.chars().count() <= 20, "cap must apply to every arm: {p}");
 		assert!(p.ends_with(']'));
 		set_preview_max_chars(prev);
+	}
+
+	// ── ISSUE-11 residuals #1/#2/#4 (the honest tail) ──────────────
+
+	// #1: pretty-printed JSON with a `tool_result` hint previewed as a lone
+	// `{` (MISLEADING, the top battery offender). The generic arm must skip
+	// the structural brace line and show the first MEANINGFUL line.
+	#[test]
+	fn test_preview_pretty_json_lone_brace_never_previews_as_brace() {
+		let _g = cap_guard();
+		// Wrapper-envelope keys (name/version) keep the raw-JSON preview; the
+		// generic arm must NOT show the lone `{` opener.
+		let c = "{\n  \"name\": \"webapp\",\n  \"version\": \"1.0.0\",\n  \"port\": 8080\n}";
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[tool_result:5L"), "got {p}");
+		assert!(
+			p.contains("\"name\": \"webapp\""),
+			"first meaningful line (first key) must be shown, got {p}"
+		);
+		assert!(!p.contains("| {]"), "lone brace preview is the bug: {p}");
+	}
+
+	// #1: pretty-printed JSON WITHOUT wrapper-envelope keys routes to the JSON
+	// arm (detection upgrade RC-C) - keys + counts, never a brace.
+	#[test]
+	fn test_preview_pretty_json_routes_to_json_arm() {
+		let _g = cap_guard();
+		let c = "{\n  \"web\": [\n    { \"title\": \"x\" }\n  ]\n}";
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[json:"), "pretty JSON must route to the json arm, got {p}");
+		assert!(p.contains("web"), "top-level keys must be listed: {p}");
+	}
+
+	// #1/#4: a single-line JSON object with no hint (nested_obj_nohint /
+	// flat_json_nohint battery rows) used to preview as `[text:...]` SHALLOW;
+	// detection now routes it to the json arm.
+	#[test]
+	fn test_preview_nested_json_object_routes_to_json_arm() {
+		let _g = cap_guard();
+		let c = "{\"data\": {\"user\": {\"name\": \"Alice\", \"email\": \"a@b.c\"}}}";
+		assert_eq!(detect_semantic_type(c), Some("json"));
+		let p = build_preview("text", c);
+		assert!(p.starts_with("[json:1keys 1L | data]"), "got {p}");
+	}
+
+	// #2: terminal arm shows the FIRST meaningful line, never the last (the
+	// `[terminal:7L }]` bug class). An exit-code line still wins.
+	#[test]
+	fn test_terminal_arm_shows_first_meaningful_line_not_last() {
+		let _g = cap_guard();
+		let c = "$ run script\noutput line\n}";
+		let p = build_preview("terminal", c);
+		assert!(p.starts_with("[terminal:3L $ run script]"), "got {p}");
+		assert!(!p.contains("| }]"), "closing-brace preview is the bug: {p}");
+	}
+
+	// #2: rust code with a `terminal` hint (rust_code_hint_terminal battery
+	// row) - detection upgrades it to the code arm instead of `[terminal:7L }]`.
+	#[test]
+	fn test_terminal_hint_with_code_routes_to_code_arm() {
+		let _g = cap_guard();
+		let c = "use std::collections::HashMap;\n\nfn main() {\n    let mut map = HashMap::new();\n    map.insert(\"a\", 1);\n    println!(\"{:?}\", map);\n}";
+		assert_eq!(detect_semantic_type(c), Some("code"));
+		let p = build_preview("terminal", c);
+		assert!(p.starts_with("[code:"), "code with terminal hint must get the code arm, got {p}");
+		assert!(p.contains("fn main"), "first signature must be visible: {p}");
+	}
+
+	// #4 (RC-C): raw diff with a `tool_result` hint (diff_raw battery row)
+	// upgrades to the diff arm with the changed file named.
+	#[test]
+	fn test_detect_diff_raw_upgrades_to_diff_arm() {
+		let _g = cap_guard();
+		let c = "--- a/foo.rs\n+++ b/foo.rs\n@@ -1,2 +1,3 @@\n-old line\n+new line\ncontext";
+		assert_eq!(detect_semantic_type(c), Some("diff"));
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[diff:"), "raw diff must get the diff arm, got {p}");
+		assert!(p.contains("foo.rs"), "changed file must be named: {p}");
+	}
+
+	// #4 (RC-C): yaml with a `tool_result` hint upgrades to the yaml arm.
+	#[test]
+	fn test_detect_yaml_upgrades_to_yaml_arm() {
+		let _g = cap_guard();
+		let c = "name: webapp\nversion: 1.0.0\nport: 8080\ndebug: true";
+		assert_eq!(detect_semantic_type(c), Some("yaml"));
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[yaml:4 keys 4L | name, version, port, debug]"), "got {p}");
+	}
+
+	// #4 (RC-C): markdown table upgrades to the table arm with cols+rows+header.
+	#[test]
+	fn test_detect_markdown_table_upgrades_to_table_arm() {
+		let _g = cap_guard();
+		let c = "| Name | Age | City |\n|------|-----|------|\n| Alice | 30 | NYC |\n| Bob | 25 | LA |";
+		assert_eq!(detect_semantic_type(c), Some("table"));
+		let p = build_preview("tool_result", c);
+		assert!(
+			p.starts_with("[table:3 cols 3 rows | Name, Age, City]"),
+			"got {p}"
+		);
+	}
+
+	// #4 (RC-C): csv, xml, markdown doc, build log all upgrade off the generic
+	// first-line arm.
+	#[test]
+	fn test_detect_csv_upgrades_to_csv_arm() {
+		let _g = cap_guard();
+		let c = "name,age,city\nalice,30,nyc\nbob,25,la\ncarol,28,sf";
+		assert_eq!(detect_semantic_type(c), Some("csv"));
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[csv:4 rows 3 cols | name, age, city]"), "got {p}");
+	}
+
+	#[test]
+	fn test_detect_xml_upgrades_to_xml_arm() {
+		let _g = cap_guard();
+		let c = "<root>\n  <item>one</item>\n  <item>two</item>\n</root>";
+		assert_eq!(detect_semantic_type(c), Some("xml"));
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[xml:3 elements 4L | <root>]"), "got {p}");
+	}
+
+	#[test]
+	fn test_detect_markdown_doc_upgrades_to_markdown_arm() {
+		let _g = cap_guard();
+		let c = "# Release Notes\n\n## Features\n- new previews\n- honest counts\n\n## Fixes";
+		assert_eq!(detect_semantic_type(c), Some("markdown"));
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[md:"), "got {p}");
+		assert!(p.contains("h1×1 h2×2"), "heading tally expected: {p}");
+		assert!(p.contains("# Release Notes"), "first heading expected: {p}");
+	}
+
+	#[test]
+	fn test_detect_build_log_upgrades_to_build_arm() {
+		let _g = cap_guard();
+		let c = "Compiling foo v0.1.0\nCompiling bar v0.1.1\nFinished dev [unoptimized] target(s) in 0.42s";
+		assert_eq!(detect_semantic_type(c), Some("build"));
+		let p = build_preview("tool_result", c);
+		assert_eq!(p, "[build:0E 0W 3L]");
+	}
+
+	// #4: git status / ls with a `tool_result` hint (git_status_raw / ls_raw
+	// battery rows) - the semantic detectors already knew these shapes; the
+	// hint made them unreachable. The upgrade set now includes `tool_result`.
+	#[test]
+	fn test_tool_result_hint_still_upgrades_git_and_ls() {
+		let _g = cap_guard();
+		let git = "M src/a.rs\n?? tmp/scratch\nA  src/new.rs";
+		let p = build_preview("tool_result", git);
+		assert!(p.starts_with("[git:"), "git status with tool_result hint: {p}");
+		let p2 = build_preview("tool_result", LS_LONG);
+		assert!(p2.starts_with("[ls:"), "ls listing with tool_result hint: {p2}");
+	}
+
+	// #4 (RC-D): a very long single line (long_single_line / repeated battery
+	// rows) samples head+tail instead of a bare head.
+	#[test]
+	fn test_generic_arm_long_line_samples_head_and_tail() {
+		let _g = cap_guard();
+		let c = format!("{}", "word ".repeat(2000));
+		let p = build_preview("tool_result", &c);
+		assert!(p.starts_with("[tool_result:1L 10000B | "), "got {p}");
+		assert!(p.contains("…"), "long line must be sampled head+tail: {p}");
+		assert!(p.contains("word"), "both ends are words: {p}");
+		assert!(p.chars().count() < 120, "sample must stay compact: {p}");
+	}
+
+	// #4: a bare test log without a summary line (term_plain battery row)
+	// upgrades to the test arm with an honest pass/fail tally.
+	#[test]
+	fn test_bare_test_log_without_summary_gets_test_arm() {
+		let _g = cap_guard();
+		let c = "running 3 tests\ntest alpha ... ok\ntest beta ... ok";
+		assert_eq!(detect_semantic_type(c), Some("test"));
+		let p = build_preview("tool_result", c);
+		assert!(p.starts_with("[test:2 pass 0 fail 0 ignored]"), "got {p}");
+	}
+
+	// #4: wrapper-envelope JSON (success/output/diff keys) must NOT be hijacked
+	// into the json arm - the raw wrapper preview is the payload (WS1).
+	#[test]
+	fn test_envelope_json_objects_are_not_hijacked_to_json_arm() {
+		let _g = cap_guard();
+		for c in [
+			"{\"success\": true}",
+			"{\"output\": \"running 10 tests\\n\\nte\", \"exit_code\": 0}",
+			"{\"error\": \"file not found: foo.rs\"}",
+		] {
+			assert_ne!(detect_semantic_type(c), Some("json"), "envelope must be excluded: {c}");
+		}
+		let p = build_preview("tool_result", "{\"success\": true}");
+		assert!(p.starts_with("[tool_result:"), "envelope keeps its hinted arm: {p}");
+	}
+
+	// #4: shell-script comments must not be mis-tagged as markdown.
+	#[test]
+	fn test_shell_comments_are_not_misdetected_as_markdown() {
+		let _g = cap_guard();
+		let c = "#!/bin/sh\n# build the thing\n# then run it\necho done";
+		assert_eq!(detect_semantic_type(c), Some("code"), "shebang + code wins: {c}");
+		let c2 = "# just a comment\n# another comment\n# third comment";
+		assert_ne!(detect_semantic_type(c2), Some("markdown"), "comment-only lines are not a doc");
 	}
 }
