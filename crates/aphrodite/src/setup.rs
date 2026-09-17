@@ -106,13 +106,19 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// ── Step 8: Write __init__.py shim ──
 	write_init_py(&ctx)?;
 
-	// ── Step 9: Symlink to hermes plugins dir ──
-	symlink_plugin(&ctx)?;
-
-	// ── Step 10: Register with hermes ──
+	// ── Step 9: Register with hermes ──
 	register_plugin(&ctx)?;
 
 	println!("aphrodite installed -> {}", ctx.aphrodite_dir.display());
+	println!(
+		"plugin directory ready: {} (setup no longer symlinks it into Hermes automatically)",
+		ctx.aphrodite_dir.display()
+	);
+	println!(
+		"link it manually: ln -s {} {}/plugins/aphrodite",
+		ctx.aphrodite_dir.display(),
+		home.display()
+	);
 
 	Ok(())
 }
