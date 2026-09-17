@@ -335,6 +335,9 @@ def install(final_source, output_path):
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)
+        # mkstemp creates 0600; the committed artifact must be world-readable
+        # (644) like the rest of the plugin tree.
+        os.chmod(tmp, 0o644)
         os.replace(tmp, output_path)
     except BaseException:
         with suppress_oserror():
