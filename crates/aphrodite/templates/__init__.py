@@ -41,6 +41,25 @@ _DYLIB_PATH = os.environ.get(
 _BINARY_NAME = "aphrodite.exe" if sys.platform == "win32" else "aphrodite"
 _BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH", str(_BINARIES_DIR / _BINARY_NAME))
 
+# ── Pointer-returning exports the shim calls through ctypes ──
+# Every export listed here MUST be configured with restype=c_void_p in the
+# _load_dylib setup block. ctypes' default restype is c_int: a 64-bit
+# *mut c_char return is read truncated and sign-extended, and _read_str then
+# strlen()s a bogus low address - the SIGSEGV this plugin shipped when
+# materialize_directives was configured everywhere except the setup block.
+# _load_dylib asserts the invariant on every load so an export added without
+# a setup-block entry fails registration loudly (graceful disable) instead of
+# crashing the gateway with a silent SIGSEGV (harden item 3).
+_REQUIRED_VOID_P: tuple[str, ...] = (
+    "aphrodite_hermes_dispatch_tool",
+    "aphrodite_hermes_call_hook",
+    "aphrodite_hermes_proxy_health",
+    "aphrodite_hermes_version",
+    "aphrodite_hermes_materialize_directives",
+    "aphrodite_hermes_get_schemas",
+    "aphrodite_hermes_get_hooks",
+)
+
 # Directives are provided by the BINARY (embedded in libaphrodite_hermes.dylib
 # via the core crate's builtin_directives) and materialized into the user-data
 # home at setup/startup - they are NOT shipped in the plugin dir anymore.
@@ -80,6 +99,11 @@ def _process_state() -> types.ModuleType:
     # half-swapped reference, compounding the split-brain hazard below (F4).
     holder.lock = threading.Lock()  # type: ignore[attr-defined]
     holder.atexit_registered = False  # type: ignore[attr-defined]
+    # Dylib source paths already subprocess smoke-tested in THIS process
+    # (harden item 6): the probe runs once per unique path, never again on
+    # later hot-reload mtime checks (a subprocess spawn per reload would be
+    # wasteful and would add latency to every rebuild loop).
+    holder.probed_paths: set[str] = set()  # type: ignore[attr-defined]
     try:
         # dict.setdefault is atomic under the GIL, so two shim copies
         # importing concurrently still converge on a single holder.
@@ -324,6 +348,61 @@ def _resolve_binary_path() -> str:
     return _BINARY_PATH
 
 
+def _probe_dylib(path: str) -> bool:
+    """Smoke-test a dylib in a SUBPROCESS before ctypes loads it in-process.
+
+    A ctypes SIGSEGV (a faulting export, a stale image whose symbols/contract
+    mismatch the shim) CANNOT be caught by try/except - it kills the whole
+    Hermes gateway. Loading the dylib in a fresh ``sys.executable`` child and
+    calling aphrodite_hermes_version there confines any crash to that child:
+    a nonzero returncode means "refuse to load this in-process", and
+    register() then degrades to a graceful 'plugin disabled' + ERROR log
+    instead of a gateway SIGSEGV.
+
+    Runs ONCE per unique dylib source path per process (see
+    _state.probed_paths) - deliberately NOT per hot-reload mtime check, which
+    would spawn a subprocess on every reload.
+    """
+    probe_script = (
+        "import ctypes, sys\n"
+        f"path = {path!r}\n"
+        "try:\n"
+        "    d = ctypes.CDLL(path)\n"
+        "    d.aphrodite_hermes_version.restype = ctypes.c_void_p\n"
+        "    ptr = d.aphrodite_hermes_version()\n"
+        "    if not ptr:\n"
+        "        sys.exit(3)\n"
+        "except Exception as e:\n"
+        "    sys.stderr.write(f'probe error: {e}\\n')\n"
+        "    sys.exit(2)\n"
+    )
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-c", probe_script],
+            timeout=5,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+    except subprocess.TimeoutExpired:
+        _log.warning("dylib smoke-test timed out for %s", path)
+        return False
+    except Exception as e:
+        _log.warning("dylib smoke-test could not run for %s (%s)", path, e)
+        return False
+    if probe.returncode != 0:
+        stderr = (probe.stderr or "").strip()
+        _log.error(
+            "dylib smoke-test FAILED for %s (rc=%s%s) - refusing to load it "
+            "in-process (a faulting dylib would SIGSEGV the gateway)",
+            path,
+            probe.returncode,
+            f"; stderr: {stderr}" if stderr else "",
+        )
+        return False
+    return True
+
+
 def _load_dylib() -> ctypes.CDLL:
     """Load libaphrodite_hermes.dylib with ctypes. Hot-reloads on mtime change.
 
@@ -386,6 +465,17 @@ def _load_dylib() -> ctypes.CDLL:
                 path,
             )
 
+        # Smoke-test the dylib in a SUBPROCESS before loading it in-process:
+        # a ctypes SIGSEGV cannot be caught by try/except and would kill the
+        # whole gateway, so a faulting image is rejected here - once per
+        # unique path - and register() degrades to a graceful disable.
+        if path not in _state.probed_paths:
+            if not _probe_dylib(path):
+                raise RuntimeError(
+                    f"dylib smoke-test failed for {path} - plugin disabled"
+                )
+            _state.probed_paths.add(path)
+
         # Load from a fresh unique-path copy, not `path` directly - see
         # `_load_fresh_copy`'s docstring for why a repeat dlopen of the same
         # path silently returns stale, cached code on every platform.
@@ -420,6 +510,20 @@ def _load_dylib() -> ctypes.CDLL:
             dylib.aphrodite_hermes_materialize_directives.argtypes = [ctypes.c_char_p]
             dylib.aphrodite_hermes_materialize_directives.restype = ctypes.c_void_p
             dylib.aphrodite_hermes_free_string.argtypes = [ctypes.c_void_p]
+            # Completeness assertion (harden item 3): every pointer-returning
+            # export we call must read its return at full 64-bit width. An
+            # export missing from this setup block keeps the ctypes default
+            # restype (c_int), which truncates the pointer and SIGSEGVs in
+            # _read_str; assert the invariant so the failure is a caught
+            # RuntimeError (graceful disable), never a silent gateway crash.
+            for _sym in _REQUIRED_VOID_P:
+                if getattr(dylib, _sym).restype is not ctypes.c_void_p:
+                    raise RuntimeError(
+                        f"dylib at {path} configures {_sym} with restype "
+                        f"{getattr(dylib, _sym).restype!r}, expected c_void_p "
+                        f"- pointer-returning exports must be read at full "
+                        f"width (a truncated pointer SIGSEGVs in _read_str)"
+                    )
         except AttributeError as e:
             # A stale/mismatched dylib (see _check_version) surfacing as a
             # raw AttributeError deep in ctypes gives no context on which
@@ -437,11 +541,18 @@ def _load_dylib() -> ctypes.CDLL:
 
 
 def _read_str(ptr: int | None) -> str | None:
-    """Read a null-terminated C string from a void pointer."""
-    if ptr is None or ptr == 0:
+    """Read a null-terminated C string from a void pointer.
+
+    NULL must be checked BEFORE the cast: ctypes.cast(ptr, c_char_p).value
+    runs strlen() on the pointer (z_get), so a NULL/bogus pointer from Rust
+    would segfault inside the C getter - and a SIGSEGV is not a Python
+    exception, it kills the process (harden item 2). errors='replace' keeps
+    a non-UTF-8 payload from raising on a best-effort string read.
+    """
+    if not ptr:
         return None
     value = ctypes.cast(ptr, ctypes.c_char_p).value
-    return value.decode("utf-8") if value else None
+    return value.decode("utf-8", errors="replace") if value is not None else None
 
 
 def _call_json(dylib: ctypes.CDLL, fn_name: str, *args: bytes) -> Any:
@@ -459,6 +570,12 @@ def _call_json(dylib: ctypes.CDLL, fn_name: str, *args: bytes) -> Any:
     configured everywhere except here). Setting it unconditionally is a
     no-op for already-configured fns and a correctness clamp for any
     future one added without a setup-block entry.
+
+    F4 constraint: ptr is ALWAYS freed through THIS `dylib` handle - the
+    same image that allocated it - never through a cached/reloaded handle
+    (e.g. _state.dylib). Freeing through a different generation's
+    free_string is undefined behavior the day a custom global allocator is
+    added; the handle must travel with the pointer it produced.
     """
     fn = getattr(dylib, fn_name)
     fn.restype = ctypes.c_void_p
@@ -553,6 +670,58 @@ def _tail_log(path: Path, n: int = 15) -> str:
     return "(no stderr log yet)"
 
 
+def _check_version_published() -> None:
+    """Warn (never raise) if BINARY_VERSION's GitHub release carries no assets.
+
+    download.sh builds asset URLs from
+    https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite%2Fv{V}
+    (URL-encoded slash, REPO=PlayForm/Aphrodite). A tag with no published
+    assets - or no tag at all - makes every asset 404 and the fetch
+    crash-loops at every registration. Checked via the GitHub API
+    releases/tags endpoint (3s timeout) BEFORE download.sh is invoked
+    (from _ensure_binaries); any network/API failure degrades to a
+    warning, never a raise (harden item 4).
+    """
+    try:
+        import urllib.request
+        from urllib.parse import quote
+
+        version_file = _PLUGIN_DIR / "BINARY_VERSION"
+        if not version_file.exists():
+            return
+        version = version_file.read_text().strip()
+        if not version:
+            return
+        url = (
+            "https://api.github.com/repos/PlayForm/Aphrodite/releases/tags/"
+            f"{quote(f'Aphrodite/v{version}', safe='')}"
+        )
+        req = urllib.request.Request(
+            url,
+            method="GET",
+            headers={
+                "User-Agent": "aphrodite-hermes-plugin",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            payload = json.loads(resp.read(65536).decode("utf-8", errors="replace"))
+        assets = payload.get("assets") if isinstance(payload, dict) else None
+        if isinstance(assets, list) and len(assets) == 0:
+            _log.warning(
+                "BINARY_VERSION %s points at GitHub release Aphrodite/v%s "
+                "which has NO assets - download.sh will 404 on every asset "
+                "URL (auto-fetch crash-loop). Publish the release artifacts "
+                "or bump BINARY_VERSION to a published tag",
+                version,
+                version,
+            )
+    except Exception as e:
+        # Network/API hiccups must never block registration - the check is
+        # best-effort diagnostics ahead of a download that may still succeed.
+        _log.warning("version-published check skipped (%s)", e)
+
+
 def _ensure_binaries() -> None:
     """Fetch the proxy binary + dylib via download.sh when either is missing.
 
@@ -569,6 +738,11 @@ def _ensure_binaries() -> None:
         return
     if os.path.exists(_BINARY_PATH) and os.path.exists(_DYLIB_PATH):
         return
+    # Harden item 4: fail the auto-fetch loudly BEFORE download.sh when the
+    # pinned BINARY_VERSION points at a release with no assets (every asset
+    # URL 404s - the crash-loop this prevents). Best-effort: network failure
+    # degrades to a warning, never a raise.
+    _check_version_published()
     try:
         env = os.environ.copy()
         env["BINARY_DIR"] = str(_BINARIES_DIR)
@@ -933,13 +1107,21 @@ def register(ctx: Any) -> None:
                 args_json.encode("utf-8"),
             )
 
+        registered_hooks = 0
         for hook_name in hooks:
 
             def _dispatch(*a: Any, name: str = hook_name, **kw: Any) -> Any:
                 return _hook_dispatch(name, **kw)
 
-            ctx.register_hook(hook_name, _dispatch)
-        _log.info("registered %d hooks", len(hooks))
+            try:
+                ctx.register_hook(hook_name, _dispatch)
+                registered_hooks += 1
+            except Exception as e:
+                # Isolate each hook like register_tool below: one broken
+                # registration must never abort the whole plugin (harden
+                # item 5).
+                _log.warning("failed to register hook %s: %s", hook_name, e)
+        _log.info("registered %d hooks", registered_hooks)
 
     # Register tools. Hermes API: register_tool(name, toolset, schema, handler).
     schemas = _call_json(dylib, "aphrodite_hermes_get_schemas")
