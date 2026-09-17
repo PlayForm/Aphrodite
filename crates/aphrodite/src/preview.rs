@@ -161,6 +161,102 @@ static REEST_PYTEST: std::sync::LazyLock<regex::Regex> =
 static REEST_JEST: std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"Tests:\s+\d+").unwrap());
 
+/// Process-wide preview length cap in chars; 0 = unlimited. Set from
+/// `[previews] preview_max_chars` (Issue #11 WS4): the key was declared in
+/// the config structs but never read anywhere, so every preview knob was a
+/// no-op. The builder now enforces it on EVERY path - proxy, hooks, and the
+/// Hermes dylib all funnel through [`build_preview`].
+static PREVIEW_MAX_CHARS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Configure the preview length cap (chars); `None`/0 = unlimited.
+/// Returns the previous value so callers (tests, hot-reload) can restore it.
+///
+/// Wiring (Issue #11 WS4): the engine binary sets it right after
+/// `MultiConfig::load`, the proxy `/reload` handler re-sets it on hot-reload,
+/// and the Hermes bridge applies it via
+/// `config_loader::Config::apply_previews` at dylib init.
+pub fn set_preview_max_chars(max: Option<u32>) -> Option<u32> {
+	let prev = PREVIEW_MAX_CHARS.swap(max.unwrap_or(0), std::sync::atomic::Ordering::Relaxed);
+	if prev == 0 { None } else { Some(prev) }
+}
+
+/// Current preview cap in chars (0 = unlimited). Test/visibility helper.
+pub fn preview_max_chars() -> u32 {
+	PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Truncate a preview to `max_chars` chars on a char boundary. Preserves the
+/// closing `]` (with a `…` marker) for self-bracketed previews so
+/// `render_marker`/`parse_preview`/`chain_split` keep working after
+/// truncation - a bare cut that drops `]` would re-trigger the
+/// `[text:[text:...]]` double-wrap bug class (`marker.rs`). `0` = no cap.
+fn apply_preview_cap(preview: &str, max_chars: usize) -> String {
+	if max_chars == 0 || preview.chars().count() <= max_chars {
+		return preview.to_string();
+	}
+	let keep_close = preview.trim_end().ends_with(']');
+	if !keep_close || max_chars <= 1 {
+		return preview.chars().take(max_chars).collect();
+	}
+	let mut out: String = preview.chars().take(max_chars - 2).collect();
+	out.push('…');
+	out.push(']');
+	out
+}
+
+/// True for a line that is a real compiler/build error line: rustc/clang/gcc
+/// `error[E0432]:` / `error:`, capitalized `Error:`, all-caps `ERROR`, Go
+/// `panicked at`, and `file:line: error[`-style prefixes. Line-based (not
+/// substring) counting so a word containing "error" (`noerror`, `error-prone`)
+/// or a capitalized variant can never inflate/miss the tally.
+fn is_error_line(line: &str) -> bool {
+	let t = line.trim_start();
+	t.starts_with("error[")
+		|| t.starts_with("error:")
+		|| t.starts_with("Error:")
+		|| t.starts_with("ERROR")
+		|| t.starts_with("panicked at")
+		|| t.contains(": error[")
+		|| t.contains(": error:")
+}
+
+/// True for a line that is a real compiler warning line (`warning[`/`warning:`
+/// /`Warning:`/`WARNING` or a `file:line: warning:` prefix).
+fn is_warning_line(line: &str) -> bool {
+	let t = line.trim_start();
+	t.starts_with("warning[")
+		|| t.starts_with("warning:")
+		|| t.starts_with("Warning:")
+		|| t.starts_with("WARNING")
+		|| t.contains(": warning[")
+		|| t.contains(": warning:")
+}
+
+/// True for a line that signals a FAILED state: a `FAILED`/`FAIL` marker, a
+/// `--- FAIL:` test failure, or a NON-ZERO `N failed` count. `0 failed`
+/// (clean runs) never matches, so a passing test summary stays clean.
+fn is_failure_line(line: &str) -> bool {
+	let t = line.trim_start();
+	t.contains("FAILED")
+		|| t.starts_with("FAIL ")
+		|| t.starts_with("--- FAIL:")
+		|| FAILED_COUNT_RE.is_match(t)
+}
+
+static FAILED_COUNT_RE: std::sync::LazyLock<regex::Regex> =
+	std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)[1-9]\d*\s+failed").unwrap());
+
+/// True for a linter issue line: `path:line:col:` prefix (ruff/flake8/eslint)
+/// or a `E###`/`W###`/`F###` issue code.
+fn is_lint_line(line: &str) -> bool {
+	let t = line.trim_start();
+	is_error_line(t) || is_warning_line(t) || LINT_RE.is_match(t)
+}
+
+static LINT_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+	regex::Regex::new(r"^[^\s:]+:\d+:\d+:|(?:^|\s)[EWF]\d{3,4}\b").unwrap()
+});
+
 /// Build a compact, human-readable preview string for compressed content,
 /// shaped per content type (e.g. error/warning counts for build output,
 /// +/- line counts for diffs, fn/struct counts for source code) so the LLM
@@ -181,25 +277,57 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 	};
 	match effective {
 		"build" | "build_output" | "build_error" => {
-			let e = content.matches("error").count();
-			let w = content.matches("warning").count();
+			// Honest tallies (Issue #11 WS2): count error/warning LINES, not
+			// substring occurrences. The old `content.matches("error").count()`
+			// inflated lines with repeated occurrences, matched inside
+			// unrelated words, and missed capitalized `Error:` (Python/Swift/
+			// clang output) - a genuinely failed build could render as `0E`.
+			let e = content.lines().filter(|l| is_error_line(l)).count();
+			let w = content.lines().filter(|l| is_warning_line(l)).count();
 			// Enrich: surface the first error MESSAGE (e.g. `E0432: unresolved
 			// import ...`), not just tallies - the exact text the agent needs to
 			// decide whether to retrieve the full log.
 			let first_err = content
 				.lines()
 				.map(|l| l.trim())
-				.find(|l| l.starts_with("error[") || l.starts_with("error:") || l.contains(": error["))
+				.find(|l| is_error_line(l))
 				.map(|l| {
 					// Prefer the `error[EXXXX]: msg` / `error: msg` remainder.
-					let start = l.find("error").unwrap_or(0);
+					let start = l
+						.find("error")
+						.or_else(|| l.find("Error"))
+						.or_else(|| l.find("ERROR"))
+						.unwrap_or(0);
 					l[start..].chars().take(60).collect::<String>()
 				});
 			match first_err {
 				Some(msg) if !msg.is_empty() => {
 					format!("[build:{}E {}W {}L | {}]", e, w, lines, msg)
 				},
-				_ => format!("[build:{}E {}W {}L]", e, w, lines),
+				_ => {
+					// Honesty: `0E 0W` renders like a clean build. When the
+					// output carries a FAILURE signal (failing test run,
+					// FAILED markers) but no error line was tallied, surface
+					// the failure line instead of a success-looking summary -
+					// a failing test run used to preview as
+					// `[build:0E 0W 3L]` (ISSUE-11-PREVIEW-BATTERY #2).
+					if e == 0 && w == 0 {
+						if let Some(fail) = content
+							.lines()
+							.map(|l| l.trim())
+							.find(|l| is_failure_line(l))
+						{
+							return format!(
+								"[build:{}E {}W {}L | {}]",
+								e,
+								w,
+								lines,
+								fail.chars().take(60).collect::<String>()
+							);
+						}
+					}
+					format!("[build:{}E {}W {}L]", e, w, lines)
+				},
 			}
 		},
 		"diff" => {
