@@ -24,23 +24,46 @@ impossible):
    ``hasattr()``/``getattr()``, so the artifact carries no lookup-adapter
    class (it binds the plugin's raw CDLL handle directly).
 
-2. REWRITE pointer restypes to ``c_void_p``. ctypesgen types ``char *``
-   returns as its ``String``/``ReturnString`` wrapper; the FFI contract
-   (and Maintain/check_ffi_contract.py) requires ``restype = c_void_p`` -
-   the plugin reads raw pointers and frees them through the same handle,
-   and ``_call_json`` clamps restype to ``c_void_p`` anyway. ``errcheck``
-   is stripped: a String-returning errcheck would break ``_call_json``'s
-   raw-pointer protocol.
+2. REWRITE pointer restypes to ``c_void_p`` and argtypes to ``c_char_p``.
+   ctypesgen types ``char *`` returns as its String/ReturnString helper
+   pair (a multi-line if/else block) and ``const char *`` returns as a bare
+   single-line ``c_char_p`` (upstream ctypdescs.py CtypesFunction); both
+   forms - plus WideString (``wchar_t *``) - are rewritten to ``c_void_p``.
+   Because the String helper class is then referenced by NOTHING (argtypes
+   ``String`` -> ``c_char_p``; ``free_string`` -> ``c_void_p``, since the
+   plugin passes it the raw pointer int - mirroring its ``_manual_ffi_setup``),
+   the entire string machinery of the preamble
+   (UserString/MutableString/String/ReturnString, ~300 lines) and the
+   library-loader section (~390 lines) become dead code and are stripped
+   from the final artifact. ``errcheck`` is stripped: a String-returning
+   errcheck would break ``_call_json``'s raw-pointer protocol (see the
+   comment at ``_ERRCHECK_RE`` for the CtypesPointerCast nuance).
 
-3. VALIDATE the contract (only meaningful when generation actually ran):
-   every pointer-returning export parsed from the header must be declared
-   with a pointer-width restype (``c_void_p`` after the rewrite - NEVER
-   ``c_int``), argtypes must match the header's parameter counts, and the
-   declared set must equal the header's export set. Any violation exits 1
-   and build.rs PANICS - tools were available, so a silently-wrong
-   committed artifact would re-open the SIGSEGV bug class.
+3. VALIDATE the contract with a PURE-AST validator - nothing in the
+   generated source is ever EXECUTED at build time (ast.parse + compile
+   without exec; mirrors Maintain/check_ffi_contract.py's approach): every
+   pointer-returning export parsed from the header must be declared with a
+   pointer-width restype (``c_void_p`` after the rewrite - NEVER ``c_int``),
+   argtypes must match the header's parameter counts, errcheck must be
+   absent, and the declared set must equal the header's export set. Any
+   violation exits 1 and build.rs PANICS - tools were available, so a
+   silently-wrong committed artifact would re-open the SIGSEGV bug class.
 
-4. COPY-ON-CHANGE install to plugins/aphrodite/_bindings.py (only written
+4. CONTAIN the namespace bleed: ``__all__ = ["bind_to"]`` on the final
+   artifact, so ``from _bindings import *`` re-exports none of the names the
+   preamble's ``from ctypes import *`` pulled in.
+
+5. FORK/unknown-shape detection. The rewrite patterns target the upstream
+   ctypesgen loop shape (``for _lib in _libs.values():``). The pypdfium2
+   fork (pypdfium2-team/ctypesgen, ``pypdfium2`` branch) emits a flat
+   ``PN = _libs[L][CN]`` form with single-line ``restype = String`` and no
+   if/else block; any non-upstream shape is reported through a
+   ``CTYPESGEN_FORK_WARNING:`` marker (build.rs re-emits it as a
+   cargo:warning) and finalize exits 2 - the committed artifact stays in
+   effect. build.rs additionally classifies ``ctypesgen --version`` and
+   warns when the version string does not identify upstream ctypesgen.
+
+6. COPY-ON-CHANGE install to plugins/aphrodite/_bindings.py (only written
    when the content actually changed), with machine-specific paths in the
    ctypesgen banner/comments normalized away so the committed artifact is
    byte-stable across machines.
@@ -51,29 +74,29 @@ the committed artifact stays in effect).
 """
 
 import argparse
-import ctypes
+import ast
 import os
 import re
 import sys
 import tempfile
-from collections import defaultdict
 from contextlib import suppress
 from pathlib import Path
-from types import SimpleNamespace
 
 PLACEHOLDER_LIB = "__APHRODITE_DYLIB__"
 
 # cbindgen renders the crate's ABI (char*/void only) as:
-#   char *aphrodite_hermes_dispatch_tool(char const *tool_name, char const *args_json);
+#   char *aphrodite_hermes_dispatch_tool(const char *tool_name, const char *args_json);
 #   void aphrodite_hermes_free_string(char *s);
 #   char *aphrodite_hermes_version(void);
-# (`char *` has NO space between the asterisk and the name - `\s*`, not `\s+`.)
+# (`char *` has NO space between the asterisk and the name - `\s*`, not `\s+`.
+# cbindgen puts pointee const BEFORE the type: `const char *`, never `char const *`.)
 _HEADER_FN_RE = re.compile(
     r"^(?:char\s*\*|void)\s*(aphrodite_hermes_\w+)\s*\(([^)]*)\)", re.MULTILINE
 )
 _HEADER_PTR_RE = re.compile(r"^char\s*\*\s*(aphrodite_hermes_\w+)\s*\(", re.MULTILINE)
 
-# ctypesgen declaration loops start here and run to EOF:
+# ctypesgen declaration loops start here and run to EOF (upstream shape,
+# verified against 2.7.4-27202 output with `-l`):
 #   for _lib in _libs.values():
 #       if not _lib.has("NAME", "cdecl"):
 #           continue
@@ -86,6 +109,9 @@ _HEADER_PTR_RE = re.compile(r"^char\s*\*\s*(aphrodite_hermes_\w+)\s*\(", re.MULT
 # artifact needs NO lookup-adapter class - _libs[PLACEHOLDER] holds the
 # plugin's raw CDLL handle and the loops call hasattr/getattr on it.)
 _BLOCK_START_RE = re.compile(r"^for _lib in _libs\.values\(\):", re.MULTILINE)
+# pypdfium2-team fork (pypdfium2 branch) flat shape:
+#   NAME = _libs["LIB"]["NAME"]      (and single-line restype, no if/else)
+_FORK_FLAT_RE = re.compile(r"^\s*\w+\s*=\s*_libs\[[^\]]+\]\[", re.MULTILINE)
 # ctypesgen resolves symbols through a loader Lookup object (.has/.get with a
 # calling_convention kwarg); the plugin's live CDLL is a plain ctypes.CDLL,
 # so rewrite the loop calls to hasattr/getattr - purely declarative artifact.
@@ -96,8 +122,13 @@ _LOAD_LINE_RE = re.compile(
 # char* restype declaration: the multi-line if/else block ctypesgen emits for
 # every char* return, OR a bare single-line form - one consolidated pattern
 # (ordered alternation: the if/else block first, so its inner lines are
-# consumed whole, then the single-line form) replaces the former two-pattern
+# consumed whole, then the single-line forms) replaces the former two-pattern
 # pair (_IF_ELSE_RESTYPE_RE + _RESTYPE_SINGLE_RE).
+# Single-line forms cover every restype ctypesgen can emit for a pointer
+# return: `String`/`ReturnString` (char*, non-const), `c_char_p` (const
+# char* - upstream ctypdescs.py CtypesFunction rewrites POINTER(c_char) with
+# the const qualifier to CtypesSpecial("c_char_p")), and `WideString`
+# (wchar_t*). The plugin contract wants c_void_p for ALL of them.
 _RESTYPE_RE = re.compile(
     r"(?:"
     r"    if sizeof\(c_int\) == sizeof\(c_void_p\):\n"
@@ -106,29 +137,37 @@ _RESTYPE_RE = re.compile(
     r"        (?P=name)\.restype = String\n"
     r"        (?P=name)\.errcheck = ReturnString\n"
     r"|"
-    r"^(?P<indent>[ \t]+)(?P<single>[A-Za-z_]\w*)\.restype = (?:ReturnString|String)$"
+    r"^(?P<indent>[ \t]+)(?P<single>[A-Za-z_]\w*)\.restype = (?:ReturnString|String|c_char_p|WideString)$"
     r")",
     re.MULTILINE,
 )
-
-
-def _restype_repl(m):
-    """If/else block -> ``NAME.restype = c_void_p`` (fixed indent; the match
-    consumed the trailing newline, so one must be re-emitted); a bare
-    single-line declaration -> same rewrite keeping its own indent."""
-    if m.group("name") is not None:
-        return f"    {m.group('name')}.restype = c_void_p\n"
-    return f"{m.group('indent')}{m.group('single')}.restype = c_void_p"
+# ctypesgen argtypes use its String helper class (`[String, String]`); the
+# helper is dead code once restypes are c_void_p, so rewrite argtypes to
+# plain c_char_p and strip the whole string machinery with the preamble.
+# Applied AFTER the restype/errcheck rewrites: `\bString\b` then only ever
+# matches argtypes entries (ReturnString/WideString have no word boundary
+# at the capital, and restype lines no longer contain String).
+_ARGYPES_STRING_RE = re.compile(r"\bString\b")
+# errcheck lines to strip: `NAME.errcheck = ReturnString` (char* errcheck -
+# would break _call_json's raw-pointer protocol) and ctypesgen's
+# `NAME.errcheck = lambda v,*a : cast(v, c_void_p)` cast for void* returns.
+# NOTE (CtypesNoErrorCheck/CtypesPointerCast): ctypesgen's default errcheck
+# is CtypesNoErrorCheck, whose __bool__ is False - printer.py emits NO
+# errcheck line for it, so `restype = None` (void fns) has no errcheck line
+# to strip. The CtypesPointerCast(c_void_p) cast on void* returns IS
+# safe-to-keep (it only casts the POINTER(c_ubyte) restype to c_void_p), but
+# stripping it is correct in THIS pipeline: the restype rewrite runs FIRST,
+# so any pointer return is already a full-width c_void_p read and _call_json
+# clamps restype to c_void_p anyway - the cast would be a no-op.
 _ERRCHECK_RE = re.compile(r"^(\s+)([A-Za-z_]\w*)\.errcheck = [^\n]*$", re.MULTILINE)
-# Declared-name scan runs on the POST-rewrite source (hasattr form).
-_DECLARED_NAME_RE = re.compile(r'hasattr\(_lib, "([A-Za-z_]\w*)"')
-
-# The generated module's docstring embeds the exact ctypesgen command line
-# (with machine-specific OUT_DIR paths); normalize it so the committed
-# artifact is byte-identical on every machine.
-_DOCSTRING_RE = re.compile(r'r?"""Wrapper for .*?"""', re.DOTALL)
+# ctypesgen comments its declaration loops with the input header's full
+# machine-specific path (`# /Volumes/.../out/aphrodite_hermes.h: 16`);
+# normalize so the committed artifact is byte-stable on every machine.
 _HEADER_COMMENT_RE = re.compile(r"# .*?aphrodite_hermes\.h: ", re.MULTILINE)
 
+# The generated module's docstring embeds the exact ctypesgen command line
+# (with machine-specific OUT_DIR paths); the final artifact uses a canonical
+# docstring instead, so the committed artifact is byte-identical everywhere.
 CANONICAL_DOCSTRING = (
     'r"""Wrapper for aphrodite_hermes.h (generated by ctypesgen)\n'
     "\n"
@@ -137,6 +176,21 @@ CANONICAL_DOCSTRING = (
     "Do not modify this file.\n"
     '"""'
 )
+# The final head is built from scratch (the raw preamble's string machinery,
+# c_ptrdiff_t loop, and loader section are dead code after the rewrites).
+MINIMAL_HEAD = (
+    "\n"
+    "__docformat__ = \"restructuredtext\"\n"
+    "\n"
+    "from ctypes import *  # noqa: F401, F403 - ctypesgen preamble (c_int, c_void_p, c_char_p, sizeof, ...)\n"
+    "\n"
+    "# `__all__` contains the public surface: the preamble's `from ctypes import *`\n"
+    "# bleeds ctypes' names into this module, and without __all__ a wildcard import\n"
+    "# of _bindings would re-export all of them.\n"
+    "__all__ = [\"bind_to\"]\n"
+    "\n"
+    "_libs = {}\n"
+)
 
 BINDER_HEADER = """
 
@@ -144,7 +198,14 @@ BINDER_HEADER = """
 # Importing this module NEVER loads a library (no hardcoded dylib path): the
 # plugin owns the live CDLL handle (hot-reload unique-path copy) and calls
 # bind_to(dylib) to replay the declarations below onto it. The loops call
-# hasattr/getattr directly - no lookup adapter class is needed.
+# hasattr/getattr directly - no lookup adapter class is needed. errcheck is
+# stripped unconditionally: pointer restypes are rewritten to c_void_p FIRST
+# (a String-returning errcheck would only corrupt the raw-pointer protocol),
+# and ctypesgen's CtypesPointerCast(c_void_p) casts on void* returns are safe
+# to drop because c_void_p already reads the full pointer width. argtypes use
+# plain c_char_p (free_string is [c_void_p] - the plugin passes it the raw
+# pointer int, mirroring its _manual_ffi_setup); the String helper class is
+# stripped with the dead preamble.
 
 def bind_to(_dylib):
     \"\"\"Replay the generated declarations onto an already-loaded CDLL handle.
@@ -160,43 +221,19 @@ def bind_to(_dylib):
 """.format(placeholder=PLACEHOLDER_LIB)
 
 
-class _StubDylib:
-    """Simulates the plugin's CDLL: getattr returns a per-name record.
-
-    SimpleNamespace-based (lean-up proposal 5): a defaultdict of
-    SimpleNamespace records replaces the former _FnRec/_StubDylib pair.
-    has()/get() resolve through __getattr__ - any name yields (and lazily
-    creates) a record, so bind_to()'s replay runs verbatim.
-    """
-
-    def __init__(self):
-        self._recs = defaultdict(
-            lambda: SimpleNamespace(restype=None, argtypes=None, errcheck=None)
-        )
-
-    def __getattr__(self, name):
-        return self._recs[name]
-
-    @property
-    def recs(self):
-        return self._recs
+def _restype_repl(m):
+    """If/else block -> ``NAME.restype = c_void_p`` (fixed indent; the match
+    consumed the trailing newline, so one must be re-emitted); a bare
+    single-line declaration -> same rewrite keeping its own indent."""
+    if m.group("name") is not None:
+        return f"    {m.group('name')}.restype = c_void_p\n"
+    return f"{m.group('indent')}{m.group('single')}.restype = c_void_p"
 
 
-def _pointer_width(t):
-    """True when a ctypes restype reads a return at full pointer width.
-
-    Accepts c_void_p / c_char_p / any POINTER(_) subclass plus ctypesgen's
-    String/ReturnString char* declarations. c_int (the ctypes default) and
-    None are REJECTED - c_int truncates a 64-bit pointer (the SIGSEGV bug
-    class this pipeline exists to make structurally impossible).
-    """
-    if t is None:
-        return False
-    if t in (ctypes.c_void_p, ctypes.c_char_p):
-        return True
-    if isinstance(t, type) and issubclass(t, ctypes._Pointer):
-        return True
-    return getattr(t, "__name__", "") in ("String", "ReturnString")
+def _lookup_repl(m):
+    """ctypesgen ``_lib.has/get("NAME", "cdecl")`` -> ``hasattr/getattr(_lib, "NAME")``."""
+    fn = "hasattr" if m.group(1) == "has" else "getattr"
+    return f'{fn}(_lib, "{m.group(2)}")'
 
 
 def parse_header(header_text):
@@ -209,32 +246,76 @@ def parse_header(header_text):
     return fns
 
 
-def _lookup_repl(m):
-    """ctypesgen ``_lib.has/get("NAME", "cdecl")`` -> ``hasattr/getattr(_lib, "NAME")``."""
-    fn = "hasattr" if m.group(1) == "has" else "getattr"
-    return f'{fn}(_lib, "{m.group(2)}")'
+def classify_shape(raw):
+    """Identify which ctypesgen variant produced the raw module.
+
+    Returns 'upstream-loop' (ctypesgen/ctypesgen with `-l`: the
+    ``for _lib in _libs.values():`` shape - the only shape the rewrite
+    patterns target), 'fork-flat' (pypdfium2-team fork: ``NAME = _libs[L][N]``
+    with single-line restype), or 'unknown' (neither - treat as unavailable).
+    """
+    if _BLOCK_START_RE.search(raw):
+        return "upstream-loop"
+    if _FORK_FLAT_RE.search(raw):
+        return "fork-flat"
+    return "unknown"
 
 
 def postprocess(raw, header_path):
-    """Return the final _bindings.py source: neutralized load, bind_to(), and
-    c_void_p restypes. Raises ValueError on an unexpected ctypesgen shape."""
+    """Return the final _bindings.py source: neutralized load, bind_to(),
+    c_void_p restypes / c_char_p argtypes, stripped dead preamble, __all__.
+    Raises ValueError on an unexpected ctypesgen shape."""
+    shape = classify_shape(raw)
+    if shape != "upstream-loop":
+        # The rewrite patterns are the UNION of the known upstream forms (the
+        # if/else block + every single-line pointer restype). A fork or
+        # unknown shape cannot be rewritten safely - report it through the
+        # CTYPESGEN_FORK_WARNING marker (build.rs re-emits it as a
+        # cargo:warning) and fail gracefully: exit 2 keeps the committed
+        # artifact in effect.
+        hint = " (pypdfium2-team fork flat form - no _libs.values() loop, single-line restype)" if shape == "fork-flat" else ""
+        print(
+            f"CTYPESGEN_FORK_WARNING: ctypesgen output shape is '{shape}'{hint}; "
+            "the upstream pattern set (for _lib in _libs.values() loops + "
+            "if/else restype block + single-line pointer restypes) does not apply; "
+            "skipping install - the committed plugins/aphrodite/_bindings.py remains in effect",
+            file=sys.stderr,
+        )
+        raise ValueError(f"unexpected ctypesgen output shape: {shape} (not the upstream loop form)")
+
     m = _BLOCK_START_RE.search(raw)
     if m is None:
         raise ValueError("no ctypesgen declaration loops found in raw output")
-    head = raw[: m.start()]
     loops = raw[m.start() :]
 
     # 1. Never load a library at import time (the plugin owns the handle).
-    head, n_load = _LOAD_LINE_RE.subn(
+    # The replacement is discarded with the dead preamble - this is a SHAPE
+    # check: upstream ctypesgen always emits the load line.
+    _, n_load = _LOAD_LINE_RE.subn(
         f'_libs["{PLACEHOLDER_LIB}"] = None  # bound at runtime via bind_to()',
-        head,
+        raw,
     )
     if n_load == 0:
         raise ValueError("no import-time library load line found (unexpected ctypesgen output)")
 
-    # 2. Pointer restypes -> c_void_p; strip errcheck.
+    # 2. Pointer restypes -> c_void_p; strip errcheck. Order matters: the
+    # restype rewrite must run FIRST (it consumes the if/else block including
+    # its errcheck line), then the argtypes String -> c_char_p rewrite may
+    # safely assume every remaining `String` token is an argtypes entry.
     loops = _RESTYPE_RE.sub(_restype_repl, loops)
     loops = _ERRCHECK_RE.sub("", loops)
+    loops = _ARGYPES_STRING_RE.sub("c_char_p", loops)
+    # free_string is the ONE arg-carrying entry point that receives a raw
+    # pointer INT, not str/bytes: the plugin's _call_json passes it the
+    # c_void_p restype value of the call that produced the pointer
+    # (plugins/aphrodite/__init__.py::_call_json). ctypesgen's String helper
+    # class happened to accept ints - the leniency the plugin relies on - and
+    # plain c_char_p rejects them with TypeError. Mirror the plugin's
+    # _manual_ffi_setup, which declares `[ctypes.c_void_p]`.
+    loops = loops.replace(
+        "aphrodite_hermes_free_string.argtypes = [c_char_p]",
+        "aphrodite_hermes_free_string.argtypes = [c_void_p]",
+    )
 
     # 2b. _lib.has/get("NAME", "cdecl") -> hasattr/getattr(_lib, "NAME"): the
     # artifact binds the plugin's raw CDLL handle, so no lookup-adapter class.
@@ -247,23 +328,70 @@ def postprocess(raw, header_path):
         ("    " + line) if line.strip() else line for line in loops.splitlines()
     )
 
-    final = head + BINDER_HEADER + indented + "\n"
+    final = CANONICAL_DOCSTRING + MINIMAL_HEAD + BINDER_HEADER + indented + "\n"
 
-    # 4. Normalize machine-specific paths so the artifact is byte-stable.
-    final = _DOCSTRING_RE.sub(CANONICAL_DOCSTRING, final, count=1)
+    # 4. Normalize machine-specific paths so the artifact is byte-stable
+    # (the header line-numbers comments inside the loops embed OUT_DIR).
     final = _HEADER_COMMENT_RE.sub("# aphrodite_hermes.h: ", final)
     return final
 
 
+def _is_pointer_width_ast(expr_str):
+    """Mirror the former runtime _pointer_width() on the AST-unparsed string:
+    c_void_p / c_char_p / any POINTER(...) / String / ReturnString. c_int
+    (the ctypes default) and None are REJECTED - c_int truncates a 64-bit
+    pointer (the SIGSEGV bug class this pipeline exists to prevent)."""
+    s = expr_str
+    if s in ("c_void_p", "c_char_p", "String", "ReturnString"):
+        return True
+    return s.startswith("POINTER(")
+
+
 def validate(final_source, header_fns, header_text, required, raw_path):
-    """Run bind_to() against a stub and verify the FFI contract.
+    """AST-based FFI contract validation - NOTHING is executed.
 
-    Raises a ContractViolation with a readable message on any breach; build.rs
-    turns that into a build failure (the tools were available)."""
-    ns = {}
-    exec(compile(final_source, str(raw_path), "exec"), ns)  # noqa: S102 - trusted generated source
+    Parses the finalized source with ``ast`` and inspects only ``ast.Assign``
+    nodes whose target is ``NAME.restype/argtypes/errcheck`` (the exact
+    approach Maintain/check_ffi_contract.py uses), then verifies: the
+    declared export set equals the header's, every pointer-returning export
+    has a pointer-width restype (c_void_p after the rewrite), argtypes counts
+    match the header, errcheck is never applied, and every --required export
+    is present. A pure compile() (no exec) additionally catches syntax errors
+    the parser alone would miss. Raises ContractViolation on any breach;
+    build.rs turns that into a build failure (the tools were available)."""
+    try:
+        tree = ast.parse(final_source)
+    except SyntaxError as e:  # noqa: S314 - AST parse of trusted generated source
+        raise ContractViolation([f"generated bindings are not valid Python: {e}"]) from e
+    compile(final_source, str(raw_path), "exec")  # full syntax check, never executes
 
-    declared = set(_DECLARED_NAME_RE.findall(final_source))
+    restypes, argtypes, errchecks = {}, {}, {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Attribute):
+            continue  # _libs[...] = ... / NAME = getattr(...) are not declarations
+        obj = target.value
+        if isinstance(obj, ast.Name):
+            name = obj.id
+        elif isinstance(obj, ast.Attribute):
+            name = obj.attr
+        else:
+            continue
+        if not name.startswith("aphrodite_hermes_"):
+            continue
+        if target.attr == "restype":
+            restypes[name] = ast.unparse(node.value).strip()
+        elif target.attr == "argtypes":
+            if isinstance(node.value, (ast.List, ast.Tuple)):
+                argtypes[name] = len(node.value.elts)
+            else:
+                argtypes[name] = -1  # not a literal list/tuple -> violation
+        elif target.attr == "errcheck":
+            errchecks[name] = ast.unparse(node.value).strip()
+
+    declared = set(restypes) | set(argtypes)
     header_names = set(header_fns)
     ptr_names = set(_HEADER_PTR_RE.findall(header_text))
 
@@ -283,34 +411,32 @@ def validate(final_source, header_fns, header_text, required, raw_path):
                 "would trip the static checker's [unknown-export-configured] rule"
             )
 
-    stub = _StubDylib()
-    try:
-        ns["bind_to"](stub)
-    except Exception as e:  # noqa: BLE001 - surfaced as a contract violation
-        violations.append(f"bind_to(dylib) replay failed against a stub dylib: {e!r}")
-
-    for name in header_names:
-        rec = stub.recs.get(name)
-        if rec is None:
-            continue  # already reported under declared != header_names
+    for name in sorted(header_names & declared):
         if name in ptr_names:
-            if not _pointer_width(rec.restype):
+            if name not in restypes:
                 violations.append(
-                    f"{name}: restype is {rec.restype!r}, NOT pointer-width - "
+                    f"{name}: no restype declaration at all - ctypes defaults to "
+                    "c_int, truncating the 64-bit pointer (historical SIGSEGV bug class)"
+                )
+            elif not _is_pointer_width_ast(restypes[name]):
+                violations.append(
+                    f"{name}: restype is {restypes[name]!r}, NOT pointer-width - "
                     "ctypes would read the 64-bit pointer return truncated "
                     "(c_int default = the historical SIGSEGV bug class)"
                 )
-        if rec.argtypes is None:
+        if name in argtypes:
+            if argtypes[name] < 0:
+                violations.append(f"{name}: argtypes is not a literal list/tuple")
+            elif header_fns[name] != argtypes[name]:
+                violations.append(
+                    f"{name}: declared argtypes has {argtypes[name]} entries but "
+                    f"the header declares {header_fns[name]} parameter(s)"
+                )
+        else:
             violations.append(f"{name}: no argtypes declaration at all")
-        elif header_fns[name] != len(rec.argtypes):
+        if name in errchecks:
             violations.append(
-                f"{name}: declared argtypes {rec.argtypes!r} has "
-                f"{len(rec.argtypes)} entries but the header declares "
-                f"{header_fns[name]} parameter(s)"
-            )
-        if rec.errcheck is not None:
-            violations.append(
-                f"{name}: errcheck would be applied ({rec.errcheck!r}) - a "
+                f"{name}: errcheck would be applied ({errchecks[name]!r}) - a "
                 "String-returning errcheck breaks _call_json's raw-pointer protocol"
             )
 
@@ -353,7 +479,6 @@ def install(final_source, output_path):
         raise
     print(f"finalize_bindings.py: wrote {output_path} ({len(data)} bytes)")
     return True
-
 
 
 def main(argv=None):
@@ -400,7 +525,7 @@ def main(argv=None):
     print(
         f"finalize_bindings.py: validated {len(header_fns)} exports "
         f"({len(required)} required pointer-returning) - all pointer restypes "
-        "are c_void_p, argtypes match the header"
+        "are c_void_p, argtypes are c_char_p and match the header"
     )
     return 0
 

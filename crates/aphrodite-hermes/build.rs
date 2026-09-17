@@ -6,6 +6,10 @@
 //!   - cbindgen generation fails             → cargo:warning + skip
 //!   - ctypesgen tool not found              → cargo:warning + skip
 //!   - ctypesgen run / post-process fails    → cargo:warning + skip
+//!   - ctypesgen variant is NOT upstream
+//!     (pypdfium2 fork or unrecognized)      → cargo:warning (finalize re-emits
+//!     `CTYPESGEN_FORK_WARNING:` when the raw output shape is not the upstream
+//!     loop form and skips - the fork's flat declaration form is not rewritable)
 //!   - CONTRACT VIOLATION (a pointer-returning export declared with a
 //!     non-pointer-width restype, or an export missing from the bindings)
 //!     when the tools WERE available        → PANIC (fail the build loudly)
@@ -129,11 +133,16 @@ fn main() {
 	// ── ctypesgen availability probe ──
 	// Prefer `python3 -m ctypesgen` (modern pip/venv installs); fall back to
 	// the `ctypesgen` console script (homebrew/pip entry point). The probe
-	// runs `--version` so a broken install degrades the same way.
-	let Some(ctypesgen_cmd) = probe_ctypesgen() else {
+	// runs `--version` so a broken install degrades the same way, and the
+	// version string classifies the variant: upstream ctypesgen reports a
+	// semver-ish git-describe string; the pypdfium2-team fork (which emits a
+	// flat `NAME = _libs[LIB][NAME]` form the upstream pattern set cannot
+	// rewrite) identifies itself by name.
+	let Some((ctypesgen_cmd, ctypesgen_version)) = probe_ctypesgen() else {
 		skip("ctypesgen not found (tried `python3 -m ctypesgen` and `ctypesgen`)");
 		return;
 	};
+	report_ctypesgen_variant(&ctypesgen_version);
 
 	// ── ctypesgen: header → raw bindings module ──
 	// `-l __APHRODITE_DYLIB__` is a placeholder only - finalize_bindings.py
@@ -181,7 +190,7 @@ fn main() {
 		.arg("--required")
 		.arg(POINTER_RETURNING_EXPORTS.join(","))
 		.output();
-	match output {
+	match &output {
 		Ok(o) if o.status.success() => {
 			// Generated bindings are in place (copy-on-change applied).
 		},
@@ -197,19 +206,61 @@ fn main() {
 			skip(&format!("finalize_bindings.py could not run ({e})"));
 		},
 	}
+	// finalize_bindings.py reports non-upstream ctypesgen output shapes
+	// (pypdfium2 fork / unknown) through a CTYPESGEN_FORK_WARNING: marker -
+	// surface it as a cargo:warning so the fork is identifiable in build logs.
+	if let Ok(o) = &output {
+		let combined = format!(
+			"{}{}",
+			String::from_utf8_lossy(&o.stdout),
+			String::from_utf8_lossy(&o.stderr)
+		);
+		for line in combined.lines() {
+			if let Some(rest) = line.strip_prefix("CTYPESGEN_FORK_WARNING: ") {
+				cargo_warning(rest);
+			}
+		}
+	}
 }
 
-fn probe_ctypesgen() -> Option<Vec<String>> {
+fn probe_ctypesgen() -> Option<(Vec<String>, String)> {
 	for candidate in [
 		vec!["python3".to_string(), "-m".to_string(), "ctypesgen".to_string()],
 		vec!["ctypesgen".to_string()],
 	] {
-		let probe = Command::new(&candidate[0]).args(&candidate[1..]).arg("--version").output();
+		let probe = Command::new(&candidate[0])
+			.args(&candidate[1..])
+			.arg("--version")
+			.output();
 		if let Ok(out) = probe {
 			if out.status.success() {
-				return Some(candidate);
+				let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+				return Some((candidate, version));
 			}
 		}
 	}
 	None
+}
+
+/// Warn (cargo:warning) when the ctypesgen variant is NOT upstream
+/// ctypesgen - the upstream case stays silent. Upstream reports a semver-ish
+/// git-describe version (e.g. 2.7.4-27202-gb3625f73d3); the pypdfium2-team
+/// fork identifies itself by name; anything else is unrecognized and the
+/// upstream pattern set may not apply.
+fn report_ctypesgen_variant(version: &str) {
+	let v = version.trim();
+	if v.is_empty() {
+		cargo_warning("ctypesgen --version reported nothing - cannot classify the ctypesgen variant; the upstream pattern set in finalize_bindings.py may not apply (an unrecognized output shape warns and skips, keeping the committed plugins/aphrodite/_bindings.py in effect)");
+		return;
+	}
+	let lower = v.to_lowercase();
+	if lower.contains("pypdfium2") || lower.contains("pdfium") {
+		cargo_warning(&format!(
+			"ctypesgen variant: pypdfium2-team fork (version {v}) - it emits a flat `NAME = _libs[LIB][NAME]` declaration form with single-line restype, NOT the upstream `for _lib in _libs.values()` loops; finalize_bindings.py will warn (CTYPESGEN_FORK_WARNING) and skip, keeping the committed plugins/aphrodite/_bindings.py in effect"
+		));
+	} else if !v.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+		cargo_warning(&format!(
+			"ctypesgen variant: unrecognized version string ({v:?}) - the upstream pattern set in finalize_bindings.py may not apply; an unrecognized output shape warns and skips, keeping the committed plugins/aphrodite/_bindings.py in effect"
+		));
+	}
 }
