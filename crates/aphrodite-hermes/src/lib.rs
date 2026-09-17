@@ -65,7 +65,13 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 		#[cfg(not(test))]
 		let state = {
 			let mut s = AphroditeState::default();
-			aphrodite::config_loader::Config::load().apply_compression(&mut s);
+			let cfg = aphrodite::config_loader::Config::load();
+			cfg.apply_compression(&mut s);
+			// Issue #11 WS4: also push `[previews] preview_max_chars` into
+			// the process-global preview builder so the dylib path caps
+			// previews exactly like the proxy path (the key was
+			// declared-but-unread dead config).
+			cfg.apply_previews();
 			s
 		};
 		#[cfg(test)]

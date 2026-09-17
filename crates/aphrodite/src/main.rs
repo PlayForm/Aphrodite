@@ -125,6 +125,13 @@ async fn run() -> anyhow::Result<()> {
 	};
 	let (multi_config, cli_fallback, log_compact) = if use_multi_config {
 		let config = MultiConfig::load(&config_path)?;
+		// ── Issue #11 WS4: wire `[previews] preview_max_chars` into the
+		// process-global preview builder - the key was declared in the
+		// config structs but never read anywhere, so every preview knob
+		// was a no-op. Absent -> unlimited (legacy behavior).
+		aphrodite::preview::set_preview_max_chars(
+			config.previews.as_ref().and_then(|p| p.preview_max_chars),
+		);
 		let log_compact = aphrodite::config::env_bool("APHRODITE_LOG_COMPACT");
 		(Some(config), None, log_compact)
 	} else {

@@ -503,4 +503,28 @@ mod tests {
 		cfg.apply_compression(&mut state);
 		assert!(!state.poll_worker_enabled);
 	}
+
+	// ── Issue #11 WS4: `[previews] preview_max_chars` must reach the
+	// preview builder (the key was declared-but-unread dead config). ──
+	#[test]
+	fn test_apply_previews_wires_preview_max_chars() {
+		let _g = crate::preview::preview_cap_test_guard();
+		// TOML wins over the default (unlimited).
+		let cfg = Config {
+			raw: "[previews]\npreview_max_chars = 77\n".parse().unwrap(),
+			overrides: HashMap::new(),
+		};
+		cfg.apply_previews();
+		assert_eq!(crate::preview::preview_max_chars(), 77);
+
+		// Env override wins over TOML.
+		let mut cfg2 = Config::default();
+		cfg2.set_override("APHRODITE_PREVIEW_MAX_CHARS", "123");
+		cfg2.apply_previews();
+		assert_eq!(crate::preview::preview_max_chars(), 123);
+
+		// Absent/0 -> unlimited (legacy behavior), and restore the global.
+		Config::default().apply_previews();
+		assert_eq!(crate::preview::preview_max_chars(), 0);
+	}
 }

@@ -1031,7 +1031,7 @@ pub async fn proxy_handler(
 	// total timeout), not the bounded `client` - see its doc comment.
 	let http_client = if body_wants_stream(&body_vec) { &state.stream_client } else { &state.client };
 	// F10 fix (above) builds `body_vec` once (one Vec alloc). Convert to
-	// `Bytes` here — outside the retry loop — so each attempt clones in O(1)
+	// `Bytes` here - outside the retry loop - so each attempt clones in O(1)
 	// (refcount) instead of copying the whole payload. The no-retry common
 	// path pays a single buffer move, not the two full copies the prior
 	// `body_vec.clone()` forced on every request (bug 18-P9: up to 4 copies
@@ -2656,6 +2656,11 @@ pub async fn handle_ccr_reload(State(state): State<Arc<AppState>>) -> impl IntoR
 	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
 	match crate::config::MultiConfig::load(&config_path) {
 		Ok(config) => {
+			// Issue #11 WS4: keep the preview cap in sync on hot-reload
+			// (`[previews] preview_max_chars`).
+			crate::preview::set_preview_max_chars(
+				config.previews.as_ref().and_then(|p| p.preview_max_chars),
+			);
 			let comp = config.compression.as_ref();
 			let thresholds = resolve_thresholds(comp);
 			state.cache_compress_threshold.store(thresholds.cache, Ordering::Relaxed);

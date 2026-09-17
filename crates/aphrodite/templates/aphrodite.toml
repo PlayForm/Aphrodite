@@ -65,7 +65,7 @@ chain_split = false # opt-in fine-grained command splitting; OFF by default (mar
 [previews]
 model_family = "code_first" # compact | code_first | balance
 code_structure_map = true   # show fn/struct/class sigs
-preview_max_chars = 120     # max chars per preview line
+preview_max_chars = 120     # max chars per preview line (enforced by the preview builder; 0 = unlimited)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
