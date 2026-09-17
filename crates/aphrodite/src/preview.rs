@@ -25,11 +25,16 @@ pub fn detect_type(content: &str) -> String {
 /// preview, the same override pattern `hooks::transform_terminal_output`
 /// already uses for shell traces.
 ///
-/// Returns `Some(type)` for a recognized shape (`git`, `ls`, `test`, `grep`,
-/// `gitlog`), or `None` to leave the classifier's own verdict in place. Detection
-/// is deliberately conservative (line-prefix / marker patterns, majority votes)
-/// so a random paragraph is never mis-tagged. Char-boundary safe and panic-free
-/// on empty/NUL/multibyte input.
+/// Returns `Some(type)` for a recognized shape (`json`, `test`, `diff`,
+/// `code`, `table`, `markdown`, `yaml`, `html`, `xml`, `csv`, `build`, `git`,
+/// `ls`, `grep`, `gitlog`), or `None` to leave the classifier's own verdict in
+/// place. Detection is deliberately conservative (line-prefix / marker
+/// patterns, majority votes) so a random paragraph is never mis-tagged.
+/// Char-boundary safe and panic-free on empty/NUL/multibyte input.
+///
+/// Issue #11 residual #4 (RC-C): structured content (diffs, code, tables,
+/// yaml/xml/csv, JSON objects, build logs) used to land on the generic
+/// first-line arm - the detectors below give each shape its semantic arm.
 pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 	let lines: Vec<&str> = content.lines().collect();
 	if lines.is_empty() {
@@ -40,17 +45,155 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 		return None;
 	}
 
+	// ── JSON: a strict parse of an object/array is the strongest possible
+	// shape signal - run it FIRST so a JSON payload can never be hijacked by
+	// a marker substring inside one of its string values. ──
+	// Hermes wrapper envelopes (`output`/`exit_code`, `diff`, `error`,
+	// `success`, `total_count`/`matches`, `content`/`total_lines`,
+	// `result`/`message`/`found`/`preview`, skill_view `name`/`description`)
+	// are EXCLUDED: their raw-JSON previews are deliberately the caller-visible
+	// payload (WS1 full-content preview), and hiding e.g. an error message
+	// behind a key listing would be a regression.
+	if let Ok(v) = serde_json::from_str::<JsonValue>(content) {
+		match v {
+			JsonValue::Object(obj) => {
+				if !is_envelope_json_object(&obj) {
+					return Some("json");
+				}
+			},
+			JsonValue::Array(_) => return Some("json"),
+			_ => {},
+		}
+	}
+
 	// ── test output: cargo/pytest/jest/go ──
 	// A `test result:` / `N passed` / `=== RUN` / pytest summary line is a
-	// strong, unambiguous signal even amid other noise.
+	// strong, unambiguous signal even amid other noise. Extended for the
+	// SHALLOW tail (residual #4): `running N tests` + `test X ... ok` lines
+	// (a bare test log without a summary line) also count as test output.
 	if content.contains("test result:")
 		|| content.contains("=== RUN ")
 		|| content.contains("--- FAIL:")
 		|| content.contains("--- PASS:")
 		|| REEST_PYTEST.is_match(content)
 		|| REEST_JEST.is_match(content)
+		|| REEST_RUNNING.is_match(content)
+		|| REEST_TEST_LINE.is_match(content)
 	{
 		return Some("test");
+	}
+
+	// ── diff: git/unified headers or a hunk ──
+	let has_diff_git = non_empty.iter().any(|l| l.trim_start().starts_with("diff --git "));
+	let has_ab_headers = {
+		let a = non_empty.iter().any(|l| l.trim_start().starts_with("--- "));
+		let b = non_empty.iter().any(|l| l.trim_start().starts_with("+++ "));
+		a && b
+	};
+	let has_hunk = {
+		let h = non_empty.iter().any(|l| l.trim_start().starts_with("@@ "));
+		let delta = non_empty
+			.iter()
+			.filter(|l| {
+				let t = l.trim_start();
+				(t.starts_with('+') && !t.starts_with("+++")) || (t.starts_with('-') && !t.starts_with("---"))
+			})
+			.count();
+		h && delta >= 1
+	};
+	if has_diff_git || has_ab_headers || has_hunk {
+		return Some("diff");
+	}
+
+	// ── code: a strong signature marker (`fn main(`, `def x(`, `struct X`,
+	// `#include`, shebang) or >=2 statement-line votes (`use x::y;`,
+	// `let x =`, `import x`, `return x`, ...). ──
+	let code_strong = non_empty.iter().any(|l| CODE_STRONG_RE.is_match(l));
+	let code_votes = non_empty.iter().filter(|l| CODE_VOTE_RE.is_match(l)).count();
+	if code_strong || code_votes >= 2 {
+		return Some("code");
+	}
+
+	// ── markdown table: >=2 `|`-prefixed lines with a separator row ──
+	let md_table_lines = non_empty.iter().filter(|l| l.trim_start().starts_with('|')).count();
+	let has_table_sep = non_empty.iter().any(|l| {
+		let cells = l.trim().trim_matches('|');
+		!cells.is_empty()
+			&& cells.split('|').all(|c| {
+				let t = c.trim();
+				!t.is_empty() && t.chars().all(|ch| matches!(ch, '-' | ':' | ' '))
+			})
+	});
+	if md_table_lines >= 2 && has_table_sep {
+		return Some("table");
+	}
+
+	// ── markdown document: heading lines + list/table/link/fence/quote
+	// structure. Gated so a shell script's `# comment` lines alone cannot
+	// trigger it (needs >=3 heading votes or a non-heading structure). ──
+	let md_heads = non_empty.iter().filter(|l| is_md_heading(l)).count();
+	let md_structure = non_empty.iter().filter(|l| is_md_structure(l)).count();
+	if md_heads >= 2 && (md_heads >= 3 || md_structure >= 1) {
+		return Some("markdown");
+	}
+
+	// ── yaml: >=3 top-level lowercase-key lines (`name: webapp`). Log-marker
+	// keys (`error:`/`warning:`/...) are excluded so a compiler log cannot be
+	// mis-tagged as yaml. ──
+	let yaml_keys = content.lines().filter(|l| is_yaml_key_line(l)).count();
+	if yaml_keys >= 3 {
+		return Some("yaml");
+	}
+
+	// ── html vs xml: a document that opens with `<!DOCTYPE html`/`<html` is
+	// html (the dedicated arm extracts <title>); other tag documents with an
+	// opening `<` and a `</` close count as xml. ──
+	let trimmed = content.trim_start();
+	if trimmed.starts_with("<!DOCTYPE html") || trimmed.starts_with("<html") || trimmed.starts_with("<HTML") {
+		return Some("html");
+	}
+	if trimmed.starts_with('<') && content.trim_end().ends_with('>') && content.contains("</") {
+		return Some("xml");
+	}
+
+	// ── csv: >=2 rows with an identical comma-field count (>=2 fields) and no
+	// `, ` (comma-space) - prose with commas is excluded by both tests. ──
+	let csv_rows: Vec<&str> = non_empty.iter().map(|l| l.trim()).collect();
+	if csv_rows.len() >= 2 && !content.contains(", ") {
+		let counts: Vec<usize> = csv_rows.iter().map(|r| r.split(',').count()).collect();
+		let first = counts[0];
+		if first >= 2 && counts.iter().all(|&c| c == first) {
+			return Some("csv");
+		}
+	}
+
+	// ── build output: cargo/rustc-style verb lines (`Compiling`, `Finished`,
+	// `error[`, `error:`, `warning:`, `-->`) - >=2 markers, or a verb plus an
+	// error/warning line. A lone `error: broke` terminal trace does NOT count
+	// (stays on the terminal arm). ──
+	let build_verbs = non_empty
+		.iter()
+		.filter(|l| {
+			let t = l.trim_start();
+			["Compiling ", "Building ", "Finished ", "Checking ", "Linking ", "--> "]
+				.iter()
+				.any(|p| t.starts_with(p))
+		})
+		.count();
+	let build_errs = non_empty
+		.iter()
+		.filter(|l| {
+			let t = l.trim_start();
+			t.starts_with("error[")
+				|| t.starts_with("error:")
+				|| t.starts_with("Error:")
+				|| t.starts_with("warning[")
+				|| t.starts_with("warning:")
+				|| t.starts_with("Warning:")
+		})
+		.count();
+	if build_verbs + build_errs >= 2 {
+		return Some("build");
 	}
 
 	// ── git status: porcelain / `M `/`A `/`D `/`R `/`??`/`UU` prefixes ──
@@ -102,6 +245,95 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 	}
 
 	None
+}
+
+/// True when a JSON object is a Hermes wrapper envelope whose raw-JSON preview
+/// is intentional (the payload is inside the wrapper, not the key list).
+fn is_envelope_json_object(obj: &serde_json::Map<String, JsonValue>) -> bool {
+	const GUARD: &[&str] = &[
+		"output", "exit_code", "diff", "error", "success", "total_count", "matches", "matches_text", "content",
+		"total_lines", "result", "message", "found", "preview", "name", "description",
+	];
+	obj.keys().any(|k| GUARD.contains(&k.as_str()))
+}
+
+/// True for a markdown heading line (`# `, `## `, ... `###### `).
+fn is_md_heading(line: &str) -> bool {
+	let t = line.trim_start();
+	let n = t.chars().take_while(|c| *c == '#').count();
+	n >= 1 && n <= 6 && t.len() > n && t[n..].starts_with(' ') && t[n..].trim().len() > 0
+}
+
+/// True for a non-heading markdown structural line (list item, link, fence,
+/// blockquote, horizontal rule).
+fn is_md_structure(line: &str) -> bool {
+	let t = line.trim_start();
+	t.starts_with("- ")
+		|| t.starts_with("* ")
+		|| t.starts_with("+ ")
+		|| t.starts_with("> ")
+		|| t.starts_with("```")
+		|| t.starts_with("~~~")
+		|| t.starts_with("|")
+		|| t.starts_with("[") && t.contains("](")
+		|| (!t.is_empty() && t.chars().all(|c| c == '-' || c == '=') && t.len() >= 3)
+}
+
+/// True for a top-level YAML key line (`name: webapp`): a lowercase
+/// identifier key, no leading indent, non-empty value side allowed. Log-marker
+/// keys are excluded so compiler logs are never mis-tagged as yaml.
+fn is_yaml_key_line(line: &str) -> bool {
+	if line.starts_with(' ') || line.starts_with('	') {
+		return false;
+	}
+	let t = line.trim_end();
+	let idx = match t.find(':') {
+		Some(i) => i,
+		None => return false,
+	};
+	if idx == 0 || idx > 64 {
+		return false;
+	}
+	let key = &t[..idx];
+	if !key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_') {
+		return false;
+	}
+	!matches!(key, "error" | "warning" | "note" | "info" | "warn" | "debug" | "trace")
+}
+
+/// First non-empty line whose trimmed form is not structural noise (a lone
+/// `{`/`}`/`[`/`]`/`(`/`)` with optional trailing `,`/`;`). Pretty-printed
+/// JSON opens with a lone `{` - previewing that line alone is the ISSUE-11
+/// residual #1 MISLEADING bug (RC-D: the generic arm showed the first line).
+/// Skips to the first real content line (first key, first statement).
+fn first_meaningful_line(content: &str) -> Option<String> {
+	content.lines().find_map(|l| {
+		let t = l.trim();
+		if t.is_empty() {
+			return None;
+		}
+		let core = t.trim_end_matches(|c| c == ',' || c == ';').trim();
+		let mut it = core.chars();
+		match (it.next(), it.next()) {
+			(Some(c), None) if matches!(c, '{' | '}' | '[' | ']' | '(' | ')') => None,
+			_ => Some(t.to_string()),
+		}
+	})
+}
+
+/// Render a content hint line: lines up to 100 chars are shown as-is
+/// (60-char cap); very long lines (a 10 KB single-line payload) sample
+/// head+tail (`head…tail`, 57 chars) so both ends are visible instead of a
+/// bare 60-char head (ISSUE-11 residual #4, `long_single_line`/`repeated`).
+fn sample_long_line(line: &str) -> String {
+	let chars: Vec<char> = line.chars().collect();
+	if chars.len() > 100 {
+		let head: String = chars[..28].iter().collect();
+		let tail: String = chars[chars.len() - 28..].iter().collect();
+		format!("{head}…{tail}")
+	} else {
+		line.chars().take(60).collect()
+	}
 }
 
 /// Git porcelain / short-status code for a line (`M `, ` M`, `A `, `D `, `R `,
@@ -160,6 +392,29 @@ static REEST_PYTEST: std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"\d+ passed|\d+ failed").unwrap());
 static REEST_JEST: std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"Tests:\s+\d+").unwrap());
+/// `running N tests` header (bare test logs without a summary line).
+static REEST_RUNNING: std::sync::LazyLock<regex::Regex> =
+	std::sync::LazyLock::new(|| regex::Regex::new(r"(?m)^\s*running\s+\d+\s+tests?\b").unwrap());
+/// `test <name> ... ok|FAILED|ignored` lines.
+static REEST_TEST_LINE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+	regex::Regex::new(r"(?m)^\s*test\s+\S+\s+\.\.\.\s+(ok|FAILED|ignored)\b").unwrap()
+});
+/// Strong code-signature markers (one line is enough): `fn main(`, `struct X`,
+/// `impl`, `def x(`, `class X`, `func X(`, `package x`, `#include`, shebang.
+static CODE_STRONG_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+	regex::Regex::new(
+		r"(?m)^\s*(?:fn\s+\w+\s*\(|(?:pub\s+)?(?:struct|enum|trait)\s+\w+|impl\s|def\s+\w+\s*\(|class\s+\w+|func\s+\w+\s*\(|package\s+[a-z]\w*|#!|#include\s*[<\"])",
+	)
+	.unwrap()
+});
+/// Code statement-line votes (`use x::y;`, `let x =`, `import x`,
+/// `from x import y`, `return ...`, `println!`, `print(`, `echo ...`).
+static CODE_VOTE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+	regex::Regex::new(
+		r"(?m)^\s*(?:use\s+[\w:]+;|(?:let|const|static)\s+(?:mut\s+)?[\w:]+\s*=|import\s+\w|from\s+\w+\s+import\b|return\s+|println!|print\s*\(|echo\s+[\w$])",
+	)
+	.unwrap()
+});
 
 /// Process-wide preview length cap in chars; 0 = unlimited. Set from
 /// `[previews] preview_max_chars` (Issue #11 WS4): the key was declared in
@@ -285,11 +540,25 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 	// Semantic-detection DEFAULT (no flag): when the classifier only reached a
 	// generic bucket (`text`/`terminal`/`log`/`""`), let Aphrodite's own
 	// detector upgrade the arm to a high-signal shape (git status, ls, test,
-	// grep, git log). Both the proxy path and the Hermes hook/FFI path funnel
-	// through this one function, so the enriched preview is emitted identically
-	// on both paths. An explicit non-generic `type_str` is always honored as-is.
+	// grep, git log, diff, code, table, yaml/xml/csv, json, build). Both the
+	// proxy path and the Hermes hook/FFI path funnel through this one
+	// function, so the enriched preview is emitted identically on both paths.
+	// An explicit non-generic `type_str` is always honored as-is.
+	//
+	// ISSUE-11 residual #4 (RC-C): the `tool_result` hint is caller intent for
+	// the STORED type, but the PREVIEW arm must still reflect content reality -
+	// a raw diff / code block / table / yaml blob hinted `tool_result` used to
+	// land on the generic first-line arm (SHALLOW). `build_output` keeps the
+	// build arm except for a PASSING test run misclassified by the classifier
+	// (`test result: ok.` - the build arm's clean `0E 0W` summary hides the
+	// payload's real shape); a FAILING run keeps the build arm's failure note
+	// (WS2 pin).
 	let effective: &str = match type_str {
-		"text" | "terminal" | "log" | "" | "plain" => detect_semantic_type(content).unwrap_or(type_str),
+		"text" | "terminal" | "log" | "" | "plain" | "tool_result" => detect_semantic_type(content).unwrap_or(type_str),
+		"build_output" | "build_error" => match detect_semantic_type(content) {
+			Some("test") if !content.lines().any(|l| is_failure_line(l)) => "test",
+			_ => type_str,
+		},
 		other => other,
 	};
 	let preview = match effective {
@@ -353,13 +622,29 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			let d = content.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
 			// Enrich: name the first couple of changed files so the agent sees
 			// WHAT changed, not just how many lines.
-			let files: Vec<String> = content
+			let mut files: Vec<String> = content
 				.lines()
 				.filter_map(|l| l.strip_prefix("diff --git "))
 				.filter_map(|rest| rest.split_whitespace().next())
 				.map(|p| p.strip_prefix("a/").unwrap_or(p).to_string())
 				.take(3)
 				.collect();
+			if files.is_empty() {
+				// Unified `diff -u` / `git diff` without --git headers: name
+				// files from `--- a/path` / `+++ b/path` header pairs so the
+				// preview is never `0F` with no file context (residual #4).
+				let mut seen = std::collections::BTreeSet::new();
+				for l in content.lines() {
+					let p = l.strip_prefix("--- ").or_else(|| l.strip_prefix("+++ "));
+					if let Some(p) = p {
+						let p = p.split_whitespace().next().unwrap_or("");
+						let p = p.strip_prefix("a/").or_else(|| p.strip_prefix("b/")).unwrap_or(p);
+						if !p.is_empty() && seen.insert(p.to_string()) && files.len() < 3 {
+							files.push(p.to_string());
+						}
+					}
+				}
+			}
 			if files.is_empty() {
 				format!("[diff:{}F +{}/-{} {}L]", f, a, d, lines)
 			} else {
@@ -415,6 +700,14 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 		},
 		"search" => build_search_preview(content, lines),
 		"html" => build_html_preview(content, lines),
+		// ISSUE-11 residual #4: structured shapes that used to land on the
+		// generic first-line arm (SHALLOW) - markdown tables, markdown docs,
+		// yaml, xml, csv - each get a semantic arm with counts + a sample.
+		"table" | "markdown_table" | "md_table" => build_table_preview(content, lines),
+		"markdown" | "md" => build_markdown_preview(content, lines),
+		"yaml" => build_yaml_preview(content, lines),
+		"xml" => build_xml_preview(content, lines),
+		"csv" => build_csv_preview(content, lines),
 		"json_array" | "json" | "json_list" => build_json_preview(content, lines),
 		// `hooks::transform_terminal_output` overrides the classified type to
 		// "terminal" when the content looks like a shell/exit-code trace, but
@@ -422,14 +715,24 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 		// fell through to the generic `_` branch (F10) - a bare line/byte
 		// count with no exit-code or last-output-line context, the exact
 		// signal a terminal preview exists to surface.
+		//
+		// ISSUE-11 residual #2: the fallback used to be the LAST non-empty
+		// line - a multi-line code block with a terminal hint previewed as
+		// `[terminal:7L }]`, the closing brace. The FIRST meaningful line
+		// (skipping lone braces) is the honest default; an `exit code:`/
+		// `Error:` line still wins when present (most recent state signal).
 		"terminal" => {
 			let exit_line = content
 				.lines()
 				.rev()
 				.find(|l| l.contains("exit code:") || l.contains("Error:"))
 				.map(|l| l.trim());
-			let last_line = content.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim());
-			let summary = exit_line.or(last_line).unwrap_or("").chars().take(60).collect::<String>();
+			let summary = exit_line
+				.or_else(|| first_meaningful_line(content).as_deref())
+				.unwrap_or("")
+				.chars()
+				.take(60)
+				.collect::<String>();
 			format!("[terminal:{}L {}]", lines, summary)
 		},
 		// Error output (Issue #11 WS2): surface the FIRST real error line -
@@ -481,15 +784,18 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			}
 		},
 		// Plain-text / unrecognized fallback: even when we can't classify the
-		// shape, do better than a bare L/B count - show the first non-empty
-		// line (trimmed, <=60 chars) as a content hint so the agent has SOME
-		// signal about what the blob is.
+		// shape, do better than a bare L/B count - show a content hint so the
+		// agent has SOME signal about what the blob is.
+		//
+		// ISSUE-11 residuals #1/#4 (RC-D): the hint used to be the FIRST
+		// non-empty line raw - a pretty-printed JSON blob previewed as a lone
+		// `{` (MISLEADING, the top battery offender) and a 10 KB single-line
+		// payload as a bare 60-char head (SHALLOW). Now: skip structural noise
+		// lines (lone braces/brackets) to the first MEANINGFUL line (the first
+		// key / statement), and sample head+tail for very long lines.
 		_ => {
-			let hint = content
-				.lines()
-				.map(|l| l.trim())
-				.find(|l| !l.is_empty())
-				.map(|l| l.chars().take(60).collect::<String>())
+			let hint = first_meaningful_line(content)
+				.map(|l| sample_long_line(&l))
 				.filter(|s| !s.is_empty());
 			match hint {
 				Some(h) => format!("[{}:{}L {}B | {}]", type_str, lines, bytes, h),
@@ -679,6 +985,26 @@ fn build_test_preview(content: &str, lines: usize) -> String {
 			}
 		}
 	}
+	// Bare test log without a summary line (residual #4, `term_plain`):
+	// `test foo ... ok` / `... FAILED` / `... ignored` lines still give an
+	// honest pass/fail tally instead of `[test:3L]`.
+	if !found {
+		for line in content.lines() {
+			let t = line.trim();
+			if let Some(rest) = t.strip_prefix("test ") {
+				if rest.contains("... ok") {
+					pass += 1;
+					found = true;
+				} else if rest.contains("... FAILED") {
+					fail += 1;
+					found = true;
+				} else if rest.contains("... ignored") {
+					ignored += 1;
+					found = true;
+				}
+			}
+		}
+	}
 	// First failing test name (cargo `test NAME ... FAILED` / go `--- FAIL: NAME`).
 	let first_fail = content
 		.lines()
@@ -834,6 +1160,119 @@ fn build_search_preview(content: &str, lines: usize) -> String {
 		Some(loc) => format!("[search:{} hits in {} files | {} …]", hits, files.len(), loc),
 		None => format!("[search:{} hits in {} files]", hits, files.len()),
 	}
+}
+
+/// Markdown table preview: column count, row count, header cells.
+/// `[table:3 cols 4 rows | Name, Age, City]`. Rows = non-empty lines minus
+/// separator rows (header + data rows).
+fn build_table_preview(content: &str, lines: usize) -> String {
+	let is_sep = |l: &str| {
+		let cells = l.trim().trim_matches('|');
+		!cells.is_empty()
+			&& cells.split('|').all(|c| {
+				let t = c.trim();
+				!t.is_empty() && t.chars().all(|ch| matches!(ch, '-' | ':' | ' '))
+			})
+	};
+	let rows: Vec<&str> = content
+		.lines()
+		.map(|l| l.trim())
+		.filter(|l| !l.is_empty() && !is_sep(l))
+		.collect();
+	let header = rows.first().unwrap_or(&"").trim_matches('|');
+	let cells: Vec<&str> = header.split('|').map(|c| c.trim()).filter(|c| !c.is_empty()).collect();
+	let cols = cells.len();
+	let shown: Vec<&str> = cells.iter().take(5).copied().collect();
+	let more = if cols > shown.len() { format!(" +{} more", cols - shown.len()) } else { String::new() };
+	format!("[table:{} cols {} rows | {}{}]", cols, rows.len(), shown.join(", "), more)
+}
+
+/// Markdown document preview: heading tally + first heading.
+/// `[md:7L h1×1 h2×2 | # Release Notes]`.
+fn build_markdown_preview(content: &str, lines: usize) -> String {
+	let mut levels: Vec<usize> = Vec::new();
+	let mut first_heading: Option<String> = None;
+	for line in content.lines() {
+		if is_md_heading(line) {
+			let t = line.trim_start();
+			let n = t.chars().take_while(|c| *c == '#').count();
+			levels.push(n);
+			if first_heading.is_none() {
+				first_heading = Some(t.chars().take(48).collect());
+			}
+		}
+	}
+	if levels.is_empty() {
+		return format!("[md:{}L]", lines);
+	}
+	let tally: Vec<String> = (1..=6)
+		.filter_map(|l| {
+			let c = levels.iter().filter(|&&x| x == l).count();
+			if c > 0 {
+				Some(format!("h{l}×{c}"))
+			} else {
+				None
+			}
+		})
+		.collect();
+	match first_heading {
+		Some(h) => format!("[md:{}L {} | {}]", lines, tally.join(" "), h),
+		None => format!("[md:{}L {}]", lines, tally.join(" ")),
+	}
+}
+
+/// YAML preview: top-level key count + first few keys.
+/// `[yaml:4 keys 6L | name, version, port, debug]`.
+fn build_yaml_preview(content: &str, lines: usize) -> String {
+	let keys: Vec<&str> = content
+		.lines()
+		.filter(|l| is_yaml_key_line(l))
+		.map(|l| l[..l.find(':').unwrap_or(0)].to_string())
+		.collect();
+	let shown: Vec<&str> = keys.iter().take(5).map(|s| s.as_str()).collect();
+	let more = if keys.len() > shown.len() {
+		format!(" +{} more", keys.len() - shown.len())
+	} else {
+		String::new()
+	};
+	format!("[yaml:{} keys {}L | {}{}]", keys.len(), lines, shown.join(", "), more)
+}
+
+/// XML preview: element count + root tag. `[xml:3 elements 4L | <root>]`.
+fn build_xml_preview(content: &str, lines: usize) -> String {
+	let elements = content.matches("</").count();
+	let root = content
+		.lines()
+		.map(|l| l.trim())
+		.find(|l| l.starts_with('<'))
+		.map(|l| {
+			let tag = l[1..]
+				.split(|c: char| c.is_whitespace() || c == '>' || c == '/')
+				.next()
+				.unwrap_or("");
+			format!("<{}>", tag)
+		});
+	match root {
+		Some(r) => format!("[xml:{} elements {}L | {}]", elements, lines, r),
+		None => format!("[xml:{} elements {}L]", elements, lines),
+	}
+}
+
+/// CSV preview: row count, column count, header cells.
+/// `[csv:4 rows 3 cols | name, age, city]`.
+fn build_csv_preview(content: &str, lines: usize) -> String {
+	let rows: Vec<&str> = content.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+	let cols = rows.first().map(|r| r.split(',').count()).unwrap_or(0);
+	let header: Vec<&str> = rows
+		.first()
+		.map(|r| r.split(',').map(|c| c.trim()).take(5).collect())
+		.unwrap_or_default();
+	let more = if cols > header.len() {
+		format!(" +{} more", cols - header.len())
+	} else {
+		String::new()
+	};
+	format!("[csv:{} rows {} cols | {}{}]", rows.len(), cols, header.join(", "), more)
 }
 
 /// HTML preview: title, heading count, link count, body size estimate.
@@ -1217,10 +1656,14 @@ mod tests {
 	#[test]
 	fn test_build_preview_passing_test_keeps_clean_summary() {
 		let _g = cap_guard();
-		// A PASSING run (`0 failed`) must not be flagged as a failure.
+		// ISSUE-11 residual #4: a PASSING test run the classifier tagged
+		// `build_output` must not render as a clean-looking `[build:0E 0W 3L]`
+		// (SHALLOW - hides that the payload is a test run). It upgrades to the
+		// test arm with the real tally; `0 fail` keeps the "not flagged as
+		// failure" intent of the original pin.
 		let c = "running 3 tests\ntest alpha ... ok\ntest result: ok. 3 passed; 0 failed; finished in 0.05s";
 		let p = build_preview("build_output", c);
-		assert_eq!(p, "[build:0E 0W 3L]");
+		assert_eq!(p, "[test:3 pass 0 fail 0 ignored | 0.05s]");
 	}
 
 	#[test]

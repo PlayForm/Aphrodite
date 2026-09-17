@@ -753,12 +753,20 @@ mod ffi_tests {
 	}
 
 	#[test]
-	fn test_build_preview_terminal_falls_back_to_last_line() {
+	fn test_build_preview_terminal_falls_back_to_first_line() {
+		// ISSUE-11 residual #2: the terminal-arm fallback used to be the LAST
+		// non-empty line - a multi-line block previewed as its closing brace
+		// (`[terminal:7L }]`). The FIRST meaningful line is the honest
+		// default (skipping lone braces/brackets).
 		let preview = build_preview("terminal", "line one\nline two\nlast line here\n");
 		assert!(preview.starts_with("[terminal:"));
 		assert!(
-			preview.contains("last line here"),
-			"preview should fall back to the last non-empty line: {preview}"
+			preview.contains("line one"),
+			"preview should fall back to the first meaningful line: {preview}"
+		);
+		assert!(
+			!preview.contains("last line here"),
+			"preview must not surface the last line: {preview}"
 		);
 	}
 
