@@ -86,11 +86,11 @@ or built locally via `cargo build --release`. Location:
 
 ### Python plugin (Hermes integration)
 
-The plugin ships as a directory that you symlink into Hermes' profile
-manually (the `ln -s` step from the install instructions):
+The plugin ships as a directory that you symlink into Hermes manually (the
+`ln -s` step from the install instructions):
 
 ```
-~/.hermes/profiles/<profile>/plugins/aphrodite/
+~/.hermes/plugins/aphrodite/
   → /path/to/repo/plugins/aphrodite/
 
 Hermes auto-discovers it via `plugin.yaml`:

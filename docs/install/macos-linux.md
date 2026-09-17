@@ -102,9 +102,6 @@ Then either:
 │   ├── aphrodite            ← binary (auto-downloaded, hand-placed, or built)
 │   ├── aphrodite.toml        ← proxy/engine config (written by `aphrodite setup`)
 │   └── ccr.db                ← SQLite CCR store (created on first run)
-└── profiles/<name>/
-    └── plugins/
-        └── aphrodite → ~/.hermes/plugins/aphrodite
 ```
 
 Two proxy processes come up on `:9797` (cache) and `:9798` (token) once

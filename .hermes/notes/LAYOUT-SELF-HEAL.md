@@ -2,9 +2,9 @@
 
 The Aphrodite plugin self-heals the `~/.hermes` layout at startup. Installers
 are gone: this module is the mechanism that creates and maintains the layout
-(plugin symlink, profile symlinks, runtime home), and it repairs broken
-installs automatically (wrong symlinks, misplaced config/binaries, stray
-plugin-source copies, dangling links, stale copies).
+(plugin symlink, runtime home), and it repairs broken installs automatically
+(wrong symlinks, misplaced config/binaries, stray plugin-source copies,
+dangling links, stale copies).
 
 ## Concept
 
@@ -45,14 +45,11 @@ plugin-source copies, dangling links, stale copies).
    current plugin version; warn-and-skip when it cannot be compared.
 6. Runtime binaries (`binaries/aphrodite` + platform lib) must not resolve
    into the plugin dir: such symlinks are replaced with verified real copies.
-7. All 7 profile symlinks `~/.hermes/profiles/aphrodite-*` exist and point at
-   the repo `profiles/` (recreated when missing; non-empty real dirs or
-   dangling links warn-and-skip).
-8. `aphrodite.toml` present in the runtime home (or at the env override).
+7. `aphrodite.toml` present in the runtime home (or at the env override).
 
-The repo root for profile targets is resolved from the plugin's real path
+The repo-root (dev-checkout) detection resolves from the plugin's real path
 (`Path.resolve()` - the plugin may itself be a symlink): `<plugin>/../..` or
-`<plugin>/..` whichever contains `profiles/`.
+`<plugin>/..` whichever contains `crates/`.
 
 ## Env-var overrides honored
 

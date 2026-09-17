@@ -16,16 +16,6 @@ sys.path.insert(0, str(PLUGIN_DIR))
 
 from layout_check import check_and_heal  # noqa: E402
 
-PROFILES = (
-    "barebone",
-    "proxy-cache",
-    "proxy-token",
-    "compress-off",
-    "compress-light",
-    "compress-medium",
-    "compress-aggressive",
-)
-
 _ASSERTS = 0
 
 
@@ -44,18 +34,12 @@ def make_tree(root):
     plugin.mkdir(parents=True, exist_ok=True)
     (plugin / "__init__.py").write_text("# fake plugin\n")
     (plugin / "plugin.yaml").write_text("name: aphrodite\n")
-    for p in PROFILES:
-        (src / "profiles" / f"aphrodite-{p}").mkdir(parents=True, exist_ok=True)
-        (src / "profiles" / f"aphrodite-{p}" / "config.yaml").write_text(f"profile: {p}\n")
     runtime = home / ".hermes" / "aphrodite"
     runtime.mkdir(parents=True, exist_ok=True)
     (runtime / "aphrodite.toml").write_text("key = 'value'\n")
     (runtime / "ccr.db").write_text("db-bytes")
     (home / ".hermes" / "plugins").mkdir(parents=True, exist_ok=True)
     (home / ".hermes" / "plugins" / "aphrodite").symlink_to(plugin)
-    (home / ".hermes" / "profiles").mkdir(parents=True, exist_ok=True)
-    for p in PROFILES:
-        (home / ".hermes" / "profiles" / f"aphrodite-{p}").symlink_to(src / "profiles" / f"aphrodite-{p}")
     return home, src
 
 
@@ -136,24 +120,6 @@ def test_plugin_dir_not_symlink_nonempty():
         ok(any("non-empty" in w for w in report["warnings"]), "no non-empty warning")
 
 
-def test_missing_profile_links():
-    with tempfile.TemporaryDirectory() as td:
-        home, src = make_tree(Path(td))
-        profiles = home / ".hermes" / "profiles"
-        for p in PROFILES:
-            (profiles / f"aphrodite-{p}").unlink()
-        report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite")
-        for p in PROFILES:
-            link = profiles / f"aphrodite-{p}"
-            ok(link.is_symlink(), f"profile link {p} missing")
-            ok(
-                link.resolve() == (src / "profiles" / f"aphrodite-{p}").resolve(),
-                f"profile link {p} has the wrong target",
-            )
-        created = [a for a in report["actions_taken"] if a.startswith("created symlink") and "profiles/" in a]
-        ok(len(created) == len(PROFILES), f"expected {len(PROFILES)} created profile links, got {len(created)}")
-
-
 def test_dangling_plugin_link():
     with tempfile.TemporaryDirectory() as td:
         home, src = make_tree(Path(td))
@@ -192,7 +158,6 @@ def test_dry_run_no_changes():
         (plugin / "binaries").mkdir()
         (plugin / "binaries" / "aphrodite").write_bytes(b"BB")
         (home / ".hermes" / "aphrodite" / "aphrodite.toml").unlink()
-        (home / ".hermes" / "profiles" / "aphrodite-barebone").unlink()
         before = tree_snapshot(home / ".hermes")
         report = check_and_heal(home_dir=home, dry_run=True, plugin_dir=plugin)
         after = tree_snapshot(home / ".hermes")
@@ -249,16 +214,9 @@ def test_missing_home_entirely():
         plugin = src / "plugins" / "aphrodite"
         plugin.mkdir(parents=True)
         (plugin / "__init__.py").write_text("# fake\n")
-        for p in PROFILES:
-            (src / "profiles" / f"aphrodite-{p}").mkdir(parents=True)
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         ok((home / ".hermes" / "aphrodite").is_dir(), "runtime home not created")
         ok((home / ".hermes" / "plugins" / "aphrodite").is_symlink(), "plugin link not created")
-        for p in PROFILES:
-            ok(
-                (home / ".hermes" / "profiles" / f"aphrodite-{p}").is_symlink(),
-                f"profile link {p} not created",
-            )
         ok(any(a.startswith("created directory") for a in report["actions_taken"]), "runtime home action missing")
 
 

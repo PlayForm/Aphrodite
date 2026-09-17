@@ -871,8 +871,8 @@ def register(ctx: Any) -> None:
     # ── Layout self-heal (best-effort, never raises) ──
     # Ensure the ~/.hermes runtime layout matches the canonical schema before
     # anything consumes it: relocates misplaced config/binaries out of the
-    # plugin dir, recreates missing profile symlinks, and warns on anything
-    # ambiguous. Failures degrade to a warning - the plugin still registers.
+    # plugin dir and warns on anything ambiguous. Failures degrade to a
+    # warning - the plugin still registers.
     try:
         from .layout_check import check_and_heal
 

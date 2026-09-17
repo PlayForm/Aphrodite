@@ -51,20 +51,6 @@ fallback_providers:
     - deepseek-direct
 ```
 
-### Profiles
-
-The repo ships ready-to-run Hermes profiles under `profiles/`:
-
-| Profile                       | Ports        | CCR       | Threshold  |
-| ----------------------------- | ------------ | --------- | ---------- |
-| aphrodite-barebone            | :9797, :9798 | Off       | -          |
-| aphrodite-proxy-cache         | :9797        | In-memory | >8KB       |
-| aphrodite-proxy-token         | :9798        | SQLite    | >1KB       |
-| aphrodite-compress-light      | :9797, :9798 | Both      | Light      |
-| aphrodite-compress-medium     | :9797, :9798 | Both      | Medium     |
-| aphrodite-compress-aggressive | :9797, :9798 | Both      | Aggressive |
-| aphrodite-compress-off        | :9797, :9798 | Off       | -          |
-
 ### Health check
 
 ```bash

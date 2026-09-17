@@ -74,7 +74,6 @@ Exclude = frozenset(
     {
         "vendor",
         "plugins",
-        "profiles",
         ".hermes",
         "target",
         "node_modules",

@@ -55,15 +55,3 @@ cargo test -p aphrodite           → all green, every time
 ```
 
 We ship clean. Always have, always will.
-
-## Profiles - Pick Your Power Level
-
-```
-aphrodite-barebone          → Minimal, just the basics
-aphrodite-compress-off      → Full tools, no compression
-aphrodite-compress-light    → Gentle savings
-aphrodite-compress-medium   → Balanced
-aphrodite-compress-aggressive → Maximum efficiency, full throttle 🚀
-aphrodite-proxy-cache       → Cache-mode proxy testing
-aphrodite-proxy-token       → Token-mode proxy testing
-```
