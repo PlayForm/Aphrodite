@@ -891,12 +891,14 @@ mod tests {
 
 	#[test]
 	fn test_detect_type_never_panics_on_interior_nul() {
+		let _g = cap_guard();
 		let content = "before\0after\0\0end";
 		let _ = detect_type(content); // must not panic
 	}
 
 	#[test]
 	fn test_build_preview_never_panics_on_interior_nul_across_type_branches() {
+		let _g = cap_guard();
 		let content = "line one\0line two\0\0error: boom\nwarning: also this";
 		for ty in [
 			"build",
@@ -918,6 +920,7 @@ mod tests {
 
 	#[test]
 	fn test_build_preview_code_rust_truncates_signature_on_char_boundary() {
+		let _g = cap_guard();
 		// The "code" family truncates the first signature to 48 *chars* via
 		// `.chars().take(48)`, not a byte slice - a signature packed with
 		// multi-byte UTF-8 must not panic or split a character mid-encoding.
@@ -932,6 +935,7 @@ mod tests {
 
 	#[test]
 	fn test_build_preview_never_panics_on_multibyte_utf8_every_type() {
+		let _g = cap_guard();
 		let content = "a\u{00e9}\u{4e2d}\u{1f600}b".repeat(30);
 		for ty in [
 			"build",
@@ -953,6 +957,7 @@ mod tests {
 
 	#[test]
 	fn test_build_preview_handles_literal_marker_shaped_content() {
+		let _g = cap_guard();
 		// Content that already contains marker-shaped text (e.g. a pasted
 		// example transcript) must not confuse the line/byte counting or
 		// panic in any branch - build_preview only ever summarizes, it never
@@ -979,6 +984,7 @@ mod tests {
 
 	#[test]
 	fn test_detect_type_never_panics_on_multibyte_utf8() {
+		let _g = cap_guard();
 		let content = "\u{1f600}".repeat(500);
 		let _ = detect_type(&content);
 	}
@@ -992,6 +998,7 @@ mod tests {
 
 	#[test]
 	fn test_detect_and_preview_git_status() {
+		let _g = cap_guard();
 		assert_eq!(detect_semantic_type(GIT_STATUS), Some("git"));
 		let p = build_preview("text", GIT_STATUS);
 		// 2 M, 2 A, 1 D, 3 ?? + first 3 paths + "+5 more".
@@ -1003,6 +1010,7 @@ mod tests {
 
 	#[test]
 	fn test_preview_git_status_rename() {
+		let _g = cap_guard();
 		let c = "R  old/path.rs -> new/path.rs\nR  a.txt -> b.txt";
 		let p = build_preview("git", c);
 		assert!(p.starts_with("[git:2R | new/path.rs b.txt"), "got {p}");
@@ -1013,6 +1021,7 @@ mod tests {
 
 	#[test]
 	fn test_detect_and_preview_cargo_test() {
+		let _g = cap_guard();
 		assert_eq!(detect_semantic_type(CARGO_TEST), Some("test"));
 		let p = build_preview("text", CARGO_TEST);
 		assert_eq!(p, "[test:220 pass 0 fail 1 ignored | 0.31s]");
@@ -1020,6 +1029,7 @@ mod tests {
 
 	#[test]
 	fn test_preview_test_names_first_failure() {
+		let _g = cap_guard();
 		let c = "running 3 tests\ntest alpha ... ok\ntest beta ... FAILED\ntest result: FAILED. 2 passed; 1 failed; 0 \
 		         ignored; finished in 0.05s";
 		let p = build_preview("text", c);
@@ -1033,6 +1043,7 @@ mod tests {
 
 	#[test]
 	fn test_detect_and_preview_ls_long() {
+		let _g = cap_guard();
 		assert_eq!(detect_semantic_type(LS_LONG), Some("ls"));
 		let p = build_preview("text", LS_LONG);
 		// 3 files, 2 dirs; extensions .rs×2 .md×1 (the `total 48` line is skipped).
@@ -1045,6 +1056,7 @@ mod tests {
 
 	#[test]
 	fn test_detect_and_preview_ripgrep() {
+		let _g = cap_guard();
 		assert_eq!(detect_semantic_type(RIPGREP), Some("grep"));
 		let p = build_preview("text", RIPGREP);
 		assert_eq!(p, "[grep:4 hits in 3 files | src/preview.rs:12 …]");
