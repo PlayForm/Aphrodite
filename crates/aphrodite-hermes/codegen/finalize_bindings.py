@@ -19,7 +19,10 @@ impossible):
    generation, so the library path can never be baked into the artifact.
    The declaration loops are moved inside ``bind_to(dylib)``, which replays
    the generated restype/argtypes onto whichever ``ctypes.CDLL`` handle the
-   plugin produced. Importing ``_bindings.py`` NEVER touches a library.
+   plugin produced. Importing ``_bindings.py`` NEVER touches a library. The
+   loops' ctypesgen ``has()``/``get()`` calls are rewritten to
+   ``hasattr()``/``getattr()``, so the artifact carries no lookup-adapter
+   class (it binds the plugin's raw CDLL handle directly).
 
 2. REWRITE pointer restypes to ``c_void_p``. ctypesgen types ``char *``
    returns as its ``String``/``ReturnString`` wrapper; the FFI contract
@@ -53,7 +56,10 @@ import os
 import re
 import sys
 import tempfile
+from collections import defaultdict
+from contextlib import suppress
 from pathlib import Path
+from types import SimpleNamespace
 
 PLACEHOLDER_LIB = "__APHRODITE_DYLIB__"
 
@@ -76,23 +82,46 @@ _HEADER_PTR_RE = re.compile(r"^char\s*\*\s*(aphrodite_hermes_\w+)\s*\(", re.MULT
 #       [if sizeof(c_int) == sizeof(c_void_p): NAME.restype = ReturnString
 #        else: NAME.restype = String; NAME.errcheck = ReturnString]
 #       break
+# (The has()/get() calls are rewritten to hasattr()/getattr() below, so the
+# artifact needs NO lookup-adapter class - _libs[PLACEHOLDER] holds the
+# plugin's raw CDLL handle and the loops call hasattr/getattr on it.)
 _BLOCK_START_RE = re.compile(r"^for _lib in _libs\.values\(\):", re.MULTILINE)
+# ctypesgen resolves symbols through a loader Lookup object (.has/.get with a
+# calling_convention kwarg); the plugin's live CDLL is a plain ctypes.CDLL,
+# so rewrite the loop calls to hasattr/getattr - purely declarative artifact.
+_LOOKUP_CALL_RE = re.compile(r'_lib\.(has|get)\("([A-Za-z_]\w*)"(?:, "[^"]*")?\)')
 _LOAD_LINE_RE = re.compile(
     r'_libs\[["\'][^"\']+["\']\] = load_library\(["\'][^"\']*["\']\)'
 )
-# char* restype declaration (both the if/else form and any single-line form).
-_IF_ELSE_RESTYPE_RE = re.compile(
+# char* restype declaration: the multi-line if/else block ctypesgen emits for
+# every char* return, OR a bare single-line form - one consolidated pattern
+# (ordered alternation: the if/else block first, so its inner lines are
+# consumed whole, then the single-line form) replaces the former two-pattern
+# pair (_IF_ELSE_RESTYPE_RE + _RESTYPE_SINGLE_RE).
+_RESTYPE_RE = re.compile(
+    r"(?:"
     r"    if sizeof\(c_int\) == sizeof\(c_void_p\):\n"
     r"        (?P<name>[A-Za-z_]\w*)\.restype = ReturnString\n"
     r"    else:\n"
     r"        (?P=name)\.restype = String\n"
     r"        (?P=name)\.errcheck = ReturnString\n"
+    r"|"
+    r"^(?P<indent>[ \t]+)(?P<single>[A-Za-z_]\w*)\.restype = (?:ReturnString|String)$"
+    r")",
+    re.MULTILINE,
 )
-_RESTYPE_SINGLE_RE = re.compile(
-    r"^(\s+)([A-Za-z_]\w*)\.restype = (ReturnString|String)$", re.MULTILINE
-)
+
+
+def _restype_repl(m):
+    """If/else block -> ``NAME.restype = c_void_p`` (fixed indent; the match
+    consumed the trailing newline, so one must be re-emitted); a bare
+    single-line declaration -> same rewrite keeping its own indent."""
+    if m.group("name") is not None:
+        return f"    {m.group('name')}.restype = c_void_p\n"
+    return f"{m.group('indent')}{m.group('single')}.restype = c_void_p"
 _ERRCHECK_RE = re.compile(r"^(\s+)([A-Za-z_]\w*)\.errcheck = [^\n]*$", re.MULTILINE)
-_DECLARED_NAME_RE = re.compile(r'_lib\.has\("([A-Za-z_]\w*)"')
+# Declared-name scan runs on the POST-rewrite source (hasattr form).
+_DECLARED_NAME_RE = re.compile(r'hasattr\(_lib, "([A-Za-z_]\w*)"')
 
 # The generated module's docstring embeds the exact ctypesgen command line
 # (with machine-specific OUT_DIR paths); normalize it so the committed
@@ -112,71 +141,41 @@ CANONICAL_DOCSTRING = (
 BINDER_HEADER = """
 
 # ── Runtime binder (post-processed by codegen/finalize_bindings.py) ──────────
-# The ctypesgen declaration loops were moved inside `bind_to()`: this module
-# NEVER loads a library at import time (no hardcoded dylib path), so importing
-# it is always safe - even on a machine with no dylib present. The plugin
-# (plugins/aphrodite/__init__.py) loads the dylib through its hot-reload
-# machinery (a fresh unique-path copy per generation) and calls
-# bind_to(dylib) to replay the generated restype/argtypes declarations onto
-# the live handle.
-
-class _LiveLookup:
-    \"\"\"ctypesgen `has`/`get` adapter over an already-loaded ctypes.CDLL.\"\"\"
-
-    def __init__(self, cdll):
-        self._cdll = cdll
-
-    def has(self, name, calling_convention="cdecl"):
-        try:
-            getattr(self._cdll, name)
-            return True
-        except AttributeError:
-            return False
-
-    def get(self, name, calling_convention="cdecl"):
-        return getattr(self._cdll, name)
-
+# Importing this module NEVER loads a library (no hardcoded dylib path): the
+# plugin owns the live CDLL handle (hot-reload unique-path copy) and calls
+# bind_to(dylib) to replay the declarations below onto it. The loops call
+# hasattr/getattr directly - no lookup adapter class is needed.
 
 def bind_to(_dylib):
-    \"\"\"Apply the generated FFI declarations to an already-loaded CDLL handle.
+    \"\"\"Replay the generated declarations onto an already-loaded CDLL handle.
 
-    `_dylib` is the ctypes.CDLL produced by the plugin's hot-reload machinery
-    (env override -> canonical runtime home -> legacy copies -> fresh
-    unique-path copy per generation), so the library path is deliberately
-    never baked in here.
-
-    argtypes come verbatim from the generated declarations. restype is
-    c_void_p for every pointer-declared fn (the plugin's universal
-    convention - _call_json clamps to c_void_p anyway, and reading a pointer
-    return at full width is the whole point of this pipeline) and None for
-    void fns. errcheck is NEVER applied: the plugin reads raw pointers and
-    frees them through the same handle that produced them.
+    `_dylib` is the plugin's live handle (env override -> canonical home ->
+    legacy copies -> fresh unique-path copy per generation), so the library
+    path is deliberately never baked in. Pointer restypes are c_void_p
+    (full-width reads - _call_json clamps to c_void_p anyway), void fns get
+    None. errcheck is never applied: the plugin reads raw pointers and frees
+    them through the same handle that produced them.
     \"\"\"
-    _libs[{placeholder!r}] = _LiveLookup(_dylib)
+    _libs[{placeholder!r}] = _dylib
 """.format(placeholder=PLACEHOLDER_LIB)
 
 
-class _FnRec:
-    """Record of the declarations bind_to applies to one symbol."""
-
-    def __init__(self, name):
-        self.name = name
-        self.restype = None
-        self.argtypes = None
-        self.errcheck = None
-
-
 class _StubDylib:
-    """Simulates the plugin's CDLL: getattr returns a record per declared name."""
+    """Simulates the plugin's CDLL: getattr returns a per-name record.
 
-    def __init__(self, declared):
-        self._recs = {n: _FnRec(n) for n in declared}
+    SimpleNamespace-based (lean-up proposal 5): a defaultdict of
+    SimpleNamespace records replaces the former _FnRec/_StubDylib pair.
+    has()/get() resolve through __getattr__ - any name yields (and lazily
+    creates) a record, so bind_to()'s replay runs verbatim.
+    """
+
+    def __init__(self):
+        self._recs = defaultdict(
+            lambda: SimpleNamespace(restype=None, argtypes=None, errcheck=None)
+        )
 
     def __getattr__(self, name):
-        rec = self._recs.get(name)
-        if rec is None:
-            raise AttributeError(name)
-        return rec
+        return self._recs[name]
 
     @property
     def recs(self):
@@ -210,6 +209,12 @@ def parse_header(header_text):
     return fns
 
 
+def _lookup_repl(m):
+    """ctypesgen ``_lib.has/get("NAME", "cdecl")`` -> ``hasattr/getattr(_lib, "NAME")``."""
+    fn = "hasattr" if m.group(1) == "has" else "getattr"
+    return f'{fn}(_lib, "{m.group(2)}")'
+
+
 def postprocess(raw, header_path):
     """Return the final _bindings.py source: neutralized load, bind_to(), and
     c_void_p restypes. Raises ValueError on an unexpected ctypesgen shape."""
@@ -228,11 +233,14 @@ def postprocess(raw, header_path):
         raise ValueError("no import-time library load line found (unexpected ctypesgen output)")
 
     # 2. Pointer restypes -> c_void_p; strip errcheck.
-    loops = _IF_ELSE_RESTYPE_RE.sub(
-        lambda m_: f'    {m_.group("name")}.restype = c_void_p\n', loops
-    )
-    loops = _RESTYPE_SINGLE_RE.sub(r"\1\2.restype = c_void_p", loops)
+    loops = _RESTYPE_RE.sub(_restype_repl, loops)
     loops = _ERRCHECK_RE.sub("", loops)
+
+    # 2b. _lib.has/get("NAME", "cdecl") -> hasattr/getattr(_lib, "NAME"): the
+    # artifact binds the plugin's raw CDLL handle, so no lookup-adapter class.
+    loops = _LOOKUP_CALL_RE.sub(_lookup_repl, loops)
+    if 'hasattr(_lib, "' not in loops:
+        raise ValueError("no has/get lookup calls found in ctypesgen loops (unexpected output)")
 
     # 3. Wrap the loops in bind_to() (re-indented +4).
     indented = "\n".join(
@@ -275,7 +283,7 @@ def validate(final_source, header_fns, header_text, required, raw_path):
                 "would trip the static checker's [unknown-export-configured] rule"
             )
 
-    stub = _StubDylib(declared)
+    stub = _StubDylib()
     try:
         ns["bind_to"](stub)
     except Exception as e:  # noqa: BLE001 - surfaced as a contract violation
@@ -340,19 +348,12 @@ def install(final_source, output_path):
         os.chmod(tmp, 0o644)
         os.replace(tmp, output_path)
     except BaseException:
-        with suppress_oserror():
+        with suppress(OSError):
             os.remove(tmp)
         raise
     print(f"finalize_bindings.py: wrote {output_path} ({len(data)} bytes)")
     return True
 
-
-class suppress_oserror:
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return exc[0] is not None and issubclass(exc[0], OSError)
 
 
 def main(argv=None):

@@ -14,6 +14,14 @@
 //! effect; the plugin additionally falls back to its manual restype setup
 //! when the artifact is absent entirely (fresh checkout, standalone
 //! `aphrodite setup` installs whose embedded template ships without it).
+//!
+//! Header strategy (LEAN-UP #2/#9): OUT_DIR/aphrodite_hermes.h doubles as the
+//! copy-on-change marker. ctypesgen 2.7.4 cannot read the header from stdin -
+//! `-` is treated as a literal filename and fails inside gcc -E (verified on
+//! this machine) - so the header stays a real file in OUT_DIR, cargo's
+//! designated build-artifact dir. When cbindgen output is byte-identical to
+//! the previous generation, the ctypesgen + finalize chain is skipped
+//! entirely: a lib.rs edit that does not move the ABI costs nothing.
 
 use std::env;
 use std::path::PathBuf;
@@ -55,11 +63,17 @@ fn main() {
 		println!("cargo:rerun-if-changed={}", plugin_init.display());
 	}
 
+	// Shared degraded-path exit (LEAN-UP #1): every early return below ends
+	// with the committed artifact still in effect.
+	let skip = |msg: &str| {
+		cargo_warning(&format!(
+			"{msg}; skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect"
+		));
+	};
+
 	// ── Force-skip escape hatch (offline/dev-loop machines) ──
 	if matches!(env::var("APHRODITE_SKIP_FFI_GEN").as_deref(), Ok("1") | Ok("true")) {
-		cargo_warning(
-			"APHRODITE_SKIP_FFI_GEN=1: skipping cbindgen+ctypesgen FFI generation; the committed plugins/aphrodite/_bindings.py remains in effect",
-		);
+		skip("APHRODITE_SKIP_FFI_GEN=1: cbindgen+ctypesgen FFI generation disabled");
 		return;
 	}
 
@@ -71,47 +85,55 @@ fn main() {
 	let config = match cbindgen::Config::from_file(crate_dir.join("cbindgen.toml")) {
 		Ok(c) => c,
 		Err(e) => {
-			cargo_warning(&format!(
-				"cbindgen.toml could not be loaded ({e}); skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect"
-			));
+			skip(&format!("cbindgen.toml could not be loaded ({e})"));
 			return;
 		},
 	};
 	let bindings = match cbindgen::Builder::new().with_crate(&crate_dir).with_config(config).generate() {
 		Ok(b) => b,
 		Err(e) => {
-			cargo_warning(&format!(
-				"cbindgen generation failed ({e}); skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect"
-			));
+			skip(&format!("cbindgen generation failed ({e})"));
 			return;
 		},
 	};
 	// cbindgen 0.29 dropped Display on Bindings - write to a Vec<u8> buffer.
+	// The header is valid UTF-8 by construction (LEAN-UP #3): the bytes go
+	// straight to the equality check and to disk with no lossy String
+	// round-trip.
 	let mut header_bytes = Vec::new();
 	bindings.write(&mut header_bytes);
-	let header = String::from_utf8_lossy(&header_bytes).into_owned();
+
+	let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
+	// OUT_DIR/aphrodite_hermes.h doubles as the copy-on-change marker
+	// (LEAN-UP #9): it persists across incremental builds of this
+	// crate+profile, so it is both the previous-generation reference AND the
+	// ctypesgen input.
+	let header_path = out_dir.join("aphrodite_hermes.h");
+	let raw_bindings_path = out_dir.join("_bindings.raw.py");
+
+	// Copy-on-change: byte-identical header ⇒ the ABI did not move ⇒ the
+	// committed _bindings.py is still exactly what this header produces, so
+	// skip the ctypesgen + finalize chain entirely.
+	if let Ok(prev) = std::fs::read(&header_path) {
+		if prev == header_bytes {
+			cargo_warning("header unchanged - skipping ctypesgen/finalize (committed plugins/aphrodite/_bindings.py already matches this ABI)");
+			return;
+		}
+	}
+
+	if let Err(e) = std::fs::write(&header_path, &header_bytes) {
+		skip(&format!("could not write {} ({e})", header_path.display()));
+		return;
+	}
 
 	// ── ctypesgen availability probe ──
 	// Prefer `python3 -m ctypesgen` (modern pip/venv installs); fall back to
 	// the `ctypesgen` console script (homebrew/pip entry point). The probe
 	// runs `--version` so a broken install degrades the same way.
 	let Some(ctypesgen_cmd) = probe_ctypesgen() else {
-		cargo_warning(
-			"ctypesgen not found (tried `python3 -m ctypesgen` and `ctypesgen`); skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect",
-		);
+		skip("ctypesgen not found (tried `python3 -m ctypesgen` and `ctypesgen`)");
 		return;
 	};
-
-	let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
-	let header_path = out_dir.join("aphrodite_hermes.h");
-	let raw_bindings_path = out_dir.join("_bindings.raw.py");
-	if let Err(e) = std::fs::write(&header_path, &header) {
-		cargo_warning(&format!(
-			"could not write {} ({e}); skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect",
-			header_path.display()
-		));
-		return;
-	}
 
 	// ── ctypesgen: header → raw bindings module ──
 	// `-l __APHRODITE_DYLIB__` is a placeholder only - finalize_bindings.py
@@ -129,15 +151,11 @@ fn main() {
 	match status {
 		Ok(s) if s.success() => {},
 		Ok(s) => {
-			cargo_warning(&format!(
-				"ctypesgen exited {s}; skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect"
-			));
+			skip(&format!("ctypesgen exited {s}"));
 			return;
 		},
 		Err(e) => {
-			cargo_warning(&format!(
-				"ctypesgen could not run ({e}); skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect"
-			));
+			skip(&format!("ctypesgen could not run ({e})"));
 			return;
 		},
 	}
@@ -147,6 +165,11 @@ fn main() {
 	// 1 = FFI CONTRACT VIOLATION (tools were available - the committed
 	// artifact must not silently encode a truncating declaration, so the
 	// build FAILS); 2+ = tool/script failure (warn + skip).
+	// LEAN-UP #8: finalize_bindings.py STILL accepts `--required` (the
+	// partner-side change that derives pointer-returning exports from the
+	// header has not landed), so build.rs keeps the current call shape -
+	// build.rs and finalize must not disagree mid-flight. Drop `--required`
+	// in lockstep with that partner change.
 	let output = Command::new("python3")
 		.arg(&finalize_script)
 		.arg("--header")
@@ -168,14 +191,10 @@ fn main() {
 			if code == 1 {
 				panic!("FFI CONTRACT VIOLATION in generated bindings (see finalize_bindings.py output):\n{stderr}");
 			}
-			cargo_warning(&format!(
-				"finalize_bindings.py exited {code}; skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect\n{stderr}"
-			));
+			skip(&format!("finalize_bindings.py exited {code}: {stderr}"));
 		},
 		Err(e) => {
-			cargo_warning(&format!(
-				"finalize_bindings.py could not run ({e}); skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect"
-			));
+			skip(&format!("finalize_bindings.py could not run ({e})"));
 		},
 	}
 }
