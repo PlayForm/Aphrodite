@@ -1141,6 +1141,7 @@ mod tests {
 
 	#[test]
 	fn test_search_preview_ignores_non_search_lines() {
+		let _g = cap_guard();
 		let c = "src/main.rs:12:    let x = 1;\njust some prose here\nsrc/lib.rs:7:    pub fn foo()";
 		let p = build_preview("search", c);
 		assert!(p.contains("2 hits"), "got {p}");
@@ -1150,6 +1151,7 @@ mod tests {
 
 	#[test]
 	fn test_html_preview_extracts_title_and_counts() {
+		let _g = cap_guard();
 		let c = "<!DOCTYPE html>\n<html>\n<head><title>My Page</title></head>\n<body>\n<h1>Hello</h1>\n<h2>Section</h2>\n<a href=\"/x\">link</a>\n<a href=\"/y\">link2</a>\n<img src=\"a.png\">\n</body>\n</html>";
 		let p = build_preview("html", c);
 		assert!(p.contains("My Page"), "must include title, got {p}");
@@ -1175,6 +1177,7 @@ mod tests {
 
 	#[test]
 	fn test_build_preview_counts_error_warning_lines_not_substrings() {
+		let _g = cap_guard();
 		// One line with TWO `error` occurrences, a capitalized `Error:` line
 		// (invisible to the old lowercase substring counter), an unrelated
 		// `error`-shaped word, and a warning line: the OLD counter reported
@@ -1187,6 +1190,7 @@ mod tests {
 
 	#[test]
 	fn test_build_preview_failing_test_never_looks_clean() {
+		let _g = cap_guard();
 		// ISSUE-11-PREVIEW-BATTERY #2: `test result: FAILED. 3 failed` used
 		// to preview as `[build:0E 0W ...]` - a failing test run looked like
 		// a clean build. The failure signal must surface.
