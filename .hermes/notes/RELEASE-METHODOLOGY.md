@@ -146,7 +146,8 @@ git tag Aphrodite/vX.Y.Z && git push Source Aphrodite/vX.Y.Z
 gh release create Aphrodite/vX.Y.Z --notes-file Maintain/release-notes-vX.Y.Z.md
    # NEVER inline backticks in --notes; always --notes-file
    # Build.yml auto-fires on refs/tags/Aphrodite/* → 12 artifacts (4 targets × bin+dylib+SUMS)
-   # Publish.yml fires too but needs manual publish_crates:true for crates.io
+   # Publish.yml fires on tag push too: aphrodite + aphrodite-hermes publish steps run
+   # on refs/tags/Aphrodite/* (only headroom-core needs workflow_dispatch + publish_crates)
 ```
 
 Action 14: return the working copy to Development
@@ -158,8 +159,8 @@ git -C plugins/aphrodite checkout Development
 
 ### A3. What ships vs what never ships (Current tree)
 
-| Ships on Current                                                                                                                                             | Never ships (Development-only)                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Ships on Current                                                                                                                                             | Never ships (Development-only)                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
 | crates/, plugins/ (as gitlink), docs, README, CHANGELOG, Maintain/scripts (non-bench), .githooks, ruff.toml, rustfmt.toml, .prettier*, .vscode/settings.json | .hermes/ (incl. skills/), bench/, tests/, test_* files, auto-release.sh, bench examples (`[[example]]` blocks), dev notes |
 
 ---
@@ -283,13 +284,13 @@ TRANSFERS (shared content):        STAYS (branch-owned identity):
 
 ## PART 4 - RELEASE / CI TRIGGERS (what fires where)
 
-| Trigger             | Workflow                  | What it does                                                                                                                                                              |
-| ------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| push to Development | Check.yml `[Development]` | full CI: fmt (nightly), check, clippy, deny, ruff, pyright, **tests**                                                                                                     |
-| push to Current     | Check.yml `[Current]`     | CI minus Test job (test-free line): fmt, check, clippy, deny, ruff, pyright                                                                                               |
-| tag `Aphrodite/v*`  | Build.yml                 | **12 artifacts**: 4 targets × (binary + libaphrodite_hermes + SHA256SUMS) + source zips                                                                                   |
-| tag `Aphrodite/v*`  | Publish.yml               | fires but does NOT publish crates unless `workflow_dispatch` + `publish_crates: true` (manual, deliberate; order: aphrodite-headroom-core → aphrodite → aphrodite-hermes) |
-| plugin tag `vX.Y.Z` | (Aphrodite-Hermes repo)   | plugin release marker; plugin has no CI                                                                                                                                   |
+| Trigger             | Workflow                  | What it does                                                                                                                                                                              |
+| ------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| push to Development | Check.yml `[Development]` | full CI: fmt (nightly), check, clippy, deny, ruff, pyright, **tests**                                                                                                                     |
+| push to Current     | Check.yml `[Current]`     | CI minus Test job (test-free line): fmt, check, clippy, deny, ruff, pyright                                                                                                               |
+| tag `Aphrodite/v*`  | Build.yml                 | **12 artifacts**: 4 targets × (binary + libaphrodite_hermes + SHA256SUMS) + source zips                                                                                                   |
+| tag `Aphrodite/v*`  | Publish.yml               | fires and publishes to crates.io when `workflow_dispatch` + `publish_crates: true` (manual, deliberate) OR on a plain tag push - the `aphrodite`/`aphrodite-hermes` publish steps carry ` |     | startsWith(github.ref, 'refs/tags/Aphrodite/')`and DO fire on tag; only`aphrodite-headroom-core` is truly dispatch-only (order: aphrodite-headroom-core → aphrodite → aphrodite-hermes) |
+| plugin tag `vX.Y.Z` | (Aphrodite-Hermes repo)   | plugin release marker; plugin has no CI                                                                                                                                                   |
 
 `download.sh` resolves the binary by `BINARY_VERSION` (arg → file → Cargo.toml →
 GitHub latest) and builds URL `releases/download/Aphrodite%2Fv{V}` - works for
@@ -302,14 +303,22 @@ any tagged release with identical asset names.
 - Repo `rustfmt.toml` uses **nightly-only unstable options**
   (`space_after_colon = false` etc.). CI pins `nightly-2026-05-01`.
 - Stable rustfmt / rust-analyzer internal IGNORE those → space-after-colon →
-  drift. **Fix:** `.vscode/settings.json` forces rust-analyzer to call
-  `rustup run nightly-2026-05-01 rustfmt --edition 2024` - VSCode == CI.
-- `ruff.toml`: explicit (line-length 100, double quotes, space indent, LF) +
-  `extend-exclude = ["crates/aphrodite/templates/**"]`.
+  drift. The nightly-rustfmt contract is enforced in CI workflows (the
+  `[rust]` block in `.vscode/settings.json` only selects rust-analyzer as the
+  formatter - it does NOT override the toolchain, so VSCode == CI only when
+  rust-analyzer is configured to the pinned nightly; the repo's
+  `rust-toolchain.toml` (stable 1.96.0) silently ignores the unstable
+  options, so the drift the contract exists to prevent is currently only
+  caught by CI).
+- `ruff.toml`: explicit (line-length 100, double quotes, space indent, LF).
+  NOTE: it has NO `extend-exclude` for `crates/aphrodite/templates/**` - the
+  embedded template is kept ruff-formatted, which is exactly why the
+  byte-identity guard holds. Do not add an exclude; format the template.
 - **Shim template rule:** `crates/aphrodite/templates/__init__.py` MUST stay
   byte-identical to `plugins/aphrodite/__init__.py` (setup.rs asserts).
   Format the PLUGIN first, then `cp` to the template. Never format the template
-  directly. `rustfmt.toml` ignores the templates dir for the same reason.
+  directly. (`rustfmt.toml` ignores `vendor/`, `target/`, and codegen dirs -
+  templates are irrelevant to rustfmt since it only formats `.rs`.)
 
 ---
 

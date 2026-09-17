@@ -38,10 +38,12 @@ data folder `~/.hermes/aphrodite/directives/`.
 ```
 pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir: *const c_char) -> *mut c_char
 ```
+
 Free the returned string with `aphrodite_hermes_free_string`.
 Response: `{"status":"ok","dir":"<target>","written":["..."],"skipped":["..."],"warnings":["..."]}`
+
 - `written`/`skipped` sorted; `skipped` = filenames, `warnings` carry the
-reason (e.g. `"directives/focus.md exists with different content; leaving
+  reason (e.g. `"directives/focus.md exists with different content; leaving
 user-modified file as-is (not overwritten)"`).
 
 ### Home resolution precedence (materialize target)
@@ -54,13 +56,13 @@ user-modified file as-is (not overwritten)"`).
 5. `.` + warning (degraded, never fails)
 
 Env-var choice: added **`APHRODITE_HOME`** as the home-level override.
-`APHRODITE_CONFIG_PATH` was NOT reused: it names a *file* (the toml), not the
+`APHRODITE_CONFIG_PATH` was NOT reused: it names a _file_ (the toml), not the
 home dir, so deriving a directory from it would be ambiguous.
 `APHRODITE_DIRECTIVES_DIR` already existed and is honored because it is the
 loader's exact-dir override (candidate 0) - the materialize target must match
 where the loader reads.
 
-## __init__.py wiring recommendation (later wave - do not edit now)
+## **init**.py wiring recommendation (later wave - do not edit now)
 
 Call site: **after the dylib handle exists**, i.e. right after the first
 `dylib = _load_dylib()` in the registration/session-start path

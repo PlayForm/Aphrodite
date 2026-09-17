@@ -12,12 +12,12 @@ for ALL release work; this continuation note holds the session-specific state.
 
 ## State at session end
 
-| Repo | Branch | HEAD | Notes |
-| ---- | ------ | ---- | ----- |
-| Aphrodite (parent) | `Development` | `ade4136` | pushed; continuation note + vendor/headroom gitlink → `84c8d117` committed |
-| plugins/aphrodite (submodule) | `Development` | `c0bc01d` | clean |
-| Source/Current (parent) | `Current` | `2f3b461` | fully pushed; tag `Aphrodite/v1.4.3` at `36dec3c` (NOT at final tip - deliberate) |
-| Source/Current (plugin) | `Current` | `f8f4cdf` | pushed (ruff reformat of __init__.py) |
+| Repo                          | Branch        | HEAD      | Notes                                                                             |
+| ----------------------------- | ------------- | --------- | --------------------------------------------------------------------------------- |
+| Aphrodite (parent)            | `Development` | `ade4136` | pushed; continuation note + vendor/headroom gitlink → `84c8d117` committed        |
+| plugins/aphrodite (submodule) | `Development` | `c0bc01d` | clean                                                                             |
+| Source/Current (parent)       | `Current`     | `2f3b461` | fully pushed; tag `Aphrodite/v1.4.3` at `36dec3c` (NOT at final tip - deliberate) |
+| Source/Current (plugin)       | `Current`     | `f8f4cdf` | pushed (ruff reformat of **init**.py)                                             |
 
 ## v1.4.3 release - DONE (but NOT fully released)
 
@@ -35,6 +35,7 @@ for ALL release work; this continuation note holds the session-specific state.
 ## The test-free release policy (user's standing rule, this session)
 
 Current ships **NO tests, NO bench, NO dev scaffolding**:
+
 - Test files deleted from Current (`966cb41`); `crates/aphrodite/tests/`, root `tests/`, bench
   examples gone. All tests + CI run on Development only.
 - `Check.yml` on Current: Test job REMOVED (`3589b33` fixed a dangling `Test:` YAML key that
@@ -66,6 +67,7 @@ Current ships **NO tests, NO bench, NO dev scaffolding**:
 those → space-after-colon. CI pins `nightly-2026-05-01` → honors them.
 
 **Fixes committed to Current (`c5cbed8` + `589807a`)**:
+
 1. `.vscode/settings.json` (now TRACKED, was gitignored-dead): `rust-analyzer.rustfmt.overrideCommand`
    → `["rustup","run","nightly-2026-05-01","rustfmt","--edition","2024"]` - VSCode now uses the
    SAME nightly rustfmt as CI → byte-identical.
@@ -87,6 +89,7 @@ is a generated mirror, never edited directly.
 ## Release ceremony - the working sequence (both directions)
 
 **Development → Current (release, snapshot transplant, no cherry-picks down):**
+
 1. Prep on Development (bump, notes, gates). S sync first, then P.
 2. S: `merge --squash Development` on S-Current → commit `release: sync vX.Y.Z` → push.
 3. P: `merge --squash <cutoff>` on Current → restore protected paths
@@ -97,6 +100,7 @@ is a generated mirror, never edited directly.
 4. Direct promotion (no promote/vX.Y.Z branch) - PR variant documented in strategy doc §8.
 
 **Current → Development (sync-back, for hotfixes AND release-line fixes):**
+
 - Plugin FIRST, then parent (submodule-first: parent's gitlink must reference the plugin's tip).
 - `git merge --squash Source/Current` STAGES only (no commit) → VSCode selective pick per file
   (unstage = `git restore --staged`, discard = `git restore`).
@@ -116,41 +120,41 @@ is a generated mirror, never edited directly.
 ## NEXT SESSION - immediate steps (in order)
 
 0. **State update (committed after the note was written)**:
-   - Parent Development HEAD is now **`ade4136`** (pushed): committed the continuation note
-     + bumped the `vendor/headroom` gitlink to `84c8d117` (ml-cluster pin). The `+` on
-     vendor/headroom in `git submodule status` is now RESOLVED (parent records 84c8d117).
-   - Plugin submodule: clean, nothing to commit (verified `git ecommit` → "nothing to
-     commit, working tree clean").
-   - **Global gitignore caveat**: the user's machine-global excludesFile intentionally
-     excludes `.hermes` - the repo's `!.hermes/` + `!.hermes/**` negation overrides it
-     (repo .gitignore is checked AFTER core.excludesFile), which is why `git add .`
-     picked up the note. If a future `.hermes` file needs adding and the negation was
-     dropped/not present, use `git add -f <path>` - it's a .gitignore fix, not a content
-     change.
-   - **PHASE B PLUGIN SQUASH IS STAGED, AWAITING VSCode REVIEW** (from the interrupted
-     session): in `plugins/aphrodite` (on Development) the index holds the squash of
-     `Source/Current`: `M __init__.py` (ruff reformat) + `D tests/test_*.py` ×4 (the
-     test-free deletions from Current). **Remember the rule: Development KEEPS tests** -
-     when reviewing in VSCode, UNSTAGE/DISCARD the `D tests/...` entries; keep the
-     `__init__.py` reformat. Phantom gitlink cleared already (`git rm --cached
-     plugins/aphrodite` done). Do NOT commit until the user picks in VSCode (Phase B
-     B1 Actions 3-5 per the methodology).
-   - **CI status on Development is RED (pre-existing, 6+ commits)**: (1) vendored
-     headroom's own `kompress_parity` test won't compile at `84c8d117`
-     (`transforms::kompress` unresolved - headroom-side issue, its own test;
-     `cargo test --workspace` compiles it); (2) `cargo fmt --check` drift
-     (Development source is stable-formatted; CI nightly wants no-space - the
-     formatter alignment from Current fixes this via the Phase B sync-back); (3) ruff
-     violations in a test file. The Phase B sync-back (formatter config + code) cures
-     fmt+ruff; kompress_parity is a vendored-headroom concern (fix in the headroom
-     repo or exclude that test from the workspace).
-   - **Build + Publish on tag `Aphrodite/v1.4.3` (36dec3c): both SUCCESS ✓** (finished
-     clean). Plugin tag `v2.1.3` on S-Current: NOT created yet - user said "tagging is
-     done at the end" and "no tags yet, we're first about the merge Current into
-     Development" → defer to the release-finishing step.
-   - **Methodology spec written**: `.hermes/notes/RELEASE-METHODOLOGY.md` - the
-     canonical action-by-action spec for both phases, tagging, triggers, formatter
-     contract, invariants. Follow it for all release work.
+    - Parent Development HEAD is now **`ade4136`** (pushed): committed the continuation note
+        - bumped the `vendor/headroom` gitlink to `84c8d117` (ml-cluster pin). The `+` on
+          vendor/headroom in `git submodule status` is now RESOLVED (parent records 84c8d117).
+    - Plugin submodule: clean, nothing to commit (verified `git ecommit` → "nothing to
+      commit, working tree clean").
+    - **Global gitignore caveat**: the user's machine-global excludesFile intentionally
+      excludes `.hermes` - the repo's `!.hermes/` + `!.hermes/**` negation overrides it
+      (repo .gitignore is checked AFTER core.excludesFile), which is why `git add .`
+      picked up the note. If a future `.hermes` file needs adding and the negation was
+      dropped/not present, use `git add -f <path>` - it's a .gitignore fix, not a content
+      change.
+    - **PHASE B PLUGIN SQUASH IS STAGED, AWAITING VSCode REVIEW** (from the interrupted
+      session): in `plugins/aphrodite` (on Development) the index holds the squash of
+      `Source/Current`: `M __init__.py` (ruff reformat) + `D tests/test_*.py` ×4 (the
+      test-free deletions from Current). **Remember the rule: Development KEEPS tests** -
+      when reviewing in VSCode, UNSTAGE/DISCARD the `D tests/...` entries; keep the
+      `__init__.py` reformat. Phantom gitlink cleared already (`git rm --cached
+plugins/aphrodite` done). Do NOT commit until the user picks in VSCode (Phase B
+      B1 Actions 3-5 per the methodology).
+    - **CI status on Development is RED (pre-existing, 6+ commits)**: (1) vendored
+      headroom's own `kompress_parity` test won't compile at `84c8d117`
+      (`transforms::kompress` unresolved - headroom-side issue, its own test;
+      `cargo test --workspace` compiles it); (2) `cargo fmt --check` drift
+      (Development source is stable-formatted; CI nightly wants no-space - the
+      formatter alignment from Current fixes this via the Phase B sync-back); (3) ruff
+      violations in a test file. The Phase B sync-back (formatter config + code) cures
+      fmt+ruff; kompress_parity is a vendored-headroom concern (fix in the headroom
+      repo or exclude that test from the workspace).
+    - **Build + Publish on tag `Aphrodite/v1.4.3` (36dec3c): both SUCCESS ✓** (finished
+      clean). Plugin tag `v2.1.3` on S-Current: NOT created yet - user said "tagging is
+      done at the end" and "no tags yet, we're first about the merge Current into
+      Development" → defer to the release-finishing step.
+    - **Methodology spec written**: `.hermes/notes/RELEASE-METHODOLOGY.md` - the
+      canonical action-by-action spec for both phases, tagging, triggers, formatter
+      contract, invariants. Follow it for all release work.
 
 1. **Finish the v1.4.3 release**: watch the tag Build/Publish runs (in_progress at session end).
    Decide whether to move tag `Aphrodite/v1.4.3` from `36dec3c` → `2f3b461` (final tip) and
@@ -159,12 +163,12 @@ is a generated mirror, never edited directly.
 2. **Sync Current work back to Development** (user approved, both repos on Development now):
    a. Plugin: `git -C plugins/aphrodite merge --squash Source/Current` → VSCode review → commit.
    b. Parent: `git merge --squash Source/Current` → restore Development identity
-      (`.gitmodules .github/workflows plugins/aphrodite vendor/headroom`) → VSCode review → commit.
+   (`.gitmodules .github/workflows plugins/aphrodite vendor/headroom`) → VSCode review → commit.
    c. Bring: formatter config (ruff.toml, .vscode/settings.json, rustfmt.toml ignore), template
-      byte-sync, root `directives/` good markdown, README plugin badge v2.1.3, finalized release
-      notes. Leave: test-free deletions? NO - Development KEEPS tests (that's its job).
+   byte-sync, root `directives/` good markdown, README plugin badge v2.1.3, finalized release
+   notes. Leave: test-free deletions? NO - Development KEEPS tests (that's its job).
    d. Note: parent `vendor/headroom` gitlink is dirty (`M vendor/headroom`) - bump to the
-      pushed `84c8d117` (ml-cluster pin) as part of this.
+   pushed `84c8d117` (ml-cluster pin) as part of this.
 3. **Save the release methodology as a skill** (user asked): full phases, both directions,
    formatter alignment, test-free policy, badge checklist (release + plugin + crates.io - plugin
    badge drifts silently, was stale v2.1.2 → fixed v2.1.3), gitlink/phantom traps.

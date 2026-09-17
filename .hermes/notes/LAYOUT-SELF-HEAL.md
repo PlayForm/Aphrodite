@@ -17,7 +17,7 @@ dangling links, stale copies).
   actual `~/.hermes` state, compares it against the schema, and repairs
   deviations. It returns a report dict
   `{schema_version, dry_run, home_dir, checks, mismatches, actions_taken,
-  warnings}`.
+warnings}`.
 - Self-heal acts ONLY on `~/.hermes` runtime paths. It never deletes user
   data (everything displaced is moved to the runtime home, verified
   byte-identical first, and never overwrites an existing destination), never
@@ -61,8 +61,9 @@ The repo-root (dev-checkout) detection resolves from the plugin's real path
 ## Integration point
 
 In `plugins/aphrodite/__init__.py`, invoke the check early in plugin startup
+
 - at module-level init or inside the plugin's activate/registration entry,
-before binaries or config are consumed:
+  before binaries or config are consumed:
 
 ```python
 from .layout_check import check_and_heal
