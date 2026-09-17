@@ -15,7 +15,6 @@ import ctypes
 import json
 import os
 import platform
-import sys
 
 import pytest
 
@@ -53,8 +52,6 @@ lib.aphrodite_hermes_dispatch_tool.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.aphrodite_hermes_dispatch_tool.restype = ctypes.c_void_p
 lib.aphrodite_hermes_list_tools.argtypes = []
 lib.aphrodite_hermes_list_tools.restype = ctypes.c_void_p
-lib.aphrodite_hermes_list_skills.argtypes = []
-lib.aphrodite_hermes_list_skills.restype = ctypes.c_void_p
 lib.aphrodite_hermes_get_schema.argtypes = [ctypes.c_char_p]
 lib.aphrodite_hermes_get_schema.restype = ctypes.c_void_p
 lib.aphrodite_hermes_call_hook.argtypes = [ctypes.c_char_p, ctypes.c_char_p]

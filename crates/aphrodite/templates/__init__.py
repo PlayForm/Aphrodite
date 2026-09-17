@@ -411,7 +411,6 @@ def _load_dylib() -> ctypes.CDLL:
             # c_void_p avoids Python 3.14 c_char_p malloc mismatch → SIGABRT
             dylib.aphrodite_hermes_get_schemas.restype = ctypes.c_void_p
             dylib.aphrodite_hermes_get_hooks.restype = ctypes.c_void_p
-            dylib.aphrodite_hermes_list_skills.restype = ctypes.c_void_p
             dylib.aphrodite_hermes_dispatch_tool.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
             dylib.aphrodite_hermes_dispatch_tool.restype = ctypes.c_void_p
             dylib.aphrodite_hermes_call_hook.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
