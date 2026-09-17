@@ -1,10 +1,10 @@
 # Windows Install
 
 Native Windows (PowerShell or `cmd.exe`) is now a first-class install path -
-`download.ps1` and `install.ps1` are direct PowerShell equivalents of the
-Unix `download.sh`/`install.sh` scripts, so Git Bash/WSL are no longer
-required. This page covers the fast path first, then the fully manual
-walkthrough for anyone who wants to see (or needs to do) every step by hand.
+`download.ps1` is the direct PowerShell equivalent of the Unix `download.sh`
+script, so Git Bash/WSL are no longer required. This page covers the fast
+path first, then the fully manual walkthrough for anyone who wants to see
+(or needs to do) every step by hand.
 
 ## Fast path
 
@@ -22,18 +22,11 @@ hermes
 `download.sh` - no arguments needed. Works in both PowerShell 5.1 (built into
 Windows) and PowerShell 7+ (`pwsh`).
 
-If you're working from a local monorepo clone instead, `Maintain\install.ps1`
-does the whole flow in one step - binary copy, plugin junction, skills
-junction, all 7 profile junctions, and plugin registration:
-
-```powershell
-cargo build --release -p aphrodite -p aphrodite-hermes
-pwsh Maintain\install.ps1
-```
-
-`Maintain\install.bat` calls the same script for `cmd.exe` users - it just
-detects `pwsh`/`powershell` on your `PATH` and delegates to `install.ps1`, so
-there's one script to keep working, not two.
+If you're working from a local monorepo clone instead, there is no separate
+installer script to run - build the crates with cargo, then let the plugin
+handle installation itself (it links itself into `~/.hermes/plugins/` and
+self-heals its layout on launch). The manual walkthrough below shows each
+step by hand.
 
 ## Manual walkthrough
 

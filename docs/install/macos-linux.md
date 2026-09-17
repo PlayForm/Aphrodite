@@ -2,8 +2,8 @@
 
 Everything below also works on Windows if you have Git Bash, WSL, or MSYS -
 these are all POSIX shell scripts. If you're on native PowerShell/`cmd.exe`,
-use [Windows install](windows.md) instead - `download.ps1`/`install.ps1` are
-direct PowerShell equivalents of `download.sh`/`install.sh`.
+use [Windows install](windows.md) instead - `download.ps1` is the direct
+PowerShell equivalent of `download.sh`.
 
 ## Option 1: Hermes plugin, auto-download (recommended for most users)
 
@@ -87,10 +87,10 @@ cargo build --release -p aphrodite -p aphrodite-hermes
 
 Then either:
 
-| Approach                                     | What it does                                                                                                                                                                                                                                                                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Run `Maintain/install.sh` from the repo root | Copies the binary into `~/.hermes/aphrodite/`, symlinks the plugin into `~/.hermes/`, symlinks all 7 `profiles/aphrodite-*` directories into `~/.hermes/profiles/`, and enables the plugin per-profile. Expects `target/release/aphrodite` to already exist - it doesn't build or download anything itself |
-| Wire things up manually                      | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                    |
+| Approach                      | What it does                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Let the plugin install itself | Build the crates, then enable the plugin - installation and symlinking are handled by the plugin itself (it self-heals its `~/.hermes/` layout on launch; there is no separate installer script). Point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output, or copy it into the plugin's `binaries/` |
+| Wire things up manually       | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                                                 |
 
 ## What changes after any of these
 
@@ -100,6 +100,7 @@ Then either:
 │   └── aphrodite/          ← manual symlink (or junction/copy on Windows) to the plugin source
 ├── aphrodite/
 │   ├── aphrodite            ← binary (auto-downloaded, hand-placed, or built)
+│   ├── aphrodite.toml        ← proxy/engine config (written by `aphrodite setup`)
 │   └── ccr.db                ← SQLite CCR store (created on first run)
 └── profiles/<name>/
     └── plugins/

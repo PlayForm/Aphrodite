@@ -13,11 +13,10 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 - [Installing Aphrodite](install/README.md) - which of the two build
   artifacts (proxy binary vs. Hermes dylib) you need, and a decision tree
   across the three supported install paths
-- [Windows Install](install/windows.md) - fast path with `download.ps1` /
-  `install.ps1` (native PowerShell, no `bash` needed), plus a fully manual
-  walkthrough
+- [Windows Install](install/windows.md) - fast path with `download.ps1`
+  (native PowerShell, no `bash` needed), plus a fully manual walkthrough
 - [macOS/Linux Install](install/macos-linux.md) - `download.sh`,
-  `aphrodite setup`, `Maintain/install.sh`, building from source
+  `aphrodite setup`, building from source
 - [Troubleshooting](install/troubleshooting.md) - proxy not auto-launching,
   verifying the proxy without a full Hermes session, the two-config-files trap
 

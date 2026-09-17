@@ -29,21 +29,21 @@ shared keys. See
 
 ## Three ways to install
 
-Every path below has a native script for both shell families: a `.sh` for
+Only the plugin auto-download path ships native scripts: a `.sh` for
 macOS/Linux (and Windows via Git Bash/WSL) and a `.ps1` for native Windows
 PowerShell - both auto-detect your platform, so you never need to pick a
-target triple by hand.
+target triple by hand. The other paths need no installer script.
 
-| Path                                             | Best for                                                                                                               | Scripts                                                                                                    |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Hermes plugin, auto-download**                 | Everyday users on any platform                                                                                         | `download.sh` / `download.ps1` inside your plugin clone, then `hermes plugins enable aphrodite`            |
-| **`cargo install aphrodite && aphrodite setup`** | Users with a Rust toolchain who want one command to bootstrap the binary, dylibs, and config (the plugin symlink is a manual follow-up) | [macOS/Linux](macos-linux.md#cargo-install--aphrodite-setup)                                               |
-| **Local-clone installer**                        | Working from a full monorepo checkout, building from source                                                            | `Maintain/install.sh` / `Maintain/install.ps1` (`install.bat` delegates to the `.ps1` for `cmd.exe` users) |
+| Path                                             | Best for                                                                                                                                | How                                                                                                          |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Hermes plugin, auto-download**                 | Everyday users on any platform                                                                                                          | `download.sh` / `download.ps1` inside your plugin clone, then `hermes plugins enable aphrodite`              |
+| **`cargo install aphrodite && aphrodite setup`** | Users with a Rust toolchain who want one command to bootstrap the binary, dylibs, and config (the plugin symlink is a manual follow-up) | [macOS/Linux](macos-linux.md#cargo-install--aphrodite-setup)                                                 |
+| **From source (monorepo)**                       | Working from a full checkout, building the Rust crates yourself                                                                         | Build with cargo, then let the plugin itself handle installation and symlinking (layout self-heal on launch) |
 
 ## Guides
 
 | Guide                                 | Covers                                                                                                 |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| [Windows install](windows.md)         | Fast path with `download.ps1`/`install.ps1`, plus the fully manual walkthrough                         |
-| [macOS/Linux install](macos-linux.md) | `download.sh`, `aphrodite setup`, `Maintain/install.sh`, building from source                          |
+| [Windows install](windows.md)         | Fast path with `download.ps1`, plus the fully manual walkthrough                                       |
+| [macOS/Linux install](macos-linux.md) | `download.sh`, `aphrodite setup`, building from source                                                 |
 | [Troubleshooting](troubleshooting.md) | Proxy not auto-launching, verifying the proxy without a full Hermes session, the two-config-files trap |

@@ -1,7 +1,8 @@
 //! TOML config loader - port of plugins/aphrodite/_core/config.py
 //!
 //! Priority: env var > aphrodite.toml > hardcoded default
-//! Search paths: cwd, ~/.hermes/aphrodite/, relative to binary
+//! Search paths: cwd, then ~/.hermes/aphrodite/ - the config is NEVER
+//! resolved relative to the binary (or the plugin dir).
 
 use std::{collections::HashMap, path::PathBuf};
 
