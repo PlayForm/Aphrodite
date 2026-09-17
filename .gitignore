@@ -41,6 +41,13 @@ env/
 !.hermes/
 !.hermes/**
 
+# `.hermes/tmp/` is the repo-local scratch dir (moved out of /tmp): the
+# CONTENTS are ignored (probe scripts, generated fixtures, research dumps -
+# see `.hermes/skills/aphrodite-testing-discipline`), but the directory
+# itself stays tracked via its `.gitkeep`.
+.hermes/tmp/*
+!.hermes/tmp/.gitkeep
+
 .headroom/
 *.log
 *.lock
