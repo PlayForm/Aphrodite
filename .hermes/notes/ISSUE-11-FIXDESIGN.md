@@ -1,8 +1,11 @@
 # ISSUE-11 FIX DESIGN - Complete fix design space for the JSON-preview bug (`[text:1L 2B | ok]`)
 
 **Repo:** PlayForm/Aphrodite, branch `Development`, aphrodite + aphrodite-hermes 1.4.5
+
 **Date:** 2026-09-17
+
 **Predecessors:** `.hermes/notes/ISSUE-11-ROOT-CAUSE.md` (root cause), `.hermes/notes/ISSUE-11-VERIFY-1.4.5.md` (verified NOT FIXED on 1.4.5)
+
 **Scope of this doc:** complete fix design space, test constraints, recommendation, regression tests, preview-format coupling audit. No code changes, no commit.
 
 ---
@@ -19,15 +22,101 @@
 
 ## 1. Fix candidates - complete design space
 
-| #    | Candidate                                                                                                                                                                                              | Mechanism                                                                                                                                                                                                                                                                                                                                      | Tests at risk (pinned)                                                                                                                                                                                                                                                                                                                                                                                                      | New tests needed                                                                                                                                                               | Risk / notes                                                                                                                                                                                                                                                                                                                                                                       |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (a)  | **Hint wins + full-content preview for JSON** (prior agent's minimal fix, ROOT-CAUSE §4)                                                                                                               | In `compress_into` unwrap branch: if `!hint.is_empty() && hint != "text"` → if `content.trim_start().starts_with('{')` use `(content, hint)` else use `(c, hint)`. Unwrap result only used when hint is empty/"text".                                                                                                                          | **None.** `test_unwrap_hermes_result_table` (tools.rs:538) tests the fn directly (untouched). `test_compress_preserves_terminal_wrapper_metadata` (tools.rs:654) passes no hint → unchanged path → still `terminal`. `test_compress_preserves_original_when_content_looks_like_a_wrapper` (tools.rs:636) no hint → unchanged. Hook tests (lib.rs:852, 778) untouched. All roundtrip tests pass (storage untouched).         | (1) Explicit-path repro test (issue shape + `type:"tool_result"`); (2) no-hint regression guards so default behavior is pinned.                                                | **Low.** Hint is caller intent (schema contract: "trusts the `type` hint"). Caveat: with a hint + genuine envelope (`{"output":...,"exit_code":1}`), preview shows the wrapper JSON instead of the extracted output (a' refinement: use `(c, hint)` for known envelope shapes, full content only for non-envelope JSON). Hook path **not fixed** by (a) alone.                     |
-| (b)  | **Remove the success-bool `"ok"` collapse** (tools.rs:123-126) so `{"success":true}` classifies as json                                                                                                | Delete/never return the `("ok","text")` fragment; `{"success":true}` and `{"success":true,"data":...}` fall through to `None` → `detect_type` (json bucket) or the hint path.                                                                                                                                                                  | **tools.rs:570 table case `("success bool only", {"success":true}, Some(("ok","text")))` BREAKS** - must be updated to `None` (this pin is the buggy behavior; ROOT-CAUSE flags it as "pins the offending collapse"). Nothing else: diff branch (tools.rs:110) fires before success; terminal/search/content/error branches unaffected; lib.rs hook tests use `output`/`exit_code` - unaffected.                            | (1) bare `{"success":true}` → json type, honest preview (no `\| ok]`); (2) hook-path repro (see §3); (3) update table case + add `{"success":true,"data":{...}}` → `None` row. | **Low on hook path:** per `Maintain/hermes_tool_output_formats.json` **no Hermes tool returns a bare `{"success":true}` envelope** (write_file is `{"status":"written","path":...}`, patch carries `diff`). Even if one did, collapsing it to `"ok"` loses the payload - the collapse is lossy for any 2-key object. Fixes the **hook-path manifestation** (no hint exists there). |
-| (b') | (b) + guard the same-bug-class branches: success-**string** (tools.rs:127-131) and priority-keys (tools.rs:167-172) must not collapse multi-key objects                                                | Restrict both branches to single-key objects (`obj.len() <= 1`), or require the extracted string to be the object's dominant content.                                                                                                                                                                                                          | Breaks table cases **if** scoped strictly: `"success string message"` (tools.rs:573, single key - survives a `len<=1` guard, breaks if branch removed entirely) and `"priority key fallback"` (tools.rs:592, `{"name","description"}` - skill_view is a genuine Hermes envelope; breaking it regresses skill_view previews). Recommend keeping priority keys (they serve real shapes) and only gating the success branches. | Priority-key/success-string regression cases with multi-key payloads (`{"success":"ok","data":{...}}` must not collapse).                                                      | **Medium** - wider behavior change than the issue needs; the issue repro only exercises the bool branch. Optional hardening.                                                                                                                                                                                                                                                       |
-| (c)  | **Gate `unwrap_hermes_result` to the hook path only** - never on explicit `aphrodite_compress`                                                                                                         | `compress_into` skips unwrap; explicit path always uses hint/detect_type.                                                                                                                                                                                                                                                                      | **tools.rs:654 BREAKS**: pins that the explicit path unwraps `{"output":"error: broke\nexit code: 1\n","exit_code":1}` → type `terminal` **with no hint** (deliberate 01-F2 design: the agent may compress a Hermes-wrapped terminal envelope verbatim). Hook tests still pass.                                                                                                                                             | Would need to rewrite/repurpose tools.rs:654 (assert json bucket instead).                                                                                                     | **High.** The explicit path _does_ need unwrapping when the agent parks a wrapped tool result without a hint; and (c) does **not** fix the hook-path collapse (no hint there), so the issue's automatic-compression path stays broken. Rejected as a standalone fix.                                                                                                               |
-| (d)  | **Stronger envelope signature** - unwrap only on known Hermes envelope shapes (`output`+`exit_code`, `diff`, `error`, `total_count`/`matches`, `content`+`total_lines`); drop/guard ambiguous branches | Scoped D1: drop only success-bool. Scoped D2: drop success-bool + gate success-string. Scoped D3: also gate priority keys.                                                                                                                                                                                                                     | D1 breaks only tools.rs:570. D2 additionally breaks tools.rs:573 if string branch removed (survives a `len<=1` guard). D3 additionally breaks tools.rs:592.                                                                                                                                                                                                                                                                 | Same as (b)/(b') + explicit-path repro.                                                                                                                                        | **D1 ≈ (b)**, and because `{"success":true,"data":...}` then returns `None` on the explicit path too, D1 **also fixes the explicit repro without (a)** (hint honored in the `else` branch). D3 risks skill_view/aphrodite-tool previews (priority keys are the only thing serving them) - keep them.                                                                               |
-| (e)  | **`unwrap` returns original content + a json type instead of a fragment** when the object is not a known envelope shape                                                                                | Change the success-bool branch to `Some((content.to_string(), "json"))` (or detect_type) instead of `("ok","text")`.                                                                                                                                                                                                                           | tools.rs:570 BREAKS (expected value changes). Everything else passes.                                                                                                                                                                                                                                                                                                                                                       | Same as (b) + a type-assertion variant.                                                                                                                                        | **Medium - strictly worse than (b) for the explicit path:** `Some` still suppresses the caller's hint, so `type:"tool_result"` would become `json` (type-flip persists, only the preview is honest). Only sensible combined with (a).                                                                                                                                              |
-| (f)  | **Combinations**                                                                                                                                                                                       | (a)+(b): explicit path fixed by hint-priority, hook path fixed by dropping the collapse - complementary, disjoint surfaces. (a)+(e): hook path gets `json` + full preview (≈(b) outcome) but (e)'s `Some` is redundant once (a) handles the explicit path. (a)+(c): (c)'s breakage of tools.rs:654 persists - pointless. (a)+(d-D1) ≡ (a)+(b). | For (a)+(b): only tools.rs:570 (the buggy pin) needs updating.                                                                                                                                                                                                                                                                                                                                                              | Full set from (a) + (b).                                                                                                                                                       | **This is the recommendation - see §2.**                                                                                                                                                                                                                                                                                                                                           |
+**#:** (a)
+
+**Candidate:** **Hint wins + full-content preview for JSON** (prior agent's minimal fix, ROOT-CAUSE §4)
+
+**Mechanism:** In `compress_into` unwrap branch: if `!hint.is_empty() && hint != "text"` → if `content.trim_start().starts_with('{')` use `(content, hint)` else use `(c, hint)`. Unwrap result only used when hint is empty/"text".
+
+**Tests at risk (pinned):** **None.** `test_unwrap_hermes_result_table` (tools.rs:538) tests the fn directly (untouched). `test_compress_preserves_terminal_wrapper_metadata` (tools.rs:654) passes no hint → unchanged path → still `terminal`. `test_compress_preserves_original_when_content_looks_like_a_wrapper` (tools.rs:636) no hint → unchanged. Hook tests (lib.rs:852, 778) untouched. All roundtrip tests pass (storage untouched).
+
+**New tests needed:** (1) Explicit-path repro test (issue shape + `type:"tool_result"`); (2) no-hint regression guards so default behavior is pinned.
+
+**Risk / notes:** **Low.** Hint is caller intent (schema contract: "trusts the `type` hint"). Caveat: with a hint + genuine envelope (`{"output":...,"exit_code":1}`), preview shows the wrapper JSON instead of the extracted output (a' refinement: use `(c, hint)` for known envelope shapes, full content only for non-envelope JSON). Hook path **not fixed** by (a) alone.
+
+---
+
+**#:** (b)
+
+**Candidate:** **Remove the success-bool `"ok"` collapse** (tools.rs:123-126) so `{"success":true}` classifies as json
+
+**Mechanism:** Delete/never return the `("ok","text")` fragment; `{"success":true}` and `{"success":true,"data":...}` fall through to `None` → `detect_type` (json bucket) or the hint path.
+
+**Tests at risk (pinned):** **tools.rs:570 table case `("success bool only", {"success":true}, Some(("ok","text")))` BREAKS** - must be updated to `None` (this pin is the buggy behavior; ROOT-CAUSE flags it as "pins the offending collapse"). Nothing else: diff branch (tools.rs:110) fires before success; terminal/search/content/error branches unaffected; lib.rs hook tests use `output`/`exit_code` - unaffected.
+
+**New tests needed:** (1) bare `{"success":true}` → json type, honest preview (no `| ok]`); (2) hook-path repro (see §3); (3) update table case + add `{"success":true,"data":{...}}` → `None` row.
+
+**Risk / notes:** **Low on hook path:** per `Maintain/hermes_tool_output_formats.json` **no Hermes tool returns a bare `{"success":true}` envelope** (write_file is `{"status":"written","path":...}`, patch carries `diff`). Even if one did, collapsing it to `"ok"` loses the payload - the collapse is lossy for any 2-key object. Fixes the **hook-path manifestation** (no hint exists there).
+
+---
+
+**#:** (b')
+
+**Candidate:** (b) + guard the same-bug-class branches: success-**string** (tools.rs:127-131) and priority-keys (tools.rs:167-172) must not collapse multi-key objects
+
+**Mechanism:** Restrict both branches to single-key objects (`obj.len() <= 1`), or require the extracted string to be the object's dominant content.
+
+**Tests at risk (pinned):** Breaks table cases **if** scoped strictly: `"success string message"` (tools.rs:573, single key - survives a `len<=1` guard, breaks if branch removed entirely) and `"priority key fallback"` (tools.rs:592, `{"name","description"}` - skill_view is a genuine Hermes envelope; breaking it regresses skill_view previews). Recommend keeping priority keys (they serve real shapes) and only gating the success branches.
+
+**New tests needed:** Priority-key/success-string regression cases with multi-key payloads (`{"success":"ok","data":{...}}` must not collapse).
+
+**Risk / notes:** **Medium** - wider behavior change than the issue needs; the issue repro only exercises the bool branch. Optional hardening.
+
+---
+
+**#:** (c)
+
+**Candidate:** **Gate `unwrap_hermes_result` to the hook path only** - never on explicit `aphrodite_compress`
+
+**Mechanism:** `compress_into` skips unwrap; explicit path always uses hint/detect_type.
+
+**Tests at risk (pinned):** **tools.rs:654 BREAKS**: pins that the explicit path unwraps `{"output":"error: broke\nexit code: 1\n","exit_code":1}` → type `terminal` **with no hint** (deliberate 01-F2 design: the agent may compress a Hermes-wrapped terminal envelope verbatim). Hook tests still pass.
+
+**New tests needed:** Would need to rewrite/repurpose tools.rs:654 (assert json bucket instead).
+
+**Risk / notes:** **High.** The explicit path _does_ need unwrapping when the agent parks a wrapped tool result without a hint; and (c) does **not** fix the hook-path collapse (no hint there), so the issue's automatic-compression path stays broken. Rejected as a standalone fix.
+
+---
+
+**#:** (d)
+
+**Candidate:** **Stronger envelope signature** - unwrap only on known Hermes envelope shapes (`output`+`exit_code`, `diff`, `error`, `total_count`/`matches`, `content`+`total_lines`); drop/guard ambiguous branches
+
+**Mechanism:** Scoped D1: drop only success-bool. Scoped D2: drop success-bool + gate success-string. Scoped D3: also gate priority keys.
+
+**Tests at risk (pinned):** D1 breaks only tools.rs:570. D2 additionally breaks tools.rs:573 if string branch removed (survives a `len<=1` guard). D3 additionally breaks tools.rs:592.
+
+**New tests needed:** Same as (b)/(b') + explicit-path repro.
+
+**Risk / notes:** **D1 ≈ (b)**, and because `{"success":true,"data":...}` then returns `None` on the explicit path too, D1 **also fixes the explicit repro without (a)** (hint honored in the `else` branch). D3 risks skill_view/aphrodite-tool previews (priority keys are the only thing serving them) - keep them.
+
+---
+
+**#:** (e)
+
+**Candidate:** **`unwrap` returns original content + a json type instead of a fragment** when the object is not a known envelope shape
+
+**Mechanism:** Change the success-bool branch to `Some((content.to_string(), "json"))` (or detect_type) instead of `("ok","text")`.
+
+**Tests at risk (pinned):** tools.rs:570 BREAKS (expected value changes). Everything else passes.
+
+**New tests needed:** Same as (b) + a type-assertion variant.
+
+**Risk / notes:** **Medium - strictly worse than (b) for the explicit path:** `Some` still suppresses the caller's hint, so `type:"tool_result"` would become `json` (type-flip persists, only the preview is honest). Only sensible combined with (a).
+
+---
+
+**#:** (f)
+
+**Candidate:** **Combinations**
+
+**Mechanism:** (a)+(b): explicit path fixed by hint-priority, hook path fixed by dropping the collapse - complementary, disjoint surfaces. (a)+(e): hook path gets `json` + full preview (≈(b) outcome) but (e)'s `Some` is redundant once (a) handles the explicit path. (a)+(c): (c)'s breakage of tools.rs:654 persists - pointless. (a)+(d-D1) ≡ (a)+(b).
+
+**Tests at risk (pinned):** For (a)+(b): only tools.rs:570 (the buggy pin) needs updating.
+
+**New tests needed:** Full set from (a) + (b).
+
+**Risk / notes:** **This is the recommendation - see §2.**
 
 Additional candidate considered and rejected: **classifier-side fix in `crates/aphrodite/src/preview.rs`** - no change needed there; the generic arm already renders any type honestly from whatever content it is given (60-char hint cap, preview.rs:294-304), and the json arm (`json_array|json|json_list`, preview.rs:273) already produces a good `[json:N...]` preview. The bug is entirely in the bridge's _choice of fragment + type_, not in preview rendering.
 

@@ -9,25 +9,241 @@ Trigger: the discovered leak where Current's copy of `Auto.yml` pushes to
 
 ## Findings table
 
-| File                                                                                                                                               | Branch             | Verdict                          | Evidence (command + snippet)                                                                                                                                                                                                                                                                                                                                                                                            |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.github/workflows/Auto.yml`                                                                                                                       | Current            | **LEAK**                         | `git show Source/Current:.github/workflows/Auto.yml` line 68: push step `branch: Development`. Full quote below.                                                                                                                                                                                                                                                                                                        |
-| `.github/workflows/Auto.yml`                                                                                                                       | Development        | clean (sanctioned)               | `git show Source/Development:.github/workflows/Auto.yml` line 68: `branch: Current`. Matches classification `G5-05 +guard` ("pushes Current"; heartbeat touches only the CI-ignored `.github/Update.md` path - accepted exception to I10).                                                                                                                                                                              |
-| `.github/workflows/Check.yml`                                                                                                                      | Development        | clean                            | `git grep -n 'branches:' Source/Development -- .github/workflows` lines 12, 15: `branches: [Development]`.                                                                                                                                                                                                                                                                                                              |
-| `.github/workflows/Check.yml`                                                                                                                      | Current            | clean                            | lines 12, 15: `branches: [Current]`; lines 108-110 comment on Test-job removal = content, not identity.                                                                                                                                                                                                                                                                                                                 |
-| `.github/workflows/ffi-check.yml`                                                                                                                  | Development (only) | clean                            | lines 12, 32: `branches: [Development]`; absent from Current by design.                                                                                                                                                                                                                                                                                                                                                 |
-| `.github/workflows/Build.yml`, `Publish.yml`, `Dependabot.yml`, `GitHub.yml`                                                                       | both               | clean                            | zero `Current`/`Development` keyword matches on either ref; tag triggers `Aphrodite/v*` are branch-agnostic.                                                                                                                                                                                                                                                                                                            |
-| `.gitmodules`                                                                                                                                      | Development        | clean                            | `git show Source/Development:.gitmodules`: `plugins/aphrodite -> branch = Development`, `vendor/headroom` + `vendor/rtk -> branch = Current` (by design, V7).                                                                                                                                                                                                                                                           |
-| `.gitmodules`                                                                                                                                      | Current            | clean                            | `git show Source/Current:.gitmodules`: `plugins/aphrodite -> branch = Current`, vendors `-> branch = Current`.                                                                                                                                                                                                                                                                                                          |
-| `plugins/aphrodite` gitlink                                                                                                                        | Development        | clean                            | `git ls-tree Source/Development plugins/aphrodite` = d4b426bb…; `git -C plugins/aphrodite branch --contains d4b426bb…` -> Development.                                                                                                                                                                                                                                                                                  |
-| `plugins/aphrodite` gitlink                                                                                                                        | Current            | clean                            | a340e063…; `--contains` -> Current (and remotes/Source/Current).                                                                                                                                                                                                                                                                                                                                                        |
-| `.githooks/*`                                                                                                                                      | Current            | LOW (stale comment + divergence) | hooks still tracked on Current although the 2026-09-17 removal removed them repo-wide (ceremony + TAXONOMY line 55: "the hooks are gone"). `lib/sync-submodules.sh` lines 8-10 comment describes the Development layout ("Development for plugins/aphrodite on this branch") while Current's own `.gitmodules` says `branch = Current`. Comment-only; the script derives from `.gitmodules` at runtime. Reporting only. |
-| `Maintain/scripts/release/auto-release.sh`                                                                                                         | Development        | LOW (guarded)                    | line 27: `RELEASE_BRANCH` derives from HEAD, falls back to `echo Current` on detached HEAD - a detached-HEAD run on Development would release to Current. Parameterized by design (comment lines 25-26); latent risk, not an active leak.                                                                                                                                                                               |
-| `README.md`                                                                                                                                        | both               | clean                            | `tree/Current`/`blob/Current` doc URLs = sanctioned convention (Current is the distributed docs line). Badge drift v2.1.4 (D) vs v2.1.3 (C) = version-track note, not identity.                                                                                                                                                                                                                                         |
-| `crates/aphrodite/templates/aphrodite.toml`                                                                                                        | both               | clean                            | no branch keywords; D..C diff = engine-config drift (thresholds, preview templates, directives) only.                                                                                                                                                                                                                                                                                                                   |
-| Docs/notes/AGENTS/classification (`TAXONOMY.md`, `CUR-release-infra-identity.md`, `RELEASE-METHODOLOGY.md`, release-notes, `CHANGELOG.md`, skills) | Development        | clean                            | mentions describe the dual-line model (ceremony/taxonomy content), not identity assertions in the wrong branch.                                                                                                                                                                                                                                                                                                         |
-| `Maintain/install.sh`                                                                                                                              | Current            | clean                            | `raw.githubusercontent.com/PlayForm/Aphrodite/Current/...` self-reference.                                                                                                                                                                                                                                                                                                                                              |
-| `crates/aphrodite-hermes/Cargo.toml`                                                                                                               | Current            | clean                            | "Currently" inside a comment = false positive.                                                                                                                                                                                                                                                                                                                                                                          |
+**File:** `.github/workflows/Auto.yml`
+
+**Branch:** Current
+
+**Verdict:** **LEAK**
+
+**Evidence (command + snippet):**
+
+```text
+`git show Source/Current:.github/workflows/Auto.yml` line 68: push step `branch: Development`. Full quote below.
+```
+
+---
+
+**File:** `.github/workflows/Auto.yml`
+
+**Branch:** Development
+
+**Verdict:** clean (sanctioned)
+
+**Evidence (command + snippet):**
+
+```text
+`git show Source/Development:.github/workflows/Auto.yml` line 68: `branch: Current`. Matches classification `G5-05 +guard` ("pushes Current"; heartbeat touches only the CI-ignored `.github/Update.md` path - accepted exception to I10).
+```
+
+---
+
+**File:** `.github/workflows/Check.yml`
+
+**Branch:** Development
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+`git grep -n 'branches:' Source/Development -- .github/workflows` lines 12, 15: `branches: [Development]`.
+```
+
+---
+
+**File:** `.github/workflows/Check.yml`
+
+**Branch:** Current
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+lines 12, 15: `branches: [Current]`; lines 108-110 comment on Test-job removal = content, not identity.
+```
+
+---
+
+**File:** `.github/workflows/ffi-check.yml`
+
+**Branch:** Development (only)
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+lines 12, 32: `branches: [Development]`; absent from Current by design.
+```
+
+---
+
+**File:** `.github/workflows/Build.yml`, `Publish.yml`, `Dependabot.yml`, `GitHub.yml`
+
+**Branch:** both
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+zero `Current`/`Development` keyword matches on either ref; tag triggers `Aphrodite/v*` are branch-agnostic.
+```
+
+---
+
+**File:** `.gitmodules`
+
+**Branch:** Development
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+`git show Source/Development:.gitmodules`: `plugins/aphrodite -> branch = Development`, `vendor/headroom` + `vendor/rtk -> branch = Current` (by design, V7).
+```
+
+---
+
+**File:** `.gitmodules`
+
+**Branch:** Current
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+`git show Source/Current:.gitmodules`: `plugins/aphrodite -> branch = Current`, vendors `-> branch = Current`.
+```
+
+---
+
+**File:** `plugins/aphrodite` gitlink
+
+**Branch:** Development
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+`git ls-tree Source/Development plugins/aphrodite` = d4b426bb…; `git -C plugins/aphrodite branch --contains d4b426bb…` -> Development.
+```
+
+---
+
+**File:** `plugins/aphrodite` gitlink
+
+**Branch:** Current
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+a340e063…; `--contains` -> Current (and remotes/Source/Current).
+```
+
+---
+
+**File:** `.githooks/*`
+
+**Branch:** Current
+
+**Verdict:** LOW (stale comment + divergence)
+
+**Evidence (command + snippet):**
+
+```text
+hooks still tracked on Current although the 2026-09-17 removal removed them repo-wide (ceremony + TAXONOMY line 55: "the hooks are gone"). `lib/sync-submodules.sh` lines 8-10 comment describes the Development layout ("Development for plugins/aphrodite on this branch") while Current's own `.gitmodules` says `branch = Current`. Comment-only; the script derives from `.gitmodules` at runtime. Reporting only.
+```
+
+---
+
+**File:** `Maintain/scripts/release/auto-release.sh`
+
+**Branch:** Development
+
+**Verdict:** LOW (guarded)
+
+**Evidence (command + snippet):**
+
+```text
+line 27: `RELEASE_BRANCH` derives from HEAD, falls back to `echo Current` on detached HEAD - a detached-HEAD run on Development would release to Current. Parameterized by design (comment lines 25-26); latent risk, not an active leak.
+```
+
+---
+
+**File:** `README.md`
+
+**Branch:** both
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+`tree/Current`/`blob/Current` doc URLs = sanctioned convention (Current is the distributed docs line). Badge drift v2.1.4 (D) vs v2.1.3 (C) = version-track note, not identity.
+```
+
+---
+
+**File:** `crates/aphrodite/templates/aphrodite.toml`
+
+**Branch:** both
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+no branch keywords; D..C diff = engine-config drift (thresholds, preview templates, directives) only.
+```
+
+---
+
+**File:** Docs/notes/AGENTS/classification (`TAXONOMY.md`, `CUR-release-infra-identity.md`, `RELEASE-METHODOLOGY.md`, release-notes, `CHANGELOG.md`, skills)
+
+**Branch:** Development
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+mentions describe the dual-line model (ceremony/taxonomy content), not identity assertions in the wrong branch.
+```
+
+---
+
+**File:** `Maintain/install.sh`
+
+**Branch:** Current
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+`raw.githubusercontent.com/PlayForm/Aphrodite/Current/...` self-reference.
+```
+
+---
+
+**File:** `crates/aphrodite-hermes/Cargo.toml`
+
+**Branch:** Current
+
+**Verdict:** clean
+
+**Evidence (command + snippet):**
+
+```text
+"Currently" inside a comment = false positive.
+```
 
 Verdict legend: **LEAK** = branch-owned identity pointing at the other branch
 (ABORT per ceremony I11); clean = matches its branch; LOW = risk/stale note, no

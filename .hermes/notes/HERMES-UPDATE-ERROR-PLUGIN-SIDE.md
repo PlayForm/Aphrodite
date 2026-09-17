@@ -8,18 +8,63 @@ Read-only investigation: no repo or `~/.hermes` files modified.
 
 ## 0. Observed timeline (from logs, crash reports, filesystem mtimes)
 
-| Time (EEST)                    | Event                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 20:08-20:18                    | Pre-update CPython heap-corruption crashes (`python-*.ips`, worker-thread, same strlen-in-getattr signature). Plugin was active in these processes.                                                                                                                                                                                                |
-| 20:24:40-20:24:47              | Gateway children SIGSEGV burst (crash reports `python3-2026-09-17-2024*.ips`, pids 94314/94331/94337/94342) - **starts 19 s BEFORE `hermes update`** (started 20:24:59, receipt `update_20260917_202603_94438.json`, outcome success, no version change: 0.21.3 → 0.21.3).                                                                         |
-| 20:25:03 → 20:34:12            | Plugin loads every ~30 s (16+ loads in `agent.log`): `capability_check tools.override allow (legacy)` → `dylib loaded: ~/.hermes/aphrodite/binaries/...` → 2 layout warnings. **No `registered N hooks` / `registered N tools` / proxy lines after any of these loads.**                                                                           |
-| 20:33:11 / 20:33:37 / 20:33:41 | The "3x load" the user saw - three gateway children in the crash-loop window.                                                                                                                                                                                                                                                                      |
-| 20:33:14                       | `.update_check` written (`ver 0.21.3, behind 0, head==target 64ea66b0`) - an update _check_, nothing to pull.                                                                                                                                                                                                                                      |
-| 20:33:17-20:33:38              | SIGSEGV burst 2 (crash reports `python3-2026-09-17-2033*.ips`, pids 97516/97543/97548/97553/97583/97592; `tui_gateway_crash.log` lifecycle lines).                                                                                                                                                                                                 |
-| ~20:34:34                      | `~/.hermes/aphrodite/` recreated empty (`binaries/`, `hotreload/`), `~/.hermes/plugins/` touched, `config.yaml` rewritten (mtime 20:34) - **aphrodite added to `plugins.disabled`** (it was NOT disabled before: 0.21.3 gates loading on `plugins.disabled` - `hermes_cli/plugins.py:1324-1334` - and the plugin demonstrably loaded 20:25-20:34). |
-| 20:34:43                       | Gateway restarted (98245); 20:34:45 `capability_check tools.override decision=deny evidence="not granted"` (plugin no longer resolvable - symlink gone).                                                                                                                                                                                           |
-| 20:34:46                       | **The ERROR line the user saw** (in `errors.log` + `gateway.error.log`): `ERROR aphrodite: aphrodite-hermes dylib could not be loaded (Dylib not found. Tried: [6 paths]) - plugin disabled` preceded by `WARNING aphrodite: download.sh exited 1 ... ERROR: curl download failed ... curl: (56) The requested URL returned error: 404`.           |
-| 20:35:08                       | Gateway child 98508 - **stable, no further crashes after the plugin stopped loading**.                                                                                                                                                                                                                                                             |
+**Time (EEST):** 20:08-20:18
+
+**Event:** Pre-update CPython heap-corruption crashes (`python-*.ips`, worker-thread, same strlen-in-getattr signature). Plugin was active in these processes.
+
+---
+
+**Time (EEST):** 20:24:40-20:24:47
+
+**Event:** Gateway children SIGSEGV burst (crash reports `python3-2026-09-17-2024*.ips`, pids 94314/94331/94337/94342) - **starts 19 s BEFORE `hermes update`** (started 20:24:59, receipt `update_20260917_202603_94438.json`, outcome success, no version change: 0.21.3 → 0.21.3).
+
+---
+
+**Time (EEST):** 20:25:03 → 20:34:12
+
+**Event:** Plugin loads every ~30 s (16+ loads in `agent.log`): `capability_check tools.override allow (legacy)` → `dylib loaded: ~/.hermes/aphrodite/binaries/...` → 2 layout warnings. **No `registered N hooks` / `registered N tools` / proxy lines after any of these loads.**
+
+---
+
+**Time (EEST):** 20:33:11 / 20:33:37 / 20:33:41
+
+**Event:** The "3x load" the user saw - three gateway children in the crash-loop window.
+
+---
+
+**Time (EEST):** 20:33:14
+
+**Event:** `.update_check` written (`ver 0.21.3, behind 0, head==target 64ea66b0`) - an update _check_, nothing to pull.
+
+---
+
+**Time (EEST):** 20:33:17-20:33:38
+
+**Event:** SIGSEGV burst 2 (crash reports `python3-2026-09-17-2033*.ips`, pids 97516/97543/97548/97553/97583/97592; `tui_gateway_crash.log` lifecycle lines).
+
+---
+
+**Time (EEST):** ~20:34:34
+
+**Event:** `~/.hermes/aphrodite/` recreated empty (`binaries/`, `hotreload/`), `~/.hermes/plugins/` touched, `config.yaml` rewritten (mtime 20:34) - **aphrodite added to `plugins.disabled`** (it was NOT disabled before: 0.21.3 gates loading on `plugins.disabled` - `hermes_cli/plugins.py:1324-1334` - and the plugin demonstrably loaded 20:25-20:34).
+
+---
+
+**Time (EEST):** 20:34:43
+
+**Event:** Gateway restarted (98245); 20:34:45 `capability_check tools.override decision=deny evidence="not granted"` (plugin no longer resolvable - symlink gone).
+
+---
+
+**Time (EEST):** 20:34:46
+
+**Event:** **The ERROR line the user saw** (in `errors.log` + `gateway.error.log`): `ERROR aphrodite: aphrodite-hermes dylib could not be loaded (Dylib not found. Tried: [6 paths]) - plugin disabled` preceded by `WARNING aphrodite: download.sh exited 1 ... ERROR: curl download failed ... curl: (56) The requested URL returned error: 404`.
+
+---
+
+**Time (EEST):** 20:35:08
+
+**Event:** Gateway child 98508 - **stable, no further crashes after the plugin stopped loading**.
 
 Current state (verified): `~/.hermes/plugins/aphrodite` symlink is **GONE** (only `hermes-achievements` remains); `~/.hermes/aphrodite/binaries/` and `hotreload/` exist but are **empty** (created 20:34:34); no dylib/binary in any of the 6 candidate paths.
 

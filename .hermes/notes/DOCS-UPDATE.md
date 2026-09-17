@@ -8,27 +8,87 @@ numbers are current, confirmed by grep - not carried over from the old docs).
 
 ### .hermes/uml/ (12 files + README)
 
-| File                    | What changed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| README.md               | Title v1.3.4 → v1.4.6; table rows 01/04/08/09/10/11 rewritten (plugin startup, generated `_bindings.py` FFI, hotreload home, tag-push publish, runtime home, SplitEvent); cross-cutting findings: added "Removed in the 1.4.6 cycle" bullet (skills dev-side, `list_skills` FFI, S2 navigation, installers, `profiles/`, `.githooks/`); dead-path line refs updated (resolve.rs:68, retrieve.rs:122).                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 01-startup.md           | All line refs refreshed (main.rs:31/98/229/251/371/768, config.rs:301/410, proxy.rs:656/130, sqlite.rs:113/in_memory.rs:100); NEW "Plugin startup (register())" section + sequence diagram: `_load_dylib` with `_ensure_binaries` auto-fetch → `_probe_dylib` subprocess sentinel → `_configure_ffi` (bind_to/fallback/`_REQUIRED_VOID_P`) → layout self-heal `check_and_heal()` → `aphrodite_hermes_materialize_directives` → per-hook/per-tool registration → `_start_proxy` (pre-launch health probe, ≤5s poll).                                                                                                                                                                                                                                                                                                                                                            |
-| 02-chat-compression.md  | Line refs refreshed (proxy.rs:926/2103/1336/483/516/533/1946/1926/2088/2096, ccr/mod.rs:100, tool_calls test :3440). No structural change - proxy path still never calls transforms/stage2/struct_extract.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 03-retrieve.md          | Line refs refreshed (retrieve.rs:47/164/200, resolve.rs:185/115/60, marker.rs:14/167/162).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 04-hook-ffi.md          | Rewritten FFI path: declarations now come from the generated `_bindings.py` (cbindgen → ctypesgen, `build.rs`) replayed via `bind_to(dylib)`, manual `_manual_ffi_setup` fallback, `_ensure_ffi_argtypes`, `_REQUIRED_VOID_P` assertion (7 exports), `_probe_dylib` subprocess sentinel, `_read_str` NULL guard, `_call_json` forced `c_void_p` restype + free through the SAME dylib handle; `list_skills` REMOVED (bridge exports: dispatch_tool/call_hook/get_schemas/get_hooks/version/proxy_health/materialize_directives/free_string/list_tools/get_schema); hook list = 6 (`on_session_start`, `pre_tool_call`, `transform_tool_result`, `transform_terminal_output`, `pre_llm_call`, `post_llm_call`); all line refs refreshed (hermes lib.rs:235/297/108/489/498, hooks.rs:121/437/462, flow.rs:64, tools.rs:19/68/516, core lib.rs:141/536, shim:492/636/1167/1106). |
-| 05-ccr-lifecycle.md     | Line refs refreshed (state.rs:289/307/332/343/417, session.rs:38, proxy.rs:516/533/734); "catalog_summary lists recent 5" → delta-only emission (`last_emitted_marker_count/file_count`, +N new compressions this turn).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 06-sse-streaming.md     | Line refs refreshed (proxy.rs:781/668/1032/918/1124/926).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| 07-config-resolution.md | Line refs refreshed (config.rs:301/410, config_loader.rs:23/75/89/109/133, proxy.rs:130); `api_url` default now EMPTY (provider-specific defaults dropped, `model` = "gpt-4o"); inert list extended: `PreviewsConfig` dead keys `model_family`/`code_structure_map`/`preview_max_chars`/`rust_preview_lines` (declared, zero read sites).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| 08-dylib-hotreload.md   | Hot-reload mechanics rewritten: copies now land in `~/.hermes/aphrodite/hotreload/<name>.<pid>.<gen>` (NOT the old in-tree `.hotreload/`); `_reap_stale_hotreloads` + `_pid_alive` sweep (dead PIDs removed, newest gen kept per live PID) + atexit cleanup; `_probe_dylib` once-per-path subprocess smoke test before in-process load; process-global `_process_state` holder for multi-home re-exec; auto-fetch via `download.sh` → `~/.hermes/aphrodite/binaries/` with `_check_version_published` guard; FFI configured on every load (bind_to/fallback/assertion).                                                                                                                                                                                                                                                                                                        |
-| 09-release-ci.md        | Publish.yml corrected: on a plain `Aphrodite/v*` tag push the `aphrodite` (:197) and `aphrodite-hermes` (:235) publish steps DO fire; only `aphrodite-headroom-core`'s publish step is dispatch-only (:157, its version-check :143 runs on tag too); added Test job packaging guard (builtin_directives/*.md in `cargo package --list`); Build.yml refs refreshed (:53/73/154/165/205, 12 assets); note that `.githooks`, installers, `profiles/` no longer exist.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 10-component.md         | Plugin is now a pure loader: `_probe_dylib`/layout_check/download.sh; new `~/.hermes/aphrodite` runtime-home subgraph (binaries/, directives/, hotreload/, config/db/log); bridge box no longer claims skills (exports = dispatch/hooks/schemas/version/health/materialize, no skill export); directives embedded in the core crate (`builtin_directives/*.md`); legacy plugin-dir `binaries/` copies are warning-flagged fallbacks; boundary notes updated.                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| 11-data-model.md        | `AphroditeState` class updated: `inline_store` is now `HashMap` + `inline_order: VecDeque` (was VecDeque-of-tuples, bug 18-P14); added `SplitEvent` class + chain-split fields (`chain_split_enabled`/`min_segments`/`floor`/`max_segments`/`split_events`/`split_segment_map`), `session_inject`, `bg_tasks`, `poll_worker_enabled`, `last_emitted_marker_count/file_count`, `engine_threshold_pct`, `catalog_mode`; line refs refreshed (state.rs:27/193/160/183/210, directives.rs:56/157, flow.rs:240/199/251, proxy.rs:189/113, ccr/mod.rs:40, session.rs:38/66); catalog_summary delta-only note.                                                                                                                                                                                                                                                                        |
+**File:** README.md
+
+**What changed:** Title v1.3.4 → v1.4.6; table rows 01/04/08/09/10/11 rewritten (plugin startup, generated `_bindings.py` FFI, hotreload home, tag-push publish, runtime home, SplitEvent); cross-cutting findings: added "Removed in the 1.4.6 cycle" bullet (skills dev-side, `list_skills` FFI, S2 navigation, installers, `profiles/`, `.githooks/`); dead-path line refs updated (resolve.rs:68, retrieve.rs:122).
+
+---
+
+**File:** 01-startup.md
+
+**What changed:** All line refs refreshed (main.rs:31/98/229/251/371/768, config.rs:301/410, proxy.rs:656/130, sqlite.rs:113/in_memory.rs:100); NEW "Plugin startup (register())" section + sequence diagram: `_load_dylib` with `_ensure_binaries` auto-fetch → `_probe_dylib` subprocess sentinel → `_configure_ffi` (bind_to/fallback/`_REQUIRED_VOID_P`) → layout self-heal `check_and_heal()` → `aphrodite_hermes_materialize_directives` → per-hook/per-tool registration → `_start_proxy` (pre-launch health probe, ≤5s poll).
+
+---
+
+**File:** 02-chat-compression.md
+
+**What changed:** Line refs refreshed (proxy.rs:926/2103/1336/483/516/533/1946/1926/2088/2096, ccr/mod.rs:100, tool_calls test :3440). No structural change - proxy path still never calls transforms/stage2/struct_extract.
+
+---
+
+**File:** 03-retrieve.md
+
+**What changed:** Line refs refreshed (retrieve.rs:47/164/200, resolve.rs:185/115/60, marker.rs:14/167/162).
+
+---
+
+**File:** 04-hook-ffi.md
+
+**What changed:** Rewritten FFI path: declarations now come from the generated `_bindings.py` (cbindgen → ctypesgen, `build.rs`) replayed via `bind_to(dylib)`, manual `_manual_ffi_setup` fallback, `_ensure_ffi_argtypes`, `_REQUIRED_VOID_P` assertion (7 exports), `_probe_dylib` subprocess sentinel, `_read_str` NULL guard, `_call_json` forced `c_void_p` restype + free through the SAME dylib handle; `list_skills` REMOVED (bridge exports: dispatch_tool/call_hook/get_schemas/get_hooks/version/proxy_health/materialize_directives/free_string/list_tools/get_schema); hook list = 6 (`on_session_start`, `pre_tool_call`, `transform_tool_result`, `transform_terminal_output`, `pre_llm_call`, `post_llm_call`); all line refs refreshed (hermes lib.rs:235/297/108/489/498, hooks.rs:121/437/462, flow.rs:64, tools.rs:19/68/516, core lib.rs:141/536, shim:492/636/1167/1106).
+
+---
+
+**File:** 05-ccr-lifecycle.md
+
+**What changed:** Line refs refreshed (state.rs:289/307/332/343/417, session.rs:38, proxy.rs:516/533/734); "catalog_summary lists recent 5" → delta-only emission (`last_emitted_marker_count/file_count`, +N new compressions this turn).
+
+---
+
+**File:** 06-sse-streaming.md
+
+**What changed:** Line refs refreshed (proxy.rs:781/668/1032/918/1124/926).
+
+---
+
+**File:** 07-config-resolution.md
+
+**What changed:** Line refs refreshed (config.rs:301/410, config_loader.rs:23/75/89/109/133, proxy.rs:130); `api_url` default now EMPTY (provider-specific defaults dropped, `model` = "gpt-4o"); inert list extended: `PreviewsConfig` dead keys `model_family`/`code_structure_map`/`preview_max_chars`/`rust_preview_lines` (declared, zero read sites).
+
+---
+
+**File:** 08-dylib-hotreload.md
+
+**What changed:** Hot-reload mechanics rewritten: copies now land in `~/.hermes/aphrodite/hotreload/<name>.<pid>.<gen>` (NOT the old in-tree `.hotreload/`); `_reap_stale_hotreloads` + `_pid_alive` sweep (dead PIDs removed, newest gen kept per live PID) + atexit cleanup; `_probe_dylib` once-per-path subprocess smoke test before in-process load; process-global `_process_state` holder for multi-home re-exec; auto-fetch via `download.sh` → `~/.hermes/aphrodite/binaries/` with `_check_version_published` guard; FFI configured on every load (bind_to/fallback/assertion).
+
+---
+
+**File:** 09-release-ci.md
+
+**What changed:** Publish.yml corrected: on a plain `Aphrodite/v*` tag push the `aphrodite` (:197) and `aphrodite-hermes` (:235) publish steps DO fire; only `aphrodite-headroom-core`'s publish step is dispatch-only (:157, its version-check :143 runs on tag too); added Test job packaging guard (builtin_directives/*.md in `cargo package --list`); Build.yml refs refreshed (:53/73/154/165/205, 12 assets); note that `.githooks`, installers, `profiles/` no longer exist.
+
+---
+
+**File:** 10-component.md
+
+**What changed:** Plugin is now a pure loader: `_probe_dylib`/layout_check/download.sh; new `~/.hermes/aphrodite` runtime-home subgraph (binaries/, directives/, hotreload/, config/db/log); bridge box no longer claims skills (exports = dispatch/hooks/schemas/version/health/materialize, no skill export); directives embedded in the core crate (`builtin_directives/*.md`); legacy plugin-dir `binaries/` copies are warning-flagged fallbacks; boundary notes updated.
+
+---
+
+**File:** 11-data-model.md
+
+**What changed:** `AphroditeState` class updated: `inline_store` is now `HashMap` + `inline_order: VecDeque` (was VecDeque-of-tuples, bug 18-P14); added `SplitEvent` class + chain-split fields (`chain_split_enabled`/`min_segments`/`floor`/`max_segments`/`split_events`/`split_segment_map`), `session_inject`, `bg_tasks`, `poll_worker_enabled`, `last_emitted_marker_count/file_count`, `engine_threshold_pct`, `catalog_mode`; line refs refreshed (state.rs:27/193/160/183/210, directives.rs:56/157, flow.rs:240/199/251, proxy.rs:189/113, ccr/mod.rs:40, session.rs:38/66); catalog_summary delta-only note.
 
 ### Other files
 
-| File                                 | What changed                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| .hermes/notes/RELEASE-METHODOLOGY.md | Two example plugin tags `v2.1.3` → `v2.1.4` (PART 3 + A1 Action 6). No other stale claims found - githooks/installers/profiles references were already gone; the PART 4 Publish.yml row already documents tag-push publishing for aphrodite/aphrodite-hermes (matches current `.github/workflows/Publish.yml`). |
-| README.md                            | Plugin badge `v2.1.3` → `v2.1.4` (explicit version-bump spot; binary badge v1.4.6 was already correct).                                                                                                                                                                                                         |
+**File:** .hermes/notes/RELEASE-METHODOLOGY.md
+
+**What changed:** Two example plugin tags `v2.1.3` → `v2.1.4` (PART 3 + A1 Action 6). No other stale claims found - githooks/installers/profiles references were already gone; the PART 4 Publish.yml row already documents tag-push publishing for aphrodite/aphrodite-hermes (matches current `.github/workflows/Publish.yml`).
+
+---
+
+**File:** README.md
+
+**What changed:** Plugin badge `v2.1.3` → `v2.1.4` (explicit version-bump spot; binary badge v1.4.6 was already correct).
 
 ## Not updated (deliberately)
 
