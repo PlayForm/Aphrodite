@@ -524,12 +524,6 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		})
 	});
 
-	// ── navigate: S2 context navigation - zoomable hierarchical context index ──
-	#[cfg(feature = "navigation")]
-	m.insert("aphrodite_navigate", |args| {
-		with_shared(|state| aphrodite::navigate::handle_navigate_tool(state, args))
-	});
-
 	m
 }
 

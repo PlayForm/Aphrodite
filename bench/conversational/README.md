@@ -2,8 +2,8 @@
 
 This directory defines the **conversation scripts** that the conversational
 benchmark harness (`harness.py`) drives through the four compression
-scenarios (baseline, full, hermes_proxy, proxy_api - plus the s2_navigate
-experimental axis). The scripts are not transcripts of real sessions; they
+scenarios (baseline, full, hermes_proxy, proxy_api). The scripts are not
+transcripts of real sessions; they
 are synthetic, fully anonymized conversations engineered to exercise the
 content types that trigger Aphrodite's compression paths.
 
@@ -37,7 +37,7 @@ turn.tool_call_id            # tool-result message id (defaults to call_XXXX)
 
 Each `tool` message whose `content` is ≥ 4096 bytes is compressed to a
 `<<<CCR:hash|type|size>>>` marker by the cache-proxy simulation in the
-FULL / HERMES_PROXY / S2_NAVIGATE scenarios; the token proxy offloads older
+FULL / HERMES_PROXY scenarios; the token proxy offloads older
 messages when the simulated context exceeds ~57.6K tokens. Big tool outputs
 are therefore the primary compression drivers in these scripts.
 

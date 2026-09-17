@@ -94,18 +94,9 @@ toml = "1.1"
 notify = { version = "8.2.0", optional = true }
 regex = "1.12.4"
 blake3 = "1.7"
-s2 = { version = "0.2.0", optional = true }
 
 [features]
 default = ["proxy"]
-# S2 context navigation (`aphrodite_navigate`). DECLARED BUT NOT CURRENTLY
-# BUILDABLE: 8e9a8c3 removed the unpublishable `s2-navigate` dependency for
-# crates.io, but left the `cfg(feature = "navigation")` gates in flow.rs/lib.rs
-# behind, so enabling this fails with an unresolved `s2_navigate` import.
-# It must still be DECLARED: an undeclared feature makes
-# `unexpected_cfg_condition` fire on the cfg gates, which is a hard error under
-# CI's `-D warnings`. Restore the dependency before enabling.
-navigation = ["s2"]
 proxy = [
 	"axum",
 	"tokio",

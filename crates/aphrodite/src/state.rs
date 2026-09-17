@@ -152,15 +152,6 @@ pub struct AphroditeState {
 	/// Number of referenced files the last time catalog_summary rendered,
 	/// for delta-only file listing (04-F4: stops re-listing same 5 files).
 	pub last_emitted_file_count: usize,
-	// ── S2 context navigation ──
-	/// Master on/off for S2 context navigation. When true, the per-turn
-	/// context and aphrodite_navigate tool emit a navigable index instead
-	/// of flat prose (the complexion axis, report 08+10 tied together).
-	/// Default false. Env: `APHRODITE_NAVIGATION`, TOML: `[flow] navigation`.
-	pub navigation_enabled: bool,
-	/// Default S2 level for navigable index rendering when the model
-	/// doesn't specify one. Lower = coarser = fewer tokens. Default 4.
-	pub navigation_default_level: u8,
 }
 
 /// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
@@ -268,8 +259,6 @@ impl Default for AphroditeState {
 					split_events: VecDeque::new(),
 					split_segment_map: HashMap::new(),
 					split_next_event_id: 0,
-			navigation_enabled: false,
-			navigation_default_level: 4,
 			last_emitted_marker_count: 0,
 			last_emitted_file_count: 0,
 		}

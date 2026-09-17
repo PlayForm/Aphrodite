@@ -237,7 +237,6 @@ crates/aphrodite/          ← Core engine (binary + cdylib)
   catalog.rs               ← CCR catalog listing (TOC, tool formats)
   prefetch.rs              ← Background file prefetch → CCR
   poll_worker.rs           ← Auto-backgrounding of slow tool calls
-  navigate.rs              ← S2 context navigation (experimental)
   flow.rs / setup.rs       ← Plugin bootstrap, `aphrodite setup` installer
   builtin_directives/      ← Shipped directive markdown (focus, foresight, cleanup, explore, lazy, ccr-handling)
 

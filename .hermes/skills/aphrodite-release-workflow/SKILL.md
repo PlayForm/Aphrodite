@@ -38,10 +38,10 @@ cargo audit                                     # GATE 3 (or: cargo deny check a
    Recurring violations: `SIM105` (`try/except/pass` → `contextlib.suppress`)
    and `F401` unused imports. Fix in plugin source + tests before releasing.
 3. **GATE 3 - cargo audit / unmaintained advisory**: `Check.yml` fails on
-   advisories. `cgmath` (unmaintained) enters only through the experimental
-   `s2` crates (`crates/s2-probe`, `crates/s2-navigate`) which are NOT shipped.
-   Keep `s2` an `optional` dep behind the `navigation` feature (off by default)
-   AND excluded from `workspace.members`. Verify with
+   advisories. `cgmath` (unmaintained) previously entered only through the
+   experimental `s2` crates. s2/navigation is now FULLY REMOVED - the
+   `crates/s2-probe`, `crates/s2-navigate` crates and the `navigation` feature
+   no longer exist - so `cgmath` cannot enter the dependency tree. Verify with
    `cargo tree -p aphrodite -i cgmath` - must return nothing.
 4. **GATE 4 - version discipline**: never re-tag a released version to fix it;
    cut a new version.

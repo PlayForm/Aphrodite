@@ -274,11 +274,6 @@ active = ["focus", "foresight"] # restored per standing feedback (feedback.md): 
 # catalog is never spill-mangled. Sections drop bottom-up when over budget;
 # directives and nudges never drop. Env: APHRODITE_FLOW_BUDGET_CHARS.
 budget_chars = 2600
-# S2 context navigation: when true, replaces flat prose [recall] block with a
-# compact navigable S2 index (~40% smaller). The LLM can call
-# aphrodite_navigate(level=N, cell=0x...) to zoom in. Env: APHRODITE_NAVIGATION.
-navigation = true
-navigation_default_level = 4   # 2=coarsest, 16=finest; 4 is balanced
 
 
 # ── Reverse key map: type aliases for template resolution ────────────────────

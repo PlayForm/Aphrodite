@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import math
-import sys
 from pathlib import Path
 from typing import Optional
 
@@ -23,24 +22,14 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-# Add parent for s2-probe if available
-_S2_AVAILABLE = False
-try:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "crates" / "s2-probe" / "src"))
-    # We import s2-probe Rust concepts but reproduce them in Python for the visualization
-    # since s2-probe is Rust, we implement the S2 shape logic directly in Python
-    _S2_AVAILABLE = True
-except Exception:
-    pass
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# S2 Context Shape Generator (Python port of s2-probe concepts)
+# Context Shape Generator
 # ═══════════════════════════════════════════════════════════════════════════════
 
 S2_MAX_LEVEL = 16
 
-# Context block definitions (matching s2-probe's task_profiles)
+# Context block definitions (default per-block token allocation)
 CONTEXT_BLOCKS = [
     ("system",     120,  3,  "System prompt"),
     ("directives", 420,  5,  "Behavioral directives"),
@@ -199,7 +188,6 @@ COLORS = {
     "full":          "#2ecc71",  # Green
     "hermes_proxy": "#e67e22",  # Orange
     "proxy_api":    "#9b59b6",  # Purple
-    "s2_navigate":  "#e74c3c",  # Red
 }
 
 SCENARIO_LABELS = {
@@ -207,7 +195,6 @@ SCENARIO_LABELS = {
     "full":          "Full Compression",
     "hermes_proxy": "Hermes↔Proxy (cache)",
     "proxy_api":    "Proxy↔API (token)",
-    "s2_navigate":  "S2 Navigation (cache + index)",
 }
 
 
