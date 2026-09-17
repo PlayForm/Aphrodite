@@ -45,6 +45,7 @@ Development (workshop)          Current (distributed/release)
 [ ] Release notes finalized at Maintain/release-notes-vX.Y.Z.md
 [ ] Gates green on Development: cargo build/test/clippy, ruff, pyright, deny
 [ ] Tags checked free: git tag | grep 'Aphrodite/vX.Y.Z' → empty
+[ ] Branch-identity audit clean on BOTH refs (I11 - see B4)
 ```
 
 ### A1. Plugin sync (S-Development → S-Current) - ALWAYS FIRST
@@ -175,6 +176,7 @@ from the same state. **Plugin FIRST, then parent** (same bottom-up rule).
 ```
 [ ] Both repos on Development
 [ ] Plugin tree clean (or phantom cleared - see B1 Action 2)
+[ ] Branch-identity audit clean on BOTH refs (I11 - see B4)
 ```
 
 ### B1. Plugin sync-back (S-Current → S-Development)
@@ -261,6 +263,44 @@ TRANSFERS (shared content):        STAYS (branch-owned identity):
   release notes, CHANGELOG          Current-only CI edits (Test job removal)
   directives markdown
 ```
+
+### B4. Branch-identity audit - MANDATORY pre-sync/pre-tag gate (I11)
+
+Run BEFORE any merge, sync, or tag in EITHER phase (A0 and B0 precondition).
+Read-only ref access only - NEVER checkout the other branch. Fetch both refs,
+scan BOTH sides for [Development]/[Current] identity leaks, and refuse to
+proceed on any hit. The Auto.yml class of leak: a workflow on one branch whose
+push target names the OTHER branch.
+
+```
+git fetch Source
+# 1. Workflow triggers + push targets (Auto.yml's `branch:` is branch-owned identity)
+git grep -n -E 'branch: (Current|Development)|branches: \[(Current|Development)\]' Source/Development -- .github/workflows
+git grep -n -E 'branch: (Current|Development)|branches: \[(Current|Development)\]' Source/Current -- .github/workflows
+#    triggers must match the branch they live on ([Development] vs [Current]);
+#    Auto.yml's push target is Current on BOTH copies (G5-05: the heartbeat
+#    touches only the CI-ignored .github/Update.md path - a sanctioned
+#    Current-side exception to I10). A push target of Development on either
+#    copy = LEAK (ABORT).
+# 2. .gitmodules branch fields must match the branch they live on
+git show Source/Development:.gitmodules | grep -E '^branch'
+git show Source/Current:.gitmodules | grep -E '^branch'
+#    plugins/aphrodite -> Development on Development, Current on Current;
+#    vendor/headroom + vendor/rtk -> Current on BOTH lines (by design, V7).
+# 3. Gitlink targets must resolve to the branch they belong on
+git -C plugins/aphrodite branch --contains "$(git ls-tree Source/Development plugins/aphrodite | awk '{print $3}')"
+git -C plugins/aphrodite branch --contains "$(git ls-tree Source/Current plugins/aphrodite | awk '{print $3}')"
+# 4. Keyword scan for branch-identity statements in the wrong branch's files
+git grep -n -E 'Current|Development' Source/Development Source/Current -- .github/workflows .gitmodules
+#    (docs/README tree/Current links, release notes, and taxonomy notes are
+#    content describing the dual-line model, not identity - do not flag them)
+```
+
+Any hit where a file's branch-owned identity (workflow trigger/push target,
+.gitmodules branch field, gitlink target, branch-identity statement) does not
+match the branch it lives on = **ABORT the ceremony** - record it in
+CEREMONY-AUDIT.md, fix the offending branch separately, re-run the audit clean,
+then proceed.
 
 ---
 
@@ -351,6 +391,9 @@ I7  upward picks carry -x + .hermes/picks manifest entry
 I8  versions monotonic, never reused
 I9  protected paths clean after any transplant (diff HEAD empty on them)
 I10 working copy on Development; Current touched only inside the ritual
+I11 branch-identity audit: no [Development]/[Current] identity leak on EITHER
+    ref before any merge/sync/tag (workflow triggers + push targets,
+    .gitmodules branch fields, gitlink targets - see B4)
 D1  selective boundary honored (chain-split absent/present per track)
 D2  chain-split opt-in OFF in shipped config (aphrodite.toml)
 ```
@@ -361,11 +404,12 @@ D2  chain-split opt-in OFF in shipped config (aphrodite.toml)
 
 ```
 PHASE A (release):
-  A0 checks → A1 plugin sync+push → A2 parent sync+push →
+  A0 checks (incl. B4 branch-identity audit) → A1 plugin sync+push → A2 parent sync+push →
   A2 tags (plugin vX.Y.Z, parent Aphrodite/vX.Y.Z) → gh release → A14 return
 PHASE B (sync-back, after release is published):
   B1 plugin squash-staging → VSCode pick → commit+push →
-  B2 parent squash-staging → restore identity → VSCode pick → commit+push
+  B2 parent squash-staging → restore identity → VSCode pick → commit+push →
+  B4 audit gate re-run (I11)
 NEXT CYCLE:
   Development continues (1.5.0 work), bump versions, repeat Phase A.
 ```
