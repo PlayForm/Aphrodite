@@ -443,7 +443,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			let hint = content
 				.lines()
 				.map(|l| l.trim())
-				.find(|l| is_error_line(l) || is_failure_line(l) || l.contains("Traceback") || l.contains("Exception"))
+				.find(|l| is_error_line(l) || is_failure_line(l))
 				.or_else(|| content.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim()))
 				.map(|l| l.chars().take(60).collect::<String>());
 			match hint {
