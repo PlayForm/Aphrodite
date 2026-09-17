@@ -12,7 +12,7 @@ visits, so it always passes through untouched.
 > `transforms::detect`, `stage2::compress_stage2`, or
 > `struct_extract::extract_code_structure`. Those run on the Hermes FFI hook path
 > (see `04-hook-ffi.md`). The proxy classifies via `proxy_detect_content_type`
-> (proxy.rs:1316) and builds previews via `proxy_build_preview` (proxy.rs:1919).
+> (proxy.rs:1336) and builds previews via `proxy_build_preview` (proxy.rs:1946).
 
 ## Response compression sequence
 
@@ -20,14 +20,14 @@ visits, so it always passes through untouched.
 sequenceDiagram
     autonumber
     participant Client as OpenAI/Anthropic client
-    participant PH as proxy_handler (proxy.rs:913)
+    participant PH as proxy_handler (proxy.rs:926)
     participant Cache as response_cache (LRU, 1MB cap)
     participant Up as upstream LLM API
-    participant CC as compress_chat_completion (proxy.rs:2075)
-    participant CT as proxy_detect_content_type (proxy.rs:1316)
-    participant TH as threshold_for + EMA (proxy.rs:470,503)
+    participant CC as compress_chat_completion (proxy.rs:2103)
+    participant CT as proxy_detect_content_type (proxy.rs:1336)
+    participant TH as threshold_for + EMA (proxy.rs:483,516)
     participant Store as CcrStore / inline_ccr LRU
-    participant MK as smart_marker/cache_marker (proxy.rs:2060)
+    participant MK as smart_marker/cache_marker (proxy.rs:2088,2096)
 
     Client->>PH: POST /v1/chat/completions {messages,tools,...}
     PH->>PH: requests_total++ · is_chat_completion = path==/v1/chat/completions
@@ -87,7 +87,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A["threshold_for(ct) (proxy.rs:470)"] --> B{"ct in linter/build_output/log?"}
+    A["threshold_for(ct) (proxy.rs:483)"] --> B{"ct in linter/build_output/log?"}
     B -->|yes| Z["return base (no tune, no mult)"]
     B -->|no| C["ratio = compression_ratio_ema/100"]
     C --> D{"ratio"}
@@ -103,7 +103,7 @@ flowchart TD
     I -->|diff/git/text| L["base'*2"]
     I -->|tool_output/json| M["base'"]
 
-    subgraph EMA["update_compression_ratio (proxy.rs:503)"]
+    subgraph EMA["update_compression_ratio (proxy.rs:516)"]
       N["ratio = orig/comp * 100"] --> O["new = 0.2*ratio + 0.8*old  (α=0.2)"]
       O --> P["fill_pct = clamp(100 - ema/20, 1..99)*100"]
     end
@@ -111,10 +111,11 @@ flowchart TD
 
 ## Key call sites
 
-- `proxy_handler` request/response orchestration - `crates/aphrodite/src/proxy.rs:913`
-- `compress_chat_completion` - `crates/aphrodite/src/proxy.rs:2075`
-- `proxy_detect_content_type` (classify) - `crates/aphrodite/src/proxy.rs:1316`
-- `AppState::threshold_for` / `update_compression_ratio` / `compute_fill_pct` - `crates/aphrodite/src/proxy.rs:470,503,520`
-- `compute_key` (BLAKE3, 40-hex) - `vendor/headroom/crates/headroom-core/src/ccr/mod.rs:86`
-- `smart_marker` / `cache_marker` / `proxy_format_ccr_output` - `crates/aphrodite/src/proxy.rs:2060,2068,1906`
-- tool_calls pass-through rationale + test - `crates/aphrodite/src/proxy.rs:2169`, test `:3409`
+- `proxy_handler` request/response orchestration - `crates/aphrodite/src/proxy.rs:926`
+- `compress_chat_completion` - `crates/aphrodite/src/proxy.rs:2103`
+- `proxy_detect_content_type` (classify) - `crates/aphrodite/src/proxy.rs:1336`
+- `proxy_build_preview` / `proxy_format_ccr_output` - `crates/aphrodite/src/proxy.rs:1946,1926`
+- `AppState::threshold_for` / `update_compression_ratio` / `compute_fill_pct` - `crates/aphrodite/src/proxy.rs:483,516,533`
+- `compute_key` (BLAKE3, 40-hex) - `vendor/headroom/crates/headroom-core/src/ccr/mod.rs:100`
+- `smart_marker` / `cache_marker` - `crates/aphrodite/src/proxy.rs:2088,2096`
+- tool_calls pass-through rationale + test - `crates/aphrodite/src/proxy.rs:2197`, test `:3440`

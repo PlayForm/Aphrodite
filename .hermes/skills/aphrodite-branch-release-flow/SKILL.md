@@ -164,7 +164,7 @@ Current, delete the branch.
 - **V3** Submodule detach: hooks used to float to the configured branch +
   bump the gitlink automatically; the hooks are REMOVED 2026-09-17, so a
   detach is now handled manually (`git -C plugins/aphrodite checkout
-  Development`).
+Development`).
 - **V4** Auto-committer races: it commits on the checked-out branch.
   Working copy stays on Development (I10); Current is only touched inside
   the ritual.

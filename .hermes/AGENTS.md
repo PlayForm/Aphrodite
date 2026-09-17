@@ -8,7 +8,7 @@ Every line you write here directly makes LLMs cheaper, faster, and smarter. ✨
 
 - **Rust proxy** - LLM API with intelligent CCR compression
 - **Two crates**: `crates/aphrodite` (core engine) + `crates/aphrodite-hermes` (agent integration)
-- **Plugin**: `plugins/aphrodite` v2.0.6 - 13 tools, dylib hot-reload, dual-proxy architecture (skills live dev-side in `.hermes/skills/`, never shipped)
+- **Plugin**: `plugins/aphrodite` v2.1.4 - 13 tools, dylib hot-reload, dual-proxy architecture, generated FFI bindings (`_bindings.py`), layout self-heal (skills live dev-side in `.hermes/skills/`, never shipped)
 - **Config**: `aphrodite.toml` - all tuning in one file, env-overridable
 - **Binary**: `~/.hermes/aphrodite/aphrodite` - auto-downloaded, auto-updated (run `aphrodite --version` for the current version, not a hardcoded one here)
 

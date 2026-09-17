@@ -12,11 +12,11 @@ account bytes/errors mid-stream. Detection happens twice: on the request
 sequenceDiagram
     autonumber
     participant C as client
-    participant PH as proxy_handler (proxy.rs:913)
-    participant BW as body_wants_stream (proxy.rs:768)
-    participant SC as stream_client (NO total timeout, proxy.rs:655)
+    participant PH as proxy_handler (proxy.rs:926)
+    participant BW as body_wants_stream (proxy.rs:781)
+    participant SC as stream_client (NO total timeout, proxy.rs:668)
     participant Up as upstream
-    participant IS as is_sse (proxy.rs:905)
+    participant IS as is_sse (proxy.rs:918)
     participant STR as bytes_stream().inspect
 
     C->>PH: POST /v1/chat/completions {"stream":true}
@@ -65,9 +65,9 @@ compressed. `sse_stream_errors` surfaces in `/stats` and `/metrics`
 
 ## Key call sites
 
-- `body_wants_stream` (request-side detection) - `crates/aphrodite/src/proxy.rs:768`
-- `stream_client` construction (no total timeout) - `crates/aphrodite/src/proxy.rs:655`
-- client selection in handler - `crates/aphrodite/src/proxy.rs:1019`
-- `is_sse` (response-side detection) - `crates/aphrodite/src/proxy.rs:905`
-- SSE stream branch (`bytes_stream().inspect`, byte/error counting) - `crates/aphrodite/src/proxy.rs:1102`
+- `body_wants_stream` (request-side detection) - `crates/aphrodite/src/proxy.rs:781`
+- `stream_client` construction (no total timeout) - `crates/aphrodite/src/proxy.rs:668`
+- client selection in handler - `crates/aphrodite/src/proxy.rs:1032`
+- `is_sse` (response-side detection) - `crates/aphrodite/src/proxy.rs:918`
+- SSE stream branch (`bytes_stream().inspect`, byte/error counting) - `crates/aphrodite/src/proxy.rs:1124`
 - `sse_stream_errors` in `/metrics` - `crates/aphrodite/src/main.rs:550`

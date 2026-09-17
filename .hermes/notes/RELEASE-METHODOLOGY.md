@@ -86,7 +86,7 @@ git -C plugins/aphrodite push Source Current
 Action 6 (at the END of the whole release, NOT here): tag on Current
 
 ```
-git -C plugins/aphrodite tag vX.Y.Z              # e.g. v2.1.3
+git -C plugins/aphrodite tag vX.Y.Z              # e.g. v2.1.4
 git -C plugins/aphrodite push Source vX.Y.Z
 ```
 
@@ -267,7 +267,7 @@ TRANSFERS (shared content):        STAYS (branch-owned identity):
 ## PART 3 - TAGGING RULES (the immutable step)
 
 - **Tags exist ONLY on Current.** Development never carries release tags (V5).
-- **Sequence: plugin tag first, then parent tag.** `v2.1.3` on S-Current, then
+- **Sequence: plugin tag first, then parent tag.** `v2.1.4` on S-Current, then
   `Aphrodite/v1.4.3` on P-Current.
 - **Tag AFTER the final tip is settled, at the END of the ceremony** - not
   mid-flight. Every code/config fix after a tag forces a re-tag (delete +

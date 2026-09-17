@@ -11,7 +11,7 @@ precedence but live in different modules:
 
 ```mermaid
 flowchart TD
-    subgraph proxy["Proxy path - MultiConfig::resolve (config.rs:297)"]
+    subgraph proxy["Proxy path - MultiConfig::resolve (config.rs:301)"]
       P0["aphrodite.toml [[proxies]] + [defaults] + [compression]"] --> P1
       P1{"per key"} --> P2["env APHRODITE_* (env_parse_warn / env var)"]
       P2 -->|set| PV["value"]
@@ -44,7 +44,7 @@ flowchart LR
       L1["tool_threshold_cache/token → cache/token_compress_threshold (atomics)"]
       L2["inline_threshold → inline_ccr_threshold (atomic)"]
       L3["code_multiplier → code_multiplier_x100 (atomic)"]
-      L4["defaults.api_url/model, ccr_ttl_seconds, timeout"]
+      L4["defaults.api_url/model, ccr_ttl_seconds, timeout<br/>(api_url default now EMPTY - provider defaults dropped)"]
       L5["[flow] budget_chars → flow_budget_chars"]
       L6["[compression] context_engine, tool_threshold_token, terminal_threshold (FFI state)"]
       L7["[directives] active (seeds active_directives)"]
@@ -55,7 +55,7 @@ flowchart LR
     subgraph inert["INERT / RESERVED (write-only, never read by proxy)"]
       I1["engine_min_msgs, engine_protect_first/last (state.rs 01-F9)"]
       I2["catalog_mode (RESERVED)"]
-      I3["previews.* , prompts.* (parsed into MultiConfig, no consumer)"]
+      I3["previews.* (PreviewsConfig: model_family / code_structure_map /<br/>preview_max_chars / rust_preview_lines - declared, never read) ·<br/>prompts.* (parsed into MultiConfig, no consumer)"]
       I4["auto_expand / auto_expand_limit / classifier_poll (CompressionConfig fields, unused)"]
       I5["mode/listen: NOT env-overridable in resolve (would break dual-proxy)"]
     end
@@ -77,9 +77,9 @@ Precedence subtleties:
 
 ## Key call sites
 
-- `MultiConfig::resolve` (env>TOML>default chains) - `crates/aphrodite/src/config.rs:297`
-- `env_bool` / `env_parse_warn` / `apply_port_override` - `crates/aphrodite/src/config.rs:18,33,406`
-- `Config::{load,get_bool,get_u64,get_string}` - `crates/aphrodite/src/config_loader.rs:20,66,80,100`
-- `Config::apply_compression` - `crates/aphrodite/src/config_loader.rs:124`
-- `resolve_thresholds` (proxy defaults + env) - `crates/aphrodite/src/proxy.rs:121`
+- `MultiConfig::resolve` (env>TOML>default chains) - `crates/aphrodite/src/config.rs:301`
+- `env_bool` / `env_parse_warn` / `apply_port_override` - `crates/aphrodite/src/config.rs:18,33,410`
+- `Config::{load,get_bool,get_u64,get_string}` - `crates/aphrodite/src/config_loader.rs:23,75,89,109`
+- `Config::apply_compression` - `crates/aphrodite/src/config_loader.rs:133`
+- `resolve_thresholds` (proxy defaults + env) - `crates/aphrodite/src/proxy.rs:130`
 - hot-reload watcher (4 atomics) - `crates/aphrodite/src/main.rs:251`

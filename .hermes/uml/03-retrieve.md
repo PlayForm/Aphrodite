@@ -11,12 +11,12 @@ pagination, byte-exact round-trip) and the in-process recursive resolver
 sequenceDiagram
     autonumber
     participant C as caller (Hermes / curl)
-    participant HR as handle_retrieve (retrieve.rs:45)
+    participant HR as handle_retrieve (retrieve.rs:47)
     participant N as marker::normalize_hash (marker.rs:14)
     participant IL as inline_ccr LRU (proxy AppState)
     participant CCR as CcrStore (sqlite/in-memory)
-    participant F as filter_content (retrieve.rs:155)
-    participant P as paginate (retrieve.rs:188)
+    participant F as filter_content (retrieve.rs:164)
+    participant P as paginate (retrieve.rs:200)
 
     C->>HR: POST /retrieve {hash, query?, offset?, limit?}
     HR->>N: normalize_hash(hash)  (strip |type|size suffix, trim)
@@ -57,7 +57,7 @@ back to the marker's own hash.
 
 ```mermaid
 flowchart TD
-    A["expand(state, hash) (resolve.rs:178)"] --> B["resolve_recursive(depth=0)"]
+    A["expand(state, hash) (resolve.rs:185)"] --> B["resolve_recursive(depth=0)"]
     B --> C{"hash in visited?"}
     C -->|yes cycle| D["return resolved.get(hash) - cached pre-expansion value (F4)"]
     C -->|no| E["visited.push(hash)"]
@@ -93,8 +93,8 @@ newline).
 
 ## Key call sites
 
-- `handle_retrieve` - `crates/aphrodite/src/retrieve.rs:45`
-- `filter_content` / `paginate` - `crates/aphrodite/src/retrieve.rs:155,188`
-- `resolve::expand` / `resolve_recursive` / `resolve_one` - `crates/aphrodite/src/resolve.rs:178,108,60`
+- `handle_retrieve` - `crates/aphrodite/src/retrieve.rs:47`
+- `filter_content` / `paginate` - `crates/aphrodite/src/retrieve.rs:164,200`
+- `resolve::expand` / `resolve_recursive` / `resolve_one` - `crates/aphrodite/src/resolve.rs:185,115,60`
 - `find_markers` / `parse_marker_hash` - `crates/aphrodite/src/resolve.rs:28,22`
-- `normalize_hash` / `extract_hashes` (HASH_RE) - `crates/aphrodite/src/marker.rs:14,160,165`
+- `normalize_hash` / `extract_hashes` (HASH_RE) - `crates/aphrodite/src/marker.rs:14,167,162`

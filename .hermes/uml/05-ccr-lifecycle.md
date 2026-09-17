@@ -21,7 +21,7 @@ stateDiagram-v2
     Stored_lru --> Stored
 
     Stored --> Previewed: marker emitted<br/>preview + &lt;&lt;&lt;CCR:hash|type|size&gt;&gt;&gt;
-    Previewed --> Recalled: catalog_summary lists recent 5<br/>(pre_llm_call context)
+    Previewed --> Recalled: catalog_summary emits DELTA previews<br/>(+N new compressions this turn - pre_llm_call context)
 
     Previewed --> Retrieved: /retrieve or aphrodite_retrieve(hash)<br/>byte-exact round-trip
     Retrieved --> Previewed: entry stays stored
@@ -41,10 +41,10 @@ Notes on eviction tiers (from `state.rs` + backends):
 
 - **inline_store** (AphroditeState): dual bound - `INLINE_MAX = 500` entries
   AND `DEFAULT_INLINE_BYTE_BUDGET = 256MB`; `evict_over_budget` pops oldest
-  from the back until both hold (state.rs:187).
+  from the back until both hold (state.rs:289).
 - **inline_ccr** (proxy AppState): `lru::LruCache` capped at 1024 entries.
-- **recent_markers**: ring capped at 200 (state.rs:228); **conv_index**: last
-  50 turns (session.rs:39); **referenced_files**: last 100.
+- **recent_markers**: ring capped at 200 (state.rs:332); **conv_index**: last
+  50 turns (session.rs:38); **referenced_files**: last 100 (state.rs:417).
 - **SqliteCcrStore / InMemoryCcrStore**: TTL from `ccr_ttl_seconds`; in-memory
   also capped at 10,000 entries.
 - **Hot-reload** (see `08-dylib-hotreload.md`) is a hard reset: a new dylib
@@ -79,9 +79,9 @@ stateDiagram-v2
 
 ## Key call sites
 
-- inline_store eviction (`evict_over_budget`, `inline_store_put`) - `crates/aphrodite/src/state.rs:187,203`
-- `record_marker` (cap 200) / `record_tool_event` (cap 200) - `crates/aphrodite/src/state.rs:228,239`
-- `archive_turn` (conv_index cap 50) - `crates/aphrodite/src/session.rs:39`
-- EMA update / fill_pct - `crates/aphrodite/src/proxy.rs:503,520`
+- inline_store eviction (`evict_over_budget`, `inline_store_put`) - `crates/aphrodite/src/state.rs:289,307`
+- `record_marker` (cap 200) / `record_tool_event` (cap 200) - `crates/aphrodite/src/state.rs:332,343`
+- `archive_turn` (conv_index cap 50) - `crates/aphrodite/src/session.rs:38`
+- EMA update / fill_pct - `crates/aphrodite/src/proxy.rs:516,533`
 - backend TTL: `SqliteCcrStore` / `InMemoryCcrStore` - `vendor/headroom/crates/headroom-core/src/ccr/backends/{sqlite.rs,in_memory.rs}`
-- inline_ccr LRU (1024) - `crates/aphrodite/src/proxy.rs:213`
+- inline_ccr LRU (1024) - `crates/aphrodite/src/proxy.rs:734`
