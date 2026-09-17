@@ -2,11 +2,10 @@
 Aphrodite Conversational Benchmark Visualization
 
 Reads benchmark results and generates:
-  1. S2 context-shape maps (ASCII + PNG via matplotlib)
-  2. Token comparison charts across scenarios
-  3. Per-turn token usage timelines
-  4. Compression efficiency dashboards
-  5. CCR event analysis
+  1. Token comparison charts across scenarios
+  2. Per-turn token usage timelines
+  3. Compression efficiency dashboards
+  4. CCR event analysis
 """
 
 from __future__ import annotations
@@ -27,8 +26,6 @@ import numpy as np
 # Context Shape Generator
 # ═══════════════════════════════════════════════════════════════════════════════
 
-S2_MAX_LEVEL = 16
-
 # Context block definitions (default per-block token allocation)
 CONTEXT_BLOCKS = [
     ("system",     120,  3,  "System prompt"),
@@ -43,22 +40,22 @@ CONTEXT_BLOCKS = [
 # Per-scenario block token adjustments (scenarios skew the context differently)
 SCENARIO_BLOCKS = {
     "baseline": {
-        # No compression — full tool outputs in plain data
+        # No compression - full tool outputs in plain data
         "plain": 4000,   # Much larger: full tool outputs inline
         "recall": 0,     # No CCR recall needed
     },
     "full": {
-        # Full compression — tool outputs compressed, messages offloaded
+        # Full compression - tool outputs compressed, messages offloaded
         "plain": 600,    # Smaller: markers replace tool outputs
         "recall": 1800,  # Larger: CCR catalog + retrieval
     },
     "hermes_proxy": {
-        # Cache proxy only — tool outputs compressed, no message offloading
+        # Cache proxy only - tool outputs compressed, no message offloading
         "plain": 800,    # Compressed tool outputs
         "recall": 1400,  # CCR catalog
     },
     "proxy_api": {
-        # Token proxy only — messages offloaded, tool outputs inline
+        # Token proxy only - messages offloaded, tool outputs inline
         "plain": 3000,   # Still large (full tool outputs)
         "recall": 1200,  # Offloaded messages need retrieval
     },
@@ -94,60 +91,6 @@ def generate_context_shape(scenario: str, total_tokens: int = 4500) -> dict:
         "total_tokens": total,
         "blocks": blocks,
     }
-
-
-def render_s2_ascii(shape: dict) -> str:
-    """Render an ASCII S2 context-shape map for a scenario."""
-    blocks = shape["blocks"]
-    n = len(blocks)
-    grid_cols = 72
-    rows_per_block = 2
-
-    lines = []
-    lines.append(f"=== {shape['scenario']}: {shape['total_tokens']} tok ===")
-
-    for i, b in enumerate(blocks):
-        lat_lo = 60.0 - 120.0 * i / n
-        lat_hi = lat_lo - 120.0 / n
-        span_deg = b["share"] * 360.0
-        lng_lo = -span_deg / 2
-        lng_hi = span_deg / 2
-
-        # Simulate S2 cells at this level: approximate cell count
-        # At level L, each cell covers ~ 8.5e10 / 4^L square meters
-        # For our purpose: cell_width_deg ≈ 360 / (2^(L+1) * sqrt(3))
-        cells_at_level = int(span_deg / (360.0 / (2 ** (b["level"] + 1))))
-        cells_at_level = max(1, min(cells_at_level, grid_cols))
-
-        glyph = format(b["level"], 'x')[-1]
-
-        for row in range(rows_per_block):
-            line = ""
-            for col in range(grid_cols):
-                lng = -180.0 + 360.0 * (col + 0.5) / grid_cols
-                if lng_lo <= lng <= lng_hi:
-                    line += glyph
-                else:
-                    line += "."
-            if row == 0:
-                lines.append(
-                    f"{b['name']:>10} L{b['level']:<2}|{line}| "
-                    f"{cells_at_level:>3}c {b['tokens']:>5}t"
-                )
-            else:
-                lines.append(f"{'':>13}|{line}|")
-
-    # Level histogram
-    hist = {}
-    for b in blocks:
-        lvl = b["level"]
-        cells = int(b["share"] * 512)
-        hist[lvl] = hist.get(lvl, 0) + max(1, cells)
-
-    hist_str = " ".join(f"L{l}:{c}" for l, c in sorted(hist.items()))
-    lines.append(f"  superimposition: {sum(hist.values())} cells [{hist_str}]")
-
-    return "\n".join(lines)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -210,7 +153,7 @@ def render_token_comparison(manifest: dict, output_path: Path):
     n_scen = len(scenarios)
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 8))
-    fig.suptitle("Aphrodite Conversational Benchmark — Token Analysis",
+    fig.suptitle("Aphrodite Conversational Benchmark - Token Analysis",
                  fontsize=16, fontweight="bold")
 
     bar_width = 0.2
@@ -430,62 +373,6 @@ def render_compression_efficiency(manifest: dict, output_path: Path):
     print(f"  ✓ compression_efficiency.png saved")
 
 
-def render_s2_context_maps(manifest: dict, output_path: Path):
-    """Render S2 context-shape maps for each scenario as a multi-panel figure."""
-    scenarios = sorted(set(r["scenario"] for r in manifest.get("results", [])))
-    if not scenarios:
-        return
-
-    n = len(scenarios)
-    cols = min(2, n)
-    rows = math.ceil(n / cols)
-
-    fig, axes = plt.subplots(rows, cols, figsize=(8 * cols, 5 * rows),
-                             squeeze=False)
-    fig.suptitle("Context Shape Maps — S2 Level Distribution per Scenario",
-                 fontsize=16, fontweight="bold")
-
-    for i, scenario in enumerate(scenarios):
-        ax = axes[i // cols][i % cols]
-        shape = generate_context_shape(scenario)
-
-        blocks = shape["blocks"]
-        block_names = [b["name"] for b in blocks]
-        block_tokens = [b["tokens"] for b in blocks]
-        block_levels = [b["level"] for b in blocks]
-        colors_list = [plt.cm.viridis(b["level"] / 16) for b in blocks]
-
-        # Horizontal bars: token allocation per block, colored by S2 level
-        y_pos = range(len(blocks))
-        bars = ax.barh(y_pos, block_tokens, color=colors_list, edgecolor='white')
-
-        # Add level labels
-        for j, (bar, level) in enumerate(zip(bars, block_levels)):
-            ax.text(bar.get_width() + 20, bar.get_y() + bar.get_height() / 2,
-                    f'L{level}', va='center', fontsize=9, fontweight='bold')
-
-        ax.set_yticks(y_pos)
-        ax.set_yticklabels(block_names)
-        ax.set_xlabel("Token Budget")
-        ax.set_title(f"{SCENARIO_LABELS.get(scenario, scenario)}")
-        ax.invert_yaxis()
-
-        # Add a colorbar showing S2 level scale
-        sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(0, 16))
-        sm.set_array([])
-        cbar = plt.colorbar(sm, ax=ax, shrink=0.8)
-        cbar.set_label("S2 Level (coarse → fine)")
-
-    # Hide empty subplots
-    for j in range(i + 1, rows * cols):
-        axes[j // cols][j % cols].set_visible(False)
-
-    plt.tight_layout()
-    fig.savefig(output_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  ✓ s2_context_maps.png saved")
-
-
 def render_radar_chart(manifest: dict, output_path: Path):
     """Radar chart comparing context shape dimensions across scenarios."""
     scenarios = sorted(set(r["scenario"] for r in manifest.get("results", [])))
@@ -498,7 +385,7 @@ def render_radar_chart(manifest: dict, output_path: Path):
     angles += angles[:1]  # Close the polygon
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
-    fig.suptitle("Context Shape Comparison — Radar View", fontsize=14, fontweight="bold")
+    fig.suptitle("Context Shape Comparison - Radar View", fontsize=14, fontweight="bold")
 
     for scenario in scenarios:
         shape = generate_context_shape(scenario)
@@ -531,12 +418,12 @@ def render_summary_dashboard(manifest: dict, output_path: Path):
         return
 
     fig = plt.figure(figsize=(22, 14))
-    fig.suptitle(f"Aphrodite Conversational Benchmark — Run {manifest.get('run_id', 'unknown')}",
+    fig.suptitle(f"Aphrodite Conversational Benchmark - Run {manifest.get('run_id', 'unknown')}",
                  fontsize=16, fontweight="bold")
 
-    # Use GridSpec: top row 3 cols, bottom row 4 cols
+    # Use GridSpec: top row 4 cols
     from matplotlib.gridspec import GridSpec
-    gs = GridSpec(2, 4, figure=fig, height_ratios=[1, 1.2], hspace=0.35, wspace=0.3)
+    gs = GridSpec(1, 4, figure=fig, wspace=0.3)
 
     # ── Top-left: Summary table ──
     ax_table = fig.add_subplot(gs[0, :2])
@@ -618,51 +505,10 @@ def render_summary_dashboard(manifest: dict, output_path: Path):
     ax_savings.axhline(y=0, color='black', linewidth=0.5)
     ax_savings.legend(fontsize=7)
 
-    # ── Bottom row: S2 Context Shape Maps (one per scenario) ──
-    for i, scenario in enumerate(scenarios):
-        if i >= 4:
-            break
-        ax_s2 = fig.add_subplot(gs[1, i])
-        shape = generate_context_shape(scenario)
-
-        blocks = shape["blocks"]
-        names = [b["name"] for b in blocks]
-        tokens = [b["tokens"] for b in blocks]
-        levels = [b["level"] for b in blocks]
-        colors_list = [plt.cm.viridis(b["level"] / 16) for b in blocks]
-
-        ax_s2.barh(range(len(blocks)), tokens, color=colors_list, edgecolor='white')
-        for j, (_, lvl) in enumerate(zip(range(len(blocks)), levels)):
-            ax_s2.text(tokens[j] + 10, j, f'L{lvl}', va='center', fontsize=7, fontweight='bold')
-        ax_s2.set_yticks(range(len(blocks)))
-        ax_s2.set_yticklabels(names, fontsize=7)
-        ax_s2.set_title(f"{SCENARIO_LABELS.get(scenario, scenario)}\nS2 Context Shape", fontsize=9)
-        ax_s2.invert_yaxis()
-
     plt.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  ✓ summary_dashboard.png saved")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ASCII context maps (text output)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def generate_ascii_maps(results_dir: Path):
-    """Generate and save ASCII S2 context maps for each scenario."""
-    maps_dir = results_dir / "context_maps"
-    maps_dir.mkdir(exist_ok=True)
-
-    for scenario in ["baseline", "full", "hermes_proxy", "proxy_api"]:
-        shape = generate_context_shape(scenario)
-        ascii_map = render_s2_ascii(shape)
-
-        map_path = maps_dir / f"{scenario}.txt"
-        with open(map_path, "w") as f:
-            f.write(ascii_map)
-
-    print(f"  ✓ ASCII context maps saved to {maps_dir}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -696,12 +542,8 @@ def visualize_run(results_dir: Path) -> Path:
     render_token_comparison(manifest, viz_dir / "token_comparison.png")
     render_timeline(manifest, viz_dir / "token_timeline.png")
     render_compression_efficiency(manifest, viz_dir / "compression_efficiency.png")
-    render_s2_context_maps(manifest, viz_dir / "s2_context_maps.png")
     render_radar_chart(manifest, viz_dir / "radar_chart.png")
     render_summary_dashboard(manifest, viz_dir / "summary_dashboard.png")
-
-    # ASCII context maps
-    generate_ascii_maps(viz_dir)
 
     print(f"\n[visualize] All charts saved to {viz_dir}/")
     _print_file_list(viz_dir)
@@ -730,12 +572,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Aphrodite Benchmark Visualization")
     parser.add_argument("results_dir", help="Path to benchmark results directory")
-    parser.add_argument("--ascii-only", action="store_true",
-                        help="Only generate ASCII context maps (no PNGs)")
     args = parser.parse_args()
 
     results_dir = Path(args.results_dir)
-    if args.ascii_only:
-        generate_ascii_maps(results_dir)
-    else:
-        visualize_run(results_dir)
+    visualize_run(results_dir)
