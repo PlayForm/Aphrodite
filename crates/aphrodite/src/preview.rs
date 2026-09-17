@@ -1056,6 +1056,7 @@ mod tests {
 
 	#[test]
 	fn test_detect_and_preview_git_log() {
+		let _g = cap_guard();
 		assert_eq!(detect_semantic_type(GIT_LOG), Some("gitlog"));
 		let p = build_preview("text", GIT_LOG);
 		assert_eq!(
@@ -1066,6 +1067,7 @@ mod tests {
 
 	#[test]
 	fn test_preview_build_surfaces_first_error() {
+		let _g = cap_guard();
 		let c = "   Compiling aphrodite v1.3.3\nerror[E0432]: unresolved import `crate::foo`\n  --> \
 		         src/x.rs:1:5\nwarning: unused variable `y`";
 		let p = build_preview("build", c);
@@ -1075,6 +1077,7 @@ mod tests {
 
 	#[test]
 	fn test_preview_diff_names_files() {
+		let _g = cap_guard();
 		let c = "diff --git a/src/main.rs b/src/main.rs\n@@ -1,2 +1,3 @@\n+new\ndiff --git a/Cargo.toml \
 		         b/Cargo.toml\n@@ -1 +1 @@\n-x\n+y";
 		let p = build_preview("diff", c);
@@ -1084,6 +1087,7 @@ mod tests {
 
 	#[test]
 	fn test_fallback_shows_first_line_hint() {
+		let _g = cap_guard();
 		let c = "some unrecognizable prose here\nline two\nline three";
 		let p = build_preview("text", c);
 		// No semantic shape detected -> generic fallback WITH a first-line hint.
@@ -1100,6 +1104,7 @@ mod tests {
 
 	#[test]
 	fn test_json_preview_array_shows_keys() {
+		let _g = cap_guard();
 		let c = "[{\"status\":\"ok\",\"count\":42},{\"status\":\"err\",\"count\":0}]";
 		let p = build_preview("json_array", c);
 		assert_eq!(p, "[json:2items 1L | keys: status, count]");
@@ -1107,6 +1112,7 @@ mod tests {
 
 	#[test]
 	fn test_json_preview_object_shows_keys() {
+		let _g = cap_guard();
 		let c = "{\"status\":\"in_progress\",\"conclusion\":null,\"jobs\":[{\"name\":\"Test\"}]}";
 		let p = build_preview("json", c);
 		assert!(p.starts_with("[json:3keys"));
@@ -1117,6 +1123,7 @@ mod tests {
 
 	#[test]
 	fn test_json_preview_fallback_on_unparseable() {
+		let _g = cap_guard();
 		let c = "not valid json {at all";
 		let p = build_preview("json_array", c);
 		assert!(p.starts_with("[json:~"));
@@ -1126,6 +1133,7 @@ mod tests {
 
 	#[test]
 	fn test_search_preview_counts_hits_and_files() {
+		let _g = cap_guard();
 		let c = "src/main.rs:12:    let x = 1;\nsrc/main.rs:42:    println!();\nsrc/lib.rs:7:    pub fn foo()";
 		let p = build_preview("search", c);
 		assert!(p.starts_with("[search:3 hits in 2 files | "), "got {p}");
