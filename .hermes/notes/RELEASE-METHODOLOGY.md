@@ -161,6 +161,7 @@ git -C plugins/aphrodite checkout Development
 ### A3. What ships vs what never ships (Current tree)
 
 **Ships on Current:** crates/, plugins/ (as gitlink), docs, README, CHANGELOG, Maintain/scripts (non-bench), ruff.toml, rustfmt.toml, .prettier*, .vscode/settings.json
+
 **Never ships (Development-only):** .hermes/ (incl. skills/), bench/, tests/, test_* files, auto-release.sh, bench examples (`[[example]]` blocks), dev notes
 
 ---
@@ -324,31 +325,41 @@ then proceed.
 ## PART 4 - RELEASE / CI TRIGGERS (what fires where)
 
 **Trigger:** push to Development
+
 **Workflow:** Check.yml `[Development]`
+
 **What it does:** full CI: fmt (nightly), check, clippy, deny, ruff, pyright, **tests**
 
 ---
 
 **Trigger:** push to Current
+
 **Workflow:** Check.yml `[Current]`
+
 **What it does:** CI minus Test job (test-free line): fmt, check, clippy, deny, ruff, pyright
 
 ---
 
 **Trigger:** tag `Aphrodite/v*`
+
 **Workflow:** Build.yml
+
 **What it does:** **12 artifacts**: 4 targets × (binary + libaphrodite_hermes + SHA256SUMS) + source zips
 
 ---
 
 **Trigger:** tag `Aphrodite/v*`
+
 **Workflow:** Publish.yml
+
 **What it does:** fires and publishes to crates.io when `workflow_dispatch` + `publish_crates: true` (manual, deliberate) OR on a plain tag push - the `aphrodite`/`aphrodite-hermes` publish steps carry ` |     | startsWith(github.ref, 'refs/tags/Aphrodite/')`and DO fire on tag; only`aphrodite-headroom-core` is truly dispatch-only (order: aphrodite-headroom-core → aphrodite → aphrodite-hermes)
 
 ---
 
 **Trigger:** plugin tag `vX.Y.Z`
+
 **Workflow:** (Aphrodite-Hermes repo)
+
 **What it does:** plugin release marker; plugin has no CI
 
 `download.sh` resolves the binary by `BINARY_VERSION` (arg → file → Cargo.toml →
