@@ -121,38 +121,91 @@ pub(crate) fn unwrap_hermes_result(content: &str) -> Option<(String, String)> {
 		}
 	}
 	if let Some(ok) = obj.get("success") {
-		if ok.as_bool() == Some(true) && obj.len() <= 2 {
-			return Some(("ok".to_string(), "text".to_string()));
-		}
+		// ISSUE-11 WS1: the bare `{"success": true}` collapse
+		// (Some(("ok", "text"))) is deleted - it fired on ANY success-plus-
+		// one-key envelope and replaced the whole payload with a 2-byte
+		// fragment, producing the reported `[text:1L 2B | ok]`. Every
+		// genuine Hermes envelope is caught by the branches above
+		// (output/exit_code, diff, error), so a success-only object is a
+		// user payload: let it fall through to detect_type / the caller
+		// hint. The success-STRING branch survives only for SINGLE-key
+		// objects (e.g. {"success": "wrote 3 files"}) - multi-key payloads
+		// like {"success": "ok", "data": [...]} must not collapse to the
+		// word either.
 		if let Some(msg) = ok.as_str() {
-			if !msg.is_empty() && !msg.starts_with('{') {
+			if obj.len() <= 1 && !msg.is_empty() && !msg.starts_with('{') {
 				return Some((msg.to_string(), "text".to_string()));
 			}
 		}
 	}
 
-	// ── Search: {"total_count":N,"matches":[...],"truncated":bool} ──
+	// ── Search: {"total_count":N,"matches":[...] or "matches_text", "truncated":bool} ──
 	if let Some(count) = obj.get("total_count").and_then(|c| c.as_u64()) {
-		// Build a grep-style content so the search preview shows real hits.
-		let mut lines = Vec::new();
+		let truncated = obj.get("truncated").and_then(|t| t.as_bool()).unwrap_or(false);
+		// ISSUE-11 WS2: build ONE grep-style line per REAL match and let
+		// the search preview count them. The old take(20) cap made a
+		// 5,000-hit search preview as "[search:20 hits ...]" - a count
+		// that lied about the total. The lines feed only the preview
+		// (never stored/hashed), so no size cap is needed.
+		let mut lines: Vec<String> = Vec::new();
 		if let Some(matches) = obj.get("matches").and_then(|m| m.as_array()) {
-			for m in matches.iter().take(20) {
-				if let (Some(p), Some(l)) = (m.get("path").or(m.get("file")).and_then(|v| v.as_str()), m.get("line")) {
+			for m in matches {
+				if let (Some(p), Some(l)) =
+					(m.get("path").or(m.get("file")).and_then(|v| v.as_str()), m.get("line"))
+				{
 					let content = m.get("content").and_then(|c| c.as_str()).unwrap_or("");
 					lines.push(format!("{}:{}:{}", p, l, content));
 				}
 			}
 		}
+		// Real Hermes search_files results ship `matches_text` (path-
+		// grouped: "path\n  <line>: <content>") instead of a `matches`
+		// array. The old code ignored it, so every real search collapsed
+		// to "[search:1L]" ("N total" has no file:line: rows for the
+		// preview regex to count). Normalize it to the same grep-style
+		// lines so the preview shows the real hit count and files.
 		if lines.is_empty() {
-			let truncated = obj.get("truncated").and_then(|t| t.as_bool()).unwrap_or(false);
-			let label = if truncated {
-				format!("{} total (truncated)", count)
-			} else {
-				format!("{} total", count)
-			};
-			return Some((label, "search".to_string()));
+			if let Some(text) = obj.get("matches_text").and_then(|t| t.as_str()) {
+				let mut cur_path: Option<&str> = None;
+				for raw in text.lines() {
+					let t = raw.trim();
+					if t.is_empty() {
+						continue;
+					}
+					if raw.trim_start().len() != raw.len() {
+						// Indented row under the current path: "<line>: <content>".
+						if let (Some(p), Some((lno, rest))) = (cur_path, t.split_once(':')) {
+							lines.push(format!("{}:{}:{}", p, lno.trim(), rest.trim_start()));
+						}
+					} else {
+						cur_path = Some(t);
+					}
+				}
+			}
 		}
-		return Some((lines.join("\n"), "search".to_string()));
+		if lines.is_empty() {
+			// No per-match content to count. Surface the REAL total and
+			// the truncated flag as the payload itself, typed `text` so
+			// the generic preview arm renders "0 total" / "N total
+			// (truncated)" instead of an unreadable "[search:1L]". Only
+			// do this for genuine search shapes - a data object that
+			// merely carries a total_count key (e.g. {"total_count": 42,
+			// "items": [...]}) falls through and previews as itself.
+			let is_search_shape = obj.get("matches").is_some()
+				|| obj.get("matches_text").is_some()
+				|| obj.get("matches_format").is_some()
+				|| truncated;
+			if is_search_shape {
+				let label = if truncated {
+					format!("{} total (truncated)", count)
+				} else {
+					format!("{} total", count)
+				};
+				return Some((label, "text".to_string()));
+			}
+		} else {
+			return Some((lines.join("\n"), "search".to_string()));
+		}
 	}
 
 	// ── File read: {"content":"...","total_lines":N} ──
@@ -164,11 +217,17 @@ pub(crate) fn unwrap_hermes_result(content: &str) -> Option<(String, String)> {
 	// ── Other Hermes tools: extract first meaningful string field ──
 	// E.g. skill_view: {"name":"...","description":"..."}
 	//       aphrodite_retrieve: {"found":true,"content":"..."}
+	// ISSUE-11 WS1: only SINGLE-key objects collapse here. A multi-key
+	// payload like {"result": "ok", "data": {...}} must preview as
+	// itself, not as the fragment "ok" (the same bug class as the
+	// deleted success-bool collapse, ungated by any size before).
 	let priority_keys = ["description", "summary", "result", "message", "preview", "found"];
-	for key in &priority_keys {
-		if let Some(s) = obj.get(*key).and_then(|v| v.as_str()) {
-			if !s.is_empty() && !s.starts_with('{') && !s.starts_with('[') {
-				return Some((s.to_string(), "text".to_string()));
+	if obj.len() <= 1 {
+		for key in &priority_keys {
+			if let Some(s) = obj.get(*key).and_then(|v| v.as_str()) {
+				if !s.is_empty() && !s.starts_with('{') && !s.starts_with('[') {
+					return Some((s.to_string(), "text".to_string()));
+				}
 			}
 		}
 	}
@@ -191,7 +250,21 @@ fn compress_into(state: &mut AphroditeState, content: &str, hint: &str, center: 
 	// `exit_code`/`error`, and legitimate caller JSON that merely matches a
 	// wrapper shape (e.g. `{"content":"hi","id":42}`) must round-trip intact.
 	let (classify_content, eff_type) = if let Some((c, t)) = unwrap_hermes_result(content) {
-		(c, t)
+		// ISSUE-11 WS1 (caller-hint-wins): the caller's explicit `type`
+		// hint is intent, the unwrap is a guess - when a non-default hint
+		// is present it must win. For JSON payloads the preview is built
+		// from the FULL content: an unwrap fragment ("ok") produces a
+		// wrong `[text:1L 2B | ok]` that counts the fragment, not the
+		// stored payload, and drops the shape signal entirely.
+		if !hint.is_empty() && hint != "text" {
+			if content.trim_start().starts_with('{') {
+				(content.to_string(), hint.to_string())
+			} else {
+				(c, hint.to_string())
+			}
+		} else {
+			(c, t)
+		}
 	} else {
 		let detected = aphrodite::detect_type(content);
 		let ccr_type = if hint.is_empty() || hint == "text" { detected } else { hint.to_string() };
@@ -567,7 +640,17 @@ mod tests {
 				serde_json::json!({"error": "Found 3 matches"}),
 				Some(("Found 3 matches", "text")),
 			),
-			("success bool only", serde_json::json!({"success": true}), Some(("ok", "text"))),
+			("success bool only -> None (no collapse)", serde_json::json!({"success": true}), None),
+			(
+				"success bool with data payload",
+				serde_json::json!({"success": true, "data": {"web": [{"title": "x"}]}}),
+				None,
+			),
+			(
+				"success string with data payload",
+				serde_json::json!({"success": "ok", "data": [1]}),
+				None,
+			),
 			(
 				"success string message",
 				serde_json::json!({"success": "wrote 3 files"}),
@@ -579,9 +662,23 @@ mod tests {
 				Some(("a.rs:3:fn x()", "search")),
 			),
 			(
-				"search without matches",
+				"search with matches_text (real Hermes shape)",
+				serde_json::json!({
+					"total_count": 19,
+					"matches_format": "path-grouped",
+					"matches_text": "src/a.rs\n  10: fn alpha()\nsrc/b.rs\n  3: struct Gamma\n",
+				}),
+				Some(("src/a.rs:10:fn alpha()\nsrc/b.rs:3:struct Gamma", "search")),
+			),
+			(
+				"search without matches surfaces total as text",
 				serde_json::json!({"total_count": 5, "truncated": true}),
-				Some(("5 total (truncated)", "search")),
+				Some(("5 total (truncated)", "text")),
+			),
+			(
+				"data object with total_count key only -> None",
+				serde_json::json!({"total_count": 42, "items": [1, 2, 3]}),
+				None,
 			),
 			(
 				"file read content",
@@ -589,9 +686,19 @@ mod tests {
 				Some(("hi", "text")),
 			),
 			(
-				"priority key fallback",
-				serde_json::json!({"name": "skill", "description": "does a thing"}),
+				"priority key single-key",
+				serde_json::json!({"description": "does a thing"}),
 				Some(("does a thing", "text")),
+			),
+			(
+				"priority key multi-key -> None (no collapse)",
+				serde_json::json!({"name": "skill", "description": "does a thing"}),
+				None,
+			),
+			(
+				"priority key multi-key data payload",
+				serde_json::json!({"result": "ok", "data": {"web": [{"title": "x"}]}}),
+				None,
 			),
 			("not an object", serde_json::json!(["a", "b"]), None),
 			("plain string, not JSON", serde_json::json!("hello"), None),
