@@ -185,6 +185,18 @@ pub fn preview_max_chars() -> u32 {
 	PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// Serializes tests across modules that mutate the process-global preview
+/// cap (`cargo test` runs module test-bodies concurrently; the cap is
+/// process-wide, so config_loader's `apply_previews` test and this module's
+/// cap tests must not interleave).
+#[cfg(test)]
+pub(crate) fn preview_cap_test_guard() -> std::sync::MutexGuard<'static, ()> {
+	static G: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+	G.get_or_init(|| std::sync::Mutex::new(()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// Truncate a preview to `max_chars` chars on a char boundary. Preserves the
 /// closing `]` (with a `…` marker) for self-bracketed previews so
 /// `render_marker`/`parse_preview`/`chain_split` keep working after
@@ -275,7 +287,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 		"text" | "terminal" | "log" | "" | "plain" => detect_semantic_type(content).unwrap_or(type_str),
 		other => other,
 	};
-	match effective {
+	let preview = match effective {
 		"build" | "build_output" | "build_error" => {
 			// Honest tallies (Issue #11 WS2): count error/warning LINES, not
 			// substring occurrences. The old `content.matches("error").count()`
@@ -415,6 +427,54 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			let summary = exit_line.or(last_line).unwrap_or("").chars().take(60).collect::<String>();
 			format!("[terminal:{}L {}]", lines, summary)
 		},
+		// Error output (Issue #11 WS2): surface the FIRST real error line -
+		// the payload, not the traceback header. The generic arm used to show
+		// the first non-empty line, so a Python traceback previewed as
+		// `Traceback (most recent call last):` and a compiler log as its
+		// first `Compiling` line, both hiding the actual error. Never
+		// success-looking: with no error line found, fall back to the last
+		// non-empty line (tail = most recent state).
+		"error" => {
+			let hint = content
+				.lines()
+				.map(|l| l.trim())
+				.find(|l| is_error_line(l) || is_failure_line(l) || l.contains("Traceback") || l.contains("Exception"))
+				.or_else(|| content.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim()))
+				.map(|l| l.chars().take(60).collect::<String>());
+			match hint {
+				Some(h) => format!("[error:{}L {}B | {}]", lines, bytes, h),
+				None => format!("[error:{}L {}B]", lines, bytes),
+			}
+		},
+		// Linter output (ruff/eslint/clippy/flake8): surface the first issue
+		// line (`path:line:col: CODE message`, or `error:`/`warning:` lines).
+		"linter" | "lint" => {
+			let hint = content
+				.lines()
+				.map(|l| l.trim())
+				.find(|l| is_lint_line(l))
+				.or_else(|| content.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim()))
+				.map(|l| l.chars().take(60).collect::<String>());
+			match hint {
+				Some(h) => format!("[lint:{}L {}B | {}]", lines, bytes, h),
+				None => format!("[lint:{}L {}B]", lines, bytes),
+			}
+		},
+		// Log output: the LAST non-empty line is the most recent state, and
+		// an error/failure line (if any) is the signal that matters - prefer
+		// it over the tail so a log ending in noise never hides the error.
+		"log" => {
+			let hint = content
+				.lines()
+				.map(|l| l.trim())
+				.find(|l| is_error_line(l) || is_failure_line(l))
+				.or_else(|| content.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim()))
+				.map(|l| l.chars().take(60).collect::<String>());
+			match hint {
+				Some(h) => format!("[log:{}L {}B | {}]", lines, bytes, h),
+				None => format!("[log:{}L {}B]", lines, bytes),
+			}
+		},
 		// Plain-text / unrecognized fallback: even when we can't classify the
 		// shape, do better than a bare L/B count - show the first non-empty
 		// line (trimmed, <=60 chars) as a content hint so the agent has SOME
@@ -431,7 +491,9 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 				None => format!("[{}:{}L {}B]", type_str, lines, bytes),
 			}
 		},
-	}
+	};
+	// ── Issue #11 WS4: enforce the configured `preview_max_chars` cap ──
+	apply_preview_cap(&preview, PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed) as usize)
 }
 
 /// git status preview: tally each two-char status code and list the first few
@@ -1093,5 +1155,132 @@ mod tests {
 				let _ = detect_semantic_type(c);
 			}
 		}
+	}
+
+	// ── Issue #11 WS2: honest build arm (real counts, no fabricated
+	// success) ──
+
+	#[test]
+	fn test_build_preview_counts_error_warning_lines_not_substrings() {
+		// One line with TWO `error` occurrences, a capitalized `Error:` line
+		// (invisible to the old lowercase substring counter), an unrelated
+		// `error`-shaped word, and a warning line: the OLD counter reported
+		// 3E (occurrences) and missed the capitalized one entirely; the honest
+		// counter reports 2 error lines + 1 warning line.
+		let c = "error[E0432]: error in crate foo\nError: failed to build\nwarning: unused import\nnoerror here";
+		let p = build_preview("build", c);
+		assert!(p.starts_with("[build:2E 1W 4L"), "line-based counts expected, got {p}");
+	}
+
+	#[test]
+	fn test_build_preview_failing_test_never_looks_clean() {
+		// ISSUE-11-PREVIEW-BATTERY #2: `test result: FAILED. 3 failed` used
+		// to preview as `[build:0E 0W ...]` - a failing test run looked like
+		// a clean build. The failure signal must surface.
+		let c = "running 3 tests\ntest alpha ... ok\ntest result: FAILED. 1 passed; 2 failed; finished in 0.05s";
+		let p = build_preview("build_output", c);
+		assert!(p.starts_with("[build:0E 0W 3L | "), "failure note expected, got {p}");
+		assert!(p.contains("FAILED"), "failure summary must be visible: {p}");
+		assert!(!p.starts_with("[build:0E 0W 3L]"), "clean-looking summary is the bug: {p}");
+	}
+
+	#[test]
+	fn test_build_preview_passing_test_keeps_clean_summary() {
+		// A PASSING run (`0 failed`) must not be flagged as a failure.
+		let c = "running 3 tests\ntest alpha ... ok\ntest result: ok. 3 passed; 0 failed; finished in 0.05s";
+		let p = build_preview("build_output", c);
+		assert_eq!(p, "[build:0E 0W 3L]");
+	}
+
+	#[test]
+	fn test_build_preview_surfaces_capitalized_error_line() {
+		// `Error:` (Python/Swift/clang) was invisible to the old lowercase
+		// substring count; it must now count AND surface as the first error.
+		let c = "   Compiling foo v0.1.0\nError: failed to run custom build command";
+		let p = build_preview("build", c);
+		assert!(p.starts_with("[build:1E 0W 2L | Error: failed to run"), "got {p}");
+	}
+
+	// ── Issue #11 WS2: honest error/linter/log arms (never success-looking,
+	// never a useless first line) ──
+
+	#[test]
+	fn test_preview_error_surfaces_the_error_line_not_traceback_header() {
+		let c = "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\nValueError: disk full";
+		let p = build_preview("error", c);
+		assert!(p.starts_with("[error:3L"), "got {p}");
+		assert!(p.contains("ValueError: disk full"), "error arm must surface the real error: {p}");
+		assert!(!p.contains("Traceback"), "traceback header is not the error: {p}");
+	}
+
+	#[test]
+	fn test_preview_lint_surfaces_first_issue_line() {
+		let c = "src/x.py:10:5: E501 line too long (98 > 88)\nsrc/x.py:12:1: W0611 unused import os";
+		let p = build_preview("lint", c);
+		assert!(p.starts_with("[lint:2L"), "got {p}");
+		assert!(p.contains("E501"), "linter arm must surface the issue: {p}");
+	}
+
+	#[test]
+	fn test_preview_log_surfaces_error_signal_or_tail() {
+		// Error signal wins over the tail...
+		let with_err = "INFO starting\nWARN retry\nERROR connection refused\nINFO gave up";
+		let p = build_preview("log", with_err);
+		assert!(p.contains("connection refused"), "log arm must surface the error line: {p}");
+		// ...otherwise the last non-empty line (most recent state).
+		let tail = "2026-09-17T10:00:00Z INFO start\n2026-09-17T10:00:05Z INFO done";
+		let p2 = build_preview("log", tail);
+		assert!(p2.contains("INFO done"), "log arm must surface the tail line: {p2}");
+	}
+
+	// ── Issue #11 WS4: preview_max_chars cap end-to-end ──
+
+	/// Serializes tests that mutate the process-global preview cap (cargo
+	/// runs this module's tests concurrently; the cap is process-wide).
+	fn cap_guard() -> std::sync::MutexGuard<'static, ()> {
+		crate::preview::preview_cap_test_guard()
+	}
+
+	#[test]
+	fn test_preview_cap_truncates_and_keeps_bracket() {
+		let _g = cap_guard();
+		let prev = set_preview_max_chars(Some(30));
+		let long = format!("some {} prose", "x".repeat(200));
+		let p = build_preview("text", &long);
+		assert!(p.chars().count() <= 30, "preview must respect the cap: {p}");
+		assert!(p.ends_with(']'), "self-bracketed preview must keep its closing bracket: {p}");
+		assert_eq!(p.chars().count(), 30, "truncated preview should fill the budget exactly: {p}");
+		set_preview_max_chars(prev);
+	}
+
+	#[test]
+	fn test_preview_cap_unset_is_unlimited() {
+		let _g = cap_guard();
+		set_preview_max_chars(None);
+		let long = format!("some {} prose", "y".repeat(200));
+		let p = build_preview("text", &long);
+		assert!(p.chars().count() > 30, "no cap -> full preview expected: {p}");
+		assert!(p.contains("yyy"), "got {p}");
+	}
+
+	#[test]
+	fn test_preview_cap_multibyte_truncates_on_char_boundary() {
+		let _g = cap_guard();
+		let prev = set_preview_max_chars(Some(25));
+		let content = format!("{}{}", "a\u{00e9}\u{4e2d}\u{1f600}".repeat(30), " end");
+		let p = build_preview("text", &content);
+		assert!(p.chars().count() <= 25, "multibyte truncation must stay on a char boundary: {p}");
+		set_preview_max_chars(prev);
+	}
+
+	#[test]
+	fn test_preview_cap_applies_to_build_arm_too() {
+		let _g = cap_guard();
+		let prev = set_preview_max_chars(Some(20));
+		let c = "error[E0432]: unresolved import `crate::foo`\n  --> src/x.rs:1:5\nwarning: unused variable `y`";
+		let p = build_preview("build", c);
+		assert!(p.chars().count() <= 20, "cap must apply to every arm: {p}");
+		assert!(p.ends_with(']'));
+		set_preview_max_chars(prev);
 	}
 }

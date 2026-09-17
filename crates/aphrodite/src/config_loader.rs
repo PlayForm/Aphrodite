@@ -288,17 +288,34 @@ impl Config {
 		}
 
 		// ── First-turn session injection (templates.prompts.session_inject) ──
-		// Loaded from the TOML's [prompts] section; defaults to the compiled-in
-		// SHIPPED_SESSION_INJECT constant when the key is absent so a bare/minimal
-		// config still gets a first-turn orientation. Empty string disables it.
-		state.session_inject = self.get_string(
-			"APHRODITE_SESSION_INJECT",
-			"prompts",
-			"session_inject",
-			crate::flow::SHIPPED_SESSION_INJECT,
-		);
-	}
-}
+				// Loaded from the TOML's [prompts] section; defaults to the compiled-in
+				// SHIPPED_SESSION_INJECT constant when the key is absent so a bare/minimal
+				// config still gets a first-turn orientation. Empty string disables it.
+				state.session_inject = self.get_string(
+					"APHRODITE_SESSION_INJECT",
+					"prompts",
+					"session_inject",
+					crate::flow::SHIPPED_SESSION_INJECT,
+				);
+			}
+
+			/// Load preview settings into the process-global preview builder.
+			/// `[previews] preview_max_chars` (env override:
+			/// `APHRODITE_PREVIEW_MAX_CHARS`) caps the rendered preview string in
+			/// chars; absent/0 = unlimited (legacy behavior). Issue #11 WS4: the key
+			/// existed in the config structs but was never read anywhere - the
+			/// preview builder now enforces it on every path (proxy, hooks, Hermes
+			/// dylib), and this is the dylib-side wiring (the engine binary reads
+			/// `MultiConfig.previews` directly in `main.rs`).
+			pub fn apply_previews(&self) {
+				let max = self.get_u64("APHRODITE_PREVIEW_MAX_CHARS", "previews", "preview_max_chars", 0);
+				crate::preview::set_preview_max_chars(if max == 0 {
+					None
+				} else {
+					Some(max.min(u32::MAX as u64) as u32)
+				});
+			}
+		}
 
 #[cfg(test)]
 mod tests {
