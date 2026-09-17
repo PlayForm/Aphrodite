@@ -9,6 +9,8 @@
 //!                                           ├─ Tool dispatch (compress, retrieve, stats, etc.)
 //!                                           ├─ Hook dispatch (on_session_start, transform, terminal, pre/post LLM)
 //!                                           └─ Skill registration
+//!                                           └─ Directive provisioning (materialize the
+//!                                              embedded builtin set into the runtime home)
 //!                                           ↓ (depends on)
 //!                                    aphrodite crate (rlib)
 //!                                           ├─ Core compression (hooks, state, marker)
@@ -20,6 +22,7 @@
 // side effect of wiring up a CI clippy gate.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+mod directives;
 mod schemas;
 mod tools;
 
@@ -515,6 +518,32 @@ pub extern "C" fn aphrodite_hermes_get_hooks() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_proxy_health() -> *mut c_char {
 	guarded(|| to_c_string(&proxy_health().to_string()))
+}
+
+// ── Directives provisioning C ABI ──────────────────────────
+
+/// Materialize the embedded behavioral directives into
+/// `<runtime-home>/directives/` (idempotent; never overwrites user data).
+///
+/// The shipped directive set is embedded in the core `aphrodite` crate
+/// (`builtin_directives/*.md` via `include_str!`, exposed through
+/// `aphrodite::directives::loaded_builtins()`); this fn provisions it into
+/// the user-data home so the plugin directory never holds runtime state.
+///
+/// `home_dir` is the runtime home (the user-data folder, e.g.
+/// `~/.hermes/aphrodite`). If null/empty it is resolved from
+/// `$APHRODITE_DIRECTIVES_DIR` (exact dir), `$APHRODITE_HOME` (home), then
+/// `$HOME/.hermes/aphrodite`. Returns JSON
+/// `{"status":"ok","dir":...,"written":[...],"skipped":[...],"warnings":[...]}`
+/// - always `status:"ok"` (failures degrade to warnings). Caller must free
+/// with `aphrodite_hermes_free_string`.
+#[no_mangle]
+pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir: *const c_char) -> *mut c_char {
+	let home = unsafe { cstr_to_string(home_dir) };
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let result = directives::materialize_into(&home);
+		to_c_string(&serde_json::to_string(&result).unwrap_or_default())
+	}))
 }
 
 #[cfg(test)]

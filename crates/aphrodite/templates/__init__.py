@@ -30,18 +30,24 @@ _DYLIB_NAME = (
     if sys.platform == "linux"
     else "aphrodite_hermes.dll"
 )
+# Canonical runtime home: every runtime artifact (binaries, dylib,
+# aphrodite.toml, ccr.db, hotreload cache) lives under
+# ~/.hermes/aphrodite, never inside the plugin tree. Env overrides stay
+# first; the plugin-dir binaries/ paths survive only as legacy fallbacks.
+_BINARIES_DIR = Path.home() / ".hermes" / "aphrodite" / "binaries"
 _DYLIB_PATH = os.environ.get(
-    "APHRODITE_HERMES_DYLIB_PATH", str(_PLUGIN_DIR / "binaries" / _DYLIB_NAME)
+    "APHRODITE_HERMES_DYLIB_PATH", str(_BINARIES_DIR / _DYLIB_NAME)
 )
 _BINARY_NAME = "aphrodite.exe" if sys.platform == "win32" else "aphrodite"
-_BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH", str(_PLUGIN_DIR / "binaries" / _BINARY_NAME))
+_BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH", str(_BINARIES_DIR / _BINARY_NAME))
 
-# The shipped directives/ set was unreachable from the Rust dylib: it is
-# ctypes-loaded, so its current_exe resolves to the host process (Hermes),
-# not this plugin directory. Export the shipped directives dir as the
-# dylib's first discovery candidate so the set is found; os.environ.setdefault
-# keeps a user-provided APHRODITE_DIRECTIVES_DIR override authoritative.
-os.environ.setdefault("APHRODITE_DIRECTIVES_DIR", str(_PLUGIN_DIR / "directives"))
+# Directives are provided by the BINARY (embedded in libaphrodite_hermes.dylib
+# via the core crate's builtin_directives) and materialized into the user-data
+# home at setup/startup - they are NOT shipped in the plugin dir anymore.
+# Point the dylib's discovery at the canonical runtime home so it reads the
+# materialized set; os.environ.setdefault keeps a user-provided
+# APHRODITE_DIRECTIVES_DIR override authoritative.
+os.environ.setdefault("APHRODITE_DIRECTIVES_DIR", str(Path.home() / ".hermes" / "aphrodite" / "directives"))
 
 # ── Per-process dylib state ──
 # Hermes builds one PluginManager per Hermes home (root home + every
@@ -270,14 +276,18 @@ def _load_fresh_copy(src_path: str) -> str:
 def _dylib_candidates(plugin_dir: Path) -> list[str]:
     """Ordered dylib candidates, env override first, parent-depth guarded.
 
-    Shallow installs (e.g. /opt/Aphrodite-Hermes) have fewer than 4
-    parents; the monorepo target/release fallbacks simply do not exist
-    there, so indexing is guarded instead of crashing (issue 5).
+    Canonical runtime home (~/.hermes/aphrodite/binaries) comes first; the
+    plugin-dir binaries/ paths are legacy fallbacks so a pre-relocation
+    install still loads. Shallow installs (e.g. /opt/Aphrodite-Hermes) have
+    fewer than 4 parents; the monorepo target/release fallbacks simply do
+    not exist there, so indexing is guarded instead of crashing (issue 5).
     """
     plugin_dir = Path(plugin_dir).resolve()
+    canonical = str(_BINARIES_DIR / _DYLIB_NAME)
     candidates = [
-        _DYLIB_PATH,  # APHRODITE_HERMES_DYLIB_PATH or binaries default - wins when it exists
-        str(plugin_dir / "binaries" / _DYLIB_NAME),
+        _DYLIB_PATH,  # APHRODITE_HERMES_DYLIB_PATH override (or canonical default) - wins when it exists
+        canonical,  # canonical runtime home (dedup no-op when the env var is unset)
+        str(plugin_dir / "binaries" / _DYLIB_NAME),  # legacy fallback (old installs)
         str(plugin_dir.parent / "binaries" / _DYLIB_NAME),
     ]
     parents = plugin_dir.parents
@@ -285,6 +295,33 @@ def _dylib_candidates(plugin_dir: Path) -> list[str]:
         if depth < len(parents):
             candidates.append(str(parents[depth] / "target" / "release" / _DYLIB_NAME))
     return candidates
+
+
+def _resolve_binary_path() -> str:
+    """Proxy binary path: env override first, then canonical runtime home,
+    then the legacy plugin-dir copy as a warning-flagged fallback.
+
+    APHRODITE_BINARY_PATH wins when it exists. Otherwise prefer
+    ~/.hermes/aphrodite/binaries; a pre-relocation install may only have
+    the plugin-dir binaries/ copy, which we keep loading (with a warning)
+    so an old install still works. Returns the last candidate (missing)
+    when nothing exists - callers log the final miss.
+    """
+    if os.path.exists(_BINARY_PATH):
+        return _BINARY_PATH
+    canonical = str(_BINARIES_DIR / _BINARY_NAME)
+    if os.path.exists(canonical):
+        return canonical
+    legacy = str(_PLUGIN_DIR / "binaries" / _BINARY_NAME)
+    if os.path.exists(legacy):
+        _log.warning(
+            "canonical binary %s not found - using legacy plugin-dir copy "
+            "%s (old install; run download.sh to migrate)",
+            canonical,
+            legacy,
+        )
+        return legacy
+    return _BINARY_PATH
 
 
 def _load_dylib() -> ctypes.CDLL:
@@ -295,7 +332,8 @@ def _load_dylib() -> ctypes.CDLL:
     takes the mtime early-return below and reuses the mapped handle.
     """
     with _state.lock:
-        # Find current dylib path
+        # Find current dylib path: env override first, then the canonical
+        # runtime home, then legacy plugin-dir copies.
         path = _DYLIB_PATH
         candidates = _dylib_candidates(_PLUGIN_DIR)
         for p in candidates:
@@ -303,8 +341,28 @@ def _load_dylib() -> ctypes.CDLL:
                 path = p
                 break
         # Auto-fetch the dylib on first use if it's missing (download.sh
-        # verifies SHA-256 and writes binaries/). No-op when present.
+        # verifies SHA-256 and writes ~/.hermes/aphrodite/binaries/).
+        # No-op when present.
         _ensure_binaries()
+        if not os.path.exists(path):
+            # download.sh may have just populated the canonical home -
+            # re-resolve so the freshly fetched copy wins over legacy.
+            for p in candidates:
+                if os.path.exists(p):
+                    path = p
+                    break
+        # Defensive: prefer the canonical runtime home. A legacy
+        # plugin-dir/target hit means the canonical copy is missing - warn
+        # but keep loading, never crash registration over a path preference.
+        # Silence when the env override or the canonical path itself won.
+        if path != _DYLIB_PATH and path != str(_BINARIES_DIR / _DYLIB_NAME):
+            _log.warning(
+                "canonical dylib %s not found - using %s instead (legacy "
+                "install; run download.sh to migrate to "
+                "~/.hermes/aphrodite/binaries)",
+                _BINARIES_DIR / _DYLIB_NAME,
+                path,
+            )
         assert os.path.exists(path), f"Dylib not found. Tried: {candidates}"
 
         # Hot-reload: check mtime, reload if changed
@@ -490,18 +548,25 @@ def _ensure_binaries() -> None:
     makes that promise real. Returns immediately when both files exist, so
     repeated register() calls never re-download. APHRODITE_NO_AUTO_DOWNLOAD
     (1/true, like _env_bool) opts out for offline/dev-loop setups.
+
+    download.sh's BINARY_DIR defaults to ~/.hermes/aphrodite/binaries; we
+    also pass BINARY_DIR explicitly so an ambient BINARY_DIR in the caller's
+    environment can never redirect the fetch back into the plugin tree.
     """
     if _env_bool("APHRODITE_NO_AUTO_DOWNLOAD"):
         return
     if os.path.exists(_BINARY_PATH) and os.path.exists(_DYLIB_PATH):
         return
     try:
+        env = os.environ.copy()
+        env["BINARY_DIR"] = str(_BINARIES_DIR)
         result = subprocess.run(
             ["bash", str(_PLUGIN_DIR / "download.sh")],
             timeout=180,
             capture_output=True,
             text=True,
             errors="replace",
+            env=env,
         )
     except Exception as e:
         _log.warning(
@@ -602,8 +667,9 @@ def _start_proxy():
         return
 
     # Fetch the proxy binary + dylib on first use if either is missing
-    # (download.sh verifies SHA-256 and writes binaries/). No-op when both
-    # already exist - repeated register() calls don't re-download.
+    # (download.sh verifies SHA-256 and writes ~/.hermes/aphrodite/binaries/).
+    # No-op when both already exist - repeated register() calls don't
+    # re-download.
     _ensure_binaries()
 
     # Read custom ports from env vars (matching the Rust dylib's
@@ -628,7 +694,7 @@ def _start_proxy():
         )
         return
 
-    binary = _BINARY_PATH
+    binary = _resolve_binary_path()
     if not os.path.exists(binary):
         _log.warning("aphrodite binary not found at %s", binary)
         return
@@ -801,6 +867,34 @@ def register(ctx: Any) -> None:
         return
     _log.info("aphrodite-hermes dylib loaded: %s", _DYLIB_PATH)
     _check_version(dylib)
+
+    # ── Layout self-heal (best-effort, never raises) ──
+    # Ensure the ~/.hermes runtime layout matches the canonical schema before
+    # anything consumes it: relocates misplaced config/binaries out of the
+    # plugin dir, recreates missing profile symlinks, and warns on anything
+    # ambiguous. Failures degrade to a warning - the plugin still registers.
+    try:
+        from .layout_check import check_and_heal
+
+        report = check_and_heal()
+        for w in report.get("warnings", []):
+            _log.warning("layout self-heal: %s", w)
+    except Exception as e:
+        _log.warning("layout self-heal skipped: %s", e)
+
+    # ── Directives materialize (best-effort, never raises) ──
+    # The binary provides the directives (embedded builtins); unpack them into
+    # the user-data home ~/.hermes/aphrodite/directives/ so the plugin dir
+    # never has to hold them. User-modified files are never overwritten.
+    # home_dir=b"" -> the dylib falls back to its home resolution
+    # (APHRODITE_DIRECTIVES_DIR / APHRODITE_HOME / ~/.hermes/aphrodite).
+    try:
+        result = _call_json(dylib, "aphrodite_hermes_materialize_directives", b"")
+        if result:
+            for w in result.get("warnings", []):
+                _log.warning("directives materialize: %s", w)
+    except Exception as e:
+        _log.warning("directives materialize skipped: %s", e)
 
     # Register hooks - dispatch to Rust dylib via aphrodite_hermes_call_hook
     hooks = _call_json(dylib, "aphrodite_hermes_get_hooks")
