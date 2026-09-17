@@ -242,6 +242,7 @@ mod tests {
 	// `\[\w+:\[` doubling signature for ANY content type. ──
 	#[test]
 	fn test_marker_preview_never_doubles_bracket_prefix() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let re = regex::Regex::new(r"\[\w+:\[").unwrap();
 		for ty in [
 			"text",

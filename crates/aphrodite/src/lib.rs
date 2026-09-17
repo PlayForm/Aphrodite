@@ -744,6 +744,7 @@ mod ffi_tests {
 	// `_` branch (a bare line/byte count with no exit-code context).
 	#[test]
 	fn test_build_preview_terminal_surfaces_exit_code() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let preview = build_preview("terminal", "running tests\nall good\nexit code: 1\n");
 		assert!(preview.starts_with("[terminal:"));
 		assert!(
@@ -754,6 +755,7 @@ mod ffi_tests {
 
 	#[test]
 	fn test_build_preview_terminal_falls_back_to_first_line() {
+		let _g = crate::preview::preview_cap_test_guard();
 		// ISSUE-11 residual #2: the terminal-arm fallback used to be the LAST
 		// non-empty line - a multi-line block previewed as its closing brace
 		// (`[terminal:7L }]`). The FIRST meaningful line is the honest
