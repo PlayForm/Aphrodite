@@ -111,13 +111,12 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 
 	println!("aphrodite installed -> {}", ctx.aphrodite_dir.display());
 	println!(
-		"plugin data directory ready: {} (setup no longer symlinks the plugin into Hermes automatically)",
+		"plugin directory ready: {} (setup no longer symlinks it into Hermes automatically)",
 		ctx.aphrodite_dir.display()
 	);
 	println!(
-		"link the plugin into Hermes manually from a checkout of the plugin repo\n  \
-		 (git clone https://github.com/PlayForm/Aphrodite-Hermes.git):\n  \
-		 ln -s <plugin-checkout> {}/plugins/aphrodite",
+		"link it manually: ln -s {} {}/plugins/aphrodite",
+		ctx.aphrodite_dir.display(),
 		home.display()
 	);
 
