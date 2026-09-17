@@ -1096,6 +1096,7 @@ mod tests {
 
 	#[test]
 	fn test_semantic_detector_leaves_prose_alone() {
+		let _g = cap_guard();
 		let prose = "The quick brown fox jumps over the lazy dog.\nAnother sentence of ordinary prose.";
 		assert_eq!(detect_semantic_type(prose), None);
 	}
@@ -1203,6 +1204,7 @@ mod tests {
 
 	#[test]
 	fn test_build_preview_passing_test_keeps_clean_summary() {
+		let _g = cap_guard();
 		// A PASSING run (`0 failed`) must not be flagged as a failure.
 		let c = "running 3 tests\ntest alpha ... ok\ntest result: ok. 3 passed; 0 failed; finished in 0.05s";
 		let p = build_preview("build_output", c);
@@ -1211,6 +1213,7 @@ mod tests {
 
 	#[test]
 	fn test_build_preview_surfaces_capitalized_error_line() {
+		let _g = cap_guard();
 		// `Error:` (Python/Swift/clang) was invisible to the old lowercase
 		// substring count; it must now count AND surface as the first error.
 		let c = "   Compiling foo v0.1.0\nError: failed to run custom build command";
@@ -1223,6 +1226,7 @@ mod tests {
 
 	#[test]
 	fn test_preview_error_surfaces_the_error_line_not_traceback_header() {
+		let _g = cap_guard();
 		let c = "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\nValueError: disk full";
 		let p = build_preview("error", c);
 		assert!(p.starts_with("[error:3L"), "got {p}");
@@ -1232,6 +1236,7 @@ mod tests {
 
 	#[test]
 	fn test_preview_lint_surfaces_first_issue_line() {
+		let _g = cap_guard();
 		let c = "src/x.py:10:5: E501 line too long (98 > 88)\nsrc/x.py:12:1: W0611 unused import os";
 		let p = build_preview("lint", c);
 		assert!(p.starts_with("[lint:2L"), "got {p}");
@@ -1240,6 +1245,7 @@ mod tests {
 
 	#[test]
 	fn test_preview_log_surfaces_error_signal_or_tail() {
+		let _g = cap_guard();
 		// Error signal wins over the tail...
 		let with_err = "INFO starting\nWARN retry\nERROR connection refused\nINFO gave up";
 		let p = build_preview("log", with_err);
