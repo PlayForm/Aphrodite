@@ -11,8 +11,7 @@
     "Format:Shell": "sh Maintain/Format.sh shell",
     "Format:Prettier": "sh Maintain/Format.sh prettier",
     "Format:Rust": "sh Maintain/Format.sh rust",
-    "FormatCheck": "prettier --check .",
-    "prepare": "git config core.hooksPath .githooks && sh .githooks/lib/sync-submodules.sh"
+    "FormatCheck": "prettier --check ."
   },
   "devDependencies": {
     "prettier": "3.9.6"

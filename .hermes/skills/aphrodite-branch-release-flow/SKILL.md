@@ -48,7 +48,7 @@ bump/build/test half; the TAG step is deferred to Current (below).
 
 ## Invariants (verify before declaring done)
 
-- **I1** Both repos on a named branch; hooks float on any detach.
+- **I1** Both repos on a named branch (hooks that used to float on detach are REMOVED 2026-09-17 - branch discipline is manual).
 - **I2** `git submodule status` never shows `+`; `git status` never shows
   `M plugins/aphrodite`.
 - **I3** P-Current tree == the tagged released content; S-Current == the
@@ -161,9 +161,10 @@ Current, delete the branch.
   conflicts on a file both branches changed - resolve keeping Current's
   hotfix content, then immediately pick that hotfix up. Development must
   always contain Current (superset), so sync-down is a clean copy.
-- **V3** Submodule detach: hooks float to the configured branch + bump the
-  gitlink automatically (the GIT_DIR fix in
-  `.githooks/lib/bump-submodule-gitlink.sh` makes git-fired bumps work).
+- **V3** Submodule detach: hooks used to float to the configured branch +
+  bump the gitlink automatically; the hooks are REMOVED 2026-09-17, so a
+  detach is now handled manually (`git -C plugins/aphrodite checkout
+  Development`).
 - **V4** Auto-committer races: it commits on the checked-out branch.
   Working copy stays on Development (I10); Current is only touched inside
   the ritual.

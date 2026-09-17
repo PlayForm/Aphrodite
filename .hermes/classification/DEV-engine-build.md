@@ -6,7 +6,7 @@ See [TAXONOMY.md](TAXONOMY.md) for the code grammar.
 root build/config (18 tracked + 3 untracked-but-present), `vendor/**` (2 gitlinks).
 **Total classified: 74 files/processes.**
 **Pair partner:** `.hermes/**`, `bench/**`, `tests/**`, `docs/**`, `assets/**`, `references/**`,
-plus `plugins/`, `.github/`, `.githooks/`, `Maintain/`, `directives/` (CUR passes).
+plus `plugins/`, `.github/`, `Maintain/`, `directives/` (CUR passes). `.githooks/` was classified here originally but was **REMOVED 2026-09-17** (✝) - see CUR-release-infra-identity §1.1.
 **Grammar:** `{K}{P}{L}-{N}[annotations]` - K=kind, P=phase (D/C/B/R), L=layer (1 engine, 2 hermes bridge, 3 plugin, 4 release infra/build, 5 identity, 6 meta, 7 vendor), N=seq.
 Annotations: `→C` (Phase A push-down), `→D` (Phase B sync-back), `+tag`, `+bump`, `+float`, `+guard`, `∅` (never crosses), `@R` (ritual-only).
 All files here are **halted processes**: opening a file resumes the process it halts; the table states what resumes.

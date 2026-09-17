@@ -159,9 +159,9 @@ git -C plugins/aphrodite checkout Development
 
 ### A3. What ships vs what never ships (Current tree)
 
-| Ships on Current                                                                                                                                             | Never ships (Development-only)                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| crates/, plugins/ (as gitlink), docs, README, CHANGELOG, Maintain/scripts (non-bench), .githooks, ruff.toml, rustfmt.toml, .prettier*, .vscode/settings.json | .hermes/ (incl. skills/), bench/, tests/, test_* files, auto-release.sh, bench examples (`[[example]]` blocks), dev notes |
+| Ships on Current                                                                                                                                  | Never ships (Development-only)                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| crates/, plugins/ (as gitlink), docs, README, CHANGELOG, Maintain/scripts (non-bench), ruff.toml, rustfmt.toml, .prettier*, .vscode/settings.json | .hermes/ (incl. skills/), bench/, tests/, test_* files, auto-release.sh, bench examples (`[[example]]` blocks), dev notes |
 
 ---
 
