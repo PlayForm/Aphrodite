@@ -75,7 +75,7 @@ _REQUIRED_VOID_P: tuple[str, ...] = (
 # mismatch against the live dylib - degrades to the manual restype setup,
 # never to an unconfigured ctypes default.
 try:
-    from . import _bindings as _GENERATED_BINDINGS  # type: ignore[attr-defined]
+    from . import _bindings as _GENERATED_BINDINGS  # noqa: N812  # type: ignore[attr-defined]
 except Exception as _bindings_err:  # ImportError (absent), SyntaxError (corrupt), ...
     _GENERATED_BINDINGS = None  # type: ignore[assignment]
     _log.debug(

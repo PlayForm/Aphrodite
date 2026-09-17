@@ -8,10 +8,7 @@ strip, __all__ containment, fork/unknown-shape detection, and the AST-based
 validate() contract checks.
 """
 
-import ast
 import importlib.util
-import os
-import shutil
 import sys
 import tempfile
 import unittest
@@ -322,7 +319,7 @@ class TestValidate(unittest.TestCase):
             "    break\n"
         )
         final = fb.postprocess(make_raw(loops), Path("/tmp/x.h"))
-        with self.assertRaises(fb.ContractViolation) as cm:
+        with self.assertRaises(fb.ContractViolationError) as cm:
             fb.validate(final, fb.parse_header(HEADER), HEADER, [], Path("/tmp/r.py"))
         self.assertTrue(any("NOT pointer-width" in v for v in cm.exception.violations))
 
@@ -346,7 +343,7 @@ class TestValidate(unittest.TestCase):
             "        aphrodite_hermes_dispatch_tool.restype = c_void_p\n"
             "        aphrodite_hermes_dispatch_tool.errcheck = ReturnString\n",
         )
-        with self.assertRaises(fb.ContractViolation) as cm:
+        with self.assertRaises(fb.ContractViolationError) as cm:
             fb.validate(final, fb.parse_header(HEADER), HEADER, [], Path("/tmp/r.py"))
         self.assertTrue(any("errcheck" in v for v in cm.exception.violations))
 
@@ -354,14 +351,14 @@ class TestValidate(unittest.TestCase):
         loops = IF_ELSE_BLOCK.replace("NAME", "aphrodite_hermes_dispatch_tool")
         loops = loops.replace("[String, String]", "[String]")  # header wants 2
         final = fb.postprocess(make_raw(loops), Path("/tmp/x.h"))
-        with self.assertRaises(fb.ContractViolation) as cm:
+        with self.assertRaises(fb.ContractViolationError) as cm:
             fb.validate(final, fb.parse_header(HEADER), HEADER, [], Path("/tmp/r.py"))
         self.assertTrue(any("parameter(s)" in v for v in cm.exception.violations))
 
     def test_validate_rejects_missing_export(self):
         loops = IF_ELSE_BLOCK.replace("NAME", "aphrodite_hermes_dispatch_tool")
         final = fb.postprocess(make_raw(loops), Path("/tmp/x.h"))
-        with self.assertRaises(fb.ContractViolation) as cm:
+        with self.assertRaises(fb.ContractViolationError) as cm:
             fb.validate(final, fb.parse_header(HEADER), HEADER, [], Path("/tmp/r.py"))
         self.assertTrue(any("omitted exports" in v for v in cm.exception.violations))
 

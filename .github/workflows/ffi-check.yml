@@ -12,11 +12,19 @@ on:
     branches: [Development]
     paths:
       - crates/aphrodite-hermes/src/lib.rs
+      # Generator inputs: build.rs/cbindgen.toml/codegen/** drive the committed
+      # artifact, so a generator change must re-run the contract check even when
+      # lib.rs is untouched.
+      - crates/aphrodite-hermes/build.rs
+      - crates/aphrodite-hermes/cbindgen.toml
+      - crates/aphrodite-hermes/codegen/**
+      - crates/aphrodite-hermes/**
       - plugins/aphrodite/__init__.py
       - plugins/aphrodite/_bindings.py
-      # `plugins/` is a git submodule: GitHub sees a submodule update as a
-      # change to the `plugins` gitlink path, so the umbrella covers plugin
-      # revisions the per-file paths above cannot see.
+      # `plugins/aphrodite` is a git submodule: GitHub sees a submodule update
+      # as a change to the `plugins/aphrodite` gitlink path, so the umbrella
+      # covers artifact revisions the per-file paths above cannot see.
+      - plugins/aphrodite/**
       - plugins/**
       - Maintain/check_ffi_contract.py
       - Maintain/tests/test_check_ffi_contract.py
@@ -24,8 +32,13 @@ on:
     branches: [Development]
     paths:
       - crates/aphrodite-hermes/src/lib.rs
+      - crates/aphrodite-hermes/build.rs
+      - crates/aphrodite-hermes/cbindgen.toml
+      - crates/aphrodite-hermes/codegen/**
+      - crates/aphrodite-hermes/**
       - plugins/aphrodite/__init__.py
       - plugins/aphrodite/_bindings.py
+      - plugins/aphrodite/**
       - plugins/**
       - Maintain/check_ffi_contract.py
       - Maintain/tests/test_check_ffi_contract.py

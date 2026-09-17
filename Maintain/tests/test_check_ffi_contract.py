@@ -328,6 +328,43 @@ def test_bindings_wrong_restype_flagged():
     )
 
 
+def test_argtypes_count_mismatch_flagged():
+    # The codegen finalize step validates argtypes against the header's
+    # parameter counts at build time; the static checker must catch the same
+    # class so a hand-edited artifact cannot silently misalign the ABI frame
+    # (ctypes marshals args positionally and never verifies the count).
+    # Inline setup: argtypes declares 2 params for a 1-param export.
+    init = FIXTURE_INIT.replace(
+        "    dylib.aphrodite_hermes_materialize_directives.argtypes = [ctypes.c_char_p]",
+        "    dylib.aphrodite_hermes_materialize_directives.argtypes = [ctypes.c_char_p, ctypes.c_char_p]",
+    )
+    violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
+    ok(
+        any("materialize_directives" in v and "wrong-argcount" in v for v in violations),
+        f"inline argtypes count mismatch not flagged: {violations}",
+    )
+    # Generated bindings: same class, same violation.
+    bindings = BINDINGS_ALL.replace(
+        "aphrodite_hermes_materialize_directives.argtypes = [c_char_p]",
+        "aphrodite_hermes_materialize_directives.argtypes = [c_char_p, c_char_p]",
+    )
+    violations, _, _ = ffi.check(FIXTURE_LIBRS, FIXTURE_INIT, bindings_source=bindings)
+    ok(
+        any("materialize_directives" in v and "wrong-argcount" in v for v in violations),
+        f"bindings argtypes count mismatch not flagged: {violations}",
+    )
+    # Ghost: argtypes configured for a symbol that is not an export at all.
+    init = FIXTURE_INIT.replace(
+        "    dylib.aphrodite_hermes_materialize_directives.argtypes = [ctypes.c_char_p]",
+        "    dylib.aphrodite_hermes_typo_symbol.argtypes = [ctypes.c_char_p]",
+    )
+    violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
+    ok(
+        any("aphrodite_hermes_typo_symbol" in v and "unknown-export-argtypes" in v for v in violations),
+        f"ghost argtypes symbol not flagged: {violations}",
+    )
+
+
 # ── Real repo + CLI end-to-end ───────────────────────────────────────────────
 def test_real_repo_clean():
     librs = REPO_ROOT / "crates" / "aphrodite-hermes" / "src" / "lib.rs"
@@ -344,17 +381,61 @@ def test_real_repo_clean():
 
 
 def test_cli_exit_codes_and_missing_files():
+    # The checker auto-detects the committed generated bindings
+    # (DEFAULT_BINDINGS) as the restype ground truth, so removing an inline
+    # restype line is MASKED when the artifact covers the symbol. Masking is a
+    # toolchain property, NOT a relaxation of the contract: a missing restype
+    # on a pointer-returning export must fail validation whenever it is absent
+    # from the ground-truth source the checker actually uses. This test pins
+    # both halves - the masked behavior and the real contract.
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "lib.rs").write_text(FIXTURE_LIBRS)
         init = root / "init.py"
-        init.write_text(FIXTURE_INIT)
-        ok(ffi.main(["--librs", str(root / "lib.rs"), "--plugin", str(init)]) == 0, "clean fixture CLI exit != 0")
-        init.write_text(FIXTURE_INIT.replace(MATERIALIZE_RESTYPE_LINE + "\n", ""))
-        ok(ffi.main(["--librs", str(root / "lib.rs"), "--plugin", str(init)]) == 1, "regressed fixture CLI exit != 1")
+        bindings = root / "bindings.py"
+        original_default = ffi.DEFAULT_BINDINGS
+
+        def cli(*args):
+            return ffi.main(["--librs", str(root / "lib.rs"), "--plugin", str(init), *args])
+
+        try:
+            # Clean fixture + explicit --bindings flag path: exit 0.
+            init.write_text(FIXTURE_INIT)
+            bindings.write_text(BINDINGS_ALL)
+            ok(cli("--bindings", str(bindings)) == 0, "clean fixture CLI exit != 0")
+
+            # Ground truth = generated bindings: a missing restype THERE is a
+            # real violation -> exit 1.
+            bindings.write_text(
+                BINDINGS_ALL.replace("aphrodite_hermes_materialize_directives.restype = c_void_p\n", "")
+            )
+            ok(cli("--bindings", str(bindings)) == 1, "regressed bindings CLI exit != 1")
+
+            # Ground truth = inline setup block with the artifact covering the
+            # symbol: the inline removal is masked -> exit 0. Pinned so the
+            # auto-detection semantics stay explicit and regression-detectable.
+            bindings.write_text(BINDINGS_ALL)
+            ffi.DEFAULT_BINDINGS = bindings
+            init.write_text(FIXTURE_INIT.replace(MATERIALIZE_RESTYPE_LINE + "\n", ""))
+            ok(cli() == 0, "masked inline regression unexpectedly failed")
+
+            # Same inline regression with the artifact NEUTRALIZED: the
+            # violation is visible again -> exit 1 (the historical SIGSEGV
+            # class this test was written to guard).
+            ffi.DEFAULT_BINDINGS = root / "absent-bindings.py"
+            ok(cli() == 1, "regressed fixture CLI exit != 1")
+
+            # Clean inline setup, no artifact at all: exit 0.
+            init.write_text(FIXTURE_INIT)
+            ok(cli() == 0, "clean inline fixture CLI exit != 0")
+        finally:
+            ffi.DEFAULT_BINDINGS = original_default
+
+        # Usage errors: exit 2.
         missing = root / "nope.py"
-        ok(ffi.main(["--librs", str(root / "lib.rs"), "--plugin", str(init), "--bindings", str(missing)]) == 2, "missing --bindings exit != 2")
+        ok(cli("--bindings", str(missing)) == 2, "missing --bindings exit != 2")
         ok(ffi.main(["--librs", str(root / "lib.rs"), "--plugin", str(root / "absent.py")]) == 2, "missing plugin exit != 2")
+        ok(ffi.main(["--librs", str(root / "absent.rs"), "--plugin", str(init)]) == 2, "missing lib.rs exit != 2")
 
 
 def main():

@@ -218,7 +218,7 @@ def bind_to(_dylib):
     them through the same handle that produced them.
     \"\"\"
     _libs[{placeholder!r}] = _dylib
-""".format(placeholder=PLACEHOLDER_LIB)
+""".replace("{placeholder!r}", repr(PLACEHOLDER_LIB))  # UP032: .format() trips the f-string rule; .replace() is equivalent (single slot)
 
 
 def _restype_repl(m):
@@ -357,12 +357,12 @@ def validate(final_source, header_fns, header_text, required, raw_path):
     has a pointer-width restype (c_void_p after the rewrite), argtypes counts
     match the header, errcheck is never applied, and every --required export
     is present. A pure compile() (no exec) additionally catches syntax errors
-    the parser alone would miss. Raises ContractViolation on any breach;
+    the parser alone would miss. Raises ContractViolationError on any breach;
     build.rs turns that into a build failure (the tools were available)."""
     try:
         tree = ast.parse(final_source)
     except SyntaxError as e:  # noqa: S314 - AST parse of trusted generated source
-        raise ContractViolation([f"generated bindings are not valid Python: {e}"]) from e
+        raise ContractViolationError([f"generated bindings are not valid Python: {e}"]) from e
     compile(final_source, str(raw_path), "exec")  # full syntax check, never executes
 
     restypes, argtypes, errchecks = {}, {}, {}
@@ -448,10 +448,10 @@ def validate(final_source, header_fns, header_text, required, raw_path):
             )
 
     if violations:
-        raise ContractViolation(violations)
+        raise ContractViolationError(violations)
 
 
-class ContractViolation(Exception):
+class ContractViolationError(Exception):
     def __init__(self, violations):
         super().__init__("\n".join(violations))
         self.violations = violations
@@ -506,7 +506,7 @@ def main(argv=None):
             required=required,
             raw_path=raw_path,
         )
-    except ContractViolation as e:
+    except ContractViolationError as e:
         for v in e.violations:
             print(f"CONTRACT VIOLATION: {v}", file=sys.stderr)
         print(

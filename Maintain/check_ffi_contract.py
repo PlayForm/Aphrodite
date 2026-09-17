@@ -14,6 +14,13 @@ block in ``plugins/aphrodite/__init__.py`` or, when present, a generated
 ``_REQUIRED_VOID_P`` in the plugin is parsed as additional ground truth: every
 symbol it lists must exist as a pointer-returning export AND be configured.
 
+The checker also enforces the argtypes-count contract on every export the shim
+binds: an ``argtypes = [...]`` assignment's length must equal the export's Rust
+parameter count. ctypes marshals arguments positionally and never verifies the
+count itself, so a mismatch silently misaligns the ABI frame; the codegen
+finalize step validates the same invariant at build time, and this checker
+guards the committed artifact against hand edits.
+
 All parsing is AST-based (``ast`` for Python, structural regex for Rust), so
 string literals - e.g. the ``_probe_dylib`` subprocess script that mentions
 ``d.aphrodite_hermes_version.restype`` - cannot pollute the results.
@@ -38,9 +45,10 @@ VOID_P_SUFFIX = "c_void_p"
 
 # Matches `#[no_mangle]` followed by `pub [unsafe] extern "C" fn NAME(args)
 # [-> RET] {`. Single-line signatures like the ones in lib.rs; tolerant of
-# whitespace/newlines between the signature and the body brace.
+# whitespace/newlines between the signature and the body brace. Group 2 is
+# the argument list (counted by parse_export_arg_counts); group 3 the return.
 EXPORT_RE = re.compile(
-    r'#\[no_mangle\]\s+pub\s+(?:unsafe\s+)?extern\s+"C"\s+fn\s+(\w+)\s*\([^)]*\)\s*(?:->\s*([^{]+))?\s*\{',
+    r'#\[no_mangle\]\s+pub\s+(?:unsafe\s+)?extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([^{]+))?\s*\{',
     re.MULTILINE,
 )
 
@@ -61,8 +69,23 @@ def parse_exports(librs_source):
     """{symbol: return-kind} for every #[no_mangle] extern "C" fn in lib.rs."""
     exports = {}
     for match in EXPORT_RE.finditer(librs_source):
-        exports[match.group(1)] = classify_return(match.group(2))
+        exports[match.group(1)] = classify_return(match.group(3))
     return exports
+
+
+def parse_export_arg_counts(librs_source):
+    """{symbol: parameter count} for every #[no_mangle] extern "C" fn in lib.rs.
+
+    The parameter list group is `([^)]*)`, so nested parens (e.g. function
+    pointers) are not counted - lib.rs exports are plain pointer/scalar args.
+    """
+    counts = {}
+    for match in EXPORT_RE.finditer(librs_source):
+        args = match.group(2)
+        counts[match.group(1)] = 0 if not args.strip() else len(
+            [param for param in args.split(",") if param.strip()]
+        )
+    return counts
 
 
 def parse_required_void_p(plugin_source):
@@ -149,6 +172,38 @@ def parse_restype_assignments(source):
     return restypes
 
 
+def parse_argtypes_assignments(source):
+    """{symbol: [argtype-expressions]} for every ``<obj>.SYM.argtypes = [...]``.
+
+    Shares the AST discipline of parse_restype_assignments: only assignments
+    whose symbol uses the export prefix are kept; string literals (the
+    _probe_dylib subprocess script) and unrelated objects (k32, wt) are
+    structurally excluded. The LIST LENGTH is the contract: ctypes marshals
+    arguments positionally and never verifies the count itself, so it must
+    equal the export's Rust parameter count.
+    """
+    tree = ast.parse(source)
+    argtypes = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if not (isinstance(target, ast.Attribute) and target.attr == "argtypes"):
+                continue
+            base = target.value
+            if isinstance(base, ast.Name):
+                symbol = base.id
+            elif isinstance(base, ast.Attribute):
+                symbol = base.attr
+            else:
+                continue
+            if not symbol.startswith(EXPORT_PREFIX):
+                continue
+            if isinstance(node.value, (ast.List, ast.Tuple)):
+                argtypes[symbol] = [ast.unparse(element).strip() for element in node.value.elts]
+    return argtypes
+
+
 def check(librs_source, plugin_source, bindings_source=None):
     """Diff the export surface against the restype ground truth.
 
@@ -156,14 +211,17 @@ def check(librs_source, plugin_source, bindings_source=None):
     warnings exit 0 (surfaced so unbound exports are visible, not fatal).
     """
     exports = parse_exports(librs_source)
+    arg_counts = parse_export_arg_counts(librs_source)
     required = parse_required_void_p(plugin_source)
     called = parse_call_json_symbols(plugin_source)
     direct = parse_direct_dylib_calls(plugin_source)
     if bindings_source is not None:
         restypes = parse_restype_assignments(bindings_source)
+        argtypes = parse_argtypes_assignments(bindings_source)
         restype_source_name = "generated bindings"
     else:
         restypes = parse_restype_assignments(plugin_source)
+        argtypes = parse_argtypes_assignments(plugin_source)
         restype_source_name = "inline setup block"
 
     violations = []
@@ -189,6 +247,16 @@ def check(librs_source, plugin_source, bindings_source=None):
                     f"dylib.{symbol}(...) but not a #[no_mangle] export in lib.rs"
                 )
             continue
+        if symbol in argtypes:
+            expected = arg_counts.get(symbol)
+            actual = len(argtypes[symbol])
+            if expected is not None and actual != expected:
+                violations.append(
+                    f"[wrong-argcount] {symbol}: argtypes declares {actual} "
+                    f"parameter(s) but lib.rs declares {expected} - ctypes "
+                    "marshals arguments positionally and never verifies the "
+                    "count, so a mismatch misaligns the ABI frame"
+                )
         if kind == "pointer":
             if symbol in restypes:
                 restype = restypes[symbol]
@@ -220,6 +288,13 @@ def check(librs_source, plugin_source, bindings_source=None):
         if symbol not in exports:
             violations.append(
                 f"[unknown-export-configured] {symbol}: restype configured but symbol "
+                "is not a #[no_mangle] export in lib.rs"
+            )
+
+    for symbol in sorted(argtypes):
+        if symbol not in exports:
+            violations.append(
+                f"[unknown-export-argtypes] {symbol}: argtypes configured but symbol "
                 "is not a #[no_mangle] export in lib.rs"
             )
 
@@ -290,6 +365,8 @@ def main(argv=None):
     print(f"  exports        : {len(parse_exports(librs_source))}")
     print(f"  required       : {len(parse_required_void_p(plugin_source))}")
     print(f"  called (json)  : {len(parse_call_json_symbols(plugin_source))}")
+    argtypes_source = bindings_source if bindings_source is not None else plugin_source
+    print(f"  argtypes       : {len(parse_argtypes_assignments(argtypes_source))}")
     for violation in violations:
         print(f"  VIOLATION {violation}")
     for warning in warnings:
