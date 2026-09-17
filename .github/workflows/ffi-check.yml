@@ -1,0 +1,55 @@
+name: FFI-Check
+
+concurrency:
+  group: FFI-Check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [Development]
+    paths:
+      - crates/aphrodite-hermes/src/lib.rs
+      - plugins/aphrodite/__init__.py
+      - plugins/aphrodite/_bindings.py
+      # `plugins/` is a git submodule: GitHub sees a submodule update as a
+      # change to the `plugins` gitlink path, so the umbrella covers plugin
+      # revisions the per-file paths above cannot see.
+      - plugins/**
+      - Maintain/check_ffi_contract.py
+      - Maintain/tests/test_check_ffi_contract.py
+  pull_request:
+    branches: [Development]
+    paths:
+      - crates/aphrodite-hermes/src/lib.rs
+      - plugins/aphrodite/__init__.py
+      - plugins/aphrodite/_bindings.py
+      - plugins/**
+      - Maintain/check_ffi_contract.py
+      - Maintain/tests/test_check_ffi_contract.py
+  workflow_dispatch:
+
+jobs:
+  FFI:
+    name: Static FFI contract check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+
+      - name: FFI contract check (inline setup block)
+        run: python3 Maintain/check_ffi_contract.py
+
+      - name: FFI contract check (generated bindings)
+        run: |
+          if [ -f plugins/aphrodite/_bindings.py ]; then
+            python3 Maintain/check_ffi_contract.py --bindings plugins/aphrodite/_bindings.py
+          else
+            echo "plugins/aphrodite/_bindings.py not generated yet - bindings check skipped"
+          fi
+
+      - name: FFI checker self-tests
+        run: python3 Maintain/tests/test_check_ffi_contract.py
