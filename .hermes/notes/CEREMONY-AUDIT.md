@@ -82,9 +82,9 @@ lines after `B3`): read-only audit of BOTH refs before any merge/sync/tag
 
 ```diff
  I10 working copy on Development; Current touched only inside the ritual
-+ I11 branch-identity audit: no [Development]/[Current] identity leak on EITHER
-+     ref before any merge/sync/tag (workflow triggers + push targets,
-+     .gitmodules branch fields, gitlink targets - see B4)
++I11 branch-identity audit: no [Development]/[Current] identity leak on EITHER
++    ref before any merge/sync/tag (workflow triggers + push targets,
++    .gitmodules branch fields, gitlink targets - see B4)
  D1  selective boundary honored (chain-split absent/present per track)
 ```
 
