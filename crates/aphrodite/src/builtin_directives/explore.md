@@ -22,4 +22,6 @@ Exploration mode: build comprehensive context. Read related files, search across
 - Search for usages with search_files BEFORE editing
 - Prefer granular retrieval: expand the specific marker you need rather than
   pulling whole files when a targeted read suffices
+- Retrieve the results you'll act on BEFORE acting on them - never act on bare
+  hashes
 - Check aphrodite_catalog(mode="toc") to see what's already available

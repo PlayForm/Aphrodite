@@ -7,7 +7,11 @@ Several <<<CCR:hash|type|size>>> markers may accumulate across turns. You decide
 ## Core policy
 
 - Don't fetch a marker the instant it appears. Let pending markers accumulate
-  in your working context; accumulation is what enables batching.
+  in your working context; accumulation is what enables batching. This rule is
+  broken at serious quality cost if you fetch eagerly.
+- Reason across turns about accumulated markers WITHOUT fetching them: treat
+  each <<<CCR:hash|type|size>>> as a lazy reference that stands in for the
+  content until you actually need it to act.
 - When several markers are pending, resolve them in one parallel batch
   (multiple aphrodite_retrieve calls in a single turn) once you have enough to
   act on. Prefer batch retrieval over one-at-a-time fetching.
@@ -34,3 +38,5 @@ Several <<<CCR:hash|type|size>>> markers may accumulate across turns. You decide
 - You pay retrieval cost on content you may never use.
 - You lose the ability to reason about structure (counts, types, sizes) before
   committing to expansion.
+- You lose the ability to defer resolution across turns - every marker forces
+  an immediate expansion, so accumulated reasoning is impossible.
