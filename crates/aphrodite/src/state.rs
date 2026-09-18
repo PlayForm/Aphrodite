@@ -629,10 +629,12 @@ mod tests {
 
 	#[test]
 	fn test_adapt_raises_threshold_when_segments_ignored() {
-		let mut s = AphroditeState::default();
-		s.chain_split_min_segments = 2;
-		s.chain_split_floor = 2;
-		s.chain_split_max_segments = 6;
+		let mut s = AphroditeState {
+			chain_split_min_segments:2,
+			chain_split_floor:2,
+			chain_split_max_segments:6,
+			..Default::default()
+		};
 		// 4 splits, all segments ignored: ratio 0/8 = 0.0 < 0.25 → raise.
 		for i in 0..4 {
 			s.record_chain_split(vec![format!("a{i}"), format!("b{i}")]);
@@ -642,10 +644,12 @@ mod tests {
 
 	#[test]
 	fn test_adapt_keeps_threshold_when_segments_retrieved() {
-		let mut s = AphroditeState::default();
-		s.chain_split_min_segments = 2;
-		s.chain_split_floor = 2;
-		s.chain_split_max_segments = 6;
+		let mut s = AphroditeState {
+			chain_split_min_segments:2,
+			chain_split_floor:2,
+			chain_split_max_segments:6,
+			..Default::default()
+		};
 		// 4 splits, all segments retrieved: ratio 8/8 = 1.0 ≥ 0.5 → floor.
 		for i in 0..4 {
 			let hashes = vec![format!("a{i}"), format!("b{i}")];
@@ -659,10 +663,12 @@ mod tests {
 
 	#[test]
 	fn test_adapt_respects_bounds() {
-		let mut s = AphroditeState::default();
-		s.chain_split_min_segments = 5;
-		s.chain_split_floor = 5;
-		s.chain_split_max_segments = 6;
+		let mut s = AphroditeState {
+			chain_split_min_segments:5,
+			chain_split_floor:5,
+			chain_split_max_segments:6,
+			..Default::default()
+		};
 		// Ignored segments: threshold rises, but never past max.
 		for i in 0..20 {
 			s.record_chain_split(vec![format!("a{i}"), format!("b{i}")]);

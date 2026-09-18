@@ -608,9 +608,12 @@ mod tests {
 	// ── 01-F6/F12: table-driven coverage of every `unwrap_hermes_result`
 	// branch - this ~100-line heuristic had zero regression tests despite
 	// being rewritten three times (bf181d7 -> 9e52762 -> 8f138c1).
+	/// Table row: label, input value, expected (status, kind).
+	type UnwrapCase<'a> = (&'a str, serde_json::Value, Option<(&'a str, &'a str)>);
+
 	#[test]
 	fn test_unwrap_hermes_result_table() {
-		let cases:Vec<(&str, serde_json::Value, Option<(&str, &str)>)> = vec![
+		let cases:Vec<UnwrapCase<'_>> = vec![
 			(
 				"terminal output+exit_code",
 				serde_json::json!({"output": "hello\n", "exit_code": 0}),
