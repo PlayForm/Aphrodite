@@ -250,7 +250,7 @@ re-releases the collapsed v1.3.8 with full crates.io publishing restored._
 
 - **Release pipeline never published to crates.io on tag push.** `Publish.yml`
   gated every `cargo publish` step on `workflow_dispatch` + `publish_crates`,
-  but the `auto-release.sh` path creates `Aphrodite/v*` tags - so the publish
+  but the release-script path creates `Aphrodite/v*` tags - so the publish
   steps were always skipped on the real release trigger. The condition now also
   fires on `refs/tags/Aphrodite/`, so a tag push builds artifacts AND publishes
   `aphrodite-headroom-core` → `aphrodite` → `aphrodite-hermes` in dependency
@@ -280,7 +280,7 @@ re-releases the collapsed v1.3.8 with full crates.io publishing restored._
     - First sentences are held under 60 characters, because the deferred-tool
       catalog listing (`tool_search._short_desc`) shows only the first sentence,
       clipped to 60 chars, and silently ellipsizes anything longer.
-- **README `/health` example version never bumped.** `auto-release.sh`'s sed
+- **README `/health` example version never bumped.** The release script's sed
   and its stale-string guard were both anchored on `v$CURRENT`, while the
   example prints a bare `"version":"1.3.7"` with no `v` - so the sed skipped
   it and the guard failed to notice. Both now handle the bare form.
@@ -742,7 +742,7 @@ runtime code changes.
 - `aphrodite` publish required moving the `include_str!("../../../plugins/aphrodite/__init__.py")`
   into the crate's `templates/` directory so `cargo publish` could package it
 - Fixed `aphrodite`'s headroom-core version pin from `0.1.0` → `0.1.1` to match the published crate
-- Plugin submodule bumped from `v2.0.5` → `v2.0.6`; sync commit fixed after auto-release
+- Plugin submodule bumped from `v2.0.5` → `v2.0.6`; sync commit fixed after the release pipeline ran
   script's `git update-index --cacheinfo` failed silently
 
 ### Benchmarks (headroom-core, release profile, Apple M2 Max)
@@ -1035,7 +1035,7 @@ version. One call replaces the binary without manual intervention.
 
 ### Release Automation
 
-- `scripts/auto-release.sh --minor` for feature bumps
+- `--minor` flag for feature bumps
 - All 4 version locations auto-bumped: Cargo.toml, \_core/config.py,
   pyproject.toml, **init**.py
 - `scripts/release-notes.sh` - shell-safe template generator
