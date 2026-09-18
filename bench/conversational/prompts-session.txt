@@ -1,1 +1,5 @@
-List the top-level files and directories in the current repository, then read the first 30 lines of the CHANGELOG.md and summarize the three most recent release entries in under 150 words.
+Run `ls -la` in the current directory and also `ls -laR bench/ | head -200`, then report the 10 largest files you see.
+Run `git log --oneline -50` in this repo and `git diff HEAD~1 --stat`, then summarize what the most recent commit changed.
+Read the ENTIRE file crates/aphrodite/src/proxy.rs (all lines) and summarize its main functions in under 150 words.
+Run `find bench/ -type f | head -50` and `wc -l bench/corpus/*`, then list the biggest corpus fixture and its line count.
+Read the full docs/ccr/marker-format.md and docs/ccr/content-types.md, then compare the marker hash format with the content-type taxonomy in under 150 words.
