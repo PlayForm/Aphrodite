@@ -36,14 +36,14 @@ ccr_ttl_seconds = 3600
 #  COMPRESSION  -  thresholds, engine, auto-expand, classifier poll
 # ══════════════════════════════════════════════════════════════════════════════
 [compression]
-engine_threshold_pct = 100  # 100% = effectively disable CCR compression of tool output (avoids API errors) per standing feedback
+engine_threshold_pct = 45   # default: compress at 45% context; set to 100 or higher to disable engine compression entirely (escape hatch); APHRODITE_ENGINE_THRESHOLD_PCT > TOML > default
 engine_protect_first = 2    # messages to keep at start
 engine_protect_last = 5     # messages to keep at end
 engine_min_msgs = 8         # minimum messages before activating
-tool_threshold_token = 256  # token proxy threshold (bytes) - lower = compress more
-tool_threshold_cache = 2048 # cache proxy threshold (bytes) - lower = compress more
-terminal_threshold = 512    # terminal output threshold (bytes) - catch more terminal output
-inline_threshold = 1024     # inline zlib fallback threshold (bytes)
+tool_threshold_token = 512  # token proxy threshold (bytes) - lower = compress more
+tool_threshold_cache = 4096 # cache proxy threshold (bytes) - lower = compress more
+terminal_threshold = 1024   # terminal output threshold (bytes) - catch more terminal output
+inline_threshold = 2048     # inline zlib fallback threshold (bytes)
 auto_expand = true          # on: markers auto-expand inline - no aphrodite_retrieve needed for tool output
 auto_expand_limit = 102400  # cap per-expansion at 100KB (0=unlimited, but safe cap prevents context blowout)
 catalog_mode = "tool"       # compact | full | tool
