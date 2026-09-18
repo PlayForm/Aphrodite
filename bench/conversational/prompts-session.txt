@@ -1,0 +1,1 @@
+List the top-level files and directories in the current repository, then read the first 30 lines of the CHANGELOG.md and summarize the three most recent release entries in under 150 words.

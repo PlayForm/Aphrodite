@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use aphrodite_bench_compression::{load_corpus, pathological_corpus, run_all_stages};
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 
-fn bench_classify(c: &mut Criterion) {
+fn bench_classify(c:&mut Criterion) {
 	let corpus = load_corpus();
 	let mut g = c.benchmark_group("classify");
 	for f in &corpus {
@@ -28,25 +28,39 @@ fn bench_classify(c: &mut Criterion) {
 	g.finish();
 }
 
-fn bench_stage2(c: &mut Criterion) {
+fn bench_stage2(c:&mut Criterion) {
 	let corpus = load_corpus();
 	// Files whose detected type has a stage-2 reducer, plus text as control.
-	let picks = ["build_log.txt", "git_diff.patch", "wide_5k_keys.json", "code_rust.rs", "text_100kb.txt"];
+	let picks = [
+		"build_log.txt",
+		"git_diff.patch",
+		"wide_5k_keys.json",
+		"code_rust.rs",
+		"text_100kb.txt",
+	];
 	let mut g = c.benchmark_group("stage2");
 	for f in corpus.iter().filter(|f| picks.contains(&f.name.as_str())) {
 		let ty = aphrodite::detect_type(&f.content);
 		g.throughput(Throughput::Bytes(f.content.len() as u64));
-		g.bench_with_input(BenchmarkId::from_parameter(format!("{}[{}]", f.name, ty)), &f.content, |b, content| {
-			b.iter(|| aphrodite::stage2::compress_stage2(black_box(content), black_box(&ty)));
-		});
+		g.bench_with_input(
+			BenchmarkId::from_parameter(format!("{}[{}]", f.name, ty)),
+			&f.content,
+			|b, content| {
+				b.iter(|| aphrodite::stage2::compress_stage2(black_box(content), black_box(&ty)));
+			},
+		);
 	}
 	g.finish();
 }
 
-fn bench_struct_extract(c: &mut Criterion) {
+fn bench_struct_extract(c:&mut Criterion) {
 	let corpus = load_corpus();
-	let langs =
-		[("code_rust.rs", "rust"), ("code_python.py", "python"), ("code_go.go", "go"), ("code_ts.ts", "ts")];
+	let langs = [
+		("code_rust.rs", "rust"),
+		("code_python.py", "python"),
+		("code_go.go", "go"),
+		("code_ts.ts", "ts"),
+	];
 	let mut g = c.benchmark_group("struct_extract");
 	for (file, lang) in langs {
 		let f = corpus.iter().find(|f| f.name == file).expect("language fixture present");
@@ -58,7 +72,7 @@ fn bench_struct_extract(c: &mut Criterion) {
 	g.finish();
 }
 
-fn bench_marker(c: &mut Criterion) {
+fn bench_marker(c:&mut Criterion) {
 	let corpus = load_corpus();
 	let rust = &corpus.iter().find(|f| f.name == "code_rust.rs").unwrap().content;
 	let ty = aphrodite::detect_type(rust);
@@ -95,7 +109,7 @@ fn bench_marker(c: &mut Criterion) {
 	g.finish();
 }
 
-fn bench_resolve(c: &mut Criterion) {
+fn bench_resolve(c:&mut Criterion) {
 	// Chain of nested markers: lvl0 -> lvl1 -> ... -> lvlN (leaf).
 	// Depth d means d marker hops before hitting plain content.
 	let mut g = c.benchmark_group("resolve");
@@ -123,7 +137,7 @@ fn bench_resolve(c: &mut Criterion) {
 	g.finish();
 }
 
-fn bench_store(c: &mut Criterion) {
+fn bench_store(c:&mut Criterion) {
 	let corpus = load_corpus();
 	let picks = ["text_1kb.txt", "text_100kb.txt", "text_500kb.txt"];
 	let mut g = c.benchmark_group("store");
@@ -150,7 +164,7 @@ fn bench_store(c: &mut Criterion) {
 	g.finish();
 }
 
-fn bench_pathological(c: &mut Criterion) {
+fn bench_pathological(c:&mut Criterion) {
 	// Crash-regression corpus: every stage must complete without panicking.
 	// Criterion aborts the run on panic, so simply executing is the assert;
 	// the explicit check below also pins that output is produced.

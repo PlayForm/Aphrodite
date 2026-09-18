@@ -241,9 +241,6 @@ desktop.ini
 .idea/
 **/.idea/
 **/.idea/**
-.vscode/
-**/.vscode/
-**/.vscode/**
 *.sublime-*
 .project
 .classpath
@@ -405,6 +402,10 @@ plugins/aphrodite/**
 .hermes/**
 !.hermes/**/
 !.hermes/**/*.md
+
+!.vscode/
+.vscode/**
+!.vscode/settings.json
 
 # Benchmark suite - machine-generated corpora, results, harnesses; not
 # authored prose (keep out of formatting).

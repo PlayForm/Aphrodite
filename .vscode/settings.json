@@ -1,14 +1,87 @@
 {
-  "editor.formatOnSave": true,
-  "editor.formatOnPaste": false,
-  "editor.formatOnType": false,
+  "[go]": {
+    "editor.defaultFormatter": "tooltitudeteam.tooltitude"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4,
+    "editor.wordWrap": "on"
+  },
+  // Python: use the repo's ruff (single formatter, explicit config in
+  // ruff.toml). This is the formatter CI's Check.yml uses, so Alt+F and CI
+  // produce identical output. Requires the Ruff VSCode extension
+  // (charliermarsh.ruff).
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.tabSize": 4
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.tabSize": 4,
-  "editor.insertSpaces": false,
   "editor.detectIndentation": false,
+  "editor.formatOnPaste": false,
+  "editor.formatOnSave": true,
+  "editor.formatOnType": false,
+  "editor.insertSpaces": false,
+  "editor.tabSize": 4,
+  "explorer.excludeGitIgnore": false,
   "files.eol": "\n",
+  "files.exclude": {
+    "**/.fingerprint": true,
+    "**/Target": true,
+    "**/deps": true,
+    "**/incremental": true,
+    "**/node_modules": true,
+    "**/target": true,
+    "**/vendor": false
+  },
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
+  "files.watcherExclude": {
+    "**/.fingerprint/**": true,
+    "**/.hermes/**": true,
+    "**/Target/**": true,
+    "**/deps/**": true,
+    "**/incremental/**": true,
+    "**/node_modules/**": true,
+    "**/profiles/**": true,
+    "**/target/**": true,
+    "**/vendor/**": true
+  },
+  "prettier.ignorePath": ".prettierignore",
+  "prettier.requireConfig": true,
+  // Ruff keys ported from Current for editor parity (c5cbed8/589807a era).
+  // lineLength is redundant with ruff.toml (source of truth), kept for
+  // parity; organizeImports/showSyntaxErrors mirror Current's bindings.
+  "ruff.lineLength": 100,
+  "ruff.organizeImports": true,
+  "ruff.showSyntaxErrors": true,
   // Rust: Aphrodite uses nightly-only rustfmt options (rustfmt.toml:
   // space_after_colon = false, imports_granularity, group_imports, ...).
   // Stable rustfmt and rust-analyzer's internal formatter silently IGNORE
@@ -24,82 +97,11 @@
     "--edition",
     "2024"
   ],
-  "[rust]": {
-    "editor.defaultFormatter": "rust-lang.rust-analyzer",
-    "editor.tabSize": 4
-  },
-  // Python: use the repo's ruff (single formatter, explicit config in
-  // ruff.toml). This is the formatter CI's Check.yml uses, so Alt+F and CI
-  // produce identical output. Requires the Ruff VSCode extension
-  // (charliermarsh.ruff).
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true,
-    "editor.formatOnPaste": true,
-    "editor.tabSize": 4,
-    "editor.insertSpaces": true
-  },
-  "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "editor.tabSize": 2,
-    "editor.insertSpaces": true
-  },
-  "[yaml]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "editor.tabSize": 2,
-    "editor.insertSpaces": true
-  },
-  "[markdown]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "editor.tabSize": 4,
-    "editor.insertSpaces": false,
-    "editor.wordWrap": "on"
-  },
-  "[toml]": {
-    "editor.defaultFormatter": "tamasfe.even-better-toml",
-    "editor.tabSize": 4,
-    "editor.insertSpaces": false
-  },
-  "[shellscript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "editor.tabSize": 4,
-    "editor.insertSpaces": false
-  },
-  "prettier.requireConfig": true,
-  "prettier.ignorePath": ".prettierignore",
-  // Ruff keys ported from Current for editor parity (c5cbed8/589807a era).
-  // lineLength is redundant with ruff.toml (source of truth), kept for
-  // parity; organizeImports/showSyntaxErrors mirror Current's bindings.
-  "ruff.lineLength": 100,
-  "ruff.organizeImports": true,
-  "ruff.showSyntaxErrors": true,
-
-  "files.exclude": {
-    "**/target": true,
-    "**/Target": true,
-    "**/node_modules": true,
-    "**/.fingerprint": true,
-    "**/incremental": true,
-    "**/deps": true,
-    "**/vendor": false
-  },
   "search.exclude": {
-    "**/target": true,
+    "**/.hermes": true,
     "**/Target": true,
     "**/node_modules": true,
-    "**/.hermes": true,
-    "**/profiles": true
-  },
-  "files.watcherExclude": {
-    "**/target/**": true,
-    "**/Target/**": true,
-    "**/node_modules/**": true,
-    "**/.fingerprint/**": true,
-    "**/incremental/**": true,
-    "**/deps/**": true,
-    "**/vendor/**": true,
-    "**/.hermes/**": true,
-    "**/profiles/**": true
-},
-"explorer.excludeGitIgnore": false
+    "**/profiles": true,
+    "**/target": true
+  }
 }

@@ -8,20 +8,23 @@ use std::path::PathBuf;
 
 /// Absolute path to `bench/corpus/`.
 pub fn corpus_dir() -> PathBuf {
-	PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../corpus").canonicalize().expect("corpus dir exists")
+	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+		.join("../corpus")
+		.canonicalize()
+		.expect("corpus dir exists")
 }
 
 /// One corpus fixture: file name + UTF-8 content.
 #[derive(Debug, Clone)]
 pub struct Fixture {
-	pub name: String,
-	pub content: String,
+	pub name:String,
+	pub content:String,
 	/// Pathological fixtures are crash-regression inputs (wave-1 classes:
 	/// UTF-8 slice panics, literal-marker corruption, interior NULs).
-	pub pathological: bool,
+	pub pathological:bool,
 }
 
-const PATHOLOGICAL: &[&str] = &["utf8_boundary.txt", "marker_literal.txt", "interior_nul.json"];
+const PATHOLOGICAL:&[&str] = &["utf8_boundary.txt", "marker_literal.txt", "interior_nul.json"];
 
 /// Load every corpus fixture (excluding the generator script), sorted by name.
 pub fn load_corpus() -> Vec<Fixture> {
@@ -40,7 +43,7 @@ pub fn load_corpus() -> Vec<Fixture> {
 		let bytes = std::fs::read(entry.path()).expect("read fixture");
 		// interior_nul.json carries raw 0x00 bytes; all fixtures are valid UTF-8.
 		let content = String::from_utf8(bytes).expect("fixtures are valid UTF-8");
-		out.push(Fixture { pathological: PATHOLOGICAL.contains(&name.as_str()), name, content });
+		out.push(Fixture { pathological:PATHOLOGICAL.contains(&name.as_str()), name, content });
 	}
 	out.sort_by(|a, b| a.name.cmp(&b.name));
 	assert!(out.len() >= 10, "expected at least 10 corpus fixtures, got {}", out.len());
@@ -48,14 +51,12 @@ pub fn load_corpus() -> Vec<Fixture> {
 }
 
 /// The pathological subset.
-pub fn pathological_corpus() -> Vec<Fixture> {
-	load_corpus().into_iter().filter(|f| f.pathological).collect()
-}
+pub fn pathological_corpus() -> Vec<Fixture> { load_corpus().into_iter().filter(|f| f.pathological).collect() }
 
 /// Run the full non-proxy pipeline stage set over one content blob,
 /// returning a fingerprint (so callers can black_box it). Panics propagate -
 /// callers wrap in catch_unwind where a panic is the failure being tested.
-pub fn run_all_stages(content: &str) -> usize {
+pub fn run_all_stages(content:&str) -> usize {
 	let ty = aphrodite::detect_type(content);
 	let preview = aphrodite::build_preview(&ty, content);
 	let stage2 = aphrodite::stage2::compress_stage2(content, &ty);
