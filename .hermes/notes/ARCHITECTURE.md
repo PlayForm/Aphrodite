@@ -24,7 +24,7 @@ The two pipelines share `compute_key` (BLAKE3) + the marker wire format
 cbindgen 0.29 -> aphrodite_hermes.h
   -> ctypesgen (upstream 2.7.4-27202 installed)
   -> crates/aphrodite-hermes/codegen/finalize_bindings.py (409-line AST finalizer)
-  -> committed plugins/aphrodite/_bindings.py (copy-on-change, byte-stable, 133 lines)
+  -> committed plugins/aphrodite/_bindings.py (copy-on-change, byte-stable, 135 lines)
 ```
 
 - `finalize_bindings.py`: AST-based `validate()` (no exec), strips the
