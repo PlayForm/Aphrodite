@@ -10,7 +10,8 @@ tags: [aphrodite, release, branch, cherry-pick, submodule, hotfix]
 
 Concrete instance of `branch-flow-protocol` for PlayForm/Aphrodite (parent P)
 and its plugin submodule S (`plugins/aphrodite` → PlayForm/Aphrodite-Hermes,
-remote `Source`). Replaces the deleted `aphrodite-branch-release-flow`; read
+remote `Source`). Replaces the retired `aphrodite-branch-release-flow` v1.1.0
+(kept in place, marked deprecated - do not use it); read
 the protocol for the axioms/state machine, this skill carries the instance
 declaration and the ceremony.
 
@@ -79,6 +80,12 @@ status` shows no `+` → commit `release: sync vX.Y.Z from Development` →
    `refs/tags/Aphrodite/*` (branch-agnostic).
 5. GitHub release from the tag (notes via --notes-file, never inline
    backticks). Return to Development.
+
+**B4 - branch-identity audit gate (I11), MANDATORY before ANY sync or tag:**
+keyword-scan BOTH refs (Development + Current) for branch-identity leaks -
+`.gitmodules` branch fields, `[Development]`/`[Current]` workflow triggers,
+gitlink targets - and confirm zero identity statements on the wrong branch.
+Full procedure: `RELEASE-METHODOLOGY.md` `### B4` (in `.hermes/notes/`).
 
 ## Hotfix on Current - the fast path (user preference)
 

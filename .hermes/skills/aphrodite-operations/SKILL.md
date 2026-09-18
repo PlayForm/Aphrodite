@@ -31,8 +31,9 @@ with different offsets or tools. The full tool-API doctrine lives in
    `aphrodite_prefetch_status`.
 2. **Retrieve, don't re-read** - on `<<<CCR:hash|type|size>>>`, call
    `aphrodite_retrieve(hash)`. Never call `read_file` again on the same file.
-3. **Write terminal output to files** - `cmd > /tmp/out.txt 2>&1`, then
-   prefetch/retrieve the file instead of reading raw output.
+3. **Write terminal output to files** - `cmd > .hermes/tmp/out.txt 2>&1`,
+   then prefetch/retrieve the file instead of reading raw output (scratch
+   belongs in `.hermes/tmp/`, never `/tmp` - see `aphrodite-testing-discipline`).
 4. **Do other work while waiting** - dispatch prefetches and independent tasks,
    then poll readiness.
 

@@ -103,6 +103,16 @@ verifying preview behavior, exercise both:
 - Tests that mutate process-global state (e.g. the preview_max_chars cap)
   must take the module's shared test guard, or parallel cargo test runs
   race and fail intermittently - the cap_guard lesson from preview.rs.
+- **A stray exported env var is a SUITE-WIDE landmine (env-var
+  hermeticity).** `APHRODITE_PREVIEW_MAX_CHARS` (and every `APHRODITE_*`
+  knob) beats TOML in the resolution chain (env > TOML > default), so a
+  value left exported from a battery probe's shell silently failed 21-25
+  `cargo test -p aphrodite` config-precedence tests per run with VARYING
+  failures. Config/precedence tests must be hermetic: back up the prior
+  value, `std::env::remove_var(...)` (Python: `monkeypatch.delenv`) at
+  test start, restore it at the end. A subagent's clean env does NOT
+  prove the parent's env is clean - after any env-var change, re-run the
+  suite in your own shell.
 
 ## Verification Checklist
 
@@ -111,5 +121,7 @@ verifying preview behavior, exercise both:
 - [ ] Version handshake: dylib version == BINARY_VERSION
 - [ ] Release dylib rebuilt, not stale
 - [ ] Real test suites run and actual numbers recorded
+- [ ] No stray `APHRODITE_*` env vars exported (config tests hermetic:
+      remove_var/restore, or monkeypatch.delenv)
 - [ ] Scratch in `.hermes/tmp/` (or the sigserve scratch dir), never `/tmp`
 - [ ] No crash dialogs, repro SURVIVED, zero new SIGSEGV

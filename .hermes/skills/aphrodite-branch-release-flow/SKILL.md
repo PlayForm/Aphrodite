@@ -1,12 +1,20 @@
 ---
 name: aphrodite-branch-release-flow
-description: "Use when syncing Development to Current or hotfixes up."
+description: "DEPRECATED - superseded by aphrodite-release-flow v2.0.0 (use that for all release/sync/hotfix work). Retained as an archive only."
 version: 1.1.0
 platforms: [macos]
-tags: [aphrodite, release, branch, cherry-pick, submodule]
+tags: [aphrodite, release, branch, cherry-pick, submodule, deprecated]
 ---
 
 # Aphrodite Branch Release Flow
+
+> ## DEPRECATED - retired 2026-09-18
+>
+> **Superseded by `aphrodite-release-flow` v2.0.0.** The ceremony, topology,
+> hotfix path, sync-back, and every pitfall now live there. Do NOT load or
+> follow this skill for new release work - read `aphrodite-release-flow`
+> first. This file is retained as an archive (never deleted) so the v1.1.0
+> flow and its variant-traps stay greppable.
 
 One-line policy:
 

@@ -20,7 +20,7 @@ lives in the Rust dylib. Auto-expand is controlled by `AUTO_EXPAND_LIMIT`
 (int): when `> 0`, the pre_llm hook scans the conversation for CCR markers and
 resolves those where `marker_size < AUTO_EXPAND_LIMIT`.
 
-**Defaults** (from `~/.hermes/aphrodite.toml`):
+**Defaults** (from `~/.hermes/aphrodite/aphrodite.toml`):
 
 - `compression.auto_expand_limit` = 5 → `AUTO_EXPAND_LIMIT` = 5
 - With limit=5, only markers < 5 bytes get resolved → **effectively OFF**
@@ -45,7 +45,7 @@ default (limit=5) already produces raw markers.
 ### Step 1: Check current config
 
 ```bash
-grep -n "auto_expand" ~/.hermes/aphrodite.toml
+grep -n "auto_expand" ~/.hermes/aphrodite/aphrodite.toml
 ```
 
 ### Step 2: Test context engine with raw markers (default)

@@ -72,7 +72,7 @@ Never pass inline backtick-quoted text to `gh release create --notes` - the
 shell interprets backticks as command substitution; always use `--notes-file`
 with a heredoc. Never ship a bare compare link as release notes; every release
 MUST include Summary, Changes, Infrastructure, What Ships, and Links. Template:
-`.hermes/RELEASE-TEMPLATE.md`; full content standards live in
+`.hermes/release/RELEASE-TEMPLATE.md`; full content standards live in
 `aphrodite-release-workflow`.
 
 ## Session Setup Checklist

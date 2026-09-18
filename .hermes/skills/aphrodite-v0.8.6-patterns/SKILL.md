@@ -1,11 +1,11 @@
 ---
 name: aphrodite-v0.8.6-patterns
 description: "Historical development patterns from v0.8.5→v0.8.6 cycle. Most patterns
-    now live in aphrodite-dev-workflow, aphrodite-upgrade-breakpoints, and
+    now live in aphrodite-operations, aphrodite-upgrade-breakpoints, and
     aphrodite-development-lessons. Keep as reference snapshot."
 version: 1.1.0
 related_skills:
-    [aphrodite-dev-workflow, aphrodite-development-lessons, aphrodite-upgrade-breakpoints]
+    [aphrodite-operations, aphrodite-development-lessons, aphrodite-upgrade-breakpoints]
 ---
 
 # Aphrodite v0.8.6 Patterns (Historical Snapshot)
@@ -13,7 +13,7 @@ related_skills:
 Techniques and pitfalls from the v0.8.6 development cycle. These patterns are now
 canonicalized in:
 
-- **aphrodite-dev-workflow** - repo path resolution, dep pinning, prefetch workflow
+- **aphrodite-operations** - repo path resolution, dep pinning, prefetch workflow
 - **aphrodite-upgrade-breakpoints** - --version flag, standalone plugin repo
 - **aphrodite-development-lessons** - session setup, dual-store pattern
 

@@ -53,8 +53,9 @@ compression, no context engine.
 
 > **Branch model**: release PREPARATION (bump/build/test/commit) runs on
 > `Development`; tags + GitHub releases are created on `Current` only.
-> Follow `aphrodite-branch-release-flow` for the full sync-down ceremony
-> and the protected paths (.gitmodules, workflows, plugin gitlink).
+> Follow `aphrodite-release-flow` (v2.0.0) for the full sync-down ceremony
+> and the protected paths (.gitmodules, workflows, plugin gitlink);
+> `aphrodite-branch-release-flow` is retired.
 
 ```bash
 GIT_EDITOR=true Maintain/scripts/release/auto-release.sh "descriptive message"
@@ -155,16 +156,16 @@ Manually verify after release: grep README example output for `"version":"v`
 ## Binary Symlink (dev)
 
 ```bash
-ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/aphrodite
+ln -sf /path/to/repo/target/release/aphrodite ~/.hermes/aphrodite/binaries/aphrodite
 ```
 
 ## Release Notes - Content Standards
 
 Every release MUST include: Summary, Changes, Infrastructure, What Ships, and
-Links. Canonical template: `.hermes/RELEASE-TEMPLATE.md` (defines **Live** vs
-**Retrospective** modes).
+Links. Canonical template: `.hermes/release/RELEASE-TEMPLATE.md` (defines
+**Live** vs **Retrospective** modes).
 
-- Drafts live in `.plans/release-notes/` (`vNEXT-draft.md`,
+- Drafts live in `.hermes/release-notes/` (`vNEXT-draft.md`,
   `headroom-fork-vNEXT-draft.md`). Stage `Maintain/release-notes-vX.Y.Z.md`
   explicitly - verify it is actually committed; it can drop out between
   `git add` and commit.
@@ -180,10 +181,11 @@ Links. Canonical template: `.hermes/RELEASE-TEMPLATE.md` (defines **Live** vs
   `aphrodite-headroom-core` package name.
 - Never ship a bare compare link with zero description.
 - Never use backticks with `gh release create --notes` - the shell interprets
-  them as command substitution. Always `--notes-file` with a heredoc:
+  them as command substitution. Always `--notes-file` with a heredoc (write
+  the notes scratch into `.hermes/tmp/`, never `/tmp`):
 
 ```bash
-cat > /tmp/notes.md << 'EOF'
+cat > .hermes/tmp/notes.md << 'EOF'
 **[Compare vX.Y.Z...vX.Y.Z](https://github.com/PlayForm/Aphrodite/compare/vX.Y.Z...vX.Y.Z)**
 
 ## Aphrodite vX.Y.Z 💋 Plugin vA.B.C
@@ -220,7 +222,7 @@ Build.yml's 4-target matrix (`aarch64-apple-darwin`, `x86_64-apple-darwin`,
 EOF
 # Normal tag pushes auto-attach every staged artifact; the glob form below is
 # only for a from-source re-attach. Glob every staged file, never name 2 of 12:
-gh release create Aphrodite/vX.Y.Z --notes-file /tmp/notes.md \
+gh release create Aphrodite/vX.Y.Z --notes-file .hermes/tmp/notes.md \
   staging/aphrodite-* staging/libaphrodite_hermes-* staging/SHA256SUMS-*.txt
 ```
 
