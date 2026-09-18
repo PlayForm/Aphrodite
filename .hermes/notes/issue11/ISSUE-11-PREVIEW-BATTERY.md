@@ -1,7 +1,7 @@
 # ISSUE-11 PREVIEW BATTERY - Empirical preview-quality audit of aphrodite-hermes 1.4.5
 
 **Date:** 2026-09-17 · **Binary:** `target/release/libaphrodite_hermes.dylib` (built 17:01:49, fresh vs. latest source 16:44:06) · **Version:** `1.4.5` (confirmed via `aphrodite_hermes_version`)
-**Repo:** `/Volumes/CORSAIR/Developer/macOS/Application/PlayForm/Aphrodite` (branch `Development`)
+**Repo:** `…/PlayForm/Aphrodite` (branch `Development`)
 **Scope:** catalog every MISLEADING / SHALLOW / TYPE-WRONG preview like issue #11 (`{'success':true,...}` → literal `"ok"`) across all compression types, and score the engine.
 
 ---
@@ -213,7 +213,7 @@ Key call logic (both scripts):
 
 ```python
 import ctypes, json
-lib = ctypes.CDLL("/Volumes/CORSAIR/Developer/macOS/Application/PlayForm/Aphrodite/target/release/libaphrodite_hermes.dylib")
+lib = ctypes.CDLL("…/PlayForm/Aphrodite/target/release/libaphrodite_hermes.dylib")
 lib.aphrodite_hermes_dispatch_tool.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.aphrodite_hermes_dispatch_tool.restype = ctypes.c_void_p
 lib.aphrodite_hermes_free_string.argtypes = [ctypes.c_void_p]

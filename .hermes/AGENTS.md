@@ -1,57 +1,124 @@
-# Aphrodite 💋 Development Context
+# Aphrodite - Development Context
 
-Welcome! You're working on Aphrodite - a blazing-fast CCR compression engine
-that saves millions of tokens and makes AI agents dramatically more efficient.
-Every line you write here directly makes LLMs cheaper, faster, and smarter. ✨
+Welcome! You're working on Aphrodite: a blazing-fast CCR compression engine
+(Rust binary proxy + Hermes plugin) that turns large tool outputs into tiny
+`<<<CCR:hash|type|size>>>` markers so agents keep full context at a fraction
+of the token cost. Read this file first - it is the map.
 
-## Project
+## Current state (verified 2026-09-18)
 
-- **Rust proxy** - LLM API with intelligent CCR compression
-- **Two crates**: `crates/aphrodite` (core engine) + `crates/aphrodite-hermes` (agent integration)
-- **Plugin**: `plugins/aphrodite` v2.1.4 - 13 tools, dylib hot-reload, dual-proxy architecture, generated FFI bindings (`_bindings.py`), layout self-heal (skills live dev-side in `.hermes/skills/`, never shipped)
-- **Config**: `aphrodite.toml` - all tuning in one file, env-overridable
-- **Binary**: `~/.hermes/aphrodite/aphrodite` - auto-downloaded, auto-updated (run `aphrodite --version` for the current version, not a hardcoded one here)
+- **Binary 1.4.6** - `crates/aphrodite` (plus `crates/aphrodite-hermes`,
+  `package.json`, `plugins/aphrodite/BINARY_VERSION`). For live values ask
+  `aphrodite --version` / `aphrodite_stats`, never trust a hardcoded doc
+  number.
+- **Plugin 2.1.4** - `plugins/aphrodite` is a git submodule
+  (PlayForm/Aphrodite-Hermes, remote `Source`). It is a **pure loader**: all
+  compression/engine logic lives in the Rust dylib
+  (`libaphrodite_hermes.dylib`); the FFI bindings are **generated**
+  (`_bindings.py` via cbindgen → ctypesgen → finalize). Never hand-edit
+  them - regenerate through the codegen pipeline and keep
+  `test_finalize_bindings.py` green.
+- **Runtime home `~/.hermes/aphrodite/`** - `aphrodite.toml`, `binaries/`
+  (binary + dylib, auto-downloaded/auto-updated), `directives/`,
+  `hotreload/` (dylib hot-reloads on mtime), `ccr.db`. The layout
+  self-heals on start (re-copies binaries/directives/hotreload).
+- **Skills live dev-side** in `.hermes/skills/` (13 skills) and auto-load
+  because the repo is listed in `skills.trusted_project_dirs`
+  (`~/.hermes/config.yaml`) - never ship them with the plugin, never re-trust.
+- **Issue #11 preview machinery (landed in 1.4.6)** - honest previews: the
+  `ok`-collapse is gone, the caller's type hint wins, build/error/linter/log
+  arms surface real lines, `total_count` is real. `preview_max_chars` is
+  wired end-to-end: env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > default 120;
+  absent key = unlimited. A broken/misleading preview is a bug, not cosmetic.
+- **The ceremony** - Development builds, Current distributes (snapshot
+  transplant, submodule first); the **B4 branch-identity audit gate (I11)**
+  runs before ANY sync/tag (keyword-scan both refs for identity leaks);
+  hotfixes work directly on Current and cherry-pick back with `-x`.
+  `.githooks/` are REMOVED (2026-09-17) - never re-create them.
+- **Two version tracks, never conflated**: binary 1.4.x vs plugin 2.1.x.
+  `BINARY_VERSION` is a live distribution pointer - bump it LAST at tag time.
 
-## Dev Flow - The Joyful Loop
+## Key paths
 
-- **Pane 0**: `cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x 'run -p aphrodite'` - instant feedback on every save
-- **Pane 1**: `hermes --profile dev-aphrodite` - test in production immediately
-- **Pane 2**: WezTerm MCP for scripted verification - never interrupt the main session!
+| What            | Where                                                    |
+| --------------- | -------------------------------------------------------- |
+| Core engine     | `crates/aphrodite/` (Rust)                               |
+| Agent bridge    | `crates/aphrodite-hermes/` (dylib exports)               |
+| Plugin (loader) | `plugins/aphrodite/` (`plugin.yaml`, `BINARY_VERSION`)   |
+| Forked deps     | `vendor/headroom/` (submodule; `aphrodite-headroom-core`) |
+| Config          | `aphrodite.toml.example` (tracked); `aphrodite.toml` (local, gitignored) |
+| Runtime         | `~/.hermes/aphrodite/`                                   |
+| Release         | `.hermes/release/RELEASE-TEMPLATE.md`, `.hermes/release-notes/` (v1.4.0…v1.4.3-draft) |
+| Dev archive     | `.hermes/` - skills/, tmp/ (scratch), scripts/, classification/, notes/, uml/ |
+| Maintenance     | `Maintain/` (scripts/, tests/, CHANGELOG.md)             |
 
-Pro tip: The Rust dylib hot-reloads on mtime change - rebuild and the plugin picks
-it up without restarting Hermes. Pure magic. 🪄
+## Dev flow - the joyful loop
 
-Watch BOTH packages, not just `aphrodite`: `-p aphrodite` alone never rebuilds
-`libaphrodite_hermes.dylib` (it's a sibling package that depends on `aphrodite`,
-not the other way around, so Cargo has no reason to touch it). Watching only
-`aphrodite` means the proxy pane looks alive while the Hermes plugin keeps
-running old code indefinitely.
+- **Pane 0**: `cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x
+  'run -p aphrodite'` - instant feedback on every save. Watch BOTH
+  packages: `-p aphrodite` alone never rebuilds
+  `libaphrodite_hermes.dylib` (a sibling package, so Cargo has no reason
+  to touch it) and the plugin keeps running old code while the proxy looks
+  alive.
+- **Pane 1**: `hermes --profile dev-aphrodite` - test in production.
+- Enable auto-expand for dev sessions (`APHRODITE_AUTO_EXPAND=1` or TOML);
+  when you see a `<<<CCR:...>>>` marker, `aphrodite_retrieve(hash)` it -
+  never re-read the source file behind it.
+- Scratch belongs in `.hermes/tmp/` (gitignored contents, tracked
+  `.gitkeep`), NEVER `/tmp`; gzip/tar.gz bulky fixtures in place.
 
-## Key Paths
+## Quality gates - zero tolerance, record ACTUAL numbers (2026-09-18)
 
-| What        | Where                                                         |
-| ----------- | ------------------------------------------------------------- |
-| Binary      | `target/release/aphrodite`                                    |
-| Plugin      | `plugins/aphrodite/` (thin Python ctypes loader → Rust dylib) |
-| Environment | `~/.hermes/.env` (`APHRODITE_API_KEY`)                        |
-| Plans       | `.hermes/plans/`                                              |
-| Templates   | `.hermes/RELEASE-TEMPLATE.md`                                 |
-| Maintenance | `Maintain/scripts/`, `Maintain/CHANGELOG.md`                  |
+| Gate                                                        | Result                       |
+| ----------------------------------------------------------- | ---------------------------- |
+| `cargo test -p aphrodite` (lib + bins)                      | 406 passed (377 lib + 29 bins), 0 failed, 1 ignored |
+| `cargo test -p aphrodite-hermes`                            | 52 passed                    |
+| `python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py` | 23/23 OK              |
+| `python3 Maintain/tests/test_check_ffi_contract.py`         | 13/13 (50 asserts)           |
+| checker: `python3 Maintain/check_ffi_contract.py`           | PASS, 0 violations           |
+| drift-guard: `diff -q plugins/aphrodite/__init__.py crates/aphrodite/templates/__init__.py` | identical |
+| repro: `python3 <sigserve-scratch>/repro.py`                | SURVIVED (no crash)          |
+| `ruff check plugins/aphrodite/`                             | 0 errors (2 known pre-existing perf-probe exclusions) |
+| `cargo clippy -p aphrodite -- -D warnings`; `npx pyright plugins/aphrodite/` | clean               |
+| `npx prettier --check .hermes/**/*.md`                      | clean (tabs, width 100, proseWrap preserve) |
 
-## Agent Team - Your Digital Colleagues
+Run all gates before any release claim; report what commands printed, never
+"should pass".
 
-- **Main agent**: Development + testing - the tip of the spear
-- **Background workers**: Research, code review, test generation - tireless helpers
-- **Cron jobs**: Health checks, release builds - the unsung heroes
+## Dev-side skills (auto-load; edit the files directly)
 
-These agents work in parallel - delegate freely and trust the results!
+- `aphrodite-release-flow` v2.0.0 - THE release/hotfix ceremony, incl. B4.
+  (`aphrodite-branch-release-flow` v1.1.0 is DEPRECATED - archive only.)
+- `aphrodite-testing-discipline` - probe/test rules: exercise the real
+  plugin, no raw ctypes, scratch in `.hermes/tmp/`, env-var hermeticity.
+- `aphrodite-tool-testing` - the 13 CCR tools + retrieve-first rule.
+- `aphrodite-operations` - compressed-session workflow, rebuild, dep pins.
+- `aphrodite-release-workflow` - release gates, version-sync locations,
+  release-notes standards, crates.io publishing.
+- `aphrodite-hook-reference` - exact Hermes hook invocations.
+- `aphrodite-benchmarking` - proxy smoke/cache/threshold benchmarking.
+- `aphrodite-auto-expand-testing` - auto-expand behavior matrix.
+- `aphrodite-cargo-upgrade`, `aphrodite-upgrade-breakpoints` - silent
+  breakage checklists for dep upgrades.
+- `aphrodite-development-lessons` - session setup + imperative pitfalls.
+- `aphrodite-v0.8.6-patterns` - historical snapshot only.
 
-## Quality Gates - Zero Tolerance for Warnings
+## Standing rules
 
-```
-ruff check plugins/aphrodite/     → 0 errors, every time
-npx pyright plugins/aphrodite/    → 0 errors, every time
-cargo test -p aphrodite           → all green, every time
-```
+- Never commit/tag/push unasked; the auto-committer sweeps - verify with
+  `git log` / `git submodule status`, not `git status`.
+- Development accumulates (never rewritten); tags live ONLY on Current;
+  protected paths (`.gitmodules`, workflows, plugin gitlink) never cross a
+  transplant; the B4 audit runs before every sync/tag.
+- `BINARY_VERSION` bump LAST at tag time - it is a live distribution pointer.
+- Env vars override config - keep test env hermetic.
+- The preview the model sees must be the FINAL, honest representation of the
+  stored payload.
+- All `.hermes/**/*.md` stay prettier-clean.
 
-We ship clean. Always have, always will.
+## Reading order
+
+1. This file. 2. `aphrodite-release-flow` (ceremony) +
+`aphrodite-testing-discipline` (how to test). 3. `.hermes/notes/`
+(RELEASE-METHODOLOGY.md, ISSUE-11-LANDED.md, session reports) and
+`.hermes/classification/` (file ownership per phase/kind/layer).

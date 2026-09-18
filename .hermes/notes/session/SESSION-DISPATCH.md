@@ -10,7 +10,7 @@ Next wave: release ceremony + 1.5.0 backlog (section "Next wave" below).**
 
 All agents: do NOT commit (auto-committer sweeps); no githooks exist (branch
 discipline manual); write deliverables to both sigserve scratch
-(`~/Developer/.playform/Temporary/sigserve/`) AND `.hermes/notes/` (prettier
+(`…/.playform/Temporary/sigserve/`) AND `.hermes/notes/` (prettier
 --write + --check against repo .prettierrc: tabs, width 100, proseWrap
 preserve); deliverables anonymized (repo-relative paths, ZERO local absolute
 paths). Pairs of 2 per task, disjoint file ownership.

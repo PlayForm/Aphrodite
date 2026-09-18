@@ -27,9 +27,9 @@ Nothing committed.
   (Date/Event/Method/Repo/Scope/Predecessors) was also separated with blank
   lines (rendering fix, zero content change).
 - **Anonymization (zero local absolute paths):** `HERMES-UPDATE-ERROR-FORENSICS.md`
-  rewritten: `/Users/nikola` -> `~`, `/Volumes/CORSAIR/Developer/macOS/Application/PlayForm`
-  -> `…/PlayForm`, `/Volumes/CORSAIR/Developer/macOS/Application` -> `…/Application`,
-  `/Volumes/CORSAIR/...` -> `…/`. No local absolute path remains in any file.
+  rewritten: `/Users/nikola` -> `~`, the local drive prefix + repo root -> `…/`
+  (e.g. `…/PlayForm/Aphrodite`), the Temporary scratch -> `…/.playform/Temporary`.
+  No local absolute path remains in any file.
 - **Location note:** `ISSUE-11-BATTERY-AFTER.md` does not exist in
   `.hermes/notes/`; it lives in the sigserve scratch dir
   (`…/.playform/Temporary/sigserve/`). It was rewritten in place there.
