@@ -205,7 +205,171 @@ domain per session:
 4. **Output one file per fenced block, path-labeled**, each file independently
    compilable, sub-modules called as `Entry::X::Fn(...)`.
 
-## 5. Distilled vs omitted
+## 5. The full file-tree adaptation - preview.rs as PlayForm structure
+
+The source's exact file-tree suggestion, adapted to the current Aphrodite
+`preview.rs` (2117 lines: detection + builders + line predicates + the cap
+statics). The PlayForm shape: `Source/` is the crate root, `Library.rs` is
+`lib.rs` holding only `mod` declarations, `Fn/` holds every function one
+PascalCase file each, `Struct/` holds every struct/static, and a `.rs` file
+with a same-named folder coexist whenever a function has sub-functions.
+
+```
+crates/aphrodite/src/
+├── preview/                        ← new module root (replaces preview.rs)
+│   ├── mod.rs                      ← pub mod Detect; pub mod Preview; pub mod Line; pub mod Text; pub mod State;
+│   ├── Detect.rs                   ← pub fn Fn(content) -> Option<&'static str>  (the or_else pipeline)
+│   ├── Detect/
+│   │   ├── mod.rs                  ← pub mod Input; pub mod IsJson; pub mod IsTest; pub mod IsDiff; …
+│   │   ├── Input.rs                ← pub struct Input (typed, pre-computed once) + new/count/any/majority
+│   │   ├── IsJson.rs               ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsTest.rs               ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsDiff.rs               ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsCode.rs               ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsTable.rs              ← pub fn Fn(inp: &Input) -> bool   (markdown tables)
+│   │   ├── IsMarkdown.rs           ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsYaml.rs               ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsHtmlOrXml.rs          ← pub fn Fn(inp: &Input) -> Option<&'static str>
+│   │   ├── IsCsv.rs                ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsBuild.rs              ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsGitStatus.rs          ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsGitLog.rs             ← pub fn Fn(inp: &Input) -> bool
+│   │   ├── IsGrep.rs               ← pub fn Fn(inp: &Input) -> bool
+│   │   └── IsLs.rs                 ← pub fn Fn(inp: &Input) -> bool
+│   ├── Preview.rs                  ← pub fn Fn(type_str, content) -> String  (build_preview)
+│   ├── Preview/
+│   │   ├── mod.rs                  ← pub mod GitStatus; pub mod GitLog; pub mod Ls; …
+│   │   ├── GitStatus.rs            ← pub fn Fn(content, lines) -> String
+│   │   ├── GitLog.rs               ← pub fn Fn(content, lines) -> String
+│   │   ├── Ls.rs                   ← pub fn Fn(content, lines) -> String
+│   │   ├── Test.rs                 ← pub fn Fn(content, lines) -> String
+│   │   ├── Grep.rs                 ← pub fn Fn(content, lines) -> String
+│   │   ├── Html.rs                 ← pub fn Fn(content, lines) -> String
+│   │   ├── Table.rs                ← pub fn Fn(content, lines) -> String
+│   │   ├── Markdown.rs             ← pub fn Fn(content, lines) -> String
+│   │   ├── Yaml.rs                 ← pub fn Fn(content, lines) -> String
+│   │   ├── Xml.rs                  ← pub fn Fn(content, lines) -> String
+│   │   ├── Csv.rs                  ← pub fn Fn(content, lines) -> String
+│   │   ├── Json.rs                 ← pub fn Fn(content, lines) -> String
+│   │   ├── Search.rs               ← pub fn Fn(content, lines) -> String
+│   │   ├── Error.rs                ← pub fn Fn(content, lines) -> String
+│   │   ├── Lint.rs                 ← pub fn Fn(content, lines) -> String
+│   │   ├── Log.rs                  ← pub fn Fn(content, lines) -> String
+│   │   ├── Terminal.rs             ← pub fn Fn(content, lines) -> String
+│   │   └── Diff.rs                 ← pub fn Fn(content, lines) -> String
+│   ├── Line/                       ← per-line primitive predicates, shared by Detect + Preview
+│   │   ├── mod.rs
+│   │   ├── IsErrorLine.rs          ← fn Fn(line) -> bool
+│   │   ├── IsWarningLine.rs        ← fn Fn(line) -> bool
+│   │   ├── IsFailureLine.rs        ← fn Fn(line) -> bool
+│   │   ├── IsLintLine.rs           ← fn Fn(line) -> bool
+│   │   ├── IsGrepLine.rs           ← fn Fn(line) -> bool
+│   │   ├── IsPathLine.rs           ← fn Fn(line) -> bool
+│   │   ├── IsMdHeading.rs          ← fn Fn(line) -> bool
+│   │   ├── IsMdStructure.rs        ← fn Fn(line) -> bool
+│   │   ├── IsYamlKeyLine.rs        ← fn Fn(line) -> bool
+│   │   ├── GitStatusCode.rs        ← fn Fn(line) -> Option<&str>
+│   │   ├── FirstMeaningfulLine.rs  ← fn Fn(content) -> Option<String>
+│   │   ├── SampleLongLine.rs       ← fn Fn(line) -> String
+│   │   └── NumBefore.rs            ← fn Fn(line, keyword) -> usize
+│   ├── Text/                       ← &str utilities
+│   │   ├── mod.rs
+│   │   └── ApplyPreviewCap.rs      ← pub fn Fn(preview, max_chars) -> String
+│   └── State/
+│       ├── mod.rs                  ← pub mod PreviewMaxChars; pub mod ErrorLineRe; …
+│       ├── PreviewMaxChars.rs      ← pub static PREVIEW_MAX_CHARS: AtomicU32  + Fn() -> u32 + set Fn
+│       ├── ErrorLineRe.rs          ← static ERROR_LINE_RE: LazyLock<Regex>
+│       ├── FailedCountRe.rs        ← static FAILED_COUNT_RE: LazyLock<Regex>
+│       ├── LintRe.rs               ← static LINT_RE: LazyLock<Regex>
+│       ├── DurRe.rs                ← static DUR_RE: LazyLock<Regex>
+│       └── SearchRe.rs             ← static SEARCH_RE: LazyLock<Regex>
+└── lib.rs                          ← pub mod preview; (contract unchanged: pub use preview::{build_preview, detect_type})
+```
+
+### The mod.rs pattern
+
+Every `mod.rs` does exactly one thing - re-export its siblings:
+
+```rust
+// preview/Detect/mod.rs
+pub mod Input;
+pub mod IsJson;
+pub mod IsTest;
+pub mod IsDiff;
+pub mod IsCode;
+pub mod IsTable;
+pub mod IsMarkdown;
+pub mod IsYaml;
+pub mod IsHtmlOrXml;
+pub mod IsCsv;
+pub mod IsBuild;
+pub mod IsGitStatus;
+pub mod IsGitLog;
+pub mod IsGrep;
+pub mod IsLs;
+```
+
+And `Detect.rs` itself becomes purely the pipeline:
+
+```rust
+pub mod Entry; // submodule declarations live in the .rs file, not mod.rs
+
+use Entry::Input::Struct as Input;
+
+pub fn Fn(content: &str) -> Option<&'static str> {
+    let inp = Input::new(content)?;
+    None
+        .or_else(|| Entry::IsJson::Fn(&inp).then_some("json"))
+        .or_else(|| Entry::IsTest::Fn(&inp).then_some("test"))
+        .or_else(|| Entry::IsDiff::Fn(&inp).then_some("diff"))
+        .or_else(|| Entry::IsCode::Fn(&inp).then_some("code"))
+        // …remaining shapes in current arm order…
+        .or_else(|| Entry::IsHtmlOrXml::Fn(&inp))
+}
+```
+
+### Key conventions (verbatim rules to give a refactor agent)
+
+- PascalCase filenames and module names - `IsTest.rs`, not `is_test.rs`.
+- Every public function is named `Fn` inside its file - the module path _is_
+  the name (`preview::Detect::Entry::IsTest::Fn`).
+- `#![allow(non_snake_case)]` at the crate root - required because Rust warns
+  on PascalCase fn/module names by default.
+- Statics/globals live in `State/` (or `Struct/`) - never inline in function
+  files.
+- A `.rs` file and same-named folder always coexist when a function has
+  sub-functions: `Detect.rs` declares the fn and `pub mod` entries; `Detect/`
+  holds the sub-files.
+- No inline helpers - every helper, however small, gets its own file in
+  `Fn/` (or the domain-specific `Line/`/`Text/`).
+
+### The exact scope boundary to state in a prompt
+
+"Split only, never refactor: no logic renames, no signature changes, no
+behavior drift. One domain per session, starting with Preview. Never touch
+code outside the scoped domain. Output one file per fenced block,
+path-labeled, each file independently compilable, sub-modules called as
+`Entry::X::Fn(...)`."
+
+### The exact output format to request
+
+One fenced block per file, each opening fence labeled with the full target
+path (`preview/Detect/IsJson.rs`), the file body complete and compilable in
+isolation, nothing else in the block. Verify each phase with the repo's
+test suite before the next session starts.
+
+### Session order to use
+
+1. `preview/State/` + `preview/Text/` (no dependencies - the cap + string
+   utils move first, tests green).
+2. `preview/Line/` (per-line predicates - depend only on &str).
+3. `preview/Detect/` (the pipeline + Input + Is* shapes).
+4. `preview/Preview/` (the builders, largest surface).
+5. `lib.rs` re-export swap + dead-file removal.
+Each session ends with `cargo test -p aphrodite` green before the next
+begins.
+
+## 6. Distilled vs omitted
 
 Distilled into this record: the per-dimension crate conclusions and the
 Aphrodite verdict (no new dependencies), the no-library-exists reasoning, the
