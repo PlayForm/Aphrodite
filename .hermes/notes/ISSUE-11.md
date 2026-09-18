@@ -44,7 +44,7 @@ at the time - the reporter's config attempts could not help.
 | 2026-09-17    | Complete fix design space (candidates a-f); recommendation (a)+(b)                          | `ISSUE-11-FIXDESIGN.md`                                                                                    |
 | 2026-09-17/18 | Pair B1/B2/B-FIX land WS1 + WS2 + WS4                                                       | `PAIR-B1.md`, `PAIR-B2.md`, `PAIR-B-FIX.md`                                                                |
 | 2026-09-18    | C2 sweep green; battery-after re-run on the rebuilt dylib                                   | `ISSUE-11-BATTERY-AFTER.md`, `ISSUE-11-LANDED.md`                                                          |
-| 2026-09-18    | Residual rewrite lands (commits `3b8b5d3` fix + `1d202b2` regex-drop + `7674456` detection) | see `../ops/PREVIEW-RACE-FIX-ROOTCAUSE.md` context; residual tail in `ISSUE-11-BATTERY-AFTER.md` section 6 |
+| 2026-09-18    | Residual rewrite lands (commits `3b8b5d3` fix + `1d202b2` regex-drop + `7674456` detection) | see `issue11/PREVIEW-RACE-FIX-ROOTCAUSE.md` context; residual tail in `ISSUE-11-BATTERY-AFTER.md` section 6 |
 
 ## 4. What landed (WS1 + WS2 + WS4)
 
@@ -61,9 +61,9 @@ at the time - the reporter's config attempts could not help.
   single choke point at the end of `build_preview`, char-boundary-safe with
   closing `]` + `…` preserved, applied at startup / hot-reload / dylib init).
 
-Test counts before -> after: `cargo test -p aphrodite` 348 -> 389;
-`cargo test -p aphrodite-hermes` 46 -> 52; codegen self-tests 23 (unchanged);
-checker self-tests 12 -> 13.
+Test counts before -> after: `cargo test -p aphrodite` 348 -> 406 (current
+verified: 377 lib + 29 bins, 1 ignored); `cargo test -p aphrodite-hermes`
+46 -> 52; codegen self-tests 23 (unchanged); checker self-tests 12 -> 13.
 
 ## 5. Battery before -> after (effective rubric)
 
@@ -99,7 +99,8 @@ before new exports; real-codegen-path CI (ctypesgen byte-identity on CI).
 
 ## 7. Sweep (2026-09-18, all gates run)
 
-checker PASS 0 violations; repro SURVIVED; `cargo test -p aphrodite` 389
-passed / 0 failed / 1 ignored; `cargo test -p aphrodite-hermes` 52 passed;
-codegen 23/23; checker self-tests 13/13 (50 asserts); drift-guard identical;
-ruff clean except the 2 known pre-existing perf-probe errors; prettier clean.
+checker PASS 0 violations; repro SURVIVED; `cargo test -p aphrodite` 406
+passed (377 lib + 29 bins) / 0 failed / 1 ignored; `cargo test -p
+aphrodite-hermes` 52 passed; codegen 23/23; checker self-tests 13/13 (50
+asserts); drift-guard identical; ruff clean except the 2 known pre-existing
+perf-probe errors; prettier clean.

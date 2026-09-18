@@ -2,11 +2,10 @@
 
 Read this FIRST when resuming work on the Aphrodite monorepo. State: branch
 `Development`, binary **1.4.6** / plugin **2.1.4**. Issue #11 WS1 + WS2 + WS4
-
-- residuals 1/2/4 landed; WS3 + residual 3 pending. Skills are dev-side
-  (`.hermes/skills/`, never shipped). No `.githooks` exist - branch discipline
-  is manual. The auto-committer sweeps working-tree changes; do not commit
-  manually unless asked; no rebase ever.
+residuals 1/2/4 landed; WS3 + residual 3 pending. Skills are dev-side
+(`.hermes/skills/`, never shipped). No `.githooks` exist - branch discipline
+is manual. The auto-committer sweeps working-tree changes; do not commit
+manually unless asked; no rebase ever.
 
 ## Verified-done recap (this wave)
 
