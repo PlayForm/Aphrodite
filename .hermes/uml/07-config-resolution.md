@@ -48,6 +48,7 @@ flowchart LR
       L5["[flow] budget_chars → flow_budget_chars"]
       L6["[compression] context_engine, tool_threshold_token, terminal_threshold (FFI state)"]
       L7["[directives] active (seeds active_directives)"]
+      L8["[previews] preview_max_chars -> build_preview cap (Issue #11 WS4:<br/>env APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120, applied at<br/>startup / hot-reload / dylib init)"]
     end
     subgraph hot["HOT-RELOADABLE (main.rs watcher, applies to live atomics)"]
       H1["the 4 threshold atomics only"]
@@ -55,7 +56,7 @@ flowchart LR
     subgraph inert["INERT / RESERVED (write-only, never read by proxy)"]
       I1["engine_min_msgs, engine_protect_first/last (state.rs 01-F9)"]
       I2["catalog_mode (RESERVED)"]
-      I3["previews.* (PreviewsConfig: model_family / code_structure_map /<br/>preview_max_chars / rust_preview_lines - declared, never read) ·<br/>prompts.* (parsed into MultiConfig, no consumer)"]
+      I3["previews.* remaining inert (model_family / code_structure_map /<br/>rust_preview_lines - declared, never read) ·<br/>prompts.* (parsed into MultiConfig, no consumer)"]
       I4["auto_expand / auto_expand_limit / classifier_poll (CompressionConfig fields, unused)"]
       I5["mode/listen: NOT env-overridable in resolve (would break dual-proxy)"]
     end

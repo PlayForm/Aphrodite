@@ -46,7 +46,7 @@ sequenceDiagram
     CJ->>CJ: fn.restype = c_void_p (forced - default c_int truncates 64-bit ptr)
     CJ->>CH: extern "C" (guarded - panic → {"error":...})
     CH->>UW: unwrap_hermes_result(tool_content) → (classify_content, type)
-    Note over UW: unwraps {output,exit_code}/{diff}/{error}/{matches}/{content}<br/>ORIGINAL content still hashed verbatim - only type/preview affected
+    Note over UW: unwraps {output,exit_code}/{diff}/{error}/{matches}/{content}<br/>(success-bool collapse removed + single-key guards + caller-hint-wins - Issue #11 WS1)<br/>ORIGINAL content still hashed verbatim - only type/preview affected
     CH->>TI: transform_tool_result_with_meta(state, content, tool, classify, meta)
     TI->>IN: inner pipeline
     IN->>ST: record_tool_event_from_meta (always - telemetry)

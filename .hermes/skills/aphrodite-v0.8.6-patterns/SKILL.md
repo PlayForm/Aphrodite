@@ -4,8 +4,7 @@ description: "Historical development patterns from v0.8.5→v0.8.6 cycle. Most p
     now live in aphrodite-operations, aphrodite-upgrade-breakpoints, and
     aphrodite-development-lessons. Keep as reference snapshot."
 version: 1.1.0
-related_skills:
-    [aphrodite-operations, aphrodite-development-lessons, aphrodite-upgrade-breakpoints]
+related_skills: [aphrodite-operations, aphrodite-development-lessons, aphrodite-upgrade-breakpoints]
 ---
 
 # Aphrodite v0.8.6 Patterns (Historical Snapshot)

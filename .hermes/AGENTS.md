@@ -40,22 +40,22 @@ of the token cost. Read this file first - it is the map.
 
 ## Key paths
 
-| What            | Where                                                    |
-| --------------- | -------------------------------------------------------- |
-| Core engine     | `crates/aphrodite/` (Rust)                               |
-| Agent bridge    | `crates/aphrodite-hermes/` (dylib exports)               |
-| Plugin (loader) | `plugins/aphrodite/` (`plugin.yaml`, `BINARY_VERSION`)   |
-| Forked deps     | `vendor/headroom/` (submodule; `aphrodite-headroom-core`) |
-| Config          | `aphrodite.toml.example` (tracked); `aphrodite.toml` (local, gitignored) |
-| Runtime         | `~/.hermes/aphrodite/`                                   |
+| What            | Where                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Core engine     | `crates/aphrodite/` (Rust)                                                            |
+| Agent bridge    | `crates/aphrodite-hermes/` (dylib exports)                                            |
+| Plugin (loader) | `plugins/aphrodite/` (`plugin.yaml`, `BINARY_VERSION`)                                |
+| Forked deps     | `vendor/headroom/` (submodule; `aphrodite-headroom-core`)                             |
+| Config          | `aphrodite.toml.example` (tracked); `aphrodite.toml` (local, gitignored)              |
+| Runtime         | `~/.hermes/aphrodite/`                                                                |
 | Release         | `.hermes/release/RELEASE-TEMPLATE.md`, `.hermes/release-notes/` (v1.4.0…v1.4.3-draft) |
-| Dev archive     | `.hermes/` - skills/, tmp/ (scratch), scripts/, classification/, notes/, uml/ |
-| Maintenance     | `Maintain/` (scripts/, tests/, CHANGELOG.md)             |
+| Dev archive     | `.hermes/` - skills/, tmp/ (scratch), scripts/, classification/, notes/, uml/         |
+| Maintenance     | `Maintain/` (scripts/, tests/, CHANGELOG.md)                                          |
 
 ## Dev flow - the joyful loop
 
 - **Pane 0**: `cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x
-  'run -p aphrodite'` - instant feedback on every save. Watch BOTH
+'run -p aphrodite'` - instant feedback on every save. Watch BOTH
   packages: `-p aphrodite` alone never rebuilds
   `libaphrodite_hermes.dylib` (a sibling package, so Cargo has no reason
   to touch it) and the plugin keeps running old code while the proxy looks
@@ -69,18 +69,18 @@ of the token cost. Read this file first - it is the map.
 
 ## Quality gates - zero tolerance, record ACTUAL numbers (2026-09-18)
 
-| Gate                                                        | Result                       |
-| ----------------------------------------------------------- | ---------------------------- |
-| `cargo test -p aphrodite` (lib + bins)                      | 406 passed (377 lib + 29 bins), 0 failed, 1 ignored |
-| `cargo test -p aphrodite-hermes`                            | 52 passed                    |
-| `python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py` | 23/23 OK              |
-| `python3 Maintain/tests/test_check_ffi_contract.py`         | 13/13 (50 asserts)           |
-| checker: `python3 Maintain/check_ffi_contract.py`           | PASS, 0 violations           |
-| drift-guard: `diff -q plugins/aphrodite/__init__.py crates/aphrodite/templates/__init__.py` | identical |
-| repro: `python3 <sigserve-scratch>/repro.py`                | SURVIVED (no crash)          |
-| `ruff check plugins/aphrodite/`                             | 0 errors (2 known pre-existing perf-probe exclusions) |
-| `cargo clippy -p aphrodite -- -D warnings`; `npx pyright plugins/aphrodite/` | clean               |
-| `npx prettier --check .hermes/**/*.md`                      | clean (tabs, width 100, proseWrap preserve) |
+| Gate                                                                                        | Result                                                |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `cargo test -p aphrodite` (lib + bins)                                                      | 406 passed (377 lib + 29 bins), 0 failed, 1 ignored   |
+| `cargo test -p aphrodite-hermes`                                                            | 52 passed                                             |
+| `python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py`                         | 23/23 OK                                              |
+| `python3 Maintain/tests/test_check_ffi_contract.py`                                         | 13/13 (50 asserts)                                    |
+| checker: `python3 Maintain/check_ffi_contract.py`                                           | PASS, 0 violations                                    |
+| drift-guard: `diff -q plugins/aphrodite/__init__.py crates/aphrodite/templates/__init__.py` | identical                                             |
+| repro: `python3 <sigserve-scratch>/repro.py`                                                | SURVIVED (no crash)                                   |
+| `ruff check plugins/aphrodite/`                                                             | 0 errors (2 known pre-existing perf-probe exclusions) |
+| `cargo clippy -p aphrodite -- -D warnings`; `npx pyright plugins/aphrodite/`                | clean                                                 |
+| `npx prettier --check .hermes/**/*.md`                                                      | clean (tabs, width 100, proseWrap preserve)           |
 
 Run all gates before any release claim; report what commands printed, never
 "should pass".
@@ -119,6 +119,6 @@ Run all gates before any release claim; report what commands printed, never
 ## Reading order
 
 1. This file. 2. `aphrodite-release-flow` (ceremony) +
-`aphrodite-testing-discipline` (how to test). 3. `.hermes/notes/`
-(RELEASE-METHODOLOGY.md, ISSUE-11-LANDED.md, session reports) and
-`.hermes/classification/` (file ownership per phase/kind/layer).
+   `aphrodite-testing-discipline` (how to test). 3. `.hermes/notes/`
+   (RELEASE-METHODOLOGY.md, ISSUE-11-LANDED.md, session reports) and
+   `.hermes/classification/` (file ownership per phase/kind/layer).

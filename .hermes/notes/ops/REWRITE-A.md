@@ -27,7 +27,7 @@ Nothing committed.
   (Date/Event/Method/Repo/Scope/Predecessors) was also separated with blank
   lines (rendering fix, zero content change).
 - **Anonymization (zero local absolute paths):** `HERMES-UPDATE-ERROR-FORENSICS.md`
-  rewritten: `/Users/nikola` -> `~`, the local drive prefix + repo root -> `…/`
+  rewritten: the user home -> `~`, the local drive prefix + repo root -> `…/`
   (e.g. `…/PlayForm/Aphrodite`), the Temporary scratch -> `…/.playform/Temporary`.
   No local absolute path remains in any file.
 - **Location note:** `ISSUE-11-BATTERY-AFTER.md` does not exist in

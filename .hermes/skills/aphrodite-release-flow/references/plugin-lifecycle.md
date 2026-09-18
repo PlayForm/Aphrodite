@@ -63,8 +63,8 @@ created wrong symlinks); the plugin self-installs + self-heals at startup.
 
 ## Uninstall (complete removal from ~/.hermes)
 
-1. Preserve anything valuable FIRST (skills, logs) to
-   `~/Developer/.playform/Temporary/`.
+1. Preserve anything valuable FIRST (skills, logs) to the personal-scratch
+   Temporary dir.
 2. `rm ~/.hermes/plugins/aphrodite` (the symlink only - never the checkout),
    `rm -rf ~/.hermes/aphrodite` (data dir).
    2b. Sweep for LEGACY symlinks, not just the current paths: an old setup

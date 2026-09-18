@@ -74,8 +74,12 @@ All probe scripts, generated fixtures, research dumps, and intermediate
 artifacts go in `.hermes/tmp/` (repo-local, gitignored contents, tracked
 `.gitkeep`). Never write scratch to `/tmp` - it is cleaned by the OS,
 invisible to the repo, and scattered artifacts there caused the "where is
-the code?" confusion. The canonical scratch for session coordination
-remains the sigserve dir under the Temporary tree.
+the code?" confusion. NEVER create or write to any other scratch location:
+no `sigserve` dir anywhere (repo root, .hermes, notes, or the Temporary
+tree) - the user explicitly removed sigserve and forbids it; an agent that
+creates it is killed and the dir deleted. The ONLY scratch dirs are
+`.hermes/tmp/` (repo work) and the personal-scratch Temporary dir
+(capital-T, under the user's scratch tree).
 
 ## Rule 4 - Verify through the path the USER sees
 
@@ -113,6 +117,14 @@ verifying preview behavior, exercise both:
   test start, restore it at the end. A subagent's clean env does NOT
   prove the parent's env is clean - after any env-var change, re-run the
   suite in your own shell.
+- **Adapt documents into notes, never copy them.** When asked to bring an
+  external doc into the repo (e.g. a research file from the Downloads
+  folder), REWRITE it
+  into `.hermes/notes/` as an original adaptation: read the source,
+  distill its substance, and produce new prose in the repo's voice with
+  the ideas re-derived - never paste the source's sections or code blocks
+  verbatim, and never drop a copy of the source file into the repo. The
+  user's words: "I said rewrite, not copy over".
 
 ## Verification Checklist
 
@@ -123,5 +135,5 @@ verifying preview behavior, exercise both:
 - [ ] Real test suites run and actual numbers recorded
 - [ ] No stray `APHRODITE_*` env vars exported (config tests hermetic:
       remove_var/restore, or monkeypatch.delenv)
-- [ ] Scratch in `.hermes/tmp/` (or the sigserve scratch dir), never `/tmp`
+- [ ] Scratch in `.hermes/tmp/`, never `/tmp`
 - [ ] No crash dialogs, repro SURVIVED, zero new SIGSEGV
