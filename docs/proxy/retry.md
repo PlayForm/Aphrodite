@@ -112,4 +112,4 @@ client with **no total timeout** - reqwest's client-level `.timeout()` bounds
 the whole request including the response body stream, which used to cut off
 legitimately slow but progressing SSE streams mid-answer. Hang protection for
 streams comes from `connect_timeout` + `tcp_keepalive` instead. See
-[Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#streaming-sse).
+[Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#streaming-sse).

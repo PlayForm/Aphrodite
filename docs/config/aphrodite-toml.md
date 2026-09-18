@@ -11,11 +11,11 @@ port-specific env overrides below), since a single process-wide
 `APHRODITE_MODE`/`APHRODITE_LISTEN` would incorrectly apply to every proxy
 at once. CLI flags only apply in CLI-fallback mode (no `aphrodite.toml`
 present at all) - see [CLI Equivalents](#cli-equivalents). Full var-by-var
-detail: [`docs/config/env-vars.md`](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md).
+detail: [`docs/config/env-vars.md`](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md).
 
 This file is Aphrodite's own proxy/engine config - a **different file** from
 Hermes Agent's `config.yaml`. See
-[Troubleshooting: two separate config files](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#two-separate-config-files)
+[Troubleshooting: two separate config files](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#two-separate-config-files)
 if you came here looking for Hermes-side keys like `plugins.enabled` or
 `context.engine` instead.
 
@@ -129,7 +129,7 @@ for visibility, no consumer): `auto_expand`, `auto_expand_limit`,
 `catalog_mode` (catalog mode has no env or TOML wiring at all - it's
 whatever the caller passes per-request), `classifier_poll`, `context_engine`
 (a _different_ `APHRODITE_CONTEXT_ENGINE` env var gates a real, unrelated
-feature - see [`env-vars.md`](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md) for the disambiguation), and
+feature - see [`env-vars.md`](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md) for the disambiguation), and
 `prefetch` (the shipped root `aphrodite.toml` sets it, but nothing reads it
 back).
 
@@ -165,7 +165,7 @@ active = []                        # e.g. ["focus", "foresight"]
 Read by the Hermes-plugin dylib session (`config_loader`), not the Rust
 proxy. The active set is then fully runtime-mutable via the
 `aphrodite_directive` tool - see
-[Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md) for the complete feature reference.
+[Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md) for the complete feature reference.
 
 ## `[templates.*]`
 

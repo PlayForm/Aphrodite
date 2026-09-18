@@ -1,7 +1,7 @@
 # Metrics Queries
 
 PromQL reference for monitoring and alerting on Aphrodite proxy metrics - see
-[Prometheus](https://github.com/PlayForm/Aphrodite/tree/Current/docs/metrics/prometheus.md) for the full metric catalog these queries draw on.
+[Prometheus](https://github.com/PlayForm/Aphrodite/tree/Development/docs/metrics/prometheus.md) for the full metric catalog these queries draw on.
 
 ## CCR Cache Performance
 

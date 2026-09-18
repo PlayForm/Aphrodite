@@ -14,7 +14,7 @@ POST /retrieve
 
 Loopback only. Requires `Authorization: Bearer <token>` when
 `APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat) -
-see [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md).
+see [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md).
 
 ## Request
 

@@ -125,7 +125,7 @@ Returns session + proxy state in one call:
 ```
 
 `proxies` reflects a live HTTP poll of both configured proxy ports - see
-[Troubleshooting: verify the proxy without Hermes](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#verify-the-proxy-without-hermes).
+[Troubleshooting: verify the proxy without Hermes](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#verify-the-proxy-without-hermes).
 
 ## 4. aphrodite_files
 
@@ -223,7 +223,7 @@ after the catalog summary.
 | anything else | 3 samples (source code, a build with errors/warnings, a JSON array) - each compressed then round-tripped |
 
 Returns `{mode, status: "ok"|"fail", passed, total, checks, proxies}`. This is
-the same tool [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
+the same tool [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
 points to for confirming things work without a full Hermes session.
 
 ## 9. aphrodite_catalog
@@ -321,6 +321,6 @@ rebuild itself mid-session. Returns
 
 `aphrodite_compress`'s `type` hint accepts `code`, `log`, `diff`, `error`,
 `json`, `build_output`, or `text`. These map to the same taxonomy used
-throughout - see [Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/content-types.md). A hint of `"text"`
+throughout - see [Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md). A hint of `"text"`
 (or an empty hint) is treated as "no hint" - the type is auto-detected
 instead.

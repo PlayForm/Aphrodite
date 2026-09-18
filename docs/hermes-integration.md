@@ -1,7 +1,7 @@
 # Hermes Integration
 
 How Aphrodite connects to Hermes Agent - and why it's different from a plain
-proxy. See [Plugin: Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md) for the full hook reference this
+proxy. See [Plugin: Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md) for the full hook reference this
 page's table summarizes.
 
 ## Architecture
@@ -87,7 +87,7 @@ A generic proxy compresses HTTP response bodies. That helps, but:
 
 ## Setup
 
-See [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/README.md) for the full, per-platform
+See [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/README.md) for the full, per-platform
 walkthrough (three install paths, plus troubleshooting if the proxy doesn't
 auto-launch). Short version for macOS/Linux:
 

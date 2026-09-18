@@ -35,7 +35,7 @@ the pipeline (and of this doc) compressed large tool-call arguments into a
 CCR marker string, which a real OpenAI-tools client (no Aphrodite plugin)
 can't parse as JSON, breaking every tool call it made. SSE
 (`text/event-stream`) responses also bypass this phase entirely - see
-[Proxy: Architecture](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#streaming-sse).
+[Proxy: Architecture](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#streaming-sse).
 
 ## Phase 2: Cache
 
@@ -148,7 +148,7 @@ in `\n` used to come back one byte short (`str::lines()` discards the
 trailing newline and `join("\n")` never restored it), breaking the
 content-addressing round-trip. The `truncated` response field (also v1.3.2)
 lets a client detect a windowed/capped result without parsing the
-`[lines a-b/total]` header - see [Retrieve Endpoint](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/retrieve.md).
+`[lines a-b/total]` header - see [Retrieve Endpoint](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/retrieve.md).
 
 Earlier drafts of this doc (and of `retrieve.rs` itself) described a step
 that checked returned content for zstd magic bytes (`0x28 0xB5 0x2F 0xFD`)

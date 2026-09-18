@@ -14,7 +14,7 @@ The compression ratio EMA is updated from BOTH the Chat Completions path
 | Exempt content                    | Why                                                                                                                                                                                                                                                  |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tool_calls[].function.arguments` | Client-executable JSON, not model-facing prose - a real OpenAI-tools client (no Aphrodite plugin) can't parse a CCR marker as JSON, so compressing it broke every tool call it made. Only `message.content` is a compression target. Fixed in v1.3.2 |
-| SSE streams (`text/event-stream`) | Forwarded chunk-by-chunk, never buffered - see [Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#streaming-sse)                                                                          |
+| SSE streams (`text/event-stream`) | Forwarded chunk-by-chunk, never buffered - see [Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#streaming-sse)                                                                      |
 
 ## Full Pipeline
 
@@ -89,7 +89,7 @@ The compression ratio EMA is updated from BOTH the Chat Completions path
 
 `detect_content_type(content: &str) -> &'static str` classifies the content
 into one of the supported types. The full type taxonomy is documented in
-[../ccr/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/content-types.md).
+[../ccr/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md).
 
 ## 2. Threshold Computation
 
@@ -168,7 +168,7 @@ CCR backends store the original content bytes as-is - the "compression" is
 the marker substitution in the LLM-facing response, not a byte-level codec.
 An earlier draft of this doc (and of `retrieve.rs` itself) described a zstd
 encode/decode step; that branch was dead code and has been removed - see
-[CCR Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/lifecycle.md#phase-5-retrieve) for the full
+[CCR Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/lifecycle.md#phase-5-retrieve) for the full
 correction.
 
 ## 5. Marker Generation
@@ -211,7 +211,7 @@ non-generic type from the classifier is always honored as-is.
 The semantic-detection upgrade (`git`, `gitlog`, `grep`, `ls`, `test`) landed
 in commit `c53cb5e`; the terminal arm and the first-line text fallback are
 part of the same enriched-preview pass. See also
-[../ccr/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/content-types.md) for the underlying type
+[../ccr/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md) for the underlying type
 taxonomy.
 
 ## 6. EMA Update

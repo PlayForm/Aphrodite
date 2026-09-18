@@ -10,108 +10,108 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 ### Installation
 
-- [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/README.md) - which of the two build
+- [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/README.md) - which of the two build
   artifacts (proxy binary vs. Hermes dylib) you need, and a decision tree
   across the three supported install paths
-- [Windows Install](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/windows.md) - fast path with `download.ps1`
+- [Windows Install](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/windows.md) - fast path with `download.ps1`
   (native PowerShell, no `bash` needed), plus a fully manual walkthrough
-- [macOS/Linux Install](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/macos-linux.md) - `download.sh`,
+- [macOS/Linux Install](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/macos-linux.md) - `download.sh`,
   `aphrodite setup`, building from source
-- [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md) - proxy not auto-launching,
+- [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md) - proxy not auto-launching,
   verifying the proxy without a full Hermes session, the two-config-files trap
 
 ### Aphrodite & Headroom
 
-- [Comparison: Aphrodite vs Headroom](https://github.com/PlayForm/Aphrodite/tree/Current/docs/APHRODITE-HEADROOM.md) - What Aphrodite
+- [Comparison: Aphrodite vs Headroom](https://github.com/PlayForm/Aphrodite/tree/Development/docs/APHRODITE-HEADROOM.md) - What Aphrodite
   adds on top of our Headroom fork, what we rewrote, how they ship together
-- [Fork Divergence Analysis](https://github.com/PlayForm/Aphrodite/tree/Current/docs/HEADROOM-FORK-DIFF.md) - Every commit, deletion,
+- [Fork Divergence Analysis](https://github.com/PlayForm/Aphrodite/tree/Development/docs/HEADROOM-FORK-DIFF.md) - Every commit, deletion,
   and modification between upstream Headroom and the PlayForm fork
 
 ### CCR (Compress-Cache-Retrieve)
 
-- [Marker Format](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/marker-format.md) - `<<<CCR:hash|type|size>>>` schema with
+- [Marker Format](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/marker-format.md) - `<<<CCR:hash|type|size>>>` schema with
   BLAKE3 hash, 26 content types, TOML-driven preview templates, and metadata
   encoding rules
-- [Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/lifecycle.md) - Full 6-phase flow: compress
+- [Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/lifecycle.md) - Full 6-phase flow: compress
   (detect→threshold→hash→cache→store→marker), retrieve
   (inline→CCR→resolve→filter→paginate), expire (TTL+LRU+debounce). Includes all
   threshold tables per type and mode
-- [Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/content-types.md) - Complete taxonomy of 26 content types
+- [Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md) - Complete taxonomy of 26 content types
   with detection order, threshold groups, and examples from both Rust
   (`detect_content_type`) and Python (`_classify_content`)
 - **Backends**
-    - [SQLite](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/backends/sqlite.md) - Schema (`ccr_entries` table), WAL mode,
+    - [SQLite](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/backends/sqlite.md) - Schema (`ccr_entries` table), WAL mode,
       upsert semantics, lazy TTL purge (debounced 60s), poison resilience,
       stats_db schema
-    - [In-Memory](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/backends/in-memory.md) - DashMap + VecDeque architecture,
+    - [In-Memory](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/backends/in-memory.md) - DashMap + VecDeque architecture,
       capacity 10,000, lazy TTL + capacity eviction, queue compaction,
       TOCTOU-safe `remove_if`, soft-cap race documentation
-    - [Inline](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/backends/inline.md) - `lru::LruCache<String, String>`, 1024
+    - [Inline](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/backends/inline.md) - `lru::LruCache<String, String>`, 1024
       entries, <256B threshold, dedup via `contains()`, lock-safety pattern
       (drop before await). Includes Python `_CappedStore` comparison
 
 ### Proxy
 
-- [Architecture](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md) - Two-listener model (:9797 cache +
+- [Architecture](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md) - Two-listener model (:9797 cache +
   :9798 token), full AppState with 30+ AtomicU64 counters, routing table (17
   routes), management-route bearer auth (`APHRODITE_MGMT_TOKEN`), SSE
   streaming pass-through, middleware stack, HTTP client config, multi-proxy
   mode, worker threads, shutdown sequence
-- [Handlers](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/handlers.md) - 7 handlers: proxy_handler (catch-all forward),
+- [Handlers](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/handlers.md) - 7 handlers: proxy_handler (catch-all forward),
   handle_tool_relay, handle_ccr_create/list/delete, health_check,
   handle_retrieve. Full request/response schemas and flow
-- [Retry](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/retry.md) - 3 attempts, exponential backoff (100ms × 2^(n-1)),
+- [Retry](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/retry.md) - 3 attempts, exponential backoff (100ms × 2^(n-1)),
   jitter 0.75-1.25×, transport-only retries, 502 on final failure
-- [Compression](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/compression.md) - Full pipeline: detect→threshold
+- [Compression](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/compression.md) - Full pipeline: detect→threshold
   (per-type × auto-tune × headroom budget)→hash→cache→marker→EMA→tokens_saved.
   Auto-tune state machine with fill_pct feedback loop; what is never
   compressed (`tool_calls[].function.arguments`, SSE streams)
 
 ### Metrics
 
-- [Prometheus](https://github.com/PlayForm/Aphrodite/tree/Current/docs/metrics/prometheus.md) - All 28 metrics with types, labels,
+- [Prometheus](https://github.com/PlayForm/Aphrodite/tree/Development/docs/metrics/prometheus.md) - All 28 metrics with types, labels,
   wiring locations. Latency histogram (5 buckets). stats_json() schema. /metrics
   endpoint output format
-- [Queries](https://github.com/PlayForm/Aphrodite/tree/Current/docs/metrics/queries.md) - PromQL reference: CCR hit rate, latency
+- [Queries](https://github.com/PlayForm/Aphrodite/tree/Development/docs/metrics/queries.md) - PromQL reference: CCR hit rate, latency
   percentiles (P50/P95/P99), error rates, tool relay, cache performance,
   throughput. Dashboard panels and alert rules
 
 ### Configuration
 
-- [aphrodite.toml](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md) - Full schema: [[proxies]] (name,
+- [aphrodite.toml](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md) - Full schema: [[proxies]] (name,
   listen, mode, tool_relay, timeout, retry, ccr_db_path), [defaults] (api_url,
   model, api_key, ccr_ttl). Resolution chain and API key fallback (5 levels)
-- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md) - All 20+ env vars: API key chain,
+- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md) - All 20+ env vars: API key chain,
   proxy operation, management-route auth (`APHRODITE_MGMT_TOKEN`), Python
   thresholds (engine, tool, terminal, inline), limits, passthrough - plus the
   list of documented-but-unwired names
 
 ### Tool Relay
 
-- [Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md) - 13 tools with full JSON schemas:
+- [Tools](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/tools.md) - 13 tools with full JSON schemas:
   aphrodite_retrieve, compress, stats, rebuild, files, diff, search, directive,
   test, catalog, reclassify, prefetch, prefetch_status. All delegate to Rust dylib
-- [Callbacks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/callbacks.md) - Async tool relay + CCR create
+- [Callbacks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/callbacks.md) - Async tool relay + CCR create
   notifications. SSRF protection (https only), Bearer token auth, 5s timeout,
   TaskTracker lifecycle, metrics
 
 ### Plugin
 
-- [Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md) - 5 hooks: lifecycle order, on_session_start (inject
+- [Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md) - 5 hooks: lifecycle order, on_session_start (inject
   instruction), transform_tool_result (proxy→inline→passthrough), pre_llm_call
   (catalog injection), transform_terminal_output (build collapse), post_llm_call
   (conversation store). Skip sets, thresholds per hook, headroom feedback loop
-- [Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md) - Conversational behavioral context:
+- [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md) - Conversational behavioral context:
   the 4 built-in directives, `directives/*.md` discovery and caps,
   `[directives]` TOML, `aphrodite_directive` actions, and the `pre_llm_call`
   injection mechanics
-- [Context Engine](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/context-engine.md) - AphroditeContextEngine: compress
+- [Context Engine](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/context-engine.md) - AphroditeContextEngine: compress
   middle messages→CCR, protect head/tail, editing detection, orphan sweep.
   Threshold semantics (-1/0/>0), mutual exclusion, hooks, session lifecycle
-- [Hermes Integration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/hermes-integration.md) - Narrative walkthrough of why
+- [Hermes Integration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/hermes-integration.md) - Narrative walkthrough of why
   a native plugin sees things a generic HTTP proxy can't; proxy-vs-plugin
   comparison table
-- [Hermes Tool Output Schemas](https://github.com/PlayForm/Aphrodite/tree/Current/docs/hermes-tool-output-schemas.md) - Every Hermes
+- [Hermes Tool Output Schemas](https://github.com/PlayForm/Aphrodite/tree/Development/docs/hermes-tool-output-schemas.md) - Every Hermes
   tool's output shape, its classification type, and extraction pattern - the
   classifier's playbook
 
@@ -119,23 +119,23 @@ browser snapshots, build logs, and more. CCR (Compress-Cache-Retrieve) storage,
 
 All management routes (everything except `/health` and `/metrics`) accept
 `Authorization: Bearer <token>` and require it once `APHRODITE_MGMT_TOKEN`
-is set - see [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md).
+is set - see [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md).
 
-- [Health](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/health.md) - GET /health →
+- [Health](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/health.md) - GET /health →
   `{status, ccr, mode, version, fill_pct}` (public, no loopback, no auth)
-- [Metrics](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/metrics-endpoint.md) - GET /metrics → Prometheus text, 28
+- [Metrics](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/metrics-endpoint.md) - GET /metrics → Prometheus text, 28
   metrics, 5 latency buckets
-- [Retrieve](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/retrieve.md) - POST /retrieve `{hash, query?, offset?, limit?}`
+- [Retrieve](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/retrieve.md) - POST /retrieve `{hash, query?, offset?, limit?}`
   → `{found, content, source, truncated}`
-- [CCR Endpoints](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/ccr-endpoints.md) - POST /ccr/create, GET /ccr/list,
+- [CCR Endpoints](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/ccr-endpoints.md) - POST /ccr/create, GET /ccr/list,
   DELETE /ccr/:hash
 
 ### Roadmap & Examples
 
-- [Centers](https://github.com/PlayForm/Aphrodite/tree/Current/docs/centers.md) - Roadmap for AI-conversation memory annotations
+- [Centers](https://github.com/PlayForm/Aphrodite/tree/Development/docs/centers.md) - Roadmap for AI-conversation memory annotations
   traveling with CCR markers. Only the current design is implemented; later
   stages are sketches, clearly marked as such
-- [CCR Examples: What the LLM Sees](https://github.com/PlayForm/Aphrodite/tree/Current/docs/examples/llm-view.md) - Illustrated
+- [CCR Examples: What the LLM Sees](https://github.com/PlayForm/Aphrodite/tree/Development/docs/examples/llm-view.md) - Illustrated
   before/after scenarios (file read, build error, hint-driven compression,
   multi-turn memory) with token-economics tables
 
@@ -151,4 +151,4 @@ root `README.md` use:
 | No file/line citations    | Docs describe behavior directly; they don't cite exact source files or line numbers as proof - accuracy is a writing standard, not a footnote                              |
 | No placeholder content    | If a documented setting or feature isn't confirmed to do anything, the doc says so plainly instead of presenting it as working                                             |
 | Minimal external links    | Link out only when the reader needs to click through to do something (download a release, read an upstream project's own docs) - not for attribution or "see also" padding |
-| Roadmap ideas are labeled | Forward-looking or unimplemented designs (see [Centers](https://github.com/PlayForm/Aphrodite/tree/Current/docs/centers.md)) say clearly which parts are shipped and which are sketches                                            |
+| Roadmap ideas are labeled | Forward-looking or unimplemented designs (see [Centers](https://github.com/PlayForm/Aphrodite/tree/Development/docs/centers.md)) say clearly which parts are shipped and which are sketches                                            |
