@@ -106,13 +106,19 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// ── Step 8: Write __init__.py shim ──
 	write_init_py(&ctx)?;
 
-	// ── Step 9: Symlink to hermes plugins dir ──
-	symlink_plugin(&ctx)?;
-
-	// ── Step 10: Register with hermes ──
+	// ── Step 9: Register with hermes ──
 	register_plugin(&ctx)?;
 
 	println!("aphrodite installed -> {}", ctx.aphrodite_dir.display());
+	println!(
+		"plugin directory ready: {} (setup no longer symlinks it into Hermes automatically)",
+		ctx.aphrodite_dir.display()
+	);
+	println!(
+		"link it manually: ln -s {} {}/plugins/aphrodite",
+		ctx.aphrodite_dir.display(),
+		home.display()
+	);
 
 	Ok(())
 }
@@ -576,72 +582,6 @@ fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
 	println!("writing __init__.py -> {}", path.display());
 	fs::write(&path, HERMES_PLUGIN_SHIM)?;
 	secure_perms(&path, 0o644)?;
-	Ok(())
-}
-
-/// Symlink ~/.hermes/plugins/aphrodite -> ~/.hermes/aphrodite/
-fn symlink_plugin(ctx:&SetupCtx) -> Result<(), SetupError> {
-	let plugins_dir = dirs::home_dir()
-		.ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?
-		.join(".hermes")
-		.join("plugins");
-	fs::create_dir_all(&plugins_dir)?;
-	let link = plugins_dir.join("aphrodite");
-
-	if link.exists() {
-		if link.is_symlink() {
-			let target = fs::read_link(&link)?;
-			if target == ctx.aphrodite_dir {
-				return Ok(());
-			}
-			fs::remove_file(&link)?;
-		} else {
-			return Err(SetupError::PluginRegistrationFailed(format!(
-				"{} exists and is not a symlink - manual cleanup required",
-				link.display()
-			)));
-		}
-	}
-
-	#[cfg(unix)]
-	std::os::unix::fs::symlink(&ctx.aphrodite_dir, &link)?;
-	#[cfg(windows)]
-	{
-		// Real symlinks need elevated privileges on Windows; a directory
-		// junction doesn't. Try that first (mirrors Maintain/install.bat),
-		// falling back to a recursive copy if junctions are blocked too.
-		let status = Command::new("cmd")
-			.args(["/C", "mklink", "/J"])
-			.arg(&link)
-			.arg(&ctx.aphrodite_dir)
-			.status();
-		let junction_ok = matches!(status, Ok(s) if s.success());
-		if !junction_ok {
-			copy_dir_recursive(&ctx.aphrodite_dir, &link)?;
-		}
-	}
-	#[cfg(not(any(unix, windows)))]
-	{
-		let _ = (&ctx.aphrodite_dir, &link);
-	}
-	println!("symlinked plugin -> {}", link.display());
-	Ok(())
-}
-
-/// Recursively copy a directory tree - the Windows fallback when a junction
-/// can't be created (e.g. `mklink` disabled by policy).
-#[cfg(windows)]
-fn copy_dir_recursive(src:&Path, dst:&Path) -> io::Result<()> {
-	fs::create_dir_all(dst)?;
-	for entry in fs::read_dir(src)? {
-		let entry = entry?;
-		let dest_path = dst.join(entry.file_name());
-		if entry.file_type()?.is_dir() {
-			copy_dir_recursive(&entry.path(), &dest_path)?;
-		} else {
-			fs::copy(entry.path(), &dest_path)?;
-		}
-	}
 	Ok(())
 }
 
