@@ -30,7 +30,9 @@ import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RESULTS_DIR = Path(os.environ.get("BENCH_RESULTS_DIR", REPO_ROOT / "bench" / "conversational" / "results"))
+RESULTS_DIR = Path(
+    os.environ.get("BENCH_RESULTS_DIR", REPO_ROOT / "bench" / "conversational" / "results")
+)
 PROXY_HEALTH = "http://127.0.0.1:9797/health"
 PROXY_METRICS = "http://127.0.0.1:9797/metrics"
 CCR_DB = Path(os.environ.get("APHRODITE_CCR_DB", Path.home() / ".hermes" / "aphrodite" / "ccr.db"))
@@ -79,7 +81,9 @@ def db_stats() -> dict:
             continue
         try:
             con = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
-            row = con.execute("SELECT count(*), COALESCE(sum(octet_length(original)),0) FROM ccr_entries").fetchone()
+            row = con.execute(
+                "SELECT count(*), COALESCE(sum(octet_length(original)),0) FROM ccr_entries"
+            ).fetchone()
             con.close()
             out["paths"][str(p)] = {"entries": row[0], "original_bytes": row[1]}
         except Exception as e:
@@ -93,9 +97,31 @@ def compute_db_delta(before: dict, after: dict) -> dict:
     for p in before.get("paths", {}):
         b, a = before["paths"][p], after["paths"][p]
         if isinstance(b, dict) and isinstance(a, dict):
-            delta[p] = {"entries": a.get("entries", 0) - b.get("entries", 0),
-                        "original_bytes": a.get("original_bytes", 0) - b.get("original_bytes", 0)}
+            delta[p] = {
+                "entries": a.get("entries", 0) - b.get("entries", 0),
+                "original_bytes": a.get("original_bytes", 0) - b.get("original_bytes", 0),
+            }
     return delta if delta else {"note": "no db deltas (session db path may differ)"}
+
+
+REAL_MARKER_RE = re.compile(r"<<<CCR:([0-9a-f]{24,})\|([a-z_]+)\|(\d+)>>>")
+
+
+def session_db_markers(session_id: str) -> dict:
+    """Query state.db for the session's messages and count REAL CCR markers
+    (hex hash + concrete type + numeric size) - the authoritative evidence;
+    the CLI transcript display omits tool-result markers."""
+    try:
+        con = sqlite3.connect(f"file:{Path.home() / '.hermes' / 'state.db'}?mode=ro", uri=True)
+        rows = con.execute(
+            "SELECT content FROM messages WHERE session_id=? AND content LIKE '%<<<CCR:%'",
+            (session_id,),
+        ).fetchall()
+        con.close()
+    except Exception as e:
+        return {"error": f"state.db unreadable: {e}"}
+    ms = [m for r in rows for m in REAL_MARKER_RE.findall(r[0] or "")]
+    return {"markers": len(ms), "types": sorted({t for _, t, _ in ms})}
 
 
 def run_session(prompt: str, debug: bool, index: int, total: int) -> dict:
@@ -104,7 +130,9 @@ def run_session(prompt: str, debug: bool, index: int, total: int) -> dict:
     cmd = ["hermes", "chat", "-q", prompt]
     env = {**os.environ, "TERMINAL_CWD": str(REPO_ROOT)}
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env
+        )
     except FileNotFoundError:
         result.update(status="ERROR", error="hermes binary not found")
         return result
@@ -114,7 +142,9 @@ def run_session(prompt: str, debug: bool, index: int, total: int) -> dict:
         time.sleep(2.0)
         metrics_samples.append(parse_metrics(fetch(PROXY_METRICS)))
         if debug:
-            print(f"  [poll {index}/{total}] alive {time.time() - result['started']:.0f}s", flush=True)
+            print(
+                f"  [poll {index}/{total}] alive {time.time() - result['started']:.0f}s", flush=True
+            )
 
     out, err = proc.communicate(timeout=30)
     db_after = db_stats()
@@ -123,6 +153,10 @@ def run_session(prompt: str, debug: bool, index: int, total: int) -> dict:
     markers = MARKER_RE.findall(re.sub(r"\s+", "", out))
     transcript_path = RESULTS_DIR / f"transcript-{index:02d}.txt"
     transcript_path.write_text(out, encoding="utf-8", errors="replace")
+    session_id = None
+    m = re.search(r"Session:\s+(\S+)", out)
+    if m:
+        session_id = m.group(1)
     result.update(
         duration=round(time.time() - result["started"], 2),
         exit_code=proc.returncode,
@@ -130,6 +164,10 @@ def run_session(prompt: str, debug: bool, index: int, total: int) -> dict:
         transcript_path=str(transcript_path),
         marker_count=len(markers),
         marker_types=sorted({m.split("|")[1] for m in markers}),
+        session_id=session_id,
+        session_db_markers=session_db_markers(session_id)
+        if session_id
+        else {"error": "no session id parsed"},
         db_before=db_before,
         db_after=db_after,
         db_delta=compute_db_delta(db_before, db_after),
@@ -157,7 +195,10 @@ def main() -> int:
         return 2
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    runs = [run_session(p, args.debug, i + 1, args.sessions) for i, p in enumerate(prompts[: args.sessions])]
+    runs = [
+        run_session(p, args.debug, i + 1, args.sessions)
+        for i, p in enumerate(prompts[: args.sessions])
+    ]
 
     summary = {
         "tool": "poll-worker.py v2 (transcript + ccr.db + proxy)",
@@ -171,9 +212,11 @@ def main() -> int:
     }
     out_path = RESULTS_DIR / f"poll-worker-{time.strftime('%Y%m%d-%H%M%S')}.json"
     out_path.write_text(json.dumps(summary, indent=2))
-    print(f"\n=== POLL-WORKER SUMMARY: {summary['ok']}/{summary['sessions']} OK, "
-          f"{summary['total_markers']} markers, {summary['total_db_entries_stored']} entries stored, "
-          f"avg {summary['avg_duration_s']}s -> {out_path}")
+    print(
+        f"\n=== POLL-WORKER SUMMARY: {summary['ok']}/{summary['sessions']} OK, "
+        f"{summary['total_markers']} markers, {summary['total_db_entries_stored']} entries stored, "
+        f"avg {summary['avg_duration_s']}s -> {out_path}"
+    )
     return 0
 
 
