@@ -88,11 +88,11 @@ regardless of config.
 
 ## Expected Behavior Matrix
 
-| Config                      | What LLM sees             | Retrieve returns |
-| --------------------------- | ------------------------- | ---------------- |
-| Live TOML (threshold 100%)  | Full content (no markers) | Full content     |
-| Engine threshold forced low | `<<<CCR:hash              | context          | N>>>` | Full content |
-| Terminal output > 512 bytes | `<<<CCR:hash              | terminal         | N>>>` | Full content |
+| Config                      | What LLM sees                 | Retrieve returns |
+| --------------------------- | ----------------------------- | ---------------- |
+| Live TOML (threshold 100%)  | Full content (no markers)     | Full content     |
+| Engine threshold forced low | `<<<CCR:hash\|context\|N>>>`  | Full content     |
+| Terminal output > 512 bytes | `<<<CCR:hash\|terminal\|N>>>` | Full content     |
 
 ## Pitfalls
 
