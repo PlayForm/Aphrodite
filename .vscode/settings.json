@@ -59,7 +59,8 @@
     "**/incremental": true,
     "**/node_modules": true,
     "**/target": true,
-    "**/vendor": false
+    "**/vendor": false,
+    "**/tmp": false
   },
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,

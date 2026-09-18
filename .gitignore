@@ -118,3 +118,13 @@ bench/results/wire-compat-*-*.json
 # ── Misc ─────────────────────────────────────────────────────────────────────
 placeholder/
 .bench
+
+.hermes/examples/compression/*.md
+.hermes/examples/defaults/*.md
+.hermes/examples/directives/*.md
+.hermes/examples/env-vars/*.md
+.hermes/examples/flow/*.md
+.hermes/examples/previews/*.md
+.hermes/examples/prompts/*.md
+.hermes/examples/proxies/*.md
+.hermes/examples/templates/*.md
