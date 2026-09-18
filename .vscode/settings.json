@@ -28,8 +28,14 @@
     "editor.defaultFormatter": "rust-lang.rust-analyzer",
     "editor.tabSize": 4
   },
+  // Python: use the repo's ruff (single formatter, explicit config in
+  // ruff.toml). This is the formatter CI's Check.yml uses, so Alt+F and CI
+  // produce identical output. Requires the Ruff VSCode extension
+  // (charliermarsh.ruff).
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
     "editor.tabSize": 4,
     "editor.insertSpaces": true
   },

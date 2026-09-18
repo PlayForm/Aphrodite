@@ -56,7 +56,8 @@ bumped to latest across the workspace. Binary `1.4.2 → 1.4.3`, plugin
 - Build: `cargo build --release -p aphrodite -p aphrodite-hermes` ✅
   (verified in release-prep, `BUILD_EXIT:0`)
 - Tests: `cargo test -p aphrodite -p aphrodite-hermes` ✅
-  (387 passed, 0 failed, 1 ignored)
+  (387 passed, 0 failed, 1 ignored; integration tests run on Development
+  only - Current ships test-free, so the Test CI job is removed there)
 - Lint: `cargo clippy -p aphrodite -p aphrodite-hermes --lib -- -D warnings` ✅
   (finished clean)
 - Python: ruff + pyright gates per release workflow (run in CI `Check.yml`)
