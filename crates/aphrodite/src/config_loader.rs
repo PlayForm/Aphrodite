@@ -509,6 +509,12 @@ mod tests {
 	#[test]
 	fn test_apply_previews_wires_preview_max_chars() {
 		let _g = crate::preview::preview_cap_test_guard();
+		// Hermetic: a stray APHRODITE_PREVIEW_MAX_CHARS in the session env
+		// (e.g. left by a manual cap probe) would win the precedence chain
+		// and break every assert - and the leaked cap would poison every
+		// later preview test. Remove it for the duration of this test.
+		let env_backup = std::env::var("APHRODITE_PREVIEW_MAX_CHARS").ok();
+		unsafe { std::env::remove_var("APHRODITE_PREVIEW_MAX_CHARS") };
 		// TOML wins over the default (unlimited).
 		let cfg = Config {
 			raw: "[previews]\npreview_max_chars = 77\n".parse().unwrap(),
@@ -526,5 +532,8 @@ mod tests {
 		// Absent/0 -> unlimited (legacy behavior), and restore the global.
 		Config::default().apply_previews();
 		assert_eq!(crate::preview::preview_max_chars(), 0);
+		if let Some(v) = env_backup {
+			unsafe { std::env::set_var("APHRODITE_PREVIEW_MAX_CHARS", v) };
+		}
 	}
 }
