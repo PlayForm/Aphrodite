@@ -16,8 +16,11 @@ import importlib.util
 import os
 import platform
 import shutil
+import subprocess
 import sys
+import tempfile
 import time
+import urllib.request
 
 import pytest
 
@@ -33,12 +36,104 @@ def _dylib_name():
     return "libaphrodite_hermes.so"
 
 
-SRC_DYLIB = os.path.join(ROOT, "target", "release", _dylib_name())
+def _target_triple() -> str:
+    """Platform triple used by download.sh's release asset names."""
+    arch = platform.machine().lower()
+    if arch in ("arm64", "aarch64"):
+        arch = "aarch64"
+    elif arch in ("x86_64", "amd64"):
+        arch = "x86_64"
+    system = platform.system().lower()
+    if system == "darwin":
+        return f"{arch}-apple-darwin"
+    if system == "linux":
+        return f"{arch}-unknown-linux-gnu"
+    if system in ("windows", "mingw", "msys", "cygwin"):
+        return f"{arch}-pc-windows-msvc"
+    return f"{arch}-{system}"
 
-if not os.path.exists(SRC_DYLIB):
+
+def _download_published_dylib(dest: str) -> bool:
+    """Fallback: fetch the dylib from the latest PUBLISHED release.
+
+    BINARY_VERSION (v1.4.6) is unreleased - the release ceremony hasn't run
+    - so the plugin's pinned download.sh URLs 404 on every asset. v1.4.5 is
+    the newest published tag; mirror download.sh's asset naming so the
+    fixture stays independent of the unreleased binary.
+    """
+    version = "1.4.5"
+    triple = _target_triple()
+    if "windows" in triple:
+        asset = f"libaphrodite_hermes-{triple}.dll"
+    elif "apple" in triple:
+        asset = f"libaphrodite_hermes-{triple}.dylib"
+    else:
+        asset = f"libaphrodite_hermes-{triple}.so"
+    url = (
+        "https://github.com/PlayForm/Aphrodite/releases/download/"
+        f"Aphrodite%2Fv{version}/{asset}"
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = resp.read()
+    except Exception as e:
+        print(f"WARNING: could not download published dylib {url}: {e}")
+        return False
+    if len(data) < 1024:
+        print(f"WARNING: downloaded {url} is empty or truncated ({len(data)} bytes)")
+        return False
+    with open(dest, "wb") as f:
+        f.write(data)
+    return True
+
+
+def _obtain_dylib():
+    """A real dylib for the fixture, independent of the unreleased v1.4.6
+    release. Preference order (fix-ci-tests-instructions):
+      1. an existing workspace build (target/release, then target/debug)
+      2. `cargo build -p aphrodite-hermes` (deterministic, offline)
+      3. the latest PUBLISHED release (v1.4.5) asset
+    Returns the source dylib path, or None when all three fail (skip).
+    """
+    name = _dylib_name()
+    for sub in ("release", "debug"):
+        cand = os.path.join(ROOT, "target", sub, name)
+        if os.path.exists(cand):
+            return cand
+    try:
+        build = subprocess.run(
+            ["cargo", "build", "-p", "aphrodite-hermes"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=600,
+        )
+    except Exception as e:
+        print(f"WARNING: cargo build -p aphrodite-hermes could not run ({e}); falling back to published release")
+    else:
+        if build.returncode == 0:
+            cand = os.path.join(ROOT, "target", "debug", name)
+            if os.path.exists(cand):
+                return cand
+        else:
+            print(
+                f"WARNING: cargo build -p aphrodite-hermes failed (rc={build.returncode}); "
+                "falling back to published release"
+            )
+    dest = os.path.join(tempfile.mkdtemp(prefix="aphrodite-test-dylib-"), name)
+    if _download_published_dylib(dest):
+        return dest
+    return None
+
+
+SRC_DYLIB = _obtain_dylib()
+
+if not SRC_DYLIB:
     pytest.skip(
-        f"aphrodite-hermes dylib not built at {SRC_DYLIB}; "
-        f"run `cargo build --release -p aphrodite-hermes` to enable this suite",
+        "no aphrodite-hermes dylib available (local build failed and the "
+        "published-release fallback failed); run `cargo build -p "
+        "aphrodite-hermes` to enable this suite",
         allow_module_level=True,
     )
 
@@ -50,7 +145,19 @@ def plugin_module(tmp_path, monkeypatch):
     binaries.mkdir()
     dylib_copy = binaries / _dylib_name()
     shutil.copy2(SRC_DYLIB, dylib_copy)
+    # copy2 preserves the source mtime, and the plugin's hotreload state is
+    # process-global (mtime-keyed) - a second fixture copy with the same
+    # mtime would hit the cached-handle early return and never load or copy
+    # anything. Touch it so each test's copy looks like a fresh rebuild.
+    os.utime(dylib_copy, None)
     monkeypatch.setenv("APHRODITE_HERMES_DYLIB_PATH", str(dylib_copy))
+    # Isolate the runtime home (hotreload cache + reaper sweep) inside the
+    # sandbox instead of the real ~/.hermes/aphrodite, and disable the
+    # auto-download bootstrap: the fixture provides the dylib itself, and
+    # the pinned BINARY_VERSION (v1.4.6) is unreleased, so download.sh
+    # would 404 on every asset (the CI failure this fixture now avoids).
+    monkeypatch.setenv("APHRODITE_HOME", str(binaries))
+    monkeypatch.setenv("APHRODITE_NO_AUTO_DOWNLOAD", "1")
 
     spec = importlib.util.spec_from_file_location(
         "aphrodite_plugin_under_test",
@@ -75,7 +182,7 @@ def test_first_load_creates_one_hotreload_copy(plugin_module):
     dylib = mod._load_dylib()
     assert _version(dylib)
 
-    hotreload_dir = dylib_path.parent / ".hotreload"
+    hotreload_dir = dylib_path.parent / "hotreload"
     assert hotreload_dir.is_dir()
     assert len(list(hotreload_dir.iterdir())) == 1
 
@@ -86,14 +193,14 @@ def test_unchanged_mtime_returns_cached_handle_without_new_copy(plugin_module):
     d2 = mod._load_dylib()
     assert d1._handle == d2._handle
 
-    hotreload_dir = dylib_path.parent / ".hotreload"
+    hotreload_dir = dylib_path.parent / "hotreload"
     assert len(list(hotreload_dir.iterdir())) == 1
 
 
 def test_mtime_change_loads_fresh_copy_and_cleans_up_previous(plugin_module):
     mod, dylib_path = plugin_module
     d1 = mod._load_dylib()
-    hotreload_dir = dylib_path.parent / ".hotreload"
+    hotreload_dir = dylib_path.parent / "hotreload"
     first_gen = set(os.listdir(hotreload_dir))
 
     # Simulate a rebuild landing at the same path: content need not change for
