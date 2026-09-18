@@ -113,8 +113,10 @@ pub struct AphroditeState {
 	/// Fine-grained chain splitting: rewrite chained shell commands
 	/// (`a && b && c`) with segment markers and split the output into
 	/// per-segment CCR entries, so the agent sees N compact previews
-	/// instead of one giant blob. Default true. Env:
-	/// `APHRODITE_CHAIN_SPLIT`, TOML: `[compression] chain_split`.
+	/// instead of one giant blob. Struct default true; `apply_compression`
+	/// resolves the shipped config default to false (opt-in per session
+	/// via `APHRODITE_CHAIN_SPLIT=1` or TOML `[compression] chain_split`).
+	/// Env: `APHRODITE_CHAIN_SPLIT`, TOML: `[compression] chain_split`.
 	pub chain_split_enabled:bool,
 	// ── Tier 1 teaching loop: adaptive split threshold ──
 	/// Current minimum segment count for chain splitting. Only chains with

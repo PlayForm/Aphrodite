@@ -21,14 +21,16 @@ were moved into category directories, each with an INDEX.md.
 | ---------------------------- | ------------------------------------------------------------------------------------------ | -------- |
 | [ffi/](ffi/INDEX.md)         | FFI pipeline, codegen, research, hardening, FFI CI                                         | 6 files  |
 | [issue11/](issue11/INDEX.md) | Issue #11 preview-collapse bug family: root cause, fix design, batteries, landed, residual | 13 files |
-| [release/](release/INDEX.md) | Release ceremony, methodology, sync-back, CI triggers                                      | 4 files  |
+| [release/](release/INDEX.md) | Release ceremony, methodology, sync-back, CI triggers, merge review method                | 8 files  |
 | [session/](session/INDEX.md) | Chronological session continuations, handoffs, dispatches                                  | 4 files  |
 | [plugin/](plugin/INDEX.md)   | Plugin loader, layout self-heal, directives, failure forensics                             | 5 files  |
-| [ops/](ops/INDEX.md)         | Operational + meta notes (docs refresh, benchmarks, optimization clues, rewrite reports)   | 7 files  |
+| [ops/](ops/INDEX.md)         | Operational + meta notes (docs refresh, benchmarks, optimization clues, rewrite reports)  | 10 files |
 
 Plus the rewrite-session reports at this root: `HERMES-REWRITE-A.md` (this
-taxonomy + docs pass) and `HERMES-REWRITE-B.md` (the split.md rewrite),
-alongside the sibling research doc `SPLIT-MD-REWRITE.md`.
+taxonomy + uml + classification pass) and `HERMES-REWRITE-B.md` (the AGENTS.md
++ skills + tmp tidy pass). The 1.5.0 preview-refactor blueprint lives at
+`ops/SPLIT-ADAPTATION.md` (research distillation) with the concrete plan at
+`ops/REFACTOR-PLAN-1.5.0.md`.
 
 Format contract: prettier-clean (repo `.prettierrc`: tabs, width 100,
 proseWrap preserve), anonymized (zero local absolute paths - repo-relative or

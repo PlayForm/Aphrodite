@@ -65,7 +65,7 @@ One paragraph. What this release is, why it matters, 2-3 sentences max.
 ### Links
 
 - **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/{PREV_VERSION}...Aphrodite/{BIN_VERSION}
-- **CHANGELOG.md**: [Maintain/CHANGELOG.md](Maintain/CHANGELOG.md)
+- **CHANGELOG.md**: [CHANGELOG.md](../CHANGELOG.md) (repo root, both lines)
 - **Plugin**: https://github.com/PlayForm/Aphrodite-Hermes
 - **Headroom Fork**: https://github.com/PlayForm/Headroom
 ```

@@ -275,10 +275,11 @@ impl Config {
 			state.directives = crate::directives::loaded_builtins();
 		}
 		// Seed active directives: from TOML [directives] active list, filtered
-		// to those that actually loaded. If the TOML list is empty AND we fell
-		// back to builtins, default to focus + foresight + lazy (lazy keeps the
-		// session from over-eagerly stacking directives until a later turn
-		// proves it needs focus/explore/foresight/cleanup).
+		// to those that actually loaded. If the TOML list resolves empty while
+		// directives ARE loaded (from builtins or disk), default to the
+		// focus + foresight + lazy subset that exists in the loaded set (lazy
+		// keeps the session from over-eagerly stacking directives until a later
+		// turn proves it needs focus/explore/foresight/cleanup).
 		let active = self.get_string_list("directives", "active");
 		state.active_directives = active.into_iter().filter(|name| state.directives.contains_key(name)).collect();
 		if state.active_directives.is_empty() && !state.directives.is_empty() {
@@ -424,7 +425,8 @@ mod tests {
 			"directives must load even when [directives] active is empty"
 		);
 		// With empty TOML `active` and directives loaded from disk, the
-		// fallback seeds focus + foresight as defaults.
+		// fallback seeds whatever of [focus, foresight, lazy] exists in the
+		// loaded set - this temp dir only has focus.md, so focus is seeded.
 		assert!(
 			!state.active_directives.is_empty(),
 			"empty active list should seed focus + foresight defaults"

@@ -5,7 +5,7 @@ See [TAXONOMY.md](TAXONOMY.md) for the code grammar.
 **Scope:** Maintain/** (all 47 tracked files), .github/workflows/** (6), .githooks/** (6),
 .gitmodules, .gitattributes, .gitignore, vendor/** (2 gitlinks), profiles/ (deleted),
 Maintain/install.{sh,ps1,bat} (deleted).
-**Basis:** .hermes/classification/TAXONOMY.md v0.1 + .hermes/notes/RELEASE-METHODOLOGY.md
+**Basis:** .hermes/classification/TAXONOMY.md v0.1 + .hermes/notes/release/RELEASE-METHODOLOGY.md
 (Part 0-8). **Branch observed:** Development. **Date:** 2026-09-17.
 **Count:** 64 tracked files + 4 absence classifications = **68 entries**.
 

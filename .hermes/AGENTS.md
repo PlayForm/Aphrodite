@@ -48,7 +48,7 @@ of the token cost. Read this file first - it is the map.
 | Forked deps     | `vendor/headroom/` (submodule; `aphrodite-headroom-core`)                             |
 | Config          | `aphrodite.toml.example` (tracked); `aphrodite.toml` (local, gitignored)              |
 | Runtime         | `~/.hermes/aphrodite/`                                                                |
-| Release         | `.hermes/release/RELEASE-TEMPLATE.md`, `.hermes/release-notes/` (v1.4.0…v1.4.3-draft) |
+| Release         | `.hermes/release/RELEASE-TEMPLATE.md`, `.hermes/release-notes/` (v1.4.0…v1.4.3) |
 | Dev archive     | `.hermes/` - skills/, tmp/ (scratch), scripts/, classification/, notes/, uml/         |
 | Maintenance     | `Maintain/` (scripts/, tests/, CHANGELOG.md)                                          |
 

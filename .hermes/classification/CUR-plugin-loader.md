@@ -4,7 +4,7 @@ See [TAXONOMY.md](TAXONOMY.md) for the code grammar.
 
 **Pass:** CUR (Current-side pass) · **Scope owner:** plugin/loader processes
 **Repo:** Aphrodite monorepo (Development) → `plugins/aphrodite` is a SUBMODULE → PlayForm/Aphrodite-Hermes
-**Taxonomy:** `.hermes/classification/TAXONOMY.md` v0.1 · **Ceremony spec:** `.hermes/notes/RELEASE-METHODOLOGY.md`
+**Taxonomy:** `.hermes/classification/TAXONOMY.md` v0.1 · **Ceremony spec:** `.hermes/notes/release/RELEASE-METHODOLOGY.md`
 **Date:** 2026-09-17 · **Submodule state:** branch `Development`, clean tree, HEAD `497671b` (v2.1.2-37-g497671b), NO `binaries/` dir on disk
 
 Every file below is a **halted process** - opening it resumes it. The plugin submodule is the

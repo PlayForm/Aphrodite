@@ -75,7 +75,7 @@ without the ceremony window), re-run the B4 audit clean. Detail:
 - `proxy_health` export decision (dead for the plugin; HTTP /health used).
 - `model_family` / `code_structure_map` / `rust_preview_lines`: wire or
   remove (only `preview_max_chars` was wired).
-- SPLIT-MD-REWRITE.md (in this dir) holds the 1.5.0 blueprint for the
+- `ops/SPLIT-ADAPTATION.md` holds the 1.5.0 blueprint for the
   `detect_semantic_type` / preview.rs regex refactor (fancy-regex vs
   regex/aho-corasick research + isolated 7-session execution order).
 
@@ -93,7 +93,7 @@ without the ceremony window), re-run the B4 audit clean. Detail:
 1. `cd` to the monorepo, branch Development; submodule `plugins/aphrodite` on
    Development; verify no phantom gitlink (`git ls-files -s` shows no 160000).
 2. Sanity sweep: `python3 Maintain/check_ffi_contract.py` (PASS),
-   `python3 sigserve/repro.py` (SURVIVED), `cargo test -p aphrodite` (389),
+   `python3 sigserve/repro.py` (SURVIVED), `cargo test -p aphrodite` (406),
    `cargo test -p aphrodite-hermes` (52),
    `python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py` (23),
    `python3 Maintain/tests/test_check_ffi_contract.py` (13/13), drift-guard
