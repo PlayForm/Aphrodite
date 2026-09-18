@@ -14,8 +14,7 @@
 //! before any publish. A `build.rs` cannot do this reliably: it runs against
 //! the checkout (files present) and is skipped under `cargo publish --no-verify`.
 
-use std::path::Path;
-use std::process::Command;
+use std::{path::Path, process::Command};
 
 /// Extract the path argument from `include_str!("...")` occurrences wherever
 /// they appear on a line (they sit inside a tuple, e.g.
@@ -23,7 +22,7 @@ use std::process::Command;
 /// files relative to `src/`, so in the tarball they appear as
 /// `src/builtin_directives/focus.md`. We normalize both `src/...` and
 /// `builtin_directives/...` forms to the tarball path.
-fn collect_include_str_paths(source: &str) -> Vec<String> {
+fn collect_include_str_paths(source:&str) -> Vec<String> {
 	let mut out = Vec::new();
 	for line in source.lines() {
 		let line = line.trim();
@@ -80,8 +79,7 @@ fn packaged_tarball_contains_all_builtin_directives() {
 		assert!(
 			listed.lines().any(|l| l.trim_end() == target.as_str()),
 			"packaged tarball is missing `{}` (referenced by include_str! in src/directives.rs).
-\
-             Fix: ensure it is not excluded by `exclude` in Cargo.toml.",
+Fix: ensure it is not excluded by `exclude` in Cargo.toml.",
 			target
 		);
 	}

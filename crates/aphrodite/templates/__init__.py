@@ -35,9 +35,7 @@ _DYLIB_NAME = (
 # ~/.hermes/aphrodite, never inside the plugin tree. Env overrides stay
 # first; the plugin-dir binaries/ paths survive only as legacy fallbacks.
 _BINARIES_DIR = Path.home() / ".hermes" / "aphrodite" / "binaries"
-_DYLIB_PATH = os.environ.get(
-    "APHRODITE_HERMES_DYLIB_PATH", str(_BINARIES_DIR / _DYLIB_NAME)
-)
+_DYLIB_PATH = os.environ.get("APHRODITE_HERMES_DYLIB_PATH", str(_BINARIES_DIR / _DYLIB_NAME))
 _BINARY_NAME = "aphrodite.exe" if sys.platform == "win32" else "aphrodite"
 _BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH", str(_BINARIES_DIR / _BINARY_NAME))
 
@@ -78,9 +76,7 @@ try:
     from . import _bindings as _GENERATED_BINDINGS  # noqa: N812  # type: ignore[attr-defined]
 except Exception as _bindings_err:  # ImportError (absent), SyntaxError (corrupt), ...
     _GENERATED_BINDINGS = None  # type: ignore[assignment]
-    _log.debug(
-        "generated _bindings.py unavailable (%s); using the manual FFI setup", _bindings_err
-    )
+    _log.debug("generated _bindings.py unavailable (%s); using the manual FFI setup", _bindings_err)
 
 # Directives are provided by the BINARY (embedded in libaphrodite_hermes.dylib
 # via the core crate's builtin_directives) and materialized into the user-data
@@ -88,7 +84,9 @@ except Exception as _bindings_err:  # ImportError (absent), SyntaxError (corrupt
 # Point the dylib's discovery at the canonical runtime home so it reads the
 # materialized set; os.environ.setdefault keeps a user-provided
 # APHRODITE_DIRECTIVES_DIR override authoritative.
-os.environ.setdefault("APHRODITE_DIRECTIVES_DIR", str(Path.home() / ".hermes" / "aphrodite" / "directives"))
+os.environ.setdefault(
+    "APHRODITE_DIRECTIVES_DIR", str(Path.home() / ".hermes" / "aphrodite" / "directives")
+)
 
 # ── Per-process dylib state ──
 # Hermes builds one PluginManager per Hermes home (root home + every
@@ -551,9 +549,7 @@ def _load_dylib() -> ctypes.CDLL:
         # unique path - and register() degrades to a graceful disable.
         if path not in _state.probed_paths:
             if not _probe_dylib(path):
-                raise RuntimeError(
-                    f"dylib smoke-test failed for {path} - plugin disabled"
-                )
+                raise RuntimeError(f"dylib smoke-test failed for {path} - plugin disabled")
             _state.probed_paths.add(path)
 
         # Load from a fresh unique-path copy, not `path` directly - see

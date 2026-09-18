@@ -180,12 +180,8 @@ def print_corpus_report(report: dict) -> None:
     print("═" * 78)
     print("  Corpus Evaluation (bench/**, pure-python marker math)")
     print("═" * 78)
-    print(
-        "  NOTE: marker byte lengths are EXACT (repo format <<<CCR:40hex|type|size>>>);"
-    )
-    print(
-        "  hash hex is a placeholder - only the real binary computes the BLAKE3 key."
-    )
+    print("  NOTE: marker byte lengths are EXACT (repo format <<<CCR:40hex|type|size>>>);")
+    print("  hash hex is a placeholder - only the real binary computes the BLAKE3 key.")
     print("  Live binary latency + JSON: run benchmark-report.py")
     print()
     print("| Corpus | Samples | Raw (B) | Marker (B) | Ratio | % Saved |")
@@ -220,6 +216,7 @@ def print_corpus_report(report: dict) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Simulated preview-size analysis (kept from the original benchmark-eval.py).
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 # Approximate token count (1 token ≈ 4 chars for code, 3 chars for text)
 def estimate_tokens(text: str, content_type: str = "text") -> int:
@@ -277,9 +274,7 @@ def print_simulated_report() -> None:
     print("# Aphrodite Compression Evaluation Report")
     print()
     print("⚠️  SIMULATED - preview sizes are static assumptions, not runtime measurements.")
-    print(
-        "    For live metrics: .bench/proxy/bench_proxy.sh or cargo bench in .bench/compression/"
-    )
+    print("    For live metrics: .bench/proxy/bench_proxy.sh or cargo bench in .bench/compression/")
     print()
     print(f"## Content Types Tested: {len(SAMPLES)}")
     print()
@@ -381,9 +376,7 @@ def print_simulated_report() -> None:
     print()
     print("## Key Findings")
     print()
-    print(
-        f"1. **Lossless compression alone**: {total_pct:.1f}% token reduction across all types"
-    )
+    print(f"1. **Lossless compression alone**: {total_pct:.1f}% token reduction across all types")
     print(
         "2. **Preview-based decision**: The structured preview gives the agent enough info to skip retrieval for ~60% of outputs"
     )

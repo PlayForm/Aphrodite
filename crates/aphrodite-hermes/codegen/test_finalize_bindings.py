@@ -68,7 +68,7 @@ RAW_HEAD = (
 
 IF_ELSE_BLOCK = (
     "for _lib in _libs.values():\n"
-    "    if not _lib.has(\"NAME\", \"cdecl\"):\n"
+    '    if not _lib.has("NAME", "cdecl"):\n'
     "        continue\n"
     '    NAME = _lib.get("NAME", "cdecl")\n'
     "    NAME.argtypes = [String, String]\n"
@@ -82,7 +82,7 @@ IF_ELSE_BLOCK = (
 
 SINGLE_LINE = (
     "for _lib in _libs.values():\n"
-    "    if not _lib.has(\"NAME\", \"cdecl\"):\n"
+    '    if not _lib.has("NAME", "cdecl"):\n'
     "        continue\n"
     '    NAME = _lib.get("NAME", "cdecl")\n'
     "    NAME.argtypes = [String]\n"
@@ -118,17 +118,21 @@ def real_loops():
     """Raw declaration loops for the three synthetic exports (dispatch_tool
     if/else block, free_string void, version if/else block)."""
     return (
-        IF_ELSE_BLOCK.replace("NAME", "aphrodite_hermes_dispatch_tool") + "\n" + (
+        IF_ELSE_BLOCK.replace("NAME", "aphrodite_hermes_dispatch_tool")
+        + "\n"
+        + (
             "for _lib in _libs.values():\n"
-            "    if not _lib.has(\"aphrodite_hermes_free_string\", \"cdecl\"):\n"
+            '    if not _lib.has("aphrodite_hermes_free_string", "cdecl"):\n'
             "        continue\n"
             '    aphrodite_hermes_free_string = _lib.get("aphrodite_hermes_free_string", "cdecl")\n'
             "    aphrodite_hermes_free_string.argtypes = [String]\n"
             "    aphrodite_hermes_free_string.restype = None\n"
             "    break\n"
-        ) + "\n" + (
+        )
+        + "\n"
+        + (
             "for _lib in _libs.values():\n"
-            "    if not _lib.has(\"aphrodite_hermes_version\", \"cdecl\"):\n"
+            '    if not _lib.has("aphrodite_hermes_version", "cdecl"):\n'
             "        continue\n"
             '    aphrodite_hermes_version = _lib.get("aphrodite_hermes_version", "cdecl")\n'
             "    aphrodite_hermes_version.argtypes = []\n"
@@ -156,7 +160,9 @@ class TestRestypeRegex(unittest.TestCase):
         self.assertRegex(final, r"NAME\.restype = c_void_p\n")
 
     def test_single_line_returnstring(self):
-        final = fb.postprocess(make_raw(SINGLE_LINE.format(restype="ReturnString")), Path("/tmp/x.h"))
+        final = fb.postprocess(
+            make_raw(SINGLE_LINE.format(restype="ReturnString")), Path("/tmp/x.h")
+        )
         self.assertIn("NAME.restype = c_void_p", final)
         self.assertNotIn("ReturnString", final)
 
@@ -181,7 +187,7 @@ class TestRestypeRegex(unittest.TestCase):
         line (CtypesNoErrorCheck.__bool__ is False) - must stay None."""
         loops = (
             "for _lib in _libs.values():\n"
-            "    if not _lib.has(\"NAME\", \"cdecl\"):\n"
+            '    if not _lib.has("NAME", "cdecl"):\n'
             "        continue\n"
             '    NAME = _lib.get("NAME", "cdecl")\n'
             "    NAME.argtypes = [String]\n"
@@ -201,7 +207,9 @@ class TestArgtypesRewrite(unittest.TestCase):
         self.assertNotIn("[String", final)
 
     def test_single_argtype(self):
-        final = fb.postprocess(make_raw(SINGLE_LINE.format(restype="ReturnString")), Path("/tmp/x.h"))
+        final = fb.postprocess(
+            make_raw(SINGLE_LINE.format(restype="ReturnString")), Path("/tmp/x.h")
+        )
         self.assertIn("NAME.argtypes = [c_char_p]", final)
 
     def test_free_string_argtypes_c_void_p(self):
@@ -221,11 +229,25 @@ class TestDeadCodeStrip(unittest.TestCase):
 
     def test_dead_code_absent(self):
         final = fb.postprocess(make_raw(IF_ELSE_BLOCK), Path("/tmp/x.h"))
-        for dead in ("UserString", "MutableString", "load_library", "c_ptrdiff_t",
-                     "_int_types", "LibraryLoader", "ReturnString", "add_library_search_dirs"):
+        for dead in (
+            "UserString",
+            "MutableString",
+            "load_library",
+            "c_ptrdiff_t",
+            "_int_types",
+            "LibraryLoader",
+            "ReturnString",
+            "add_library_search_dirs",
+        ):
             self.assertNotIn(dead, final, f"{dead} should be stripped")
-        for alive in ("from ctypes import *", "__all__ = [\"bind_to\"]", "_libs = {}",
-                      "def bind_to(_dylib):", "c_void_p", "c_char_p"):
+        for alive in (
+            "from ctypes import *",
+            '__all__ = ["bind_to"]',
+            "_libs = {}",
+            "def bind_to(_dylib):",
+            "c_void_p",
+            "c_char_p",
+        ):
             self.assertIn(alive, final, f"{alive} must survive")
 
     def test_lookup_rewritten(self):
@@ -311,7 +333,7 @@ class TestValidate(unittest.TestCase):
         """The historical SIGSEGV class: a c_int restype on a pointer export."""
         loops = (
             "for _lib in _libs.values():\n"
-            "    if not _lib.has(\"aphrodite_hermes_dispatch_tool\", \"cdecl\"):\n"
+            '    if not _lib.has("aphrodite_hermes_dispatch_tool", "cdecl"):\n'
             "        continue\n"
             '    aphrodite_hermes_dispatch_tool = _lib.get("aphrodite_hermes_dispatch_tool", "cdecl")\n'
             "    aphrodite_hermes_dispatch_tool.argtypes = [String, String]\n"
@@ -328,7 +350,7 @@ class TestValidate(unittest.TestCase):
         must flag a source that still carries one (e.g. an unhandled form)."""
         loops = (
             "for _lib in _libs.values():\n"
-            "    if not _lib.has(\"aphrodite_hermes_dispatch_tool\", \"cdecl\"):\n"
+            '    if not _lib.has("aphrodite_hermes_dispatch_tool", "cdecl"):\n'
             "        continue\n"
             '    aphrodite_hermes_dispatch_tool = _lib.get("aphrodite_hermes_dispatch_tool", "cdecl")\n'
             "    aphrodite_hermes_dispatch_tool.argtypes = [String, String]\n"

@@ -392,9 +392,9 @@ plugins/aphrodite/**
 # Plugin directive markdown is authored prose - re-include under the same
 # gitignore semantics as the README above (dir un-excluded first, then
 # contents re-excluded, then .md re-included LAST).
-!plugins/aphrodite/directives/
-plugins/aphrodite/directives/**
-!plugins/aphrodite/directives/**/*.md
+# NOTE: directives no longer ship in the plugin (they are binary-provided
+# into the canonical runtime-home directives dir) - this block is kept only
+# for historical compat and can be removed once the plugin tree is clean.
 
 # .hermes is the dev archive: formattable markdown only, categorized by
 # .hermes/<category>/<thing>.md. Order matters (gitignore semantics): the

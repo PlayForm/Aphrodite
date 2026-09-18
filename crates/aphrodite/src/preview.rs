@@ -5,13 +5,12 @@
 //! (via `crate::preview` re-export).
 
 use headroom_core::transforms;
-
 use serde_json::Value as JsonValue;
 
 /// Detect the CCR content-type string for a blob (e.g. `source_code`, `build`,
 /// `json_array`). Thin wrapper over the Headroom classifier so downstream
 /// crates (aphrodite-hermes) don't need a direct headroom-core dependency.
-pub fn detect_type(content: &str) -> String {
+pub fn detect_type(content:&str) -> String {
 	transforms::content_detector::detect_content_type(content)
 		.content_type
 		.as_str()
@@ -35,12 +34,12 @@ pub fn detect_type(content: &str) -> String {
 /// Issue #11 residual #4 (RC-C): structured content (diffs, code, tables,
 /// yaml/xml/csv, JSON objects, build logs) used to land on the generic
 /// first-line arm - the detectors below give each shape its semantic arm.
-pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
-	let lines: Vec<&str> = content.lines().collect();
+pub fn detect_semantic_type(content:&str) -> Option<&'static str> {
+	let lines:Vec<&str> = content.lines().collect();
 	if lines.is_empty() {
 		return None;
 	}
-	let non_empty: Vec<&str> = lines.iter().map(|l| l.trim_end()).filter(|l| !l.trim().is_empty()).collect();
+	let non_empty:Vec<&str> = lines.iter().map(|l| l.trim_end()).filter(|l| !l.trim().is_empty()).collect();
 	if non_empty.is_empty() {
 		return None;
 	}
@@ -75,7 +74,9 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 		|| content.contains("=== RUN ")
 		|| content.contains("--- FAIL:")
 		|| content.contains("--- PASS:")
-		|| content.lines().any(|l| has_number_before(l, "passed") || has_number_before(l, "failed"))
+		|| content
+			.lines()
+			.any(|l| has_number_before(l, "passed") || has_number_before(l, "failed"))
 		|| content.lines().any(|l| has_number_after(l, "Tests:"))
 		|| content.lines().any(|l| is_running_tests_line(l.trim_start()))
 		|| content.lines().any(|l| is_test_result_line(l.trim_start()))
@@ -160,9 +161,9 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 
 	// ── csv: >=2 rows with an identical comma-field count (>=2 fields) and no
 	// `, ` (comma-space) - prose with commas is excluded by both tests. ──
-	let csv_rows: Vec<&str> = non_empty.iter().map(|l| l.trim()).collect();
+	let csv_rows:Vec<&str> = non_empty.iter().map(|l| l.trim()).collect();
 	if csv_rows.len() >= 2 && !content.contains(", ") {
-		let counts: Vec<usize> = csv_rows.iter().map(|r| r.split(',').count()).collect();
+		let counts:Vec<usize> = csv_rows.iter().map(|r| r.split(',').count()).collect();
 		let first = counts[0];
 		if first >= 2 && counts.iter().all(|&c| c == first) {
 			return Some("csv");
@@ -251,16 +252,30 @@ pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 
 /// True when a JSON object is a Hermes wrapper envelope whose raw-JSON preview
 /// is intentional (the payload is inside the wrapper, not the key list).
-fn is_envelope_json_object(obj: &serde_json::Map<String, JsonValue>) -> bool {
-	const GUARD: &[&str] = &[
-		"output", "exit_code", "diff", "error", "success", "total_count", "matches", "matches_text", "content",
-		"total_lines", "result", "message", "found", "preview", "name", "description",
+fn is_envelope_json_object(obj:&serde_json::Map<String, JsonValue>) -> bool {
+	const GUARD:&[&str] = &[
+		"output",
+		"exit_code",
+		"diff",
+		"error",
+		"success",
+		"total_count",
+		"matches",
+		"matches_text",
+		"content",
+		"total_lines",
+		"result",
+		"message",
+		"found",
+		"preview",
+		"name",
+		"description",
 	];
 	obj.keys().any(|k| GUARD.contains(&k.as_str()))
 }
 
 /// True for a markdown heading line (`# `, `## `, ... `###### `).
-fn is_md_heading(line: &str) -> bool {
+fn is_md_heading(line:&str) -> bool {
 	let t = line.trim_start();
 	let n = t.chars().take_while(|c| *c == '#').count();
 	n >= 1 && n <= 6 && t.len() > n && t[n..].starts_with(' ') && t[n..].trim().len() > 0
@@ -268,7 +283,7 @@ fn is_md_heading(line: &str) -> bool {
 
 /// True for a non-heading markdown structural line (list item, link, fence,
 /// blockquote, horizontal rule).
-fn is_md_structure(line: &str) -> bool {
+fn is_md_structure(line:&str) -> bool {
 	let t = line.trim_start();
 	t.starts_with("- ")
 		|| t.starts_with("* ")
@@ -284,7 +299,7 @@ fn is_md_structure(line: &str) -> bool {
 /// True for a top-level YAML key line (`name: webapp`): a lowercase
 /// identifier key, no leading indent, non-empty value side allowed. Log-marker
 /// keys are excluded so compiler logs are never mis-tagged as yaml.
-fn is_yaml_key_line(line: &str) -> bool {
+fn is_yaml_key_line(line:&str) -> bool {
 	if line.starts_with(' ') || line.as_bytes().first() == Some(&9) {
 		return false;
 	}
@@ -297,7 +312,10 @@ fn is_yaml_key_line(line: &str) -> bool {
 		return false;
 	}
 	let key = &t[..idx];
-	if !key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_') {
+	if !key
+		.chars()
+		.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+	{
 		return false;
 	}
 	// Exclude log-marker keys (`error:`/`warning:`/...) so a compiler log is
@@ -310,7 +328,7 @@ fn is_yaml_key_line(line: &str) -> bool {
 /// JSON opens with a lone `{` - previewing that line alone is the ISSUE-11
 /// residual #1 MISLEADING bug (RC-D: the generic arm showed the first line).
 /// Skips to the first real content line (first key, first statement).
-fn first_meaningful_line(content: &str) -> Option<String> {
+fn first_meaningful_line(content:&str) -> Option<String> {
 	content.lines().find_map(|l| {
 		let t = l.trim();
 		if t.is_empty() {
@@ -329,11 +347,11 @@ fn first_meaningful_line(content: &str) -> Option<String> {
 /// (60-char cap); very long lines (a 10 KB single-line payload) sample
 /// head+tail (`head…tail`, 57 chars) so both ends are visible instead of a
 /// bare 60-char head (ISSUE-11 residual #4, `long_single_line`/`repeated`).
-fn sample_long_line(line: &str) -> String {
-	let chars: Vec<char> = line.chars().collect();
+fn sample_long_line(line:&str) -> String {
+	let chars:Vec<char> = line.chars().collect();
 	if chars.len() > 100 {
-		let head: String = chars[..28].iter().collect();
-		let tail: String = chars[chars.len() - 28..].iter().collect();
+		let head:String = chars[..28].iter().collect();
+		let tail:String = chars[chars.len() - 28..].iter().collect();
 		format!("{head}…{tail}")
 	} else {
 		line.chars().take(60).collect()
@@ -343,7 +361,7 @@ fn sample_long_line(line: &str) -> String {
 /// Git porcelain / short-status code for a line (`M `, ` M`, `A `, `D `, `R `,
 /// `??`, `UU`, etc.), or `None`. Two leading columns (staged, unstaged) then a
 /// space then a path.
-fn git_status_code(line: &str) -> Option<&str> {
+fn git_status_code(line:&str) -> Option<&str> {
 	let b = line.as_bytes();
 	if b.len() < 4 {
 		return None;
@@ -365,7 +383,7 @@ fn git_status_code(line: &str) -> Option<&str> {
 
 /// True when a line looks like a grep/ripgrep hit: `path:line:match` (with a
 /// numeric line field) or `path:match` where the path has a file-ish shape.
-fn is_grep_line(line: &str) -> bool {
+fn is_grep_line(line:&str) -> bool {
 	let mut it = line.splitn(3, ':');
 	let path = match it.next() {
 		Some(p) if !p.trim().is_empty() && !p.contains(' ') => p,
@@ -384,7 +402,7 @@ fn is_grep_line(line: &str) -> bool {
 
 /// True when a line is a bare path-like token (find output / plain `ls`): a
 /// single whitespace-free token that has an extension or a path separator.
-fn is_path_line(line: &str) -> bool {
+fn is_path_line(line:&str) -> bool {
 	let t = line.trim();
 	if t.is_empty() || t.contains(char::is_whitespace) {
 		return false;
@@ -398,7 +416,7 @@ fn is_path_line(line: &str) -> bool {
 /// no raw-string escaping). ──
 
 /// `running N tests` header (bare test logs without a summary line).
-fn is_running_tests_line(t: &str) -> bool {
+fn is_running_tests_line(t:&str) -> bool {
 	let rest = match t.strip_prefix("running ") {
 		Some(r) => r,
 		None => return false,
@@ -421,7 +439,7 @@ fn is_running_tests_line(t: &str) -> bool {
 }
 
 /// `test <name> ... ok|FAILED|ignored` line.
-fn is_test_result_line(t: &str) -> bool {
+fn is_test_result_line(t:&str) -> bool {
 	let rest = match t.strip_prefix("test ") {
 		Some(r) => r,
 		None => return false,
@@ -446,7 +464,7 @@ fn is_test_result_line(t: &str) -> bool {
 }
 
 /// `N passed` / `N failed` anywhere on a line (pytest summaries).
-fn has_number_before(line: &str, kw: &str) -> bool {
+fn has_number_before(line:&str, kw:&str) -> bool {
 	match line.find(kw) {
 		Some(i) => line[..i].trim_end().chars().last().map(|c| c.is_ascii_digit()).unwrap_or(false),
 		None => false,
@@ -454,15 +472,22 @@ fn has_number_before(line: &str, kw: &str) -> bool {
 }
 
 /// `Tests: N` jest summary line.
-fn has_number_after(line: &str, kw: &str) -> bool {
+fn has_number_after(line:&str, kw:&str) -> bool {
 	match line.find(kw) {
-		Some(i) => line[i + kw.len()..].trim_start().chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false),
+		Some(i) => {
+			line[i + kw.len()..]
+				.trim_start()
+				.chars()
+				.next()
+				.map(|c| c.is_ascii_digit())
+				.unwrap_or(false)
+		},
 		None => false,
 	}
 }
 
 /// `fn name(` / `def name(` / `func name(` style signature.
-fn is_fn_style_sig(t: &str, kw: &str) -> bool {
+fn is_fn_style_sig(t:&str, kw:&str) -> bool {
 	let rest = match t.strip_prefix(kw) {
 		Some(r) => r,
 		None => return false,
@@ -473,11 +498,15 @@ fn is_fn_style_sig(t: &str, kw: &str) -> bool {
 }
 
 /// `struct Name` / `enum Name` / `trait Name` (optionally `pub`-prefixed).
-fn is_type_decl(t: &str) -> bool {
+fn is_type_decl(t:&str) -> bool {
 	let stripped = t.strip_prefix("pub ").unwrap_or(t);
 	for kw in ["struct ", "enum ", "trait "] {
 		if let Some(rest) = stripped.strip_prefix(kw) {
-			let name_len = rest.trim_start().chars().take_while(|c| c.is_alphanumeric() || *c == '_').count();
+			let name_len = rest
+				.trim_start()
+				.chars()
+				.take_while(|c| c.is_alphanumeric() || *c == '_')
+				.count();
 			if name_len > 0 {
 				return true;
 			}
@@ -487,7 +516,7 @@ fn is_type_decl(t: &str) -> bool {
 }
 
 /// `#include <...>` / `#include "..."` / `#include<...>`.
-fn is_include_directive(t: &str) -> bool {
+fn is_include_directive(t:&str) -> bool {
 	let rest = match t.strip_prefix("#include") {
 		Some(r) => r,
 		None => return false,
@@ -497,7 +526,7 @@ fn is_include_directive(t: &str) -> bool {
 }
 
 /// Strong code-signature line: ONE such line is enough to call content code.
-fn is_code_strong_line(t: &str) -> bool {
+fn is_code_strong_line(t:&str) -> bool {
 	is_fn_style_sig(t, "fn ")
 		|| is_fn_style_sig(t, "def ")
 		|| is_fn_style_sig(t, "func ")
@@ -512,28 +541,34 @@ fn is_code_strong_line(t: &str) -> bool {
 }
 
 /// `let x =` / `const X =` / `static X =` assignment (optional `mut`).
-fn is_let_assign(t: &str) -> bool {
+fn is_let_assign(t:&str) -> bool {
 	let rest = match ["let ", "const ", "static "].iter().find_map(|p| t.strip_prefix(p)) {
 		Some(r) => r,
 		None => return false,
 	};
 	let rest = rest.strip_prefix("mut ").unwrap_or(rest).trim_start();
-	let name_len = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':').count();
+	let name_len = rest
+		.chars()
+		.take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':')
+		.count();
 	name_len > 0 && rest[name_len..].trim_start().starts_with('=')
 }
 
 /// `use std::collections::HashMap;` (rust use statement ending in `;`).
-fn is_use_statement(t: &str) -> bool {
+fn is_use_statement(t:&str) -> bool {
 	let rest = match t.strip_prefix("use ") {
 		Some(r) => r,
 		None => return false,
 	};
-	let path_len = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':').count();
+	let path_len = rest
+		.chars()
+		.take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':')
+		.count();
 	path_len > 0 && rest[path_len..].starts_with(';')
 }
 
 /// `from x import y` (python).
-fn is_from_import(t: &str) -> bool {
+fn is_from_import(t:&str) -> bool {
 	let rest = match t.strip_prefix("from ") {
 		Some(r) => r,
 		None => return false,
@@ -544,7 +579,7 @@ fn is_from_import(t: &str) -> bool {
 
 /// Code statement-line vote: `use x::y;`, `let x =`, `import x`,
 /// `from x import y`, `return ...`, `println!`, `print(`, `echo ...`.
-fn is_code_vote_line(t: &str) -> bool {
+fn is_code_vote_line(t:&str) -> bool {
 	is_use_statement(t)
 		|| is_let_assign(t)
 		|| is_from_import(t)
@@ -556,7 +591,9 @@ fn is_code_vote_line(t: &str) -> bool {
 			.unwrap_or(false)
 		|| t.starts_with("println!")
 		|| t.starts_with("print(")
-		|| t.strip_prefix("print").map(|r| r.trim_start().starts_with('(')).unwrap_or(false)
+		|| t.strip_prefix("print")
+			.map(|r| r.trim_start().starts_with('('))
+			.unwrap_or(false)
 		|| t.strip_prefix("echo ")
 			.map(|r| r.chars().next().map(|c| c.is_alphanumeric() || c == '$').unwrap_or(false))
 			.unwrap_or(false)
@@ -567,7 +604,7 @@ fn is_code_vote_line(t: &str) -> bool {
 /// the config structs but never read anywhere, so every preview knob was a
 /// no-op. The builder now enforces it on EVERY path - proxy, hooks, and the
 /// Hermes dylib all funnel through [`build_preview`].
-static PREVIEW_MAX_CHARS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static PREVIEW_MAX_CHARS:std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 /// Configure the preview length cap (chars); `None`/0 = unlimited.
 /// Returns the previous value so callers (tests, hot-reload) can restore it.
@@ -576,15 +613,13 @@ static PREVIEW_MAX_CHARS: std::sync::atomic::AtomicU32 = std::sync::atomic::Atom
 /// `MultiConfig::load`, the proxy `/reload` handler re-sets it on hot-reload,
 /// and the Hermes bridge applies it via
 /// `config_loader::Config::apply_previews` at dylib init.
-pub fn set_preview_max_chars(max: Option<u32>) -> Option<u32> {
+pub fn set_preview_max_chars(max:Option<u32>) -> Option<u32> {
 	let prev = PREVIEW_MAX_CHARS.swap(max.unwrap_or(0), std::sync::atomic::Ordering::Relaxed);
 	if prev == 0 { None } else { Some(prev) }
 }
 
 /// Current preview cap in chars (0 = unlimited). Test/visibility helper.
-pub fn preview_max_chars() -> u32 {
-	PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed)
-}
+pub fn preview_max_chars() -> u32 { PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed) }
 
 /// Serializes tests across modules that mutate the process-global preview
 /// cap (`cargo test` runs module test-bodies concurrently; the cap is
@@ -592,7 +627,7 @@ pub fn preview_max_chars() -> u32 {
 /// cap tests must not interleave).
 #[cfg(test)]
 pub(crate) fn preview_cap_test_guard() -> std::sync::MutexGuard<'static, ()> {
-	static G: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+	static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
 	G.get_or_init(|| std::sync::Mutex::new(()))
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -603,7 +638,7 @@ pub(crate) fn preview_cap_test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// `render_marker`/`parse_preview`/`chain_split` keep working after
 /// truncation - a bare cut that drops `]` would re-trigger the
 /// `[text:[text:...]]` double-wrap bug class (`marker.rs`). `0` = no cap.
-fn apply_preview_cap(preview: &str, max_chars: usize) -> String {
+fn apply_preview_cap(preview:&str, max_chars:usize) -> String {
 	if max_chars == 0 || preview.chars().count() <= max_chars {
 		return preview.to_string();
 	}
@@ -611,7 +646,7 @@ fn apply_preview_cap(preview: &str, max_chars: usize) -> String {
 	if !keep_close || max_chars <= 1 {
 		return preview.chars().take(max_chars).collect();
 	}
-	let mut out: String = preview.chars().take(max_chars - 2).collect();
+	let mut out:String = preview.chars().take(max_chars - 2).collect();
 	out.push('…');
 	out.push(']');
 	out
@@ -623,7 +658,7 @@ fn apply_preview_cap(preview: &str, max_chars: usize) -> String {
 /// lines (`ValueError:`, `TypeError:`, `Exception:`). Line-based (not
 /// substring) counting so a word containing "error" (`noerror`, `error-prone`)
 /// or a capitalized variant can never inflate/miss the tally.
-fn is_error_line(line: &str) -> bool {
+fn is_error_line(line:&str) -> bool {
 	let t = line.trim_start();
 	t.starts_with("error[")
 		|| t.starts_with("error:")
@@ -635,12 +670,12 @@ fn is_error_line(line: &str) -> bool {
 		|| ERROR_LINE_RE.is_match(t)
 }
 
-static ERROR_LINE_RE: std::sync::LazyLock<regex::Regex> =
+static ERROR_LINE_RE:std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"\b\w+(?:Error|Exception):").unwrap());
 
 /// True for a line that is a real compiler warning line (`warning[`/`warning:`
 /// /`Warning:`/`WARNING` or a `file:line: warning:` prefix).
-fn is_warning_line(line: &str) -> bool {
+fn is_warning_line(line:&str) -> bool {
 	let t = line.trim_start();
 	t.starts_with("warning[")
 		|| t.starts_with("warning:")
@@ -653,34 +688,30 @@ fn is_warning_line(line: &str) -> bool {
 /// True for a line that signals a FAILED state: a `FAILED`/`FAIL` marker, a
 /// `--- FAIL:` test failure, or a NON-ZERO `N failed` count. `0 failed`
 /// (clean runs) never matches, so a passing test summary stays clean.
-fn is_failure_line(line: &str) -> bool {
+fn is_failure_line(line:&str) -> bool {
 	let t = line.trim_start();
-	t.contains("FAILED")
-		|| t.starts_with("FAIL ")
-		|| t.starts_with("--- FAIL:")
-		|| FAILED_COUNT_RE.is_match(t)
+	t.contains("FAILED") || t.starts_with("FAIL ") || t.starts_with("--- FAIL:") || FAILED_COUNT_RE.is_match(t)
 }
 
-static FAILED_COUNT_RE: std::sync::LazyLock<regex::Regex> =
+static FAILED_COUNT_RE:std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)[1-9]\d*\s+failed").unwrap());
 
 /// True for a linter issue line: `path:line:col:` prefix (ruff/flake8/eslint)
 /// or a `E###`/`W###`/`F###` issue code.
-fn is_lint_line(line: &str) -> bool {
+fn is_lint_line(line:&str) -> bool {
 	let t = line.trim_start();
 	is_error_line(t) || is_warning_line(t) || LINT_RE.is_match(t)
 }
 
-static LINT_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-	regex::Regex::new(r"^[^\s:]+:\d+:\d+:|(?:^|\s)[EWF]\d{3,4}\b").unwrap()
-});
+static LINT_RE:std::sync::LazyLock<regex::Regex> =
+	std::sync::LazyLock::new(|| regex::Regex::new(r"^[^\s:]+:\d+:\d+:|(?:^|\s)[EWF]\d{3,4}\b").unwrap());
 
 /// Build a compact, human-readable preview string for compressed content,
 /// shaped per content type (e.g. error/warning counts for build output,
 /// +/- line counts for diffs, fn/struct counts for source code) so the LLM
 /// gets a useful summary instead of a generic byte/line count wherever a
 /// richer signal is available.
-pub fn build_preview(type_str: &str, content: &str) -> String {
+pub fn build_preview(type_str:&str, content:&str) -> String {
 	let lines = content.lines().count();
 	let bytes = content.len();
 	// Semantic-detection DEFAULT (no flag): when the classifier only reached a
@@ -699,11 +730,13 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 	// (`test result: ok.` - the build arm's clean `0E 0W` summary hides the
 	// payload's real shape); a FAILING run keeps the build arm's failure note
 	// (WS2 pin).
-	let effective: &str = match type_str {
+	let effective:&str = match type_str {
 		"text" | "terminal" | "log" | "" | "plain" | "tool_result" => detect_semantic_type(content).unwrap_or(type_str),
-		"build_output" | "build_error" => match detect_semantic_type(content) {
-			Some("test") if !content.lines().any(|l| is_failure_line(l)) => "test",
-			_ => type_str,
+		"build_output" | "build_error" => {
+			match detect_semantic_type(content) {
+				Some("test") if !content.lines().any(|l| is_failure_line(l)) => "test",
+				_ => type_str,
+			}
 		},
 		other => other,
 	};
@@ -719,19 +752,15 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			// Enrich: surface the first error MESSAGE (e.g. `E0432: unresolved
 			// import ...`), not just tallies - the exact text the agent needs to
 			// decide whether to retrieve the full log.
-			let first_err = content
-				.lines()
-				.map(|l| l.trim())
-				.find(|l| is_error_line(l))
-				.map(|l| {
-					// Prefer the `error[EXXXX]: msg` / `error: msg` remainder.
-					let start = l
-						.find("error")
-						.or_else(|| l.find("Error"))
-						.or_else(|| l.find("ERROR"))
-						.unwrap_or(0);
-					l[start..].chars().take(60).collect::<String>()
-				});
+			let first_err = content.lines().map(|l| l.trim()).find(|l| is_error_line(l)).map(|l| {
+				// Prefer the `error[EXXXX]: msg` / `error: msg` remainder.
+				let start = l
+					.find("error")
+					.or_else(|| l.find("Error"))
+					.or_else(|| l.find("ERROR"))
+					.unwrap_or(0);
+				l[start..].chars().take(60).collect::<String>()
+			});
 			match first_err {
 				Some(msg) if !msg.is_empty() => {
 					format!("[build:{}E {}W {}L | {}]", e, w, lines, msg)
@@ -744,11 +773,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 					// a failing test run used to preview as
 					// `[build:0E 0W 3L]` (ISSUE-11-PREVIEW-BATTERY #2).
 					if e == 0 && w == 0 {
-						if let Some(fail) = content
-							.lines()
-							.map(|l| l.trim())
-							.find(|l| is_failure_line(l))
-						{
+						if let Some(fail) = content.lines().map(|l| l.trim()).find(|l| is_failure_line(l)) {
 							return format!(
 								"[build:{}E {}W {}L | {}]",
 								e,
@@ -768,7 +793,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			let d = content.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
 			// Enrich: name the first couple of changed files so the agent sees
 			// WHAT changed, not just how many lines.
-			let mut files: Vec<String> = content
+			let mut files:Vec<String> = content
 				.lines()
 				.filter_map(|l| l.strip_prefix("diff --git "))
 				.filter_map(|rest| rest.split_whitespace().next())
@@ -817,7 +842,7 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 			// + first signature) so the dylib/hook path matches the proxy's preview
 			// quality, instead of a bare substring count.
 			let st = crate::struct_extract::extract_code_structure(content, "");
-			let mut parts: Vec<String> = Vec::new();
+			let mut parts:Vec<String> = Vec::new();
 			for (key, label) in [
 				("fns", "fns"),
 				("structs", "structs"),
@@ -956,10 +981,10 @@ pub fn build_preview(type_str: &str, content: &str) -> String {
 
 /// git status preview: tally each two-char status code and list the first few
 /// paths. `[git:5M 2A 1D 3?? | src/x.rs src/y.rs +6 more]`.
-fn build_git_status_preview(content: &str, lines: usize) -> String {
+fn build_git_status_preview(content:&str, lines:usize) -> String {
 	use std::collections::BTreeMap;
-	let mut tally: BTreeMap<char, usize> = BTreeMap::new();
-	let mut paths: Vec<String> = Vec::new();
+	let mut tally:BTreeMap<char, usize> = BTreeMap::new();
+	let mut paths:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if let Some(code) = git_status_code(line) {
 			// Collapse the two columns to the most significant status char
@@ -981,14 +1006,14 @@ fn build_git_status_preview(content: &str, lines: usize) -> String {
 	}
 	// Emit tallies in a stable, readable order.
 	let order = ['M', 'A', 'D', 'R', 'C', 'U', 'T', '?', '!'];
-	let mut counts: Vec<String> = Vec::new();
+	let mut counts:Vec<String> = Vec::new();
 	for c in order {
 		if let Some(n) = tally.get(&c) {
 			let label = if c == '?' { "??".to_string() } else { c.to_string() };
 			counts.push(format!("{}{}", n, label));
 		}
 	}
-	let total: usize = tally.values().sum();
+	let total:usize = tally.values().sum();
 	let shown = paths.len();
 	let more = if total > shown { format!(" +{} more", total - shown) } else { String::new() };
 	if paths.is_empty() {
@@ -1000,13 +1025,13 @@ fn build_git_status_preview(content: &str, lines: usize) -> String {
 
 /// git log preview: commit count + first->last short hash and subject.
 /// `[gitlog:20 commits | abc123 fix(x): … → def456 …]`.
-fn build_gitlog_preview(content: &str, lines: usize) -> String {
+fn build_gitlog_preview(content:&str, lines:usize) -> String {
 	// Collect `commit <hash>` entries and, if present, the following subject.
-	let all: Vec<&str> = content.lines().collect();
-	let mut commits: Vec<(String, String)> = Vec::new();
+	let all:Vec<&str> = content.lines().collect();
+	let mut commits:Vec<(String, String)> = Vec::new();
 	for (i, line) in all.iter().enumerate() {
 		if let Some(rest) = line.strip_prefix("commit ") {
-			let hash: String = rest.trim().chars().take(7).collect();
+			let hash:String = rest.trim().chars().take(7).collect();
 			// Subject: first non-empty, non-header line after the commit line.
 			let subject = all[i + 1..]
 				.iter()
@@ -1039,11 +1064,11 @@ fn build_gitlog_preview(content: &str, lines: usize) -> String {
 
 /// directory-listing preview: file/dir counts + top extensions.
 /// `[ls:42 files 7 dirs | .rs×18 .md×9 …]`.
-fn build_ls_preview(content: &str, lines: usize) -> String {
+fn build_ls_preview(content:&str, lines:usize) -> String {
 	use std::collections::HashMap;
 	let mut files = 0usize;
 	let mut dirs = 0usize;
-	let mut ext: HashMap<String, usize> = HashMap::new();
+	let mut ext:HashMap<String, usize> = HashMap::new();
 	for line in content.lines() {
 		let t = line.trim();
 		if t.is_empty() {
@@ -1078,7 +1103,7 @@ fn build_ls_preview(content: &str, lines: usize) -> String {
 			let base = name.rsplit('/').next().unwrap_or(name);
 			if let Some(dot) = base.rfind('.') {
 				if dot > 0 && dot < base.len() - 1 {
-					let e: String = base[dot..].chars().take(8).collect();
+					let e:String = base[dot..].chars().take(8).collect();
 					*ext.entry(e).or_insert(0) += 1;
 				}
 			}
@@ -1087,7 +1112,7 @@ fn build_ls_preview(content: &str, lines: usize) -> String {
 	if files == 0 && dirs == 0 {
 		return format!("[ls:{}L]", lines);
 	}
-	let mut top: Vec<(String, usize)> = ext.into_iter().collect();
+	let mut top:Vec<(String, usize)> = ext.into_iter().collect();
 	top.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 	let ext_str = top
 		.iter()
@@ -1104,7 +1129,7 @@ fn build_ls_preview(content: &str, lines: usize) -> String {
 
 /// test-output preview: pass/fail/ignored tallies + first failing test.
 /// `[test:220 pass 0 fail 1 ignored | 0.31s]` / names the first failure.
-fn build_test_preview(content: &str, lines: usize) -> String {
+fn build_test_preview(content:&str, lines:usize) -> String {
 	// cargo: `test result: ok. 220 passed; 0 failed; 1 ignored; ... 0.31s`
 	let mut pass = 0usize;
 	let mut fail = 0usize;
@@ -1191,11 +1216,11 @@ fn build_test_preview(content: &str, lines: usize) -> String {
 
 /// grep/ripgrep preview: hit count, distinct files, first location.
 /// `[grep:38 hits in 9 files | src/x.rs:12 …]`.
-fn build_grep_preview(content: &str, lines: usize) -> String {
+fn build_grep_preview(content:&str, lines:usize) -> String {
 	use std::collections::BTreeSet;
 	let mut hits = 0usize;
-	let mut files: BTreeSet<String> = BTreeSet::new();
-	let mut first: Option<String> = None;
+	let mut files:BTreeSet<String> = BTreeSet::new();
+	let mut first:Option<String> = None;
 	for line in content.lines() {
 		if !is_grep_line(line) {
 			continue;
@@ -1220,33 +1245,33 @@ fn build_grep_preview(content: &str, lines: usize) -> String {
 
 /// Parse the integer immediately preceding `keyword` on a line (e.g. `220
 /// passed` -> 220). Returns 0 when absent.
-fn num_before(line: &str, keyword: &str) -> usize {
+fn num_before(line:&str, keyword:&str) -> usize {
 	let idx = match line.find(keyword) {
 		Some(i) => i,
 		None => return 0,
 	};
 	line[..idx]
 		.trim_end()
-		.rsplit(|c: char| !c.is_ascii_digit())
+		.rsplit(|c:char| !c.is_ascii_digit())
 		.find(|s| !s.is_empty())
 		.and_then(|s| s.parse().ok())
 		.unwrap_or(0)
 }
 
-static DUR_RE: std::sync::LazyLock<regex::Regex> =
+static DUR_RE:std::sync::LazyLock<regex::Regex> =
 	std::sync::LazyLock::new(|| regex::Regex::new(r"(\d+\.\d+s|\d+ms)").unwrap());
 
 /// JSON preview: parse content and show item/object count with top-level keys,
 /// matching the quality of stage2's `reduce_json`. Falls back to a crude `{"`
 /// count when parsing fails (e.g. truncated or malformed JSON).
-fn build_json_preview(content: &str, lines: usize) -> String {
+fn build_json_preview(content:&str, lines:usize) -> String {
 	match serde_json::from_str::<JsonValue>(content) {
 		Ok(JsonValue::Array(arr)) => {
 			let keys = arr
 				.first()
 				.and_then(|v| v.as_object())
 				.map(|obj| {
-					let ks: Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+					let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
 					let more = if ks.len() < obj.len() {
 						format!(" +{} more", obj.len() - ks.len())
 					} else {
@@ -1258,7 +1283,7 @@ fn build_json_preview(content: &str, lines: usize) -> String {
 			format!("[json:{}items {}L{}]", arr.len(), lines, keys)
 		},
 		Ok(JsonValue::Object(obj)) => {
-			let ks: Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+			let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
 			let more = if ks.len() < obj.len() {
 				format!(" +{} more", obj.len() - ks.len())
 			} else {
@@ -1277,13 +1302,13 @@ fn build_json_preview(content: &str, lines: usize) -> String {
 /// Search preview: grep/ripgrep hit count, distinct files, first match location.
 /// Uses the same regex pattern as `content_detector::SEARCH_RESULT_PATTERN`
 /// (`file:line:` format).
-fn build_search_preview(content: &str, lines: usize) -> String {
+fn build_search_preview(content:&str, lines:usize) -> String {
 	use std::collections::BTreeSet;
-	static SEARCH_RE: std::sync::LazyLock<regex::Regex> =
+	static SEARCH_RE:std::sync::LazyLock<regex::Regex> =
 		std::sync::LazyLock::new(|| regex::Regex::new(r"^[^\s:]+:\d+:").unwrap());
 	let mut hits = 0usize;
-	let mut files: BTreeSet<String> = BTreeSet::new();
-	let mut first: Option<String> = None;
+	let mut files:BTreeSet<String> = BTreeSet::new();
+	let mut first:Option<String> = None;
 	for line in content.lines() {
 		if line.trim().is_empty() {
 			continue;
@@ -1312,8 +1337,8 @@ fn build_search_preview(content: &str, lines: usize) -> String {
 /// Markdown table preview: column count, row count, header cells.
 /// `[table:3 cols 4 rows | Name, Age, City]`. Rows = non-empty lines minus
 /// separator rows (header + data rows).
-fn build_table_preview(content: &str, _lines: usize) -> String {
-	let is_sep = |l: &str| {
+fn build_table_preview(content:&str, _lines:usize) -> String {
+	let is_sep = |l:&str| {
 		let cells = l.trim().trim_matches('|');
 		!cells.is_empty()
 			&& cells.split('|').all(|c| {
@@ -1321,24 +1346,28 @@ fn build_table_preview(content: &str, _lines: usize) -> String {
 				!t.is_empty() && t.chars().all(|ch| matches!(ch, '-' | ':' | ' '))
 			})
 	};
-	let rows: Vec<&str> = content
+	let rows:Vec<&str> = content
 		.lines()
 		.map(|l| l.trim())
 		.filter(|l| !l.is_empty() && !is_sep(l))
 		.collect();
 	let header = rows.first().unwrap_or(&"").trim_matches('|');
-	let cells: Vec<&str> = header.split('|').map(|c| c.trim()).filter(|c| !c.is_empty()).collect();
+	let cells:Vec<&str> = header.split('|').map(|c| c.trim()).filter(|c| !c.is_empty()).collect();
 	let cols = cells.len();
-	let shown: Vec<&str> = cells.iter().take(5).copied().collect();
-	let more = if cols > shown.len() { format!(" +{} more", cols - shown.len()) } else { String::new() };
+	let shown:Vec<&str> = cells.iter().take(5).copied().collect();
+	let more = if cols > shown.len() {
+		format!(" +{} more", cols - shown.len())
+	} else {
+		String::new()
+	};
 	format!("[table:{} cols {} rows | {}{}]", cols, rows.len(), shown.join(", "), more)
 }
 
 /// Markdown document preview: heading tally + first heading.
 /// `[md:7L h1×1 h2×2 | # Release Notes]`.
-fn build_markdown_preview(content: &str, lines: usize) -> String {
-	let mut levels: Vec<usize> = Vec::new();
-	let mut first_heading: Option<String> = None;
+fn build_markdown_preview(content:&str, lines:usize) -> String {
+	let mut levels:Vec<usize> = Vec::new();
+	let mut first_heading:Option<String> = None;
 	for line in content.lines() {
 		if is_md_heading(line) {
 			let t = line.trim_start();
@@ -1352,14 +1381,10 @@ fn build_markdown_preview(content: &str, lines: usize) -> String {
 	if levels.is_empty() {
 		return format!("[md:{}L]", lines);
 	}
-	let tally: Vec<String> = (1..=6)
+	let tally:Vec<String> = (1..=6)
 		.filter_map(|l| {
 			let c = levels.iter().filter(|&&x| x == l).count();
-			if c > 0 {
-				Some(format!("h{l}×{c}"))
-			} else {
-				None
-			}
+			if c > 0 { Some(format!("h{l}×{c}")) } else { None }
 		})
 		.collect();
 	match first_heading {
@@ -1370,13 +1395,13 @@ fn build_markdown_preview(content: &str, lines: usize) -> String {
 
 /// YAML preview: top-level key count + first few keys.
 /// `[yaml:4 keys 6L | name, version, port, debug]`.
-fn build_yaml_preview(content: &str, lines: usize) -> String {
-	let keys: Vec<&str> = content
+fn build_yaml_preview(content:&str, lines:usize) -> String {
+	let keys:Vec<&str> = content
 		.lines()
 		.filter(|l| is_yaml_key_line(l))
 		.filter_map(|l| l.find(':').map(|i| &l[..i]))
 		.collect();
-	let shown: Vec<&str> = keys.iter().take(5).copied().collect();
+	let shown:Vec<&str> = keys.iter().take(5).copied().collect();
 	let more = if keys.len() > shown.len() {
 		format!(" +{} more", keys.len() - shown.len())
 	} else {
@@ -1386,19 +1411,15 @@ fn build_yaml_preview(content: &str, lines: usize) -> String {
 }
 
 /// XML preview: element count + root tag. `[xml:3 elements 4L | <root>]`.
-fn build_xml_preview(content: &str, lines: usize) -> String {
+fn build_xml_preview(content:&str, lines:usize) -> String {
 	let elements = content.matches("</").count();
-	let root = content
-		.lines()
-		.map(|l| l.trim())
-		.find(|l| l.starts_with('<'))
-		.map(|l| {
-			let tag = l[1..]
-				.split(|c: char| c.is_whitespace() || c == '>' || c == '/')
-				.next()
-				.unwrap_or("");
-			format!("<{}>", tag)
-		});
+	let root = content.lines().map(|l| l.trim()).find(|l| l.starts_with('<')).map(|l| {
+		let tag = l[1..]
+			.split(|c:char| c.is_whitespace() || c == '>' || c == '/')
+			.next()
+			.unwrap_or("");
+		format!("<{}>", tag)
+	});
 	match root {
 		Some(r) => format!("[xml:{} elements {}L | {}]", elements, lines, r),
 		None => format!("[xml:{} elements {}L]", elements, lines),
@@ -1407,10 +1428,10 @@ fn build_xml_preview(content: &str, lines: usize) -> String {
 
 /// CSV preview: row count, column count, header cells.
 /// `[csv:4 rows 3 cols | name, age, city]`.
-fn build_csv_preview(content: &str, _lines: usize) -> String {
-	let rows: Vec<&str> = content.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+fn build_csv_preview(content:&str, _lines:usize) -> String {
+	let rows:Vec<&str> = content.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
 	let cols = rows.first().map(|r| r.split(',').count()).unwrap_or(0);
-	let header: Vec<&str> = rows
+	let header:Vec<&str> = rows
 		.first()
 		.map(|r| r.split(',').map(|c| c.trim()).take(5).collect())
 		.unwrap_or_default();
@@ -1423,7 +1444,7 @@ fn build_csv_preview(content: &str, _lines: usize) -> String {
 }
 
 /// HTML preview: title, heading count, link count, body size estimate.
-fn build_html_preview(content: &str, lines: usize) -> String {
+fn build_html_preview(content:&str, lines:usize) -> String {
 	// Extract <title>…</title> text (anywhere on a line, case-insensitive).
 	let title = content.lines().find_map(|l| {
 		let lower = l.to_lowercase();
@@ -1442,11 +1463,11 @@ fn build_html_preview(content: &str, lines: usize) -> String {
 	let imgs = content.matches("<img ").count() + content.matches("<IMG ").count();
 	let scripts = content.matches("<script").count() + content.matches("<SCRIPT").count();
 
-	let mut parts: Vec<String> = Vec::new();
+	let mut parts:Vec<String> = Vec::new();
 	if let Some(t) = title {
 		parts.push(t);
 	}
-	let mut stats: Vec<String> = Vec::new();
+	let mut stats:Vec<String> = Vec::new();
 	if headings > 0 {
 		stats.push(format!("{}h", headings));
 	}
@@ -1579,7 +1600,8 @@ mod tests {
 	// enriched output. Each preview must be self-describing `[type:...]` and
 	// pack decision-relevant facts. ──
 
-	const GIT_STATUS: &str = " M crates/aphrodite/src/preview.rs\n M crates/aphrodite/src/hooks.rs\nA  src/new_a.rs\nA  src/new_b.rs\nD  \
+	const GIT_STATUS:&str =
+		" M crates/aphrodite/src/preview.rs\n M crates/aphrodite/src/hooks.rs\nA  src/new_a.rs\nA  src/new_b.rs\nD  \
 		 src/old.rs\n?? tmp/scratch\n?? tmp/other\n?? build/log";
 
 	#[test]
@@ -1602,7 +1624,7 @@ mod tests {
 		assert!(p.starts_with("[git:2R | new/path.rs b.txt"), "got {p}");
 	}
 
-	const CARGO_TEST: &str = "running 221 tests\ntest foo::bar ... ok\ntest result: ok. 220 passed; 0 failed; 1 \
+	const CARGO_TEST:&str = "running 221 tests\ntest foo::bar ... ok\ntest result: ok. 220 passed; 0 failed; 1 \
 	                         ignored; 0 measured; 0 filtered out; finished in 0.31s";
 
 	#[test]
@@ -1622,7 +1644,7 @@ mod tests {
 		assert!(p.starts_with("[test:2 pass 1 fail 0 ignored | FAIL beta"), "got {p}");
 	}
 
-	const LS_LONG: &str = "total 48\ndrwxr-xr-x  5 nikola staff  160 Jul 14 10:00 src\ndrwxr-xr-x  2 nikola staff   64 \
+	const LS_LONG:&str = "total 48\ndrwxr-xr-x  5 nikola staff  160 Jul 14 10:00 src\ndrwxr-xr-x  2 nikola staff   64 \
 	                      Jul 14 10:00 tests\n-rw-r--r--  1 nikola staff 1913 Jul 14 10:00 preview.rs\n-rw-r--r--  1 \
 	                      nikola staff  820 Jul 14 10:00 hooks.rs\n-rw-r--r--  1 nikola staff  512 Jul 14 10:00 \
 	                      README.md";
@@ -1636,7 +1658,7 @@ mod tests {
 		assert_eq!(p, "[ls:3 files 2 dirs | .rs×2 .md×1]");
 	}
 
-	const RIPGREP: &str = "src/preview.rs:12:    let lines = content.lines().count();\nsrc/preview.rs:88:    \
+	const RIPGREP:&str = "src/preview.rs:12:    let lines = content.lines().count();\nsrc/preview.rs:88:    \
 	                      format!(\"[terminal...\nsrc/hooks.rs:91:    let preview = \
 	                      crate::build_preview();\nsrc/marker.rs:49:    let mut safe = preview.replace();";
 
@@ -1648,7 +1670,7 @@ mod tests {
 		assert_eq!(p, "[grep:4 hits in 3 files | src/preview.rs:12 …]");
 	}
 
-	const GIT_LOG: &str = "commit abc1234def5678\nAuthor: Nikola <n@x.io>\nDate:   Mon Jul 14\n\n    fix(preview): \
+	const GIT_LOG:&str = "commit abc1234def5678\nAuthor: Nikola <n@x.io>\nDate:   Mon Jul 14\n\n    fix(preview): \
 	                      stop doubling\n\ncommit def5678abc1234\nAuthor: Nikola <n@x.io>\nDate:   Sun Jul 13\n\n    \
 	                      feat: add detector";
 
@@ -1751,7 +1773,9 @@ mod tests {
 	#[test]
 	fn test_html_preview_extracts_title_and_counts() {
 		let _g = cap_guard();
-		let c = "<!DOCTYPE html>\n<html>\n<head><title>My Page</title></head>\n<body>\n<h1>Hello</h1>\n<h2>Section</h2>\n<a href=\"/x\">link</a>\n<a href=\"/y\">link2</a>\n<img src=\"a.png\">\n</body>\n</html>";
+		let c = "<!DOCTYPE html>\n<html>\n<head><title>My \
+		         Page</title></head>\n<body>\n<h1>Hello</h1>\n<h2>Section</h2>\n<a href=\"/x\">link</a>\n<a \
+		         href=\"/y\">link2</a>\n<img src=\"a.png\">\n</body>\n</html>";
 		let p = build_preview("html", c);
 		assert!(p.contains("My Page"), "must include title, got {p}");
 		assert!(p.contains("2h"), "got {p}");
@@ -1832,7 +1856,10 @@ mod tests {
 		let c = "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\nValueError: disk full";
 		let p = build_preview("error", c);
 		assert!(p.starts_with("[error:3L"), "got {p}");
-		assert!(p.contains("ValueError: disk full"), "error arm must surface the real error: {p}");
+		assert!(
+			p.contains("ValueError: disk full"),
+			"error arm must surface the real error: {p}"
+		);
 		assert!(!p.contains("Traceback"), "traceback header is not the error: {p}");
 	}
 
@@ -1862,9 +1889,7 @@ mod tests {
 
 	/// Serializes tests that mutate the process-global preview cap (cargo
 	/// runs this module's tests concurrently; the cap is process-wide).
-	fn cap_guard() -> std::sync::MutexGuard<'static, ()> {
-		crate::preview::preview_cap_test_guard()
-	}
+	fn cap_guard() -> std::sync::MutexGuard<'static, ()> { crate::preview::preview_cap_test_guard() }
 
 	#[test]
 	fn test_preview_cap_truncates_and_keeps_bracket() {
@@ -1894,7 +1919,10 @@ mod tests {
 		let prev = set_preview_max_chars(Some(25));
 		let content = format!("{}{}", "a\u{00e9}\u{4e2d}\u{1f600}".repeat(30), " end");
 		let p = build_preview("text", &content);
-		assert!(p.chars().count() <= 25, "multibyte truncation must stay on a char boundary: {p}");
+		assert!(
+			p.chars().count() <= 25,
+			"multibyte truncation must stay on a char boundary: {p}"
+		);
 		set_preview_max_chars(prev);
 	}
 
@@ -1970,11 +1998,18 @@ mod tests {
 	#[test]
 	fn test_terminal_hint_with_code_routes_to_code_arm() {
 		let _g = cap_guard();
-		let c = "use std::collections::HashMap;\n\nfn main() {\n    let mut map = HashMap::new();\n    map.insert(\"a\", 1);\n    println!(\"{:?}\", map);\n}";
+		let c = "use std::collections::HashMap;\n\nfn main() {\n    let mut map = HashMap::new();\n    \
+		         map.insert(\"a\", 1);\n    println!(\"{:?}\", map);\n}";
 		assert_eq!(detect_semantic_type(c), Some("code"));
 		let p = build_preview("terminal", c);
-		assert!(p.starts_with("[code:1fns"), "code with terminal hint must get the code arm, got {p}");
-		assert!(!p.starts_with("[terminal:"), "terminal hint must not keep the terminal arm: {p}");
+		assert!(
+			p.starts_with("[code:1fns"),
+			"code with terminal hint must get the code arm, got {p}"
+		);
+		assert!(
+			!p.starts_with("[terminal:"),
+			"terminal hint must not keep the terminal arm: {p}"
+		);
 	}
 
 	// #4 (RC-C): raw diff with a `tool_result` hint (diff_raw battery row)
@@ -2006,10 +2041,7 @@ mod tests {
 		let c = "| Name | Age | City |\n|------|-----|------|\n| Alice | 30 | NYC |\n| Bob | 25 | LA |";
 		assert_eq!(detect_semantic_type(c), Some("table"));
 		let p = build_preview("tool_result", c);
-		assert!(
-			p.starts_with("[table:3 cols 3 rows | Name, Age, City]"),
-			"got {p}"
-		);
+		assert!(p.starts_with("[table:3 cols 3 rows | Name, Age, City]"), "got {p}");
 	}
 
 	// #4 (RC-C): csv, xml, markdown doc, build log all upgrade off the generic

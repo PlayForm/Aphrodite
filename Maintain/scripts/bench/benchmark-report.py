@@ -48,7 +48,9 @@ load_corpus = _eval_ns["load_corpus"]
 marker_bytes_estimate = _eval_ns["marker_bytes_estimate"]
 
 RESULTS_DIR = Path(
-    os.environ.get("BENCH_RESULTS_DIR", str(Path.home() / "Developer" / ".playform" / "Temporary" / "hermes"))
+    os.environ.get(
+        "BENCH_RESULTS_DIR", str(Path.home() / "Developer" / ".playform" / "Temporary" / "hermes")
+    )
 )
 RESULTS_FILE = RESULTS_DIR / "benchmark-results.json"
 
@@ -74,7 +76,11 @@ def http_post_json(url: str, payload: dict, timeout: float = 30.0) -> dict:
     if _HTTP_BACKEND == "requests":
         try:
             resp = requests.post(url, json=payload, timeout=timeout)  # type: ignore[attr-defined]
-            return resp.json() if resp.status_code < 300 else {"error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+            return (
+                resp.json()
+                if resp.status_code < 300
+                else {"error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+            )
         except Exception as e:  # noqa: BLE001
             return {"error": str(e)}
     try:
@@ -101,9 +107,7 @@ def resolve_binary() -> str | None:
 
 def binary_version(bin_path: str) -> str:
     try:
-        out = subprocess.run(
-            [bin_path, "--version"], capture_output=True, text=True, timeout=10
-        )
+        out = subprocess.run([bin_path, "--version"], capture_output=True, text=True, timeout=10)
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip().splitlines()[0]
     except Exception:  # noqa: BLE001
@@ -132,10 +136,14 @@ def start_proxy(bin_path: str) -> subprocess.Popen | None:
         proc = subprocess.Popen(
             [
                 bin_path,
-                "--mode", "cache",
-                "--listen", f"127.0.0.1:{BENCH_PORT}",
-                "--api-url", "http://127.0.0.1:1",
-                "--api-key", "bench",
+                "--mode",
+                "cache",
+                "--listen",
+                f"127.0.0.1:{BENCH_PORT}",
+                "--api-url",
+                "http://127.0.0.1:1",
+                "--api-key",
+                "bench",
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -186,7 +194,9 @@ def main() -> None:
 
     ap = argparse.ArgumentParser(description="Aphrodite benchmark report (live binary + JSON)")
     ap.add_argument("--json-only", action="store_true", help="print only the JSON summary")
-    ap.add_argument("--skip-live", action="store_true", help="skip the live binary latency measurement")
+    ap.add_argument(
+        "--skip-live", action="store_true", help="skip the live binary latency measurement"
+    )
     args = ap.parse_args()
 
     corpora = load_corpus()
@@ -257,7 +267,9 @@ def main() -> None:
                 )
             else:
                 entry["status"] = "skipped"
-                entry["skip_reason"] = SKIP_REASON_BINARY if binary_available is False else "skip_live"
+                entry["skip_reason"] = (
+                    SKIP_REASON_BINARY if binary_available is False else "skip_live"
+                )
             live_entries.append(entry)
     finally:
         stop_proxy(proxy)
@@ -414,7 +426,9 @@ def _latency_summary(lat: list[float], label: str, binary_available: bool) -> di
 def _fmt_lat(v: float | None, status: str) -> str:
     if v is not None:
         return f"{v:.2f}"
-    return status.replace("SKIPPED (", "").replace(")", "") if status.startswith("SKIPPED") else status
+    return (
+        status.replace("SKIPPED (", "").replace(")", "") if status.startswith("SKIPPED") else status
+    )
 
 
 if __name__ == "__main__":

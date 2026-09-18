@@ -8,19 +8,19 @@
 use std::collections::HashMap;
 
 /// Maximum total output in characters (preview budget).
-const BUDGET: usize = 300;
+const BUDGET:usize = 300;
 
 /// Maximum length of a single signature line.
-const MAX_SIG_LEN: usize = 60;
+const MAX_SIG_LEN:usize = 60;
 
 /// Maximum param string length before truncation.
-const MAX_PARAMS_LEN: usize = 35;
+const MAX_PARAMS_LEN:usize = 35;
 
 /// Byte-safe prefix of `s` no longer than `max` bytes - never splits a
 /// multi-byte UTF-8 character, unlike a raw `&s[..max]` (which panics if
 /// `max` falls inside a codepoint; source content is arbitrary UTF-8, not
 /// guaranteed ASCII-aligned at any fixed offset).
-pub(crate) fn floor_boundary(s: &str, max: usize) -> &str {
+pub(crate) fn floor_boundary(s:&str, max:usize) -> &str {
 	if s.len() <= max {
 		return s;
 	}
@@ -34,14 +34,14 @@ pub(crate) fn floor_boundary(s: &str, max: usize) -> &str {
 /// Extract code structure from source content.
 /// Auto-detects language from content prefixes.
 /// Returns a map of category → list of short signature strings.
-pub fn extract_code_structure(content: &str, language: &str) -> HashMap<String, Vec<String>> {
+pub fn extract_code_structure(content:&str, language:&str) -> HashMap<String, Vec<String>> {
 	let lang = if language.is_empty() { auto_detect(content) } else { language.to_string() };
 
 	if lang.is_empty() {
 		return HashMap::new();
 	}
 
-	let mut result: HashMap<String, Vec<String>> = HashMap::new();
+	let mut result:HashMap<String, Vec<String>> = HashMap::new();
 	let mut budget = BUDGET as isize;
 
 	match lang.as_str() {
@@ -56,11 +56,11 @@ pub fn extract_code_structure(content: &str, language: &str) -> HashMap<String, 
 }
 
 /// Number of non-comment lines `auto_detect` scans before giving up.
-const AUTO_DETECT_SCAN_LINES: usize = 60;
+const AUTO_DETECT_SCAN_LINES:usize = 60;
 
 /// Is this line a comment/doc-comment line, for the purposes of skipping
 /// leading file-header comment blocks in `auto_detect`?
-fn is_comment_line(trimmed: &str) -> bool {
+fn is_comment_line(trimmed:&str) -> bool {
 	trimmed.is_empty()
 		|| trimmed.starts_with("//") // Rust/Go/JS/TS line comments (incl. `///`, `//!`)
 		|| trimmed.starts_with('#') // Python/shell comments (and shebangs)
@@ -76,8 +76,8 @@ fn is_comment_line(trimmed: &str) -> bool {
 /// detector saw only comment prose and returned "unknown" for a file that is
 /// unambiguously Rust. Skipping comment lines while scanning fixes that
 /// without needing a real tokenizer.
-fn auto_detect(content: &str) -> String {
-	let sample: String = content
+fn auto_detect(content:&str) -> String {
+	let sample:String = content
 		.lines()
 		.filter(|l| !is_comment_line(l.trim()))
 		.take(AUTO_DETECT_SCAN_LINES)
@@ -102,7 +102,7 @@ fn auto_detect(content: &str) -> String {
 }
 
 /// Truncate a signature to fit the preview budget.
-fn sig(kind: &str, text: &str) -> String {
+fn sig(kind:&str, text:&str) -> String {
 	let s = format!("{} {}", kind, text).trim().to_string();
 	if s.len() > MAX_SIG_LEN {
 		floor_boundary(&s, MAX_SIG_LEN - 3).to_string() + "..."
@@ -111,7 +111,7 @@ fn sig(kind: &str, text: &str) -> String {
 	}
 }
 
-fn trunc_params(params: &str) -> String {
+fn trunc_params(params:&str) -> String {
 	if params.len() > MAX_PARAMS_LEN {
 		floor_boundary(params, MAX_PARAMS_LEN - 3).to_string() + "..."
 	} else {
@@ -121,9 +121,9 @@ fn trunc_params(params: &str) -> String {
 
 // ── Rust extractor ─────────────────────────────────────
 
-fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget: &mut isize) {
+fn extract_rust(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mut isize) {
 	// fn (with return type)
-	let mut fns: Vec<String> = Vec::new();
+	let mut fns:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -190,7 +190,7 @@ fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget
 	}
 
 	// struct
-	let mut structs: Vec<String> = Vec::new();
+	let mut structs:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -201,7 +201,7 @@ fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget
 			let name = trimmed
 				.trim_start_matches("pub ")
 				.trim_start_matches("struct ")
-				.split(|c: char| c.is_whitespace() || c == '<' || c == '{')
+				.split(|c:char| c.is_whitespace() || c == '<' || c == '{')
 				.next()
 				.unwrap_or("?");
 			let s = sig("struct", name);
@@ -218,7 +218,7 @@ fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget
 	}
 
 	// trait
-	let mut traits: Vec<String> = Vec::new();
+	let mut traits:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -229,7 +229,7 @@ fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget
 			let name = trimmed
 				.trim_start_matches("pub ")
 				.trim_start_matches("trait ")
-				.split(|c: char| c.is_whitespace() || c == '<' || c == '{')
+				.split(|c:char| c.is_whitespace() || c == '<' || c == '{')
 				.next()
 				.unwrap_or("?");
 			let s = sig("trait", name);
@@ -246,7 +246,7 @@ fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget
 	}
 
 	// impl
-	let mut impls: Vec<String> = Vec::new();
+	let mut impls:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -257,7 +257,7 @@ fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget
 			let name = trimmed
 				.trim_start_matches("impl")
 				.trim_start_matches('<')
-				.split(|c: char| c.is_whitespace() || c == '<' || c == '{')
+				.split(|c:char| c.is_whitespace() || c == '<' || c == '{')
 				.find(|s| !s.is_empty())
 				.unwrap_or("?");
 			let s = sig("impl", name);
@@ -273,8 +273,8 @@ fn extract_rust(content: &str, result: &mut HashMap<String, Vec<String>>, budget
 
 // ── Python extractor ───────────────────────────────────
 
-fn extract_python(content: &str, result: &mut HashMap<String, Vec<String>>, budget: &mut isize) {
-	let mut fns: Vec<String> = Vec::new();
+fn extract_python(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mut isize) {
+	let mut fns:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -307,7 +307,7 @@ fn extract_python(content: &str, result: &mut HashMap<String, Vec<String>>, budg
 		return;
 	}
 
-	let mut classes: Vec<String> = Vec::new();
+	let mut classes:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -328,8 +328,8 @@ fn extract_python(content: &str, result: &mut HashMap<String, Vec<String>>, budg
 
 // ── Go extractor ───────────────────────────────────────
 
-fn extract_go(content: &str, result: &mut HashMap<String, Vec<String>>, budget: &mut isize) {
-	let mut fns: Vec<String> = Vec::new();
+fn extract_go(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mut isize) {
+	let mut fns:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -384,7 +384,7 @@ fn extract_go(content: &str, result: &mut HashMap<String, Vec<String>>, budget: 
 		return;
 	}
 
-	let mut types: Vec<String> = Vec::new();
+	let mut types:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -405,8 +405,8 @@ fn extract_go(content: &str, result: &mut HashMap<String, Vec<String>>, budget: 
 
 // ── JS/TS extractor ────────────────────────────────────
 
-fn extract_js(content: &str, result: &mut HashMap<String, Vec<String>>, budget: &mut isize) {
-	let mut fns: Vec<String> = Vec::new();
+fn extract_js(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mut isize) {
+	let mut fns:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;
@@ -471,7 +471,7 @@ fn extract_js(content: &str, result: &mut HashMap<String, Vec<String>>, budget: 
 		return;
 	}
 
-	let mut classes: Vec<String> = Vec::new();
+	let mut classes:Vec<String> = Vec::new();
 	for line in content.lines() {
 		if *budget <= 0 {
 			break;

@@ -148,7 +148,9 @@ def register():
     return dylib
 """
 
-MATERIALIZE_RESTYPE_LINE = "    dylib.aphrodite_hermes_materialize_directives.restype = ctypes.c_void_p"
+MATERIALIZE_RESTYPE_LINE = (
+    "    dylib.aphrodite_hermes_materialize_directives.restype = ctypes.c_void_p"
+)
 
 # ctypesgen-style generated bindings covering every required symbol.
 BINDINGS_ALL = """\
@@ -197,7 +199,10 @@ def test_parsers():
     ok(direct == {"aphrodite_hermes_free_string"}, f"unexpected direct calls: {direct}")
 
     restypes = ffi.parse_restype_assignments(FIXTURE_INIT)
-    ok(restypes.get("aphrodite_hermes_materialize_directives") == "ctypes.c_void_p", "materialize restype not parsed")
+    ok(
+        restypes.get("aphrodite_hermes_materialize_directives") == "ctypes.c_void_p",
+        "materialize restype not parsed",
+    )
     ok("OpenProcess" not in restypes, "k32 restype leaked into results")
     ok("GetExitCodeProcess" not in restypes, "k32 restype leaked into results")
     ok("fn" not in restypes, "_call_json's fn.restype clamp leaked into results")
@@ -209,8 +214,14 @@ def test_clean_contract():
     violations, warnings, source = ffi.check(FIXTURE_LIBRS, FIXTURE_INIT)
     ok(violations == [], f"unexpected violations: {violations}")
     ok(source == "inline setup block", f"unexpected restype source: {source}")
-    ok(any("list_tools" in w for w in warnings), "expected unconfigured-export warning for list_tools")
-    ok(any("get_schema" in w for w in warnings), "expected unconfigured-export warning for get_schema")
+    ok(
+        any("list_tools" in w for w in warnings),
+        "expected unconfigured-export warning for list_tools",
+    )
+    ok(
+        any("get_schema" in w for w in warnings),
+        "expected unconfigured-export warning for get_schema",
+    )
 
 
 def test_historical_missing_restype_flagged():
@@ -231,7 +242,10 @@ def test_wrong_restype_flagged():
     )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
     ok(
-        any("materialize_directives" in v and "wrong-restype" in v and "c_int" in v for v in violations),
+        any(
+            "materialize_directives" in v and "wrong-restype" in v and "c_int" in v
+            for v in violations
+        ),
         f"c_int restype not flagged: {violations}",
     )
     # c_char_p is full-width but violates the c_void_p contract (Python 3.14
@@ -242,7 +256,10 @@ def test_wrong_restype_flagged():
     )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
     ok(
-        any("materialize_directives" in v and "wrong-restype" in v and "c_char_p" in v for v in violations),
+        any(
+            "materialize_directives" in v and "wrong-restype" in v and "c_char_p" in v
+            for v in violations
+        ),
         f"c_char_p restype not flagged: {violations}",
     )
 
@@ -250,7 +267,10 @@ def test_wrong_restype_flagged():
 def test_call_json_without_setup_flagged():
     # New pointer-returning export wired into _call_json but never configured:
     # the "future export added without a setup-block entry" class.
-    librs = FIXTURE_LIBRS + '\n#[no_mangle]\npub extern "C" fn aphrodite_hermes_future_export() -> *mut c_char {\n    todo!()\n}\n'
+    librs = (
+        FIXTURE_LIBRS
+        + '\n#[no_mangle]\npub extern "C" fn aphrodite_hermes_future_export() -> *mut c_char {\n    todo!()\n}\n'
+    )
     init = FIXTURE_INIT.replace(
         '    result = _call_json(dylib, "aphrodite_hermes_materialize_directives", b"")\n',
         '    result = _call_json(dylib, "aphrodite_hermes_materialize_directives", b"")\n'
@@ -269,7 +289,10 @@ def test_call_json_without_setup_flagged():
     )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
     ok(
-        any("aphrodite_hermes_nonexistent_export" in v and "called-not-exported" in v for v in violations),
+        any(
+            "aphrodite_hermes_nonexistent_export" in v and "called-not-exported" in v
+            for v in violations
+        ),
         f"nonexistent _call_json symbol not flagged: {violations}",
     )
 
@@ -281,7 +304,10 @@ def test_required_symbol_not_exported_flagged():
     )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
     ok(
-        any("aphrodite_hermes_ghost_symbol" in v and "required-not-exported" in v for v in violations),
+        any(
+            "aphrodite_hermes_ghost_symbol" in v and "required-not-exported" in v
+            for v in violations
+        ),
         f"ghost required symbol not flagged: {violations}",
     )
 
@@ -293,7 +319,10 @@ def test_unknown_export_configured_flagged():
     )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
     ok(
-        any("aphrodite_hermes_typo_symbol" in v and "unknown-export-configured" in v for v in violations),
+        any(
+            "aphrodite_hermes_typo_symbol" in v and "unknown-export-configured" in v
+            for v in violations
+        ),
         f"typo setup entry not flagged: {violations}",
     )
 
@@ -301,14 +330,18 @@ def test_unknown_export_configured_flagged():
 # ── Generated-bindings mode ─────────────────────────────────────────────────
 def test_bindings_clean():
     # Bindings REPLACE the inline setup block as restype source of truth.
-    violations, warnings, source = ffi.check(FIXTURE_LIBRS, FIXTURE_INIT, bindings_source=BINDINGS_ALL)
+    violations, warnings, source = ffi.check(
+        FIXTURE_LIBRS, FIXTURE_INIT, bindings_source=BINDINGS_ALL
+    )
     ok(source == "generated bindings", f"unexpected restype source: {source}")
     ok(violations == [], f"bindings violations: {violations}")
     ok(any("list_tools" in w for w in warnings), "expected list_tools warning in bindings mode")
 
 
 def test_bindings_missing_restype_flagged():
-    bindings = BINDINGS_ALL.replace("aphrodite_hermes_materialize_directives.restype = c_void_p\n", "")
+    bindings = BINDINGS_ALL.replace(
+        "aphrodite_hermes_materialize_directives.restype = c_void_p\n", ""
+    )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, FIXTURE_INIT, bindings_source=bindings)
     ok(
         any("materialize_directives" in v and "missing-restype" in v for v in violations),
@@ -323,7 +356,10 @@ def test_bindings_wrong_restype_flagged():
     )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, FIXTURE_INIT, bindings_source=bindings)
     ok(
-        any("materialize_directives" in v and "wrong-restype" in v and "c_int" in v for v in violations),
+        any(
+            "materialize_directives" in v and "wrong-restype" in v and "c_int" in v
+            for v in violations
+        ),
         f"bindings c_int not flagged: {violations}",
     )
 
@@ -360,7 +396,10 @@ def test_argtypes_count_mismatch_flagged():
     )
     violations, _, _ = ffi.check(FIXTURE_LIBRS, init)
     ok(
-        any("aphrodite_hermes_typo_symbol" in v and "unknown-export-argtypes" in v for v in violations),
+        any(
+            "aphrodite_hermes_typo_symbol" in v and "unknown-export-argtypes" in v
+            for v in violations
+        ),
         f"ghost argtypes symbol not flagged: {violations}",
     )
 
@@ -377,7 +416,10 @@ def test_real_repo_clean():
     ok(any("list_tools" in w for w in warnings), "expected list_tools unconfigured warning")
     ok(any("get_schema" in w for w in warnings), "expected get_schema unconfigured warning")
     # CLI end-to-end against the real repo.
-    ok(ffi.main(["--librs", str(librs), "--plugin", str(plugin)]) == 0, "CLI exit != 0 on real repo")
+    ok(
+        ffi.main(["--librs", str(librs), "--plugin", str(plugin)]) == 0,
+        "CLI exit != 0 on real repo",
+    )
 
 
 def test_cli_exit_codes_and_missing_files():
@@ -407,7 +449,9 @@ def test_cli_exit_codes_and_missing_files():
             # Ground truth = generated bindings: a missing restype THERE is a
             # real violation -> exit 1.
             bindings.write_text(
-                BINDINGS_ALL.replace("aphrodite_hermes_materialize_directives.restype = c_void_p\n", "")
+                BINDINGS_ALL.replace(
+                    "aphrodite_hermes_materialize_directives.restype = c_void_p\n", ""
+                )
             )
             ok(cli("--bindings", str(bindings)) == 1, "regressed bindings CLI exit != 1")
 
@@ -434,12 +478,20 @@ def test_cli_exit_codes_and_missing_files():
         # Usage errors: exit 2.
         missing = root / "nope.py"
         ok(cli("--bindings", str(missing)) == 2, "missing --bindings exit != 2")
-        ok(ffi.main(["--librs", str(root / "lib.rs"), "--plugin", str(root / "absent.py")]) == 2, "missing plugin exit != 2")
-        ok(ffi.main(["--librs", str(root / "absent.rs"), "--plugin", str(init)]) == 2, "missing lib.rs exit != 2")
+        ok(
+            ffi.main(["--librs", str(root / "lib.rs"), "--plugin", str(root / "absent.py")]) == 2,
+            "missing plugin exit != 2",
+        )
+        ok(
+            ffi.main(["--librs", str(root / "absent.rs"), "--plugin", str(init)]) == 2,
+            "missing lib.rs exit != 2",
+        )
 
 
 def main():
-    tests = [fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)]
+    tests = [
+        fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)
+    ]
     failed = []
     for fn in tests:
         try:

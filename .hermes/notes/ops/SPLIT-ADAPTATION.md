@@ -366,8 +366,8 @@ test suite before the next session starts.
 3. `preview/Detect/` (the pipeline + Input + Is* shapes).
 4. `preview/Preview/` (the builders, largest surface).
 5. `lib.rs` re-export swap + dead-file removal.
-Each session ends with `cargo test -p aphrodite` green before the next
-begins.
+   Each session ends with `cargo test -p aphrodite` green before the next
+   begins.
 
 ## 6. Distilled vs omitted
 

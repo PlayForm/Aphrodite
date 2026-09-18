@@ -116,9 +116,7 @@ _FORK_FLAT_RE = re.compile(r"^\s*\w+\s*=\s*_libs\[[^\]]+\]\[", re.MULTILINE)
 # calling_convention kwarg); the plugin's live CDLL is a plain ctypes.CDLL,
 # so rewrite the loop calls to hasattr/getattr - purely declarative artifact.
 _LOOKUP_CALL_RE = re.compile(r'_lib\.(has|get)\("([A-Za-z_]\w*)"(?:, "[^"]*")?\)')
-_LOAD_LINE_RE = re.compile(
-    r'_libs\[["\'][^"\']+["\']\] = load_library\(["\'][^"\']*["\']\)'
-)
+_LOAD_LINE_RE = re.compile(r'_libs\[["\'][^"\']+["\']\] = load_library\(["\'][^"\']*["\']\)')
 # char* restype declaration: the multi-line if/else block ctypesgen emits for
 # every char* return, OR a bare single-line form - one consolidated pattern
 # (ordered alternation: the if/else block first, so its inner lines are
@@ -180,14 +178,14 @@ CANONICAL_DOCSTRING = (
 # c_ptrdiff_t loop, and loader section are dead code after the rewrites).
 MINIMAL_HEAD = (
     "\n"
-    "__docformat__ = \"restructuredtext\"\n"
+    '__docformat__ = "restructuredtext"\n'
     "\n"
     "from ctypes import *  # noqa: F401, F403 - ctypesgen preamble (c_int, c_void_p, c_char_p, sizeof, ...)\n"
     "\n"
     "# `__all__` contains the public surface: the preamble's `from ctypes import *`\n"
     "# bleeds ctypes' names into this module, and without __all__ a wildcard import\n"
     "# of _bindings would re-export all of them.\n"
-    "__all__ = [\"bind_to\"]\n"
+    '__all__ = ["bind_to"]\n'
     "\n"
     "_libs = {}\n"
 )
@@ -218,7 +216,9 @@ def bind_to(_dylib):
     them through the same handle that produced them.
     \"\"\"
     _libs[{placeholder!r}] = _dylib
-""".replace("{placeholder!r}", repr(PLACEHOLDER_LIB))  # UP032: .format() trips the f-string rule; .replace() is equivalent (single slot)
+""".replace(
+    "{placeholder!r}", repr(PLACEHOLDER_LIB)
+)  # UP032: .format() trips the f-string rule; .replace() is equivalent (single slot)
 
 
 def _restype_repl(m):
@@ -273,7 +273,11 @@ def postprocess(raw, header_path):
         # CTYPESGEN_FORK_WARNING marker (build.rs re-emits it as a
         # cargo:warning) and fail gracefully: exit 2 keeps the committed
         # artifact in effect.
-        hint = " (pypdfium2-team fork flat form - no _libs.values() loop, single-line restype)" if shape == "fork-flat" else ""
+        hint = (
+            " (pypdfium2-team fork flat form - no _libs.values() loop, single-line restype)"
+            if shape == "fork-flat"
+            else ""
+        )
         print(
             f"CTYPESGEN_FORK_WARNING: ctypesgen output shape is '{shape}'{hint}; "
             "the upstream pattern set (for _lib in _libs.values() loops + "
@@ -324,9 +328,7 @@ def postprocess(raw, header_path):
         raise ValueError("no has/get lookup calls found in ctypesgen loops (unexpected output)")
 
     # 3. Wrap the loops in bind_to() (re-indented +4).
-    indented = "\n".join(
-        ("    " + line) if line.strip() else line for line in loops.splitlines()
-    )
+    indented = "\n".join(("    " + line) if line.strip() else line for line in loops.splitlines())
 
     final = CANONICAL_DOCSTRING + MINIMAL_HEAD + BINDER_HEADER + indented + "\n"
 
@@ -517,8 +519,11 @@ def main(argv=None):
         )
         return 1
     except Exception as e:  # noqa: BLE001 - tool/script failure => warn + skip
-        print(f"finalize_bindings.py: failed ({e!r}) - skipping install; the committed "
-              f"plugins/aphrodite/_bindings.py remains in effect", file=sys.stderr)
+        print(
+            f"finalize_bindings.py: failed ({e!r}) - skipping install; the committed "
+            f"plugins/aphrodite/_bindings.py remains in effect",
+            file=sys.stderr,
+        )
         return 2
 
     install(final, output_path)

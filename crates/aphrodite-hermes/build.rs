@@ -27,16 +27,14 @@
 //! the previous generation, the ctypesgen + finalize chain is skipped
 //! entirely: a lib.rs edit that does not move the ABI costs nothing.
 
-use std::env;
-use std::path::PathBuf;
-use std::process::Command;
+use std::{env, path::PathBuf, process::Command};
 
 /// Every pointer-returning export of the crate. Must match src/lib.rs and
 /// plugins/aphrodite/__init__.py::_REQUIRED_VOID_P. `codegen/finalize_bindings.py`
 /// verifies the generated bindings declare ALL of these with a pointer-width
 /// restype (c_void_p) - a c_int declaration would truncate the 64-bit pointer
 /// and re-open the historical SIGSEGV bug class.
-const POINTER_RETURNING_EXPORTS: &[&str] = &[
+const POINTER_RETURNING_EXPORTS:&[&str] = &[
 	"aphrodite_hermes_dispatch_tool",
 	"aphrodite_hermes_list_tools",
 	"aphrodite_hermes_get_schema",
@@ -48,7 +46,7 @@ const POINTER_RETURNING_EXPORTS: &[&str] = &[
 	"aphrodite_hermes_materialize_directives",
 ];
 
-fn cargo_warning(msg: &str) {
+fn cargo_warning(msg:&str) {
 	println!("cargo:warning={msg}");
 }
 
@@ -69,7 +67,7 @@ fn main() {
 
 	// Shared degraded-path exit (LEAN-UP #1): every early return below ends
 	// with the committed artifact still in effect.
-	let skip = |msg: &str| {
+	let skip = |msg:&str| {
 		cargo_warning(&format!(
 			"{msg}; skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect"
 		));
@@ -120,7 +118,10 @@ fn main() {
 	// skip the ctypesgen + finalize chain entirely.
 	if let Ok(prev) = std::fs::read(&header_path) {
 		if prev == header_bytes {
-			cargo_warning("header unchanged - skipping ctypesgen/finalize (committed plugins/aphrodite/_bindings.py already matches this ABI)");
+			cargo_warning(
+				"header unchanged - skipping ctypesgen/finalize (committed plugins/aphrodite/_bindings.py already \
+				 matches this ABI)",
+			);
 			return;
 		}
 	}
@@ -210,11 +211,7 @@ fn main() {
 	// (pypdfium2 fork / unknown) through a CTYPESGEN_FORK_WARNING: marker -
 	// surface it as a cargo:warning so the fork is identifiable in build logs.
 	if let Ok(o) = &output {
-		let combined = format!(
-			"{}{}",
-			String::from_utf8_lossy(&o.stdout),
-			String::from_utf8_lossy(&o.stderr)
-		);
+		let combined = format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr));
 		for line in combined.lines() {
 			if let Some(rest) = line.strip_prefix("CTYPESGEN_FORK_WARNING: ") {
 				cargo_warning(rest);
@@ -228,10 +225,7 @@ fn probe_ctypesgen() -> Option<(Vec<String>, String)> {
 		vec!["python3".to_string(), "-m".to_string(), "ctypesgen".to_string()],
 		vec!["ctypesgen".to_string()],
 	] {
-		let probe = Command::new(&candidate[0])
-			.args(&candidate[1..])
-			.arg("--version")
-			.output();
+		let probe = Command::new(&candidate[0]).args(&candidate[1..]).arg("--version").output();
 		if let Ok(out) = probe {
 			if out.status.success() {
 				let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -247,20 +241,29 @@ fn probe_ctypesgen() -> Option<(Vec<String>, String)> {
 /// git-describe version (e.g. 2.7.4-27202-gb3625f73d3); the pypdfium2-team
 /// fork identifies itself by name; anything else is unrecognized and the
 /// upstream pattern set may not apply.
-fn report_ctypesgen_variant(version: &str) {
+fn report_ctypesgen_variant(version:&str) {
 	let v = version.trim();
 	if v.is_empty() {
-		cargo_warning("ctypesgen --version reported nothing - cannot classify the ctypesgen variant; the upstream pattern set in finalize_bindings.py may not apply (an unrecognized output shape warns and skips, keeping the committed plugins/aphrodite/_bindings.py in effect)");
+		cargo_warning(
+			"ctypesgen --version reported nothing - cannot classify the ctypesgen variant; the upstream pattern set \
+			 in finalize_bindings.py may not apply (an unrecognized output shape warns and skips, keeping the \
+			 committed plugins/aphrodite/_bindings.py in effect)",
+		);
 		return;
 	}
 	let lower = v.to_lowercase();
 	if lower.contains("pypdfium2") || lower.contains("pdfium") {
 		cargo_warning(&format!(
-			"ctypesgen variant: pypdfium2-team fork (version {v}) - it emits a flat `NAME = _libs[LIB][NAME]` declaration form with single-line restype, NOT the upstream `for _lib in _libs.values()` loops; finalize_bindings.py will warn (CTYPESGEN_FORK_WARNING) and skip, keeping the committed plugins/aphrodite/_bindings.py in effect"
+			"ctypesgen variant: pypdfium2-team fork (version {v}) - it emits a flat `NAME = _libs[LIB][NAME]` \
+			 declaration form with single-line restype, NOT the upstream `for _lib in _libs.values()` loops; \
+			 finalize_bindings.py will warn (CTYPESGEN_FORK_WARNING) and skip, keeping the committed \
+			 plugins/aphrodite/_bindings.py in effect"
 		));
 	} else if !v.chars().next().is_some_and(|c| c.is_ascii_digit()) {
 		cargo_warning(&format!(
-			"ctypesgen variant: unrecognized version string ({v:?}) - the upstream pattern set in finalize_bindings.py may not apply; an unrecognized output shape warns and skips, keeping the committed plugins/aphrodite/_bindings.py in effect"
+			"ctypesgen variant: unrecognized version string ({v:?}) - the upstream pattern set in \
+			 finalize_bindings.py may not apply; an unrecognized output shape warns and skips, keeping the committed \
+			 plugins/aphrodite/_bindings.py in effect"
 		));
 	}
 }

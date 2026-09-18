@@ -20,7 +20,7 @@ dependency that Aphrodite extends.
 | **HEALTH + Prometheus**   | ✅ `/health` endpoint, `/metrics` → 28 Prometheus metrics                               | Basic only               |
 | **Python settings store** | ✅ In-memory mutable store, API-driven reload, hot-reload from TOML                     | ❌                       |
 | **Config file watcher**   | ✅ Proxy + plugin auto-detect `aphrodite.toml` changes                                  | ❌                       |
-| **Hermes skills**         | ❌ Dev-side only (`.hermes/skills/` on Development)                              | ❌                       |
+| **Hermes skills**         | ❌ Dev-side only (`.hermes/skills/` on Development)                                     | ❌                       |
 | **Live container**        | ✅ `APHRODITE_LIVE_CONTAINER` mode for streaming `read_file` via CCR                    | ❌                       |
 | **Rhai scripting**        | ✅ Feature-gated hook injection (`--features scripting`)                                | ❌                       |
 | **Auto-download binary**  | ✅ Detects platform, downloads from GitHub releases, validates magic bytes              | ❌                       |

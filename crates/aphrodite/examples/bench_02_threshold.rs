@@ -46,12 +46,12 @@ fn bin_path() -> std::path::PathBuf {
 		.map(|p| p.join(bin_name))
 		.unwrap_or_else(|| bin_name.into())
 }
-const CACHE_PORT: u16 = 59797;
-const TOKEN_PORT: u16 = 59798;
+const CACHE_PORT:u16 = 59797;
+const TOKEN_PORT:u16 = 59798;
 
 struct Proxy {
-	child: std::process::Child,
-	port: u16,
+	child:std::process::Child,
+	port:u16,
 }
 impl Drop for Proxy {
 	fn drop(&mut self) {
@@ -59,7 +59,7 @@ impl Drop for Proxy {
 		let _ = self.child.wait();
 	}
 }
-fn spawn(mode: &str, port: u16) -> Proxy {
+fn spawn(mode:&str, port:u16) -> Proxy {
 	let listen = format!("127.0.0.1:{}", port);
 	// Isolate CCR storage per bench run so this never touches the operator's
 	// real ~/.hermes/aphrodite/ccr.db (token mode only opens SQLite there).
@@ -101,7 +101,7 @@ fn spawn(mode: &str, port: u16) -> Proxy {
 }
 
 /// POST /ccr/create - returns the stored hash, if any.
-fn ccr_create(port: u16, content: &str) -> Option<String> {
+fn ccr_create(port:u16, content:&str) -> Option<String> {
 	let body = serde_json::json!({"content": content}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -116,12 +116,12 @@ fn ccr_create(port: u16, content: &str) -> Option<String> {
 		])
 		.output()
 		.ok()?;
-	let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+	let v:serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
 	v.get("hash").and_then(|h| h.as_str()).map(str::to_string)
 }
 
 /// POST /retrieve - true if the hash resolves back to `expected`.
-fn ccr_retrieve_matches(port: u16, hash: &str, expected: &str) -> bool {
+fn ccr_retrieve_matches(port:u16, hash:&str, expected:&str) -> bool {
 	let body = serde_json::json!({"hash": hash}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -145,8 +145,8 @@ fn ccr_retrieve_matches(port: u16, hash: &str, expected: &str) -> bool {
 }
 
 /// Generate a payload of exactly `size` bytes that triggers `ct` detection.
-fn make(ct: &str, size: usize) -> String {
-	let unit: &str = match ct {
+fn make(ct:&str, size:usize) -> String {
+	let unit:&str = match ct {
 		"code_rust" => "fn foo() -> u64 { 42 }\n",
 		"linter" => "error[E0308]: mismatched types\n  --> src/lib.rs:1:5\n",
 		"build_output" => "   Compiling crate v0.1.0\n",
@@ -166,7 +166,7 @@ fn make(ct: &str, size: usize) -> String {
 
 /// A single probe: store then retrieve; pass iff the round-trip is
 /// byte-exact and a hash was actually returned.
-fn probe(port: u16, ct: &str, size: usize) -> bool {
+fn probe(port:u16, ct:&str, size:usize) -> bool {
 	let content = make(ct, size);
 	match ccr_create(port, &content) {
 		Some(hash) if !hash.is_empty() => ccr_retrieve_matches(port, &hash, &content),
@@ -175,38 +175,38 @@ fn probe(port: u16, ct: &str, size: usize) -> bool {
 }
 
 struct Case {
-	label: &'static str,
-	ct: &'static str,
-	size: usize,
-	mode: &'static str, // "cache" | "token" | "both"
+	label:&'static str,
+	ct:&'static str,
+	size:usize,
+	mode:&'static str, // "cache" | "token" | "both"
 }
 
 fn cases() -> Vec<Case> {
 	vec![
 		// ── inline-zone boundary (256 B) ───────────────────────────────────
-		Case { label: "inline_below_255", ct: "text", size: 255, mode: "both" },
-		Case { label: "inline_at_256", ct: "text", size: 256, mode: "both" },
+		Case { label:"inline_below_255", ct:"text", size:255, mode:"both" },
+		Case { label:"inline_at_256", ct:"text", size:256, mode:"both" },
 		// ── 1 KB boundary ──────────────────────────────────────────────────
-		Case { label: "token_below_1023", ct: "text", size: 1023, mode: "token" },
-		Case { label: "token_at_1024", ct: "text", size: 1024, mode: "token" },
-		Case { label: "token_above_1025", ct: "text", size: 1025, mode: "token" },
+		Case { label:"token_below_1023", ct:"text", size:1023, mode:"token" },
+		Case { label:"token_at_1024", ct:"text", size:1024, mode:"token" },
+		Case { label:"token_above_1025", ct:"text", size:1025, mode:"token" },
 		// ── 8 KB boundary ──────────────────────────────────────────────────
-		Case { label: "cache_below_8191", ct: "text", size: 8191, mode: "cache" },
-		Case { label: "cache_at_8192", ct: "text", size: 8192, mode: "cache" },
-		Case { label: "cache_above_8193", ct: "text", size: 8193, mode: "cache" },
+		Case { label:"cache_below_8191", ct:"text", size:8191, mode:"cache" },
+		Case { label:"cache_at_8192", ct:"text", size:8192, mode:"cache" },
+		Case { label:"cache_above_8193", ct:"text", size:8193, mode:"cache" },
 		// ── 4 KB boundary, code_rust content ────────────────────────────────
-		Case { label: "code_rust_below", ct: "code_rust", size: 4095, mode: "token" },
-		Case { label: "code_rust_at", ct: "code_rust", size: 4096, mode: "token" },
-		Case { label: "code_rust_above", ct: "code_rust", size: 4097, mode: "token" },
+		Case { label:"code_rust_below", ct:"code_rust", size:4095, mode:"token" },
+		Case { label:"code_rust_at", ct:"code_rust", size:4096, mode:"token" },
+		Case { label:"code_rust_above", ct:"code_rust", size:4097, mode:"token" },
 		// ── 512 B boundary, linter/build_output content ─────────────────────
-		Case { label: "linter_below", ct: "linter", size: 511, mode: "token" },
-		Case { label: "linter_at", ct: "linter", size: 512, mode: "token" },
-		Case { label: "linter_above", ct: "linter", size: 513, mode: "token" },
-		Case { label: "build_below", ct: "build_output", size: 511, mode: "token" },
-		Case { label: "build_at", ct: "build_output", size: 512, mode: "token" },
+		Case { label:"linter_below", ct:"linter", size:511, mode:"token" },
+		Case { label:"linter_at", ct:"linter", size:512, mode:"token" },
+		Case { label:"linter_above", ct:"linter", size:513, mode:"token" },
+		Case { label:"build_below", ct:"build_output", size:511, mode:"token" },
+		Case { label:"build_at", ct:"build_output", size:512, mode:"token" },
 		// ── 8 KB boundary, error content ────────────────────────────────────
-		Case { label: "error_below_8191", ct: "error", size: 8191, mode: "token" },
-		Case { label: "error_at_8192", ct: "error", size: 8192, mode: "token" },
+		Case { label:"error_below_8191", ct:"error", size:8191, mode:"token" },
+		Case { label:"error_at_8192", ct:"error", size:8192, mode:"token" },
 	]
 }
 
@@ -223,7 +223,7 @@ fn main() {
 	eprintln!("{}", "─".repeat(55));
 
 	for c in &all_cases {
-		let ports: Vec<(u16, &str)> = match c.mode {
+		let ports:Vec<(u16, &str)> = match c.mode {
 			"cache" => vec![(CACHE_PORT, "cache")],
 			"token" => vec![(TOKEN_PORT, "token")],
 			_ => vec![(CACHE_PORT, "cache"), (TOKEN_PORT, "token")],

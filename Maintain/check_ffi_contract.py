@@ -82,8 +82,8 @@ def parse_export_arg_counts(librs_source):
     counts = {}
     for match in EXPORT_RE.finditer(librs_source):
         args = match.group(2)
-        counts[match.group(1)] = 0 if not args.strip() else len(
-            [param for param in args.split(",") if param.strip()]
+        counts[match.group(1)] = (
+            0 if not args.strip() else len([param for param in args.split(",") if param.strip()])
         )
     return counts
 
@@ -354,9 +354,7 @@ def main(argv=None):
     plugin_source = plugin_path.read_text()
     bindings_source = bindings_path.read_text() if bindings_path else None
 
-    violations, warnings, restype_source_name = check(
-        librs_source, plugin_source, bindings_source
-    )
+    violations, warnings, restype_source_name = check(librs_source, plugin_source, bindings_source)
 
     print("FFI contract check")
     print(f"  restype source : {restype_source_name}")

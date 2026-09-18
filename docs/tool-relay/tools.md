@@ -13,7 +13,6 @@ result verbatim; there's no separate Python-side tool logic to know about.
 > `crates/aphrodite-hermes/src/schemas.rs` defines. Run
 > `python3 Maintain/scripts/verify_tool_schemas.py` to print the live records.
 
-
 ## Tool registry
 
 | #   | Tool                        | What it's for                                                   |

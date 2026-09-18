@@ -39,7 +39,7 @@ All five hooks register in `plugin.yaml`. Zero changes to Hermes core.
 | Context engine          | ✅ Compresses middle messages         | ❌                               |
 | Auto-launch             | ✅ Proxies start automatically        | ❌ Manual `aphrodite` command    |
 | aphrodite\_\* tools     | ✅ 13 tools in agent namespace        | ❌ Agent doesn't know about them |
-| Bundled skills          | ❌ Dev-side only (`.hermes/skills/`)          | ❌                               |
+| Bundled skills          | ❌ Dev-side only (`.hermes/skills/`)  | ❌                               |
 | Prompt injection        | ✅ Retrieval guidance added           | ❌                               |
 | CCR storage             | ✅ Token + cache proxy                | ✅ Token + cache proxy           |
 | Works with              | Hermes only                           | Any OpenAI-compatible client     |

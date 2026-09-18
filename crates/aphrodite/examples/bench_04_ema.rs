@@ -40,11 +40,11 @@ fn bin_path() -> std::path::PathBuf {
 		.map(|p| p.join(bin_name))
 		.unwrap_or_else(|| bin_name.into())
 }
-const TOKEN_PORT: u16 = 39799;
+const TOKEN_PORT:u16 = 39799;
 
 struct Proxy {
-	child: std::process::Child,
-	port: u16,
+	child:std::process::Child,
+	port:u16,
 }
 impl Drop for Proxy {
 	fn drop(&mut self) {
@@ -78,10 +78,10 @@ fn spawn_proxy() -> Proxy {
 		assert!(Instant::now() < dl);
 		std::thread::sleep(Duration::from_millis(50));
 	}
-	Proxy { child, port: TOKEN_PORT }
+	Proxy { child, port:TOKEN_PORT }
 }
 
-fn ccr_create(port: u16, content: &str) {
+fn ccr_create(port:u16, content:&str) {
 	let body = serde_json::json!({"content": content}).to_string();
 	let _ = Command::new("curl")
 		.args([
@@ -97,7 +97,7 @@ fn ccr_create(port: u16, content: &str) {
 		.output();
 }
 
-fn read_ema(port: u16) -> f64 {
+fn read_ema(port:u16) -> f64 {
 	let out = Command::new("curl")
 		.args(["-s", &format!("http://127.0.0.1:{}/stats", port)])
 		.output()
@@ -110,8 +110,8 @@ fn read_ema(port: u16) -> f64 {
 /// Read back the compression threshold for a given content type by injecting
 /// a pair of probes at threshold-1 and threshold bytes and checking which
 /// one compresses.  Binary-searches between 256 and 65536.
-fn measure_threshold(port: u16, ct: &str) -> usize {
-	let make = |size: usize| -> String {
+fn measure_threshold(port:u16, ct:&str) -> usize {
+	let make = |size:usize| -> String {
 		let unit = match ct {
 			"linter" => "error[E0308]: mismatched types\n  --> src/lib.rs:1:5\n",
 			"build_output" => "   Compiling crate v0.1.0\n",
@@ -126,7 +126,7 @@ fn measure_threshold(port: u16, ct: &str) -> usize {
 		}
 		s
 	};
-	let compressed = |size: usize| -> bool {
+	let compressed = |size:usize| -> bool {
 		let body = serde_json::json!({"content": make(size)}).to_string();
 		Command::new("curl")
 			.args([
@@ -159,7 +159,7 @@ fn measure_threshold(port: u16, ct: &str) -> usize {
 	hi
 }
 
-fn check(id: u8, label: &str, pass: bool, failures: &mut usize) {
+fn check(id:u8, label:&str, pass:bool, failures:&mut usize) {
 	eprintln!("  {:02}  {:<60} {}", id, label, if pass { "PASS" } else { "FAIL ←" });
 	if !pass {
 		*failures += 1;

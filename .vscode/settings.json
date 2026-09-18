@@ -9,6 +9,21 @@
   "files.eol": "\n",
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
+  // Rust: Aphrodite uses nightly-only rustfmt options (rustfmt.toml:
+  // space_after_colon = false, imports_granularity, group_imports, ...).
+  // Stable rustfmt and rust-analyzer's internal formatter silently IGNORE
+  // those, producing space-after-colon output that diverges from CI
+  // (Check.yml pins nightly-2026-05-01 for the fmt gate). Force
+  // rust-analyzer to call the SAME nightly rustfmt as CI so VSCode
+  // formatting is byte-identical to `cargo fmt --check`.
+  "rust-analyzer.rustfmt.overrideCommand": [
+    "rustup",
+    "run",
+    "nightly-2026-05-01",
+    "rustfmt",
+    "--edition",
+    "2024"
+  ],
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer",
     "editor.tabSize": 4

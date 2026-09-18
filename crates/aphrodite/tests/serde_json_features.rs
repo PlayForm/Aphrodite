@@ -16,12 +16,12 @@
 
 #[test]
 fn serde_json_preserves_insertion_order() {
-	let v: serde_json::Value = serde_json::from_str(r#"{"z":1,"a":2,"m":3}"#).unwrap();
+	let v:serde_json::Value = serde_json::from_str(r#"{"z":1,"a":2,"m":3}"#).unwrap();
 	assert_eq!(serde_json::to_string(&v).unwrap(), r#"{"z":1,"a":2,"m":3}"#);
 }
 
 #[test]
 fn serde_json_keeps_arbitrary_precision_literals() {
-	let v: serde_json::Value = serde_json::from_str(r#"{"x":1.0,"y":12345678901234567}"#).unwrap();
+	let v:serde_json::Value = serde_json::from_str(r#"{"x":1.0,"y":12345678901234567}"#).unwrap();
 	assert_eq!(serde_json::to_string(&v).unwrap(), r#"{"x":1.0,"y":12345678901234567}"#);
 }

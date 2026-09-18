@@ -1,12 +1,13 @@
 # Aphrodite Agent Feedback & Best Practices
 
-> **Date:** 2026-07-31  •  **Scope:** Generalized feedback for agents using the Aphrodite CCR compression engine with Hermes. Adapted from session feedback collected across multiple projects (Aphrodite, STE-Code) and stripped of all user-specific paths, environment variables, or environment-specific values.
+> **Date:** 2026-07-31 • **Scope:** Generalized feedback for agents using the Aphrodite CCR compression engine with Hermes. Adapted from session feedback collected across multiple projects (Aphrodite, STE-Code) and stripped of all user-specific paths, environment variables, or environment-specific values.
 
 ---
 
 ## 1. CCR Marker Handling - The #1 Thing Agents Get Wrong
 
 ### What a CCR marker looks like:
+
 ```
 <<<CCR:hash|type|size>>>
 ```
@@ -44,12 +45,14 @@
    levels deep. `resolve::expand` handles this automatically.
 
 ### Consequences of ignoring CCR:
+
 - You respond with "I got compressed output" instead of the actual content
 - You waste turns re-reading files the engine already fetched
 - The user gets low-quality responses based on missing data
 - This is the #1 cause of poor agent performance in compressed sessions
 
 ### Retrieval is cheap (sub-ms from local SQLite). Thinking/acting on the content is what costs tokens.
+
 Always retrieve first, then decide what to do with the content.
 
 ---
@@ -59,50 +62,53 @@ Always retrieve first, then decide what to do with the content.
 Before relying on CCR tools in a session:
 
 1. **Check engine health:**
-   ```python
-   aphrodite_stats()
-   # Must show: engine_enabled=true,
-   # proxies.token.alive=true, proxies.cache.alive=true
-   ```
+
+    ```python
+    aphrodite_stats()
+    # Must show: engine_enabled=true,
+    # proxies.token.alive=true, proxies.cache.alive=true
+    ```
 
 2. **Run the smoke test:**
-   ```python
-   aphrodite_test(mode="quick")
-   # Must return: status="ok", passed=1, total=1
-   ```
+
+    ```python
+    aphrodite_test(mode="quick")
+    # Must return: status="ok", passed=1, total=1
+    ```
 
 3. **Verify end-to-end roundtrip:**
-   ```python
-   result = aphrodite_compress(content="Test content\nHello world", type="text")
-   hash = result["hash"]
-   aphrodite_retrieve(hash=hash)  # Must return found=true
-   ```
+    ```python
+    result = aphrodite_compress(content="Test content\nHello world", type="text")
+    hash = result["hash"]
+    aphrodite_retrieve(hash=hash)  # Must return found=true
+    ```
 
 ---
 
 ## 3. The 13 Aphrodite Tools (Quick Reference)
 
-| Tool | Purpose | Key Parameters |
-|---|---|---|
-| `aphrodite_stats` | Check health, version, thresholds, proxy status | none |
-| `aphrodite_test` | Smoke test: compress→retrieve→search roundtrip | `mode` (quick/default) |
-| `aphrodite_compress` | Compress content into CCR | `content` (req), `type` (code/log/diff/error/json/build_output/text) |
-| `aphrodite_retrieve` | **Retrieve original content from CCR** | `hash` (req), `query` (opt filter), `path` (opt file bypass) |
-| `aphrodite_search` | Search CCR entries | `query` (req), `type` (opt filter) |
-| `aphrodite_catalog` | List all CCR entries | `mode` ("toc" for compact, default full) |
-| `aphrodite_diff` | Show conversation turn history | none |
-| `aphrodite_rebuild` | Report binary version + proxy health | none |
-| `aphrodite_reclassify` | Retroactively classify/metadata-enrich entries | `hash` (opt, omit for all) |
-| `aphrodite_prefetch` | Read files in background → compress to CCR | `paths` (array of file paths) |
-| `aphrodite_prefetch_status` | Live prefetch schedule | none |
-| `aphrodite_files` | List all file paths referenced in session | none |
-| `aphrodite_directive` | Manage behavioral directives | `action`, `name` |
+| Tool                        | Purpose                                         | Key Parameters                                                       |
+| --------------------------- | ----------------------------------------------- | -------------------------------------------------------------------- |
+| `aphrodite_stats`           | Check health, version, thresholds, proxy status | none                                                                 |
+| `aphrodite_test`            | Smoke test: compress→retrieve→search roundtrip  | `mode` (quick/default)                                               |
+| `aphrodite_compress`        | Compress content into CCR                       | `content` (req), `type` (code/log/diff/error/json/build_output/text) |
+| `aphrodite_retrieve`        | **Retrieve original content from CCR**          | `hash` (req), `query` (opt filter), `path` (opt file bypass)         |
+| `aphrodite_search`          | Search CCR entries                              | `query` (req), `type` (opt filter)                                   |
+| `aphrodite_catalog`         | List all CCR entries                            | `mode` ("toc" for compact, default full)                             |
+| `aphrodite_diff`            | Show conversation turn history                  | none                                                                 |
+| `aphrodite_rebuild`         | Report binary version + proxy health            | none                                                                 |
+| `aphrodite_reclassify`      | Retroactively classify/metadata-enrich entries  | `hash` (opt, omit for all)                                           |
+| `aphrodite_prefetch`        | Read files in background → compress to CCR      | `paths` (array of file paths)                                        |
+| `aphrodite_prefetch_status` | Live prefetch schedule                          | none                                                                 |
+| `aphrodite_files`           | List all file paths referenced in session       | none                                                                 |
+| `aphrodite_directive`       | Manage behavioral directives                    | `action`, `name`                                                     |
 
 ---
 
 ## 4. Auto-Expand vs. Manual Retrieval
 
 With `auto_expand = true` (the default in shipped configs):
+
 - **Tool outputs** are auto-expanded inline - you see the full content, no markers
 - **Raw terminal/proxy output** may still produce CCR markers - retrieve with
   `aphrodite_retrieve(hash)`
@@ -110,6 +116,7 @@ With `auto_expand = true` (the default in shipped configs):
 Even with auto-expand, when you SEE a `<<<CCR:hash|type|size>>>` marker in any
 output, **retrieve it immediately**. Auto-expand handles tool results, but
 markers can appear from:
+
 - Direct terminal proxy output
 - Background worker results returned as logs
 - Compressed context from other agents/sessions
@@ -146,6 +153,7 @@ about loading files you need **NOW**.
   current status.
 
 **Best practice:**
+
 - Launch long tasks with `terminal(background=true, notify_on_complete=true)`
 - Check status with `process(action='poll', session_id=...)`
 - Use `notify_on_complete=true` to get automatic completion notification,
@@ -177,11 +185,13 @@ about loading files you need **NOW**.
 ## 8. File Editing Best Practices
 
 **Never use `sed` for file edits.** `sed` on structured files causes:
+
 - Doubled comments (`# tag` → `# tag # tag`)
 - Tab/space indentation corruption in template strings
 - Subtle regex corruption that's hard to detect
 
 **Correct approach:**
+
 - Use the `patch` tool for targeted find-and-replace edits
 - Use `write_file` for complete file rewrites
 - For bulk operations, use a proper Node.js/Python script saved to a
@@ -196,6 +206,7 @@ content, corrupt indentation, and insert fragments at wrong locations.
 ## 9. Git Workflow for Generated Files
 
 **Gitignore negation is required** for generated output files:
+
 - If `.gitignore` contains a directory pattern (e.g., `output/`), files
   inside that directory cannot be `git add`-ed, even with explicit paths
 - Add a negation rule (`!output/`) to `.gitignore` first, then use
@@ -212,30 +223,31 @@ content, corrupt indentation, and insert fragments at wrong locations.
 Aphrodite ships five built-in directives baked into the binary via
 `include_str!`:
 
-| Directive | Behavior |
-|---|---|
-| `focus` | Stay targeted: at most 1-2 tools per turn, prefer `aphrodite_retrieve` over re-reading files |
-| `foresight` | Anticipate I/O, prefetch files you'll need next turn. After search_files, prefetch top 5-10 results |
-| `ccr-handling` | CCR marker handling rules - the core retrieval discipline from sections 1-2 above |
-| `cleanup` | Summarize and prune: progress summary every 5 turns, catalog sweeps, verify nothing left behind |
-| `explore` | Read broadly: 2-3 related files per turn, prefetch batches of related paths |
+| Directive      | Behavior                                                                                            |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| `focus`        | Stay targeted: at most 1-2 tools per turn, prefer `aphrodite_retrieve` over re-reading files        |
+| `foresight`    | Anticipate I/O, prefetch files you'll need next turn. After search_files, prefetch top 5-10 results |
+| `ccr-handling` | CCR marker handling rules - the core retrieval discipline from sections 1-2 above                   |
+| `cleanup`      | Summarize and prune: progress summary every 5 turns, catalog sweeps, verify nothing left behind     |
+| `explore`      | Read broadly: 2-3 related files per turn, prefetch batches of related paths                         |
 
 ### Discovery and loading
 
-| Rule | Behavior |
-|---|---|
-| Search order | `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` → `~/.hermes/aphrodite/directives/` → binary-relative; first directory that exists wins, NOT merged. An empty directives dir = intentionally empty (no custom directives) |
-| File filter | Only `*.md` files; anything else is silently skipped |
-| Naming | Directive name = file stem (`focus.md` → `focus`) |
-| Per-file cap | 2,000 chars per directive body (char-safe truncation, `…` appended) |
-| Combined cap | 4,000 chars across all active directives' injected text combined |
-| Load condition | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty |
-| Built-in fallback | When no directives directory is found, the 5 baked-in directives are loaded automatically - activation is **logged** |
-| Active default | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` are seeded as active |
+| Rule              | Behavior                                                                                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search order      | `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` → `~/.hermes/aphrodite/directives/` → binary-relative; first directory that exists wins, NOT merged. An empty directives dir = intentionally empty (no custom directives) |
+| File filter       | Only `*.md` files; anything else is silently skipped                                                                                                                                                                            |
+| Naming            | Directive name = file stem (`focus.md` → `focus`)                                                                                                                                                                               |
+| Per-file cap      | 2,000 chars per directive body (char-safe truncation, `…` appended)                                                                                                                                                             |
+| Combined cap      | 4,000 chars across all active directives' injected text combined                                                                                                                                                                |
+| Load condition    | Directories load **unconditionally** when present - loading is not gated on `[directives] active` being non-empty                                                                                                               |
+| Built-in fallback | When no directives directory is found, the 5 baked-in directives are loaded automatically - activation is **logged**                                                                                                            |
+| Active default    | When `[directives] active` is empty and no disk directives found, `focus` + `foresight` are seeded as active                                                                                                                    |
 
 ### Runtime management
 
 Use `aphrodite_directive` to manage directives at runtime:
+
 ```python
 aphrodite_directive(action="list")                    # list active/available
 aphrodite_directive(action="swap", name="explore")    # replace active set
@@ -264,12 +276,12 @@ focus:
   Use aphrodite_retrieve(hash) for any <<<CCR:hash...>>> you see
 ```
 
-| Detail | Behavior |
-|---|---|
-| Header line | `[directives: name1, name2]` - active names, comma-joined |
-| Body | Each active directive's **full** (per-file-capped) body, not just its title line - leading `#` markers stripped, blank lines dropped, remaining lines indented |
-| Placement | Appended after the catalog summary in the hook's returned context string; empty when no directives are active |
-| Frequency | Every `pre_llm_call` - the block reflects the active set at that moment |
+| Detail      | Behavior                                                                                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header line | `[directives: name1, name2]` - active names, comma-joined                                                                                                      |
+| Body        | Each active directive's **full** (per-file-capped) body, not just its title line - leading `#` markers stripped, blank lines dropped, remaining lines indented |
+| Placement   | Appended after the catalog summary in the hook's returned context string; empty when no directives are active                                                  |
+| Frequency   | Every `pre_llm_call` - the block reflects the active set at that moment                                                                                        |
 
 ---
 
@@ -309,21 +321,21 @@ session_inject = """
 
 **Storage tiers** (by content size and mode):
 
-| Tier | Threshold | Backend | Capacity | TTL |
-|---|---|---|---|---|
-| Inline | < 256B | `LruCache<String, String>` | 1,024 entries | LRU eviction only |
-| Cache mode | > 8KB | `InMemoryCcrStore` (DashMap) | 10,000 entries | Configurable (default 3600s) |
-| Token mode | > 1KB | `SqliteCcrStore` (SQLite) | Unlimited (disk) | Configurable (default 3600s) |
+| Tier       | Threshold | Backend                      | Capacity         | TTL                          |
+| ---------- | --------- | ---------------------------- | ---------------- | ---------------------------- |
+| Inline     | < 256B    | `LruCache<String, String>`   | 1,024 entries    | LRU eviction only            |
+| Cache mode | > 8KB     | `InMemoryCcrStore` (DashMap) | 10,000 entries   | Configurable (default 3600s) |
+| Token mode | > 1KB     | `SqliteCcrStore` (SQLite)    | Unlimited (disk) | Configurable (default 3600s) |
 
 **Per-type multipliers** (token mode, 1KB base):
 
-| Type | Multiplier | Effective threshold |
-|---|---|---|
-| error | ×8 | 8,192 |
-| code | ×4 (default) | 4,096 |
-| diff, git, text | ×2 | 2,048 |
-| tool_output, json | ×1 | 1,024 |
-| linter, build_output, log | ×1 (BASE, not halved) | 1,024 |
+| Type                      | Multiplier            | Effective threshold |
+| ------------------------- | --------------------- | ------------------- |
+| error                     | ×8                    | 8,192               |
+| code                      | ×4 (default)          | 4,096               |
+| diff, git, text           | ×2                    | 2,048               |
+| tool_output, json         | ×1                    | 1,024               |
+| linter, build_output, log | ×1 (BASE, not halved) | 1,024               |
 
 > **Correction:** `linter`, `build_output`, and `log` are pinned at BASE
 > threshold, not halved. `proxy.rs::threshold_for` returns `base` for these

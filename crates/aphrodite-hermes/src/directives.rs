@@ -16,8 +16,10 @@
 //! `<name>.md` (the core loader only reads `*.md` files and derives the
 //! directive name from the file stem).
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+	fs,
+	path::{Path, PathBuf},
+};
 
 use serde_json::json;
 
@@ -34,8 +36,8 @@ use serde_json::json;
 ///   5. `.` - degraded fallback with a warning (never fail).
 ///
 /// Returns `(directives_dir, warnings)`.
-pub(crate) fn resolve_directives_dir(home_param: &str) -> (PathBuf, Vec<String>) {
-	let mut warnings: Vec<String> = Vec::new();
+pub(crate) fn resolve_directives_dir(home_param:&str) -> (PathBuf, Vec<String>) {
+	let mut warnings:Vec<String> = Vec::new();
 
 	if !home_param.is_empty() {
 		return (PathBuf::from(home_param).join("directives"), warnings);
@@ -58,9 +60,8 @@ pub(crate) fn resolve_directives_dir(home_param: &str) -> (PathBuf, Vec<String>)
 			);
 		}
 	}
-	warnings.push(
-		"neither $HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using current directory".into(),
-	);
+	warnings
+		.push("neither $HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using current directory".into());
 	(PathBuf::from(".").join("directives"), warnings)
 }
 
@@ -71,7 +72,7 @@ pub(crate) fn resolve_directives_dir(home_param: &str) -> (PathBuf, Vec<String>)
 /// match the embedded sources verbatim. Sorted by name for deterministic
 /// output ordering.
 fn loaded_builtin_set() -> Vec<(String, String)> {
-	let mut set: Vec<(String, String)> = aphrodite::directives::loaded_builtins()
+	let mut set:Vec<(String, String)> = aphrodite::directives::loaded_builtins()
 		.into_iter()
 		.map(|(name, d)| (name, d.content))
 		.collect();
@@ -85,17 +86,13 @@ fn loaded_builtin_set() -> Vec<(String, String)> {
 /// files are skipped, and existing DIFFERENT files are never overwritten
 /// (skipped with a warning). Always returns `status: "ok"` - every failure
 /// degrades to a `warning`, never a panic or an error status.
-pub(crate) fn materialize(dir: &Path) -> serde_json::Value {
-	let mut written: Vec<String> = Vec::new();
-	let mut skipped: Vec<String> = Vec::new();
-	let mut warnings: Vec<String> = Vec::new();
+pub(crate) fn materialize(dir:&Path) -> serde_json::Value {
+	let mut written:Vec<String> = Vec::new();
+	let mut skipped:Vec<String> = Vec::new();
+	let mut warnings:Vec<String> = Vec::new();
 
 	if let Err(e) = fs::create_dir_all(dir) {
-		let msg = format!(
-			"could not create directives dir {}: {}; nothing materialized",
-			dir.display(),
-			e
-		);
+		let msg = format!("could not create directives dir {}: {}; nothing materialized", dir.display(), e);
 		warnings.push(msg.clone());
 		eprintln!("aphrodite-hermes: {msg}");
 		return json!({
@@ -114,23 +111,24 @@ pub(crate) fn materialize(dir: &Path) -> serde_json::Value {
 			Ok(existing) if existing == content.as_bytes() => skipped.push(file_name),
 			Ok(_) => {
 				warnings.push(format!(
-					"directives/{file_name} exists with different content; leaving user-modified file as-is (not overwritten)"
+					"directives/{file_name} exists with different content; leaving user-modified file as-is (not \
+					 overwritten)"
 				));
 				skipped.push(file_name);
-			}
+			},
 			Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
 				match fs::write(&dest, content.as_bytes()) {
 					Ok(()) => written.push(file_name),
 					Err(we) => {
 						warnings.push(format!("could not write directives/{file_name}: {we}"));
 						eprintln!("aphrodite-hermes: directives/{file_name} write failed: {we}");
-					}
+					},
 				}
-			}
+			},
 			Err(e) => {
 				warnings.push(format!("could not read directives/{file_name}: {e}; leaving as-is"));
 				skipped.push(file_name);
-			}
+			},
 		}
 	}
 
@@ -150,7 +148,7 @@ pub(crate) fn materialize(dir: &Path) -> serde_json::Value {
 ///
 /// Resolution warnings (e.g. a degraded `$HOME` fallback) are logged and
 /// folded into the report's `warnings` array.
-pub(crate) fn materialize_into(home_param: &str) -> serde_json::Value {
+pub(crate) fn materialize_into(home_param:&str) -> serde_json::Value {
 	let (dir, warnings) = resolve_directives_dir(home_param);
 	for w in &warnings {
 		eprintln!("aphrodite-hermes: {w}");
@@ -172,13 +170,13 @@ mod tests {
 
 	/// Serializes tests that mutate process-global env vars.
 	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
-		static G: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
 		G.get_or_init(|| std::sync::Mutex::new(()))
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner)
 	}
 
-	fn temp_home(tag: &str) -> PathBuf {
+	fn temp_home(tag:&str) -> PathBuf {
 		let base = std::env::temp_dir().join(format!(
 			"aphrodite-directives-{tag}-{}-{}",
 			std::process::id(),
@@ -232,11 +230,7 @@ mod tests {
 		assert_eq!(first["written"].as_array().unwrap().len(), expected.len());
 
 		let second = materialize(&dir);
-		assert_eq!(
-			second["written"].as_array().unwrap().len(),
-			0,
-			"re-run must write nothing"
-		);
+		assert_eq!(second["written"].as_array().unwrap().len(), 0, "re-run must write nothing");
 		assert_eq!(second["skipped"].as_array().unwrap().len(), expected.len());
 		assert_eq!(second["warnings"].as_array().unwrap().len(), 0);
 
@@ -325,7 +319,7 @@ mod tests {
 		assert!(!ptr.is_null());
 		let json = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
 		crate::aphrodite_hermes_free_string(ptr);
-		let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
 		assert_eq!(v["status"], "ok");
 		assert_eq!(
 			v["written"].as_array().unwrap().len(),
