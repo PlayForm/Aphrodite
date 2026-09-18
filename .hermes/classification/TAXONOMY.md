@@ -88,26 +88,26 @@ but live in layer 6).
 
 ## 4. Worked examples
 
-| File                                        | Code                   | Reasoning                                                                                                                                         |
-| ------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plugins/aphrodite/BINARY_VERSION`          | `MC3-01 +tag+guard`    | Manifest, Current-only (pairs the plugin with a binary release), bumped LAST in any ceremony (live download pointer), guarded by release ordering |
-| `crates/aphrodite/src/lib.rs`               | `PD1-01 →C +bump`      | Process, Development home, ships via Phase A, version rides the release                                                                           |
-| `plugins/aphrodite/__init__.py`             | `PB3-01 →C +tag`       | Loader process, both phases, must stay byte-identical to `crates/aphrodite/templates/__init__.py` (setup.rs drift guard)                          |
-| `crates/aphrodite/templates/__init__.py`    | `MB1-05 +guard`        | Manifest-embedded copy, both phases, drift-guard test keeps it identical to the plugin                                                            |
-| `.gitmodules`                               | `G5-01 ∅`              | Identity - never crosses; branch field is per-branch                                                                                              |
-| `.hermes/notes/release/RELEASE-METHODOLOGY.md`      | `DD6-01 ∅`             | Doc, Development-only, never ships                                                                                                                |
-| `Maintain/release-notes-vX.Y.Z.md`          | `D@R4-01 →C +tag`      | Ritual doc - staged during ceremony, feeds the GitHub release notes                                                                               |
-| `.github/workflows/Check.yml`               | `G5-02 ∅`              | Trigger identity - `[Development]` vs `[Current]` variant per branch                                                                              |
-| `plugins/aphrodite/layout_check.py`         | `PD3-02 →C`            | Self-heal process, Development home, ships (runtime home is on the user side)                                                                     |
-| `vendor/headroom/**`                        | `V7-01`                | Pinned third-party                                                                                                                                |
-| `plugins/aphrodite/plugin.yaml`             | `MB3-01 →C +bump +tag` | Manifest, both phases, version rides the release (plugin tag first, before parent)                                                                |
-| `plugins/aphrodite/download.sh`             | `SB3-01 →C +guard`     | Downloader script, ships; semver-validated against BINARY_VERSION + checksum + magic-byte guard                                                   |
-| `plugins/aphrodite/layout_schema.json`      | `CB3-01 →C +guard`     | Layout contract, ships; missing/malformed degrades self-heal to report-only                                                                       |
-| `plugins/aphrodite/tests/**`                | `TD3-01..05 ∅`         | Plugin tests never cross - Development keeps them in Phase B                                                                                      |
-| `plugins/aphrodite/binaries/**`             | `A-3-01 @R`            | Runtime artifacts (untracked): exist only on the user side, populated by download.sh, never in the Tag                                            |
-| `Maintain/install.sh` (deleted)             | `SD4-97 ✝`             | Absence IS the ceremony rule - installers deleted (846c490); the plugin self-links + self-heals                                                   |
-| `profiles/` (deleted)                       | `CD6-99 ✝`             | Hermes-profile scaffolding deleted; never ships, dev-side only                                                                                    |
-| `Cargo.lock` / `pnpm-lock.yaml` / `uv.lock` | `AB4-* ∅ (untracked)`  | Lockfiles regenerated per line, never staged, ceremony-invisible                                                                                  |
+| File                                           | Code                   | Reasoning                                                                                                                                         |
+| ---------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `plugins/aphrodite/BINARY_VERSION`             | `MC3-01 +tag+guard`    | Manifest, Current-only (pairs the plugin with a binary release), bumped LAST in any ceremony (live download pointer), guarded by release ordering |
+| `crates/aphrodite/src/lib.rs`                  | `PD1-01 →C +bump`      | Process, Development home, ships via Phase A, version rides the release                                                                           |
+| `plugins/aphrodite/__init__.py`                | `PB3-01 →C +tag`       | Loader process, both phases, must stay byte-identical to `crates/aphrodite/templates/__init__.py` (setup.rs drift guard)                          |
+| `crates/aphrodite/templates/__init__.py`       | `MB1-05 +guard`        | Manifest-embedded copy, both phases, drift-guard test keeps it identical to the plugin                                                            |
+| `.gitmodules`                                  | `G5-01 ∅`              | Identity - never crosses; branch field is per-branch                                                                                              |
+| `.hermes/notes/release/RELEASE-METHODOLOGY.md` | `DD6-01 ∅`             | Doc, Development-only, never ships                                                                                                                |
+| `Maintain/release-notes-vX.Y.Z.md`             | `D@R4-01 →C +tag`      | Ritual doc - staged during ceremony, feeds the GitHub release notes                                                                               |
+| `.github/workflows/Check.yml`                  | `G5-02 ∅`              | Trigger identity - `[Development]` vs `[Current]` variant per branch                                                                              |
+| `plugins/aphrodite/layout_check.py`            | `PD3-02 →C`            | Self-heal process, Development home, ships (runtime home is on the user side)                                                                     |
+| `vendor/headroom/**`                           | `V7-01`                | Pinned third-party                                                                                                                                |
+| `plugins/aphrodite/plugin.yaml`                | `MB3-01 →C +bump +tag` | Manifest, both phases, version rides the release (plugin tag first, before parent)                                                                |
+| `plugins/aphrodite/download.sh`                | `SB3-01 →C +guard`     | Downloader script, ships; semver-validated against BINARY_VERSION + checksum + magic-byte guard                                                   |
+| `plugins/aphrodite/layout_schema.json`         | `CB3-01 →C +guard`     | Layout contract, ships; missing/malformed degrades self-heal to report-only                                                                       |
+| `plugins/aphrodite/tests/**`                   | `TD3-01..05 ∅`         | Plugin tests never cross - Development keeps them in Phase B                                                                                      |
+| `plugins/aphrodite/binaries/**`                | `A-3-01 @R`            | Runtime artifacts (untracked): exist only on the user side, populated by download.sh, never in the Tag                                            |
+| `Maintain/install.sh` (deleted)                | `SD4-97 ✝`             | Absence IS the ceremony rule - installers deleted (846c490); the plugin self-links + self-heals                                                   |
+| `profiles/` (deleted)                          | `CD6-99 ✝`             | Hermes-profile scaffolding deleted; never ships, dev-side only                                                                                    |
+| `Cargo.lock` / `pnpm-lock.yaml` / `uv.lock`    | `AB4-* ∅ (untracked)`  | Lockfiles regenerated per line, never staged, ceremony-invisible                                                                                  |
 
 ---
 

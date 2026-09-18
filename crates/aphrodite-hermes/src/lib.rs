@@ -1,21 +1,21 @@
 //! aphrodite-hermes: Hermes Agent-specific integration crate.
 //!
 //! This crate handles all Hermes-specific concerns - tool schemas,
-//! hook dispatch, skill registration - leaving the core `aphrodite`
-//! crate as a pure, agent-agnostic compression engine.
+//! hook dispatch, directive provisioning - leaving the core `aphrodite`
+//! crate as a pure, agent-agnostic compression engine. (Bundled skill
+//! registration is the Python plugin's job, not this crate's.)
 //!
 //! Architecture:
 //!   Python plugin (thin loader) → ctypes → libaphrodite_hermes.dylib
 //!                                           ├─ Tool dispatch (compress, retrieve, stats, etc.)
 //!                                           ├─ Hook dispatch (on_session_start, transform, terminal, pre/post LLM)
-//!                                           └─ Skill registration
-//!                                           └─ Directive provisioning (materialize the
-//!                                              embedded builtin set into the runtime home)
+//!                                           ├─ Directive provisioning (materialize the
+//!                                           │  embedded builtin set into the runtime home)
 //!                                           ↓ (depends on)
 //!                                    aphrodite crate (rlib)
 //!                                           ├─ Core compression (hooks, state, marker)
 //!                                           ├─ Resolution (resolve, stage2, struct)
-//!                                           └─ Catalog, session, prefetch, config
+//!                                           └─ Catalog, session, prefetch, config, chain_split
 
 // See crates/aphrodite/src/lib.rs's matching comment: fixing this properly
 // (marking every `pub extern "C" fn` `unsafe`) is report 03's job, not a
@@ -70,7 +70,9 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 			// Issue #11 WS4: also push `[previews] preview_max_chars` into
 			// the process-global preview builder so the dylib path caps
 			// previews exactly like the proxy path (the key was
-			// declared-but-unread dead config).
+			// declared-but-unread dead config). Precedence is
+			// $APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120; an absent
+			// key means unlimited.
 			cfg.apply_previews();
 			s
 		};

@@ -60,9 +60,10 @@ fn read_path_guarded(path:&str) -> Result<String, String> {
 
 /// Hermes wraps all tool results in JSON wrappers like
 /// {"output":"...","exit_code":N}, {"success":true,"diff":"..."},
-/// {"total_count":N,"matches":[...]}, etc. The aphrodite classifier
-/// sees '{' and returns json_array - hiding the real content behind a
-/// useless preview. This extracts the meaningful content and reclassifies.
+/// {"total_count":N,"matches":[...]}, etc. The aphrodite classifier sees a
+/// JSON object and types it as text (json_array only for '[' array shapes) -
+/// hiding the real content behind a useless preview. This extracts the
+/// meaningful content and reclassifies.
 pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 	// Only attempt unwrapping if the content looks like a JSON object.
 	if !content.trim_start().starts_with('{') {

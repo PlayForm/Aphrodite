@@ -6,8 +6,9 @@
 //! `include_str!` and exposed through `aphrodite::directives::loaded_builtins()`).
 //! This module provisions those builtins into the user-data home
 //! (`~/.hermes/aphrodite/directives/` by default) so the plugin directory
-//! never has to hold runtime state: the binary is the provider, the runtime
-//! home is the store, and the core directive loader reads the same location
+//! never has to hold runtime state: the core crate is the provider (the
+//! embedded set ships inside this dylib), the runtime home is the store,
+//! and the core directive loader reads the same location
 //! (its home-namespace candidate, or `$APHRODITE_DIRECTIVES_DIR` when set).
 //!
 //! Provisioning is idempotent and strictly non-destructive: files are only

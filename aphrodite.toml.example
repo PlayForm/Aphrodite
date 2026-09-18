@@ -68,7 +68,7 @@ context_engine = true       # dylib-path only (aphrodite_stats/config_get/set,
 # no gated behavior tied to this key
 prefetch = true # enable aphrodite_prefetch tool
 poll_worker = true # enable auto-backgrounding of slow tool calls
-chain_split = false # opt-in fine-grained command splitting; OFF by default (markers pollute redirected stdout)
+chain_split = false # opt-in fine-grained command splitting (SEG_MARKER segments); OFF by default (markers pollute redirected stdout)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -77,7 +77,7 @@ chain_split = false # opt-in fine-grained command splitting; OFF by default (mar
 [previews]
 model_family = "code_first" # compact | code_first | balance
 code_structure_map = true   # show fn/struct/class sigs
-preview_max_chars = 120     # max chars per preview line
+preview_max_chars = 120     # max chars per preview line (env APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120; key absent = unlimited)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

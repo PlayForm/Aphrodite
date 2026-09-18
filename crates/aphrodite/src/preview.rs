@@ -278,7 +278,7 @@ fn is_envelope_json_object(obj:&serde_json::Map<String, JsonValue>) -> bool {
 fn is_md_heading(line:&str) -> bool {
 	let t = line.trim_start();
 	let n = t.chars().take_while(|c| *c == '#').count();
-	n >= 1 && n <= 6 && t.len() > n && t[n..].starts_with(' ') && t[n..].trim().len() > 0
+	(1..=6).contains(&n) && t.len() > n && t[n..].starts_with(' ') && !t[n..].trim().is_empty()
 }
 
 /// True for a non-heading markdown structural line (list item, link, fence,
@@ -334,10 +334,10 @@ fn first_meaningful_line(content:&str) -> Option<String> {
 		if t.is_empty() {
 			return None;
 		}
-		let core = t.trim_end_matches(|c| c == ',' || c == ';').trim();
+		let core = t.trim_end_matches([',', ';']).trim();
 		let mut it = core.chars();
 		match (it.next(), it.next()) {
-			(Some(c), None) if matches!(c, '{' | '}' | '[' | ']' | '(' | ')') => None,
+			(Some('{' | '}' | '[' | ']' | '(' | ')'), None) => None,
 			_ => Some(t.to_string()),
 		}
 	})
@@ -410,10 +410,10 @@ fn is_path_line(line:&str) -> bool {
 	t.contains('/') || (t.rfind('.').map(|i| i > 0 && i < t.len() - 1).unwrap_or(false))
 }
 
-/// ── Structured detection matchers (Issue #11 residual #4; user directive:
-/// the type-detection layer must NOT use the regex crate - explicit
-/// `strip_prefix`/`starts_with` checks against literal prefixes, testable,
-/// no raw-string escaping). ──
+// ── Structured detection matchers (Issue #11 residual #4; user directive:
+// the type-detection layer must NOT use the regex crate - explicit
+// `strip_prefix`/`starts_with` checks against literal prefixes, testable,
+// no raw-string escaping). ──
 
 /// `running N tests` header (bare test logs without a summary line).
 fn is_running_tests_line(t:&str) -> bool {
@@ -734,7 +734,7 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 		"text" | "terminal" | "log" | "" | "plain" | "tool_result" => detect_semantic_type(content).unwrap_or(type_str),
 		"build_output" | "build_error" => {
 			match detect_semantic_type(content) {
-				Some("test") if !content.lines().any(|l| is_failure_line(l)) => "test",
+				Some("test") if !content.lines().any(is_failure_line) => "test",
 				_ => type_str,
 			}
 		},
