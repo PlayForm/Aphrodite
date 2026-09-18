@@ -26,11 +26,13 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 19899
 _lock = threading.Lock()
 _last = {}  # last request seen, keyed by a client-supplied bench id
 
-BIG_CONTENT = ("fn compute(x: u64) -> u64 { x.wrapping_mul(2654435761) }\n" * 520)  # ~30KB
-BIG_TOOL_ARGS = json.dumps({
-    "file_path": "/tmp/very/long/path/to/file.rs",
-    "content": "let mut total = 0u64;\n" * 900,  # ~20KB inside args
-})
+BIG_CONTENT = "fn compute(x: u64) -> u64 { x.wrapping_mul(2654435761) }\n" * 520  # ~30KB
+BIG_TOOL_ARGS = json.dumps(
+    {
+        "file_path": "/tmp/very/long/path/to/file.rs",
+        "content": "let mut total = 0u64;\n" * 900,  # ~20KB inside args
+    }
+)
 
 
 def openai_completion(content, tool_calls=None):
@@ -43,7 +45,9 @@ def openai_completion(content, tool_calls=None):
         "object": "chat.completion",
         "created": 1760000000,
         "model": "bench-model",
-        "choices": [{"index": 0, "message": msg, "finish_reason": "tool_calls" if tool_calls else "stop"}],
+        "choices": [
+            {"index": 0, "message": msg, "finish_reason": "tool_calls" if tool_calls else "stop"}
+        ],
         "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
     }
 
@@ -105,8 +109,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_sse()
                 return
             if "want_tool_calls" in text:
-                tc = [{"id": "call_bench_1", "type": "function",
-                       "function": {"name": "write_file", "arguments": BIG_TOOL_ARGS}}]
+                tc = [
+                    {
+                        "id": "call_bench_1",
+                        "type": "function",
+                        "function": {"name": "write_file", "arguments": BIG_TOOL_ARGS},
+                    }
+                ]
                 self._send_json(openai_completion("", tool_calls=tc))
                 return
             if "want_big_content" in text:
@@ -116,21 +125,34 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if self.path.endswith("/v1/messages") or self.path.endswith("/messages"):
-            self._send_json({
-                "id": "msg_bench_1", "type": "message", "role": "assistant",
-                "model": "bench-model",
-                "content": [{"type": "text", "text": "anthropic canned answer."}],
-                "stop_reason": "end_turn",
-                "usage": {"input_tokens": 10, "output_tokens": 5},
-            })
+            self._send_json(
+                {
+                    "id": "msg_bench_1",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": "bench-model",
+                    "content": [{"type": "text", "text": "anthropic canned answer."}],
+                    "stop_reason": "end_turn",
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                }
+            )
             return
 
         if ":generateContent" in self.path:
-            self._send_json({
-                "candidates": [{"content": {"parts": [{"text": "gemini canned answer."}],
-                                            "role": "model"}, "finishReason": "STOP"}],
-                "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5},
-            })
+            self._send_json(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [{"text": "gemini canned answer."}],
+                                "role": "model",
+                            },
+                            "finishReason": "STOP",
+                        }
+                    ],
+                    "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5},
+                }
+            )
             return
 
         self._send_json({"echo": True, "path": self.path})
@@ -138,16 +160,34 @@ class Handler(BaseHTTPRequestHandler):
     def _send_sse(self):
         chunks = []
         for i, piece in enumerate(["Hello", " from", " SSE", " stream."]):
-            chunks.append("data: " + json.dumps({
-                "id": "chatcmpl-bench-1", "object": "chat.completion.chunk",
-                "created": 1760000000, "model": "bench-model",
-                "choices": [{"index": 0, "delta": {"content": piece}, "finish_reason": None}],
-            }) + "\n\n")
-        chunks.append("data: " + json.dumps({
-            "id": "chatcmpl-bench-1", "object": "chat.completion.chunk",
-            "created": 1760000000, "model": "bench-model",
-            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-        }) + "\n\n")
+            chunks.append(
+                "data: "
+                + json.dumps(
+                    {
+                        "id": "chatcmpl-bench-1",
+                        "object": "chat.completion.chunk",
+                        "created": 1760000000,
+                        "model": "bench-model",
+                        "choices": [
+                            {"index": 0, "delta": {"content": piece}, "finish_reason": None}
+                        ],
+                    }
+                )
+                + "\n\n"
+            )
+        chunks.append(
+            "data: "
+            + json.dumps(
+                {
+                    "id": "chatcmpl-bench-1",
+                    "object": "chat.completion.chunk",
+                    "created": 1760000000,
+                    "model": "bench-model",
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                }
+            )
+            + "\n\n"
+        )
         chunks.append("data: [DONE]\n\n")
         payload = "".join(chunks).encode()
         self.send_response(200)

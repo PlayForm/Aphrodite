@@ -19,6 +19,7 @@ Migration notes (archive corpus -> Development bench/corpus):
     absent the embedded SAMPLE_FALLBACK (canonical archive-era copy) is
     used instead, keeping regeneration deterministic.
 """
+
 import json
 import os
 import random
@@ -212,12 +213,18 @@ write("wide_5k_keys.json", json.dumps(wide, indent=0))
 
 # ── build log: modern cargo build of the aphrodite workspace ─────────
 CRATES = [
-    ("aphrodite-types", "1.4.3"), ("aphrodite-core", "1.4.3"),
-    ("aphrodite-http", "1.4.3"), ("aphrodite-cache", "1.4.3"),
-    ("aphrodite", "1.4.3"), ("headroom-core", "0.3.2"),
-    ("headroom-proxy", "0.3.2"), ("tokio", "1.45.0"),
-    ("serde", "1.0.219"), ("serde_json", "1.0.145"),
-    ("clap", "4.5.41"), ("thiserror", "2.0.12"),
+    ("aphrodite-types", "1.4.3"),
+    ("aphrodite-core", "1.4.3"),
+    ("aphrodite-http", "1.4.3"),
+    ("aphrodite-cache", "1.4.3"),
+    ("aphrodite", "1.4.3"),
+    ("headroom-core", "0.3.2"),
+    ("headroom-proxy", "0.3.2"),
+    ("tokio", "1.45.0"),
+    ("serde", "1.0.219"),
+    ("serde_json", "1.0.145"),
+    ("clap", "4.5.41"),
+    ("thiserror", "2.0.12"),
 ]
 SRC_FILES = ["compressor.rs", "marker.rs", "config.rs", "proxy.rs", "lib.rs"]
 ERR_CODES = ["E0308", "E0599", "E0433", "E0502"]
@@ -278,11 +285,14 @@ blines.append(
     f"error: could not compile `aphrodite` (lib) due to {err_count} previous errors; "
     f"{warn_count} warnings emitted"
 )
-blines += ["", "$ cargo test --lib",
-           "   Compiling aphrodite v1.4.3 (crates/aphrodite)",
-           "    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.41s",
-           "     Running unittests src/lib.rs (target/debug/deps/aphrodite-9f0c2a41)",
-           "running 214 tests"]
+blines += [
+    "",
+    "$ cargo test --lib",
+    "   Compiling aphrodite v1.4.3 (crates/aphrodite)",
+    "    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.41s",
+    "     Running unittests src/lib.rs (target/debug/deps/aphrodite-9f0c2a41)",
+    "running 214 tests",
+]
 for t in range(12):
     blines.append(f"test compressor::tests::case_{t:02d} ... ok")
 blines += [
@@ -306,7 +316,7 @@ dlines = []
 for f_i, (name, start) in enumerate(DIFF_FILES):
     dlines += [
         f"diff --git a/{name} b/{name}",
-        f"index {0x1a2b3c + f_i * 0x11111:07x}..{0x5d6e7f + f_i * 0x22222:07x} 100644",
+        f"index {0x1A2B3C + f_i * 0x11111:07x}..{0x5D6E7F + f_i * 0x22222:07x} 100644",
         f"--- a/{name}",
         f"+++ b/{name}",
         f"@@ -{start},40 +{start},46 @@ impl Compressor {{",
@@ -348,7 +358,9 @@ nul_obj = {
     "rows": [f"row_{i}\x00tail" for i in range(200)],
     "note": "decoded strings contain interior NUL bytes",
 }
-write("interior_nul.json", json.dumps(nul_obj).encode() + b"\ntrailing\x00raw\x00bytes\n", binary=True)
+write(
+    "interior_nul.json", json.dumps(nul_obj).encode() + b"\ntrailing\x00raw\x00bytes\n", binary=True
+)
 
 # ── source fixtures for struct_extract (python/go/ts) ────────────────
 py = [

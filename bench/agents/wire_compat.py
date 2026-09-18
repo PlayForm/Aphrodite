@@ -69,14 +69,26 @@ def http(method, url, body=None, headers=None, timeout=30):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read()
-            return {"status": r.status, "headers": {k.lower(): v for k, v in r.headers.items()},
-                    "body": raw, "ms": (time.perf_counter() - t0) * 1000}
+            return {
+                "status": r.status,
+                "headers": {k.lower(): v for k, v in r.headers.items()},
+                "body": raw,
+                "ms": (time.perf_counter() - t0) * 1000,
+            }
     except urllib.error.HTTPError as e:
-        return {"status": e.code, "headers": {k.lower(): v for k, v in (e.headers or {}).items()},
-                "body": e.read(), "ms": (time.perf_counter() - t0) * 1000}
+        return {
+            "status": e.code,
+            "headers": {k.lower(): v for k, v in (e.headers or {}).items()},
+            "body": e.read(),
+            "ms": (time.perf_counter() - t0) * 1000,
+        }
     except Exception as e:
-        return {"status": -1, "headers": {}, "body": repr(e).encode(),
-                "ms": (time.perf_counter() - t0) * 1000}
+        return {
+            "status": -1,
+            "headers": {},
+            "body": repr(e).encode(),
+            "ms": (time.perf_counter() - t0) * 1000,
+        }
 
 
 def wait_healthy(url, tries=50):
@@ -96,7 +108,7 @@ def stub_last(bench_id):
         return {}
 
 
-BIG_TOOL_OUTPUT = ("error[E0308]: mismatched types\n --> src/proxy.rs:1?\n" * 700)  # ~38KB
+BIG_TOOL_OUTPUT = "error[E0308]: mismatched types\n --> src/proxy.rs:1?\n" * 700  # ~38KB
 
 
 def dialect_requests():
@@ -119,9 +131,17 @@ def dialect_requests():
             "messages": [
                 {"role": "system", "content": "You are a coding agent."},
                 {"role": "user", "content": "Fix the build."},
-                {"role": "assistant", "content": None, "tool_calls": [
-                    {"id": "call_1", "type": "function",
-                     "function": {"name": "bash", "arguments": "{\"cmd\":\"cargo build\"}"}}]},
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "bash", "arguments": '{"cmd":"cargo build"}'},
+                        }
+                    ],
+                },
                 {"role": "tool", "tool_call_id": "call_1", "content": BIG_TOOL_OUTPUT},
             ],
         },
@@ -137,10 +157,22 @@ def dialect_requests():
             "model": "bench-model",
             "want_tool_calls": True,
             "messages": [{"role": "user", "content": "write the file (want_tool_calls)"}],
-            "tools": [{"type": "function", "function": {
-                "name": "write_file", "description": "write a file",
-                "parameters": {"type": "object", "properties": {
-                    "file_path": {"type": "string"}, "content": {"type": "string"}}}}}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "write_file",
+                        "description": "write a file",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "file_path": {"type": "string"},
+                                "content": {"type": "string"},
+                            },
+                        },
+                    },
+                }
+            ],
         },
         "headers": {},
     }
@@ -166,10 +198,17 @@ def dialect_requests():
             "max_tokens": 128,
             "system": "You are a coding agent.",
             "messages": [
-                {"role": "user", "content": [
-                    {"type": "tool_result", "tool_use_id": "toolu_1",
-                     "content": [{"type": "text", "text": BIG_TOOL_OUTPUT}]},
-                    {"type": "text", "text": "now fix it"}]},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "toolu_1",
+                            "content": [{"type": "text", "text": BIG_TOOL_OUTPUT}],
+                        },
+                        {"type": "text", "text": "now fix it"},
+                    ],
+                },
             ],
         },
         "headers": {"x-api-key": "client-anthropic-key", "anthropic-version": "2023-06-01"},
@@ -182,8 +221,17 @@ def dialect_requests():
             "bench_id": bid("gemini"),
             "contents": [
                 {"role": "user", "parts": [{"text": "fix the build"}]},
-                {"role": "function", "parts": [{"functionResponse": {
-                    "name": "bash", "response": {"output": BIG_TOOL_OUTPUT}}}]},
+                {
+                    "role": "function",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": "bash",
+                                "response": {"output": BIG_TOOL_OUTPUT},
+                            }
+                        }
+                    ],
+                },
             ],
         },
         "headers": {"x-goog-api-key": "client-gemini-key"},
@@ -199,7 +247,7 @@ def find_ccr_markers(text):
         if i < 0:
             return out
         j = text.find(">>>", i)
-        out.append(text[i:j + 3] if j > 0 else text[i:i + 60])
+        out.append(text[i : j + 3] if j > 0 else text[i : i + 60])
         i = i + 7
 
 
@@ -231,11 +279,13 @@ def run_dialect(name, spec, reps=5):
     tool_calls_intact = None
     if name == "openai-tools" and r["status"] == 200:
         try:
-            direct = json.loads(http("POST", STUB + spec["path"], body_json, spec["headers"])["body"])
+            direct = json.loads(
+                http("POST", STUB + spec["path"], body_json, spec["headers"])["body"]
+            )
             via = json.loads(resp_text)
             a = direct["choices"][0]["message"].get("tool_calls")
             b = via["choices"][0]["message"].get("tool_calls")
-            tool_calls_intact = (json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True))
+            tool_calls_intact = json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
         except Exception as e:
             tool_calls_intact = f"parse-error: {e}"
     result["response_tool_calls_intact"] = tool_calls_intact
@@ -244,21 +294,25 @@ def run_dialect(name, spec, reps=5):
         result["stream_is_sse"] = "text/event-stream" in result["response_content_type"]
         direct = http("POST", STUB + spec["path"], body_json, spec["headers"])
         result["stream_byte_identical"] = direct["body"] == r["body"]
-        result["stream_note"] = ("proxy buffers whole upstream body before replying "
-                                 "(proxy.rs response.bytes().await) - bytes intact but "
-                                 "no incremental delivery")
+        result["stream_note"] = (
+            "proxy buffers whole upstream body before replying "
+            "(proxy.rs response.bytes().await) - bytes intact but "
+            "no incremental delivery"
+        )
 
     # Latency: median over reps, fresh bench_id per rep to dodge response cache.
     prox_ms, direct_ms = [], []
     for i in range(reps):
         b = dict(spec["body"])
-        b["bench_id"] = f'{spec["body"]["bench_id"]}-r{i}'
+        b["bench_id"] = f"{spec['body']['bench_id']}-r{i}"
         bj = json.dumps(b)
         prox_ms.append(http("POST", PROXY + spec["path"], bj, spec["headers"])["ms"])
         direct_ms.append(http("POST", STUB + spec["path"], bj, spec["headers"])["ms"])
     result["latency_proxy_ms_median"] = round(statistics.median(prox_ms), 2)
     result["latency_direct_ms_median"] = round(statistics.median(direct_ms), 2)
-    result["latency_overhead_ms"] = round(result["latency_proxy_ms_median"] - result["latency_direct_ms_median"], 2)
+    result["latency_overhead_ms"] = round(
+        result["latency_proxy_ms_median"] - result["latency_direct_ms_median"], 2
+    )
 
     # Verdict.
     if r["status"] != 200:
@@ -286,22 +340,37 @@ def main():
     signal.signal(signal.SIGINT, lambda *a: (cleanup(), sys.exit(130)))
     signal.signal(signal.SIGTERM, lambda *a: (cleanup(), sys.exit(143)))
 
-    stub = subprocess.Popen([sys.executable, os.path.join(HERE, "mock_upstream.py"), str(STUB_PORT)],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    stub = subprocess.Popen(
+        [sys.executable, os.path.join(HERE, "mock_upstream.py"), str(STUB_PORT)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     PROCS.append(stub)
 
     env = dict(os.environ)
-    env["APHRODITE_CONFIG_PATH"] = "/nonexistent/aphrodite.toml"  # force CLI mode, not repo aphrodite.toml
+    env["APHRODITE_CONFIG_PATH"] = (
+        "/nonexistent/aphrodite.toml"  # force CLI mode, not repo aphrodite.toml
+    )
     proxy_log = open(os.path.join(TMP_DIR, "proxy-19898.log"), "w")
     proxy = subprocess.Popen(
-        [args.proxy_bin,
-         "--mode", "token",
-         "--listen", f"127.0.0.1:{PROXY_PORT}",   # port-override: CLI --listen (env APHRODITE_LISTEN also works)
-         "--api-url", STUB,                        # upstream override: --api-url / APHRODITE_API_URL
-         "--api-key", "bench-proxy-key",
-         "--ccr-db-path", os.path.join(TMP_DIR, "ccr-bench.db"),
-         "--tool-relay"],
-        env=env, stdout=proxy_log, stderr=proxy_log)
+        [
+            args.proxy_bin,
+            "--mode",
+            "token",
+            "--listen",
+            f"127.0.0.1:{PROXY_PORT}",  # port-override: CLI --listen (env APHRODITE_LISTEN also works)
+            "--api-url",
+            STUB,  # upstream override: --api-url / APHRODITE_API_URL
+            "--api-key",
+            "bench-proxy-key",
+            "--ccr-db-path",
+            os.path.join(TMP_DIR, "ccr-bench.db"),
+            "--tool-relay",
+        ],
+        env=env,
+        stdout=proxy_log,
+        stderr=proxy_log,
+    )
     PROCS.append(proxy)
 
     try:
@@ -309,8 +378,10 @@ def main():
             print("FATAL: stub did not come up", file=sys.stderr)
             return 1
         if not wait_healthy(f"{PROXY}/health"):
-            print("FATAL: proxy did not come up on 19898 - see bench/results/tmp/proxy-19898.log",
-                  file=sys.stderr)
+            print(
+                "FATAL: proxy did not come up on 19898 - see bench/results/tmp/proxy-19898.log",
+                file=sys.stderr,
+            )
             return 1
 
         results = []
@@ -323,8 +394,11 @@ def main():
             for m in res["response_markers"]:
                 h = m.split("<<<CCR:")[1].split("|")[0]
                 rr = http("POST", f"{PROXY}/retrieve", json.dumps({"hash": h}))
-                retrieve_check = {"hash": h, "status": rr["status"],
-                                  "found": b"content" in rr["body"] or rr["status"] == 200}
+                retrieve_check = {
+                    "hash": h,
+                    "status": rr["status"],
+                    "found": b"content" in rr["body"] or rr["status"] == 200,
+                }
                 break
             if retrieve_check:
                 break
@@ -345,11 +419,24 @@ def main():
             json.dump(out, f, indent=2)
 
         # stdout table
-        cols = ["dialect", "verdict", "status_via_proxy", "latency_overhead_ms",
-                "request_tool_msgs_compressed", "response_tool_calls_intact"]
+        cols = [
+            "dialect",
+            "verdict",
+            "status_via_proxy",
+            "latency_overhead_ms",
+            "request_tool_msgs_compressed",
+            "response_tool_calls_intact",
+        ]
         widths = [24, 12, 7, 10, 10, 10]
-        print("\n" + " | ".join(c[:w].ljust(w) for c, w in zip(
-            ["dialect", "verdict", "status", "ovhd_ms", "req_tool_z", "tc_intact"], widths)))
+        print(
+            "\n"
+            + " | ".join(
+                c[:w].ljust(w)
+                for c, w in zip(
+                    ["dialect", "verdict", "status", "ovhd_ms", "req_tool_z", "tc_intact"], widths
+                )
+            )
+        )
         print("-" * 90)
         for res in results:
             row = [str(res.get(c, "")) for c in cols]

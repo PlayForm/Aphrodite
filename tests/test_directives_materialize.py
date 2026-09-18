@@ -33,17 +33,19 @@ DYLIB_CANDIDATES = [
 # The embed source of truth: the core crate's builtin_directives/ (included
 # into the binary at compile time via include_str!).
 EMBED_SOURCE_DIR = REPO_ROOT / "crates" / "aphrodite" / "src" / "builtin_directives"
-EMBEDDED_NAMES = sorted(
-    name for name in os.listdir(EMBED_SOURCE_DIR) if name.endswith(".md")
-) if EMBED_SOURCE_DIR.is_dir() else [
-    "ccr-handling.md",
-    "cleanup.md",
-    "explore.md",
-    "focus.md",
-    "foresight.md",
-    "lazy-eval.md",
-    "lazy.md",
-]
+EMBEDDED_NAMES = (
+    sorted(name for name in os.listdir(EMBED_SOURCE_DIR) if name.endswith(".md"))
+    if EMBED_SOURCE_DIR.is_dir()
+    else [
+        "ccr-handling.md",
+        "cleanup.md",
+        "explore.md",
+        "focus.md",
+        "foresight.md",
+        "lazy-eval.md",
+        "lazy.md",
+    ]
+)
 
 
 def main():

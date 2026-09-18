@@ -15,6 +15,7 @@ corpus file x both proxies measures:
 Writes machine-readable JSON to bench/results/ (timestamped) and prints a
 human summary table. Kills the spawned proxy on exit (atexit + signal).
 """
+
 import atexit
 import datetime
 import json
@@ -215,7 +216,9 @@ def main():
 
             after = scrape_metrics(port)
             rec["metrics_delta"] = {
-                k: after.get(k, 0) - before.get(k, 0) for k in METRIC_KEYS if k in after or k in before
+                k: after.get(k, 0) - before.get(k, 0)
+                for k in METRIC_KEYS
+                if k in after or k in before
             }
             results.append(rec)
             print(
@@ -242,10 +245,14 @@ def main():
 
     # Human summary.
     print("\n===== aphrodite proxy bench summary =====")
-    print(f"{'proxy':6s} {'file':24s} {'in(B)':>8s} {'ratio':>10s} {'p50ms':>8s} {'p95ms':>8s} {'p99ms':>8s} {'rt':>4s}")
+    print(
+        f"{'proxy':6s} {'file':24s} {'in(B)':>8s} {'ratio':>10s} {'p50ms':>8s} {'p95ms':>8s} {'p99ms':>8s} {'rt':>4s}"
+    )
     for r in results:
         if "create_error" in r:
-            print(f"{r['proxy']:6s} {r['file']:24s} {r['bytes_in']:8d}  CREATE ERROR: {r['create_error']}")
+            print(
+                f"{r['proxy']:6s} {r['file']:24s} {r['bytes_in']:8d}  CREATE ERROR: {r['create_error']}"
+            )
             continue
         lm = r["latency_ms"]
         rt = "OK" if r.get("roundtrip_identical") else "FAIL"
@@ -258,7 +265,9 @@ def main():
         if rs:
             med_ratio = statistics.median(r["token_savings_ratio"] for r in rs)
             worst_p95 = max(r["latency_ms"]["p95"] for r in rs)
-            print(f"[{mode}] median ratio {med_ratio:.1f}x, worst p95 {worst_p95:.2f}ms over {len(rs)} files")
+            print(
+                f"[{mode}] median ratio {med_ratio:.1f}x, worst p95 {worst_p95:.2f}ms over {len(rs)} files"
+            )
     if findings:
         print(f"\nFINDINGS ({len(findings)}):")
         for f_ in findings:

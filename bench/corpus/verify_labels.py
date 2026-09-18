@@ -177,7 +177,9 @@ def main() -> int:
 
     intended = load_intended()
     if not intended:
-        print("# note: metadata.json missing/unreadable - intended labels unknown; detect-only mode")
+        print(
+            "# note: metadata.json missing/unreadable - intended labels unknown; detect-only mode"
+        )
 
     fixtures = discover_fixtures(intended)
     if not fixtures:
@@ -192,19 +194,31 @@ def main() -> int:
     for name in fixtures:
         detected, conf, note = classify_fixture(name, detector, detector is None)
         want = intended.get(name, "unknown")
-        ok = detected == want and detected not in ("read_error", "decode_error", "detector_error", "heuristic_error")
+        ok = detected == want and detected not in (
+            "read_error",
+            "decode_error",
+            "detector_error",
+            "heuristic_error",
+        )
         if ok:
             matched += 1
             status = "OK"
         else:
             mismatched += 1
-            status = "MISMATCH" if detected not in ("read_error", "decode_error", "detector_error", "heuristic_error") else "ERROR"
+            status = (
+                "MISMATCH"
+                if detected
+                not in ("read_error", "decode_error", "detector_error", "heuristic_error")
+                else "ERROR"
+            )
         conf_s = f" ({conf:.2f})" if conf is not None else ""
         extra = f" [{note}]" if note else ""
         print(f"{name:<24} {want:<16} {detected + conf_s:<16} {status}{extra}")
 
     print("-" * len(hdr))
-    print(f"# summary: {matched} match, {mismatched} mismatch/error across {len(fixtures)} fixtures")
+    print(
+        f"# summary: {matched} match, {mismatched} mismatch/error across {len(fixtures)} fixtures"
+    )
     if detector is None:
         print(f"# {DETECTOR_UNAVAILABLE} - results above are heuristic, not the real classifier")
     return 0

@@ -70,10 +70,10 @@ APHRODITE_BINARY = None  # Resolved at runtime
 
 
 class Scenario(Enum):
-    BASELINE = "baseline"           # Direct to DeepSeek, no proxy
-    FULL = "full"                   # Both cache + token proxies
-    HERMES_PROXY = "hermes_proxy"   # Cache proxy only (tool output compression)
-    PROXY_API = "proxy_api"         # Token proxy only (context window compression)
+    BASELINE = "baseline"  # Direct to DeepSeek, no proxy
+    FULL = "full"  # Both cache + token proxies
+    HERMES_PROXY = "hermes_proxy"  # Cache proxy only (tool output compression)
+    PROXY_API = "proxy_api"  # Token proxy only (context window compression)
 
 
 SCENARIO_METADATA = {
@@ -112,13 +112,15 @@ SCENARIO_METADATA = {
 # Result types
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class TurnResult:
     """Captured result for a single conversation turn."""
+
     turn_index: int
     role: str
-    request: Optional[dict] = None       # The API request sent
-    response: Optional[dict] = None      # The API response received
+    request: Optional[dict] = None  # The API request sent
+    response: Optional[dict] = None  # The API response received
     response_status: Optional[int] = None
     elapsed_ms: float = 0.0
     prompt_tokens: int = 0
@@ -132,6 +134,7 @@ class TurnResult:
 @dataclass
 class ConversationResult:
     """Aggregate result for one conversation under one scenario."""
+
     scenario: str
     conversation_name: str
     turns: list[TurnResult] = field(default_factory=list)
@@ -146,6 +149,7 @@ class ConversationResult:
 @dataclass
 class RunManifest:
     """Top-level manifest for a full benchmark run."""
+
     run_id: str
     timestamp: str
     aphrodite_version: str
@@ -160,6 +164,7 @@ class RunManifest:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Proxy lifecycle management
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class ProxyManager:
     """Manages aphrodite proxy processes for benchmark scenarios."""
@@ -187,11 +192,16 @@ class ProxyManager:
         proc = subprocess.Popen(
             [
                 self.bin_path,
-                "--mode", mode,
-                "--listen", listen,
-                "--api-url", DEEPSEEK_BASE_URL,
-                "--api-key", DEEPSEEK_API_KEY,
-                "--ccr-db-path", str(db_path),
+                "--mode",
+                mode,
+                "--listen",
+                listen,
+                "--api-url",
+                DEEPSEEK_BASE_URL,
+                "--api-key",
+                DEEPSEEK_API_KEY,
+                "--ccr-db-path",
+                str(db_path),
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -203,7 +213,7 @@ class ProxyManager:
         deadline = time.time() + 10
         while time.time() < deadline:
             try:
-                sock = __import__('socket').create_connection(("127.0.0.1", port), timeout=0.5)
+                sock = __import__("socket").create_connection(("127.0.0.1", port), timeout=0.5)
                 sock.close()
                 print(f"  [proxy] {mode} proxy ready on :{port}")
                 return proc
@@ -264,6 +274,7 @@ class ProxyManager:
 # DeepSeek API client (direct, no proxy)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class DeepSeekClient:
     """Direct DeepSeek API client for baseline scenario."""
 
@@ -299,13 +310,16 @@ class DeepSeekClient:
         )
         return {
             "status_code": resp.status_code,
-            "body": resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"raw": resp.text},
+            "body": resp.json()
+            if resp.headers.get("content-type", "").startswith("application/json")
+            else {"raw": resp.text},
         }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Proxy API client
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class ProxyClient:
     """Client that talks to an aphrodite proxy (cache or token)."""
@@ -341,7 +355,9 @@ class ProxyClient:
         )
         return {
             "status_code": resp.status_code,
-            "body": resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"raw": resp.text},
+            "body": resp.json()
+            if resp.headers.get("content-type", "").startswith("application/json")
+            else {"raw": resp.text},
         }
 
     def ccr_create(self, content: str, content_type: str = "text") -> dict:
@@ -372,10 +388,12 @@ class ProxyClient:
 # Estimated token counter (tiktoken when available, char/4 fallback)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def estimate_tokens(text: str) -> int:
     """Estimate token count for a string. Uses tiktoken if available."""
     try:
         import tiktoken
+
         enc = tiktoken.get_encoding("cl100k_base")  # GPT-4 / DeepSeek encoding
         return len(enc.encode(text))
     except (ImportError, Exception):
@@ -406,6 +424,7 @@ def count_message_tokens(messages: list[dict]) -> int:
 # Conversation runner
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ConversationRunner:
     """Runs a Conversation through a specific scenario configuration."""
 
@@ -422,8 +441,8 @@ class ConversationRunner:
         self.output_dir = output_dir
         self.proxy_manager = proxy_manager
         self.deepseek = deepseek_client
-        self.proxy = proxy_client       # Token proxy client (or primary)
-        self.cache = cache_client       # Cache proxy client
+        self.proxy = proxy_client  # Token proxy client (or primary)
+        self.cache = cache_client  # Cache proxy client
         self.turns_dir = output_dir / "turns"
         self.turns_dir.mkdir(parents=True, exist_ok=True)
 
@@ -446,12 +465,12 @@ class ConversationRunner:
         )
 
         # ── Compression simulation parameters ──────────────────────────
-        CACHE_THRESHOLD = 4096       # Cache proxy: compress tool outputs > 4KB
-        TOKEN_ENGINE_PCT = 45        # Token proxy: offload at 45% of 128k context
+        CACHE_THRESHOLD = 4096  # Cache proxy: compress tool outputs > 4KB
+        TOKEN_ENGINE_PCT = 45  # Token proxy: offload at 45% of 128k context
         TOKEN_CONTEXT_MAX = 128_000  # DeepSeek Flash context window
         TOKEN_OFFLOAD_THRESHOLD = int(TOKEN_CONTEXT_MAX * TOKEN_ENGINE_PCT / 100)  # ~57,600
-        PROTECT_FIRST = 2            # Messages to protect at start (system + first)
-        PROTECT_LAST = 5             # Messages to protect at end (recent)
+        PROTECT_FIRST = 2  # Messages to protect at start (system + first)
+        PROTECT_LAST = 5  # Messages to protect at end (recent)
 
         use_cache = self.scenario in (Scenario.FULL, Scenario.HERMES_PROXY)
         use_token = self.scenario in (Scenario.FULL, Scenario.PROXY_API)
@@ -498,8 +517,11 @@ class ConversationRunner:
                     # ── Token proxy simulation: offload old messages if over threshold ──
                     if use_token:
                         self._simulate_token_offload(
-                            messages, TOKEN_OFFLOAD_THRESHOLD,
-                            PROTECT_FIRST, PROTECT_LAST, turn_result
+                            messages,
+                            TOKEN_OFFLOAD_THRESHOLD,
+                            PROTECT_FIRST,
+                            PROTECT_LAST,
+                            turn_result,
                         )
 
                 elif turn.role == "tool":
@@ -513,10 +535,13 @@ class ConversationRunner:
                             turn_result.ccr_events.append(ccr_result)
                             if ccr_result.get("hash"):
                                 compressed_size = ccr_result.get("compressed_size", original_size)
-                                marker = f'<<<CCR:{ccr_result["hash"]}|text|{compressed_size}>>>'
+                                marker = f"<<<CCR:{ccr_result['hash']}|text|{compressed_size}>>>"
                                 content_to_store = marker
                                 savings = original_size - len(marker)
-                                print(f" [CCR: {original_size}→{len(marker)}B ({savings}B saved)]", end="")
+                                print(
+                                    f" [CCR: {original_size}→{len(marker)}B ({savings}B saved)]",
+                                    end="",
+                                )
 
                     tool_msg = {
                         "role": "tool",
@@ -529,7 +554,9 @@ class ConversationRunner:
                     turn_result.prompt_tokens = count_message_tokens(messages)
 
                 turn_result.total_tokens = turn_result.prompt_tokens + turn_result.completion_tokens
-                print(f" (p:{turn_result.prompt_tokens} c:{turn_result.completion_tokens} t:{turn_result.total_tokens})")
+                print(
+                    f" (p:{turn_result.prompt_tokens} c:{turn_result.completion_tokens} t:{turn_result.total_tokens})"
+                )
 
             except Exception as e:
                 turn_result.error = str(e)
@@ -602,13 +629,15 @@ class ConversationRunner:
         messages.clear()
         messages.extend(new_messages)
 
-        turn_result.ccr_events.append({
-            "event": "token_offload",
-            "offloaded_count": offloaded_count,
-            "offloaded_tokens": offloaded_tokens,
-            "remaining_messages": len(messages),
-            "new_total_tokens": count_message_tokens(messages),
-        })
+        turn_result.ccr_events.append(
+            {
+                "event": "token_offload",
+                "offloaded_count": offloaded_count,
+                "offloaded_tokens": offloaded_tokens,
+                "remaining_messages": len(messages),
+                "new_total_tokens": count_message_tokens(messages),
+            }
+        )
 
     def _call_api(self, messages: list[dict]) -> dict:
         """Call the appropriate API for this scenario."""
@@ -621,7 +650,9 @@ class ConversationRunner:
             result["status"] = resp["status_code"]
             if "usage" in result["response"]:
                 result["prompt_tokens"] = result["response"]["usage"].get("prompt_tokens", 0)
-                result["completion_tokens"] = result["response"]["usage"].get("completion_tokens", 0)
+                result["completion_tokens"] = result["response"]["usage"].get(
+                    "completion_tokens", 0
+                )
                 result["total_tokens"] = result["response"]["usage"].get("total_tokens", 0)
         elif self.deepseek:
             # Direct to DeepSeek
@@ -631,7 +662,9 @@ class ConversationRunner:
             result["status"] = resp["status_code"]
             if "usage" in result["response"]:
                 result["prompt_tokens"] = result["response"]["usage"].get("prompt_tokens", 0)
-                result["completion_tokens"] = result["response"]["usage"].get("completion_tokens", 0)
+                result["completion_tokens"] = result["response"]["usage"].get(
+                    "completion_tokens", 0
+                )
                 result["total_tokens"] = result["response"]["usage"].get("total_tokens", 0)
         return result
 
@@ -686,6 +719,7 @@ class ConversationRunner:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main harness
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def resolve_aphrodite_binary() -> str:
     """Find the aphrodite binary. Checks: env var, target/release, target/debug, cargo build."""
@@ -757,10 +791,10 @@ def run_benchmark(
 
     try:
         for scenario in scenarios:
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             print(f"SCENARIO: {scenario.value}")
             print(f"  {SCENARIO_METADATA[scenario]['description']}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             # Start proxies for this scenario
             proxy_manager.start_for_scenario(scenario)
@@ -797,9 +831,11 @@ def run_benchmark(
 
                 # Save summary
                 _save_conversation_summary(conv_dir, conv_result)
-                print(f"    ✓ {len(conv_result.turns)} turns, "
-                      f"{conv_result.total_tokens} tokens, "
-                      f"{len(conv_result.errors)} errors")
+                print(
+                    f"    ✓ {len(conv_result.turns)} turns, "
+                    f"{conv_result.total_tokens} tokens, "
+                    f"{len(conv_result.errors)} errors"
+                )
 
             # Stop proxies between scenarios
             proxy_manager.stop_all()
@@ -837,7 +873,7 @@ def run_benchmark(
     with open(manifest_path, "w") as f:
         json.dump(manifest_data, f, indent=2, default=str)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"BENCHMARK COMPLETE")
     print(f"  Run ID: {run_id}")
     print(f"  Results: {results_dir}")
@@ -890,12 +926,16 @@ def _get_aphrodite_version(bin_path: str) -> str:
 
 def _print_token_summary(manifest: RunManifest):
     """Print a summary table of token usage across scenarios."""
-    print(f"\n{'Scenario':<20} {'Conversation':<20} {'Turns':>6} {'Prompt':>10} {'Completion':>12} {'Total':>10} {'Ms':>8}")
+    print(
+        f"\n{'Scenario':<20} {'Conversation':<20} {'Turns':>6} {'Prompt':>10} {'Completion':>12} {'Total':>10} {'Ms':>8}"
+    )
     print("-" * 86)
     for r in manifest.results:
-        print(f"{r.scenario:<20} {r.conversation_name:<20} {len(r.turns):>6} "
-              f"{r.total_prompt_tokens:>10} {r.total_completion_tokens:>12} "
-              f"{r.total_tokens:>10} {int(r.total_elapsed_ms):>8}")
+        print(
+            f"{r.scenario:<20} {r.conversation_name:<20} {len(r.turns):>6} "
+            f"{r.total_prompt_tokens:>10} {r.total_completion_tokens:>12} "
+            f"{r.total_tokens:>10} {int(r.total_elapsed_ms):>8}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -906,12 +946,16 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Aphrodite Conversational Benchmark")
-    parser.add_argument("--scenario", choices=[s.value for s in Scenario],
-                        help="Run a single scenario (default: all)")
+    parser.add_argument(
+        "--scenario",
+        choices=[s.value for s in Scenario],
+        help="Run a single scenario (default: all)",
+    )
     parser.add_argument("--conversation", help="Run a single conversation (default: all)")
     parser.add_argument("--run-id", help="Custom run ID (default: timestamp)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validate setup without running conversations")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Validate setup without running conversations"
+    )
     args = parser.parse_args()
 
     if args.dry_run:

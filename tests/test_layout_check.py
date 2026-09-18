@@ -62,7 +62,9 @@ def tree_snapshot(root):
 def test_happy_path():
     with tempfile.TemporaryDirectory() as td:
         home, src = make_tree(Path(td))
-        report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite")
+        report = check_and_heal(
+            home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
+        )
         ok(report["mismatches"] == [], f"unexpected mismatches: {report['mismatches']}")
         ok(report["actions_taken"] == [], f"unexpected actions: {report['actions_taken']}")
         ok(report["warnings"] == [], f"unexpected warnings: {report['warnings']}")
@@ -85,7 +87,10 @@ def test_misplaced_config_binaries_db():
         ok((runtime / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01", "binary not moved")
         ok(not (plugin / "ccr.db").exists(), "ccr.db still in plugin dir")
         ok((runtime / "ccr.db").read_text() == "db-bytes", "runtime ccr.db damaged")
-        ok(any("moved" in a for a in report["actions_taken"]), f"no move actions: {report['actions_taken']}")
+        ok(
+            any("moved" in a for a in report["actions_taken"]),
+            f"no move actions: {report['actions_taken']}",
+        )
         ok(any("duplicate" in a for a in report["actions_taken"]), "no dedupe action")
 
 
@@ -103,9 +108,18 @@ def test_plugin_dir_not_symlink():
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         ok(link.is_symlink(), "plugin path was not converted to a symlink")
         ok(link.resolve() == plugin.resolve(), "plugin link points at the wrong target")
-        ok((home / ".hermes" / "aphrodite" / "aphrodite.toml").read_text() == "cfg\n", "config not moved")
-        ok((home / ".hermes" / "aphrodite" / "binaries" / "aphrodite").read_bytes() == b"BB", "binary not moved")
-        ok(any("created symlink" in a for a in report["actions_taken"]), "no symlink creation action")
+        ok(
+            (home / ".hermes" / "aphrodite" / "aphrodite.toml").read_text() == "cfg\n",
+            "config not moved",
+        )
+        ok(
+            (home / ".hermes" / "aphrodite" / "binaries" / "aphrodite").read_bytes() == b"BB",
+            "binary not moved",
+        )
+        ok(
+            any("created symlink" in a for a in report["actions_taken"]),
+            "no symlink creation action",
+        )
 
 
 def test_plugin_dir_not_symlink_nonempty():
@@ -115,7 +129,9 @@ def test_plugin_dir_not_symlink_nonempty():
         link.unlink()
         link.mkdir()
         (link / "user-notes.txt").write_text("keep me")
-        report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite")
+        report = check_and_heal(
+            home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
+        )
         ok(not link.is_symlink(), "non-empty plugin dir was clobbered")
         ok(any("non-empty" in w for w in report["warnings"]), "no non-empty warning")
 
@@ -126,7 +142,9 @@ def test_dangling_plugin_link():
         link = home / ".hermes" / "plugins" / "aphrodite"
         link.unlink()
         link.symlink_to(Path(td) / "gone" / "aphrodite")
-        report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite")
+        report = check_and_heal(
+            home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
+        )
         ok(any("dangling" in m for m in report["mismatches"]), "dangling link not reported")
         ok(any("dangling" in w for w in report["warnings"]), "no warn-and-skip warning")
         ok(link.is_symlink() and not link.resolve().exists(), "dangling link was touched")
@@ -165,7 +183,8 @@ def test_dry_run_no_changes():
         ok(report["dry_run"] is True, "dry_run flag not reported")
         ok(len(report["mismatches"]) >= 3, f"expected mismatches, got {report['mismatches']}")
         ok(
-            report["actions_taken"] and all(a.startswith("would ") for a in report["actions_taken"]),
+            report["actions_taken"]
+            and all(a.startswith("would ") for a in report["actions_taken"]),
             "dry run should only report planned actions",
         )
 
@@ -201,9 +220,14 @@ def test_missing_plugin_link_created():
         home, src = make_tree(Path(td))
         link = home / ".hermes" / "plugins" / "aphrodite"
         link.unlink()
-        report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite")
+        report = check_and_heal(
+            home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
+        )
         ok(link.is_symlink(), "plugin symlink not created")
-        ok(link.resolve() == (src / "plugins" / "aphrodite").resolve(), "plugin symlink wrong target")
+        ok(
+            link.resolve() == (src / "plugins" / "aphrodite").resolve(),
+            "plugin symlink wrong target",
+        )
         ok(any("created symlink" in a for a in report["actions_taken"]), "no create action")
 
 
@@ -217,7 +241,10 @@ def test_missing_home_entirely():
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         ok((home / ".hermes" / "aphrodite").is_dir(), "runtime home not created")
         ok((home / ".hermes" / "plugins" / "aphrodite").is_symlink(), "plugin link not created")
-        ok(any(a.startswith("created directory") for a in report["actions_taken"]), "runtime home action missing")
+        ok(
+            any(a.startswith("created directory") for a in report["actions_taken"]),
+            "runtime home action missing",
+        )
 
 
 def test_destination_differs_skipped():
@@ -242,12 +269,20 @@ def test_stray_plugin_source_in_runtime_home():
         runtime = home / ".hermes" / "aphrodite"
         (runtime / "__init__.py").write_text("# OLD PLUGIN VERSION\n")
         (runtime / "plugin.yaml").write_text("name: old\n")
-        (plugin / "__init__.py").write_text("# CURRENT PLUGIN VERSION\n")  # differs from the stray copy
+        (plugin / "__init__.py").write_text(
+            "# CURRENT PLUGIN VERSION\n"
+        )  # differs from the stray copy
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         ok(not (runtime / "__init__.py").exists(), "stray __init__.py not quarantined")
         ok(not (runtime / "plugin.yaml").exists(), "stray plugin.yaml not quarantined")
-        ok((runtime / ".stale-backup" / "__init__.py").read_text() == "# OLD PLUGIN VERSION\n", "backup missing")
-        ok((runtime / ".stale-backup" / "plugin.yaml").read_text() == "name: old\n", "backup missing")
+        ok(
+            (runtime / ".stale-backup" / "__init__.py").read_text() == "# OLD PLUGIN VERSION\n",
+            "backup missing",
+        )
+        ok(
+            (runtime / ".stale-backup" / "plugin.yaml").read_text() == "name: old\n",
+            "backup missing",
+        )
         ok(any("moved" in a for a in report["actions_taken"]), "no quarantine action")
 
 
@@ -283,7 +318,9 @@ def test_newer_binary_in_plugin_warn_skip():
 
 
 def main():
-    tests = [fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)]
+    tests = [
+        fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)
+    ]
     failed = []
     for fn in tests:
         try:

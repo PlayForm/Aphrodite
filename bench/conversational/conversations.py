@@ -19,11 +19,13 @@ Scripts 4 and 5 additionally exercise the Development release ritual
 from dataclasses import dataclass, field
 from typing import Optional
 
+
 @dataclass
 class ToolCall:
     id: str
     name: str
     arguments: str  # JSON string
+
 
 @dataclass
 class Turn:
@@ -31,6 +33,7 @@ class Turn:
     content: str
     tool_calls: Optional[list[ToolCall]] = None
     tool_call_id: Optional[str] = None  # for tool role responses
+
 
 @dataclass
 class Conversation:
@@ -51,19 +54,25 @@ CODING_TASK = Conversation(
     system_prompt="""You are a Rust programming assistant. The user needs help refactoring a multi-module Rust project. Use tools to read files, make edits, and verify builds. Be thorough and check your work.""",
     turns=[
         # Turn 1: User describes the task
-        Turn(role="user", content="""I have a Rust project with these modules: `src/parser.rs` (tokenizer + AST), `src/codegen.rs` (LLVM IR generation), and `src/main.rs` (CLI driver). The parser and codegen both have their own error types that are almost identical. I want to extract a shared `Error` enum into `src/error.rs` and use it everywhere. Can you help me refactor this?"""),
-
+        Turn(
+            role="user",
+            content="""I have a Rust project with these modules: `src/parser.rs` (tokenizer + AST), `src/codegen.rs` (LLVM IR generation), and `src/main.rs` (CLI driver). The parser and codegen both have their own error types that are almost identical. I want to extract a shared `Error` enum into `src/error.rs` and use it everywhere. Can you help me refactor this?""",
+        ),
         # Turn 2: Assistant reads the files
-        Turn(role="assistant", content="Let me read the current files to understand the error types.",
-             tool_calls=[
-                 ToolCall(id="call_1", name="read_file", arguments='{"path": "src/parser.rs"}'),
-                 ToolCall(id="call_2", name="read_file", arguments='{"path": "src/codegen.rs"}'),
-                 ToolCall(id="call_3", name="read_file", arguments='{"path": "src/main.rs"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Let me read the current files to understand the error types.",
+            tool_calls=[
+                ToolCall(id="call_1", name="read_file", arguments='{"path": "src/parser.rs"}'),
+                ToolCall(id="call_2", name="read_file", arguments='{"path": "src/codegen.rs"}'),
+                ToolCall(id="call_3", name="read_file", arguments='{"path": "src/main.rs"}'),
+            ],
+        ),
         # Turn 3: Tool results - large code files that exercise compression
-        Turn(role="tool", tool_call_id="call_1",
-             content="""// src/parser.rs - Tokenizer + AST + Error types (~180 lines)
+        Turn(
+            role="tool",
+            tool_call_id="call_1",
+            content="""// src/parser.rs - Tokenizer + AST + Error types (~180 lines)
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -199,10 +208,12 @@ impl Parser {
     fn parse_while_loop(&mut self) -> Result<crate::ast::Expr, ParserError> { todo!() }
     fn parse_expr(&mut self) -> Result<crate::ast::Expr, ParserError> { todo!() }
 }
-"""),
-
-        Turn(role="tool", tool_call_id="call_2",
-             content="""// src/codegen.rs - LLVM IR generation + Error types (~160 lines)
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_2",
+            content="""// src/codegen.rs - LLVM IR generation + Error types (~160 lines)
 use std::fmt;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -295,10 +306,12 @@ impl<'ctx> Codegen<'ctx> {
         self.module.verify().map_err(|e| e.to_string())
     }
 }
-"""),
-
-        Turn(role="tool", tool_call_id="call_3",
-             content="""// src/main.rs - CLI driver (~50 lines)
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_3",
+            content="""// src/main.rs - CLI driver (~50 lines)
 use std::env;
 use std::fs;
 use std::process;
@@ -356,10 +369,12 @@ fn main() {
     cg.module().print_to_file("output.ll").unwrap();
     println!("Compiled to output.ll");
 }
-"""),
-
+""",
+        ),
         # Turn 4: Assistant proposes the refactoring
-        Turn(role="assistant", content="""I can see both `ParserError` (in parser.rs) and `CodegenError` (in codegen.rs) share several overlapping variants: UndefinedVariable, TypeMismatch, TooManyArguments. Let me extract the common ones into a shared `error.rs` module.
+        Turn(
+            role="assistant",
+            content="""I can see both `ParserError` (in parser.rs) and `CodegenError` (in codegen.rs) share several overlapping variants: UndefinedVariable, TypeMismatch, TooManyArguments. Let me extract the common ones into a shared `error.rs` module.
 
 Here's my plan:
 1. Create `src/error.rs` with a unified `CompileError` enum
@@ -368,21 +383,32 @@ Here's my plan:
 4. Update imports in all files
 5. Run `cargo build` to verify
 
-Let me make these changes now."""),
-
+Let me make these changes now.""",
+        ),
         # Turn 5: User asks to proceed
         Turn(role="user", content="Go ahead with the changes. Also run the build after."),
-
         # Turn 6: Assistant makes edits
-        Turn(role="assistant", content="Creating the files and running the build.",
-             tool_calls=[
-                 ToolCall(id="call_4", name="write_file", arguments='{"path": "src/error.rs", "content": "// shared error types"}'),
-                 ToolCall(id="call_5", name="terminal", arguments='{"command": "cd /tmp/test_project && cargo build 2>&1"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Creating the files and running the build.",
+            tool_calls=[
+                ToolCall(
+                    id="call_4",
+                    name="write_file",
+                    arguments='{"path": "src/error.rs", "content": "// shared error types"}',
+                ),
+                ToolCall(
+                    id="call_5",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/test_project && cargo build 2>&1"}',
+                ),
+            ],
+        ),
         # Turn 7: Build output - large to exercise compression
-        Turn(role="tool", tool_call_id="call_5",
-             content="""   Compiling mylang v0.1.0 (/tmp/test_project)
+        Turn(
+            role="tool",
+            tool_call_id="call_5",
+            content="""   Compiling mylang v0.1.0 (/tmp/test_project)
 warning: unused import: `std::fmt`
  --> src/codegen.rs:2:5
   |
@@ -433,36 +459,49 @@ Some errors have detailed explanations: E0432, E0433.
 For more information about an error, try `rustc --explain E0432`.
 warning: `mylang` (bin "mylang") generated 3 warnings
 error: could not compile `mylang` (bin "mylang") due to 4 previous errors; 3 warnings emitted
-"""),
-
+""",
+        ),
         # Turn 8: Assistant fixes build errors
-        Turn(role="assistant", content="""The build shows the inkwell dependency is missing from Cargo.toml and the `span`/`ast` modules need to be created. Let me fix these issues:
+        Turn(
+            role="assistant",
+            content="""The build shows the inkwell dependency is missing from Cargo.toml and the `span`/`ast` modules need to be created. Let me fix these issues:
 1. Add `inkwell` to Cargo.toml dependencies
 2. Create the missing `src/ast.rs` and `src/span.rs` stub modules
 3. Declare them in `src/main.rs`
 
-Let me fix everything and rebuild."""),
-
+Let me fix everything and rebuild.""",
+        ),
         # Turn 9: Fixes applied, rebuild
-        Turn(role="assistant", content="",
-             tool_calls=[
-                 ToolCall(id="call_6", name="terminal", arguments='{"command": "cd /tmp/test_project && cargo build 2>&1"}'),
-             ]),
-
-        Turn(role="tool", tool_call_id="call_6",
-             content="""   Compiling mylang v0.1.0 (/tmp/test_project)
+        Turn(
+            role="assistant",
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="call_6",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/test_project && cargo build 2>&1"}',
+                ),
+            ],
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_6",
+            content="""   Compiling mylang v0.1.0 (/tmp/test_project)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.34s
-"""),
-
+""",
+        ),
         # Turn 10: Final summary
-        Turn(role="assistant", content="""The refactoring is complete and the project builds successfully. Here's a summary of what was done:
+        Turn(
+            role="assistant",
+            content="""The refactoring is complete and the project builds successfully. Here's a summary of what was done:
 
 1. **Created `src/error.rs`**: Unified `CompileError` with 7 common variants shared between parser and codegen
 2. **Module structure**: `main.rs` now declares `mod error; mod ast; mod span;` alongside existing modules
 3. **Clean build**: All warnings resolved, no errors
 
-The shared error type eliminates the duplication between `ParserError` and `CodegenError` and will make future error handling additions much simpler."""),
-    ]
+The shared error type eliminates the duplication between `ParserError` and `CodegenError` and will make future error handling additions much simpler.""",
+        ),
+    ],
 )
 
 
@@ -475,15 +514,25 @@ EXPLORATION_TASK = Conversation(
     description="Explore an unfamiliar codebase - search, read many files, understand architecture",
     system_prompt="""You are a software exploration assistant. Help the user understand an unfamiliar codebase by searching for relevant code, reading files, and explaining the architecture. Use search and read tools systematically.""",
     turns=[
-        Turn(role="user", content="""I just joined a project and need to understand its HTTP proxy implementation. The codebase is at `/tmp/proxy_project/`. It seems to handle API requests, compression, and has multiple proxy modes. Can you explore it and give me an architectural overview? Start by finding the main entry points."""),
-
-        Turn(role="assistant", content="Let me explore the project structure and find the key files.",
-             tool_calls=[
-                 ToolCall(id="call_e1", name="search_files", arguments='{"path": "/tmp/proxy_project", "pattern": "*.rs", "target": "files"}'),
-             ]),
-
-        Turn(role="tool", tool_call_id="call_e1",
-             content="""Found 47 Rust source files:
+        Turn(
+            role="user",
+            content="""I just joined a project and need to understand its HTTP proxy implementation. The codebase is at `/tmp/proxy_project/`. It seems to handle API requests, compression, and has multiple proxy modes. Can you explore it and give me an architectural overview? Start by finding the main entry points.""",
+        ),
+        Turn(
+            role="assistant",
+            content="Let me explore the project structure and find the key files.",
+            tool_calls=[
+                ToolCall(
+                    id="call_e1",
+                    name="search_files",
+                    arguments='{"path": "/tmp/proxy_project", "pattern": "*.rs", "target": "files"}',
+                ),
+            ],
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_e1",
+            content="""Found 47 Rust source files:
 
 ./src/main.rs (2.1 KB)
 ./src/lib.rs (4.8 KB)
@@ -533,17 +582,33 @@ EXPLORATION_TASK = Conversation(
 ./src/tools/aphrodite_directive.rs (2.0 KB)
 ./src/tools/aphrodite_reclassify.rs (1.9 KB)
 
-Total: 47 files, ~240 KB of Rust source"""),
-
-        Turn(role="assistant", content="Good, I can see the project structure. Let me read the main entry point, the proxy module, and the config to understand the core architecture.",
-             tool_calls=[
-                 ToolCall(id="call_e2", name="read_file", arguments='{"path": "/tmp/proxy_project/src/main.rs"}'),
-                 ToolCall(id="call_e3", name="read_file", arguments='{"path": "/tmp/proxy_project/src/proxy.rs", "limit": 200}'),
-                 ToolCall(id="call_e4", name="read_file", arguments='{"path": "/tmp/proxy_project/src/config.rs"}'),
-             ]),
-
-        Turn(role="tool", tool_call_id="call_e2",
-             content="""// src/main.rs - Binary entry point for the Aphrodite proxy
+Total: 47 files, ~240 KB of Rust source""",
+        ),
+        Turn(
+            role="assistant",
+            content="Good, I can see the project structure. Let me read the main entry point, the proxy module, and the config to understand the core architecture.",
+            tool_calls=[
+                ToolCall(
+                    id="call_e2",
+                    name="read_file",
+                    arguments='{"path": "/tmp/proxy_project/src/main.rs"}',
+                ),
+                ToolCall(
+                    id="call_e3",
+                    name="read_file",
+                    arguments='{"path": "/tmp/proxy_project/src/proxy.rs", "limit": 200}',
+                ),
+                ToolCall(
+                    id="call_e4",
+                    name="read_file",
+                    arguments='{"path": "/tmp/proxy_project/src/config.rs"}',
+                ),
+            ],
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_e2",
+            content="""// src/main.rs - Binary entry point for the Aphrodite proxy
 //
 // Two modes: `cache` (compress tool results → CCR) and `token`
 // (compress chat completions → CCR offload). Both accept the
@@ -634,10 +699,12 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-"""),
-
-        Turn(role="tool", tool_call_id="call_e3",
-             content="""// src/proxy.rs - HTTP proxy: routes, middleware, compression pipeline
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_e3",
+            content="""// src/proxy.rs - HTTP proxy: routes, middleware, compression pipeline
 //
 // Architecture:
 // ┌──────────────┐     POST /v1/chat/completions      ┌──────────────────┐
@@ -742,10 +809,12 @@ pub async fn chat_completions(
 ) -> impl IntoResponse {
     // ... (200 more lines of handler implementation)
 }
-"""),
-
-        Turn(role="tool", tool_call_id="call_e4",
-             content="""// src/config.rs - Configuration types and loading
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_e4",
+            content="""// src/config.rs - Configuration types and loading
 //
 // Loads from aphrodite.toml, CLI flags, and environment variables.
 // Supports hot-reload via POST /reload and filesystem watcher.
@@ -978,10 +1047,12 @@ impl Config {
     pub async fn load_from_file(path: &str) -> anyhow::Result<Self> { todo!() }
     pub fn hot_reload(&mut self, new: AphroditeConfig) { todo!() }
 }
-"""),
-
+""",
+        ),
         # Architectural summary
-        Turn(role="assistant", content="""Here's the architectural overview of this proxy project:
+        Turn(
+            role="assistant",
+            content="""Here's the architectural overview of this proxy project:
 
 ## Aphrodite Proxy Architecture
 
@@ -1018,8 +1089,9 @@ Client (Hermes) → POST /v1/chat/completions → Aphrodite Proxy
 4. **Storage** (`store.rs`): Stores original content, keyed by content hash (BLAKE3)
 5. **Retrieval** (`retrieve.rs`): Resolves markers back to original content
 
-The architecture is clean and modular - new API providers can be added by implementing a handler in the `handlers/` directory, and new compression strategies go in `compression/`."""),
-    ]
+The architecture is clean and modular - new API providers can be added by implementing a handler in the `handlers/` directory, and new compression strategies go in `compression/`.""",
+        ),
+    ],
 )
 
 
@@ -1032,15 +1104,25 @@ DEBUGGING_TASK = Conversation(
     description="Debug a failing build - search for errors, read files, fix, rebuild, iterate",
     system_prompt="""You are a debugging assistant. Help the user diagnose and fix build errors, test failures, and runtime issues. Use search, file reading, and terminal commands systematically. Always verify fixes by re-running the failing command.""",
     turns=[
-        Turn(role="user", content="""My Rust project won't compile. I'm getting dozens of errors from `cargo build`. The project is at `/tmp/rust_project/`. Can you help me figure out what's wrong? Start by running the build and then we'll fix the errors one by one."""),
-
-        Turn(role="assistant", content="Let me run the build to see what errors we're dealing with.",
-             tool_calls=[
-                 ToolCall(id="call_d1", name="terminal", arguments='{"command": "cd /tmp/rust_project && cargo build 2>&1"}'),
-             ]),
-
-        Turn(role="tool", tool_call_id="call_d1",
-             content="""   Compiling serde v1.0.228
+        Turn(
+            role="user",
+            content="""My Rust project won't compile. I'm getting dozens of errors from `cargo build`. The project is at `/tmp/rust_project/`. Can you help me figure out what's wrong? Start by running the build and then we'll fix the errors one by one.""",
+        ),
+        Turn(
+            role="assistant",
+            content="Let me run the build to see what errors we're dealing with.",
+            tool_calls=[
+                ToolCall(
+                    id="call_d1",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/rust_project && cargo build 2>&1"}',
+                ),
+            ],
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_d1",
+            content="""   Compiling serde v1.0.228
    Compiling serde_json v1.0.150
    Compiling tokio v1.52.3
    Compiling hyper v1.8.1
@@ -1135,9 +1217,11 @@ error[E0425]: cannot find value `CONFIG` in this scope
 Some errors have detailed explanations: E0061, E0277, E0308, E0425, E0432, E0507, E0599.
 For more information about an error, try `rustc --explain E0061`.
 error: could not compile `myproject` (bin "myproject") due to 7 previous errors; 1 warning emitted
-"""),
-
-        Turn(role="assistant", content="""We have 7 errors and 1 warning. Let me tackle them in order of dependency (fixing root causes first, since they often cascade). Let me read the affected files:
+""",
+        ),
+        Turn(
+            role="assistant",
+            content="""We have 7 errors and 1 warning. Let me tackle them in order of dependency (fixing root causes first, since they often cascade). Let me read the affected files:
 
 1. **E0432 + E0425** in `main.rs`: Missing config module - likely the root cause
 2. **E0277** in `models/output.rs`: Missing Serialize derive
@@ -1146,18 +1230,29 @@ error: could not compile `myproject` (bin "myproject") due to 7 previous errors;
 5. **E0507** in `service/processor.rs`: Borrow issue
 6. **E0599** in `api/errors.rs`: Missing method
 
-Let me read the files to understand each error."""),
-
+Let me read the files to understand each error.""",
+        ),
         Turn(role="user", content="Yes, please fix them all. I need this building today."),
-
-        Turn(role="assistant", content="Let me read each failing file and fix the issues.",
-             tool_calls=[
-                 ToolCall(id="call_d2", name="read_file", arguments='{"path": "/tmp/rust_project/src/main.rs"}'),
-                 ToolCall(id="call_d3", name="read_file", arguments='{"path": "/tmp/rust_project/src/models/output.rs"}'),
-             ]),
-
-        Turn(role="tool", tool_call_id="call_d2",
-             content="""// src/main.rs
+        Turn(
+            role="assistant",
+            content="Let me read each failing file and fix the issues.",
+            tool_calls=[
+                ToolCall(
+                    id="call_d2",
+                    name="read_file",
+                    arguments='{"path": "/tmp/rust_project/src/main.rs"}',
+                ),
+                ToolCall(
+                    id="call_d3",
+                    name="read_file",
+                    arguments='{"path": "/tmp/rust_project/src/models/output.rs"}',
+                ),
+            ],
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_d2",
+            content="""// src/main.rs
 use std::env;
 use tokio;
 
@@ -1192,10 +1287,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn connect_to_database(settings: &DatabaseSettings) -> Result<sqlx::PgPool, sqlx::Error> {
     sqlx::PgPool::connect(&settings.url).await
 }
-"""),
-
-        Turn(role="tool", tool_call_id="call_d3",
-             content="""// src/models/output.rs
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_d3",
+            content="""// src/models/output.rs
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
@@ -1220,20 +1317,34 @@ pub struct Output {
     pub status: String,
     pub results: Vec<MyStruct>,
 }
-"""),
-
-        Turn(role="assistant", content="I see the issues. Let me fix all of them now.",
-             tool_calls=[
-                 ToolCall(id="call_d4", name="patch", arguments='{"path": "/tmp/rust_project/src/main.rs", "mode": "replace", "old_string": "use config::DatabaseSettings;", "new_string": "use config::{DatabaseSettings, Config as AppConfig};"}'),
-                 ToolCall(id="call_d5", name="terminal", arguments='{"command": "cd /tmp/rust_project && cargo build 2>&1"}'),
-             ]),
-
-        Turn(role="tool", tool_call_id="call_d5",
-             content="""   Compiling myproject v0.2.0 (/tmp/rust_project)
+""",
+        ),
+        Turn(
+            role="assistant",
+            content="I see the issues. Let me fix all of them now.",
+            tool_calls=[
+                ToolCall(
+                    id="call_d4",
+                    name="patch",
+                    arguments='{"path": "/tmp/rust_project/src/main.rs", "mode": "replace", "old_string": "use config::DatabaseSettings;", "new_string": "use config::{DatabaseSettings, Config as AppConfig};"}',
+                ),
+                ToolCall(
+                    id="call_d5",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/rust_project && cargo build 2>&1"}',
+                ),
+            ],
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_d5",
+            content="""   Compiling myproject v0.2.0 (/tmp/rust_project)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.12s
-"""),
-
-        Turn(role="assistant", content="""All 7 errors are fixed and the project builds cleanly now. Here's what was changed:
+""",
+        ),
+        Turn(
+            role="assistant",
+            content="""All 7 errors are fixed and the project builds cleanly now. Here's what was changed:
 
 1. **main.rs**: Fixed `CONFIG` → `config` (the loaded config variable)
 2. **models/output.rs**: Added `Serialize, Deserialize` derives to `MyStruct` and `Payload`
@@ -1242,8 +1353,9 @@ pub struct Output {
 5. **service/processor.rs**: Changed `record.data` to `record.data.clone()`
 6. **api/errors.rs**: Added the `to_response` method to `ApiError`
 
-The build is green. Your project is ready to use!"""),
-    ]
+The build is green. Your project is ready to use!""",
+        ),
+    ],
 )
 
 
@@ -1258,28 +1370,48 @@ RELEASE_FLOW_TASK = Conversation(
     system_prompt="""You are a release engineering assistant for a two-branch project (Development = workshop, Current = distributed branch). Releases are snapshot transplants, never merges: prepare the bump on Development, run the gates, sync the plugin submodule first, then the parent, restore protected paths (.gitmodules, .github/workflows, the submodule gitlink), float the submodule to the Current tip, tag on Current only, and end with the working copy back on Development. Verify every step with machine-checkable exit codes and never tag on Development.""",
     turns=[
         # Turn 1: User requests the release ritual
-        Turn(role="user", content="""We need to cut the next release: sync Development → Current for Aphrodite v1.4.3 (plugin v2.1.3). The repo is at `/tmp/aphrodite-release/` with the plugin submodule at `plugins/aphrodite`. Walk the full ritual: verify version parity, run the gate set, sync the plugin first, then the parent with the protected-path restore and submodule float, tag on Current only, and end with the working copy back on Development. Keep commands machine-checkable - echo exit codes so we can verify each step."""),
-
+        Turn(
+            role="user",
+            content="""We need to cut the next release: sync Development → Current for Aphrodite v1.4.3 (plugin v2.1.3). The repo is at `/tmp/aphrodite-release/` with the plugin submodule at `plugins/aphrodite`. Walk the full ritual: verify version parity, run the gate set, sync the plugin first, then the parent with the protected-path restore and submodule float, tag on Current only, and end with the working copy back on Development. Keep commands machine-checkable - echo exit codes so we can verify each step.""",
+        ),
         # Turn 2: Assistant checks version parity and tree state
-        Turn(role="assistant", content="Starting the ritual. First verify version parity and a clean tree on Development.",
-             tool_calls=[
-                 ToolCall(id="call_r1", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && git status --short 2>&1; echo EXIT:$?"}'),
-                 ToolCall(id="call_r2", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && grep -n \\\"version\\\" crates/aphrodite/Cargo.toml crates/aphrodite-hermes/Cargo.toml plugins/aphrodite/plugin.yaml plugins/aphrodite/BINARY_VERSION package.json 2>/dev/null; echo EXIT:$?"}'),
-                 ToolCall(id="call_r3", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && git log --oneline -3; echo EXIT:$?"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Starting the ritual. First verify version parity and a clean tree on Development.",
+            tool_calls=[
+                ToolCall(
+                    id="call_r1",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && git status --short 2>&1; echo EXIT:$?"}',
+                ),
+                ToolCall(
+                    id="call_r2",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && grep -n \\"version\\" crates/aphrodite/Cargo.toml crates/aphrodite-hermes/Cargo.toml plugins/aphrodite/plugin.yaml plugins/aphrodite/BINARY_VERSION package.json 2>/dev/null; echo EXIT:$?"}',
+                ),
+                ToolCall(
+                    id="call_r3",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && git log --oneline -3; echo EXIT:$?"}',
+                ),
+            ],
+        ),
         # Turn 3: Tool results - clean tree, version parity, recent commits
-        Turn(role="tool", tool_call_id="call_r1",
-             content="""On branch Development
+        Turn(
+            role="tool",
+            tool_call_id="call_r1",
+            content="""On branch Development
 Your branch is up to date with 'Source/Development'.
 
 nothing to commit, working tree clean
 
 EXIT:0
-"""),
-
-        Turn(role="tool", tool_call_id="call_r2",
-             content="""crates/aphrodite/Cargo.toml:1:[package]
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_r2",
+            content="""crates/aphrodite/Cargo.toml:1:[package]
 crates/aphrodite/Cargo.toml:3:version = "1.4.3"
 crates/aphrodite-hermes/Cargo.toml:3:version = "1.4.3"
 crates/aphrodite-hermes/Cargo.toml:18:aphrodite = { version = "1.4.3", path = "../aphrodite" }
@@ -1289,26 +1421,44 @@ package.json:3:"version": "1.4.3"
 
 Version parity OK: binary 1.4.3, plugin 2.1.3 (monotonic vs 1.4.2 / 2.1.2 on Current)
 EXIT:0
-"""),
-
-        Turn(role="tool", tool_call_id="call_r3",
-             content="""a1b2c3d (HEAD -> Development) chore: bump v1.4.3 (binary) + v2.1.3 (plugin)
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_r3",
+            content="""a1b2c3d (HEAD -> Development) chore: bump v1.4.3 (binary) + v2.1.3 (plugin)
 e4f5a6b feat: add classifier pre-filter for clean outputs
 9c8d7e6 fix: poll worker reconnects on proxy restart
 EXIT:0
-"""),
-
+""",
+        ),
         # Turn 4: Assistant runs the gate set
-        Turn(role="assistant", content="Versions match and the tree is clean - the bump commit is on Development. Running the gates: clippy with -D warnings, advisory scan, and the import check.",
-             tool_calls=[
-                 ToolCall(id="call_r4", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && cargo clippy -p aphrodite -p aphrodite-hermes -- -D warnings 2>&1 | tail -40; echo EXIT:${PIPESTATUS[0]}"}'),
-                 ToolCall(id="call_r5", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && cargo deny check advisories 2>&1; echo EXIT:$?"}'),
-                 ToolCall(id="call_r6", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && python3 -c \\\"import aphrodite\\\" 2>&1; echo EXIT:$?"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Versions match and the tree is clean - the bump commit is on Development. Running the gates: clippy with -D warnings, advisory scan, and the import check.",
+            tool_calls=[
+                ToolCall(
+                    id="call_r4",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && cargo clippy -p aphrodite -p aphrodite-hermes -- -D warnings 2>&1 | tail -40; echo EXIT:${PIPESTATUS[0]}"}',
+                ),
+                ToolCall(
+                    id="call_r5",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && cargo deny check advisories 2>&1; echo EXIT:$?"}',
+                ),
+                ToolCall(
+                    id="call_r6",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && python3 -c \\"import aphrodite\\" 2>&1; echo EXIT:$?"}',
+                ),
+            ],
+        ),
         # Turn 5: Tool results - large clippy build output, deny scan, import check
-        Turn(role="tool", tool_call_id="call_r4",
-             content="""   Compiling proc-macro2 v1.0.86
+        Turn(
+            role="tool",
+            tool_call_id="call_r4",
+            content="""   Compiling proc-macro2 v1.0.86
    Compiling quote v1.0.36
    Compiling syn v2.0.72
    Compiling unicode-ident v1.0.12
@@ -1445,36 +1595,50 @@ EXIT:0
 
 clippy gate: PASS (-D warnings, 0 warnings emitted)
 EXIT:0
-"""),
-
-        Turn(role="tool", tool_call_id="call_r5",
-             content="""[fetch] advisory DB: crates.io-advisories (frozen)
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_r5",
+            content="""[fetch] advisory DB: crates.io-advisories (frozen)
 [fetch] lock file: /tmp/aphrodite-release/Cargo.lock
 [analyze] Scanning 214 crates for vulnerabilities...
 [analyze] Found 0 vulnerabilities
 [analyze] 0 ignored, 0 error-level, 0 warning-level
 deny gate: PASS (0 advisories)
 EXIT:0
-"""),
-
-        Turn(role="tool", tool_call_id="call_r6",
-             content="""aphrodite loaded from /tmp/aphrodite-release/target/release
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_r6",
+            content="""aphrodite loaded from /tmp/aphrodite-release/target/release
 import gate: PASS
 EXIT:0
-"""),
-
+""",
+        ),
         # Turn 6: User approves the sync
-        Turn(role="user", content="All gates are green. Proceed with the sync: plugin first, then the parent. Remember the protected-path restore and submodule float, and keep the tag on Current only."),
-
+        Turn(
+            role="user",
+            content="All gates are green. Proceed with the sync: plugin first, then the parent. Remember the protected-path restore and submodule float, and keep the tag on Current only.",
+        ),
         # Turn 7: Assistant syncs the plugin submodule (S-Dev → S-Current)
-        Turn(role="assistant", content="Syncing the plugin first - the parent's gitlink must reference the released plugin.",
-             tool_calls=[
-                 ToolCall(id="call_r7", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release/plugins/aphrodite && git checkout Current 2>&1 && git merge --squash Development 2>&1 && git commit -m \\\"release: sync v2.1.3 from Development\\\" 2>&1 && git tag v2.1.3 2>&1 && git push Source Current --tags 2>&1; echo EXIT:$?"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Syncing the plugin first - the parent's gitlink must reference the released plugin.",
+            tool_calls=[
+                ToolCall(
+                    id="call_r7",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release/plugins/aphrodite && git checkout Current 2>&1 && git merge --squash Development 2>&1 && git commit -m \\"release: sync v2.1.3 from Development\\" 2>&1 && git tag v2.1.3 2>&1 && git push Source Current --tags 2>&1; echo EXIT:$?"}',
+                ),
+            ],
+        ),
         # Turn 8: Tool result - plugin sync output
-        Turn(role="tool", tool_call_id="call_r7",
-             content="""Switched to branch 'Current'
+        Turn(
+            role="tool",
+            tool_call_id="call_r7",
+            content="""Switched to branch 'Current'
 Your branch is up to date with 'Source/Current'.
 Squash commit -- not updating HEAD
  Automatic merge went well; stopped before committing as requested
@@ -1487,17 +1651,25 @@ To /tmp/mirrors/aphrodite-hermes.git
 
 plugin sync: PASS (v2.1.3 tagged on S-Current)
 EXIT:0
-"""),
-
+""",
+        ),
         # Turn 9: Assistant syncs the parent (P-Dev → P-Current) + tag
-        Turn(role="assistant", content="Plugin is on Current at v2.1.3. Now the parent sync: clean-tree check, squash Development into Current, restore protected paths, float the submodule to S-Current, verify, commit, tag, push, and return to Development.",
-             tool_calls=[
-                 ToolCall(id="call_r8", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && test -z \\\"$(git status --porcelain)\\\" && echo TREE_CLEAN && git checkout Current 2>&1 && git pull --ff-only Source Current 2>&1 && git merge --squash Development 2>&1 && git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite && git -C plugins/aphrodite fetch Source Current 2>&1 && git -C plugins/aphrodite checkout -B Current Source/Current 2>&1 && git add plugins/aphrodite && test -z \\\"$(git diff --cached --name-only -- .gitmodules .github/workflows)\\\" && echo PROTECTED_PATHS_RESTORED && git commit -m \\\"release: sync v1.4.3 from Development\\\" 2>&1 && git tag Aphrodite/v1.4.3 2>&1 && git push Source Current --tags 2>&1 && git checkout Development 2>&1; echo EXIT:$?"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Plugin is on Current at v2.1.3. Now the parent sync: clean-tree check, squash Development into Current, restore protected paths, float the submodule to S-Current, verify, commit, tag, push, and return to Development.",
+            tool_calls=[
+                ToolCall(
+                    id="call_r8",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && test -z \\"$(git status --porcelain)\\" && echo TREE_CLEAN && git checkout Current 2>&1 && git pull --ff-only Source Current 2>&1 && git merge --squash Development 2>&1 && git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite && git -C plugins/aphrodite fetch Source Current 2>&1 && git -C plugins/aphrodite checkout -B Current Source/Current 2>&1 && git add plugins/aphrodite && test -z \\"$(git diff --cached --name-only -- .gitmodules .github/workflows)\\" && echo PROTECTED_PATHS_RESTORED && git commit -m \\"release: sync v1.4.3 from Development\\" 2>&1 && git tag Aphrodite/v1.4.3 2>&1 && git push Source Current --tags 2>&1 && git checkout Development 2>&1; echo EXIT:$?"}',
+                ),
+            ],
+        ),
         # Turn 10: Tool result - large parent sync output with diffstat
-        Turn(role="tool", tool_call_id="call_r8",
-             content="""TREE_CLEAN
+        Turn(
+            role="tool",
+            tool_call_id="call_r8",
+            content="""TREE_CLEAN
 Switched to branch 'Current'
 Your branch is up to date with 'Source/Current'.
 Squash commit -- not updating HEAD
@@ -1578,27 +1750,37 @@ Your branch is up to date with 'Source/Development'.
 
 parent sync: PASS (Aphrodite/v1.4.3 tagged on Current, worktree back on Development)
 EXIT:0
-"""),
-
+""",
+        ),
         # Turn 11: Assistant runs final invariant verification
-        Turn(role="assistant", content="Sync complete. Final verification pass - branch, submodule pin, and tag placement.",
-             tool_calls=[
-                 ToolCall(id="call_r9", name="terminal", arguments='{"command": "cd /tmp/aphrodite-release && git branch --show-current && git submodule status && git -C plugins/aphrodite describe --tags --exact-match HEAD 2>/dev/null; git describe --tags 2>/dev/null || echo NO_TAGS_ON_DEVELOPMENT; echo EXIT:$?"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Sync complete. Final verification pass - branch, submodule pin, and tag placement.",
+            tool_calls=[
+                ToolCall(
+                    id="call_r9",
+                    name="terminal",
+                    arguments='{"command": "cd /tmp/aphrodite-release && git branch --show-current && git submodule status && git -C plugins/aphrodite describe --tags --exact-match HEAD 2>/dev/null; git describe --tags 2>/dev/null || echo NO_TAGS_ON_DEVELOPMENT; echo EXIT:$?"}',
+                ),
+            ],
+        ),
         # Turn 12: Tool result - verification output
-        Turn(role="tool", tool_call_id="call_r9",
-             content="""Development
+        Turn(
+            role="tool",
+            tool_call_id="call_r9",
+            content="""Development
  5f6e7d8... plugins/aphrodite (v2.1.3)
 v2.1.3
 NO_TAGS_ON_DEVELOPMENT
 
 verify: PASS (worktree on Development, submodule pinned with no '+', tags live on Current only)
 EXIT:0
-"""),
-
+""",
+        ),
         # Turn 13: Final release summary
-        Turn(role="assistant", content="""The Development → Current release ritual is complete. Summary:
+        Turn(
+            role="assistant",
+            content="""The Development → Current release ritual is complete. Summary:
 
 1. **Version parity** - binary 1.4.3 (Cargo.toml, package.json), plugin 2.1.3 (plugin.yaml, BINARY_VERSION); monotonic vs 1.4.2/2.1.2 on Current.
 2. **Gates** - clippy `-D warnings` PASS, `cargo deny check advisories` PASS (0 of 214 crates vulnerable), import check PASS.
@@ -1606,8 +1788,9 @@ EXIT:0
 4. **Parent sync** (P-Dev → P-Current) - clean tree confirmed, Development squashed into Current (55 files), protected paths (`.gitmodules`, `.github/workflows`, submodule gitlink) restored from HEAD, submodule floated to S-Current tip, commit `9a8b7c6 release: sync v1.4.3`, tagged `Aphrodite/v1.4.3`, pushed.
 5. **Invariants** - worktree on Development (I10), submodule status clean with no `+` (I2), tags on Current only (V5), versions monotonic (I8).
 
-Ready for the GitHub release from the `Aphrodite/v1.4.3` tag."""),
-    ]
+Ready for the GitHub release from the `Aphrodite/v1.4.3` tag.""",
+        ),
+    ],
 )
 
 
@@ -1622,18 +1805,32 @@ COMPRESSION_AWARE_TASK = Conversation(
     system_prompt="""You are a context-frugal assistant operating under an aggressive token budget. CCR (context compression) is available: aphrodite_prefetch stores whole files as markers, aphrodite_search returns compact hits with previews, aphrodite_catalog lists stored entries, and aphrodite_retrieve expands a marker only when its content is actually needed. Never pull raw content you do not need - prefer markers and previews, and retrieve at most the exact entries required to answer. State explicitly what you chose NOT to expand.""",
     turns=[
         # Turn 1: User requests exploration under a tight context budget
-        Turn(role="user", content="""I need to understand how the Aphrodite compression pipeline classifies tool output - the content types, the thresholds, and how previews are generated. The source is at `/tmp/aphrodite-src/` (compression module under `src/compression/`). I am on a tight context budget, so treat every token as expensive: use CCR aggressively - prefetch whole files as markers, show previews instead of raw output, and retrieve only the exact entry you need. Do not dump full file contents into context."""),
-
+        Turn(
+            role="user",
+            content="""I need to understand how the Aphrodite compression pipeline classifies tool output - the content types, the thresholds, and how previews are generated. The source is at `/tmp/aphrodite-src/` (compression module under `src/compression/`). I am on a tight context budget, so treat every token as expensive: use CCR aggressively - prefetch whole files as markers, show previews instead of raw output, and retrieve only the exact entry you need. Do not dump full file contents into context.""",
+        ),
         # Turn 2: Assistant prefetches into CCR and searches
-        Turn(role="assistant", content="Understood - strategy: prefetch the core pipeline files into CCR as markers, search for the classification logic to find the exact entry, then retrieve only that one entry when answering.",
-             tool_calls=[
-                 ToolCall(id="call_c1", name="aphrodite_prefetch", arguments='{"files": ["/tmp/aphrodite-src/src/compression/classifier.rs", "/tmp/aphrodite-src/src/compression/engine.rs", "/tmp/aphrodite-src/src/compression/marker.rs", "/tmp/aphrodite-src/src/compression/store.rs"]}'),
-                 ToolCall(id="call_c2", name="aphrodite_search", arguments='{"query": "classify content type threshold preview", "type": "code"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Understood - strategy: prefetch the core pipeline files into CCR as markers, search for the classification logic to find the exact entry, then retrieve only that one entry when answering.",
+            tool_calls=[
+                ToolCall(
+                    id="call_c1",
+                    name="aphrodite_prefetch",
+                    arguments='{"files": ["/tmp/aphrodite-src/src/compression/classifier.rs", "/tmp/aphrodite-src/src/compression/engine.rs", "/tmp/aphrodite-src/src/compression/marker.rs", "/tmp/aphrodite-src/src/compression/store.rs"]}',
+                ),
+                ToolCall(
+                    id="call_c2",
+                    name="aphrodite_search",
+                    arguments='{"query": "classify content type threshold preview", "type": "code"}',
+                ),
+            ],
+        ),
         # Turn 3: Tool results - markers + previews, compact search hits
-        Turn(role="tool", tool_call_id="call_c1",
-             content="""Prefetched 4 files → CCR markers (no raw content pulled into context):
+        Turn(
+            role="tool",
+            tool_call_id="call_c1",
+            content="""Prefetched 4 files → CCR markers (no raw content pulled into context):
 
   src/compression/classifier.rs   → <<<CCR:a3f9c21e7b04d5f8a6c3e2d1b9f8472a|code|5231>>>   [preview: ContentType enum, threshold table, preview generation]
   src/compression/engine.rs       → <<<CCR:7e2b8d4f6a1c9e3b5d7f8a2c4e6b1d9f0|code|12440>>>  [preview: pipeline orchestration, classifier → marker → store]
@@ -1641,10 +1838,12 @@ COMPRESSION_AWARE_TASK = Conversation(
   src/compression/store.rs        → <<<CCR:9d2f5a8b1c4e7d0a3b6f9c2e5a8d1b4f|code|8941>>>   [preview: hash-keyed storage, BLAKE3, TTL expiry]
 
 Stored 4 markers: ~29.9 KB raw → ~600 B of markers/previews in context.
-"""),
-
-        Turn(role="tool", tool_call_id="call_c2",
-             content="""Search 'classify content type threshold preview' (type=code) - 6 hits:
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_c2",
+            content="""Search 'classify content type threshold preview' (type=code) - 6 hits:
 
   src/compression/classifier.rs:12    ContentType enum: Code, Diff, BuildOutput, Error, Json, Terminal, Git, Text
   src/compression/classifier.rs:41    fn classify(&self, output: &str) -> ContentType
@@ -1654,18 +1853,22 @@ Stored 4 markers: ~29.9 KB raw → ~600 B of markers/previews in context.
   src/compression/preview.rs:15       preview_max_chars default 400
 
 Hits 1-4 are inside the prefetched classifier.rs marker - retrieve that one entry if needed.
-"""),
-
+""",
+        ),
         # Turn 4: Assistant checks catalog + stats without expanding anything
-        Turn(role="assistant", content="Prefetch returned markers only (~29.9 KB of raw source stayed out of context) and search returned compact hits with line numbers. Checking the catalog and session stats to confirm what is storable.",
-             tool_calls=[
-                 ToolCall(id="call_c3", name="aphrodite_catalog", arguments='{"mode": "compact"}'),
-                 ToolCall(id="call_c4", name="aphrodite_stats", arguments="{}"),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="Prefetch returned markers only (~29.9 KB of raw source stayed out of context) and search returned compact hits with line numbers. Checking the catalog and session stats to confirm what is storable.",
+            tool_calls=[
+                ToolCall(id="call_c3", name="aphrodite_catalog", arguments='{"mode": "compact"}'),
+                ToolCall(id="call_c4", name="aphrodite_stats", arguments="{}"),
+            ],
+        ),
         # Turn 5: Tool results - compact catalog + stats
-        Turn(role="tool", tool_call_id="call_c3",
-             content="""CCR catalog (compact, 4 entries):
+        Turn(
+            role="tool",
+            tool_call_id="call_c3",
+            content="""CCR catalog (compact, 4 entries):
 
   # | type | size  | marker                                                              | source
   1 | code | 5231  | <<<CCR:a3f9c21e7b04d5f8a6c3e2d1b9f8472a|code|5231>>>                 | classifier.rs
@@ -1674,10 +1877,12 @@ Hits 1-4 are inside the prefetched classifier.rs marker - retrieve that one entr
   4 | code | 8941  | <<<CCR:9d2f5a8b1c4e7d0a3b6f9c2e5a8d1b4f|code|8941>>>              | store.rs
 
 All four entries already stored; engine.rs is the largest (12.4 KB) - left as a marker unless needed.
-"""),
-
-        Turn(role="tool", tool_call_id="call_c4",
-             content="""Session stats:
+""",
+        ),
+        Turn(
+            role="tool",
+            tool_call_id="call_c4",
+            content="""Session stats:
 
   entries_created:       4
   entries_retrieved:     0
@@ -1686,20 +1891,30 @@ All four entries already stored; engine.rs is the largest (12.4 KB) - left as a 
   markers_in_context:    4
   raw_bytes_in_context:  0
   estimated_tokens_saved: ~7000
-"""),
-
+""",
+        ),
         # Turn 6: User asks a specific question
-        Turn(role="user", content="Good. Specifically - how does classifier.rs decide the content type at the threshold boundary, and what does a generated preview look like?"),
-
+        Turn(
+            role="user",
+            content="Good. Specifically - how does classifier.rs decide the content type at the threshold boundary, and what does a generated preview look like?",
+        ),
         # Turn 7: Assistant does ONE targeted retrieve
-        Turn(role="assistant", content="One targeted retrieve - the classifier entry only. engine.rs, marker.rs, and store.rs stay as markers.",
-             tool_calls=[
-                 ToolCall(id="call_c5", name="aphrodite_retrieve", arguments='{"hash": "a3f9c21e7b04d5f8a6c3e2d1b9f8472a"}'),
-             ]),
-
+        Turn(
+            role="assistant",
+            content="One targeted retrieve - the classifier entry only. engine.rs, marker.rs, and store.rs stay as markers.",
+            tool_calls=[
+                ToolCall(
+                    id="call_c5",
+                    name="aphrodite_retrieve",
+                    arguments='{"hash": "a3f9c21e7b04d5f8a6c3e2d1b9f8472a"}',
+                ),
+            ],
+        ),
         # Turn 8: Tool result - retrieved classifier.rs (large, gets CCR'd again under the cache proxy)
-        Turn(role="tool", tool_call_id="call_c5",
-             content="""// src/compression/classifier.rs - content-type detection for CCR
+        Turn(
+            role="tool",
+            tool_call_id="call_c5",
+            content="""// src/compression/classifier.rs - content-type detection for CCR
 //
 // The classifier is the pre-filter of the compression pipeline. It looks
 // at a tool output and decides (a) which ContentType it is and (b) whether
@@ -1877,10 +2092,12 @@ mod tests {
         assert!(!c.should_compress(ContentType::Terminal, 1023));
     }
 }
-"""),
-
+""",
+        ),
         # Turn 9: Assistant answers from the single retrieved entry
-        Turn(role="assistant", content="""Retrieved classifier.rs only (5.2 KB). From it:
+        Turn(
+            role="assistant",
+            content="""Retrieved classifier.rs only (5.2 KB). From it:
 
 **Classification:** `classify()` scores each line by shape - leading tokens (`//` → code, `diff --git` → diff, `error[E...]` → error, `{`-heavy → json, `Compiling`/`Finished` → build_output, `On branch`/`EXIT:` → git) and picks the highest-scoring ContentType; ties and clean outputs fall back to Text (the poll pre-filter).
 
@@ -1888,13 +2105,17 @@ mod tests {
 
 **Preview:** the first `preview_max_chars` (default 400) chars plus a structure map of function/struct names. The preview is what a marker expands to in prompts - the full body stays in CCR until `aphrodite_retrieve`.
 
-Not expanded: engine.rs (12.4 KB), store.rs (8.9 KB), marker.rs (3.2 KB) - all still markers. One entry retrieved out of four."""),
-
+Not expanded: engine.rs (12.4 KB), store.rs (8.9 KB), marker.rs (3.2 KB) - all still markers. One entry retrieved out of four.""",
+        ),
         # Turn 10: User asks for the token-saving summary
-        Turn(role="user", content="That answers it. Now summarize the token-saving decisions you made this session."),
-
+        Turn(
+            role="user",
+            content="That answers it. Now summarize the token-saving decisions you made this session.",
+        ),
         # Turn 11: Final summary of context-minimization choices
-        Turn(role="assistant", content="""Token-frugal decisions, in order:
+        Turn(
+            role="assistant",
+            content="""Token-frugal decisions, in order:
 
 1. **Prefetch, not read** - 4 files (~29.9 KB raw) became 4 CCR markers + previews (~600 B in context). Raw content never entered context.
 2. **Search with previews** - `aphrodite_search` returned 6 compact hits with line numbers instead of grepping full files.
@@ -1902,12 +2123,19 @@ Not expanded: engine.rs (12.4 KB), store.rs (8.9 KB), marker.rs (3.2 KB) - all s
 4. **Retrieve-only-when-needed** - exactly one `aphrodite_retrieve` (classifier.rs, the entry the question needed); the other 3 markers stayed unexpanded.
 5. **Preview-over-raw reporting** - answered from the preview plus the single retrieved body; quoted only the needed lines.
 
-Net effect: ~29.9 KB of source stayed out of context - roughly 7000 tokens saved versus reading the files raw. This is the behavior the compression proxy is designed to enable: markers replace bulk, retrieval is opt-in per question."""),
-    ]
+Net effect: ~29.9 KB of source stayed out of context - roughly 7000 tokens saved versus reading the files raw. This is the behavior the compression proxy is designed to enable: markers replace bulk, retrieval is opt-in per question.""",
+        ),
+    ],
 )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # All scripts registry
 # ═══════════════════════════════════════════════════════════════════════════════
-ALL_CONVERSATIONS = [CODING_TASK, EXPLORATION_TASK, DEBUGGING_TASK, RELEASE_FLOW_TASK, COMPRESSION_AWARE_TASK]
+ALL_CONVERSATIONS = [
+    CODING_TASK,
+    EXPLORATION_TASK,
+    DEBUGGING_TASK,
+    RELEASE_FLOW_TASK,
+    COMPRESSION_AWARE_TASK,
+]
