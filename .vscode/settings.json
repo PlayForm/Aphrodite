@@ -61,6 +61,12 @@
   },
   "prettier.requireConfig": true,
   "prettier.ignorePath": ".prettierignore",
+  // Ruff keys ported from Current for editor parity (c5cbed8/589807a era).
+  // lineLength is redundant with ruff.toml (source of truth), kept for
+  // parity; organizeImports/showSyntaxErrors mirror Current's bindings.
+  "ruff.lineLength": 100,
+  "ruff.organizeImports": true,
+  "ruff.showSyntaxErrors": true,
 
   "files.exclude": {
     "**/target": true,

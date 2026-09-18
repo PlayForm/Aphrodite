@@ -71,7 +71,7 @@ active = []                        # e.g. ["focus", "foresight"]
 `active` only seeds which loaded directives start active. Names not found in
 the loaded set are filtered out rather than erroring. Everything else -
 activation, deactivation, stacking - happens at runtime through the tool
-below. See [aphrodite.toml Configuration](../config/aphrodite-toml.md#directives)
+below. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md#directives)
 for where this section sits in the full schema.
 
 ## Injection mechanics
@@ -104,7 +104,7 @@ travels, under the combined 4,000-char cap.
 ## The `aphrodite_directive` tool
 
 Registered in the Hermes bridge's tool registry with this schema (see
-[Tool Relay: Tools](../tool-relay/tools.md#7-aphrodite_directive) for its
+[Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md#7-aphrodite_directive) for its
 place in the full 13-tool reference):
 
 ```json
@@ -151,7 +151,7 @@ per-process state, not per-turn.
 
 ## See also
 
-- [Plugin Hooks](hooks.md) - the `pre_llm_call` lifecycle this feature rides
-- [Tool Relay: Tools](../tool-relay/tools.md) - full tool reference
-- [aphrodite.toml Configuration](../config/aphrodite-toml.md) - the `[directives]` section in context
-- [Environment Variables](../config/env-vars.md) - the separate config path that feeds the dylib session
+- [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md) - the `pre_llm_call` lifecycle this feature rides
+- [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md) - full tool reference
+- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md) - the `[directives]` section in context
+- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md) - the separate config path that feeds the dylib session

@@ -6,7 +6,7 @@ compressed aggressively. Both the Rust proxy and the Python plugin implement
 their own classifiers, each with a distinct type registry and detection order.
 
 Once a type is chosen, the marker's human-readable preview is built per-type -
-see [Enriched Preview Catalog](../proxy/compression.md#enriched-preview-catalog)
+see [Enriched Preview Catalog](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/compression.md#enriched-preview-catalog)
 for the shape each content type produces (git status, git log, grep, ls, test,
 build, diff, code, terminal, and the plain-text fallback).
 

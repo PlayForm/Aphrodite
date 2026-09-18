@@ -50,10 +50,10 @@ side-effect-free PID probe, install-flow auto-download), and lands real-corpus
 benchmark tooling. Binary `1.4.2 → 1.4.3`, plugin `2.1.2 → 2.1.3`.
 
 - **Feature (release pipeline):** release preparation now runs on `Development`
-  - the release script derives `RELEASE_BRANCH` from the current HEAD instead of
-  hardcoding a branch, and `Check.yml`/`Build.yml` workflow triggers are
-  restricted to the `Development` branch (tags + GitHub releases remain a
-  `Current`-side ceremony).
+    - the release script derives `RELEASE_BRANCH` from the current HEAD instead of
+      hardcoding a branch, and `Check.yml`/`Build.yml` workflow triggers are
+      restricted to the `Development` branch (tags + GitHub releases remain a
+      `Current`-side ceremony).
 - **Feature (directives):** `APHRODITE_DIRECTIVES_DIR` environment override is
   now the first candidate in directives discovery (`config_loader.rs`), with
   intentional-empty semantics in `directives.rs` - an empty-but-set dir is a
@@ -820,7 +820,7 @@ runtime code changes.
 2026-06-21 to 2026-07-10), bringing in CCR/TLS/output-shaping improvements while
 preserving every Aphrodite-specific customization. Full breakdown, including every
 silent merge regression found and fixed, in
-[`docs/HEADROOM-FORK-DIFF.md`](../docs/HEADROOM-FORK-DIFF.md#2026-07-11-merge-upstream-sync-to-5e14b8c0).
+[`docs/HEADROOM-FORK-DIFF.md`](https://github.com/PlayForm/Aphrodite/tree/Current/docs/HEADROOM-FORK-DIFF.md#2026-07-11-merge-upstream-sync-to-5e14b8c0).
 
 Highlights:
 

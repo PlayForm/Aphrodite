@@ -2,7 +2,7 @@
 
 Everything below also works on Windows if you have Git Bash, WSL, or MSYS -
 these are all POSIX shell scripts. If you're on native PowerShell/`cmd.exe`,
-use [Windows install](windows.md) instead - `download.ps1` is the direct
+use [Windows install](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/windows.md) instead - `download.ps1` is the direct
 PowerShell equivalent of `download.sh`.
 
 ## Option 1: Hermes plugin, auto-download (recommended for most users)
@@ -25,7 +25,7 @@ bash download.sh                 # auto-detects version + platform
 `download.sh` resolves the version to fetch automatically (a bundled version
 file, the monorepo's own version, or the latest published release) and
 detects your platform automatically too. No Rust toolchain needed. If the
-proxy never comes up, see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
+proxy never comes up, see [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#proxy-doesnt-auto-launch).
 
 ## Option 2: `cargo install` + `aphrodite setup`
 
@@ -106,7 +106,7 @@ Then either:
 
 Two proxy processes come up on `:9797` (cache) and `:9798` (token) once
 Hermes launches the plugin (or once you launch `aphrodite` yourself - see
-[Troubleshooting](troubleshooting.md)).
+[Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md)).
 
 ## Uninstall
 

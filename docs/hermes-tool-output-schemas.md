@@ -2,7 +2,7 @@
 
 This covers Hermes Agent's own tool surface rather than Aphrodite's code, so
 treat it as reference for the agent side; see
-[CCR: Content Types](ccr/content-types.md) for the classification taxonomy
+[CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/content-types.md) for the classification taxonomy
 it documents. Its machine-readable companion is
 `Maintain/hermes_tool_output_formats.json`.
 
@@ -19,7 +19,7 @@ documented here first - the classifier follows.
 > each tool's preview surfaces. The exact enriched shapes emitted by default
 > (git status, git log, grep, ls, test, build-with-first-error, diff-with-file-
 > names, code-with-signature, terminal, first-line text fallback) are the ones
-> in [Enriched Preview Catalog](proxy/compression.md#enriched-preview-catalog),
+> in [Enriched Preview Catalog](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/compression.md#enriched-preview-catalog),
 > which is authoritative for the emitted format.
 
 ---

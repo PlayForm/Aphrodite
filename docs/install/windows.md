@@ -71,7 +71,7 @@ Pick one:
 
 If none of these ran and you skip straight to enabling the plugin, Hermes
 will try to auto-download for you on first launch - if that doesn't work,
-see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
+see [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#proxy-doesnt-auto-launch).
 
 ### Step 4: Enable the plugin
 
@@ -86,13 +86,13 @@ Answer `Y` if prompted to allow tool overrides.
 
 Before trusting Hermes to launch the proxy for you, confirm the binary itself
 runs. This does **not** require a real upstream API key or a Hermes session -
-see [Troubleshooting: verify the proxy without Hermes](troubleshooting.md#verify-the-proxy-without-hermes)
+see [Troubleshooting: verify the proxy without Hermes](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
 for the placeholder-key pattern and what a healthy response looks like.
 
 ### Step 6: Configure
 
 Two different files, two different repos - see
-[Troubleshooting: two config files](troubleshooting.md#two-separate-config-files)
+[Troubleshooting: two config files](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#two-separate-config-files)
 if this is confusing. On the Hermes side (`config.yaml`), the plugin needs to
 be enabled and, optionally, wired as the context engine:
 
@@ -106,7 +106,7 @@ context:
 ```
 
 Proxy-side tuning (ports, thresholds, preview style) lives in `aphrodite.toml`,
-not `config.yaml` - see [aphrodite.toml Configuration](../config/aphrodite-toml.md)
+not `config.yaml` - see [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md)
 for the full schema. If you need Hermes and the proxy to disagree with the
 compiled-in defaults (`:9797`/`:9798`), set `cache_port`/`token_port` there or
 via `APHRODITE_CACHE_PORT`/`APHRODITE_TOKEN_PORT`.

@@ -156,4 +156,4 @@ is exactly the anti-pattern this checklist exists to prevent.
 
 ---
 
-→ **[Complete fork divergence analysis](HEADROOM-FORK-DIFF.md)** - every commit, every deleted file, every modified subsystem between upstream Headroom and our PlayForm fork.
+→ **[Complete fork divergence analysis](https://github.com/PlayForm/Aphrodite/tree/Current/docs/HEADROOM-FORK-DIFF.md)** - every commit, every deleted file, every modified subsystem between upstream Headroom and our PlayForm fork.
