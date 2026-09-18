@@ -78,7 +78,7 @@ pub const MAX_COMBINED_CHARS:usize = 4000;
 /// (`read_dir` fails) do the built-in directives (baked into the binary via
 /// `include_str!`) come back as a fallback, so a fresh install without a
 /// `directives/` directory still gets `focus`, `foresight`, `ccr-handling`,
-/// `cleanup`, `explore`, and `lazy`.
+/// `cleanup`, `explore`, `lazy`, and `lazy-eval`.
 pub fn load_directives(dir:&PathBuf) -> HashMap<String, Directive> {
 	let entries = match std::fs::read_dir(dir) {
 		Ok(entries) => entries,
