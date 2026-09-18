@@ -36,14 +36,14 @@ at the time - the reporter's config attempts could not help.
 
 ## 3. Timeline
 
-| Date          | Event                                                                                       | Record                                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| 2026-09-17    | Root cause + empirical verify on the 1.4.5 dylib: **NOT FIXED** above 1.3.7                 | `issue11/ISSUE-11-ROOT-CAUSE.md`, `ISSUE-11-VERIFY-1.4.5.md`                                               |
-| 2026-09-17    | Full bug-class audit of `unwrap_hermes_result` (9 shapes) + preview-system deep audit       | `ISSUE-11-AUDIT.md`, `ISSUE-11-PREVIEW-SYSTEM-AUDIT.md`                                                    |
-| 2026-09-17    | 95-row preview battery on 1.4.5: 65% defective direct / 55% hook                            | `ISSUE-11-PREVIEW-BATTERY.md`                                                                              |
-| 2026-09-17    | Complete fix design space (candidates a-f); recommendation (a)+(b)                          | `ISSUE-11-FIXDESIGN.md`                                                                                    |
-| 2026-09-17/18 | Pair B1/B2/B-FIX land WS1 + WS2 + WS4                                                       | `PAIR-B1.md`, `PAIR-B2.md`, `PAIR-B-FIX.md`                                                                |
-| 2026-09-18    | C2 sweep green; battery-after re-run on the rebuilt dylib                                   | `ISSUE-11-BATTERY-AFTER.md`, `ISSUE-11-LANDED.md`                                                          |
+| Date          | Event                                                                                       | Record                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 2026-09-17    | Root cause + empirical verify on the 1.4.5 dylib: **NOT FIXED** above 1.3.7                 | `issue11/ISSUE-11-ROOT-CAUSE.md`, `ISSUE-11-VERIFY-1.4.5.md`                                                |
+| 2026-09-17    | Full bug-class audit of `unwrap_hermes_result` (9 shapes) + preview-system deep audit       | `ISSUE-11-AUDIT.md`, `ISSUE-11-PREVIEW-SYSTEM-AUDIT.md`                                                     |
+| 2026-09-17    | 95-row preview battery on 1.4.5: 65% defective direct / 55% hook                            | `ISSUE-11-PREVIEW-BATTERY.md`                                                                               |
+| 2026-09-17    | Complete fix design space (candidates a-f); recommendation (a)+(b)                          | `ISSUE-11-FIXDESIGN.md`                                                                                     |
+| 2026-09-17/18 | Pair B1/B2/B-FIX land WS1 + WS2 + WS4                                                       | `PAIR-B1.md`, `PAIR-B2.md`, `PAIR-B-FIX.md`                                                                 |
+| 2026-09-18    | C2 sweep green; battery-after re-run on the rebuilt dylib                                   | `ISSUE-11-BATTERY-AFTER.md`, `ISSUE-11-LANDED.md`                                                           |
 | 2026-09-18    | Residual rewrite lands (commits `3b8b5d3` fix + `1d202b2` regex-drop + `7674456` detection) | see `issue11/PREVIEW-RACE-FIX-ROOTCAUSE.md` context; residual tail in `ISSUE-11-BATTERY-AFTER.md` section 6 |
 
 ## 4. What landed (WS1 + WS2 + WS4)
