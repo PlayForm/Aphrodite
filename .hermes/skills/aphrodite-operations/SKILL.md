@@ -47,21 +47,11 @@ offsets - each call returns a fresh compressed marker.
 - **User mode**: no Cargo workspace found (standalone install) → re-downloads
   the binary from GitHub Releases.
 
-Never hardcode `os.path.dirname()` chains in `_hooks/rebuild.py` - they break
-when directory structure changes. Always use `_find_cargo_toml()`, which walks
-up to 6 levels from the rebuild module:
-
-```python
-def _find_cargo_toml():
-    d = os.path.dirname(os.path.abspath(__file__))
-    for _ in range(6):
-        if os.path.isfile(os.path.join(d, "Cargo.toml")):
-            return d
-        parent = os.path.dirname(d)
-        if parent == d: break
-        d = parent
-    return None
-```
+The plugin is a pure loader post-merge: `_hooks/rebuild.py` no longer exists
+(the old `_find_cargo_toml()` walk-up is historical - see the archived
+`aphrodite-upgrade-breakpoints` snapshot). Rebuild/version logic now lives in
+the Rust binary + dylib; `aphrodite_rebuild` reports the dylib version and
+proxy health - cross-check it against `BINARY_VERSION` after every bump.
 
 ## `--version` Must Precede Config Loading
 
@@ -78,23 +68,16 @@ if args.iter().any(|a| a == "--version" || a == "-V") {
 }
 ```
 
-## Standalone Plugin Repo Sync
+## Plugin Repo = the Submodule (post-merge)
 
-End users install from
-[Aphrodite-Hermes](https://github.com/PlayForm/Aphrodite-Hermes) - a lightweight
-repo with Python plugin files only (no binary, no monorepo). The binary is
-auto-downloaded from
-[GitHub Releases](https://github.com/PlayForm/Aphrodite/releases) on first
-session start. After releasing in the monorepo, sync the changed files:
-
-```bash
-cp plugins/aphrodite/_core/config.py $STANDALONE/_core/config.py
-cp plugins/aphrodite/plugin.yaml $STANDALONE/plugin.yaml
-cp plugins/aphrodite/pyproject.toml $STANDALONE/pyproject.toml
-cp plugins/aphrodite/__init__.py $STANDALONE/__init__.py
-cp plugins/aphrodite/_hooks/rebuild.py $STANDALONE/_hooks/rebuild.py
-cd $STANDALONE && git add -A && git commit -m "sync: v$NEW" && git push
-```
+`plugins/aphrodite` IS the standalone repo `PlayForm/Aphrodite-Hermes` (a git
+submodule) - there is no separate copy to sync. Work lands directly inside the
+submodule and is carried to Current by the release ceremony (submodule-first,
+see `aphrodite-release-flow`). End users install from Aphrodite-Hermes; the
+binary is auto-downloaded from GitHub Releases on first session start. The
+loader file set is `__init__.py`, `_bindings.py`, `BINARY_VERSION`,
+`download.sh` / `download.ps1`, `layout_check.py`, `layout_schema.json`,
+`plugin.yaml`, `README.md`, `tests/` - no `_core/`, no `_hooks/`.
 
 ## Dep Pinning Convention
 

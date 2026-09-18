@@ -61,10 +61,12 @@ Every proxy compress/fetch MUST also store in the inline store - this prevents
 
 ## Version Bump Locations
 
-The 5-location set: `Cargo.toml` (binary), `_core/config.py`
-(`BIN_VERSION` + `PLUGIN_VERSION`), `pyproject.toml`, `__init__.py` docstring,
-`plugin.yaml`. Use `--minor` for feature releases, default patch for fixes. The
-full binary+plugin version-sync list lives in `aphrodite-release-workflow`.
+The authoritative binary+plugin version-sync list lives in
+`aphrodite-release-flow` (bump procedure) and `aphrodite-release-workflow`
+(per-file locations). Post-merge, the plugin is a pure loader: there is no
+`_core/config.py` and no `pyproject.toml` - the plugin version lives in
+`plugin.yaml` (+ `install_message`), and `BINARY_VERSION` pairs the plugin to a
+binary release. Use `--minor` for feature releases, default patch for fixes.
 
 ## Release Notes
 

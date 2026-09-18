@@ -89,7 +89,8 @@ cross-session cache layer that saves token budget.
 
 ## Terminal Output Compression
 
-Large terminal output (>1KB) is auto-compressed into CCR markers:
+Large terminal output (above `terminal_threshold` - live 512 bytes in TOML)
+is auto-compressed into CCR markers:
 `<<<CCR:hash|terminal|size>>>` followed by a short preview. To verify the
 threshold:
 
@@ -115,8 +116,9 @@ Run `aphrodite_stats` after each benchmark phase:
 | `engine.protect`     | Protect first/last count                    |
 
 The token cache grows with each unique compression; hits increase on repeated
-content. The engine fires only when total context exceeds the configured
-threshold (default 450K tokens).
+content. The engine fires only when total context exceeds
+`engine_threshold_pct` (live TOML: 100 = effectively disabled; source default
+45%).
 
 ## All-Modes Comparison
 

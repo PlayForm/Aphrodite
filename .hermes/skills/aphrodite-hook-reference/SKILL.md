@@ -238,6 +238,9 @@ if engine_configured:
 Enable: `APHRODITE_CONTEXT_ENGINE=1 hermes config set context.engine aphrodite`
 Disable: `hermes config set context.engine default` (engine not registered
 without the env var)
+Runtime toggle (dylib side): `compression.context_engine = true` in
+`~/.hermes/aphrodite/aphrodite.toml` (config_loader.rs reads env or TOML,
+default true).
 
 **Never leave Hermes' built-in compression on** (`compression.enabled: true` in
 config.yaml) - it runs independently of the aphrodite engine and causes
@@ -372,8 +375,12 @@ Key files for verifying hook signatures:
 - `references/health-check-pattern.md` - `_alive()` 5s TTL cache, retry loop,
   Rust health decoupling
 - `references/hook-invocations.md` - full hook invocation reference
+- `references/hook-invocation-verification.md` - verifying invocations against
+  Hermes source
 - `references/hook-parameter-mismatches.md` - wrong-param incidents mapped to
   correct params
+- `references/session-discoveries-20260615.md` - session findings on hook
+  wiring
 - `references/context-engine-api.md`, `references/context-engine-integration.md`,
   `references/context-engine-pitfalls.md` - ContextEngine API and registration
 - `references/recompression-guard.md`, `references/ccr-infinite-recursion.md` -

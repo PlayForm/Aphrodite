@@ -96,11 +96,11 @@ the actual content, never to verify storage (that wastes tokens and context).
 
 ## Auto-Expand vs. Manual Retrieval
 
-With auto-expand on, tool outputs are usually expanded inline. But raw markers
-can still appear - direct terminal proxy output, background worker logs, and
-compressed context from other sessions. Whenever you SEE a marker, retrieve
-it; auto-expand is not a substitute for the retrieve-first rule.
-Protocol-level auto-expand testing lives in `aphrodite-auto-expand-testing`.
+Auto-expand is vestigial in the current codebase (the `auto_expand*` config
+keys have no consumer - see `aphrodite-auto-expand-testing`). Raw markers are
+the normal state for terminal output, background worker logs, and compressed
+context. Whenever you SEE a marker, retrieve it immediately - the
+retrieve-first rule is unconditional.
 
 ## Active Directives
 

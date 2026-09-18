@@ -307,6 +307,8 @@ checkout Development`).
 - `branch-flow-protocol` - axioms, state machine, invariant verifier.
 - `submodule-fleet-management` / `git-operations` - hook mechanics, gitlink
   hygiene.
+- `aphrodite-release-workflow` - pre-release gates, crates.io publishing,
+  release-notes standards.
 - `references/plugin-lifecycle.md` - install layouts, uninstall procedure,
   proxy key sourcing.
 - `references/engine-health-debugging.md` - live-engine probe battery,

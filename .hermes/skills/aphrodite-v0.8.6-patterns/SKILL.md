@@ -1,13 +1,18 @@
 ---
 name: aphrodite-v0.8.6-patterns
-description: "Historical development patterns from v0.8.5→v0.8.6 cycle. Most patterns
-    now live in aphrodite-operations, aphrodite-upgrade-breakpoints, and
-    aphrodite-development-lessons. Keep as reference snapshot."
-version: 1.1.0
+description: "Use when you need historical v0.8.5→v0.8.6 cycle context. Patterns canonicalized in aphrodite-operations and aphrodite-development-lessons; archival snapshot only."
+version: 1.2.0
 related_skills: [aphrodite-operations, aphrodite-development-lessons, aphrodite-upgrade-breakpoints]
 ---
 
 # Aphrodite v0.8.6 Patterns (Historical Snapshot)
+
+> ## ARCHIVED - historical snapshot 2026-09-18
+>
+> Retained for v0.8.x cycle context only. Live patterns live in
+> `aphrodite-operations`, `aphrodite-development-lessons`, and
+> `aphrodite-cargo-upgrade`. Snapshot preserved in
+> `.hermes/notes/ops/ARCHIVE-2026-09-18/`. Do NOT extend this skill.
 
 Techniques and pitfalls from the v0.8.6 development cycle. These patterns are now
 canonicalized in:

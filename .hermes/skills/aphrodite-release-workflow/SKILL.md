@@ -130,28 +130,29 @@ version-pattern seds, so a stale doc number can never misdirect a release.
 **Plugin version locations** (submodule `plugins/aphrodite/`):
 
 5. `plugin.yaml` - `version` + the `install_message` block
-6. `pyproject.toml` - `version` (if the file exists)
-7. `__init__.py` - docstring version (if present)
-8. `_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION` constants (if exists)
+6. `pyproject.toml` - `version` (only if the file exists - the pure-loader
+   plugin no longer ships one)
+7. `__init__.py` - docstring version (only if present)
+8. `_core/config.py` - `BIN_VERSION` + `PLUGIN_VERSION` constants (REMOVED
+   post-merge - the plugin is a pure loader with no `_core/` directory)
 
 **Documentation**: `README.md` - release badge, plugin badge, and the example
 health output `"version":"v<bin>"`.
 
 ## Submodule Release Flow
 
-`plugins/aphrodite` is a git submodule → separate repo `PlayForm/Aphrodite-Hermes`.
-`auto-release.sh` handles the full cross-repo release:
+`plugins/aphrodite` is a git submodule → the standalone repo
+`PlayForm/Aphrodite-Hermes` (remote `Source`). The release sync is
+submodule-first (plugin before parent, so the parent's gitlink references the
+released plugin in one pass): S-Current gets `git merge --squash Development`,
+then the parent gitlink is floated to the S tip. Run the full ceremony in
+`aphrodite-release-flow` (v2.0.0) - it is THE ceremony skill; the old
+`auto-release.sh` sed / `git update-index --cacheinfo` flow is retired (it
+existed for the removed `ignore = all`; `.gitmodules` now sets
+`ignore = dirty`).
 
-1. Bump `plugin.yaml` (and other submodule files) via sed
-2. Commit in submodule: `cd plugins/aphrodite && git commit -m "release: plugin vX.Y.Z"`
-3. Tag in submodule: `git tag "vX.Y.Z"`
-4. Push submodule branch + tag to `$SUBMODULE_REMOTE` (default: `Source`)
-5. Update parent pointer with `git update-index --cacheinfo` (needed because
-   `.gitmodules` has `ignore = all`, which hides dirty submodules)
-6. Commit parent pointer: `chore: sync aphrodite submodule → plugin vX.Y.Z`
-
-Manually verify after release: grep README example output for `"version":"v`
-(non-critical).
+Manually verify after release: `git submodule status` shows no `+`, and grep
+README example output for `"version":"v` (non-critical).
 
 ## Binary Symlink (dev)
 
