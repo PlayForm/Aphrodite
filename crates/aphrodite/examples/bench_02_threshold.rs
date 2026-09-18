@@ -51,6 +51,7 @@ const TOKEN_PORT:u16 = 59798;
 
 struct Proxy {
 	child:std::process::Child,
+	#[allow(dead_code)]
 	port:u16,
 }
 impl Drop for Proxy {
@@ -158,7 +159,7 @@ fn make(ct:&str, size:usize) -> String {
 	// Trim or pad to exact byte size (ASCII-only units, so byte == char)
 	match s.len().cmp(&size) {
 		std::cmp::Ordering::Greater => s.truncate(size),
-		std::cmp::Ordering::Less => s.extend(std::iter::repeat('x').take(size - s.len())),
+		std::cmp::Ordering::Less => s.extend(std::iter::repeat_n('x', size - s.len())),
 		std::cmp::Ordering::Equal => {},
 	}
 	s

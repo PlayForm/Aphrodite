@@ -329,7 +329,7 @@ mod tests {
 	fn test_defaults() {
 		let cfg = Config::default();
 		assert_eq!(cfg.get_u64("NONEXISTENT", "compression", "threshold", 42), 42);
-		assert_eq!(cfg.get_bool("NONEXISTENT", "compression", "enabled", true), true);
+		assert!(cfg.get_bool("NONEXISTENT", "compression", "enabled", true));
 		assert_eq!(cfg.get_string("NONEXISTENT", "defaults", "model", "gpt-4o"), "gpt-4o");
 	}
 

@@ -627,7 +627,7 @@ mod tests {
 		crate::poll_worker::insert_bg_task(&mut s, "task1".into(), "terminal".into(), "cargo build".into(), 1);
 		let _ = pre_llm_call(&mut s);
 		// The nudge should have been pushed into ephemeral_directives.
-		assert!(s.ephemeral_directives.len() >= 1, "pre_llm_call should push poll-worker nudge");
+		assert!(!s.ephemeral_directives.is_empty(), "pre_llm_call should push poll-worker nudge");
 		let nudge = s.ephemeral_directives.last().unwrap();
 		assert!(
 			nudge.inline.as_deref().unwrap().contains("cargo build"),

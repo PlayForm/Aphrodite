@@ -544,7 +544,7 @@ pub extern "C" fn aphrodite_hermes_proxy_health() -> *mut c_char {
 /// `$HOME/.hermes/aphrodite`. Returns JSON
 /// `{"status":"ok","dir":...,"written":[...],"skipped":[...],"warnings":[...]}`
 /// - always `status:"ok"` (failures degrade to warnings). Caller must free
-/// with `aphrodite_hermes_free_string`.
+///   with `aphrodite_hermes_free_string`.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir:*const c_char) -> *mut c_char {
 	let home = unsafe { cstr_to_string(home_dir) };

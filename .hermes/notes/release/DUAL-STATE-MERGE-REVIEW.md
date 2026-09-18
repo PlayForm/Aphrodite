@@ -38,18 +38,18 @@ git merge --squash <source>   # on the target branch, clean tree first
 - NO scripts, NO bulk, NO `git restore`, NO `git checkout HEAD -- <path>`,
   NO `git reset`. Read → edit → stage only.
 - Submodule conflicts resolve at the superproject gitlink only (`git add
-  plugins/<sub>` when the worktree pin is already the wanted one); never enter
+plugins/<sub>` when the worktree pin is already the wanted one); never enter
   the submodule. Rename/delete pairs resolve on the NEW path.
 
 ## Phase 3 - Dual-state corrections (index untouched, corrections land unstaged)
 
-| Decision | Action | State |
-|---|---|---|
-| KEEP staged content | leave as-is | `M ` |
-| CORRECT content (staged = source's unwanted version) | write target's HEAD content into worktree | `MM` |
-| RESTORE a staged deletion (file IS wanted) | recreate file from `git show HEAD:<path>` | `D ` + `??` |
-| CONFIRM deletion (file not wanted) | leave staged-deletion-only | `D ` |
-| REMOVE an unwanted file | delete in worktree (plain `rm`) | `MD` |
+| Decision                                             | Action                                    | State       |
+| ---------------------------------------------------- | ----------------------------------------- | ----------- |
+| KEEP staged content                                  | leave as-is                               | `M `        |
+| CORRECT content (staged = source's unwanted version) | write target's HEAD content into worktree | `MM`        |
+| RESTORE a staged deletion (file IS wanted)           | recreate file from `git show HEAD:<path>` | `D ` + `??` |
+| CONFIRM deletion (file not wanted)                   | leave staged-deletion-only                | `D `        |
+| REMOVE an unwanted file                              | delete in worktree (plain `rm`)           | `MD`        |
 
 The dual state is the point: staged = the proposal, pending = the correction.
 

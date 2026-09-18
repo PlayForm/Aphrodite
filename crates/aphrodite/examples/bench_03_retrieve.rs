@@ -44,6 +44,7 @@ const TOKEN_PORT:u16 = 39798;
 
 struct Proxy {
 	child:std::process::Child,
+	#[allow(dead_code)]
 	port:u16,
 }
 impl Drop for Proxy {
@@ -140,6 +141,7 @@ fn found(port:u16, hash:&str) -> bool {
 }
 
 /// POST /retrieve and return HTTP status code (for negative-path tests).
+#[allow(dead_code)]
 fn retrieve_status(port:u16, hash:&str) -> Option<u16> {
 	let body = serde_json::json!({"hash": hash}).to_string();
 	Command::new("curl")

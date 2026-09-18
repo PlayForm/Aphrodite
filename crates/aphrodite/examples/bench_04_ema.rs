@@ -121,7 +121,7 @@ fn measure_threshold(port:u16, ct:&str) -> usize {
 		let mut s = unit.repeat(rep);
 		match s.len().cmp(&size) {
 			std::cmp::Ordering::Greater => s.truncate(size),
-			std::cmp::Ordering::Less => s.extend(std::iter::repeat('x').take(size - s.len())),
+			std::cmp::Ordering::Less => s.extend(std::iter::repeat_n('x', size - s.len())),
 			_ => {},
 		}
 		s
@@ -170,7 +170,7 @@ fn main() {
 	let proxy = spawn_proxy();
 	let mut failures = 0usize;
 
-	// High-ratio content: single repeated character — only 1 unique 3-byte
+	// High-ratio content: single repeated character - only 1 unique 3-byte
 	// trigram, so the entropy estimate gives the highest possible ratio.
 	// 100 KB pushes EMA well above 20×, triggering the R-9 auto-tune branch.
 	let high = || -> String { "a".repeat(100_000) }; // 100 KB, maximum compression

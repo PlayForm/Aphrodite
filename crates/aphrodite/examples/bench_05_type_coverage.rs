@@ -5,9 +5,9 @@
 //! ratio plus an in-process classifier verdict for each sample (headroom
 //! `detect_type` + the Aphrodite semantic override `detect_semantic_type`
 //! - informational only: the proxy's fine-grained classifier is private
-//! and not exposed over HTTP). Exits non-zero on any coverage violation:
-//! a sample that fails to compress, or a compressed sample whose retrieve
-//! round-trip misses.
+//!   and not exposed over HTTP). Exits non-zero on any coverage violation:
+//!   a sample that fails to compress, or a compressed sample whose retrieve
+//!   round-trip misses.
 //!
 //! Content types covered: build, diff, git, gitlog, ls, test, grep,
 //! code_rust, code_python, code_go, code_js, json, error, log, linter,

@@ -2102,7 +2102,7 @@ mod tests {
 	#[test]
 	fn test_generic_arm_long_line_samples_head_and_tail() {
 		let _g = cap_guard();
-		let c = format!("{}", "word ".repeat(2000));
+		let c = "word ".repeat(2000);
 		let p = build_preview("tool_result", &c);
 		assert!(p.starts_with("[tool_result:1L 10000B | "), "got {p}");
 		assert!(p.contains("…"), "long line must be sampled head+tail: {p}");

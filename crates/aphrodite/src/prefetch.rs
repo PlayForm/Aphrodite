@@ -159,7 +159,7 @@ mod tests {
 	fn test_prefetch_real_file() {
 		let mut s = AphroditeState::default();
 		let src = env!("CARGO_MANIFEST_DIR").to_string() + "/src/prefetch.rs";
-		let r = prefetch_files(&mut s, &[src.clone()]);
+		let r = prefetch_files(&mut s, std::slice::from_ref(&src));
 		assert_eq!(r["loaded"], 1, "prefetch failed: {:?}", r);
 		assert_eq!(s.recent_markers.len(), 1);
 	}
