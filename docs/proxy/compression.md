@@ -14,7 +14,7 @@ The compression ratio EMA is updated from BOTH the Chat Completions path
 | Exempt content                    | Why                                                                                                                                                                                                                                                  |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tool_calls[].function.arguments` | Client-executable JSON, not model-facing prose - a real OpenAI-tools client (no Aphrodite plugin) can't parse a CCR marker as JSON, so compressing it broke every tool call it made. Only `message.content` is a compression target. Fixed in v1.3.2 |
-| SSE streams (`text/event-stream`) | Forwarded chunk-by-chunk, never buffered - see [Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#streaming-sse)                                                                      |
+| SSE streams (`text/event-stream`) | Forwarded chunk-by-chunk, never buffered - see [Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#streaming-sse)                                                                          |
 
 ## Full Pipeline
 

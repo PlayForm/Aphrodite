@@ -6,8 +6,8 @@
   "license": "CC0-1.0",
   "repository": "PlayForm/Aphrodite",
   "scripts": {
-      "FormatCheck": "prettier --check ."
-    },
+    "FormatCheck": "prettier --check ."
+  },
   "devDependencies": {
     "prettier": "3.9.6"
   },
