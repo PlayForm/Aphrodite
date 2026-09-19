@@ -64,13 +64,13 @@ bumped to latest across the workspace. Binary `1.4.2 → 1.4.3`, plugin
 
 ### What Ships
 
-| Artifact | Platform |
-|----------|----------|
-| `aphrodite-aarch64-apple-darwin` | macOS ARM64 |
-| `aphrodite-x86_64-apple-darwin` | macOS Intel |
-| `aphrodite-x86_64-unknown-linux-gnu` | Linux x86_64 |
-| `aphrodite-x86_64-pc-windows-msvc` | Windows x86_64 |
-| Plugin v2.1.3 | Hermes (standalone repo `Aphrodite-Hermes`) |
+| Artifact                             | Platform                                    |
+| ------------------------------------ | ------------------------------------------- |
+| `aphrodite-aarch64-apple-darwin`     | macOS ARM64                                 |
+| `aphrodite-x86_64-apple-darwin`      | macOS Intel                                 |
+| `aphrodite-x86_64-unknown-linux-gnu` | Linux x86_64                                |
+| `aphrodite-x86_64-pc-windows-msvc`   | Windows x86_64                              |
+| Plugin v2.1.3                        | Hermes (standalone repo `Aphrodite-Hermes`) |
 
 ### Links
 

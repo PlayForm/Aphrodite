@@ -69,10 +69,7 @@ def _download_published_dylib(dest: str) -> bool:
         asset = f"libaphrodite_hermes-{triple}.dylib"
     else:
         asset = f"libaphrodite_hermes-{triple}.so"
-    url = (
-        "https://github.com/PlayForm/Aphrodite/releases/download/"
-        f"Aphrodite%2Fv{version}/{asset}"
-    )
+    url = f"https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite%2Fv{version}/{asset}"
     try:
         with urllib.request.urlopen(url, timeout=30) as resp:
             data = resp.read()
@@ -110,7 +107,9 @@ def _obtain_dylib():
             timeout=600,
         )
     except Exception as e:
-        print(f"WARNING: cargo build -p aphrodite-hermes could not run ({e}); falling back to published release")
+        print(
+            f"WARNING: cargo build -p aphrodite-hermes could not run ({e}); falling back to published release"
+        )
     else:
         if build.returncode == 0:
             cand = os.path.join(ROOT, "target", "debug", name)
