@@ -8,7 +8,7 @@ pub(crate) fn git_status_code(line:&str) -> Option<&str> {
 	if b.len() < 4 {
 		return None;
 	}
-	let codes = [b'M', b'A', b'D', b'R', b'C', b'U', b'?', b'!', b' ', b'T'];
+	let codes = *b"MADRCU?! T";
 	let c0 = b[0];
 	let c1 = b[1];
 	// Reject an all-space prefix (that's just indented prose).

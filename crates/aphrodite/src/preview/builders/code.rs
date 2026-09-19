@@ -16,10 +16,10 @@ pub(crate) fn build_code_preview(inp:&Input<'_>) -> String {
 		("classes", "classes"),
 		("types", "types"),
 	] {
-		if let Some(v) = st.get(key) {
-			if !v.is_empty() {
-				parts.push(format!("{}{}", v.len(), label));
-			}
+		if let Some(v) = st.get(key)
+			&& !v.is_empty()
+		{
+			parts.push(format!("{}{}", v.len(), label));
 		}
 	}
 	let summary = if parts.is_empty() {

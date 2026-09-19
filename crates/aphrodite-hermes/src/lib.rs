@@ -131,10 +131,10 @@ pub(crate) fn replacement_from(r:&serde_json::Value) -> serde_json::Value {
 			}
 		}
 	}
-	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false) {
-		if let Some(marker) = r.get("marker").and_then(|v| v.as_str()) {
-			return serde_json::Value::String(marker.to_string());
-		}
+	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false)
+		&& let Some(marker) = r.get("marker").and_then(|v| v.as_str())
+	{
+		return serde_json::Value::String(marker.to_string());
 	}
 	serde_json::Value::Null
 }
@@ -352,24 +352,23 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 									.and_then(|v| v.as_str())
 									.map(|a| a == "poll")
 									.unwrap_or(false);
-							if !is_poll {
-								if let Some((_task_id, cmd_summary)) =
+							if !is_poll
+								&& let Some((_task_id, cmd_summary)) =
 									aphrodite::poll_worker::should_background_pre(command)
-								{
-									// We don't create a BgTask here - Hermes handles the
-									// process lifecycle. We'll track completion via
-									// transform_tool_result when the agent polls.
-									return serde_json::json!({
-										"action": "modify",
-										"args": {
-											"background": true,
-											"notify_on_complete": true,
-										},
-										"message": format!(
-											"aphrodite: auto-backgrounding `{}`", cmd_summary
-										),
-									});
-								}
+							{
+								// We don't create a BgTask here - Hermes handles the
+								// process lifecycle. We'll track completion via
+								// transform_tool_result when the agent polls.
+								return serde_json::json!({
+									"action": "modify",
+									"args": {
+										"background": true,
+										"notify_on_complete": true,
+									},
+									"message": format!(
+										"aphrodite: auto-backgrounding `{}`", cmd_summary
+									),
+								});
 							}
 						}
 					}
@@ -382,28 +381,24 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					// threshold adapts from retrieval consequences (invisible).
 					if state.chain_split_enabled {
 						let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
-						if call_tool == "terminal" {
-							if let Some(command) =
+						if call_tool == "terminal"
+							&& let Some(command) =
 								parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str())
-							{
-								if let Some(segments) = aphrodite::chain_split::split_chain(command) {
-									if segments.len() >= state.chain_split_min_segments {
-										let rewritten = aphrodite::chain_split::build_marked_command(&segments);
-										if rewritten != command {
-											let mut args =
-												parsed.get("args").cloned().unwrap_or_else(|| serde_json::json!({}));
-											args["command"] = serde_json::Value::String(rewritten.clone());
-											return serde_json::json!({
-												"action": "modify",
-												"args": args,
-												"message": format!(
-													"aphrodite: split chained command into {} segments (fine-grained CCR)",
-													segments.len()
-												),
-											});
-										}
-									}
-								}
+							&& let Some(segments) = aphrodite::chain_split::split_chain(command)
+							&& segments.len() >= state.chain_split_min_segments
+						{
+							let rewritten = aphrodite::chain_split::build_marked_command(&segments);
+							if rewritten != command {
+								let mut args = parsed.get("args").cloned().unwrap_or_else(|| serde_json::json!({}));
+								args["command"] = serde_json::Value::String(rewritten.clone());
+								return serde_json::json!({
+									"action": "modify",
+									"args": args,
+									"message": format!(
+										"aphrodite: split chained command into {} segments (fine-grained CCR)",
+										segments.len()
+									),
+								});
 							}
 						}
 					}

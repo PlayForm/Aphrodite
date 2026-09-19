@@ -36,16 +36,16 @@ pub(crate) fn build_build_preview(inp:&Input<'_>) -> String {
 			// the failure line instead of a success-looking summary -
 			// a failing test run used to preview as
 			// `[build:0E 0W 3L]` (ISSUE-11-PREVIEW-BATTERY #2).
-			if e == 0 && w == 0 {
-				if let Some(fail) = inp.raw.lines().map(|l| l.trim()).find(|l| is_failure_line(l)) {
-					return format!(
-						"[build:{}E {}W {}L | {}]",
-						e,
-						w,
-						inp.total,
-						fail.chars().take(60).collect::<String>()
-					);
-				}
+			if e == 0
+				&& w == 0 && let Some(fail) = inp.raw.lines().map(|l| l.trim()).find(|l| is_failure_line(l))
+			{
+				return format!(
+					"[build:{}E {}W {}L | {}]",
+					e,
+					w,
+					inp.total,
+					fail.chars().take(60).collect::<String>()
+				);
 			}
 			format!("[build:{}E {}W {}L]", e, w, inp.total)
 		},

@@ -441,25 +441,23 @@ fn extract_js(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mu
 		// trailing `// ...` after real code) would still miss this exact
 		// case, since the line as a whole does not start with `//`.
 		let code_part = trimmed.split("//").next().unwrap_or(trimmed);
-		if !code_part.trim().is_empty() {
-			if let Some((before_eq, after_eq)) = code_part.split_once('=') {
-				let before_eq = before_eq.trim();
-				if after_eq.contains("=>")
-					&& (before_eq.starts_with("const ")
-						|| before_eq.starts_with("let ")
-						|| before_eq.starts_with("var "))
-				{
-					let name = before_eq
-						.trim_start_matches("const ")
-						.trim_start_matches("let ")
-						.trim_start_matches("var ")
-						.trim();
-					if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-						let s = sig("=>", name);
-						let slen = s.len();
-						fns.push(s);
-						*budget -= slen as isize + 1;
-					}
+		if !code_part.trim().is_empty()
+			&& let Some((before_eq, after_eq)) = code_part.split_once('=')
+		{
+			let before_eq = before_eq.trim();
+			if after_eq.contains("=>")
+				&& (before_eq.starts_with("const ") || before_eq.starts_with("let ") || before_eq.starts_with("var "))
+			{
+				let name = before_eq
+					.trim_start_matches("const ")
+					.trim_start_matches("let ")
+					.trim_start_matches("var ")
+					.trim();
+				if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+					let s = sig("=>", name);
+					let slen = s.len();
+					fns.push(s);
+					*budget -= slen as isize + 1;
 				}
 			}
 		}

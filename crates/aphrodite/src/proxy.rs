@@ -1220,12 +1220,12 @@ pub async fn proxy_handler(
 					// error body as a real chat completion. TTL-stamped (F5,
 					// report 06) so it's checked against `response_cache_ttl` on
 					// the hit path instead of replaying forever.
-					if let Some(ck) = cache_key {
-						if status.is_success() && body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES {
-							if let Ok(mut cache) = state.response_cache.lock() {
-								cache.put(ck, (std::time::Instant::now(), body.clone()));
-							}
-						}
+					if let Some(ck) = cache_key
+						&& status.is_success()
+						&& body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES
+						&& let Ok(mut cache) = state.response_cache.lock()
+					{
+						cache.put(ck, (std::time::Instant::now(), body.clone()));
 					}
 					let mut builder = Response::builder().status(status);
 					builder = copy_upstream_headers(builder, &upstream_headers);
@@ -1272,12 +1272,12 @@ pub async fn proxy_handler(
 			);
 			// Store raw response in LLM cache if applicable - success only (F2, see
 			// the compressed-path cache write above for the full rationale).
-			if let Some(ck) = cache_key {
-				if status.is_success() && resp_body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES {
-					if let Ok(mut cache) = state.response_cache.lock() {
-						cache.put(ck, (std::time::Instant::now(), resp_body.to_vec()));
-					}
-				}
+			if let Some(ck) = cache_key
+				&& status.is_success()
+				&& resp_body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES
+				&& let Ok(mut cache) = state.response_cache.lock()
+			{
+				cache.put(ck, (std::time::Instant::now(), resp_body.to_vec()));
 			}
 			let mut builder = Response::builder().status(status);
 			builder = copy_upstream_headers(builder, &upstream_headers);
@@ -1889,70 +1889,70 @@ async fn compress_chat_completion(
 		let message = choice.get_mut("message")?;
 
 		// Compress text content with smart markers
-		if let Some(content_val) = message.get_mut("content") {
-			if let Some(content) = content_val.as_str() {
-				let ct = proxy_detect_content_type(content);
-				let threshold = (state.threshold_for(ct).max(base_threshold) as f64 * budget_mult) as usize;
-				if content.len() > threshold {
-					if let Some(ccr) = &state.ccr {
-						let hash = compute_key(content.as_bytes());
-						// F4: only replace `content` with a marker if the content is
-						// actually retrievable under `hash` - either it was already
-						// there (cache hit) or this `put` succeeded. A failed put
-						// (store full/locked/panicked) must NOT be followed by
-						// swapping the response for an unresolvable marker - that
-						// would permanently destroy content that never reached the
-						// client any other way.
-						let stored = if ccr_get(ccr, &hash).await.is_some() {
-							state.ccr_hits.fetch_add(1, Ordering::Relaxed);
-							true
-						} else {
-							state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-							let ok = ccr_put(ccr, &hash, content).await;
-							if ok {
-								state.ccr_created.fetch_add(1, Ordering::Relaxed);
-							} else {
-								tracing::error!(hash = %hash, "ccr_put failed - leaving content uncompressed to avoid data loss");
-							}
-							ok
-						};
-						if stored {
-							let (compressed, orig_len) = {
-								let compressed = match state.mode {
-									ProxyMode::Cache => cache_marker(&hash, content, ct, None),
-									ProxyMode::Token => smart_marker(&hash, content, ct, None),
-								};
-								let len = content.len();
-								state.record_compression(ct);
-								(compressed, len)
-							};
-							let marker_len = compressed.len();
-							// Savings = bytes actually removed from the response
-							// (original content minus the rendered marker that
-							// replaces it), not the bare hash length - the marker
-							// is hundreds of chars longer than the 40-char hash,
-							// so subtracting only `hash.len()` overstated savings
-							// (report 05 F5). Unit is bytes throughout - see
-							// `tokens_saved`'s field doc for the naming caveat.
-							state
-								.tokens_saved
-								.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
-							*content_val = serde_json::Value::String(compressed);
-							did_compress = true;
-							state.update_compression_ratio(orig_len, marker_len);
-						}
-					}
-				} else if content.len() > state.inline_ccr_threshold() {
-					// Below compression threshold but above inline threshold: store in inline_ccr
-					// so later retrievals can find tiny entries without a backend round-trip.
+		if let Some(content_val) = message.get_mut("content")
+			&& let Some(content) = content_val.as_str()
+		{
+			let ct = proxy_detect_content_type(content);
+			let threshold = (state.threshold_for(ct).max(base_threshold) as f64 * budget_mult) as usize;
+			if content.len() > threshold {
+				if let Some(ccr) = &state.ccr {
 					let hash = compute_key(content.as_bytes());
-					if let Ok(mut map) = state.inline_ccr.lock() {
-						if map.contains(&hash) {
-							state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+					// F4: only replace `content` with a marker if the content is
+					// actually retrievable under `hash` - either it was already
+					// there (cache hit) or this `put` succeeded. A failed put
+					// (store full/locked/panicked) must NOT be followed by
+					// swapping the response for an unresolvable marker - that
+					// would permanently destroy content that never reached the
+					// client any other way.
+					let stored = if ccr_get(ccr, &hash).await.is_some() {
+						state.ccr_hits.fetch_add(1, Ordering::Relaxed);
+						true
+					} else {
+						state.ccr_misses.fetch_add(1, Ordering::Relaxed);
+						let ok = ccr_put(ccr, &hash, content).await;
+						if ok {
+							state.ccr_created.fetch_add(1, Ordering::Relaxed);
 						} else {
-							state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
-							map.put(hash, content.to_string());
+							tracing::error!(hash = %hash, "ccr_put failed - leaving content uncompressed to avoid data loss");
 						}
+						ok
+					};
+					if stored {
+						let (compressed, orig_len) = {
+							let compressed = match state.mode {
+								ProxyMode::Cache => cache_marker(&hash, content, ct, None),
+								ProxyMode::Token => smart_marker(&hash, content, ct, None),
+							};
+							let len = content.len();
+							state.record_compression(ct);
+							(compressed, len)
+						};
+						let marker_len = compressed.len();
+						// Savings = bytes actually removed from the response
+						// (original content minus the rendered marker that
+						// replaces it), not the bare hash length - the marker
+						// is hundreds of chars longer than the 40-char hash,
+						// so subtracting only `hash.len()` overstated savings
+						// (report 05 F5). Unit is bytes throughout - see
+						// `tokens_saved`'s field doc for the naming caveat.
+						state
+							.tokens_saved
+							.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
+						*content_val = serde_json::Value::String(compressed);
+						did_compress = true;
+						state.update_compression_ratio(orig_len, marker_len);
+					}
+				}
+			} else if content.len() > state.inline_ccr_threshold() {
+				// Below compression threshold but above inline threshold: store in inline_ccr
+				// so later retrievals can find tiny entries without a backend round-trip.
+				let hash = compute_key(content.as_bytes());
+				if let Ok(mut map) = state.inline_ccr.lock() {
+					if map.contains(&hash) {
+						state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+					} else {
+						state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
+						map.put(hash, content.to_string());
 					}
 				}
 			}
@@ -2085,11 +2085,11 @@ async fn execute_tool_relay(
 			// exact-match only.
 			let hash = crate::marker::normalize_hash(hash_raw);
 			// Check inline_ccr first (no round-trip needed for tiny entries)
-			if let Ok(mut map) = state.inline_ccr.lock() {
-				if let Some(content) = map.get(hash) {
-					state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
-					return Ok(serde_json::json!({"found": true, "content": content.clone()}));
-				}
+			if let Ok(mut map) = state.inline_ccr.lock()
+				&& let Some(content) = map.get(hash)
+			{
+				state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+				return Ok(serde_json::json!({"found": true, "content": content.clone()}));
 			}
 			state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
 			// Fallback to CCR store

@@ -106,10 +106,10 @@ fn wrote_path_from(tool_name:&str, args:Option<&serde_json::Value>, content:&str
 	}
 	if let Some(v) = args {
 		for key in ["path", "file", "file_path", "filename"] {
-			if let Some(p) = v.get(key).and_then(|x| x.as_str()) {
-				if !p.is_empty() {
-					return Some(p.to_string());
-				}
+			if let Some(p) = v.get(key).and_then(|x| x.as_str())
+				&& !p.is_empty()
+			{
+				return Some(p.to_string());
 			}
 		}
 	}
@@ -144,10 +144,10 @@ fn transform_tool_result_inner(
 	// never recorded. Skipping compression and recording a reference are
 	// independent decisions; do both regardless of which tools land in
 	// which list.
-	if state.file_tools.contains(&tool_name.to_string()) {
-		if let Some(path) = extract_file_path(content, tool_name) {
-			state.record_file(path, tool_name.to_string());
-		}
+	if state.file_tools.contains(&tool_name.to_string())
+		&& let Some(path) = extract_file_path(content, tool_name)
+	{
+		state.record_file(path, tool_name.to_string());
 	}
 
 	// Skip essential tools
@@ -316,11 +316,11 @@ fn transform_terminal_output_inner(
 				// message, so skip the hint there (no duplication). The hint
 				// is merged INSIDE the preview's brackets: `[text:2L 63B |
 				// scanning... ⚠ grep: ...]`, never appended after the `]`.
-				if !preview.contains("error[") {
-					if let Some(hint) = crate::chain_split::segment_error_hint(seg_text) {
-						let inner = preview.trim_end_matches(']');
-						preview = format!("{} ⚠ {}]", inner, hint);
-					}
+				if !preview.contains("error[")
+					&& let Some(hint) = crate::chain_split::segment_error_hint(seg_text)
+				{
+					let inner = preview.trim_end_matches(']');
+					preview = format!("{} ⚠ {}]", inner, hint);
 				}
 				let marker = ccr_marker(&seg_hash, &type_str, seg_text.len(), &preview, None, None, None);
 				total_marker += marker.len();

@@ -585,7 +585,7 @@ pub extern "C" fn aphrodite_dispatch(
 		None
 	});
 
-	let result = match with_state(hid, |s| {
+	match with_state(hid, |s| {
 		match name.as_ref() {
 			"on_session_start" | "session_start" => hooks::on_session_start(s),
 			"transform_tool_result" => hooks::transform_tool_result(s, content, tool),
@@ -665,9 +665,7 @@ pub extern "C" fn aphrodite_dispatch(
 	}) {
 		Ok(v) => to_json_ok(&v),
 		Err(e) => to_json_error(&e),
-	};
-
-	result
+	}
 }
 
 /// Filter lines by query - port of _resolve.py _filter_lines

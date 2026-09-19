@@ -29,10 +29,10 @@ impl Config {
 		];
 
 		for path in &search_paths {
-			if let Ok(content) = std::fs::read_to_string(path) {
-				if let Ok(table) = content.parse::<toml::Table>() {
-					return Self { raw:table, overrides:HashMap::new() };
-				}
+			if let Ok(content) = std::fs::read_to_string(path)
+				&& let Ok(table) = content.parse::<toml::Table>()
+			{
+				return Self { raw:table, overrides:HashMap::new() };
 			}
 		}
 
@@ -49,10 +49,10 @@ impl Config {
 	/// silently drifted from `apply_compression`'s own key names and never
 	/// honored env var overrides at all).
 	pub fn load_from(path:&str) -> Self {
-		if let Ok(content) = std::fs::read_to_string(path) {
-			if let Ok(table) = content.parse::<toml::Table>() {
-				return Self { raw:table, overrides:HashMap::new() };
-			}
+		if let Ok(content) = std::fs::read_to_string(path)
+			&& let Ok(table) = content.parse::<toml::Table>()
+		{
+			return Self { raw:table, overrides:HashMap::new() };
 		}
 		Self::default()
 	}
@@ -219,10 +219,10 @@ impl Config {
 		//   3. binary-relative (portable install: shipped directives/ next to
 		//      the executable, e.g. the Hermes plugin dir).
 		let mut dirs:Vec<std::path::PathBuf> = Vec::new();
-		if let Ok(env_dir) = std::env::var("APHRODITE_DIRECTIVES_DIR") {
-			if !env_dir.trim().is_empty() {
-				dirs.push(std::path::PathBuf::from(env_dir));
-			}
+		if let Ok(env_dir) = std::env::var("APHRODITE_DIRECTIVES_DIR")
+			&& !env_dir.trim().is_empty()
+		{
+			dirs.push(std::path::PathBuf::from(env_dir));
 		}
 		dirs.push(std::path::PathBuf::from("directives"));
 		dirs.push(home_aphrodite.join("directives"));

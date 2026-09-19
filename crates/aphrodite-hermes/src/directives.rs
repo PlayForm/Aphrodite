@@ -43,23 +43,23 @@ pub(crate) fn resolve_directives_dir(home_param:&str) -> (PathBuf, Vec<String>) 
 	if !home_param.is_empty() {
 		return (PathBuf::from(home_param).join("directives"), warnings);
 	}
-	if let Ok(dir) = std::env::var("APHRODITE_DIRECTIVES_DIR") {
-		if !dir.trim().is_empty() {
-			return (PathBuf::from(dir), warnings);
-		}
+	if let Ok(dir) = std::env::var("APHRODITE_DIRECTIVES_DIR")
+		&& !dir.trim().is_empty()
+	{
+		return (PathBuf::from(dir), warnings);
 	}
-	if let Ok(home) = std::env::var("APHRODITE_HOME") {
-		if !home.trim().is_empty() {
-			return (PathBuf::from(home).join("directives"), warnings);
-		}
+	if let Ok(home) = std::env::var("APHRODITE_HOME")
+		&& !home.trim().is_empty()
+	{
+		return (PathBuf::from(home).join("directives"), warnings);
 	}
-	if let Ok(home) = std::env::var("HOME") {
-		if !home.trim().is_empty() {
-			return (
-				PathBuf::from(home.trim_end_matches('/')).join(".hermes/aphrodite/directives"),
-				warnings,
-			);
-		}
+	if let Ok(home) = std::env::var("HOME")
+		&& !home.trim().is_empty()
+	{
+		return (
+			PathBuf::from(home.trim_end_matches('/')).join(".hermes/aphrodite/directives"),
+			warnings,
+		);
 	}
 	warnings
 		.push("neither $HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using current directory".into());

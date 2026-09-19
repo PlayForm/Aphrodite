@@ -223,18 +223,18 @@ async fn run() -> anyhow::Result<()> {
 		// process is launched from. (Moved here from `run_single` so
 		// `build_state` can run before spawning.)
 		if let Some(ref db_path) = cli.ccr_db_path {
-			if !db_path.as_os_str().is_empty() && !db_path.is_absolute() {
-				if let Ok(exe_path) = std::env::current_exe() {
-					if let Some(exe_dir) = exe_path.parent() {
-						let old = db_path.display().to_string();
-						cli.ccr_db_path = Some(exe_dir.join(db_path));
-						tracing::info!(
-							"resolved relative ccr_db_path from {} to {}",
-							old,
-							cli.ccr_db_path.as_ref().unwrap().display()
-						);
-					}
-				}
+			if !db_path.as_os_str().is_empty()
+				&& !db_path.is_absolute()
+				&& let Ok(exe_path) = std::env::current_exe()
+				&& let Some(exe_dir) = exe_path.parent()
+			{
+				let old = db_path.display().to_string();
+				cli.ccr_db_path = Some(exe_dir.join(db_path));
+				tracing::info!(
+					"resolved relative ccr_db_path from {} to {}",
+					old,
+					cli.ccr_db_path.as_ref().unwrap().display()
+				);
 			}
 			if let Some(parent) = cli.ccr_db_path.as_ref().and_then(|p| p.parent()) {
 				std::fs::create_dir_all(parent)?;
@@ -433,11 +433,10 @@ async fn run_single(
                     // rate-limit-quota-burning cost class as the health
                     // check this endpoint's sibling `/health` already fixed.
                     const TTL: std::time::Duration = std::time::Duration::from_secs(60);
-                    if let Some((ok, at)) = *s.upstream_health_cache.lock().unwrap_or_else(|e| e.into_inner()) {
-                        if at.elapsed() < TTL {
+                    if let Some((ok, at)) = *s.upstream_health_cache.lock().unwrap_or_else(|e| e.into_inner())
+                        && at.elapsed() < TTL {
                             return Json(serde_json::json!({"upstream": ok, "cached": true})).into_response();
                         }
-                    }
                     let ok = s.client
                         .get(format!("{}/models", s.api_url.trim_end_matches('/')))
                         .header("Authorization", format!("Bearer {}", s.api_key.expose()))

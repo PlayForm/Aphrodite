@@ -99,15 +99,14 @@ fn first_duration(content:&str) -> Option<String> {
 				if !ms.is_empty() && ms.chars().all(|c| c.is_ascii_digit()) {
 					return Some(format!("{ms}ms"));
 				}
-			} else if let Some(s) = tok.strip_suffix('s') {
-				if let Some((a, b)) = s.split_once('.') {
-					if !a.is_empty()
-						&& !b.is_empty() && a.chars().all(|c| c.is_ascii_digit())
-						&& b.chars().all(|c| c.is_ascii_digit())
-					{
-						return Some(format!("{s}s"));
-					}
-				}
+			} else if let Some(s) = tok.strip_suffix('s')
+				&& let Some((a, b)) = s.split_once('.')
+				&& !a.is_empty()
+				&& !b.is_empty()
+				&& a.chars().all(|c| c.is_ascii_digit())
+				&& b.chars().all(|c| c.is_ascii_digit())
+			{
+				return Some(format!("{s}s"));
 			}
 		}
 	}

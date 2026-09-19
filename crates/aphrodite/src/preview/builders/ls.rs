@@ -15,10 +15,11 @@ pub(crate) fn build_ls_preview(inp:&Input<'_>) -> String {
 			continue;
 		}
 		// Skip the `total N` header `ls -l` prints (not a filesystem entry).
-		if let Some(rest) = t.strip_prefix("total ") {
-			if rest.chars().all(|c| c.is_ascii_digit()) && !rest.is_empty() {
-				continue;
-			}
+		if let Some(rest) = t.strip_prefix("total ")
+			&& rest.chars().all(|c| c.is_ascii_digit())
+			&& !rest.is_empty()
+		{
+			continue;
 		}
 		let b = line.as_bytes();
 		// `ls -l` long form: mode string in the first column.
@@ -41,11 +42,11 @@ pub(crate) fn build_ls_preview(inp:&Input<'_>) -> String {
 			files += 1;
 			// File extension: text after the last `.` in the basename.
 			let base = name.rsplit('/').next().unwrap_or(name);
-			if let Some(dot) = base.rfind('.') {
-				if dot > 0 && dot < base.len() - 1 {
-					let e:String = base[dot..].chars().take(8).collect();
-					*ext.entry(e).or_insert(0) += 1;
-				}
+			if let Some(dot) = base.rfind('.')
+				&& dot > 0 && dot < base.len() - 1
+			{
+				let e:String = base[dot..].chars().take(8).collect();
+				*ext.entry(e).or_insert(0) += 1;
 			}
 		}
 	}
