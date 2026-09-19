@@ -1,14 +1,13 @@
 //! git status preview arm.
 
-use crate::preview::input::Input;
-use crate::preview::line::git_status::git_status_code;
+use crate::preview::{input::Input, line::git_status::git_status_code};
 
 /// git status preview: tally each two-char status code and list the first few
 /// paths. `[git:5M 2A 1D 3?? | src/x.rs src/y.rs +6 more]`.
-pub(crate) fn build_git_status_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_git_status_preview(inp:&Input<'_>) -> String {
 	use std::collections::BTreeMap;
-	let mut tally: BTreeMap<char, usize> = BTreeMap::new();
-	let mut paths: Vec<String> = Vec::new();
+	let mut tally:BTreeMap<char, usize> = BTreeMap::new();
+	let mut paths:Vec<String> = Vec::new();
 	for line in inp.raw.lines() {
 		if let Some(code) = git_status_code(line) {
 			// Collapse the two columns to the most significant status char
@@ -30,14 +29,14 @@ pub(crate) fn build_git_status_preview(inp: &Input<'_>) -> String {
 	}
 	// Emit tallies in a stable, readable order.
 	let order = ['M', 'A', 'D', 'R', 'C', 'U', 'T', '?', '!'];
-	let mut counts: Vec<String> = Vec::new();
+	let mut counts:Vec<String> = Vec::new();
 	for c in order {
 		if let Some(n) = tally.get(&c) {
 			let label = if c == '?' { "??".to_string() } else { c.to_string() };
 			counts.push(format!("{}{}", n, label));
 		}
 	}
-	let total: usize = tally.values().sum();
+	let total:usize = tally.values().sum();
 	let shown = paths.len();
 	let more = if total > shown { format!(" +{} more", total - shown) } else { String::new() };
 	if paths.is_empty() {

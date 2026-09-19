@@ -2,7 +2,7 @@
 //! and the vote lines that decide the `code` shape.
 
 /// `fn name(` / `def name(` / `func name(` style signature.
-pub(crate) fn is_fn_style_sig(t: &str, kw: &str) -> bool {
+pub(crate) fn is_fn_style_sig(t:&str, kw:&str) -> bool {
 	let rest = match t.strip_prefix(kw) {
 		Some(r) => r,
 		None => return false,
@@ -13,7 +13,7 @@ pub(crate) fn is_fn_style_sig(t: &str, kw: &str) -> bool {
 }
 
 /// `struct Name` / `enum Name` / `trait Name` (optionally `pub`-prefixed).
-pub(crate) fn is_type_decl(t: &str) -> bool {
+pub(crate) fn is_type_decl(t:&str) -> bool {
 	let stripped = t.strip_prefix("pub ").unwrap_or(t);
 	for kw in ["struct ", "enum ", "trait "] {
 		if let Some(rest) = stripped.strip_prefix(kw) {
@@ -31,7 +31,7 @@ pub(crate) fn is_type_decl(t: &str) -> bool {
 }
 
 /// `#include <...>` / `#include "..."` / `#include<...>`.
-pub(crate) fn is_include_directive(t: &str) -> bool {
+pub(crate) fn is_include_directive(t:&str) -> bool {
 	let rest = match t.strip_prefix("#include") {
 		Some(r) => r,
 		None => return false,
@@ -41,7 +41,7 @@ pub(crate) fn is_include_directive(t: &str) -> bool {
 }
 
 /// Strong code-signature line: ONE such line is enough to call content code.
-pub(crate) fn is_code_strong_line(t: &str) -> bool {
+pub(crate) fn is_code_strong_line(t:&str) -> bool {
 	is_fn_style_sig(t, "fn ")
 		|| is_fn_style_sig(t, "def ")
 		|| is_fn_style_sig(t, "func ")
@@ -56,7 +56,7 @@ pub(crate) fn is_code_strong_line(t: &str) -> bool {
 }
 
 /// `let x =` / `const X =` / `static X =` assignment (optional `mut`).
-pub(crate) fn is_let_assign(t: &str) -> bool {
+pub(crate) fn is_let_assign(t:&str) -> bool {
 	let rest = match ["let ", "const ", "static "].iter().find_map(|p| t.strip_prefix(p)) {
 		Some(r) => r,
 		None => return false,
@@ -70,7 +70,7 @@ pub(crate) fn is_let_assign(t: &str) -> bool {
 }
 
 /// `use std::collections::HashMap;` (rust use statement ending in `;`).
-pub(crate) fn is_use_statement(t: &str) -> bool {
+pub(crate) fn is_use_statement(t:&str) -> bool {
 	let rest = match t.strip_prefix("use ") {
 		Some(r) => r,
 		None => return false,
@@ -83,7 +83,7 @@ pub(crate) fn is_use_statement(t: &str) -> bool {
 }
 
 /// `from x import y` (python).
-pub(crate) fn is_from_import(t: &str) -> bool {
+pub(crate) fn is_from_import(t:&str) -> bool {
 	let rest = match t.strip_prefix("from ") {
 		Some(r) => r,
 		None => return false,
@@ -94,7 +94,7 @@ pub(crate) fn is_from_import(t: &str) -> bool {
 
 /// Code statement-line vote: `use x::y;`, `let x =`, `import x`,
 /// `from x import y`, `return ...`, `println!`, `print(`, `echo ...`.
-pub(crate) fn is_code_vote_line(t: &str) -> bool {
+pub(crate) fn is_code_vote_line(t:&str) -> bool {
 	is_use_statement(t)
 		|| is_let_assign(t)
 		|| is_from_import(t)

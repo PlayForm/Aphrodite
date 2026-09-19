@@ -2,15 +2,14 @@
 
 use std::collections::BTreeSet;
 
-use crate::preview::input::Input;
-use crate::preview::line::grep::is_grep_line;
+use crate::preview::{input::Input, line::grep::is_grep_line};
 
 /// grep/ripgrep preview: hit count, distinct files, first location.
 /// `[grep:38 hits in 9 files | src/x.rs:12 …]`.
-pub(crate) fn build_grep_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_grep_preview(inp:&Input<'_>) -> String {
 	let mut hits = 0usize;
-	let mut files: BTreeSet<String> = BTreeSet::new();
-	let mut first: Option<String> = None;
+	let mut files:BTreeSet<String> = BTreeSet::new();
+	let mut first:Option<String> = None;
 	for line in inp.raw.lines() {
 		if !is_grep_line(line) {
 			continue;

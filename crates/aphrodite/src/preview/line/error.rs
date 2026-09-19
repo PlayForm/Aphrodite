@@ -6,7 +6,7 @@
 /// lines (`ValueError:`, `TypeError:`, `Exception:`). Line-based (not
 /// substring) counting so a word containing "error" (`noerror`, `error-prone`)
 /// or a capitalized variant can never inflate/miss the tally.
-pub(crate) fn is_error_line(line: &str) -> bool {
+pub(crate) fn is_error_line(line:&str) -> bool {
 	let t = line.trim_start();
 	t.starts_with("error[")
 		|| t.starts_with("error:")
@@ -22,7 +22,7 @@ pub(crate) fn is_error_line(line: &str) -> bool {
 /// regex, Phase 4): for each `:` in the line, walk back over the ASCII word
 /// run; match when that run ends `Error` or equals `Exception` (e.g.
 /// `ValueError:`, `KeyError:`, `Exception:`). No hardcoded exception list.
-fn error_word_before_colon(t: &str) -> bool {
+fn error_word_before_colon(t:&str) -> bool {
 	let bytes = t.as_bytes();
 	let mut idx = 0;
 	while let Some(rel) = t[idx..].find(':') {

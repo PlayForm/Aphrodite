@@ -110,8 +110,8 @@ fn test_detect_type_never_panics_on_multibyte_utf8() {
 // enriched output. Each preview must be self-describing `[type:...]` and
 // pack decision-relevant facts. ──
 
-const GIT_STATUS: &str = " M crates/aphrodite/src/preview.rs\n M crates/aphrodite/src/hooks.rs\nA  src/new_a.rs\nA  src/new_b.rs\nD  \
-	 src/old.rs\n?? tmp/scratch\n?? tmp/other\n?? build/log";
+const GIT_STATUS:&str = " M crates/aphrodite/src/preview.rs\n M crates/aphrodite/src/hooks.rs\nA  src/new_a.rs\nA  \
+                         src/new_b.rs\nD  src/old.rs\n?? tmp/scratch\n?? tmp/other\n?? build/log";
 
 #[test]
 fn test_detect_and_preview_git_status() {
@@ -133,8 +133,8 @@ fn test_preview_git_status_rename() {
 	assert!(p.starts_with("[git:2R | new/path.rs b.txt"), "got {p}");
 }
 
-const CARGO_TEST: &str = "running 221 tests\ntest foo::bar ... ok\ntest result: ok. 220 passed; 0 failed; 1 \
-                         ignored; 0 measured; 0 filtered out; finished in 0.31s";
+const CARGO_TEST:&str = "running 221 tests\ntest foo::bar ... ok\ntest result: ok. 220 passed; 0 failed; 1 ignored; 0 \
+                         measured; 0 filtered out; finished in 0.31s";
 
 #[test]
 fn test_detect_and_preview_cargo_test() {
@@ -153,10 +153,9 @@ fn test_preview_test_names_first_failure() {
 	assert!(p.starts_with("[test:2 pass 1 fail 0 ignored | FAIL beta"), "got {p}");
 }
 
-const LS_LONG: &str = "total 48\ndrwxr-xr-x  5 nikola staff  160 Jul 14 10:00 src\ndrwxr-xr-x  2 nikola staff   64 \
-                      Jul 14 10:00 tests\n-rw-r--r--  1 nikola staff 1913 Jul 14 10:00 preview.rs\n-rw-r--r--  1 \
-                      nikola staff  820 Jul 14 10:00 hooks.rs\n-rw-r--r--  1 nikola staff  512 Jul 14 10:00 \
-                      README.md";
+const LS_LONG:&str = "total 48\ndrwxr-xr-x  5 nikola staff  160 Jul 14 10:00 src\ndrwxr-xr-x  2 nikola staff   64 Jul \
+                      14 10:00 tests\n-rw-r--r--  1 nikola staff 1913 Jul 14 10:00 preview.rs\n-rw-r--r--  1 nikola \
+                      staff  820 Jul 14 10:00 hooks.rs\n-rw-r--r--  1 nikola staff  512 Jul 14 10:00 README.md";
 
 #[test]
 fn test_detect_and_preview_ls_long() {
@@ -167,7 +166,7 @@ fn test_detect_and_preview_ls_long() {
 	assert_eq!(p, "[ls:3 files 2 dirs | .rs×2 .md×1]");
 }
 
-const RIPGREP: &str = "src/preview.rs:12:    let lines = content.lines().count();\nsrc/preview.rs:88:    \
+const RIPGREP:&str = "src/preview.rs:12:    let lines = content.lines().count();\nsrc/preview.rs:88:    \
                       format!(\"[terminal...\nsrc/hooks.rs:91:    let preview = \
                       crate::build_preview();\nsrc/marker.rs:49:    let mut safe = preview.replace();";
 
@@ -179,9 +178,9 @@ fn test_detect_and_preview_ripgrep() {
 	assert_eq!(p, "[grep:4 hits in 3 files | src/preview.rs:12 …]");
 }
 
-const GIT_LOG: &str = "commit abc1234def5678\nAuthor: Nikola <n@x.io>\nDate:   Mon Jul 14\n\n    fix(preview): \
-                      stop doubling\n\ncommit def5678abc1234\nAuthor: Nikola <n@x.io>\nDate:   Sun Jul 13\n\n    \
-                      feat: add detector";
+const GIT_LOG:&str = "commit abc1234def5678\nAuthor: Nikola <n@x.io>\nDate:   Mon Jul 14\n\n    fix(preview): stop \
+                      doubling\n\ncommit def5678abc1234\nAuthor: Nikola <n@x.io>\nDate:   Sun Jul 13\n\n    feat: add \
+                      detector";
 
 #[test]
 fn test_detect_and_preview_git_log() {
@@ -207,8 +206,8 @@ fn test_preview_build_surfaces_first_error() {
 #[test]
 fn test_preview_diff_names_files() {
 	let _g = cap_guard();
-	let c = "diff --git a/src/main.rs b/src/main.rs\n@@ -1,2 +1,3 @@\n+new\ndiff --git a/Cargo.toml \
-	         b/Cargo.toml\n@@ -1 +1 @@\n-x\n+y";
+	let c = "diff --git a/src/main.rs b/src/main.rs\n@@ -1,2 +1,3 @@\n+new\ndiff --git a/Cargo.toml b/Cargo.toml\n@@ \
+	         -1 +1 @@\n-x\n+y";
 	let p = build_preview("diff", c);
 	assert!(p.contains("src/main.rs"), "got {p}");
 	assert!(p.contains("Cargo.toml"), "got {p}");
@@ -398,9 +397,7 @@ fn test_preview_log_surfaces_error_signal_or_tail() {
 
 /// Serializes tests that mutate the process-global preview cap (cargo
 /// runs this module's tests concurrently; the cap is process-wide).
-fn cap_guard() -> std::sync::MutexGuard<'static, ()> {
-	crate::preview::preview_cap_test_guard()
-}
+fn cap_guard() -> std::sync::MutexGuard<'static, ()> { crate::preview::preview_cap_test_guard() }
 
 #[test]
 fn test_preview_cap_truncates_and_keeps_bracket() {
@@ -509,8 +506,8 @@ fn test_terminal_arm_shows_first_meaningful_line_not_last() {
 #[test]
 fn test_terminal_hint_with_code_routes_to_code_arm() {
 	let _g = cap_guard();
-	let c = "use std::collections::HashMap;\n\nfn main() {\n    let mut map = HashMap::new();\n    \
-	         map.insert(\"a\", 1);\n    println!(\"{:?}\", map);\n}";
+	let c = "use std::collections::HashMap;\n\nfn main() {\n    let mut map = HashMap::new();\n    map.insert(\"a\", \
+	         1);\n    println!(\"{:?}\", map);\n}";
 	assert_eq!(detect_semantic_type(c), Some("code"));
 	let p = build_preview("terminal", c);
 	assert!(

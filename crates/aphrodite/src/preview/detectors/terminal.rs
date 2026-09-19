@@ -10,7 +10,7 @@ use crate::preview::input::Input;
 /// Shell/exit-code trace signals: an explicit `exit code:` line, a majority
 /// of `$ `-prompt lines, or a `command not found` / `zsh:` / `bash:` error
 /// trace.
-pub(crate) fn detect(inp: &Input<'_>) -> bool {
+pub(crate) fn detect(inp:&Input<'_>) -> bool {
 	let has_exit_code = inp.raw.lines().any(|l| l.contains("exit code:"));
 	let prompt_majority = inp.majority(|l| l.trim_start().starts_with("$ "), 1);
 	let shell_err = inp.raw.lines().any(|l| {

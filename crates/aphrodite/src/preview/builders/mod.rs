@@ -25,23 +25,21 @@ pub mod test;
 pub mod xml;
 pub mod yaml;
 
-use crate::preview::input::Input;
-use crate::preview::state::PREVIEW_MAX_CHARS;
-use crate::preview::r#type::resolve_effective_type;
+use crate::preview::{input::Input, state::PREVIEW_MAX_CHARS, r#type::resolve_effective_type};
 
 /// Build a compact, human-readable preview string for compressed content,
 /// shaped per content type (e.g. error/warning counts for build output,
 /// +/- line counts for diffs, fn/struct counts for source code) so the LLM
 /// gets a useful summary instead of a generic byte/line count wherever a
 /// richer signal is available.
-pub fn build_preview(type_str: &str, content: &str) -> String {
+pub fn build_preview(type_str:&str, content:&str) -> String {
 	let inp = Input::new(content).unwrap_or_else(|| Input::empty(content));
 	let effective = resolve_effective_type(type_str, &inp);
 	dispatch(effective.as_ref(), &inp)
 }
 
 /// Dispatch to the per-arm builder; the cap applies to EVERY path.
-fn dispatch(effective: &str, inp: &Input<'_>) -> String {
+fn dispatch(effective:&str, inp:&Input<'_>) -> String {
 	let preview = match effective {
 		"build" | "build_output" | "build_error" => build::build_build_preview(inp),
 		"diff" => diff::build_diff_preview(inp),

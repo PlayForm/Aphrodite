@@ -20,19 +20,19 @@
 
 /// Marker echoed between segments. Chosen to be visually distinct from real
 /// output, unlikely in tool output, and greppable for tests.
-pub const SEG_MARKER: &str = "__APHRODITE_SEG__";
+pub const SEG_MARKER:&str = "__APHRODITE_SEG__";
 
 /// A parsed chain segment: its raw command text and its index.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Segment {
-	pub index: usize,
-	pub command: String,
+	pub index:usize,
+	pub command:String,
 }
 
 /// Split a command string into segments on shell separators (`&&`, `;`,
 /// newlines), respecting single/double quotes and trailing backslash
 /// continuations. Returns `None` for constructs we must not rewrite.
-pub fn split_chain(command: &str) -> Option<Vec<Segment>> {
+pub fn split_chain(command:&str) -> Option<Vec<Segment>> {
 	let mut segments = Vec::new();
 	let mut cur = String::new();
 	let mut chars = command.chars().peekable();
@@ -83,7 +83,7 @@ pub fn split_chain(command: &str) -> Option<Vec<Segment>> {
 	push_segment(&mut segments, &mut cur, seg_index);
 
 	// Require at least 2 non-empty segments to be worth rewriting.
-	let segments: Vec<Segment> = segments.into_iter().filter(|s| !s.command.trim().is_empty()).collect();
+	let segments:Vec<Segment> = segments.into_iter().filter(|s| !s.command.trim().is_empty()).collect();
 	if segments.len() < 2 {
 		return None;
 	}
@@ -98,9 +98,9 @@ pub fn split_chain(command: &str) -> Option<Vec<Segment>> {
 	Some(segments)
 }
 
-fn push_segment(segments: &mut Vec<Segment>, cur: &mut String, index: usize) {
+fn push_segment(segments:&mut Vec<Segment>, cur:&mut String, index:usize) {
 	if !cur.trim().is_empty() {
-		segments.push(Segment { index, command: cur.trim().to_string() });
+		segments.push(Segment { index, command:cur.trim().to_string() });
 	}
 	cur.clear();
 }
@@ -109,7 +109,7 @@ fn push_segment(segments: &mut Vec<Segment>, cur: &mut String, index: usize) {
 /// STDERR (not stdout). Markers on stderr never pollute stdout (files, pipes,
 /// captured tool output stay clean); Hermes merges stderr into the terminal
 /// result, so the transform hook still sees them and splits per segment.
-pub fn build_marked_command(segments: &[Segment]) -> String {
+pub fn build_marked_command(segments:&[Segment]) -> String {
 	let mut out = String::new();
 	for (i, seg) in segments.iter().enumerate() {
 		if i > 0 {
@@ -128,8 +128,8 @@ pub fn build_marked_command(segments: &[Segment]) -> String {
 /// Split tool output on segment markers into (segment_index, text) pairs.
 /// Output before the first marker belongs to segment 0. Marker lines are
 /// removed; surrounding blank lines are trimmed per segment.
-pub fn split_marked_output(output: &str) -> Vec<(usize, String)> {
-	let mut parts: Vec<(usize, String)> = Vec::new();
+pub fn split_marked_output(output:&str) -> Vec<(usize, String)> {
+	let mut parts:Vec<(usize, String)> = Vec::new();
 	let mut cur = String::new();
 	let mut cur_idx = 0usize;
 
@@ -160,8 +160,8 @@ pub fn split_marked_output(output: &str) -> Vec<(usize, String)> {
 /// the segment itself says), never mechanism vocabulary - the invisibility
 /// contract limits hints to the segment's own output, so the LLM learns
 /// "that segment failed" from the hint without any chain/split wording.
-pub fn segment_error_hint(content: &str) -> Option<String> {
-	let mut first_signal: Option<&str> = None;
+pub fn segment_error_hint(content:&str) -> Option<String> {
+	let mut first_signal:Option<&str> = None;
 	for line in content.lines() {
 		let l = line.trim();
 		if l.is_empty() {

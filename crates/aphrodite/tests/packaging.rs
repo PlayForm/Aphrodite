@@ -22,7 +22,7 @@ use std::{path::Path, process::Command};
 /// files relative to `src/`, so in the tarball they appear as
 /// `src/builtin_directives/focus.md`. We normalize both `src/...` and
 /// `builtin_directives/...` forms to the tarball path.
-fn collect_include_str_paths(source: &str) -> Vec<String> {
+fn collect_include_str_paths(source:&str) -> Vec<String> {
 	let mut out = Vec::new();
 	for line in source.lines() {
 		let line = line.trim();

@@ -1,8 +1,9 @@
 //! generic preview arm (the honest fallback).
 
-use crate::preview::input::Input;
-use crate::preview::text::first_meaningful::first_meaningful_line;
-use crate::preview::text::sample_long::sample_long_line;
+use crate::preview::{
+	input::Input,
+	text::{first_meaningful::first_meaningful_line, sample_long::sample_long_line},
+};
 
 /// Plain-text / unrecognized fallback: even when we can't classify the shape,
 /// do better than a bare L/B count - show a content hint so the agent has
@@ -14,7 +15,7 @@ use crate::preview::text::sample_long::sample_long_line;
 /// head (SHALLOW). Now: skip structural noise lines (lone braces/brackets) to
 /// the first MEANINGFUL line (the first key / statement), and sample
 /// head+tail for very long lines.
-pub(crate) fn build_generic_preview(type_str: &str, inp: &Input<'_>) -> String {
+pub(crate) fn build_generic_preview(type_str:&str, inp:&Input<'_>) -> String {
 	let hint = first_meaningful_line(inp.raw)
 		.map(|l| sample_long_line(&l))
 		.filter(|s| !s.is_empty());

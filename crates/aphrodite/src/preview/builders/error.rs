@@ -1,9 +1,10 @@
 //! error preview arm (surface the FIRST real error line, never the
 //! traceback header, never success-looking).
 
-use crate::preview::input::Input;
-use crate::preview::line::error::is_error_line;
-use crate::preview::line::failure::is_failure_line;
+use crate::preview::{
+	input::Input,
+	line::{error::is_error_line, failure::is_failure_line},
+};
 
 /// Error output (Issue #11 WS2): surface the FIRST real error line - the
 /// payload, not the traceback header. The generic arm used to show the first
@@ -12,7 +13,7 @@ use crate::preview::line::failure::is_failure_line;
 /// `Compiling` line, both hiding the actual error. Never success-looking:
 /// with no error line found, fall back to the last non-empty line (tail =
 /// most recent state).
-pub(crate) fn build_error_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_error_preview(inp:&Input<'_>) -> String {
 	let hint = inp
 		.raw
 		.lines()

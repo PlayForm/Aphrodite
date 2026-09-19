@@ -2,16 +2,15 @@
 
 use std::collections::BTreeSet;
 
-use crate::preview::input::Input;
-use crate::preview::line::grep::is_search_line;
+use crate::preview::{input::Input, line::grep::is_search_line};
 
 /// Search preview: grep/ripgrep hit count, distinct files, first match location.
 /// Matches the same `file:line:` shape as `content_detector::SEARCH_RESULT_PATTERN`
 /// (Phase 4: structural `is_search_line`, no regex).
-pub(crate) fn build_search_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_search_preview(inp:&Input<'_>) -> String {
 	let mut hits = 0usize;
-	let mut files: BTreeSet<String> = BTreeSet::new();
-	let mut first: Option<String> = None;
+	let mut files:BTreeSet<String> = BTreeSet::new();
+	let mut first:Option<String> = None;
 	for line in inp.raw.lines() {
 		if line.trim().is_empty() {
 			continue;

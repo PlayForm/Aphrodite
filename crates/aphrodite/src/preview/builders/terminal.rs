@@ -1,14 +1,13 @@
 //! terminal preview arm (exit-code signal, first meaningful line).
 
-use crate::preview::input::Input;
-use crate::preview::text::first_meaningful::first_meaningful_line;
+use crate::preview::{input::Input, text::first_meaningful::first_meaningful_line};
 
 /// `hooks::transform_terminal_output` overrides the classified type to
 /// "terminal" when the content looks like a shell/exit-code trace; this arm
 /// surfaces the exit-code / `Error:` line when present (most recent state
 /// signal), else the FIRST meaningful line (skipping lone braces - the
 /// `[terminal:7L }]` bug class).
-pub(crate) fn build_terminal_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_terminal_preview(inp:&Input<'_>) -> String {
 	let exit_line = inp
 		.raw
 		.lines()

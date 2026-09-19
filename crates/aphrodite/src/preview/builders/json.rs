@@ -7,14 +7,14 @@ use crate::preview::input::Input;
 /// JSON preview: parse content and show item/object count with top-level keys,
 /// matching the quality of stage2's `reduce_json`. Falls back to a crude `{"`
 /// count when parsing fails (e.g. truncated or malformed JSON).
-pub(crate) fn build_json_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_json_preview(inp:&Input<'_>) -> String {
 	match serde_json::from_str::<JsonValue>(inp.raw) {
 		Ok(JsonValue::Array(arr)) => {
 			let keys = arr
 				.first()
 				.and_then(|v| v.as_object())
 				.map(|obj| {
-					let ks: Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+					let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
 					let more = if ks.len() < obj.len() {
 						format!(" +{} more", obj.len() - ks.len())
 					} else {
@@ -26,7 +26,7 @@ pub(crate) fn build_json_preview(inp: &Input<'_>) -> String {
 			format!("[json:{}items {}L{}]", arr.len(), inp.total, keys)
 		},
 		Ok(JsonValue::Object(obj)) => {
-			let ks: Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
+			let ks:Vec<&str> = obj.keys().map(|k| k.as_str()).take(8).collect();
 			let more = if ks.len() < obj.len() {
 				format!(" +{} more", obj.len() - ks.len())
 			} else {

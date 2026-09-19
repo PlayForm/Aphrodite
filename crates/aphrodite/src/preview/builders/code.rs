@@ -5,9 +5,9 @@ use crate::preview::input::Input;
 /// Enrich with the structure map (fns/structs/traits/impls/classes/types +
 /// first signature) so the dylib/hook path matches the proxy's preview
 /// quality, instead of a bare substring count.
-pub(crate) fn build_code_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_code_preview(inp:&Input<'_>) -> String {
 	let st = crate::struct_extract::extract_code_structure(inp.raw, "");
-	let mut parts: Vec<String> = Vec::new();
+	let mut parts:Vec<String> = Vec::new();
 	for (key, label) in [
 		("fns", "fns"),
 		("structs", "structs"),

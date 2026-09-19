@@ -1,16 +1,16 @@
 //! build-output preview arm (honest tallies, never success-looking).
 
-use crate::preview::input::Input;
-use crate::preview::line::error::is_error_line;
-use crate::preview::line::failure::is_failure_line;
-use crate::preview::line::warning::is_warning_line;
+use crate::preview::{
+	input::Input,
+	line::{error::is_error_line, failure::is_failure_line, warning::is_warning_line},
+};
 
 /// Honest tallies (Issue #11 WS2): count error/warning LINES, not substring
 /// occurrences. The old `content.matches("error").count()` inflated lines with
 /// repeated occurrences, matched inside unrelated words, and missed
 /// capitalized `Error:` (Python/Swift/clang output) - a genuinely failed
 /// build could render as `0E`.
-pub(crate) fn build_build_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_build_preview(inp:&Input<'_>) -> String {
 	let e = inp.raw.lines().filter(|l| is_error_line(l)).count();
 	let w = inp.raw.lines().filter(|l| is_warning_line(l)).count();
 	// Enrich: surface the first error MESSAGE (e.g. `E0432: unresolved

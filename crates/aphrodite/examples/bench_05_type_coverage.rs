@@ -38,11 +38,11 @@ fn bin_path() -> std::path::PathBuf {
 		.map(|p| p.join(bin_name))
 		.unwrap_or_else(|| bin_name.into())
 }
-const TOKEN_PORT: u16 = 34798;
+const TOKEN_PORT:u16 = 34798;
 
 struct Proxy {
-	child: std::process::Child,
-	port: u16,
+	child:std::process::Child,
+	port:u16,
 }
 impl Drop for Proxy {
 	fn drop(&mut self) {
@@ -85,10 +85,10 @@ fn spawn_proxy() -> Proxy {
 		std::thread::sleep(Duration::from_millis(50));
 	}
 	eprintln!("[bench_05] token proxy up on :{}", TOKEN_PORT);
-	Proxy { child, port: TOKEN_PORT }
+	Proxy { child, port:TOKEN_PORT }
 }
 
-fn ccr_create(port: u16, content: &str) -> Option<serde_json::Value> {
+fn ccr_create(port:u16, content:&str) -> Option<serde_json::Value> {
 	let body = serde_json::json!({"content": content}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -106,7 +106,7 @@ fn ccr_create(port: u16, content: &str) -> Option<serde_json::Value> {
 	serde_json::from_slice(&out.stdout).ok()
 }
 
-fn ccr_retrieve(port: u16, hash: &str) -> bool {
+fn ccr_retrieve(port:u16, hash:&str) -> bool {
 	let body = serde_json::json!({"hash": hash}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -128,8 +128,8 @@ fn ccr_retrieve(port: u16, hash: &str) -> bool {
 // ── corpus: one authored sample per content type ───────────────────
 
 struct Sample {
-	label: &'static str,
-	content: String,
+	label:&'static str,
+	content:String,
 }
 
 fn corpus() -> Vec<Sample> {
@@ -258,18 +258,18 @@ fn corpus() -> Vec<Sample> {
 
 #[derive(Default)]
 struct Row {
-	expected: &'static str,
-	detected: String,
-	semantic: Option<&'static str>,
-	orig: usize,
-	marker: usize,
-	ratio: f64,
-	compressed: bool,
-	retrieve_ok: bool,
-	latency_ms: u128,
+	expected:&'static str,
+	detected:String,
+	semantic:Option<&'static str>,
+	orig:usize,
+	marker:usize,
+	ratio:f64,
+	compressed:bool,
+	retrieve_ok:bool,
+	latency_ms:u128,
 }
 
-fn classify(content: &str) -> (String, Option<&'static str>) {
+fn classify(content:&str) -> (String, Option<&'static str>) {
 	// `detect_type` = headroom classifier; `detect_semantic_type` = the
 	// Aphrodite tool-output override that takes precedence in preview.rs.
 	(
@@ -278,7 +278,7 @@ fn classify(content: &str) -> (String, Option<&'static str>) {
 	)
 }
 
-fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<Row> {
+fn run(proxy:&Proxy, samples:&[Sample]) -> Vec<Row> {
 	let mut rows = Vec::new();
 	for s in samples {
 		let (detected, semantic) = classify(&s.content);
@@ -286,11 +286,11 @@ fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<Row> {
 		let res = ccr_create(proxy.port, &s.content);
 		let latency = t0.elapsed().as_millis();
 		let mut row = Row {
-			expected: s.label,
+			expected:s.label,
 			detected,
 			semantic,
-			orig: s.content.len(),
-			latency_ms: latency,
+			orig:s.content.len(),
+			latency_ms:latency,
 			..Default::default()
 		};
 		if let Some(v) = res {
@@ -314,12 +314,12 @@ fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<Row> {
 	rows
 }
 
-fn effective_type(row: &Row) -> String {
+fn effective_type(row:&Row) -> String {
 	// Precedence mirrors preview.rs: semantic override wins over headroom.
 	row.semantic.unwrap_or(&row.detected).to_string()
 }
 
-fn print_report(rows: &[Row]) {
+fn print_report(rows:&[Row]) {
 	eprintln!("\n{}", "─".repeat(88));
 	eprintln!("  content-type coverage: {} samples", rows.len());
 	eprintln!(
@@ -358,9 +358,9 @@ fn print_report(rows: &[Row]) {
 			r.latency_ms
 		);
 	}
-	let compr: Vec<&Row> = rows.iter().filter(|r| r.compressed).collect();
-	let total_orig: usize = compr.iter().map(|r| r.orig).sum();
-	let total_mark: usize = compr.iter().map(|r| r.marker).sum();
+	let compr:Vec<&Row> = rows.iter().filter(|r| r.compressed).collect();
+	let total_orig:usize = compr.iter().map(|r| r.orig).sum();
+	let total_mark:usize = compr.iter().map(|r| r.marker).sum();
 	eprintln!("{}", "─".repeat(88));
 	eprintln!(
 		"  compressed={} passthrough={}  retrieve hits={} misses={}  coarse-classifier={}",
@@ -396,8 +396,8 @@ fn main() {
 	// round-trip. Coarse in-process classification is informational only
 	// (see print_report) - the proxy's own fine-grained classifier is not
 	// exposed over HTTP, so it cannot be asserted from here.
-	let misses: usize = rows.iter().filter(|r| r.compressed && !r.retrieve_ok).count();
-	let failures: usize = rows.iter().filter(|r| !r.compressed).count();
+	let misses:usize = rows.iter().filter(|r| r.compressed && !r.retrieve_ok).count();
+	let failures:usize = rows.iter().filter(|r| !r.compressed).count();
 	drop(proxy);
 	if misses > 0 || failures > 0 {
 		eprintln!("\n[bench_05] FAILED - uncompressed={} retrieve miss(es)={}", failures, misses);

@@ -28,6 +28,5 @@ mod tests;
 pub use builders::build_preview;
 pub use detect::{detect_semantic_type, detect_type};
 pub use state::{preview_max_chars, set_preview_max_chars};
-
 #[cfg(test)]
 pub(crate) use state::preview_cap_test_guard;

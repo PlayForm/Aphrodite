@@ -1,11 +1,10 @@
 //! test-output preview arm.
 
-use crate::preview::input::Input;
-use crate::preview::text::num_before::num_before;
+use crate::preview::{input::Input, text::num_before::num_before};
 
 /// test-output preview: pass/fail/ignored tallies + first failing test.
 /// `[test:220 pass 0 fail 1 ignored | 0.31s]` / names the first failure.
-pub(crate) fn build_test_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_test_preview(inp:&Input<'_>) -> String {
 	// cargo: `test result: ok. 220 passed; 0 failed; 1 ignored; ... 0.31s`
 	let mut pass = 0usize;
 	let mut fail = 0usize;
@@ -93,7 +92,7 @@ pub(crate) fn build_test_preview(inp: &Input<'_>) -> String {
 /// the same order as the old `DUR_RE` captures. A whitespace token ending
 /// `s` with a `digits '.' digits` prefix, or ending `ms` with an all-digit
 /// prefix.
-fn first_duration(content: &str) -> Option<String> {
+fn first_duration(content:&str) -> Option<String> {
 	for line in content.lines() {
 		for tok in line.split_whitespace() {
 			if let Some(ms) = tok.strip_suffix("ms") {

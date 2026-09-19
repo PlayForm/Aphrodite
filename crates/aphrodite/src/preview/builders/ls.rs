@@ -4,11 +4,11 @@ use crate::preview::input::Input;
 
 /// directory-listing preview: file/dir counts + top extensions.
 /// `[ls:42 files 7 dirs | .rs×18 .md×9 …]`.
-pub(crate) fn build_ls_preview(inp: &Input<'_>) -> String {
+pub(crate) fn build_ls_preview(inp:&Input<'_>) -> String {
 	use std::collections::HashMap;
 	let mut files = 0usize;
 	let mut dirs = 0usize;
-	let mut ext: HashMap<String, usize> = HashMap::new();
+	let mut ext:HashMap<String, usize> = HashMap::new();
 	for line in inp.raw.lines() {
 		let t = line.trim();
 		if t.is_empty() {
@@ -43,7 +43,7 @@ pub(crate) fn build_ls_preview(inp: &Input<'_>) -> String {
 			let base = name.rsplit('/').next().unwrap_or(name);
 			if let Some(dot) = base.rfind('.') {
 				if dot > 0 && dot < base.len() - 1 {
-					let e: String = base[dot..].chars().take(8).collect();
+					let e:String = base[dot..].chars().take(8).collect();
 					*ext.entry(e).or_insert(0) += 1;
 				}
 			}
@@ -52,7 +52,7 @@ pub(crate) fn build_ls_preview(inp: &Input<'_>) -> String {
 	if files == 0 && dirs == 0 {
 		return format!("[ls:{}L]", inp.total);
 	}
-	let mut top: Vec<(String, usize)> = ext.into_iter().collect();
+	let mut top:Vec<(String, usize)> = ext.into_iter().collect();
 	top.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 	let ext_str = top
 		.iter()

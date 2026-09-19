@@ -7,7 +7,7 @@ use crate::preview::input::Input;
 /// `[DEBUG]`, `[TRACE]`, `[FATAL]`, `[PANIC]`) or a timestamp-prefixed line
 /// (starts with a digit, >10 chars, contains `:` or `-`). Same rules the
 /// proxy classifier used; lives in the pipeline now so both paths agree.
-pub(crate) fn detect(inp: &Input<'_>) -> bool {
+pub(crate) fn detect(inp:&Input<'_>) -> bool {
 	inp.raw.lines().any(|l| {
 		let t = l.trim();
 		t.starts_with('[')
@@ -20,6 +20,6 @@ pub(crate) fn detect(inp: &Input<'_>) -> bool {
 				|| t.contains("PANIC"))
 	}) || inp.raw.lines().any(|l| {
 		let t = l.trim();
-		t.starts_with(|c: char| c.is_ascii_digit()) && t.len() > 10 && (t.contains(':') || t.contains('-'))
+		t.starts_with(|c:char| c.is_ascii_digit()) && t.len() > 10 && (t.contains(':') || t.contains('-'))
 	})
 }
