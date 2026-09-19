@@ -17,7 +17,7 @@
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
 [![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.1.4&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
-[![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE)
+[![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Current/LICENSE)
 
 ---
 
@@ -43,7 +43,7 @@ On first launch the plugin auto-downloads the `aphrodite` binary from
 > [!IMPORTANT]
 >
 > Use the Hermes plugin method on Windows too - `download.ps1` is a native
-> PowerShell equivalent. See [docs/install/windows.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/windows.md).
+> PowerShell equivalent. See [docs/install/windows.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/windows.md).
 
 ### Option B: cargo install (standalone binary)
 
@@ -170,7 +170,7 @@ first match wins, and each type carries its own compression threshold tier.
 > the high-signal shapes - `git`, `gitlog`, `grep`, `ls`, `test` - before the
 > preview is built. Detection is conservative (line-prefix patterns, majority
 > votes), so ordinary prose is never mis-tagged.
-> Full taxonomy: [docs/ccr/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md).
+> Full taxonomy: [docs/classification/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/classification/content-types.md).
 
 ### Threshold Tiers
 
@@ -369,7 +369,7 @@ code_multiplier     = 3.0    # multiply threshold for code_* content types
 ```
 
 Each `[compression]` field is overridable via an `APHRODITE_*` env var
-(see [docs/config/env-vars.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md)).
+(see [docs/config/env-vars.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md)).
 
 > [!TIP]
 >
@@ -406,13 +406,13 @@ Benchmarks are reproducible:
 
 ## Relationship to Headroom 🔗
 
-Aphrodite embeds [Headroom](https://github.com/PlayForm/Aphrodite/tree/Development/docs/APHRODITE-HEADROOM.md) - a custom fork tracked
+Aphrodite embeds [Headroom](https://github.com/PlayForm/headroom) - a custom fork tracked
 as a git submodule at `vendor/headroom/`.
 Headroom provides the content transforms (classifier, smart crusher, tokenizer);
 Aphrodite adds the preview pipeline, CCR storage, Hermes integration, and
 dual-proxy architecture.
 
-→ [Full comparison: Aphrodite vs Headroom](https://github.com/PlayForm/Aphrodite/tree/Development/docs/APHRODITE-HEADROOM.md)
+→ See [docs/architecture/10-component.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/architecture/10-component.md) for how the fork integrates.
 
 ---
 
@@ -432,7 +432,7 @@ First-time contributors are especially welcome.
 
 ## License 📜
 
-Released under [CC0-1.0](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE) - public domain.
+Released under [CC0-1.0](https://github.com/PlayForm/Aphrodite/tree/Current/LICENSE) - public domain.
 
 ---
 

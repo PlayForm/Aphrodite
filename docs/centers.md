@@ -65,9 +65,7 @@ centers.
 | Rust `format_ccr_output`   | `;center=X` in structure line |
 | Rust `smart_marker`        | `center: Option<&str>` param  |
 | Rust tool relay            | `_ccr_center` from params     |
-| Python `_ccr_marker`       | `center=None` param           |
-| Python `_compress_handler` | `X-Aphrodite-Center` header   |
-| Python tool schema         | `_ccr_center` exposed         |
+| Python layer (1.4.6)       | none - center is Rust-only    |
 
 ## What the LLM Sees
 

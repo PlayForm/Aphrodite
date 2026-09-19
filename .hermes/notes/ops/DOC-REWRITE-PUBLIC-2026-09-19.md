@@ -36,23 +36,23 @@ references, no task-queue sections, no feedback-note phrasing, no
 
 ## Target structure (docs/ mimics .hermes/ categories)
 
-| New path                    | Source / notes                                                                                       |
-| --------------------------- | ---------------------------------------------------------------------------------------------------- |
-| docs/README.md              | Index (orchestrator-owned, rewritten LAST after links settle)                                        |
-| docs/architecture/          | From `.hermes/uml/` 01-11: mermaid flow traces, scrubbed to public cleanliness                       |
-| docs/classification/        | Content-type taxonomy (from `docs/ccr/content-types.md` + `.hermes/classification/TAXONOMY.md`)      |
-| docs/ccr/                   | marker-format, lifecycle, backends/ (sqlite, in-memory, inline) - rewrite + verify                   |
-| docs/examples/              | From `.hermes/examples/` + `docs/examples/llm-view.md` - real captures, token economics              |
-| docs/release-notes/         | From `.hermes/release-notes/v1.4.0..v1.4.6` (new)                                                    |
-| docs/install/               | README, macos-linux, windows, troubleshooting - rewrite for runtime home + `download.sh/.ps1`        |
-| docs/config/                | aphrodite-toml (verify vs `aphrodite.toml.example`), env-vars                                        |
-| docs/api/                   | health, metrics-endpoint, retrieve, ccr-endpoints                                                    |
-| docs/metrics/               | prometheus, queries                                                                                  |
-| docs/proxy/                 | architecture, handlers, retry, compression                                                           |
-| docs/plugin/                | hooks (SIX), directives, context-engine                                                              |
-| docs/tool-relay/            | tools (13), callbacks                                                                                |
-| docs/guides/ (new)          | hermes-integration, hermes-tool-output-schemas, troubleshooting notes (from existing top-level docs) |
-| docs/centers.md             | Roadmap - keep, label shipped vs sketch                                                              |
+| New path             | Source / notes                                                                                       |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| docs/README.md       | Index (orchestrator-owned, rewritten LAST after links settle)                                        |
+| docs/architecture/   | From `.hermes/uml/` 01-11: mermaid flow traces, scrubbed to public cleanliness                       |
+| docs/classification/ | Content-type taxonomy (from `docs/ccr/content-types.md` + `.hermes/classification/TAXONOMY.md`)      |
+| docs/ccr/            | marker-format, lifecycle, backends/ (sqlite, in-memory, inline) - rewrite + verify                   |
+| docs/examples/       | From `.hermes/examples/` + `docs/examples/llm-view.md` - real captures, token economics              |
+| docs/release-notes/  | From `.hermes/release-notes/v1.4.0..v1.4.6` (new)                                                    |
+| docs/install/        | README, macos-linux, windows, troubleshooting - rewrite for runtime home + `download.sh/.ps1`        |
+| docs/config/         | aphrodite-toml (verify vs `aphrodite.toml.example`), env-vars                                        |
+| docs/api/            | health, metrics-endpoint, retrieve, ccr-endpoints                                                    |
+| docs/metrics/        | prometheus, queries                                                                                  |
+| docs/proxy/          | architecture, handlers, retry, compression                                                           |
+| docs/plugin/         | hooks (SIX), directives, context-engine                                                              |
+| docs/tool-relay/     | tools (13), callbacks                                                                                |
+| docs/guides/ (new)   | hermes-integration, hermes-tool-output-schemas, troubleshooting notes (from existing top-level docs) |
+| docs/centers.md      | Roadmap - keep, label shipped vs sketch                                                              |
 
 ## Stale-content audit targets (per user: delete stale content)
 
@@ -73,7 +73,7 @@ references, no task-queue sections, no feedback-note phrasing, no
 - Wave 4: PAIR-7 stale-content audit (agent-feedback + APHRODITE-HEADROOM /
   HEADROOM-FORK-DIFF + tool-output-schemas), PAIR-8 guides/ migration
 - Orchestrator (LAST, after all agents): docs/README.md index + root README.md
-  + ALL link updates (tree/Current), prettier + link + mermaid verification.
+    - ALL link updates (tree/Current), prettier + link + mermaid verification.
 
 ## Per-child contract (verbatim in every brief)
 
@@ -103,8 +103,25 @@ X was stale; source says Y (file:line)`.
 
 Resumed by orchestrator after the morning session died on provider 429/401s.
 
-- [x] Wave 1 PAIR-1-A: docs/architecture/01-06 (landed morning, verified on disk
-      + git status)
+## COMPLETE 2026-09-19 (orchestrator final pass done)
+
+- [x] Wave 4 PAIR-7-A/B: stale audit verdicts (A + B files in
+      .hermes/notes/ops/AUDIT-PAIR7-{A,B}-2026-09-19.md). Executed:
+      agent-feedback.md + APHRODITE-HEADROOM.md + HEADROOM-FORK-DIFF.md moved
+      to .hermes/notes/; centers.md 2 stale Python rows corrected (center is
+      Rust-only); hermes-tool-output-schemas.md rewritten into docs/guides/
+- [x] Wave 4 PAIR-8: docs/guides/ created (README + hermes-integration +
+      hermes-tool-output-schemas), old top-level files removed
+- [x] Orchestrator LAST: docs/README.md index rewritten (relative links, 30
+      types, 6 hooks, 13 tools, 8 handlers, all categories incl. release-notes + guides); root README.md 7 tree/Development links fixed + 2
+      moved-internal Headroom refs re-pointed; marker-format preview-order
+      flag resolved (doc was correct: proxy=preview-first, hook=marker-first,
+      verified proxy.rs:1917 vs tools.rs:273). Verification: 0 tree/Development
+      links, 0 dead links, 27 mermaid fences 0 risks, prettier clean on all
+      .hermes/**/*.md + docs + README. Discrepancy logs: 13 files (~110
+      entries). NO COMMITS by orchestrator (auto-committer swept waves 1-4).
+
+- [x] Wave 1 PAIR-1-A: docs/architecture/01-06 (landed morning, verified on disk + git status)
 - [x] Wave 1 PAIR-2-C: docs/ccr/ backends + lifecycle + marker-format (landed
       morning, verified on disk)
 - [x] Wave 1 PAIR-1-B: docs/architecture/07-11 + README (landed deleg_5f42b944,
