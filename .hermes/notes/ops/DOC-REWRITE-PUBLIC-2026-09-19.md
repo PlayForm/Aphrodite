@@ -98,3 +98,35 @@ references, no task-queue sections, no feedback-note phrasing, no
 
 Children append their verified-stale findings here as `- [date] file: claim
 X was stale; source says Y (file:line)`.
+
+## Resume status (2026-09-19 afternoon, orchestrator)
+
+Resumed by orchestrator after the morning session died on provider 429/401s.
+
+- [x] Wave 1 PAIR-1-A: docs/architecture/01-06 (landed morning, verified on disk
+      + git status)
+- [x] Wave 1 PAIR-2-C: docs/ccr/ backends + lifecycle + marker-format (landed
+      morning, verified on disk)
+- [x] Wave 1 PAIR-1-B: docs/architecture/07-11 + README (landed deleg_5f42b944,
+      787s, prettier-clean, 3 discrepancy entries)
+- [x] Wave 1 PAIR-2-D: docs/classification/ (landed deleg_1bd50bd5, 417s; REAL
+      content-type count = 30 not 26; content-types.md moved; 6 discrepancy
+      entries)
+- [~] Wave 2 PAIR-3-A/B: docs/config/ + docs/install/ (RUNNING deleg_2389d5bf)
+- [ ] Wave 2 PAIR-4-A/B: docs/proxy/ + docs/api/ + docs/metrics/ (briefs
+      staged .hermes/tmp/DOC-REWRITE-BRIEF-PAIR4-A.md / PAIR4-B.md)
+- [ ] Wave 3 PAIR-5-A/B: docs/plugin/ + docs/tool-relay/ (briefs staged
+      .hermes/tmp/DOC-REWRITE-BRIEF-PAIR5-A.md / PAIR5-B.md)
+- [ ] Wave 3 PAIR-6-A/B: docs/examples/ + docs/release-notes/ (briefs staged
+      .hermes/tmp/DOC-REWRITE-BRIEF-PAIR6-A.md / PAIR6-B.md)
+- [ ] Wave 4 PAIR-7-A/B: stale-content audit (read-only verdicts; briefs
+      staged .hermes/tmp/DOC-REWRITE-BRIEF-PAIR7-A.md / PAIR7-B.md)
+- [ ] Wave 4 PAIR-8: docs/guides/ migration (brief staged
+      .hermes/tmp/DOC-REWRITE-BRIEF-PAIR8.md)
+- [ ] Orchestrator LAST: docs/README.md index + root README.md + ALL link
+      updates (tree/Current), prettier + link + mermaid verification.
+
+Orchestrator mermaid pass already done on docs/examples/llm-view.md Scenario
+4: labels quoted (["..."]) - fixes the DIAMOND_START parse error; the x4
+times-symbol was replaced with plain x4. All 17 mermaid fences in docs/ now
+pass the risk scan.
