@@ -106,7 +106,8 @@ id_rsa*
 .cargo_check_output.txt
 
 # ── Benchmark outputs (machine-generated; never tracked) ────────────────────
-bench/conversational/results/
+bench/conversational/results/**
+!bench/conversational/results/.gitkeep
 bench/conversational/__pycache__/
 bench/results/proxy-bench-*-*.json
 bench/results/tmp/bench-rendered.toml
