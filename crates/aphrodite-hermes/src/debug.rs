@@ -118,10 +118,10 @@ fn flag_enabled(path:&Path) -> bool {
 		.unwrap_or(0.0);
 	let cache = FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
 	let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-	if let Some((cached_mtime, cached_on)) = guard.get(&key) {
-		if *cached_mtime == mtime {
-			return *cached_on;
-		}
+	if let Some((cached_mtime, cached_on)) = guard.get(&key)
+		&& *cached_mtime == mtime
+	{
+		return *cached_on;
 	}
 	let on = std::fs::read_to_string(path)
 		.map(|s| s.trim().to_lowercase())
