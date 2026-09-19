@@ -68,6 +68,11 @@ pub(crate) fn record_session(session:&str, parent:&str) {
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
 		*last = session.to_string();
 	}
+	// Persist across hot-reloads: a dylib reload wipes ALL Rust statics
+	// (__init__.py:537), so the session id is mirrored to a tiny file that
+	// `last_session()` reads back after a reload. Best-effort - a failed
+	// write degrades to "no persistence", never an error.
+	let _ = std::fs::write(runtime_home().join("session.current"), session);
 	if parent.is_empty() || session == parent {
 		return;
 	}
@@ -171,19 +176,39 @@ fn current_root() -> String {
 /// through - `transform_terminal_output` passes only command/output/
 /// returncode/task_id/env_type (terminal_tool_result.py:144), so the terminal
 /// arm falls back to this instead of losing the session scope.
+///
+/// Persists across dylib hot-reloads: `record_session` also writes the id to
+/// a tiny file in the runtime home, and a reload (which wipes all Rust
+/// statics - __init__.py:537) falls back to reading that file. Without this,
+/// a mid-turn rebuild would leave terminal output with no session scope.
 pub(crate) fn last_session() -> String {
-	LAST_SESSION
-		.get_or_init(|| Mutex::new(String::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner)
-		.clone()
+	{
+		let last = LAST_SESSION
+			.get_or_init(|| Mutex::new(String::new()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner);
+		if !last.is_empty() {
+			return last.clone();
+		}
+	}
+	// Reload fallback: read the persisted session id from the runtime home.
+	std::fs::read_to_string(runtime_home().join("session.current"))
+		.ok()
+		.map(|s| s.trim().to_string())
+		.unwrap_or_default()
 }
 
 /// Set (or clear) the debug flag for the CURRENT session tree - the tool
 /// entry point for `aphrodite_debug`. Returns the resolved root session id
 /// and the flag path written, so the caller can report both.
+///
+/// Uses the persisted session id (falling back to `session.current` across
+/// hot-reloads, same as `last_session`): a reload wipes LAST_SESSION, and
+/// without the file fallback the toggle would report "no session context"
+/// until the next `pre_llm_call`.
 pub(crate) fn set_enabled_current(on:bool) -> Result<(String, String), String> {
 	let root = current_root();
+	let root = if root.is_empty() { last_session() } else { root };
 	if root.is_empty() {
 		return Err("no session context yet - hooks have not fired in this process".to_string());
 	}
