@@ -2646,11 +2646,11 @@ code_multiplier = 6.5
 		.unwrap();
 
 		// No other test in this crate reads/writes APHRODITE_CONFIG_PATH.
-		std::env::set_var("APHRODITE_CONFIG_PATH", &path);
+		unsafe { std::env::set_var("APHRODITE_CONFIG_PATH", &path) };
 		let state = std::sync::Arc::new(test_state());
 		let rt = tokio::runtime::Runtime::new().unwrap();
 		let resp = rt.block_on(handle_ccr_reload(State(state.clone()))).into_response();
-		std::env::remove_var("APHRODITE_CONFIG_PATH");
+		unsafe { std::env::remove_var("APHRODITE_CONFIG_PATH") };
 		let _ = std::fs::remove_file(&path);
 
 		assert_eq!(resp.status(), axum::http::StatusCode::OK);

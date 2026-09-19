@@ -404,6 +404,45 @@ def test_argtypes_count_mismatch_flagged():
     )
 
 
+# ── Edition-2024 unsafe-attribute form ───────────────────────────────────────
+# Rust 2024 requires `#[unsafe(no_mangle)]`; the checker must parse BOTH the
+# pre-2024 `#[no_mangle]` form and the edition-2024 unsafe form.
+UNSAFE_FIXTURE_LIBRS = """\
+use std::ffi::c_char;
+
+#[unsafe(no_mangle)]
+pub extern "C" fn aphrodite_hermes_unsafe_export(a: *const c_char) -> *mut c_char { std::ptr::null_mut() }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn aphrodite_hermes_unsafe_export2() -> *mut c_char { std::ptr::null_mut() }
+
+#[no_mangle]
+pub extern "C" fn aphrodite_hermes_plain_export() {}
+"""
+
+
+def test_unsafe_no_mangle_form():
+    exports = ffi.parse_exports(UNSAFE_FIXTURE_LIBRS)
+    ok(
+        exports.get("aphrodite_hermes_unsafe_export") == "pointer",
+        f"unsafe(no_mangle) pointer export not parsed: {exports}",
+    )
+    ok(
+        "aphrodite_hermes_unsafe_export2" in exports,
+        f"unsafe(no_mangle) unsafe-fn export not parsed: {exports}",
+    )
+    ok(
+        exports.get("aphrodite_hermes_plain_export") == "void",
+        f"legacy #[no_mangle] form must still parse: {exports}",
+    )
+    ok(len(exports) == 3, f"expected 3 exports, got {sorted(exports)}")
+    arg_counts = ffi.parse_export_arg_counts(UNSAFE_FIXTURE_LIBRS)
+    ok(
+        arg_counts.get("aphrodite_hermes_unsafe_export") == 1,
+        f"arg count for unsafe(no_mangle) export wrong: {arg_counts}",
+    )
+
+
 # ── Real repo + CLI end-to-end ───────────────────────────────────────────────
 def test_real_repo_clean():
     librs = REPO_ROOT / "crates" / "aphrodite-hermes" / "src" / "lib.rs"

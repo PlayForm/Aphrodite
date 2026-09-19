@@ -456,20 +456,20 @@ mod tests {
 	fn test_env_bool_true_values_case_insensitive() {
 		let _g = env_guard();
 		for v in ["1", "true", "TRUE", "True"] {
-			std::env::set_var("APHRODITE_TEST_BOOL", v);
+			unsafe { std::env::set_var("APHRODITE_TEST_BOOL", v) };
 			assert!(env_bool("APHRODITE_TEST_BOOL"), "{v:?} should be true");
 		}
-		std::env::remove_var("APHRODITE_TEST_BOOL");
+		unsafe { std::env::remove_var("APHRODITE_TEST_BOOL") };
 	}
 
 	#[test]
 	fn test_env_bool_false_values() {
 		let _g = env_guard();
 		for v in ["0", "false", "yes", ""] {
-			std::env::set_var("APHRODITE_TEST_BOOL", v);
+			unsafe { std::env::set_var("APHRODITE_TEST_BOOL", v) };
 			assert!(!env_bool("APHRODITE_TEST_BOOL"), "{v:?} should be false");
 		}
-		std::env::remove_var("APHRODITE_TEST_BOOL");
+		unsafe { std::env::remove_var("APHRODITE_TEST_BOOL") };
 		assert!(!env_bool("APHRODITE_TEST_BOOL"), "absent should be false");
 	}
 
@@ -478,8 +478,8 @@ mod tests {
 	#[test]
 	fn test_resolve_default_ports_per_mode() {
 		let _g = env_guard();
-		std::env::remove_var("APHRODITE_CACHE_PORT");
-		std::env::remove_var("APHRODITE_TOKEN_PORT");
+		unsafe { std::env::remove_var("APHRODITE_CACHE_PORT") };
+		unsafe { std::env::remove_var("APHRODITE_TOKEN_PORT") };
 
 		let mc = multi_config_from_toml(
 			r#"
@@ -507,7 +507,7 @@ mod tests {
 	#[test]
 	fn test_resolve_explicit_port_override_via_env() {
 		let _g = env_guard();
-		std::env::set_var("APHRODITE_CACHE_PORT", "19797");
+		unsafe { std::env::set_var("APHRODITE_CACHE_PORT", "19797") };
 		let mc = multi_config_from_toml(
 			r#"
 			[[proxies]]
@@ -519,7 +519,7 @@ mod tests {
 		);
 		let cli = mc.resolve(&mc.proxies[0]).unwrap();
 		assert_eq!(cli.listen.port(), 19797);
-		std::env::remove_var("APHRODITE_CACHE_PORT");
+		unsafe { std::env::remove_var("APHRODITE_CACHE_PORT") };
 	}
 
 	// ── T17 (F1): env vars must override TOML values in multi-proxy mode,
@@ -537,7 +537,7 @@ mod tests {
 			("APHRODITE_NOTIFY_URL", "https://env-notify.example.com"),
 			("APHRODITE_NOTIFY_KEY", "env-notify-key"),
 		] {
-			std::env::set_var(k, v);
+			unsafe { std::env::set_var(k, v) };
 		}
 		let mc = multi_config_from_toml(
 			r#"
@@ -562,7 +562,7 @@ mod tests {
 			"APHRODITE_NOTIFY_URL",
 			"APHRODITE_NOTIFY_KEY",
 		] {
-			std::env::remove_var(k);
+			unsafe { std::env::remove_var(k) };
 		}
 		assert_eq!(cli.api_url, "https://env-api.example.com");
 		assert_eq!(cli.model, "env-model");
@@ -576,7 +576,7 @@ mod tests {
 	fn test_resolve_falls_back_to_toml_when_env_unset() {
 		let _g = env_guard();
 		for k in ["APHRODITE_API_URL", "APHRODITE_MODEL", "APHRODITE_CCR_TTL", "APHRODITE_DB"] {
-			std::env::remove_var(k);
+			unsafe { std::env::remove_var(k) };
 		}
 		let mc = multi_config_from_toml(
 			r#"
@@ -653,9 +653,9 @@ mod tests {
 	#[test]
 	fn test_resolve_missing_api_key_errors() {
 		let _g = env_guard();
-		std::env::remove_var("APHRODITE_API_KEY");
-		std::env::remove_var("DEEPSEEK_API_KEY");
-		std::env::remove_var("HEADROOM_DEEPSEEK_KEY");
+		unsafe { std::env::remove_var("APHRODITE_API_KEY") };
+		unsafe { std::env::remove_var("DEEPSEEK_API_KEY") };
+		unsafe { std::env::remove_var("HEADROOM_DEEPSEEK_KEY") };
 		let mc = multi_config_from_toml(
 			r#"
 			[[proxies]]
@@ -700,8 +700,8 @@ mod tests {
 		// api_url/model are env-overridable since T17 - guard against the
 		// process-global env vars racing with other tests in this module.
 		let _g = env_guard();
-		std::env::remove_var("APHRODITE_API_URL");
-		std::env::remove_var("APHRODITE_MODEL");
+		unsafe { std::env::remove_var("APHRODITE_API_URL") };
+		unsafe { std::env::remove_var("APHRODITE_MODEL") };
 		let mc = multi_config_from_toml(
 			r#"
 			[defaults]

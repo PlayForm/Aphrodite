@@ -283,9 +283,9 @@ mod tests {
 	#[test]
 	fn resolve_directives_dir_precedence() {
 		let _g = env_guard();
-		std::env::remove_var("APHRODITE_DIRECTIVES_DIR");
-		std::env::remove_var("APHRODITE_HOME");
-		std::env::remove_var("HOME");
+		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
+		unsafe { std::env::remove_var("APHRODITE_HOME") };
+		unsafe { std::env::remove_var("HOME") };
 
 		// No override at all -> degraded fallback with a warning, never fails.
 		let (dir, warnings) = resolve_directives_dir("");
@@ -293,13 +293,13 @@ mod tests {
 		assert!(!warnings.is_empty(), "degraded fallback must warn");
 
 		// $APHRODITE_HOME -> <home>/directives.
-		std::env::set_var("APHRODITE_HOME", "/tmp/aph-home");
+		unsafe { std::env::set_var("APHRODITE_HOME", "/tmp/aph-home") };
 		let (dir, warnings) = resolve_directives_dir("");
 		assert_eq!(dir, PathBuf::from("/tmp/aph-home/directives"));
 		assert!(warnings.is_empty());
 
 		// $APHRODITE_DIRECTIVES_DIR (the loader's candidate 0) beats the home override.
-		std::env::set_var("APHRODITE_DIRECTIVES_DIR", "/tmp/aph-exact");
+		unsafe { std::env::set_var("APHRODITE_DIRECTIVES_DIR", "/tmp/aph-exact") };
 		let (dir, _) = resolve_directives_dir("");
 		assert_eq!(dir, PathBuf::from("/tmp/aph-exact"));
 
@@ -307,8 +307,8 @@ mod tests {
 		let (dir, _) = resolve_directives_dir("/tmp/param-home");
 		assert_eq!(dir, PathBuf::from("/tmp/param-home/directives"));
 
-		std::env::remove_var("APHRODITE_DIRECTIVES_DIR");
-		std::env::remove_var("APHRODITE_HOME");
+		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
+		unsafe { std::env::remove_var("APHRODITE_HOME") };
 	}
 
 	// ── FFI round-trip: the exported C ABI entry point works end-to-end. ──

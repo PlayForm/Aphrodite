@@ -454,12 +454,12 @@ mod tests {
 
 		let original = std::env::current_dir().unwrap();
 		std::env::set_current_dir(&cwd_dir).unwrap();
-		std::env::set_var("APHRODITE_DIRECTIVES_DIR", &env_dir);
+		unsafe { std::env::set_var("APHRODITE_DIRECTIVES_DIR", &env_dir) };
 
 		let mut state = crate::state::AphroditeState::default();
 		Config::default().apply_compression(&mut state);
 
-		std::env::remove_var("APHRODITE_DIRECTIVES_DIR");
+		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
 		std::env::set_current_dir(&original).unwrap();
 		let _ = std::fs::remove_dir_all(&env_dir);
 		let _ = std::fs::remove_dir_all(&cwd_dir);

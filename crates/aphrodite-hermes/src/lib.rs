@@ -573,10 +573,10 @@ mod tests {
 	#[test]
 	fn test_configured_ports_falls_back_on_malformed_value() {
 		let _g = env_guard();
-		std::env::set_var("APHRODITE_CACHE_PORT", "not-a-port");
-		std::env::remove_var("APHRODITE_TOKEN_PORT");
+		unsafe { std::env::set_var("APHRODITE_CACHE_PORT", "not-a-port") };
+		unsafe { std::env::remove_var("APHRODITE_TOKEN_PORT") };
 		let (cache, token) = configured_ports();
-		std::env::remove_var("APHRODITE_CACHE_PORT");
+		unsafe { std::env::remove_var("APHRODITE_CACHE_PORT") };
 		assert_eq!(cache, DEFAULT_CACHE_PORT);
 		assert_eq!(token, DEFAULT_TOKEN_PORT);
 	}
@@ -584,9 +584,9 @@ mod tests {
 	#[test]
 	fn test_configured_ports_honors_valid_override() {
 		let _g = env_guard();
-		std::env::set_var("APHRODITE_CACHE_PORT", "19797");
+		unsafe { std::env::set_var("APHRODITE_CACHE_PORT", "19797") };
 		let (cache, _token) = configured_ports();
-		std::env::remove_var("APHRODITE_CACHE_PORT");
+		unsafe { std::env::remove_var("APHRODITE_CACHE_PORT") };
 		assert_eq!(cache, 19797);
 	}
 

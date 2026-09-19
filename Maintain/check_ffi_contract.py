@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Static FFI-contract checker for the Aphrodite Rust<->ctypes boundary.
 
-Verifies that every pointer-returning ``#[no_mangle] pub extern "C"`` export
+Verifies that every pointer-returning ``#[no_mangle]`` /
+``#[unsafe(no_mangle)]`` ``pub extern "C"`` export
 in ``crates/aphrodite-hermes/src/lib.rs`` that the Python shim binds or calls
 is configured with ``restype = c_void_p``. A missing restype is the historical
 SIGSEGV root cause: ctypes' default restype (``c_int``) reads the 64-bit
@@ -43,12 +44,13 @@ DEFAULT_BINDINGS = REPO_ROOT / "plugins" / "aphrodite" / "_bindings.py"
 EXPORT_PREFIX = "aphrodite_hermes_"
 VOID_P_SUFFIX = "c_void_p"
 
-# Matches `#[no_mangle]` followed by `pub [unsafe] extern "C" fn NAME(args)
+# Matches `#[no_mangle]` (pre-2024) or `#[unsafe(no_mangle)]` (edition
+# 2024) followed by `pub [unsafe] extern "C" fn NAME(args)
 # [-> RET] {`. Single-line signatures like the ones in lib.rs; tolerant of
 # whitespace/newlines between the signature and the body brace. Group 2 is
 # the argument list (counted by parse_export_arg_counts); group 3 the return.
 EXPORT_RE = re.compile(
-    r'#\[no_mangle\]\s+pub\s+(?:unsafe\s+)?extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([^{]+))?\s*\{',
+    r'#\[(?:unsafe\(no_mangle\)|no_mangle)\]\s+pub\s+(?:unsafe\s+)?extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([^{]+))?\s*\{',
     re.MULTILINE,
 )
 
@@ -66,7 +68,7 @@ def classify_return(ret):
 
 
 def parse_exports(librs_source):
-    """{symbol: return-kind} for every #[no_mangle] extern "C" fn in lib.rs."""
+    """{symbol: return-kind} for every #[no_mangle] / #[unsafe(no_mangle)] extern "C" fn in lib.rs."""
     exports = {}
     for match in EXPORT_RE.finditer(librs_source):
         exports[match.group(1)] = classify_return(match.group(3))
