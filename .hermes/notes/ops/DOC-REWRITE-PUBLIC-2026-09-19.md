@@ -8,15 +8,14 @@ values). NO COMMITS (auto-committer may
 sweep - verify with `git log`/`git status`, never fight it). Public-facing
 content must be free of internal process artifacts (no HANDOFF/STEP_ENGINE
 references, no task-queue sections, no feedback-note phrasing). Link branch
-rule (user correction 2026-09-19, refined same day): the branch in a repo
-link is a PER-FILE property - each file is a halted process, and the branch
-you find it on (and the branch it will be viewed from) decides its links:
-a file living on the Development working line gets `tree/Development`, a
-file living on the Current distribution line gets `tree/Current`. Infer per
-file with `git symbolic-ref --short HEAD` (or the file's position in the
-dual line) at edit time - never blanket-assume one branch for every file
-(see ground facts below; the original task text said "no tree/Development
-links - default branch is Current", which the user explicitly reversed).
+rule (standing convention, applies to every future editor): the branch in
+a repo link is a PER-FILE property - each file is a halted process, and the
+branch you find it on (and the branch it will be viewed from) decides its
+links: a file living on the Development working line gets `tree/Development`,
+a file living on the Current distribution line gets `tree/Current`. Infer
+per file with `git symbolic-ref --short HEAD` (or the file's position in
+the dual line) at edit time - never blanket-assume one branch for every
+file.
 
 ## Verified ground facts (2026-09-19, from source)
 
@@ -26,8 +25,7 @@ links - default branch is Current", which the user explicitly reversed).
   Development files → `tree/Development`, Current files →
   `tree/Current`. During this rewrite the docs/ tree lives on
   Development, so its links are `tree/Development` - that is the outcome
-  of per-file inference, not a blanket rule (user correction 2026-09-19:
-  links follow the branch the repo is developed on).
+  of per-file inference, not a blanket rule.
 - Binary 1.4.6, plugin 2.1.4 (`plugin.yaml`, `BINARY_VERSION`, both Cargo.toml).
 - Hooks: SIX (`on_session_start`, `pre_tool_call`, `transform_tool_result`,
   `transform_terminal_output`, `pre_llm_call`, `post_llm_call`) -
