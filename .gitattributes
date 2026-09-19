@@ -14,5 +14,4 @@
 *.ico binary
 
 # Export ignore (don't include in archive downloads)
-.hermes/ export-ignore
 .github/ export-ignore

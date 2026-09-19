@@ -43,14 +43,6 @@ plugins/aphrodite/aphrodite
 aphrodite.toml
 aphrodite.local.toml
 
-# ── Profiles - keep local, ship only examples ────────────────────────────────
-# Local profile dirs stay out of the tree; only profiles/example/ ships.
-# Re-include the dir first, then its contents - a bare `!profiles/example/`
-# under an excluded `profiles/` is a no-op.
-profiles/*
-!profiles/example/
-!profiles/example/**
-
 # ── IDE / editors ───────────────────────────────────────────────────────────
 .idea/
 *.swp
