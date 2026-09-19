@@ -588,6 +588,24 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 		})
 	});
 
+	// ── debug: per-session debug toggle (Rust-side only) ──
+	// Flips the session-scoped flag file in the runtime home. Resolution is
+	// root-session based (see debug.rs): the CURRENT session's root id keys the
+	// flag, so subagents inherit it and other sessions stay quiet. Pure Rust -
+	// the customer-facing Python shim is untouched.
+	m.insert("aphrodite_debug", |args| {
+		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
+		match crate::debug::set_enabled_current(on) {
+			Ok((session, flag)) => serde_json::json!({
+				"status": "ok",
+				"debug": on,
+				"session": session,
+				"flag": flag,
+			}),
+			Err(e) => serde_json::json!({"error": e}),
+		}
+	});
+
 	// ── context engine pre-LLM hook (registered via ctx.register_context_engine) ──
 	// 05-P1/T1: same single assembler as the bridge `pre_llm_call` arm and core
 	// `hooks::pre_llm_call`, so this path can't fork on what the model sees.

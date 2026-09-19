@@ -23,14 +23,21 @@
 //! Toggle from a session:
 //!   echo on  > ~/.hermes/aphrodite/debug.<root-session-id>
 //!   echo off > ~/.hermes/aphrodite/debug.<root-session-id>
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::{
+	collections::HashMap,
+	path::{Path, PathBuf},
+	sync::{Mutex, OnceLock},
+};
 
 /// session_id -> parent_session_id map, learned from `pre_llm_call` kwargs.
 /// Bounded: a session records its parent exactly once; the map only grows
 /// with the number of distinct sessions, which is small per process.
 static SESSION_PARENTS:OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+/// The most recently seen session id (updated on every hook dispatch). The
+/// `aphrodite_debug` tool has no session in its args - it toggles whatever
+/// session the surrounding hooks belong to, which is the calling session.
+static LAST_SESSION:OnceLock<Mutex<String>> = OnceLock::new();
 
 /// flag-file path -> (mtime, enabled) cache; one entry per distinct flag.
 static FLAG_CACHE:OnceLock<Mutex<HashMap<String, (f64, bool)>>> = OnceLock::new();
@@ -48,7 +55,17 @@ fn runtime_home() -> PathBuf {
 /// Record session -> parent from a `pre_llm_call` invocation. Empty or
 /// self-referential pairs are ignored (a root session has no parent).
 pub(crate) fn record_session(session:&str, parent:&str) {
-	if session.is_empty() || parent.is_empty() || session == parent {
+	if session.is_empty() {
+		return;
+	}
+	{
+		let mut last = LAST_SESSION
+			.get_or_init(|| Mutex::new(String::new()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner);
+		*last = session.to_string();
+	}
+	if parent.is_empty() || session == parent {
 		return;
 	}
 	let mut map = SESSION_PARENTS
@@ -72,20 +89,16 @@ fn session_chain(session:&str) -> Vec<String> {
 			Some(p) if p != &cur => {
 				chain.push(p.clone());
 				cur = p.clone();
-			}
+			},
 			_ => break,
 		}
 	}
 	chain
 }
 
-fn flag_path_for(session:&str) -> PathBuf {
-	runtime_home().join(format!("{}.{}", FLAG_PREFIX, session))
-}
+fn flag_path_for(session:&str) -> PathBuf { runtime_home().join(format!("{}.{}", FLAG_PREFIX, session)) }
 
-fn global_flag_path() -> PathBuf {
-	runtime_home().join(FLAG_PREFIX)
-}
+fn global_flag_path() -> PathBuf { runtime_home().join(FLAG_PREFIX) }
 
 /// Mtime-cached read of one flag file; missing file = off.
 fn flag_enabled(path:&Path) -> bool {
@@ -138,10 +151,50 @@ pub(crate) fn enabled_for(session:&str) -> bool {
 	false
 }
 
+/// Resolve the most recently seen session's ROOT id.
+fn current_root() -> String {
+	let last = LAST_SESSION
+		.get_or_init(|| Mutex::new(String::new()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	if last.is_empty() {
+		return String::new();
+	}
+	session_chain(&last).last().cloned().unwrap_or_else(|| last.clone())
+}
+
+/// Set (or clear) the debug flag for the CURRENT session tree - the tool
+/// entry point for `aphrodite_debug`. Returns the resolved root session id
+/// and the flag path written, so the caller can report both.
+pub(crate) fn set_enabled_current(on:bool) -> Result<(String, String), String> {
+	let root = current_root();
+	if root.is_empty() {
+		return Err("no session context yet - hooks have not fired in this process".to_string());
+	}
+	let flag = flag_path_for(&root);
+	std::fs::write(&flag, if on { "on" } else { "off" }).map_err(|e| format!("write {}: {}", flag.display(), e))?;
+	// Invalidate the mtime cache so the next read picks up the new value.
+	let key = flag.to_string_lossy().into_owned();
+	if let Some(cache) = FLAG_CACHE.get() {
+		let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+		guard.remove(&key);
+	}
+	Ok((root, flag.to_string_lossy().into_owned()))
+}
+
 /// Build a `[aphrodite-debug ...]` prefix line from a compression result
 /// when the flag is on for `session`; `None` when off (no allocation on the
 /// quiet path).
 pub(crate) fn debug_line(r:&serde_json::Value, session:&str) -> Option<String> {
+	if !session.is_empty() {
+		// Any transform hook that names a session updates the tool's notion
+		// of "current session" too (the debug tool takes no session arg).
+		let mut last = LAST_SESSION
+			.get_or_init(|| Mutex::new(String::new()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner);
+		*last = session.to_string();
+	}
 	if !enabled_for(session) {
 		return None;
 	}
