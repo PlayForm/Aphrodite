@@ -118,8 +118,11 @@ Resumed by orchestrator after the morning session died on provider 429/401s.
       deleg_6e117e0c: A 723s 18 disc, B 539s 9 disc; both prettier-clean)
 - [x] Wave 3 PAIR-5-A/B: docs/plugin/ + docs/tool-relay/ (landed deleg_e4b3f0f2:
       A 608s 13 disc hooks=SIX, B 654s 16 disc tools=13; both prettier-clean)
-- [~] Wave 3 PAIR-6-A/B: docs/examples/ + docs/release-notes/ (RUNNING
-      deleg_72ca1bf0)
+- [x] Wave 3 PAIR-6-A/B: docs/examples/ + docs/release-notes/ (landed
+      deleg_72ca1bf0: A 465s 12 disc, B 252s; both prettier-clean. Flag:
+      marker-format.md preview-first claim vs real marker-preview relay -
+      orchestrator final pass)
+- [~] Wave 4 PAIR-7-A/B: stale-content audit READ-ONLY (RUNNING deleg_b7c7d65c)
 - [ ] Wave 2 PAIR-4-A/B: docs/proxy/ + docs/api/ + docs/metrics/ (briefs
       staged .hermes/tmp/DOC-REWRITE-BRIEF-PAIR4-A.md / PAIR4-B.md)
 - [ ] Wave 3 PAIR-5-A/B: docs/plugin/ + docs/tool-relay/ (briefs staged
