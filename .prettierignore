@@ -1,0 +1,414 @@
+# Aphrodite Prettier ignore
+# Designed for VS Code `**/*` glob - excludes everything Prettier can't parse
+
+# ═══════════════════════════════════════════════
+# Formatters that own their own file types
+# ═══════════════════════════════════════════════
+
+# Rust - rustfmt owns .rs formatting
+*.rs
+
+# TOML - taplo / even-better-toml owns .toml
+*.toml
+
+# Python - ruff/black owns .py
+*.py
+*.pyi
+*.pyc
+*.pyo
+__pycache__/
+**/__pycache__/
+.venv/
+venv/
+
+# Shell - shfmt owns .sh / .bash
+*.sh
+*.bash
+*.env.sh
+.env.sh
+
+# ═══════════════════════════════════════════════
+# Vendored / submodules / generated code
+# ═══════════════════════════════════════════════
+
+vendor/
+**/vendor/
+**/vendor/**
+
+plugins/
+**/plugins/
+**/plugins/**
+
+# Generated / codegen
+**/Generated/
+**/Generated/**
+**/.generated/
+**/.generated/**
+**/gen/
+**/gen/**
+
+# ═══════════════════════════════════════════════
+# Rust / Cargo build artifacts
+# ═══════════════════════════════════════════════
+
+target/
+Target/
+**/target/
+**/target/**
+**/Target/
+**/Target/**
+**/.fingerprint
+**/.fingerprint/**
+**/incremental
+**/incremental/**
+**/deps
+**/deps/**
+.cargo/
+Cargo.lock
+
+# ═══════════════════════════════════════════════
+# Node / package manager
+# ═══════════════════════════════════════════════
+
+node_modules/
+**/node_modules/
+**/node_modules/**
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.turbo
+**/.turbo
+
+# ═══════════════════════════════════════════════
+# Hermes runtime data
+# ═══════════════════════════════════════════════
+
+.hermes/
+**/.hermes/
+**/.hermes/**
+profiles/
+**/profiles/
+**/profiles/**
+*.session
+*.session.*
+
+# ═══════════════════════════════════════════════
+# Git / VCS
+# ═══════════════════════════════════════════════
+
+.git/
+**/.git/
+**/.git/**
+.gitmodules
+.gitattributes
+.gitignore
+
+# ═══════════════════════════════════════════════
+# Binary / generated / archive formats
+# ═══════════════════════════════════════════════
+
+# Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+*.webp
+*.bmp
+*.tiff
+*.avif
+
+# Fonts
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.otf
+
+# Archives
+*.gz
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+*.bz2
+*.xz
+
+# Binaries / executables
+*.wasm
+*.bin
+*.exe
+*.dll
+*.so
+*.dylib
+*.dmg
+*.pkg
+*.app
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+
+# Documents
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.odt
+*.ods
+
+# Audio / video
+*.mp3
+*.mp4
+*.wav
+*.ogg
+*.flac
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# ═══════════════════════════════════════════════
+# Cache / temp / lock files
+# ═══════════════════════════════════════════════
+
+*.cache
+*.tmp
+*.temp
+*.log
+*.lock
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ═══════════════════════════════════════════════
+# Config / secrets (never format)
+# ═══════════════════════════════════════════════
+
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cert
+*.cer
+*.p12
+*.pfx
+*.token
+*credentials*
+*secret*
+
+# ═══════════════════════════════════════════════
+# Minified / bundled files
+# ═══════════════════════════════════════════════
+
+*.min.js
+*.min.css
+*.min.js.map
+*.bundle.js
+*.bundle.css
+**/dist/
+**/dist/**
+**/build/
+**/build/**
+**/out/
+**/out/**
+
+# ═══════════════════════════════════════════════
+# IDE / editor
+# ═══════════════════════════════════════════════
+
+.idea/
+**/.idea/
+**/.idea/**
+*.sublime-*
+.project
+.classpath
+.settings/
+
+# ═══════════════════════════════════════════════
+# CI / CD
+# ═══════════════════════════════════════════════
+
+.github/
+**/.github/
+**/.github/**
+.gitlab-ci.yml
+.jenkins
+.travis.yml
+.azure-pipelines
+.circleci
+
+# ═══════════════════════════════════════════════
+# Misc - files Prettier chokes on
+# ═══════════════════════════════════════════════
+
+# Compiled/bundled JS (not source)
+**/compiled/
+**/compiled/**
+**/transpiled/
+**/transpiled/**
+
+# Large data files
+*.csv
+*.tsv
+*.ndjson
+*.jsonl
+*.parquet
+*.arrow
+
+# Protocol buffers / schema
+*.proto
+*.pb
+*.graphqls
+*.graphql
+
+# Docker
+Dockerfile
+.dockerignore
+*.dockerfile
+
+# License files (formatting breaks legal text)
+LICENSE
+LICENSE-*
+COPYING
+NOTICE
+
+# Graphviz / diagram sources
+*.dot
+*.mmd
+*.puml
+
+# ═══════════════════════════════════════════════
+# Test fixtures - intentionally invalid/malformed
+# ═══════════════════════════════════════════════
+
+*fixture*
+*fixtures*
+*test_data*
+*test-fixtures*
+**/fixtures/
+**/fixtures/**
+**/test-fixtures/
+**/test-fixtures/**
+**/test_data/
+**/test_data/**
+*invalid*.yml
+*invalid*.yaml
+*invalid*.json
+*malformed*
+
+# ═══════════════════════════════════════════════
+# JS / web build caches (borrowed from Land)
+# ═══════════════════════════════════════════════
+
+.astro
+**/.astro
+**/.astro/**
+.cache
+**/.cache
+**/.cache/**
+.parcel-cache
+**/.parcel-cache
+**/.parcel-cache/**
+.swc
+**/.swc
+**/.swc/**
+.next
+**/.next
+**/.next/**
+
+# ═══════════════════════════════════════════════
+# Coverage / profiling / docs output
+# ═══════════════════════════════════════════════
+
+coverage/
+**/coverage/
+**/coverage/**
+.nyc_output/
+**/.nyc_output/
+*.profraw
+*.profdata
+**/Documentation/
+**/Documentation/**
+
+# ═══════════════════════════════════════════════
+# Additional generated / autogenerated
+# ═══════════════════════════════════════════════
+
+**/autogenerated/
+**/autogenerated/**
+**/bin/
+**/bin/**
+
+# ═══════════════════════════════════════════════
+# Package publishing
+# ═══════════════════════════════════════════════
+
+.npmignore
+.npmrc
+*.tgz
+
+# ═══════════════════════════════════════════════
+# Minified / compressed (broad catch)
+# ═══════════════════════════════════════════════
+
+*.min.*
+*-min.*
+*.bundle.*
+
+# The plugin README is authored in the monorepo style - re-include exactly
+# that one file (gitignore semantics: the directory exclusions above must be
+# undone first, then everything under plugins/aphrodite re-excluded, then the
+# README re-included - a bare !file inside an excluded dir is a no-op).
+!plugins/
+!plugins/aphrodite/
+plugins/aphrodite/**
+!plugins/aphrodite/README.md
+
+# Plugin directive markdown is authored prose - re-include under the same
+# gitignore semantics as the README above (dir un-excluded first, then
+# contents re-excluded, then .md re-included LAST).
+# NOTE: directives no longer ship in the plugin (they are binary-provided
+# into the canonical runtime-home directives dir) - this block is kept only
+# for historical compat and can be removed once the plugin tree is clean.
+
+# .hermes is the dev archive: formattable markdown only, categorized by
+# .hermes/<category>/<thing>.md. Order matters (gitignore semantics): the
+# blanket re-exclude must come FIRST, then dirs re-included (so prettier can
+# descend), then md files re-included LAST. A negation for a file inside an
+# excluded dir is a no-op, so dirs must never end up excluded.
+!.hermes/
+.hermes/**
+!.hermes/**/
+!.hermes/**/*.md
+
+!.vscode/
+.vscode/**
+!.vscode/settings.json
+
+# Benchmark suite - machine-generated corpora, results, harnesses; not
+# authored prose (keep out of formatting).
+bench/
+**/bench/
+**/bench/**
