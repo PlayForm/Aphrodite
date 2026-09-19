@@ -34,7 +34,7 @@ tags: [aphrodite, ccr, compression, retrieve, testing]
 | `aphrodite_files`           | List all file paths referenced in session       | none                                                                        |
 | `aphrodite_directive`       | Manage behavioral directives                    | `action`, `name`                                                            |
 
-## CCR Marker Handling (the retrieve-first rule)
+## CCR Marker Handling (preview-sufficiency first; retrieve only on need)
 
 Marker shape:
 
@@ -47,18 +47,37 @@ Marker shape:
   build_output, terminal)
 - `172` - byte size of the original content
 
-> **Every `<<<CCR:hash|type|size>>>` in tool output IS compressed content.
-> Retrieve it immediately with `aphrodite_retrieve(hash)`, before any other
-> action.** Markers are not opaque - the content is behind them, cheaply
-> retrievable (sub-ms from SQLite).
+**The preview IS the answer - the environment is good enough to proceed
+without retrieving. This is the standing rule in EVERY session, not a
+session-specific convenience.** The preview is the FINAL, honest
+representation of the stored payload (a broken/misleading preview is a bug,
+not cosmetic). The marker is always retrievable later (sub-ms from SQLite,
+returns the original verbatim), so skipping retrieval loses nothing - it
+defers, it never discards. When a preview answers the question at hand, STOP
+and proceed; do not retrieve to satisfy a stricter standard you imposed on
+yourself.
+
+**Retrieval is question-driven, never marker-driven:**
+
+- Preview answers the question → skip retrieval, proceed. (e.g. a
+  `[test:13 pass 0 fail 0 ignored]` preview answers "did the probe pass?")
+- The question needs facts the preview cannot carry (exact hashes, specific
+  lines, error text) → retrieve, prefer a `query` filter over full content.
+- Never retrieve to "verify storage" or because a marker *exists* - that
+  wastes tokens and context.
 
 Why agents fail:
 
-1. They ignore the marker and proceed without the content.
+1. They over-retrieve: the preview already answered, but they impose an extra
+   proof standard (hashes, byte counts) the question never demanded, then
+   retrieve to satisfy their own requirement.
 2. They re-read the source file with `read_file` instead of retrieving - the
    marker IS the content; re-reading just yields another marker.
 3. They treat the marker as opaque, not knowing it contains the content.
-4. They retrieve one marker at a time - retrieve ALL markers in the same turn.
+4. They retrieve one marker at a time - retrieve ALL markers the next action
+   actually needs in the same turn (one `tool_call` with multiple local
+   entries is rejected - issue local retrieves one at a time, or batch only
+   connector tools).
 
 ## Using `aphrodite_retrieve`
 
@@ -99,13 +118,15 @@ the actual content, never to verify storage (that wastes tokens and context).
 Auto-expand is vestigial in the current codebase (the `auto_expand*` config
 keys have no consumer - see `aphrodite-auto-expand-testing`). Raw markers are
 the normal state for terminal output, background worker logs, and compressed
-context. Whenever you SEE a marker, retrieve it immediately - the
-retrieve-first rule is unconditional.
+context. Whenever a marker's preview does NOT answer the question at hand,
+retrieve it - the preview-sufficiency rule is the standing default, retrieval
+is the exception driven by need.
 
 ## Active Directives
 
-- **focus** - targeted execution, CCR-first retrieval; every marker must be
-  retrieved immediately.
+- **focus** - targeted execution, preview-aware retrieval; every marker is
+  read via its preview, retrieved only when the action needs content the
+  preview doesn't carry.
 - **foresight** - anticipate I/O; after `search_files`, prefetch the top 5-10
   results; use `aphrodite_prefetch` for batches of 3+ files.
 
@@ -130,8 +151,12 @@ aphrodite_directive(action="swap", name="explore")  # swap directives
 
 ## Checklist for Agents
 
-- [ ] See `<<<CCR:hash|type|size>>>` → `aphrodite_retrieve(hash=...)` NOW
-- [ ] Multiple markers → retrieve ALL in the same turn
+- [ ] See `<<<CCR:hash|type|size>>>` → decide from the PREVIEW whether the
+      action needs the full content; skip retrieval when the preview answers
+      (standing rule, every session)
+- [ ] Question needs facts the preview can't carry → `aphrodite_retrieve(hash=...)`,
+      prefer a `query` filter over full content
+- [ ] Multiple markers the next action needs → retrieve them in the same turn
 - [ ] Retrieval fails → fall back to `read_file` or `terminal`
 - [ ] Never re-read a file you hold a live marker for - the marker IS the content
 - [ ] `aphrodite_test(mode="quick")` to verify engine health
