@@ -1,97 +1,70 @@
-# Inline CCR (LruCache)
+# Inline CCR
 
-Tiny entries (under 256 bytes) bypass the CCR backend round-trip entirely. An
-`lru::LruCache` held on `AppState` provides O(1) retrieval without any I/O,
-avoiding the cost of spawning a blocking task for a SQLite read or acquiring a
-DashMap shard lock for content that's trivially small.
+Tiny entries bypass the CCR backend round-trip entirely. Two inline stores
+exist: one in the proxy process for chat-completions and HTTP tool-relay
+traffic, and one in the Hermes session engine for the plugin-side
+compress/retrieve path. Both provide O(1) retrieval without backend I/O for
+content that is trivially small.
 
-## Struct
+## Proxy Inline Store
 
-As a Rust struct:
+An `lru::LruCache` held on the proxy's shared state:
 
 ```rust
 pub inline_ccr: std::sync::Mutex<lru::LruCache<String, String>>
 ```
 
-Constructed at startup:
+Constructed at startup with capacity 1,024.
 
-```rust
-inline_ccr: Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap()))
-```
+| Parameter      | Value                                                                                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entries        | 1,024 (hard cap via LruCache)                                                                                                                        |
+| Size threshold | inline threshold, default 256 B (`INLINE_CCR_THRESHOLD`), configurable via `APHRODITE_INLINE_THRESHOLD` env or TOML `[compression] inline_threshold` |
+| TTL            | None - pure LRU eviction                                                                                                                             |
 
-## Capacity
+Content lands here when it is above the inline threshold but at or below the
+compression threshold for its type - too big to ignore, too small to send to
+the backend. Before inserting, a `contains()` check prevents duplicate
+entries; hits and misses are tracked via `inline_ccr_hits` /
+`inline_ccr_misses` counters.
 
-| Parameter      | Value                                |
-| -------------- | ------------------------------------ |
-| Entries        | 1,024 (hard cap via LruCache)        |
-| Size threshold | < 256 bytes (`INLINE_CCR_THRESHOLD`) |
+In the tool-relay path, tiny content is stored inline AND best-effort to the
+durable backend when one is configured: the inline map is process memory, so
+a busy session could evict the entry while its marker still looks durable.
+The inline copy serves reads until eviction; a failed durable put does not
+fail the call.
 
-## TTL
+## Session Inline Store
 
-None - pure LRU eviction. Entries evicted when LruCache exceeds capacity on
-`put()`.
+The Hermes session engine keeps its own inline store in state
+(`state.rs`): a `HashMap<String, String>` with an LRU order queue
+(`VecDeque`), entry-count and byte-budget bounds, and a promoting `get`.
 
-## Storage Decision
+| Parameter   | Value                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| Entries     | 500 (`INLINE_MAX`)                                                                         |
+| Byte budget | 256 MiB (`DEFAULT_INLINE_BYTE_BUDGET`)                                                     |
+| TTL         | None - LRU + byte-budget eviction                                                          |
+| Membership  | `inline_store_contains` is non-promoting (checking resolvability never perturbs LRU order) |
 
-Content is stored in inline_ccr when:
-
-1. Content size > `INLINE_CCR_THRESHOLD` (256B)
-2. Content size ≤ compression threshold for its type
-3. (i.e., too big to ignore entirely, too small to compress to CCR backend)
-
-```rust
-} else if content.len() > INLINE_CCR_THRESHOLD {
-    // Below compression threshold but above inline threshold
-    let hash = compute_key(content.as_bytes());
-    if let Ok(mut map) = state.inline_ccr.lock() {
-        if map.contains(&hash) {
-            state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
-        } else {
-            state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
-            map.put(hash, content.to_string());
-        }
-    }
-}
-```
-
-Same logic applies to tool call arguments.
-
-## Dedup
-
-Before storing, `contains()` check prevents duplicate entries. Hits/misses
-tracked via `inline_ccr_hits` / `inline_ccr_misses` AtomicU64 counters.
+Eviction drops the least-recently-used entry until both the entry-count cap
+and the byte budget are satisfied; lowering the budget evicts immediately.
+This store backs `aphrodite_prefetch`, `aphrodite_compress`, and recursive
+marker resolution, and is the source of truth for retrieval - it round-trips
+arbitrary content (NUL bytes, multibyte UTF-8, literal marker-shaped text)
+byte-for-byte.
 
 ## Retrieval Priority
 
-In the retrieve handler:
+Both paths check the inline store first, then fall back to the CCR backend:
 
-1. Check inline_ccr first (lock dropped before any `.await`)
-2. If hit: return immediately, increment `inline_ccr_hits` + `ccr_hits`
-3. If miss: increment `inline_ccr_misses`, fall through to CCR backend
-
-In the tool relay execution path:
-
-1. Check inline_ccr first for `aphrodite_retrieve`
-2. If miss: fallback to CCR store
+1. Inline hit -> return immediately (proxy: also increment `ccr_hits`).
+2. Inline miss -> increment `inline_ccr_misses`, fall through to the backend.
+3. Backend miss -> 404 `NOT_FOUND` (HTTP) / `{"found": false}` (tool).
 
 ## Lock Safety
 
-`Mutex<LruCache>` - lock is held only for cache operations (lookup/insert). Lock
-is dropped before any `.await` (e.g., before spawning blocking CCR store tasks)
-to avoid `!Send` MutexGuard crossing await points.
-
-## Python Plugin Inline Store (Separate)
-
-The Python plugin maintains its own inline store, `_CappedStore` (capped at
-500 entries), for when the proxy is down. This is NOT the same store - it
-lives in the Hermes Python process, not in the proxy Rust process.
-
-| Property    | Rust Inline (LruCache)          | Python Inline (`_CappedStore`)  |
-| ----------- | ------------------------------- | ------------------------------- |
-| Type        | `lru::LruCache<String, String>` | `OrderedDict` (subclass)        |
-| Capacity    | 1,024                           | 500                             |
-| TTL         | None (LRU)                      | None (LRU)                      |
-| Eviction    | `put()` triggers LRU pop        | `__setitem__` triggers LRU pop  |
-| Index       | None                            | Trigram index (lazy)            |
-| Hash format | BLAKE3, 24 hex                  | SHA-256, 24 hex; or `i:` prefix |
-| Process     | Rust proxy                      | Python Hermes plugin            |
+The proxy's `Mutex<LruCache>` is held only for cache operations (lookup,
+insert) and dropped before any `.await` (e.g. before a blocking backend
+task), so a `!Send` guard never crosses an await point. The session store is
+owned by the engine's single-threaded state and needs no lock.
