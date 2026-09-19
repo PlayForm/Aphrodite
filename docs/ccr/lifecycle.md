@@ -1,264 +1,175 @@
 # CCR Lifecycle
 
-CCR (Compress-Cache-Retrieve) provides lossless end-to-end compression for LLM
-proxy traffic. Content is hashed, compressed, stored, and replaced with a
-marker in the response; the LLM retrieves the original by hash if it needs the
-full content. The `/ccr/create` endpoint (direct CCR store, no chat response)
-also updates the compression EMA after each successful store, using a
-trigram-uniqueness heuristic to estimate the compressed size. This doc walks
-through the six phases of that lifecycle, from initial compression to eventual
-expiry.
+CCR (Compress-Cache-Retrieve) is the lossless end-to-end compression path for
+LLM proxy traffic: content is hashed, stored, and replaced with a compact
+marker in the response, and the original is retrieved by hash on demand. This
+document walks the six phases of that lifecycle, from compression to expiry.
 
 ## Phase 1: Compress
 
-```
-1. Parse Chat Completions response JSON
-2. For each choice.message.content:
-   a. detect_content_type() → ct (e.g., "code_rust", "error", "diff")
-   b. threshold_for(ct) × budget_mult (from x-headroom-budget) → threshold
-   c. If content.len() > threshold:
-      i.   compute_key(content) → hash (BLAKE3, 40 hex chars)
-      ii.  Check CCR cache: ccr.get(hash) → hit or miss
-      iii. If miss: ccr.put(hash, content), increment ccr_created
-      iv.  Update tokens_saved counter
-      v.   Generate smart_marker(hash, content, ct) → marker string
-      vi.  Replace content with marker in JSON
-      vii. update_compression_ratio(original_len, marker_len) → EMA
-   d. Else if content.len() > INLINE_CCR_THRESHOLD (256B):
-      i.   compute_key(content) → hash
-      ii.  Store in inline_ccr LruCache (max 1024 entries)
-```
+The chat-completions path rewrites each `choices[].message.content` that is
+large enough to be worth compressing:
 
-`tool_calls[].function.arguments` is **never** a compression target (v1.3.2):
-it's client-executable JSON, not model-facing prose - an earlier version of
-the pipeline (and of this doc) compressed large tool-call arguments into a
-CCR marker string, which a real OpenAI-tools client (no Aphrodite plugin)
-can't parse as JSON, breaking every tool call it made. SSE
-(`text/event-stream`) responses also bypass this phase entirely - see
-[Proxy: Architecture](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#streaming-sse).
+1. Detect the content type (`proxy::proxy_detect_content_type`).
+2. Compute the threshold for that type (base threshold x type multiplier x
+   auto-tune factor x budget multiplier - see Thresholds below).
+3. If `content.len() > threshold`: compute the BLAKE3 hash, check the CCR
+   backend (hit or miss), store on miss, and replace the content with a
+   rendered marker. A content block is only replaced when the store actually
+   holds the hash - a failed store leaves the content uncompressed rather
+   than emitting an unresolvable marker.
+4. If the content is above the inline threshold but below the compression
+   threshold, store it in the inline cache instead (see
+   [Inline](backends/inline.md)).
+5. Update the savings counters and the compression-ratio EMA used by
+   auto-tune.
+
+`tool_calls[].function.arguments` is never a compression target: it is
+client-executable JSON, not model-facing prose, and compressing it would
+produce a tool call the client cannot parse. Streaming (`text/event-stream`)
+responses bypass this phase entirely.
+
+The direct `POST /ccr/create` endpoint stores content without rendering a
+marker in any response, but feeds the same counters and the same
+compression-ratio EMA (using a byte-entropy estimate - unique 3-byte
+trigrams in the first 4096 bytes - as the effective compressed size).
 
 ## Phase 2: Cache
 
-### Cache Check
+Before storing, the hash is checked against the backend (`ccr_hits` /
+`ccr_misses` counters) and against the inline cache (`inline_ccr_hits` /
+`inline_ccr_misses`).
 
-```
-ccr.get(hash) → hit? ccr_hits++ : ccr_misses++ (then store)
-```
+A separate LLM response cache avoids repeat upstream round-trips for
+identical requests:
 
-### /ccr/create Path (Direct CCR Store)
-
-The direct `POST /ccr/create` endpoint follows a shorter path than the Chat
-Completions pipeline (no response body to rewrite, no marker rendered in a
-response), but it ALSO updates the compression EMA:
-
-```
-1. Parse CcrCreateRequest JSON → content, optional key, TTL, tags
-2. compute_key(content.as_bytes()) → hash
-3. ccr.put(hash, content) → stored
-4. tokens_saved += original_size - hash.len()
-5. requests_compressed += 1
-6. estimate_compressed_size(content) → trigram-uniqueness heuristic
-7. update_compression_ratio(original_size, estimated_compressed_size) → EMA
-```
-
-This path feeds the same EMA that the Chat Completions path does, so auto-tune
-thresholds react to content flowing through either endpoint.
-
-### Inline Cache Check
-
-```
-inline_ccr.contains(hash)? inline_ccr_hits++ : inline_ccr_misses++ (then store)
-```
-
-### LLM Response Cache
-
-```
-cache_key = FNV-1a(api_key + ":" + model + ":" + serialized_messages)
-response_cache.get(cache_key) → hit? return cached : proceed to upstream
-```
-
-| Property        | Detail                                             |
-| --------------- | -------------------------------------------------- |
-| Hash            | FNV-1a 64-bit (deterministic across restarts)      |
-| Capacity        | LRU, 128 entries                                   |
-| Key scope       | Includes `api_key` to prevent cross-user collision |
-| Response header | `X-Aphrodite-Cache: HIT` or `MISS`                 |
+| Property        | Detail                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Key             | FNV-1a 64-bit over api key, model, messages, tools, tool_choice, temperature, top_p, n, and response_format, in fixed canonical order |
+| Capacity        | LRU, 128 entries, 1 MiB per body                                                                                                      |
+| TTL             | `ccr_ttl_seconds` (default 3600, env `APHRODITE_CCR_TTL`)                                                                             |
+| Scope           | Streaming requests are never cached; successful responses only                                                                        |
+| Response header | `X-Aphrodite-Cache: HIT` or `MISS`                                                                                                    |
 
 ## Phase 3: Store
 
-Three storage tiers by content size and mode:
+Three storage tiers, plus the session-side inline store used by the Hermes
+plugin integration:
 
-| Tier       | Threshold | Backend                         | Capacity         | TTL                          |
-| ---------- | --------- | ------------------------------- | ---------------- | ---------------------------- |
-| Inline     | < 256B    | `lru::LruCache<String, String>` | 1,024 entries    | LRU eviction only            |
-| Cache mode | > 8KB     | `InMemoryCcrStore` (DashMap)    | 10,000 entries   | Configurable (default 3600s) |
-| Token mode | > 1KB     | `SqliteCcrStore` (SQLite)       | Unlimited (disk) | Configurable (default 3600s) |
+| Tier             | Threshold                                                 | Backend                          | Capacity             | Expiry                                             |
+| ---------------- | --------------------------------------------------------- | -------------------------------- | -------------------- | -------------------------------------------------- |
+| Inline (proxy)   | inline threshold (256 B default) to compression threshold | `lru::LruCache`                  | 1,024 entries        | LRU eviction only                                  |
+| Inline (session) | any prefetched / compressed blob                          | HashMap + LRU order, byte budget | 500 entries, 256 MiB | LRU + byte-budget eviction                         |
+| Cache mode       | > 8 KiB                                                   | `InMemoryCcrStore` (DashMap)     | 10,000 entries       | Sliding idle TTL (default 3600 s), 8x max lifetime |
+| Token mode       | > 1 KiB                                                   | `SqliteCcrStore` (SQLite)        | Unlimited (disk)     | Sliding idle TTL (default 3600 s), 8x max lifetime |
 
-### Python Plugin Inline Store
-
-Separate from the Rust inline store: `_CappedStore`, an `OrderedDict`-backed
-store capped at 500 entries. Used when the proxy is down.
+Backend details live in [backends](backends/). Thresholds are configurable:
+env var > TOML `[compression]` > compiled-in default for cache, token,
+inline, and code multiplier.
 
 ## Phase 4: Return Marker
 
-### Cache Mode Response
-
-```
-<<<CCR:HASH|TYPE|SIZE>>>
-FIRST_512_BYTES_OF_CONTENT
-```
-
-Entire response JSON is rewritten. Response headers:
+Cache mode replaces content with a plain 512-character excerpt plus the
+marker line; token mode renders a type-aware summary with metadata. Both use
+the same `format_ccr_output` template (see [Marker Format](marker-format.md)).
+Compressed responses carry:
 
 - `X-Aphrodite-Compressed: true`
-- `X-Aphrodite-Cache: MISS` (or `HIT`)
-- `X-Aphrodite-Fill-Pct: XX.X`
-
-### Token Mode Response
-
-```
-<<<CCR:HASH|TYPE|SIZE|METADATA>>>
-```
-
-Includes structured metadata (language, functions, line count, etc.).
+- `X-Aphrodite-Cache: HIT` or `MISS`
+- `X-Aphrodite-Fill-Pct: XX.X` (headroom fill derived from the compression
+  ratio EMA)
 
 ## Phase 5: Retrieve
 
-Retrieval flow:
+The HTTP `/retrieve` endpoint resolves a hash to its original content:
 
-```
-1. Validate hash parameter (required); normalize it (strip a trailing
-   `|type|size` marker-body suffix an LLM might echo back, trim whitespace -
-   marker::normalize_hash)
-2. Check inline_ccr (LruCache):
-   a. Hit → return content immediately
-   b. Miss → fall through to CCR backend
-3. Check CCR backend (SQLite or in-memory):
-   a. ccr.get(hash) → hit or miss
-4. If miss: 404 NOT_FOUND
-5. Apply optional query filter (case-insensitive line grep, truncated to
-   512 chars, char-safe)
-6. Apply optional pagination (offset + limit, limit clamped to 10,000 lines)
-7. Return {found: true/false, content: "…", source: "ccr"/"none",
-   truncated: true/false}
-```
+1. Normalize the hash argument (strip a trailing `|type|size` suffix, trim).
+2. Check the inline cache first; on a hit, return immediately.
+3. Fall back to the CCR backend; on a miss, return 404 `NOT_FOUND`.
+4. Apply an optional `query` filter (case-insensitive line match, query
+   capped at 512 chars) and optional pagination (`offset` + `limit`; an
+   explicit `limit` is clamped to 10,000 lines, `limit: 0` returns the full
+   document).
+5. Windowed results are prefixed with a `[lines a-b/total]` header and
+   flagged via the `truncated` field.
 
-Full-document retrieval is byte-identical since v1.3.2: a stored file ending
-in `\n` used to come back one byte short (`str::lines()` discards the
-trailing newline and `join("\n")` never restored it), breaking the
-content-addressing round-trip. The `truncated` response field (also v1.3.2)
-lets a client detect a windowed/capped result without parsing the
-`[lines a-b/total]` header - see [Retrieve Endpoint](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/retrieve.md).
+Full-document retrieval is byte-identical - including a trailing newline -
+so the returned body hashes back to the marker's own hash.
 
-Earlier drafts of this doc (and of `retrieve.rs` itself) described a step
-that checked returned content for zstd magic bytes (`0x28 0xB5 0x2F 0xFD`)
-and decompressed it. That branch was dead code: `CcrStore::get` returns a
-`String`, and a `String` is guaranteed valid UTF-8 - it can never legally
-contain those non-UTF-8 magic bytes in the first place, since nothing in
-this codebase's `CcrStore` implementations ever zstd-compresses content
-before storing it. The branch has been removed; see
-`.plans/05-compression-pipeline.md` T12.
+The Hermes `aphrodite_retrieve` tool is a separate path that resolves against
+the session's in-process inline store:
 
-### Hermes Tool Retrieve (`aphrodite_retrieve`)
-
-The Hermes MCP tool's retrieve handler (`aphrodite-hermes/src/tools.rs`) is a
-separate code path from the HTTP `/retrieve` endpoint above - it resolves
-against the session's in-process inline store via `resolve::expand`, not the
-CCR backend. It additionally supports:
-
-- Recursive resolution up to `RECURSIVE_DEPTH` (currently **5**) levels deep
-  for nested CCR markers (`resolve::resolve_recursive`) - an earlier version
-  of this doc said "3 levels"; the code has always used 5, this doc was
-  wrong. At the depth limit, the un-further-expanded raw content is returned
-  rather than an `[CCR_UNRESOLVED:...]` placeholder, so hitting the limit
-  never misreports content that genuinely exists in the store as missing.
-- File path reads (workspace-bounded, 10MB cap, `read_path_guarded`)
-- Inline store fallback via `resolve_one`
-- Never writes the expanded result back over the original hash's store entry
-  (a prior implementation did this and both destroyed literal
-  marker-shaped text the original content merely contained, and broke the
-  content-address invariant - see `.plans/05-compression-pipeline.md` F1)
+- Recursive expansion of nested markers up to 5 levels deep; at the depth
+  limit the raw content is returned rather than a placeholder.
+- Workspace-bounded file-path reads (10 MiB cap).
+- Inline-store fallback; never writes expanded content back over the stored
+  entry, preserving the content-address invariant.
 
 ## Phase 6: Expire
 
-| Backend       | Expiry behavior                                                                                                                                                                                                                                    |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SQLite        | Lazy purge on every `get()`: `DELETE FROM ccr_entries WHERE created_at + ttl_seconds <= now`. Debounced to once per 60 seconds. No background thread.                                                                                              |
-| In-Memory     | Lazy TTL check on every `get()`: entries older than TTL are evicted via an atomic check-and-remove (prevents a TOCTOU race with a concurrent `put`). Queue compaction runs once the eviction queue grows past twice capacity, to clear stale keys. |
-| Inline        | LRU eviction once capacity (1,024) is exceeded. No TTL - pure LRU.                                                                                                                                                                                 |
-| Python Inline | LRU eviction once the store exceeds 500 entries. No TTL.                                                                                                                                                                                           |
+| Backend          | Expiry behavior                                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQLite           | Lazy purge on `get` and `put`, debounced to once per 60 seconds; rows expire when idle past TTL or older than the 8x max lifetime. No background thread. |
+| In-Memory        | Lazy TTL check on `get`; expired entries evicted via an atomic check-and-remove; queue compaction when the eviction order grows past twice capacity.     |
+| Inline (proxy)   | LRU eviction at capacity (1,024). No TTL.                                                                                                                |
+| Inline (session) | LRU eviction at 500 entries and/or over the 256 MiB byte budget. No TTL.                                                                                 |
 
-## Threshold Tables
+## Thresholds
 
 ### Base Thresholds
 
-| Constant                 | Bytes       | Mode  |
-| ------------------------ | ----------- | ----- |
-| CACHE_COMPRESS_THRESHOLD | 8,192 (8KB) | Cache |
-| TOKEN_COMPRESS_THRESHOLD | 1,024 (1KB) | Token |
-| INLINE_CCR_THRESHOLD     | 256         | All   |
+| Constant       | Default | Mode  |
+| -------------- | ------- | ----- |
+| Cache compress | 8,192   | Cache |
+| Token compress | 1,024   | Token |
+| Inline         | 256     | All   |
+
+Each is resolved as env var > TOML `[compression]` value > compiled-in
+default. The code multiplier defaults to 3.0.
 
 ### Per-Type Multipliers
 
-| Type                        | Multiplier            | Effective (Token, 1KB base) | Effective (Cache, 8KB base) |
-| --------------------------- | --------------------- | --------------------------- | --------------------------- |
-| error                       | ×8                    | 8,192                       | 65,536                      |
-| code_rust/python/go/js/code | ×4 (config, default)  | 4,096                       | 32,768                      |
-| diff, git, text             | ×2                    | 2,048                       | 16,384                      |
-| tool_output, json           | ×1                    | 1,024                       | 8,192                       |
-| linter, build_output, log   | ×1 (BASE, not halved) | 1,024                       | 8,192                       |
+| Type                                                 | Multiplier                      |
+| ---------------------------------------------------- | ------------------------------- |
+| `error`                                              | x8                              |
+| `code_rust`/`code_python`/`code_go`/`code_js`/`code` | x code multiplier (default 3.0) |
+| `diff`, `git`, `text`                                | x2                              |
+| `tool_output`, `json`                                | x1 (base)                       |
+| `linter`, `build_output`, `log`                      | x1 (base, never discounted)     |
 
-**Correction:** `linter`, `build_output`, and `log` are pinned at the BASE
-threshold, not halved. `proxy.rs::threshold_for` returns `base` for these
-three types immediately - before the auto-tune multiplier or the rest of
-this table is even consulted - because "coding sessions need build output
-visible" (the code's own comment). An earlier draft of this table showed a
-÷2 discount (effective 512B/4,096B); the real code has never halved these.
+`linter`, `build_output`, and `log` are pinned at the base threshold before
+any multiplier is applied, so build output stays visible in coding sessions.
 
 ### Auto-Tune
 
-Based on `compression_ratio_ema` (×100):
+The compression-ratio EMA (x100) adjusts every threshold:
 
-| EMA Ratio   | Tune Factor | Effect                                          |
-| ----------- | ----------- | ----------------------------------------------- |
-| > 20.0      | 2.0         | Raise thresholds (compress less, preserve more) |
-| 3.0 .. 20.0 | 1.0         | Default                                         |
-| < 3.0       | 0.5         | Lower thresholds (compress more aggressively)   |
-| 0.0         | 1.0         | No history - default                            |
+| EMA ratio   | Tune factor | Effect                           |
+| ----------- | ----------- | -------------------------------- |
+| > 20.0      | 2.0         | Raise thresholds (compress less) |
+| 3.0 .. 20.0 | 1.0         | Default                          |
+| < 3.0       | 0.5         | Lower thresholds (compress more) |
+| 0.0         | 1.0         | No history - default             |
 
-Note: `linter`, `build_output`, `log` types are excluded from auto-tune -
-`threshold_for` returns their (unhalved) base threshold before the auto-tune
-multiplier is applied at all, not "always base/2" as an earlier draft of
-this doc claimed.
+### Budget Multiplier
 
-### Python Plugin Thresholds
-
-| Env Var               | Default             | Scope                                                                |
-| --------------------- | ------------------- | -------------------------------------------------------------------- |
-| TOOL_THRESHOLD_TOKEN  | 1,024               | Tool outputs when token proxy alive                                  |
-| TOOL_THRESHOLD_CACHE  | 8,192               | Tool outputs when only cache proxy alive                             |
-| TERMINAL_THRESHOLD    | 2,048               | Terminal output                                                      |
-| INLINE_THRESHOLD      | 4,096               | Inline fallback (bumped to 1MB if HEADROOM_SSE_BUFFER_MAX_BYTES set) |
-| AUTO_EXPAND_LIMIT     | 51,200              | Max size for auto-expanding tool CCR markers                         |
-| MAX_REQUEST_BODY_SIZE | 104,857,600 (100MB) | Skip compression above this                                          |
-
-### Headroom Budget Multiplier
-
-`budget_mult` is a smooth linear function of the `x-headroom-budget` request
-header, NOT the discrete three-step table an earlier draft of this doc
-claimed:
+An `x-headroom-budget` request header (fill percentage 0-100) scales the
+effective threshold on a smooth linear curve, never below 0.5x:
 
 ```
-budget_mult = clamp(0.50 + (headroom_budget% / 100) * 0.50, 0.50, 1.0)
+budget_mult = clamp(0.50 + (budget% / 100) * 0.50, 0.50, 1.0)
 ```
 
-| Budget (fill %)                 | Multiplier | Effect                                           |
-| ------------------------------- | ---------- | ------------------------------------------------ |
-| 0%                              | 0.50       | Most aggressive compression allowed              |
-| 50%                             | 0.75       | Moderate compression                             |
-| 100% (or no header/unparseable) | 1.00       | No reduction (default when the header is absent) |
+| Budget (fill %) | Multiplier |
+| --------------- | ---------- |
+| 0%              | 0.50       |
+| 50%             | 0.75       |
+| 100% or absent  | 1.00       |
 
-The multiplier never drops below 0.50× regardless of how low the budget
-signal is - "semantics and tool chains are worth the tokens" per the code's
-own comment - and the default with no budget header supplied is 1.0
-(unmodified threshold), not the most aggressive setting.
+## Session Catalog Emission
+
+Per-turn catalog summaries are emitted delta-only: the renderer remembers
+`last_emitted_marker_count` and `last_emitted_file_count` and reports
+`+N new compressions this turn` / `+N new files` only when new items
+arrived, with a stable "no change" line otherwise. Counters reset on session
+start.

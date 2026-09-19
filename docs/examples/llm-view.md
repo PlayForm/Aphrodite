@@ -1,204 +1,224 @@
 # CCR Examples - What the LLM Actually Sees
 
-Hashes, byte counts, and version tags below are representative, not live
-output. See [CCR: Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/lifecycle.md) and
-[CCR: Marker Format](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/marker-format.md) for the schema these examples
-illustrate.
+Every example on this page is a real tool result captured from a live session
+against the 1.4.6 binary. Marker strings are quoted verbatim; hashes are the
+BLAKE3 digests the proxy computed for the stored bytes. Because hashing is
+content-addressed, the same bytes always produce the same hash - which is why
+the same marker reappears across sessions whenever the same output is
+compressed.
 
-## Conversation Flow with Mermaid
+The marker schema and the retrieval mechanics behind these examples are
+documented in [CCR: Marker Format](../ccr/marker-format.md), [CCR:
+Lifecycle](../ccr/lifecycle.md), and the content taxonomy in
+[Content Types](../classification/content-types.md).
+
+## The Shape of a Compressed Tool Result
+
+When a tool result crosses its compression threshold, the proxy replaces the
+raw output in the relayed result with a two-line block:
+
+```
+<<<CCR:hash|type|size>>>
+[preview line]
+```
+
+| Field | Meaning                                                                                |
+| ----- | -------------------------------------------------------------------------------------- |
+| hash  | BLAKE3 digest of the stored content, first 40 hex characters                           |
+| type  | Detected content type (for example `ls`, `source_code`, `diff`, `json`, `build_error`) |
+| size  | Original content size in bytes                                                         |
+
+The preview line is a type-aware summary rendered from the content itself -
+function counts, key names, error counts, change statistics. The model answers
+from the preview when it can, and calls `aphrodite_retrieve` with the hash when
+it needs the full content.
+
+### Conversation Flow
 
 ```mermaid
 sequenceDiagram
     actor LLM
     participant Agent as Hermes Agent
     participant Proxy as Aphrodite Proxy
-    participant CCR as CCR Store
+    participant Store as CCR Store
 
-    Note over LLM,CCR: Turn 1 - LLM reads a file
-
-    LLM->>Agent: read_file("proxy.rs")
-    Agent->>Agent: Execute read_file → 4832 bytes
-    Agent->>Proxy: Tool output intercepted by hook
-
-    Note over Proxy,CCR: Compression happens here
-    Proxy->>Proxy: detect_content_type() → code_rust
-    Proxy->>Proxy: threshold_for(code_rust) → 4KB (×4)
-    Proxy->>Proxy: 4832 > 4096 → compress
-    Proxy->>CCR: store(content, hash=abc123)
-    Proxy-->>Agent: Compressed preview marker
-    Agent-->>LLM: [code_rust:3fns 414L] <<<CCR:abc123>>>
+    Note over LLM,Store: Tool output crosses a compression threshold
+    LLM->>Agent: read a file or run a command
+    Agent->>Proxy: Tool result intercepted by hook
+    Proxy->>Proxy: detect content type (source_code, ls, diff, json, build_error)
+    Proxy->>Proxy: size above threshold, so compress
+    Proxy->>Store: store bytes keyed by BLAKE3 hash
+    Proxy-->>Agent: marker plus preview line
+    Agent-->>LLM: two-line relayed result
 ```
+
+Whether the output is compressed at all is decided by the thresholds in
+[`[compression]`](../config/aphrodite-toml.md): `tool_threshold_token` (512
+bytes default) scaled by `code_multiplier` (3.0 default) for code types, and
+`terminal_threshold` (1024 bytes default) for terminal output.
 
 ## Scenario 1: Reading a Rust File
 
-### Raw (uncompressed - below threshold)
+`cat bench/corpus/code_rust.rs` produced 2,645 bytes of Rust source - above
+the code threshold of 1,536 bytes (512 x 3.0), so the proxy compressed it.
 
-```rust
-use std::sync::Arc;
-use axum::{Router, extract::State};
-
-fn main() -> anyhow::Result<()> {
-    let worker_threads = std::env::var("APHRODITE_WORKER_THREADS")
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok())
-        .unwrap_or(32);
-    // ... 150 more lines
-}
-```
-
-### Compressed (what the LLM sees - v1.3.2)
+### What the model sees
 
 ```
-use std::sync::Arc;
-use axum::{Router, extract::State};
-fn main() -> anyhow::Result<()> {
-[code_rust: lang=rs;fns=main,run_single,proxy_handler;structs=AppState,Secret;impls=AppState;traits=CcrStore;ln=414]
-<<<CCR:abc123def456|code_rust|4832>>>
+<<<CCR:f8d6c87de81a74c79a9af2909022ffec0534f49c|source_code|2645>>>
+[code:9fns fn new(cap:usize) -> Arc<Self> 112L]
 ```
 
-**The LLM reads:**
+**What the model reads:**
 
-- Line 1: Actual code preview (first 3 lines)
-- Line 2: Structure summary - knows what functions/structs exist
-- Line 3: CCR marker - can call `aphrodite_retrieve("abc123def456")` for full
-  content
+- 2,645 bytes of source replaced by ~115 characters.
+- The preview tells it the file has 9 functions, the first is `fn new(cap:usize)
+-> Arc<Self>`, and the file is 112 lines.
+- To see the actual code it calls `aphrodite_retrieve("f8d6c87de81a74c79a9af2909022ffec0534f49c")`.
 
-**Token savings:** 4832 bytes → ~120 bytes (40× compression)
+A shorter read stays under the threshold and is relayed raw - for example a
+50-line excerpt compressed at 2,370 bytes rendered as
+`[code:2fns fn detect_type(content:&str) -> String 50L]`.
 
 ## Scenario 2: Build Error
 
-### Raw
+`rustc` on a file with an intentional type error produced 801 bytes of stderr
+with two E0308 errors across 11 lines.
+
+### What the model sees
 
 ```
-error[E0308]: mismatched types
-   --> crates/aphrodite/src/proxy.rs:505:18
-    |
-505 |         script_engine: crate::scripting_enabled().then(|| {
-    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<()>`, found `Option<Arc<ScriptEngine>>`
-
-For more information about this error, try `rustc --explain E0308`.
-error: could not compile `aphrodite` (lib) due to 1 previous error
+<<<CCR:fafc789b89d4659bae6cae77b53414e848fb6ca8|build_error|801>>>
+[build:2E 0W 11L | error[E0308]: mismatched types]
 ```
 
-### Compressed
+The preview renders the build family summary - 2 errors, 0 warnings, 11 lines -
+and appends the first error line. The model sees the failing diagnostic
+directly and only retrieves the full trace when it needs the rest.
+
+## Scenario 3: JSON Tool Output
+
+A 1,728-byte pretty-printed JSON document (nested dictionaries, list of
+records, 116 lines) crossed the tool threshold and was compressed.
+
+### What the model sees
 
 ```
-error[E0308]: mismatched types
-[error: trace=crates/aphrodite/src/proxy.rs:505:18;msg=error[E0308]: mismatched types;N_errors=1]
-<<<CCR:def789|error|892>>>
+<<<CCR:2607dcd770e3e7981a9b1c4bb0be22c4995700e6|json|1728>>>
+[json:5keys 116L | a, b, c, items, summary]
 ```
 
-**The LLM sees the error line directly** - no need to retrieve unless it wants
-the full trace.
-
-## Scenario 3: With Hint - LLM enters debug mode
-
-```mermaid
-sequenceDiagram
-    actor LLM
-    participant Agent
-    participant Proxy
-    participant Hints as HintContext
-
-    Note over LLM,Hints: Turn 1  -  LLM sets hint
-    LLM->>Agent: aphrodite_compress(content, _ccr_hint="debug")
-    Agent->>Proxy: POST /tool/relay {tool: "aphrodite_compress", params: {_ccr_hint: "debug"}}
-    Proxy->>Hints: parse_and_push("debug")
-    Note over Hints: Session mode: DEBUG
-
-    Note over LLM,Hints: Turn 2  -  LLM reads a file (hint applies)
-    LLM->>Agent: read_file("proxy.rs")
-    Agent->>Proxy: Tool output → compress (debug mode active)
-    Proxy->>Hints: has(Debug) → true → deeper extraction, more preview
-    Proxy-->>Agent: Verbose marker with full structure
-
-    Note over LLM,Hints: Turn 3  -  LLM switches to review
-    LLM->>Agent: aphrodite_retrieve(hash, _ccr_hint="review")
-    Proxy->>Hints: parse_and_push("review")
-    Note over Hints: Session mode: DEBUG + REVIEW (composed)
-
-    Note over LLM,Hints: Turn 4  -  LLM reads a diff
-    LLM->>Agent: Terminal: git diff
-    Proxy->>Hints: has(Review) → true → keep imports, show full diffs
-    Proxy-->>Agent: Diff with imports preserved
-```
-
-### What the LLM sees with `_ccr_hint="debug"` active
-
-Same `proxy.rs` read, but now the marker is richer:
-
-```
-use std::sync::Arc;
-use axum::{Router, extract::State, response::IntoResponse};
-fn main() -> anyhow::Result<()> {
-async fn run_single(name: String, cli: Cli, rx: watch::Receiver<bool>) -> anyhow::Result<()> {
-pub async fn proxy_handler(State(state): State<Arc<AppState>>, method: Method, ...) -> impl IntoResponse {
-[code_rust: lang=rs;fns=main,run_single,proxy_handler,loopback_only,shutdown_signal;structs=AppState,Secret;impls=AppState;traits=CcrStore;ln=414]
-<<<CCR:abc123def456|code_rust|4832>>
-```
-
-**Differences with debug hint:**
-
-- 5-line preview instead of 3 (deeper extraction)
-- More function names extracted (lower filter threshold)
-- All structural elements included
+The preview lists the string-named top-level keys and the line count, so the
+model knows what the document contains without expanding it.
 
 ## Scenario 4: Multi-Turn Memory Flow
 
+Compression is not a one-shot transform: the stored entry stays retrievable
+for the session, and content-addressed hashing means the same output maps to
+the same entry every time.
+
 ```mermaid
 graph TD
-    A[Turn 1: LLM sets hint=code_rust] --> B[HintContext: {Code(rust)}]
-    B --> C[Turn 2: read_file proxy.rs]
-    C --> D[Compression: ×4 threshold, extract fns+structs]
-    D --> E[LLM sees: structure preview]
-    E --> F[Turn 3: LLM sets hint=debug]
-    F --> G[HintContext: {Code(rust), Debug}]
-    G --> H[Turn 4: cargo build fails]
-    H --> I[Compression: error visible, full trace, deeper preview]
-    I --> J[LLM sees: error line + structure + marker]
-    J --> K[Turn 5: LLM retrieves full content]
-    K --> L[aphrodite_retrieve hash=abc123]
-    L --> M[Returns full content  -  hint context applied to format]
+    A["Turn 1: ls listing 5889 bytes crosses the terminal threshold"] --> B["Proxy stores it under a BLAKE3 hash"]
+    B --> C["Model sees marker plus ls preview line"]
+    C --> D["Turn 2: model calls aphrodite_retrieve with the hash"]
+    D --> E["Full listing restored into context"]
+    E --> F["Turn 3: the same command runs again"]
+    F --> G["Same bytes produce the same hash, no duplicate storage"]
+    G --> H["With auto_expand true the marker expands inline"]
 
-    style B fill:#e1f5fe
-    style G fill:#e1f5fe
-    style M fill:#c8e6c9
+    style C fill:#e1f5fe
+    style E fill:#c8e6c9
 ```
+
+- Retrieval is a normal tool call: `aphrodite_retrieve({hash})` returns the
+  stored bytes unchanged (`found: true`, `source: "ccr"`).
+- The same listing compressed in later sessions yields the identical marker -
+  the hash `e357cd16...|ls|5896` reappears byte-for-byte across several
+  captures because the tree contents were identical at those moments.
+- `auto_expand = true` (default) expands such markers inline so the model sees
+  full content without an explicit retrieve; `auto_expand = false` leaves the
+  marker and the model retrieves deliberately. Either way the relayed marker
+  string is identical - auto-expansion is a client-side behavior.
 
 ## Scenario 5: Expanded vs Unexpanded
 
-### Unexpanded (what LLM sees in context)
+The same 5,889-byte directory listing, two ways.
+
+### Unexpanded (what the model sees in context)
 
 ```
-use std::sync::Arc;
-use axum::{Router, extract::State};
-[code_rust: lang=rs;fns=build_state;structs=AppState;ln=1989]
-<<<CCR:abc123|code_rust|67097>>>
+<<<CCR:940fbe9416d6fcf921db14c81580309ed8b98351|ls|5889>>>
+[ls:68 files 32 dirs | .json×13 .txt×13 .py×11]
 ```
 
-### Expanded (what LLM sees after retrieval)
+~106 characters carry the summary: 68 files, 32 directories, and the extension
+histogram.
+
+### Expanded (what the model sees after retrieval)
+
+A real session's retrieval call, verbatim:
 
 ```
-// Full 67,097 bytes of proxy.rs
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
-...
-pub async fn proxy_handler(...) -> impl IntoResponse { ... }
-// ... all 1989 lines
+AphroditeRetrieve("e357cd16e409796079cf2db87f00ea1fc9c1cf69")
+Result: {"found": true, "source": "ccr", "hash": "e357cd16...", "content": "total 48\n..."}
 ```
 
-### Partial expansion (hint: "structure")
+The full listing replaces the marker in context. The model pays the token cost
+only when it actually needs the details.
 
-```
-[code_rust: lang=rs;fns=build_state,run_single,proxy_handler,handle_tool_relay,handle_ccr_create,smart_marker,generate_metadata,build_preview;structs=AppState,Secret,ToolRelayRequest,CcrCreateRequest;impls=AppState;traits=CcrStore;ln=1989]
-```
+## Scenario 6: Session Orientation with Directives
+
+Directives are the real session-mode mechanism: the `directives.active` list
+selects which directive files from the runtime home
+(`~/.hermes/aphrodite/directives/`) are loaded into the per-turn flow budget.
+See [Directives](../plugin/directives.md) for the full story.
+
+| Active list             | Behavior captured                                                                |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| `["focus","foresight"]` | Default. CCR-first retrieval plus anticipate/prefetch orientation.               |
+| `["explore"]`           | The agent explored tools (`tool_describe aphrodite_retrieve`) before retrieving. |
+| `[]`                    | No directive files loaded.                                                       |
+
+Directives change what the model does, not the marker shape - the relayed
+tool-result block (marker + preview) is byte-identical across directive sets,
+and directive names not in the active list are silently filtered out.
+
+## Scenario 7: Preview Families - Same Content, Different Previews
+
+The `model_family` setting (`compact`, `code_first`, `balance`) selects which
+preview template renders the summary. The same content therefore produces
+different preview text:
+
+| Content                            | compact (Claude)                                   | code_first (DeepSeek/Qwen)                                          | balance                                                 |
+| ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
+| Directory listing (`ls`)           | `[ls:68 files 32 dirs \| .json×13 .txt×13 .py×11]` | same (ls template is family-independent)                            | same                                                    |
+| Rust source (`source_code`)        | metadata only                                      | `[code:9fns fn new(cap:usize) -> Arc<Self> 112L]` (signature first) | `[code:9fns fn new(cap:usize) -> Arc<Self> 113L]`       |
+| Go source (`source_code`)          | metadata only                                      | -                                                                   | `[code:9fns func Process0(r *Record0, depth int) 607L]` |
+| Terminal output with `#[test]` fns | `[test:0 pass 0 fail 0 ignored]`                   | `[test:0 pass 0 fail 0 ignored]`                                    | `[test:0 pass 0 fail 0 ignored]`                        |
+
+Two more preview knobs from the captures:
+
+- `preview_max_chars` (120 default) caps each rendered preview line; longer
+  signatures truncate with an ellipsis.
+- `code_structure_map` (true default) controls whether function/type structure
+  extraction feeds the code preview; disabled, the preview falls back to
+  line-count-only metadata.
 
 ## Token Economics
 
-| Scenario              | Raw bytes | Compressed | Savings | What LLM pays                       |
-| --------------------- | --------- | ---------- | ------- | ----------------------------------- |
-| proxy.rs (1989 lines) | 67,097    | ~180       | 373×    | 3 lines + marker                    |
-| Build error           | 892       | ~120       | 7×      | Error line + marker                 |
-| JSON tool output      | 8,234     | ~140       | 59×     | First line + key count + marker     |
-| Git diff (3 files)    | 4,521     | ~150       | 30×     | File names + change counts + marker |
-| With debug hint       | 67,097    | ~250       | 268×    | 5 lines + full structure + marker   |
+Byte economics of the real captures above - raw stored bytes versus the
+marker-plus-preview block that actually enters the model's context:
+
+| Content             | Raw bytes | Marker + preview | Ratio | What the model sees                               |
+| ------------------- | --------- | ---------------- | ----- | ------------------------------------------------- |
+| Directory listing   | 5,889     | ~106 chars       | ~56x  | Marker + `[ls:68 files 32 dirs ...]`              |
+| Rust source file    | 2,645     | ~115 chars       | ~23x  | Marker + `[code:9fns fn new(...) 112L]`           |
+| JSON tool output    | 1,728     | ~104 chars       | ~17x  | Marker + `[json:5keys 116L ...]`                  |
+| Git diff            | 987       | ~114 chars       | ~9x   | Marker + `[diff:1F +31/-0 40L ...]`               |
+| Build error (rustc) | 801       | ~117 chars       | ~7x   | Marker + `[build:2E 0W 11L \| error[E0308]: ...]` |
+
+Ratios are byte compression of the relayed result; actual token savings depend
+on the tokenizer. The rule of thumb holds across all five: the model sees the
+shape and the summary of the content, and pays full price only when it asks
+for the details.

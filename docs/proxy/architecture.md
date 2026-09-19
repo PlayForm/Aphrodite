@@ -1,204 +1,145 @@
 # Proxy Architecture
 
-Aphrodite operates in **two modes** - as a reverse proxy between any client and
-an LLM API, and as a native Hermes plugin that intercepts output at the hook
-level before it reaches the LLM context.
-
-- **Proxy mode**: sits between client and upstream LLM, compresses Chat
-  Completions responses via CCR, provides tool relay for bidirectional
-  communication.
-- **Plugin mode**: Hermes hooks (`transform_tool_result`,
-  `transform_terminal_output`, context engine) intercept output directly - no API
-  round-trip needed. Broader coverage: file reads, terminal output, search
-  results, browser snapshots, and more.
+Aphrodite ships a local reverse proxy that sits between any OpenAI-compatible
+client and an upstream LLM API. It forwards Chat Completions traffic,
+compresses eligible response content into CCR markers, serves identical
+requests from a response cache, relays tools on request, and exposes
+management endpoints for stats, retrieval, and CCR control. This page covers
+the listener model, shared state, routing, middleware, streaming, and
+lifecycle; the individual handlers are documented in
+[Handlers](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/handlers.md).
 
 ## Two-Listener Model
 
-| Listener | Port  | CCR Backend                             | Compression Threshold           | Tool Relay | Mode             |
-| -------- | ----- | --------------------------------------- | ------------------------------- | ---------- | ---------------- |
-| Cache    | :9797 | InMemoryCcrStore (DashMap, 10K entries) | >8KB (CACHE_COMPRESS_THRESHOLD) | No         | ProxyMode::Cache |
-| Token    | :9798 | SqliteCcrStore (SQLite, persistent)     | >1KB (TOKEN_COMPRESS_THRESHOLD) | Yes        | ProxyMode::Token |
+A single binary can run two listeners with different roles - a cache proxy
+and a token proxy - each with its own `AppState` and CCR backend. Both bind to
+loopback by default.
 
-## Data Flow
+| Listener | Default port | CCR backend                       | Compression threshold | Tool relay  | Mode               |
+| -------- | ------------ | --------------------------------- | --------------------- | ----------- | ------------------ |
+| Cache    | :9797        | InMemoryCcrStore (10,000 entries) | 8192 bytes            | Config flag | `ProxyMode::Cache` |
+| Token    | :9798        | SqliteCcrStore (`ccr.db`)         | 1024 bytes            | Config flag | `ProxyMode::Token` |
+
+- Default ports are configurable (`APHRODITE_CACHE_PORT`, `APHRODITE_TOKEN_PORT`,
+  or the TOML `listen` per proxy).
+- The token proxy persists entries to SQLite at `~/.hermes/aphrodite/ccr.db`
+  (override with `APHRODITE_DB`); the cache proxy holds entries in memory only.
+- Tool relay is an independent per-listener flag (`--tool-relay` or
+  `tool_relay = true` in the TOML), not implied by the mode.
+- Compression thresholds are live values, resolved as env var > TOML
+  `[compression]` > compiled default, and hot-reloaded by `POST /reload` and
+  the config-file watcher.
+
+## Request Lifecycle
 
 ```
-PROXY MODE (any client):
-  Client → Aphrodite (:9797/:9798) → Upstream LLM API
-              ↓
-         compress Chat Completions response
-              ↓
-  Client ← CCR markers replace raw content
-
-PLUGIN MODE (Hermes only):
-  Tool executes → output intercepted by hook
-              ↓
-         classify → template → store
-              ↓
-  Agent ← [type:structured preview] (not raw output)
-              ↓
-         context engine auto-compresses middle turns
-         prefetch loads files in background
+CLIENT → Aphrodite (:9797/:9798) → upstream LLM API
+              │
+              ├─ SSE response  → forwarded chunk-by-chunk, never compressed
+              │
+              └─ JSON response → Chat Completions?
+                    │
+                    ├─ cache hit  → replay buffered response (X-Aphrodite-Cache: HIT)
+                    │
+                    ├─ compressible message.content
+                    │     → detect type → threshold check → CCR store
+                    │     → replace with marker (X-Aphrodite-Compressed: true)
+                    │
+                    └─ otherwise  → pass through untouched
+CLIENT ← response with upstream headers + X-Aphrodite-* headers
 ```
 
-## AppState Structure
+## AppState
 
-30+ AtomicU64 counters, 4 Mutex-protected structures, 1 TaskTracker.
+`AppState` is the shared per-listener state, wrapped in `Arc` and cloned into
+every handler. It holds the upstream client configuration, the CCR backend,
+and all counters and caches used by the hot paths.
 
-### Core Config
+| Group                 | Contents                                                                                                                                                                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client config         | `client` (bounded) + `stream_client` (no total timeout), `api_url`, `model`, `api_key` (redacted in logs), `dev` flag                                                                                                                              |
+| CCR                   | `ccr: Option<Arc<dyn CcrStore>>`, `add_markers`, `mode`                                                                                                                                                                                            |
+| Tool relay / notify   | `tool_relay`, `notify_url`, `notify_key`                                                                                                                                                                                                           |
+| Counters              | 33 `AtomicU64` counters (requests, compressed, ccr hits/misses/created, tokens_saved, cache hits/misses, tool relay, notify, upstream 4xx/5xx/timeouts/connect errors, SSE stream errors, store entries/bytes, body bytes, latency, fill_pct, ...) |
+| Live thresholds       | 3 `AtomicUsize` (cache/token/inline thresholds) + `code_multiplier_x100` (×100)                                                                                                                                                                    |
+| Mutex-protected state | 6 `Mutex` fields: `request_history` (last 50), `last_errors` (last 100), `compressions_by_type`, `inline_ccr` (1024-entry LRU), `response_cache` (128-entry LRU, TTL-stamped), `upstream_health_cache`                                             |
+| Task tracking         | `TaskTracker` for background callbacks (tool relay, CCR notifications)                                                                                                                                                                             |
 
-```rust
-pub client: HttpClient,           // reqwest pool: 100 idle per host, 90s idle timeout, 60s keepalive
-pub api_url: String,
-pub model: String,
-pub api_key: Secret,               // never logged (Debug/Display → [REDACTED])
-pub ccr: Option<Arc<dyn CcrStore>>, // SQLite (token) or InMemory (cache)
-pub add_markers: bool,
-pub mode: ProxyMode,
-pub tool_relay: bool,
-pub notify_url: Option<String>,    // Hermes callback URL
-pub notify_key: Option<String>,    // Bearer token for callbacks
-pub dev: bool,                     // verbose request/response logging
-```
-
-### Cache Structures
-
-```rust
-pub request_history: Mutex<VecDeque<serde_json::Value>>,  // last 50 requests
-pub inline_ccr: Mutex<lru::LruCache<String, String>>,      // 1024 entries, <256B threshold
-```
-
-### Primary Counters
-
-```rust
-pub requests_total: AtomicU64,
-pub requests_compressed: AtomicU64,
-pub tokens_saved: AtomicU64,
-pub ccr_hits: AtomicU64,
-pub ccr_misses: AtomicU64,
-pub ccr_created: AtomicU64,
-pub tool_relay_calls: AtomicU64,
-pub compression_ratio_ema: AtomicU64,  // ×100
-pub cache_hits: AtomicU64,
-pub cache_misses: AtomicU64,
-```
-
-### Latency Tracking
-
-```rust
-pub latency_buckets: [AtomicU64; 5],    // <1ms, <10ms, <100ms, <1s, <10s
-pub total_latency_micros: AtomicU64,
-```
-
-### Error Tracking
-
-```rust
-pub last_errors: Mutex<VecDeque<String>>,  // last 100 errors
-```
-
-### Compression Tracking
-
-```rust
-pub compressions_by_type: Mutex<HashMap<String, u64>>,
-```
-
-### Extended Metrics
-
-```rust
-pub inline_ccr_hits: AtomicU64,
-pub inline_ccr_misses: AtomicU64,
-pub tool_relay_success: AtomicU64,
-pub tool_relay_failure: AtomicU64,
-pub notify_success: AtomicU64,
-pub notify_failure: AtomicU64,
-pub upstream_errors_4xx: AtomicU64,
-pub upstream_errors_5xx: AtomicU64,
-pub upstream_timeouts: AtomicU64,
-pub upstream_connect_errors: AtomicU64,  // non-timeout transport failures (connect refused, DNS, TLS)
-pub sse_stream_errors: AtomicU64,        // mid-stream chunk errors on the SSE relay path
-pub ccr_store_entries: AtomicU64,
-pub ccr_store_bytes: AtomicU64,
-pub request_body_bytes: AtomicU64,
-pub response_body_bytes: AtomicU64,
-pub upstream_latency_micros: AtomicU64,
-```
-
-### Task Tracking
-
-```rust
-pub task_tracker: TaskTracker,    // tracks async callbacks for graceful shutdown
-```
-
-### Adaptive State
-
-```rust
-pub fill_pct: AtomicU64,          // ×100, 0-10000. fill_pct = 100 - (ratio_ema/20), clamped [1..99]
-pub response_cache: Mutex<lru::LruCache<u64, Vec<u8>>>,  // 128 entries, FNV-1a hash key
-```
+`tokens_saved` accumulates raw bytes saved (original minus replacement), never
+a token estimate; the name is kept for API compatibility.
 
 ## Routing Table
 
-| Route              | Method | Handler                   | Access                                   |
-| ------------------ | ------ | ------------------------- | ---------------------------------------- |
-| `/health`          | GET    | health_check              | Public (no loopback enforcement)         |
-| `/health/upstream` | GET    | upstream probe            | Loopback + mgmt token                    |
-| `/version`         | GET    | CARGO_PKG_VERSION         | Loopback + mgmt token                    |
-| `/stats`           | GET    | stats_json()              | Loopback + mgmt token                    |
-| `/stats/db`        | GET    | ccr.stats_db()            | Loopback + mgmt token                    |
-| `/metrics`         | GET    | Prometheus text format    | Loopback only (no auth, by design)       |
-| `/history`         | GET    | request_history           | Loopback + mgmt token                    |
-| `/retrieve`        | POST   | retrieve::handle_retrieve | Loopback + mgmt token                    |
-| `/tool/relay`      | POST   | handle_tool_relay         | Loopback + mgmt token                    |
-| `/ccr/create`      | POST   | handle_ccr_create         | Loopback + mgmt token                    |
-| `/ccr/list`        | GET    | handle_ccr_list           | Loopback + mgmt token                    |
-| `/ccr/{hash}`      | DELETE | handle_ccr_delete         | Loopback + mgmt token                    |
-| `/reload`          | POST   | config hot-reload         | Loopback + mgmt token                    |
-| `/favicon.ico`     | GET    | 404                       | Loopback only                            |
-| `/robots.txt`      | GET    | `Disallow: /`             | Loopback only                            |
-| `/`                | GET    | version JSON              | Loopback only                            |
-| `/{*path}`         | ANY    | proxy_handler             | Loopback only (no mgmt token - LLM path) |
+| Route              | Method | Handler                     | Access                                   |
+| ------------------ | ------ | --------------------------- | ---------------------------------------- |
+| `/health`          | GET    | `health_check`              | Public (no loopback enforcement)         |
+| `/health/upstream` | GET    | upstream probe (60s cache)  | Loopback + mgmt token                    |
+| `/version`         | GET    | `CARGO_PKG_VERSION`         | Loopback + mgmt token                    |
+| `/stats`           | GET    | `stats_json()`              | Loopback + mgmt token                    |
+| `/stats/db`        | GET    | `ccr.stats_db()`            | Loopback + mgmt token                    |
+| `/metrics`         | GET    | Prometheus text format      | Loopback only (mgmt-token exempt)        |
+| `/history`         | GET    | request history             | Loopback + mgmt token                    |
+| `/retrieve`        | POST   | `retrieve::handle_retrieve` | Loopback + mgmt token                    |
+| `/tool/relay`      | POST   | `handle_tool_relay`         | Loopback + mgmt token                    |
+| `/ccr/create`      | POST   | `handle_ccr_create`         | Loopback + mgmt token                    |
+| `/ccr/list`        | GET    | `handle_ccr_list`           | Loopback + mgmt token                    |
+| `/ccr/{hash}`      | DELETE | `handle_ccr_delete`         | Loopback + mgmt token                    |
+| `/reload`          | POST   | config hot-reload           | Loopback + mgmt token                    |
+| `/favicon.ico`     | GET    | 404                         | Loopback + mgmt token                    |
+| `/robots.txt`      | GET    | `Disallow: /`               | Loopback + mgmt token                    |
+| `/`                | GET    | version JSON                | Loopback + mgmt token                    |
+| `/{*path}`         | ANY    | `proxy_handler` catch-all   | Loopback only (LLM path - no mgmt token) |
 
 ## Management-Route Authentication
 
 When `APHRODITE_MGMT_TOKEN` is set, every "Loopback + mgmt token" route above
 requires `Authorization: Bearer <token>`. This closes a cross-site-write gap:
-a hostile local page could previously issue a CORS "simple request" that
-lands as a write (seed CCR entries, evict markers via `/reload`) even though
-it can't read the reply.
+a hostile local page could previously issue a CORS "simple request" that lands
+as a write (seed CCR entries, evict markers via `/reload`) even though it
+cannot read the reply.
 
 | Property        | Behavior                                                                                                    |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
 | Unset (default) | Back-compat: any loopback caller accepted; a one-time startup `warn!` fires                                 |
-| Set             | Missing/wrong bearer token → 401                                                                            |
+| Set             | Missing or wrong bearer token → 401                                                                         |
 | Exempt          | `/health` (external health checks), `/metrics` (Prometheus scrapers), and the LLM-proxying `/{*path}` route |
+
+Loopback enforcement adds a second layer beyond the peer-IP check: the `Host`
+header must name a loopback address (`localhost`, `127.0.0.1`, `[::1]`, `::1`).
+A missing or unparseable `Host` is rejected, not waved through - this blocks
+DNS-rebinding, where an attacker's hostname resolves to 127.0.0.1 and the
+browser genuinely is a loopback peer.
 
 ## Middleware Stack
 
-| Layer                | Config                                                                                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CORS                 | `CorsLayer::permissive()`                                                                                                                                          |
-| Body limit           | 1 MB (`DefaultBodyLimit::max(1024 * 1024)`)                                                                                                                        |
-| Loopback enforcement | `middleware::from_fn(loopback_only)` - all routes except `/health`; an empty or unparseable `Host` header is rejected (DNS-rebinding hardening), not waved through |
+| Layer                | Behavior                                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| CORS                 | None - the proxy is consumed by non-browser HTTP clients, so no permissive CORS layer exists         |
+| Body limit           | 1 MB on management routes; 64 MB on the catch-all `/{*path}` (large agent conversations exceed 1 MB) |
+| Loopback enforcement | `loopback_only` middleware on all routes except `/health`; peer IP + Host-header validation          |
+| Management auth      | `require_mgmt_token` bearer gate on the restricted router; `/metrics` exempt by path                 |
 
 ## Streaming (SSE)
 
-`"stream": true` requests and `text/event-stream` upstream responses take a
-dedicated pass-through path:
+Requests whose body sets `"stream": true`, and upstream responses with
+`Content-Type: text/event-stream`, take a dedicated pass-through path:
 
-| Aspect         | Behavior                                                                                                                                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Detection      | Request body `"stream": true` selects the streaming HTTP client; response `Content-Type: text/event-stream` (prefix match, charset-tolerant) selects the streaming response path                                                                                          |
-| Client         | A separate `stream_client` with **no total timeout** - reqwest's client-level `.timeout()` bounds the whole body stream, which used to sever legitimately slow but progressing streams mid-answer; hang protection comes from `connect_timeout` + `tcp_keepalive` instead |
-| Forwarding     | Chunk-by-chunk via `Body::from_stream` - never buffered                                                                                                                                                                                                                   |
-| Compression    | Skipped entirely - markers can't be spliced into a live stream                                                                                                                                                                                                            |
-| Response cache | Skipped - no cache key is computed for streaming requests                                                                                                                                                                                                                 |
-| Headers        | Upstream headers propagated; `X-Aphrodite-Streamed: true` added                                                                                                                                                                                                           |
-| Metrics        | Streamed bytes count into `response_body_bytes`; mid-stream chunk errors increment `sse_stream_errors` (in `/stats` and `/metrics`) - previously a stream that died mid-flight recorded a 200 with zero signal                                                            |
+| Aspect         | Behavior                                                                                                                                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Detection      | Request body `"stream": true` selects the streaming HTTP client; response content type `text/event-stream` (prefix match, charset-tolerant) selects the streaming response path                                                                  |
+| Client         | A separate `stream_client` with no total timeout - reqwest's client-level `.timeout()` bounds the whole body stream, which used to sever slow-but-progressing streams mid-answer; hang protection comes from `connect_timeout` + `tcp_keepalive` |
+| Forwarding     | Chunk-by-chunk via a body stream, never buffered                                                                                                                                                                                                 |
+| Compression    | Skipped entirely - markers cannot be spliced into a live stream                                                                                                                                                                                  |
+| Response cache | Skipped - streaming requests produce no cache key, so they never hit or populate the response cache                                                                                                                                              |
+| Headers        | Upstream headers propagated (hop-by-hop ones stripped); `X-Aphrodite-Streamed: true` added                                                                                                                                                       |
+| Metrics        | Streamed bytes count into `response_body_bytes`; mid-stream chunk errors increment `sse_stream_errors` (previously a stream that died mid-flight recorded a 200 with zero signal)                                                                |
 
 ## HTTP Client Config
 
 ```rust
 HttpClient::builder()
-    .timeout(Duration::from_secs(cli.timeout))     // default 300s, max 600s
+    .timeout(Duration::from_secs(cli.timeout))  // default 300s, clamped to max 600s
+    .connect_timeout(Duration::from_secs(10))
     .pool_max_idle_per_host(100)
     .pool_idle_timeout(Duration::from_secs(90))
     .tcp_keepalive(Duration::from_secs(60))
@@ -206,26 +147,47 @@ HttpClient::builder()
 ```
 
 A second `stream_client` is built with the same pool/keepalive tuning but no
-total timeout - see [Streaming (SSE)](#streaming-sse) above.
+total timeout - see [Streaming (SSE)](#streaming-sse) above. The client is
+built without gzip/brotli auto-decompression, so `Accept-Encoding: gzip` from
+a caller is stripped rather than forwarded.
+
+## Response Cache
+
+Chat Completions requests are cached so an identical request is served
+without a second upstream round-trip.
+
+| Property  | Behavior                                                                                                        |
+| --------- | --------------------------------------------------------------------------------------------------------------- |
+| Key       | FNV-1a 64-bit over api_key + model + messages + tools + tool_choice + temperature + top_p + n + response_format |
+| Size      | 128-entry LRU, entries capped at 1 MB                                                                           |
+| TTL       | `response_cache_ttl`, reusing `ccr_ttl_seconds` (default 3600s); expired entries are evicted on the hit path    |
+| Store     | Successful (2xx) responses only, compressed or raw                                                              |
+| Streaming | Never cached - a `"stream": true` request yields no cache key                                                   |
+| Hit       | `X-Aphrodite-Cache: HIT`, whole cached body length added to `tokens_saved`                                      |
+| Miss      | `X-Aphrodite-Cache: MISS` on the forwarded response                                                             |
 
 ## Shutdown Sequence
 
-1. `shutdown_signal()`: wait for Ctrl+C or SIGTERM
-2. `shutdown_tx.send(true)`: broadcast to all proxy listeners
-3. `axum::serve.with_graceful_shutdown(shutdown_fut)`: drain connections
-4. 5-second drain timeout → abort remaining tasks
-5. Second Ctrl+C → force immediate shutdown via abort handles
-6. `task_tracker.close(); task_tracker.wait()`: wait for background callbacks
+1. `shutdown_signal()`: wait for Ctrl+C or SIGTERM.
+2. `shutdown_tx.send(true)`: broadcast to every proxy listener.
+3. `axum::serve.with_graceful_shutdown(shutdown_fut)`: drain connections.
+4. 5-second drain timeout → abort remaining tasks.
+5. Second Ctrl+C → force immediate shutdown.
+6. `task_tracker.close(); task_tracker.wait()`: wait for background callbacks.
 
 ## Multi-Proxy Mode
 
-Config resolution priority: `aphrodite.toml` → CLI args.
+Configuration resolution: env var > TOML (`[[proxies]]` entry over `[defaults]`)
 
-Config path: `APHRODITE_CONFIG_PATH` env var or `aphrodite.toml` (CWD).
+> CLI defaults. Config path resolution: `APHRODITE_CONFIG_PATH` →
+> `./aphrodite.toml` (CWD) → `~/.hermes/aphrodite/aphrodite.toml`.
 
-Each `[[proxies]]` entry spawns its own Tokio task with independent
-`run_single()`. A shared `tokio::sync::watch` channel propagates the shutdown
-signal to all listeners.
+Each `[[proxies]]` entry spawns its own Tokio task with an independent
+`run_single()`. All listeners are bound before any server task spawns - a bind
+failure aborts startup loudly instead of leaving a silently dead listener. A
+shared `tokio::sync::watch` channel propagates the shutdown signal to all
+listeners, and a config-file watcher (500 ms debounce) applies `[compression]`
+threshold changes to every live `AppState`.
 
 ## Worker Threads
 

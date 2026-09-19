@@ -1,20 +1,18 @@
 # Retrieve Endpoint
 
-Resolves a CCR hash back to its original content, with optional query
-filtering and pagination. It's used by the LLM agent whenever
-`aphrodite_retrieve` is called.
+`POST /retrieve` resolves a CCR hash back to its original content, with
+optional line filtering and pagination. It is the HTTP path behind the
+`aphrodite_retrieve` tool and external callers.
 
 ## Endpoint
 
-```
-POST /retrieve
-```
+| Method | Path        | Access   | Auth                                            |
+| ------ | ----------- | -------- | ----------------------------------------------- |
+| POST   | `/retrieve` | Loopback | Bearer token when `APHRODITE_MGMT_TOKEN` is set |
 
-## Access
-
-Loopback only. Requires `Authorization: Bearer <token>` when
-`APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat) -
-see [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md).
+Loopback only, plus `Authorization: Bearer <token>` when
+`APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat) - see
+[Environment Variables](../config/env-vars.md).
 
 ## Request
 
@@ -40,6 +38,10 @@ pub struct RetrieveRequest {
 }
 ```
 
+The `hash` argument is normalized before lookup: a `|type|size` marker-body
+suffix and surrounding whitespace are stripped, so a hash echoed back in full
+marker form still resolves.
+
 ## Response
 
 ### Success (200)
@@ -55,9 +57,9 @@ pub struct RetrieveRequest {
 ```
 
 `truncated` is `true` when `content` is a partial window of a larger stored
-document (because of `offset`/`limit`, or because an explicit `limit` hit the
-10,000-line cap; `limit: 0` requests the FULL document and never truncates) -
-see [Pagination](#pagination).
+document - because of `offset`/`limit`, or because an explicit `limit` hit the
+10,000-line server cap. `limit: 0` requests the FULL document and never
+truncates - see [Pagination](#pagination).
 
 ### Not Found (404)
 
@@ -101,7 +103,7 @@ see [Pagination](#pagination).
 pub struct RetrieveResponse {
     pub found: bool,
     pub content: Option<String>,
-    pub source: String,           // "ccr", "inline", "none"
+    pub source: String,           // "ccr" on success, "none" on error
     pub truncated: bool,          // true if content is a partial window
     pub error: Option<String>,
 }
@@ -109,76 +111,103 @@ pub struct RetrieveResponse {
 
 ## Retrieve Flow
 
-```
-1. Validate hash (required)
-2. Check inline_ccr (lock dropped before any .await):
-   a. Hit → inline_ccr_hits++, ccr_hits++, return content
-   b. Miss → inline_ccr_misses++, fall through
-3. Check CCR backend:
-   a. Hit → ccr_hits++
-   b. Miss → ccr_misses++, return 404
-4. Decompress zstd if magic bytes (0x28, 0xB5, 0x2F, 0xFD):
-   a. zstd::decode_all()
-   b. Fail → return 500
-5. Apply query filter (case-insensitive, max 512 chars):
-   a. If no matches: "[no lines matching "query" in N lines]"
-   b. Otherwise: filtered lines
-6. Apply pagination (offset + limit):
-   a. If offset >= total lines: 400 out-of-range
-   b. Slice lines[start..end]
-   c. Prepend: "[lines {start}-{end}/{total}]" when paginated
-7. Return 200 with {found: true, content, source: "ccr"}
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as caller (Hermes / curl)
+    participant R as handle_retrieve
+    participant IL as inline_ccr LRU
+    participant S as CcrStore (sqlite/in-memory)
+    participant P as paginate
+
+    C->>R: POST /retrieve with hash, query?, offset?, limit?
+    R->>R: normalize_hash - strip |type|size suffix, trim
+    alt hash missing
+        R-->>C: 400 - hash required
+    end
+    R->>IL: inline_ccr.get(hash)
+    alt inline hit
+        IL-->>R: content (inline_ccr_hits++, ccr_hits++)
+    else inline miss
+        R->>S: ccr_get(hash)
+        alt backend hit
+            S-->>R: content (ccr_hits++)
+        else miss or no backend
+            R-->>C: 404 - CCR entry not found
+        end
+    end
+    R->>R: filter_content(query) - case-insensitive, capped at 512 chars
+    R->>P: paginate(offset, limit)
+    alt offset at or past end, non-empty document
+        P-->>R: out of range - 400
+    else full-document window
+        P-->>R: original bytes verbatim, truncated=false
+    else partial window
+        P-->>R: [lines a-b/total] header, truncated=true
+    end
+    R-->>C: 200 - found:true, content, source:ccr, truncated
 ```
 
 ## Query Filter
 
 ```rust
-fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
+fn filter_content(content: &str, query: Option<&str>) -> String {
     match query {
         Some(q) if !q.is_empty() => {
-            let q = if q.len() > 512 { &q[..512] } else { q };  // truncate to 512
+            // Truncate FIRST, char-boundary-safe, then match case-insensitively
+            let q = floor_boundary(q, 512);
+            let q_lower = q.to_ascii_lowercase();
             let filtered: Vec<&str> = content
                 .lines()
-                .filter(|line| line.to_lowercase().contains(&q.to_lowercase()))
+                .filter(|line| line.to_ascii_lowercase().contains(&q_lower))
                 .collect();
             if filtered.is_empty() {
-                Cow::Owned(format!("[no lines matching {:?} in {} lines]", q, content.lines().count()))
+                format!("[no lines matching {:?} in {} lines]", q, content.lines().count())
             } else {
-                Cow::Owned(filtered.join("\n"))
+                filtered.join("\n")
             }
         },
-        _ => Cow::Borrowed(content),
+        _ => content.to_string(),
     }
 }
 ```
 
-| Behavior     | Detail                                    |
-| ------------ | ----------------------------------------- |
-| Matching     | Case-insensitive substring match per line |
-| Query length | Truncated to 512 chars                    |
-| No matches   | Returns a descriptive placeholder         |
+| Behavior     | Detail                                       |
+| ------------ | -------------------------------------------- |
+| Matching     | Case-insensitive substring match per line    |
+| Query length | Truncated to 512 chars (char-boundary-safe)  |
+| No matches   | Returns `[no lines matching "q" in N lines]` |
 
 ## Pagination
 
-`limit: 0` requests the FULL document (no cap) - this is the round-trip
-contract: a full-document retrieval returns the exact original bytes, which
-therefore hash back to the marker's own hash. Any explicit `limit` - including
-one above 10,000 - is clamped to a 10,000-line server cap (02-F5) for safety.
-When the returned window doesn't cover the whole document (because of
+`limit: 0` requests the FULL document with no cap - this is the round-trip
+contract: a full-document retrieval returns the exact original bytes (the
+lossy lines/join round-trip is skipped entirely, so a trailing newline is
+preserved and the body hashes back to the marker's own hash). Any explicit
+`limit` - including one above 10,000 - is clamped to a 10,000-line server cap.
+When the returned window does not cover the whole document (because of
 `offset`, an explicit `limit`, or the cap), a `[lines a-b/total]` header is
-prepended to `content` so the caller can tell a truncated result from a
-genuinely short document without guessing.
+prepended to `content` and `truncated` is `true`, so a caller can distinguish
+a truncated result from a genuinely short document without parsing the header.
+
+An empty stored document (`content: ""`) is a valid zero-line entry, not an
+out-of-range offset - it returns empty content with `truncated: false`.
 
 ## Source Tracking
 
-| source value | Meaning                                                 |
-| ------------ | ------------------------------------------------------- |
-| `"ccr"`      | Found in CCR store (SQLite or in-memory)                |
-| `"inline"`   | Would be set for inline store (currently "ccr" is used) |
-| `"none"`     | Not found (error response)                              |
+| `source` value | Meaning                                           |
+| -------------- | ------------------------------------------------- |
+| `"ccr"`        | Found - served by the inline store or CCR backend |
+| `"none"`       | Not found (error response)                        |
 
-## Production Note
+The success path always reports `"ccr"` regardless of which store served the
+content. `source` is `"none"` on 400/404 error responses.
 
-The inline_ccr lock is dropped BEFORE any `.await` to avoid `!Send MutexGuard`
-crossing await points. The entire check-and-resolve for inline is scoped in a
-block.
+## Production Notes
+
+- The inline_ccr lock is dropped before any `.await`, so a `!Send` MutexGuard
+  never crosses an await point; the inline check-and-resolve is scoped in a
+  block.
+- No zstd decompression happens on this path: backends store and return
+  content verbatim as UTF-8 strings, so retrieval is byte-exact by
+  construction.
