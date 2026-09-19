@@ -23,8 +23,8 @@ pub fn env_bool(var:&str) -> bool {
 }
 
 /// Parse a present env var, warning (not silently defaulting) if it fails to
-/// parse as `T` - the bug class `Maintain/examples/01_env_var_typo.py`
-/// documents and `MultiConfig::apply_port_override`'s comment explains
+/// parse as `T` - the bug class (a typo'd env var) is documented by a dev
+/// example and by `MultiConfig::apply_port_override`'s comment
 /// (report 07 F10/F15): a missing var is the unremarkable common case, but a
 /// *present-and-malformed* one left an operator with no way to tell "my
 /// override didn't apply" from "I didn't set an override". Single shared

@@ -1,9 +1,19 @@
-# Rust
-/target/
+# ────────────────────────────────────────────────────────────────────────────
+# Aphrodite .gitignore
+# Organized by category. Patterns are ordered so re-includes come AFTER the
+# exclusion they override (gitignore semantics: a negation inside an excluded
+# directory is a no-op unless the directory itself is re-included first).
+# ────────────────────────────────────────────────────────────────────────────
+
+# ── Rust / Cargo ─────────────────────────────────────────────────────────────
+# Bare `target/` (no leading slash) matches build dirs at ANY depth.
+target/
 **/*.rs.bk
 *.pdb
 
-# Python
+# ── Python ───────────────────────────────────────────────────────────────────
+# The Hermes plugin (plugins/aphrodite) is Python - consumers may pip-install
+# it, so standard Python build/venv/cache artifacts are ignored.
 __pycache__/
 *.py[cod]
 *$py.class
@@ -17,69 +27,56 @@ build/
 venv/
 env/
 
-.headroom/
+# ruff runs on the release line (Check.yml uses ruff.toml) - local runs drop
+# their cache here. pytest/mypy are development-line only and never run here.
+.ruff_cache/
+
+# ── Generic artifacts ────────────────────────────────────────────────────────
 *.log
 *.lock
 *.tar.gz
 
-# Profiles - keep local, ship only examples.
-# `dir/` + `!dir/sub/` never re-includes anything below an excluded
-# directory (report 12 F7) - the correct shape is `dir/*` plus explicit
-# re-includes for both the subdirectory entry and its contents.
+# ── Aphrodite proxy binary (legacy plugin-dir copy, kept as fallback) ───────
+plugins/aphrodite/aphrodite
+
+# ── Local config (not committed) ────────────────────────────────────────────
+aphrodite.toml
+aphrodite.local.toml
+
+# ── Profiles - keep local, ship only examples ────────────────────────────────
+# Local profile dirs stay out of the tree; only profiles/example/ ships.
+# Re-include the dir first, then its contents - a bare `!profiles/example/`
+# under an excluded `profiles/` is a no-op.
 profiles/*
 !profiles/example/
 !profiles/example/**
 
-# Test artifacts
-plugins/aphrodite/.test-results.json
-
-# Aphrodite proxy binary (copied to profile/plugin dirs at build)
-plugins/aphrodite/aphrodite
-
-# Local config (not committed)
-aphrodite.toml
-
-# IDE
+# ── IDE / editors ───────────────────────────────────────────────────────────
 .idea/
-# .vscode is excluded EXCEPT settings.json, which is shared. The bare
-# `!.vscode/settings.json` under an excluded dir is a no-op; re-include the
-# dir first, re-exclude its contents, then re-include the file.
-!.vscode/
-.vscode/**
-!.vscode/settings.json
 *.swp
 *.swo
 *~
 
-# OS
+# ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Build
-target/
-
-# JS / pnpm
+# ── JS / pnpm ───────────────────────────────────────────────────────────────
 node_modules/
 pnpm-lock.yaml
 
-# Secrets (never commit)
+# ── Secrets (never commit) ──────────────────────────────────────────────────
 .env
 .env.sh
-aphrodite.local.toml
 *.pem
 *.key
 id_rsa*
 
-# Catch-all leaks
+# ── Catch-all leaks / runtime state (the plugin runs against this line) ──────
 **/state.db*
 **/auth.json
 **/auth.lock
 **/.hermes_*
 **/.skills_*
 **/.update_check
-**/__pycache__/
 **/.DS_Sccp_*.txt
-.cargo_check_output.txt
-
-placeholder/
-.plans

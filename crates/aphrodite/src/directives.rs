@@ -15,8 +15,8 @@ use std::{collections::HashMap, path::PathBuf};
 /// Built-in directives baked into the binary via `include_str!`.
 /// These ship with every installation and are used as fallbacks when no
 /// `directives/` directory exists on disk - so a fresh install gets
-/// `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, and `lazy`
-/// without any filesystem setup.
+/// `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy`,
+/// and `lazy-eval` without any filesystem setup.
 ///
 /// The on-disk `directives/*.md` files (if any) take precedence: if the
 /// directory exists, its `.md` files replace these defaults entirely.
@@ -30,6 +30,7 @@ fn builtin_directives() -> Vec<(&'static str, &'static str)> {
 		("cleanup", include_str!("builtin_directives/cleanup.md")),
 		("explore", include_str!("builtin_directives/explore.md")),
 		("lazy", include_str!("builtin_directives/lazy.md")),
+		("lazy-eval", include_str!("builtin_directives/lazy-eval.md")),
 	]
 }
 
@@ -77,7 +78,7 @@ pub const MAX_COMBINED_CHARS:usize = 4000;
 /// (`read_dir` fails) do the built-in directives (baked into the binary via
 /// `include_str!`) come back as a fallback, so a fresh install without a
 /// `directives/` directory still gets `focus`, `foresight`, `ccr-handling`,
-/// `cleanup`, `explore`, and `lazy`.
+/// `cleanup`, `explore`, `lazy`, and `lazy-eval`.
 pub fn load_directives(dir:&PathBuf) -> HashMap<String, Directive> {
 	let entries = match std::fs::read_dir(dir) {
 		Ok(entries) => entries,
@@ -574,15 +575,16 @@ mod tests {
 
 	// ── Built-in directives: baked into the binary via include_str! ──
 	#[test]
-	fn test_loaded_builtins_contains_all_six() {
+	fn test_loaded_builtins_contains_all_seven() {
 		let builtins = loaded_builtins();
-		assert_eq!(builtins.len(), 6, "should have 6 baked-in directives");
+		assert_eq!(builtins.len(), 7, "should have 7 baked-in directives");
 		assert!(builtins.contains_key("focus"));
 		assert!(builtins.contains_key("foresight"));
 		assert!(builtins.contains_key("ccr-handling"));
 		assert!(builtins.contains_key("cleanup"));
 		assert!(builtins.contains_key("explore"));
 		assert!(builtins.contains_key("lazy"));
+		assert!(builtins.contains_key("lazy-eval"));
 	}
 
 	#[test]

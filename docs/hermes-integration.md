@@ -1,7 +1,7 @@
 # Hermes Integration
 
 How Aphrodite connects to Hermes Agent - and why it's different from a plain
-proxy. See [Plugin: Hooks](plugin/hooks.md) for the full hook reference this
+proxy. See [Plugin: Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md) for the full hook reference this
 page's table summarizes.
 
 ## Architecture
@@ -39,7 +39,7 @@ All five hooks register in `plugin.yaml`. Zero changes to Hermes core.
 | Context engine          | ✅ Compresses middle messages         | ❌                               |
 | Auto-launch             | ✅ Proxies start automatically        | ❌ Manual `aphrodite` command    |
 | aphrodite\_\* tools     | ✅ 13 tools in agent namespace        | ❌ Agent doesn't know about them |
-| Bundled skills          | ✅ 9 skills auto-loaded               | ❌                               |
+| Bundled skills          | ❌ Dev-side only (`.hermes/skills/`)  | ❌                               |
 | Prompt injection        | ✅ Retrieval guidance added           | ❌                               |
 | CCR storage             | ✅ Token + cache proxy                | ✅ Token + cache proxy           |
 | Works with              | Hermes only                           | Any OpenAI-compatible client     |
@@ -80,13 +80,14 @@ A generic proxy compresses HTTP response bodies. That helps, but:
    history to decide which messages to offload to CCR. A proxy sees individual
    HTTP requests, not the full context.
 
-4. **Agent augmentation** - The 13 `aphrodite_*` tools and 9 bundled skills
-   teach the agent HOW to use compression. A proxy is opaque - the agent doesn't
-   know compression exists.
+4. **Agent augmentation** - The 13 `aphrodite_*` tools teach the agent HOW to
+   use compression (dev-side skills in `.hermes/skills/` support the agent
+   operating this repo). A proxy is opaque - the agent doesn't know
+   compression exists.
 
 ## Setup
 
-See [Installing Aphrodite](install/README.md) for the full, per-platform
+See [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/README.md) for the full, per-platform
 walkthrough (three install paths, plus troubleshooting if the proxy doesn't
 auto-launch). Short version for macOS/Linux:
 

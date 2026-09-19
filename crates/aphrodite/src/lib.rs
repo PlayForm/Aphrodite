@@ -20,13 +20,12 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 pub mod catalog;
+pub mod chain_split;
 pub mod config_loader;
 pub mod directives;
 pub mod flow;
 pub mod hooks;
 pub mod marker;
-#[cfg(feature = "navigation")]
-pub mod navigate;
 pub mod poll_worker;
 pub mod prefetch;
 pub mod resolve;
@@ -312,7 +311,12 @@ pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -
 		};
 		let mut s = session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 		match s.inline_store_get(&hash) {
-			Some(content) => CString::new(content.replace('\0', "")).unwrap().into_raw(),
+			Some(content) => {
+				// Tier 1 teaching loop: the FFI retrieve path bypasses
+				// resolve_one, so attribute the consequence here too.
+				s.note_split_retrieval(&hash);
+				CString::new(content.replace('\0', "")).unwrap().into_raw()
+			},
 			None => to_json_error(&format!("hash not found: {}", hash)),
 		}
 	}))
@@ -744,6 +748,7 @@ mod ffi_tests {
 	// `_` branch (a bare line/byte count with no exit-code context).
 	#[test]
 	fn test_build_preview_terminal_surfaces_exit_code() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let preview = build_preview("terminal", "running tests\nall good\nexit code: 1\n");
 		assert!(preview.starts_with("[terminal:"));
 		assert!(
@@ -753,12 +758,21 @@ mod ffi_tests {
 	}
 
 	#[test]
-	fn test_build_preview_terminal_falls_back_to_last_line() {
+	fn test_build_preview_terminal_falls_back_to_first_line() {
+		let _g = crate::preview::preview_cap_test_guard();
+		// ISSUE-11 residual #2: the terminal-arm fallback used to be the LAST
+		// non-empty line - a multi-line block previewed as its closing brace
+		// (`[terminal:7L }]`). The FIRST meaningful line is the honest
+		// default (skipping lone braces/brackets).
 		let preview = build_preview("terminal", "line one\nline two\nlast line here\n");
 		assert!(preview.starts_with("[terminal:"));
 		assert!(
-			preview.contains("last line here"),
-			"preview should fall back to the last non-empty line: {preview}"
+			preview.contains("line one"),
+			"preview should fall back to the first meaningful line: {preview}"
+		);
+		assert!(
+			!preview.contains("last line here"),
+			"preview must not surface the last line: {preview}"
 		);
 	}
 

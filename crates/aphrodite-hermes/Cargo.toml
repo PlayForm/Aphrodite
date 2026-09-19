@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite-hermes"
-version = "1.4.5"
+version = "1.4.6"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -16,13 +16,13 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-aphrodite = { path = "../aphrodite", version = "1.4.5", default-features = false }
+aphrodite = { path = "../aphrodite", version = "1.4.6", default-features = false }
 serde_json = { workspace = true }
 
-[features]
-# Mirrors the core crate's S2 navigation feature, and forwards to it -
-# `tools.rs` and `schemas.rs` both gate `aphrodite_navigate` on this. Currently
-# NOT buildable (the core crate's `s2-navigate` dep was removed in 8e9a8c3);
-# see the note on `aphrodite`'s own `navigation` feature. Declared regardless,
-# or `unexpected_cfg_condition` fails CI's `-D warnings`.
-navigation = ["aphrodite/navigation"]
+# Build-time FFI codegen (cbindgen -> aphrodite_hermes.h -> ctypesgen ->
+# plugins/aphrodite/_bindings.py). These crates are consumed by build.rs and
+# discarded after the build - zero impact on the dylib itself. The generated
+# _bindings.py is the committed artifact; build.rs degrades to the committed
+# copy whenever the codegen tools are unavailable (see CODEGEN.md).
+[build-dependencies]
+cbindgen = "0.29"

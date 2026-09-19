@@ -10,11 +10,11 @@
 > not - see `crates/aphrodite-hermes/src/lib.rs` (hook dispatch C ABI) and
 > `crates/aphrodite/src/hooks.rs` (actual transform/threshold logic,
 > `state.rs` for current default thresholds) for the real implementation.
->
+
 |> One behavior the Rust implementation added that this page's Python-era
 |> lifecycle never had: `pre_llm_call` now also injects the active
 |> **directives** block (behavioral instructions) alongside the catalog
-|> summary - see [Directives](directives.md).
+|> summary - see [Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md).
 |>
 |> The Rust implementation also restores the first-turn session injection that
 |> the Python-era docstring described: `flow::build_turn_context` injects a

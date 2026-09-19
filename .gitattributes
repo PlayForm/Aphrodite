@@ -7,8 +7,6 @@
 *.yml text eol=lf
 *.md text eol=lf
 *.sh text eol=lf
-.githooks/* text eol=lf
-.githooks/lib/* text eol=lf
 
 # Binary
 *.png binary
@@ -16,4 +14,5 @@
 *.ico binary
 
 # Export ignore (don't include in archive downloads)
+.hermes/ export-ignore
 .github/ export-ignore

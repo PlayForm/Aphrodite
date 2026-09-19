@@ -623,7 +623,7 @@ mod tests {
 		insert_bg_task(&mut state, "t1".into(), "terminal".into(), "cargo build".into(), 1);
 
 		check_bg_tasks(&mut state);
-		assert!(state.ephemeral_directives.len() >= 1, "should push at least one nudge");
+		assert!(!state.ephemeral_directives.is_empty(), "should push at least one nudge");
 		let nudge = state.ephemeral_directives.last().unwrap();
 		assert!(
 			nudge.inline.as_deref().unwrap().contains("cargo build"),

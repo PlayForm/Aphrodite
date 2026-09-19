@@ -820,7 +820,7 @@ runtime code changes.
 2026-06-21 to 2026-07-10), bringing in CCR/TLS/output-shaping improvements while
 preserving every Aphrodite-specific customization. Full breakdown, including every
 silent merge regression found and fixed, in
-[`docs/HEADROOM-FORK-DIFF.md`](../docs/HEADROOM-FORK-DIFF.md#2026-07-11-merge-upstream-sync-to-5e14b8c0).
+[`docs/HEADROOM-FORK-DIFF.md`](https://github.com/PlayForm/Aphrodite/tree/Development/docs/HEADROOM-FORK-DIFF.md#2026-07-11-merge-upstream-sync-to-5e14b8c0).
 
 Highlights:
 

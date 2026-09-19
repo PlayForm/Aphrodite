@@ -1,10 +1,7 @@
 # Tool Relay Tools
 
 Aphrodite exposes 13 tools to the Hermes agent for compression, retrieval,
-stats, and session management. A 14th, `aphrodite_navigate`, is gated behind an
-optional `navigation` feature that does not currently build - `s2-navigate` was
-dropped as a dependency for crates.io publishing and the feature has not been
-restored. All of them dispatch entirely inside the Rust
+stats, and session management. All of them dispatch entirely inside the Rust
 dylib - the Python plugin shim forwards tool calls in and returns the JSON
 result verbatim; there's no separate Python-side tool logic to know about.
 
@@ -13,9 +10,8 @@ result verbatim; there's no separate Python-side tool logic to know about.
 > carries a type, a description and (where applicable) `enum`/`default`
 > constraints. `tool_describe` is a verbatim passthrough of
 > `{name, description, parameters}`, so what an agent sees is exactly what
-> `crates/aphrodite-hermes/src/schemas.rs` defines. Run
-> `python3 Maintain/scripts/verify_tool_schemas.py` to print the live records.
-
+> `crates/aphrodite-hermes/src/schemas.rs` defines - the authoritative
+> record of every tool's live shape.
 
 ## Tool registry
 
@@ -129,7 +125,7 @@ Returns session + proxy state in one call:
 ```
 
 `proxies` reflects a live HTTP poll of both configured proxy ports - see
-[Troubleshooting: verify the proxy without Hermes](../install/troubleshooting.md#verify-the-proxy-without-hermes).
+[Troubleshooting: verify the proxy without Hermes](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#verify-the-proxy-without-hermes).
 
 ## 4. aphrodite_files
 
@@ -227,7 +223,7 @@ after the catalog summary.
 | anything else | 3 samples (source code, a build with errors/warnings, a JSON array) - each compressed then round-tripped |
 
 Returns `{mode, status: "ok"|"fail", passed, total, checks, proxies}`. This is
-the same tool [Troubleshooting](../install/troubleshooting.md#verify-the-proxy-without-hermes)
+the same tool [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
 points to for confirming things work without a full Hermes session.
 
 ## 9. aphrodite_catalog
@@ -325,6 +321,6 @@ rebuild itself mid-session. Returns
 
 `aphrodite_compress`'s `type` hint accepts `code`, `log`, `diff`, `error`,
 `json`, `build_output`, or `text`. These map to the same taxonomy used
-throughout - see [Content Types](../ccr/content-types.md). A hint of `"text"`
+throughout - see [Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/content-types.md). A hint of `"text"`
 (or an empty hint) is treated as "no hint" - the type is auto-detected
 instead.

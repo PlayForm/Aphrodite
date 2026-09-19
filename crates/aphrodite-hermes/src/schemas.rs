@@ -51,8 +51,6 @@ pub fn all_schemas() -> Vec<serde_json::Value> {
 		schema_prefetch(),
 		schema_prefetch_status(),
 		schema_rebuild(),
-		#[cfg(feature = "navigation")]
-		schema_navigate(),
 	]
 }
 
@@ -353,42 +351,6 @@ fn schema_rebuild() -> serde_json::Value {
 			command to run outside the session. Takes no arguments. \
 			Returns {status: \"ok\", version, proxies, hint}.",
 		"parameters": no_params()
-	})
-}
-
-#[cfg(feature = "navigation")]
-fn schema_navigate() -> serde_json::Value {
-	json!({
-		"name": "aphrodite_navigate",
-		"description": "Zoom through session context as an S2 cell index. \
-			Maps everything compressed this session onto an S2 cell hierarchy so context \
-			can be read at a chosen zoom level: low levels give a coarse overview, higher \
-			levels split into finer cells. Call it without arguments for the index, then \
-			pass a `cell` from that index to expand it. \
-			Returns {level, cells, token_budget, children_available, content} for an \
-			index view, {level, cell, items, content} for a single cell, and \
-			{level, band, cells, items, content} for a band filter. An unparseable cell \
-			id returns {error}.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"level": {
-					"type": "integer",
-					"minimum": 0,
-					"maximum": 16,
-					"description": "S2 zoom level, 0 (coarsest) to 16 (finest). Defaults to the configured navigation level. Values above 16 are clamped."
-				},
-				"cell": {
-					"type": "string",
-					"description": "Hex S2 cell id taken from a previous index view; expands that cell instead of rendering the index."
-				},
-				"band": {
-					"type": "string",
-					"description": "Context band name to filter by, expanding every cell in that band at `level`."
-				}
-			},
-			"additionalProperties": false
-		}
 	})
 }
 

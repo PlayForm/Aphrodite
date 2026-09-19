@@ -1,27 +1,29 @@
 //! aphrodite-hermes: Hermes Agent-specific integration crate.
 //!
 //! This crate handles all Hermes-specific concerns - tool schemas,
-//! hook dispatch, skill registration - leaving the core `aphrodite`
-//! crate as a pure, agent-agnostic compression engine.
+//! hook dispatch, directive provisioning - leaving the core `aphrodite`
+//! crate as a pure, agent-agnostic compression engine. (Bundled skill
+//! registration is the Python plugin's job, not this crate's.)
 //!
 //! Architecture:
 //!   Python plugin (thin loader) → ctypes → libaphrodite_hermes.dylib
 //!                                           ├─ Tool dispatch (compress, retrieve, stats, etc.)
 //!                                           ├─ Hook dispatch (on_session_start, transform, terminal, pre/post LLM)
-//!                                           └─ Skill registration
+//!                                           ├─ Directive provisioning (materialize the
+//!                                           │  embedded builtin set into the runtime home)
 //!                                           ↓ (depends on)
 //!                                    aphrodite crate (rlib)
 //!                                           ├─ Core compression (hooks, state, marker)
 //!                                           ├─ Resolution (resolve, stage2, struct)
-//!                                           └─ Catalog, session, prefetch, config
+//!                                           └─ Catalog, session, prefetch, config, chain_split
 
 // See crates/aphrodite/src/lib.rs's matching comment: fixing this properly
 // (marking every `pub extern "C" fn` `unsafe`) is report 03's job, not a
 // side effect of wiring up a CI clippy gate.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+mod directives;
 mod schemas;
-mod skills;
 mod tools;
 
 use std::{
@@ -63,7 +65,15 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 		#[cfg(not(test))]
 		let state = {
 			let mut s = AphroditeState::default();
-			aphrodite::config_loader::Config::load().apply_compression(&mut s);
+			let cfg = aphrodite::config_loader::Config::load();
+			cfg.apply_compression(&mut s);
+			// Issue #11 WS4: also push `[previews] preview_max_chars` into
+			// the process-global preview builder so the dylib path caps
+			// previews exactly like the proxy path (the key was
+			// declared-but-unread dead config). Precedence is
+			// $APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120; an absent
+			// key means unlimited.
+			cfg.apply_previews();
 			s
 		};
 		#[cfg(test)]
@@ -104,6 +114,23 @@ pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// through). So return the CCR marker string when compression happened, and
 /// `null` otherwise to leave the original output untouched.
 pub(crate) fn replacement_from(r:&serde_json::Value) -> serde_json::Value {
+	if r.get("chain_split").and_then(|v| v.as_bool()).unwrap_or(false) {
+		// Fine-grained chain split, invisibility contract: the LLM must see
+		// exactly what it would for any compressed output - the NATURAL
+		// per-segment CCR markers (each segment's own `<<<CCR:hash|type|size>>>`
+		// marker, retrievable by its own hash), one per line. Never the
+		// `summary` string: it announces the mechanism (`[chain:N segs | ...]`)
+		// and stays in the JSON payload for telemetry/metrics only.
+		if let Some(markers) = r.get("markers").and_then(|v| v.as_array()) {
+			let joined:Vec<String> = markers
+				.iter()
+				.filter_map(|m| m.get("marker").and_then(|v| v.as_str()).map(str::to_string))
+				.collect();
+			if !joined.is_empty() {
+				return serde_json::Value::String(joined.join("\n"));
+			}
+		}
+	}
 	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false) {
 		if let Some(marker) = r.get("marker").and_then(|v| v.as_str()) {
 			return serde_json::Value::String(marker.to_string());
@@ -235,15 +262,6 @@ pub extern "C" fn aphrodite_hermes_list_tools() -> *mut c_char {
 	})
 }
 
-/// List all bundled skill names and descriptions as JSON.
-#[no_mangle]
-pub extern "C" fn aphrodite_hermes_list_skills() -> *mut c_char {
-	guarded(|| {
-		let skills = skills::all_skills();
-		to_c_string(&serde_json::to_string(&skills).unwrap_or_default())
-	})
-}
-
 /// Get a single tool schema by name.
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_get_schema(tool_name:*const c_char) -> *mut c_char {
@@ -323,7 +341,7 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 						let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 						if call_tool == "terminal" || call_tool == "process" {
 							let command = parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str());
-							// For `process(action='poll')`, don't background — it's a check call.
+							// For `process(action='poll')`, don't background - it's a check call.
 							let is_poll = call_tool == "process"
 								&& parsed
 									.get("args")
@@ -335,7 +353,7 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 								if let Some((_task_id, cmd_summary)) =
 									aphrodite::poll_worker::should_background_pre(command)
 								{
-									// We don't create a BgTask here — Hermes handles the
+									// We don't create a BgTask here - Hermes handles the
 									// process lifecycle. We'll track completion via
 									// transform_tool_result when the agent polls.
 									return serde_json::json!({
@@ -348,6 +366,40 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 											"aphrodite: auto-backgrounding `{}`", cmd_summary
 										),
 									});
+								}
+							}
+						}
+					}
+					// ── Fine-grained chain splitting: rewrite chained commands ──
+					// LLMs chain (`cd x && cargo build && cargo test`) into one call;
+					// rewriting with segment markers lets transform_tool_result split
+					// the output into per-segment CCR entries (N compact previews).
+					// Tier 1 teaching loop: only chains with at least
+					// `chain_split_min_segments` segments are rewritten - the
+					// threshold adapts from retrieval consequences (invisible).
+					if state.chain_split_enabled {
+						let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+						if call_tool == "terminal" {
+							if let Some(command) =
+								parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str())
+							{
+								if let Some(segments) = aphrodite::chain_split::split_chain(command) {
+									if segments.len() >= state.chain_split_min_segments {
+										let rewritten = aphrodite::chain_split::build_marked_command(&segments);
+										if rewritten != command {
+											let mut args =
+												parsed.get("args").cloned().unwrap_or_else(|| serde_json::json!({}));
+											args["command"] = serde_json::Value::String(rewritten.clone());
+											return serde_json::json!({
+												"action": "modify",
+												"args": args,
+												"message": format!(
+													"aphrodite: split chained command into {} segments (fine-grained CCR)",
+													segments.len()
+												),
+											});
+										}
+									}
 								}
 							}
 						}
@@ -476,6 +528,32 @@ pub extern "C" fn aphrodite_hermes_proxy_health() -> *mut c_char {
 	guarded(|| to_c_string(&proxy_health().to_string()))
 }
 
+// ── Directives provisioning C ABI ──────────────────────────
+
+/// Materialize the embedded behavioral directives into
+/// `<runtime-home>/directives/` (idempotent; never overwrites user data).
+///
+/// The shipped directive set is embedded in the core `aphrodite` crate
+/// (`builtin_directives/*.md` via `include_str!`, exposed through
+/// `aphrodite::directives::loaded_builtins()`); this fn provisions it into
+/// the user-data home so the plugin directory never holds runtime state.
+///
+/// `home_dir` is the runtime home (the user-data folder, e.g.
+/// `~/.hermes/aphrodite`). If null/empty it is resolved from
+/// `$APHRODITE_DIRECTIVES_DIR` (exact dir), `$APHRODITE_HOME` (home), then
+/// `$HOME/.hermes/aphrodite`. Returns JSON
+/// `{"status":"ok","dir":...,"written":[...],"skipped":[...],"warnings":[...]}`
+/// - always `status:"ok"` (failures degrade to warnings). Caller must free
+///   with `aphrodite_hermes_free_string`.
+#[no_mangle]
+pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir:*const c_char) -> *mut c_char {
+	let home = unsafe { cstr_to_string(home_dir) };
+	guarded(std::panic::AssertUnwindSafe(move || {
+		let result = directives::materialize_into(&home);
+		to_c_string(&serde_json::to_string(&result).unwrap_or_default())
+	}))
+}
+
 #[cfg(test)]
 mod tests {
 	use std::ffi::CString;
@@ -514,6 +592,64 @@ mod tests {
 		assert_eq!(cache, 19797);
 	}
 
+	// ── Chain-split invisibility contract: the LLM sees the natural
+	// per-segment CCR markers (joined, one per line), never the `summary`
+	// string that announces the mechanism. ──
+	#[test]
+	fn test_replacement_from_chain_split_joins_natural_markers() {
+		let r = serde_json::json!({
+			"status": "ok",
+			"compressed": true,
+			"chain_split": true,
+			"segments": 2,
+			"summary": "[chain:2 segs | 200 orig → 90 markers]",
+			"markers": [
+				{
+					"index": 0,
+					"type": "terminal",
+					"size": 120,
+					"hash": "aaaa",
+					"preview": "[terminal:120B] seg one",
+					"marker": "<<<CCR:aaaa|terminal|120>>>\n[terminal:120B] seg one"
+				},
+				{
+					"index": 1,
+					"type": "build",
+					"size": 80,
+					"hash": "bbbb",
+					"preview": "[build:80B] seg two",
+					"marker": "<<<CCR:bbbb|build|80>>>\n[build:80B] seg two"
+				}
+			]
+		});
+		let out = replacement_from(&r);
+		let s = out.as_str().expect("chain_split must yield a string");
+		// Natural markers, one per line.
+		assert!(s.starts_with("<<<CCR:aaaa|terminal|120>>>"));
+		assert!(s.contains("\n<<<CCR:bbbb|build|80>>>"));
+		assert!(s.contains("[terminal:120B] seg one"));
+		assert!(s.contains("[build:80B] seg two"));
+		// The mechanism is invisible: no summary string, no 'chain' word.
+		assert!(!s.contains("[chain:"));
+		assert!(!s.contains("chain"));
+		assert!(!s.contains("orig →"));
+	}
+
+	#[test]
+	fn test_replacement_from_non_chain_uses_single_marker() {
+		let r = serde_json::json!({
+			"status": "ok",
+			"compressed": true,
+			"hash": "cccc",
+			"type": "text",
+			"size": 42,
+			"preview": "[text:42B] hi",
+			"marker": "<<<CCR:cccc|text|42>>>\n[text:42B] hi"
+		});
+		let s = replacement_from(&r);
+		assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
+	}
+
 	#[test]
 	fn test_version_is_semver() {
 		let json_ptr = aphrodite_hermes_version();
@@ -537,13 +673,47 @@ mod tests {
 		aphrodite_hermes_free_string(json_ptr);
 	}
 
+	// ── F4 hardening: the FFI allocate/free pairing must be symmetric and
+	// allocator-safe. Every string returned across the C ABI is allocated
+	// with `CString::new(...).into_raw()` (`to_c_string`) and reclaimed by
+	// `CString::from_raw` inside `aphrodite_hermes_free_string` - never via a
+	// manual `libc::free`/`free()` or an allocator-specific dealloc. Because
+	// both halves route through the Rust global allocator (the crate installs
+	// no `#[global_allocator]`, so that is the default system allocator shared
+	// process-wide), the pairing holds regardless of which dylib image
+	// allocated and which freed it, and is immune to hot-reload allocator
+	// skew. This test round-trips fresh allocations (allocate → read back →
+	// free) repeatedly; an asymmetric pairing (wrong deallocator, double
+	// free, invalid free) would abort the harness, not silently pass. ──
 	#[test]
-	fn test_list_skills_returns_array() {
-		let json_ptr = aphrodite_hermes_list_skills();
-		let json = unsafe { CStr::from_ptr(json_ptr) }.to_string_lossy().into_owned();
-		let v:serde_json::Value = serde_json::from_str(&json).unwrap();
-		assert!(v.is_array());
-		aphrodite_hermes_free_string(json_ptr);
+	fn test_free_string_round_trip_symmetric() {
+		// Varying lengths incl. empty string: allocate, read, free, repeat.
+		for i in 0..256 {
+			let payload = format!("round-trip-{i}-{}", "x".repeat(i % 64));
+			let ptr = to_c_string(&payload);
+			assert!(!ptr.is_null(), "to_c_string returned null for payload #{i}");
+			let read = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+			assert_eq!(read, payload, "read-back mismatch for payload #{i}");
+			aphrodite_hermes_free_string(ptr);
+		}
+		// Empty string must round-trip too (CString is NUL-terminated).
+		let ptr = to_c_string("");
+		assert!(!ptr.is_null());
+		assert_eq!(unsafe { CStr::from_ptr(ptr) }.to_bytes(), b"");
+		aphrodite_hermes_free_string(ptr);
+		// Error-JSON path (`to_json_error` → `to_c_string`) pairs identically.
+		for i in 0..64 {
+			let ptr = to_json_error(&format!("boom-{i}"));
+			assert!(!ptr.is_null());
+			let read = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+			assert!(read.contains("boom-"), "error payload #{i} corrupted");
+			aphrodite_hermes_free_string(ptr);
+		}
+		// Interior NUL: CString::new fails → null; free_string(null) is a no-op.
+		let ptr = to_c_string("a\0b");
+		assert!(ptr.is_null());
+		aphrodite_hermes_free_string(ptr);
+		aphrodite_hermes_free_string(std::ptr::null_mut());
 	}
 
 	#[test]
@@ -875,5 +1045,56 @@ mod tests {
 		aphrodite_hermes_free_string(ptr);
 
 		assert_eq!(result, "null", "disabled flag must pass through: {result}");
+	}
+
+	// ── Tier 1 teaching loop: the adaptive split threshold gates the
+	// rewrite - chains below `chain_split_min_segments` pass through
+	// untouched (no markers), chains at/above it get rewritten. ──
+	#[test]
+	fn test_pre_tool_call_chain_split_respects_adaptive_threshold() {
+		let _g = crate::test_guard();
+		aphrodite_hermes_call_hook(
+			CString::new("session_start").unwrap().as_ptr(),
+			CString::new("{}").unwrap().as_ptr(),
+		);
+		with_shared(|state| {
+			state.poll_worker_enabled = false;
+			state.chain_split_enabled = true;
+			// Threshold raised to 3: a 2-segment chain must NOT be split.
+			state.chain_split_min_segments = 3;
+		});
+
+		// Below threshold: 2 segments → pass through (null).
+		let args2 = serde_json::json!({
+			"tool_name": "terminal",
+			"args": {"command": "cd x && cargo build"},
+		})
+		.to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args2).unwrap().as_ptr(),
+		);
+		let result2 = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+		assert_eq!(result2, "null", "2-segment chain below threshold must pass through: {result2}");
+
+		// At/above threshold: 3 segments → rewritten with markers.
+		let args3 = serde_json::json!({
+			"tool_name": "terminal",
+			"args": {"command": "cd x && cargo build && cargo test"},
+		})
+		.to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args3).unwrap().as_ptr(),
+		);
+		let result3 = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+		let v3:serde_json::Value = serde_json::from_str(&result3).unwrap();
+		assert_eq!(v3["action"], "modify", "3-segment chain must be rewritten: {result3}");
+		assert!(
+			v3["args"]["command"].as_str().unwrap().contains("__APHRODITE_SEG__"),
+			"rewritten command must carry segment markers: {result3}"
+		);
 	}
 }

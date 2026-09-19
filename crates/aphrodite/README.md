@@ -4,7 +4,9 @@
 > **Sub-ms, 26 content types, 12,800× max ratio.**
 
 The core compression engine. Produces both the `aphrodite` binary (HTTP proxy on
-`:9797`/`:9798`) and `libaphrodite.dylib` (loaded by the Hermes plugin via C ABI).
+`:9797`/`:9798`) and `libaphrodite.dylib` (best-effort cdylib for external
+embedding; the Hermes plugin loads the bridge crate's `libaphrodite_hermes.dylib`
+instead - see `crates/aphrodite-hermes/README.md`).
 
 [crates.io](https://crates.io/crates/aphrodite) ·
 [docs](https://github.com/PlayForm/Aphrodite/tree/Current/docs/README.md)
@@ -16,6 +18,9 @@ The core compression engine. Produces both the `aphrodite` binary (HTTP proxy on
 ```bash
 # From source (monorepo)
 cargo build --release -p aphrodite
+# then bootstrap the runtime home (~/.hermes/aphrodite/: binaries/,
+# directives/, hotreload/, ccr.db)
+aphrodite setup
 
 # From crates.io
 cargo install aphrodite
@@ -29,7 +34,7 @@ cargo install aphrodite
 tool output → classify → template → store → <<<CCR:hash|type|size>>>
                                               │
                                               ▼
-                                         Agent (15 tok preview, not 500 tok raw)
+                                         Agent (honest preview, not raw output)
 ```
 
 Four pipeline stages, all under 1ms:
@@ -52,14 +57,17 @@ src/
 ├── state.rs             ← AphroditeState, inline store, LRU, markers
 ├── marker.rs            ← CCR marker formatting + parsing (<<<CCR:…>>>)
 ├── catalog.rs           ← Full/compact/TOC catalog display
+├── chain_split.rs       ← Fine-grained chain splitting (SEG_MARKER segments)
 ├── resolve.rs           ← Recursive CCR expansion (5 levels deep)
 ├── stage2.rs            ← Semantic reduction for JSON, build, diff, code
 ├── struct_extract.rs    ← Code structure maps (Rust, Python, Go, JS/TS)
 ├── config.rs            ← CLI args + TOML multi-config
 ├── config_loader.rs     ← TOML + env var loading
 ├── directives.rs        ← Conversational directives: load, inject, list/swap/add/remove/reset
+├── flow.rs              ← Per-turn injected-context assembler (directives + nudges + recall catalog)
 ├── setup.rs             ← `aphrodite setup` one-shot bootstrap (Gatekeeper-safe artifact install)
 ├── prefetch.rs          ← Background file read + compress threads
+├── poll_worker.rs       ← Auto-backgrounding of slow tool calls
 ├── preview.rs           ← detect_type, build_preview (shared across proxy + dylib)
 ├── main.rs              ← Binary entry point
 └── retrieve.rs          ← POST /retrieve - hash → content, filter, paginate, truncated flag
@@ -69,9 +77,11 @@ src/
 
 The 25 `#[no_mangle] extern "C"` exports in `lib.rs` (22 written out plus 3
 macro-generated: `aphrodite_compress`, `aphrodite_transform`,
-`aphrodite_terminal`) serve both the `aphrodite-hermes` bridge crate (which
-re-exports a higher-level ABI - see `crates/aphrodite-hermes/README.md`) and
-the Python plugin's ctypes bindings.
+`aphrodite_terminal`) form the core C ABI. The `aphrodite-hermes` bridge
+crate links this crate as an rlib and exposes its own higher-level ABI
+(`libaphrodite_hermes.dylib` - see `crates/aphrodite-hermes/README.md`); the
+Python plugin's ctypes bindings (`_bindings.py`) are generated from the bridge
+header, not from these exports.
 
 ---
 

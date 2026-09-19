@@ -13,11 +13,11 @@
 > type-aware classifier, TOML-driven, dylib hot-reload.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/static/v1?label=release&message=v1.4.5&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/static/v1?label=release&message=v1.4.6&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.1.3&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.1.4&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
-[![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](LICENSE)
+[![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Current/LICENSE)
 
 ---
 
@@ -45,19 +45,24 @@ On first launch the plugin auto-downloads the `aphrodite` binary from
 > Use the Hermes plugin method on Windows too - `download.ps1` is a native
 > PowerShell equivalent. See [docs/install/windows.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/windows.md).
 
-### Via cargo
+### Option B: cargo install (standalone binary)
 
-**`Terminal`**
+Prefer a source checkout (Option A above) for the Hermes plugin - it is a git
+folder by design, and `cargo install` alone does not ship the plugin code.
+The two routes are alternatives: if you install via git clone, you do not need
+`cargo install`, and vice versa.
+
+**`Terminal`** (binary + config only)
 
 ```sh
 cargo install aphrodite          # proxy binary
 cargo install aphrodite-hermes   # dylib + helper bin
-aphrodite setup                  # plugin structure + config + symlink
+aphrodite setup                  # config + data dir under ~/.hermes/aphrodite
 ```
 
-`cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/`.
-The `libaphrodite_hermes` dylib must come from a source checkout or the
-release-download flow above.
+`cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/` and never
+links the plugin into Hermes. To use the Hermes plugin, follow Option A (git
+clone + `ln -s`); `aphrodite setup` prints the exact link command.
 
 ### From source
 
@@ -232,7 +237,6 @@ crates/aphrodite/          ← Core engine (binary + cdylib)
   catalog.rs               ← CCR catalog listing (TOC, tool formats)
   prefetch.rs              ← Background file prefetch → CCR
   poll_worker.rs           ← Auto-backgrounding of slow tool calls
-  navigate.rs              ← S2 context navigation (experimental)
   flow.rs / setup.rs       ← Plugin bootstrap, `aphrodite setup` installer
   builtin_directives/      ← Shipped directive markdown (focus, foresight, cleanup, explore, lazy, ccr-handling)
 
@@ -393,22 +397,6 @@ Cache and token modes measure identical ratios;
 **Median: 23× fewer tokens on tool output.**
 End-to-end latency is 8-40 ms (includes the HTTP round-trip);
 classification alone is 40-123 ns.
-
-Benchmarks are reproducible:
-`cargo run --release -p aphrodite --example bench_01_corpus`
-(`bench_02_threshold`, `bench_03_retrieve`, `bench_04_ema`).
-
----
-
-## Relationship to Headroom 🔗
-
-Aphrodite embeds [Headroom](https://github.com/PlayForm/Aphrodite/tree/Current/docs/APHRODITE-HEADROOM.md) - a custom fork tracked
-as a git submodule at `vendor/headroom/`.
-Headroom provides the content transforms (classifier, smart crusher, tokenizer);
-Aphrodite adds the preview pipeline, CCR storage, Hermes integration, and
-dual-proxy architecture.
-
-→ [Full comparison: Aphrodite vs Headroom](https://github.com/PlayForm/Aphrodite/tree/Current/docs/APHRODITE-HEADROOM.md)
 
 ---
 

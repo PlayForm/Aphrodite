@@ -45,7 +45,7 @@ pub fn ccr_marker(
 	meta:Option<&HashMap<String, String>>,
 	center:Option<&str>,
 ) -> String {
-	// Sanitize preview: newlines → spaces (| is safe — the marker is on its own line).
+	// Sanitize preview: newlines → spaces (| is safe - the marker is on its own line).
 	let mut safe = preview.replace(['\n', '\r'], " ").trim().to_string();
 	// Strip control chars
 	safe = safe.chars().filter(|c| *c >= ' ').collect();
@@ -139,7 +139,7 @@ pub fn parse_preview(marker_line:&str) -> Option<String> {
 	}
 }
 
-/// Matches all four marker delimiter families this codebase (and the Python
+/// Matches all three marker delimiter families this codebase (and the Python
 /// plugin / docs) uses to wrap a CCR reference:
 /// `<<<CCR:hash|type|size>>>`, `[CCR:hash|type]`, and the Unicode-glyph forms
 /// opened by `⫷` (U+2AF7) or closed by `⫸` (U+2AF8). Compiled once (report 05
@@ -240,6 +240,7 @@ mod tests {
 	// `\[\w+:\[` doubling signature for ANY content type. ──
 	#[test]
 	fn test_marker_preview_never_doubles_bracket_prefix() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let re = regex::Regex::new(r"\[\w+:\[").unwrap();
 		for ty in [
 			"text",
@@ -429,7 +430,7 @@ mod tests {
 		// survive intact, so `extract_hashes` would also match the literal token
 		// alongside the real marker hash. This is acceptable: the real hash is
 		// always first (line 1), and `|`-mangling harmed every enriched preview
-		// (ls, git, test, grep — all use `|` as a visual separator in their
+		// (ls, git, test, grep - all use `|` as a visual separator in their
 		// format) to defend against a vanishingly rare edge case (tool output
 		// literally containing `<<<CCR:`-shaped text).
 		let literal_marker_text = "example: <<<CCR:fake000|text|1>>>";
@@ -444,7 +445,7 @@ mod tests {
 		);
 		assert!(m.starts_with("<<<CCR:abc123def456abc123def456abc123def456|text|999>>>"));
 		// Without | → `-` sanitization, the literal `<<<CCR:fake000|text|1>>>`
-		// in the preview survives intact — but `fake000` contains `k` which is
+		// in the preview survives intact - but `fake000` contains `k` which is
 		// outside [a-f], so `extract_hashes`'s hex-hash gate `[0-9a-fA-F]`
 		// already rejects it. Only the real hash (pure hex) is extracted.
 		assert!(

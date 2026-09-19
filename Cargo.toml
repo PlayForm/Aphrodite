@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/aphrodite", "crates/aphrodite-hermes"]
+exclude = ["Maintain/dynamic_hooks"]
 
 [workspace.package]
 edition = "2021"

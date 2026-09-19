@@ -14,7 +14,7 @@ POST /retrieve
 
 Loopback only. Requires `Authorization: Bearer <token>` when
 `APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat) -
-see [Environment Variables](../config/env-vars.md).
+see [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md).
 
 ## Request
 
@@ -36,7 +36,7 @@ pub struct RetrieveRequest {
     #[serde(default)]
     pub offset: usize,              // 0-based line offset for pagination
     #[serde(default)]
-    pub limit: usize,               // Max lines (0 = server default cap: 10,000)
+    pub limit: usize,               // Max lines (0 = FULL document, no cap; explicit limits clamp to 10,000)
 }
 ```
 
@@ -55,8 +55,9 @@ pub struct RetrieveRequest {
 ```
 
 `truncated` is `true` when `content` is a partial window of a larger stored
-document (because of `offset`/`limit`, or because `limit` hit the 10,000-line
-cap) - see [Pagination](#pagination).
+document (because of `offset`/`limit`, or because an explicit `limit` hit the
+10,000-line cap; `limit: 0` requests the FULL document and never truncates) -
+see [Pagination](#pagination).
 
 ### Not Found (404)
 
@@ -159,11 +160,14 @@ fn filter_content<'a>(content: &'a str, query: Option<&str>) -> Cow<'a, str> {
 
 ## Pagination
 
-`limit: 0` does not mean unlimited - it is clamped to a 10,000-line server
-default cap, same as any `limit` above 10,000. When the returned window
-doesn't cover the whole document (because of `offset`, `limit`, or the cap),
-a `[lines a-b/total]` header is prepended to `content` so the caller can tell
-a truncated result from a genuinely short document without guessing.
+`limit: 0` requests the FULL document (no cap) - this is the round-trip
+contract: a full-document retrieval returns the exact original bytes, which
+therefore hash back to the marker's own hash. Any explicit `limit` - including
+one above 10,000 - is clamped to a 10,000-line server cap (02-F5) for safety.
+When the returned window doesn't cover the whole document (because of
+`offset`, an explicit `limit`, or the cap), a `[lines a-b/total]` header is
+prepended to `content` so the caller can tell a truncated result from a
+genuinely short document without guessing.
 
 ## Source Tracking
 

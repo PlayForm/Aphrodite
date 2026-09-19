@@ -2,8 +2,8 @@
 
 Everything below also works on Windows if you have Git Bash, WSL, or MSYS -
 these are all POSIX shell scripts. If you're on native PowerShell/`cmd.exe`,
-use [Windows install](windows.md) instead - `download.ps1`/`install.ps1` are
-direct PowerShell equivalents of `download.sh`/`install.sh`.
+use [Windows install](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/windows.md) instead - `download.ps1` is the direct
+PowerShell equivalent of `download.sh`.
 
 ## Option 1: Hermes plugin, auto-download (recommended for most users)
 
@@ -25,17 +25,23 @@ bash download.sh                 # auto-detects version + platform
 `download.sh` resolves the version to fetch automatically (a bundled version
 file, the monorepo's own version, or the latest published release) and
 detects your platform automatically too. No Rust toolchain needed. If the
-proxy never comes up, see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
+proxy never comes up, see [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#proxy-doesnt-auto-launch).
 
 ## Option 2: `cargo install` + `aphrodite setup`
 
-If you have a Rust toolchain and want one command to provision everything
-(binary, dylibs, `aphrodite.toml`, `plugin.yaml`, Hermes registration):
+If you have a Rust toolchain, `aphrodite setup` provisions the binary, dylibs,
+and `aphrodite.toml` under `~/.hermes/aphrodite/`. It never links the plugin
+into Hermes - the Hermes plugin is a git folder (Option 1) by design. The two
+options are alternatives: git clone OR cargo install - you don't need both.
 
 ```bash
 cargo install aphrodite aphrodite-hermes
 aphrodite setup --api-key sk-... --api-url https://api.deepseek.com --model deepseek-v4-pro
 ```
+
+To also use the Hermes plugin, follow Option 1's link step (clone the plugin
+repo and `ln -s` it into `~/.hermes/plugins/aphrodite`); `aphrodite setup`
+prints the exact command.
 
 What `aphrodite setup` does, in order:
 
@@ -47,13 +53,14 @@ What `aphrodite setup` does, in order:
 | 4    | Finds and copies both dylibs from nearby build/install locations - errors out naming the missing one if none are found        |
 | 5    | Writes `~/.hermes/aphrodite/aphrodite.toml` from a template (ports from `--cache-port`/`--token-port`, default `9797`/`9798`) |
 | 6    | Writes `plugin.yaml` and a thin plugin shim                                                                                   |
-| 7    | Links `~/.hermes/plugins/aphrodite` to `~/.hermes/aphrodite/` (symlink on Unix, junction with a copy fallback on Windows)     |
-| 8    | Runs `hermes plugins enable aphrodite`                                                                                        |
+| 7    | Runs `hermes plugins enable aphrodite`                                                                                        |
 
 Useful flags: `--cache-port`/`--token-port` (run multiple concurrent Hermes
 Agents on one machine, each pointed at its own port pair), `--no-launch`
 (skip auto-starting the proxy after setup), `--force` (re-run setup over an
-existing install).
+existing install). The plugin link itself is not part of setup - run the
+`ln -s` from the command block above (or its junction/copy equivalent on
+Windows) after setup completes.
 
 ### macOS Gatekeeper handling
 
@@ -80,28 +87,26 @@ cargo build --release -p aphrodite -p aphrodite-hermes
 
 Then either:
 
-| Approach                                     | What it does                                                                                                                                                                                                                                                                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Run `Maintain/install.sh` from the repo root | Copies the binary into `~/.hermes/aphrodite/`, symlinks the plugin and its skills into `~/.hermes/`, symlinks all 7 `profiles/aphrodite-*` directories into `~/.hermes/profiles/`, and enables the plugin per-profile. Expects `target/release/aphrodite` to already exist - it doesn't build or download anything itself |
-| Wire things up manually                      | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                    |
+| Approach                      | What it does                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Let the plugin install itself | Build the crates, then enable the plugin - installation and symlinking are handled by the plugin itself (it self-heals its `~/.hermes/` layout on launch; there is no separate installer script). Point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output, or copy it into the plugin's `binaries/` |
+| Wire things up manually       | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                                                 |
 
 ## What changes after any of these
 
 ```
 ~/.hermes/
 ├── plugins/
-│   └── aphrodite/          ← symlink (or junction/copy on Windows) to the plugin source
+│   └── aphrodite/          ← manual symlink (or junction/copy on Windows) to the plugin source
 ├── aphrodite/
 │   ├── aphrodite            ← binary (auto-downloaded, hand-placed, or built)
+│   ├── aphrodite.toml        ← proxy/engine config (written by `aphrodite setup`)
 │   └── ccr.db                ← SQLite CCR store (created on first run)
-└── profiles/<name>/
-    └── plugins/
-        └── aphrodite → ~/.hermes/plugins/aphrodite
 ```
 
 Two proxy processes come up on `:9797` (cache) and `:9798` (token) once
 Hermes launches the plugin (or once you launch `aphrodite` yourself - see
-[Troubleshooting](troubleshooting.md)).
+[Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md)).
 
 ## Uninstall
 

@@ -136,5 +136,5 @@ Both `notify_url` and `notify_key` must be set for callbacks to fire. If
 | `notify_failure` | Incremented on timeout, connection error, or non-success status      |
 
 Exposed at `/metrics` as `aphrodite_notify_success` and
-`aphrodite_notify_failure`. See [Prometheus Metrics](../metrics/prometheus.md)
+`aphrodite_notify_failure`. See [Prometheus Metrics](https://github.com/PlayForm/Aphrodite/tree/Current/docs/metrics/prometheus.md)
 for the full metrics reference.

@@ -1,7 +1,8 @@
 //! TOML config loader - port of plugins/aphrodite/_core/config.py
 //!
 //! Priority: env var > aphrodite.toml > hardcoded default
-//! Search paths: cwd, ~/.hermes/aphrodite/, relative to binary
+//! Search paths: cwd, then ~/.hermes/aphrodite/ - the config is NEVER
+//! resolved relative to the binary (or the plugin dir).
 
 use std::{collections::HashMap, path::PathBuf};
 
@@ -153,6 +154,35 @@ impl Config {
 		// ── Poll-worker auto-backgrounding ──
 		state.poll_worker_enabled = self.get_bool("APHRODITE_POLL_WORKER", "compression", "poll_worker", true);
 
+		// ── Fine-grained chain splitting ──
+		// Default OFF for release: the segment markers (`echo __APHRODITE_SEG__`)
+		// pollute captured stdout when commands are redirected to files, and
+		// every split also adds marker lines to live tool output. Opt in per
+		// session with APHRODITE_CHAIN_SPLIT=1 (or TOML chain_split = true).
+		state.chain_split_enabled = self.get_bool("APHRODITE_CHAIN_SPLIT", "compression", "chain_split", false);
+
+		// ── Tier 1 teaching loop: adaptive split threshold ──
+		// `chain_split_min_segments` is the initial threshold (floor). The
+		// threshold adapts within [floor, max] from the retrieval ratio of
+		// split segments; see `adapt_chain_split_threshold`.
+		state.chain_split_min_segments = self
+			.get_usize(
+				"APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS",
+				"compression",
+				"chain_split_min_segments",
+				2,
+			)
+			.max(2);
+		state.chain_split_floor = state.chain_split_min_segments;
+		state.chain_split_max_segments = self
+			.get_usize(
+				"APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS",
+				"compression",
+				"chain_split_max_segments",
+				6,
+			)
+			.max(state.chain_split_min_segments);
+
 		// ── Directives ──
 		// 01-F4: load whenever a directives/ dir exists, not gated on `active`
 		// being non-empty - the shipped template default is `active = []`, so
@@ -245,10 +275,11 @@ impl Config {
 			state.directives = crate::directives::loaded_builtins();
 		}
 		// Seed active directives: from TOML [directives] active list, filtered
-		// to those that actually loaded. If the TOML list is empty AND we fell
-		// back to builtins, default to focus + foresight + lazy (lazy keeps the
-		// session from over-eagerly stacking directives until a later turn
-		// proves it needs focus/explore/foresight/cleanup).
+		// to those that actually loaded. If the TOML list resolves empty while
+		// directives ARE loaded (from builtins or disk), default to the
+		// focus + foresight + lazy subset that exists in the loaded set (lazy
+		// keeps the session from over-eagerly stacking directives until a later
+		// turn proves it needs focus/explore/foresight/cleanup).
 		let active = self.get_string_list("directives", "active");
 		state.active_directives = active.into_iter().filter(|name| state.directives.contains_key(name)).collect();
 		if state.active_directives.is_empty() && !state.directives.is_empty() {
@@ -270,6 +301,19 @@ impl Config {
 			crate::flow::SHIPPED_SESSION_INJECT,
 		);
 	}
+
+	/// Load preview settings into the process-global preview builder.
+	/// `[previews] preview_max_chars` (env override:
+	/// `APHRODITE_PREVIEW_MAX_CHARS`) caps the rendered preview string in
+	/// chars; absent/0 = unlimited (legacy behavior). Issue #11 WS4: the key
+	/// existed in the config structs but was never read anywhere - the
+	/// preview builder now enforces it on every path (proxy, hooks, Hermes
+	/// dylib), and this is the dylib-side wiring (the engine binary reads
+	/// `MultiConfig.previews` directly in `main.rs`).
+	pub fn apply_previews(&self) {
+		let max = self.get_u64("APHRODITE_PREVIEW_MAX_CHARS", "previews", "preview_max_chars", 0);
+		crate::preview::set_preview_max_chars(if max == 0 { None } else { Some(max.min(u32::MAX as u64) as u32) });
+	}
 }
 
 #[cfg(test)]
@@ -285,7 +329,7 @@ mod tests {
 	fn test_defaults() {
 		let cfg = Config::default();
 		assert_eq!(cfg.get_u64("NONEXISTENT", "compression", "threshold", 42), 42);
-		assert_eq!(cfg.get_bool("NONEXISTENT", "compression", "enabled", true), true);
+		assert!(cfg.get_bool("NONEXISTENT", "compression", "enabled", true));
 		assert_eq!(cfg.get_string("NONEXISTENT", "defaults", "model", "gpt-4o"), "gpt-4o");
 	}
 
@@ -381,7 +425,8 @@ mod tests {
 			"directives must load even when [directives] active is empty"
 		);
 		// With empty TOML `active` and directives loaded from disk, the
-		// fallback seeds focus + foresight as defaults.
+		// fallback seeds whatever of [focus, foresight, lazy] exists in the
+		// loaded set - this temp dir only has focus.md, so focus is seeded.
 		assert!(
 			!state.active_directives.is_empty(),
 			"empty active list should seed focus + foresight defaults"
@@ -457,5 +502,38 @@ mod tests {
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
 		assert!(!state.poll_worker_enabled);
+	}
+
+	// ── Issue #11 WS4: `[previews] preview_max_chars` must reach the
+	// preview builder (the key was declared-but-unread dead config). ──
+	#[test]
+	fn test_apply_previews_wires_preview_max_chars() {
+		let _g = crate::preview::preview_cap_test_guard();
+		// Hermetic: a stray APHRODITE_PREVIEW_MAX_CHARS in the session env
+		// (e.g. left by a manual cap probe) would win the precedence chain
+		// and break every assert - and the leaked cap would poison every
+		// later preview test. Remove it for the duration of this test.
+		let env_backup = std::env::var("APHRODITE_PREVIEW_MAX_CHARS").ok();
+		unsafe { std::env::remove_var("APHRODITE_PREVIEW_MAX_CHARS") };
+		// TOML wins over the default (unlimited).
+		let cfg = Config {
+			raw:"[previews]\npreview_max_chars = 77\n".parse().unwrap(),
+			overrides:HashMap::new(),
+		};
+		cfg.apply_previews();
+		assert_eq!(crate::preview::preview_max_chars(), 77);
+
+		// Env override wins over TOML.
+		let mut cfg2 = Config::default();
+		cfg2.set_override("APHRODITE_PREVIEW_MAX_CHARS", "123");
+		cfg2.apply_previews();
+		assert_eq!(crate::preview::preview_max_chars(), 123);
+
+		// Absent/0 -> unlimited (legacy behavior), and restore the global.
+		Config::default().apply_previews();
+		assert_eq!(crate::preview::preview_max_chars(), 0);
+		if let Some(v) = env_backup {
+			unsafe { std::env::set_var("APHRODITE_PREVIEW_MAX_CHARS", v) };
+		}
 	}
 }

@@ -48,14 +48,14 @@ ccr_ttl_seconds = 3600
 #  COMPRESSION  -  thresholds, engine, auto-expand, classifier poll
 # ══════════════════════════════════════════════════════════════════════════════
 [compression]
-engine_threshold_pct = 100  # 100% = effectively disable CCR compression of tool output (avoids API errors) per standing feedback
+engine_threshold_pct = 45   # default: compress at 45% context; set to 100 or higher to disable engine compression entirely (escape hatch); APHRODITE_ENGINE_THRESHOLD_PCT > TOML > default
 engine_protect_first = 2    # messages to keep at start
 engine_protect_last = 5     # messages to keep at end
 engine_min_msgs = 8         # minimum messages before activating
-tool_threshold_token = 256  # token proxy threshold (bytes) - lower = compress more
-tool_threshold_cache = 2048 # cache proxy threshold (bytes) - lower = compress more
-terminal_threshold = 512    # terminal output threshold (bytes) - catch more terminal output
-inline_threshold = 1024     # inline zlib fallback threshold (bytes)
+tool_threshold_token = 512  # token proxy threshold (bytes) - lower = compress more
+tool_threshold_cache = 4096 # cache proxy threshold (bytes) - lower = compress more
+terminal_threshold = 1024   # terminal output threshold (bytes) - catch more terminal output
+inline_threshold = 2048     # inline zlib fallback threshold (bytes)
 auto_expand = true          # on: markers auto-expand inline - no aphrodite_retrieve needed for tool output
 auto_expand_limit = 102400  # cap per-expansion at 100KB (0=unlimited, but safe cap prevents context blowout)
 catalog_mode = "tool"       # compact | full | tool
@@ -68,7 +68,7 @@ context_engine = true       # dylib-path only (aphrodite_stats/config_get/set,
 # no gated behavior tied to this key
 prefetch = true # enable aphrodite_prefetch tool
 poll_worker = true # enable auto-backgrounding of slow tool calls
-chain_split = false # opt-in fine-grained command splitting; OFF by default (markers pollute redirected stdout)
+chain_split = false # opt-in fine-grained command splitting (SEG_MARKER segments); OFF by default (markers pollute redirected stdout)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -77,7 +77,7 @@ chain_split = false # opt-in fine-grained command splitting; OFF by default (mar
 [previews]
 model_family = "code_first" # compact | code_first | balance
 code_structure_map = true   # show fn/struct/class sigs
-preview_max_chars = 120     # max chars per preview line
+preview_max_chars = 120     # max chars per preview line (env APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120; key absent = unlimited)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -274,11 +274,6 @@ active = ["focus", "foresight"] # restored per standing feedback (feedback.md): 
 # catalog is never spill-mangled. Sections drop bottom-up when over budget;
 # directives and nudges never drop. Env: APHRODITE_FLOW_BUDGET_CHARS.
 budget_chars = 2600
-# S2 context navigation: when true, replaces flat prose [recall] block with a
-# compact navigable S2 index (~40% smaller). The LLM can call
-# aphrodite_navigate(level=N, cell=0x...) to zoom in. Env: APHRODITE_NAVIGATION.
-navigation = true
-navigation_default_level = 4   # 2=coarsest, 16=finest; 4 is balanced
 
 
 # ── Reverse key map: type aliases for template resolution ────────────────────

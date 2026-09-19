@@ -21,3 +21,33 @@ Markers are content. A <<<CCR:hash|type|size>>> marker in tool output stands in 
   its marker; use aphrodite_catalog to see what's available.
 - If aphrodite_retrieve fails (unknown hash): fall back to read_file or
   terminal for that specific item. Do not invent content you couldn't see.
+
+## Hard rules - broken at serious quality cost
+
+- Every marker in tool output is content. Treat it as the content you asked
+  for, never as an opaque token to ignore. NEVER re-read a file when you hold a
+  live marker for it - the marker IS that content; re-reading is a wasted API
+  call.
+- After EVERY tool call: scan the output for markers. For each one, decide from
+  its type and size whether the current action needs the content - and retrieve
+  what you need BEFORE the next action. Retrieval is not optional when the
+  action needs the content.
+- When several markers from several tools are pending, retrieve them in the
+  SAME turn (batch the retrieve calls together) before any other action.
+- If aphrodite_retrieve fails: fall back to the original tool (read_file,
+  terminal) for that specific hash. Do NOT skip retrieval when you have decided
+  the content is needed, and do not invent content you couldn't see.
+
+## Consequences of ignoring markers
+
+- You respond with "I got compressed output" instead of the actual content
+- You waste turns re-reading files you already hold as markers
+- The user gets low-quality responses based on missing data
+
+## Retrieve now, think later
+
+- When the next action needs a marker's content, retrieve it BEFORE acting:
+  a marker you don't retrieve leaves you operating blind. This is the #1 cause
+  of poor agent performance in compressed sessions.
+- Always retrieve first, then decide what to do with the content - deciding
+  what to do with bare markers is deciding without the content.

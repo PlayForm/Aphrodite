@@ -302,7 +302,7 @@ pub struct AppState {
 	/// TTL cache for the `/health/upstream` probe result: `(ok, checked_at)`.
 	/// F19: without this, a monitor polling `/health/upstream` every 10-15s
 	/// re-probes the real upstream on every single call - the exact cost
-	/// class `Maintain/examples/08_health_upstream.py` documents (a live
+	/// class a dev example documents (a live
 	/// upstream call was already removed from the plain `/health` endpoint
 	/// for this reason; `/health/upstream` just re-introduced it under a
 	/// different path).
@@ -1018,7 +1018,7 @@ pub async fn proxy_handler(
 	// total timeout), not the bounded `client` - see its doc comment.
 	let http_client = if body_wants_stream(&body_vec) { &state.stream_client } else { &state.client };
 	// F10 fix (above) builds `body_vec` once (one Vec alloc). Convert to
-	// `Bytes` here — outside the retry loop — so each attempt clones in O(1)
+	// `Bytes` here - outside the retry loop - so each attempt clones in O(1)
 	// (refcount) instead of copying the whole payload. The no-retry common
 	// path pays a single buffer move, not the two full copies the prior
 	// `body_vec.clone()` forced on every request (bug 18-P9: up to 4 copies
@@ -2641,6 +2641,9 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
 	match crate::config::MultiConfig::load(&config_path) {
 		Ok(config) => {
+			// Issue #11 WS4: keep the preview cap in sync on hot-reload
+			// (`[previews] preview_max_chars`).
+			crate::preview::set_preview_max_chars(config.previews.as_ref().and_then(|p| p.preview_max_chars));
 			let comp = config.compression.as_ref();
 			let thresholds = resolve_thresholds(comp);
 			state.cache_compress_threshold.store(thresholds.cache, Ordering::Relaxed);
@@ -2951,46 +2954,54 @@ code_multiplier = 6.5
 	// ── T3: detect_content_type ─────────────────────────────────
 	#[test]
 	fn test_detect_content_type_json_tool_output() {
+		let _g = crate::preview::preview_cap_test_guard();
 		assert_eq!(proxy_detect_content_type(r#"{"exit_code": 0, "output": "ok"}"#), "tool_output");
 	}
 
 	#[test]
 	fn test_detect_content_type_invalid_json_is_text() {
+		let _g = crate::preview::preview_cap_test_guard();
 		// Starts with '{' but isn't valid JSON - must not be misclassified.
 		assert_eq!(proxy_detect_content_type("{ not json at all"), "text");
 	}
 
 	#[test]
 	fn test_detect_content_type_json_array() {
+		let _g = crate::preview::preview_cap_test_guard();
 		assert_eq!(proxy_detect_content_type(r#"[{"a":1},{"a":2}]"#), "json");
 	}
 
 	#[test]
 	fn test_detect_content_type_rust_code() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "use std::fmt;\nfn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
 		assert_eq!(proxy_detect_content_type(src), "code_rust");
 	}
 
 	#[test]
 	fn test_detect_content_type_python_code() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "import os\nclass Foo:\n    def bar(self):\n        pass\n";
 		assert_eq!(proxy_detect_content_type(src), "code_python");
 	}
 
 	#[test]
 	fn test_detect_content_type_go_code() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "package main\nimport (\n\t\"fmt\"\n)\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n";
 		assert_eq!(proxy_detect_content_type(src), "code_go");
 	}
 
 	#[test]
 	fn test_detect_content_type_js_code() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "import { foo } from 'bar';\nexport const add = (a, b) => a + b;\nconst x = 1;\nconst y = 2;\n";
 		assert_eq!(proxy_detect_content_type(src), "code_js");
 	}
 
 	#[test]
 	fn test_detect_content_type_error_first_line() {
+		let _g = crate::preview::preview_cap_test_guard();
 		assert_eq!(
 			proxy_detect_content_type("Traceback (most recent call last):\n  File \"x.py\", line 1\nValueError: bad\n"),
 			"error"
@@ -2999,6 +3010,7 @@ code_multiplier = 6.5
 
 	#[test]
 	fn test_detect_content_type_diff() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let d = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,3 +1,4 @@\n+added a \
 		         line\n";
 		assert_eq!(proxy_detect_content_type(d), "diff");
@@ -3006,6 +3018,7 @@ code_multiplier = 6.5
 
 	#[test]
 	fn test_detect_content_type_log_lines() {
+		let _g = crate::preview::preview_cap_test_guard();
 		// Must not start with '{'/'[' (that short-circuits to the JSON branch).
 		let log = "starting up\n[INFO] service ready\n[WARN] disk low\n[ERROR] connection lost\n";
 		assert_eq!(proxy_detect_content_type(log), "log");
@@ -3013,11 +3026,13 @@ code_multiplier = 6.5
 
 	#[test]
 	fn test_detect_content_type_empty_is_text() {
+		let _g = crate::preview::preview_cap_test_guard();
 		assert_eq!(proxy_detect_content_type(""), "text");
 	}
 
 	#[test]
 	fn test_detect_content_type_plain_text() {
+		let _g = crate::preview::preview_cap_test_guard();
 		assert_eq!(proxy_detect_content_type("just some plain text\nnothing special\n"), "text");
 	}
 
@@ -3065,6 +3080,7 @@ code_multiplier = 6.5
 	// ── T3: build_preview ────────────────────────────────────────
 	#[test]
 	fn test_build_preview_code_has_ct_prefix() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
 		let preview = proxy_build_preview(src, "code_rust");
 		assert!(preview.starts_with("[code_rust:"));
@@ -3076,6 +3092,7 @@ code_multiplier = 6.5
 	// paths never drift. Both are wired to the same shared builder + detector.
 	#[test]
 	fn test_proxy_and_hook_previews_are_identical_for_semantic_shapes() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let git_status = " M src/preview.rs\nA  src/new.rs\nD  src/old.rs\n?? tmp/x\n?? tmp/y";
 		let cargo_test = "test result: ok. 220 passed; 0 failed; 1 ignored; finished in 0.31s";
 		let ripgrep = "src/a.rs:12:hit one\nsrc/a.rs:20:hit two\nsrc/b.rs:5:hit three";
@@ -3092,6 +3109,7 @@ code_multiplier = 6.5
 
 	#[test]
 	fn test_build_preview_error_has_ct_prefix_via_error_line() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "some noise\nerror[E0308]: mismatched types\nmore noise\n";
 		let preview = proxy_build_preview(src, "error");
 		assert!(preview.contains("error[E0308]"));
@@ -3099,6 +3117,7 @@ code_multiplier = 6.5
 
 	#[test]
 	fn test_build_preview_diff_has_ct_prefix() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "diff --git a/x b/x\n--- a/x\n+++ a/x\n";
 		let preview = proxy_build_preview(src, "diff");
 		assert!(preview.starts_with("diff --git"));
@@ -3106,6 +3125,7 @@ code_multiplier = 6.5
 
 	#[test]
 	fn test_build_preview_json_has_ct_prefix() {
+		let _g = crate::preview::preview_cap_test_guard();
 		let src = "{\"a\":1,\"b\":2}\n";
 		let preview = proxy_build_preview(src, "json");
 		assert!(preview.contains("keys"));
@@ -3614,9 +3634,9 @@ code_multiplier = 6.5
 	}
 
 	// ── T15 (F2): regression tests for the historical corpus examples ────
-	// These exercise the real Rust code (unlike Maintain/examples/*.py,
-	// which re-implement the buggy/fixed logic in Python and can never
-	// catch a Rust regression - see Maintain/examples/README.md).
+	// These exercise the real Rust code (unlike Python example
+	// re-implementations of the buggy/fixed logic, which can never
+	// catch a Rust regression).
 
 	/// Corpus 07_tokens_saved.py: the AtomicU64 must actually be incremented
 	/// on the real compression path, not just exist unused in /stats.
