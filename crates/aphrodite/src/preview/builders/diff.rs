@@ -4,11 +4,11 @@ use crate::preview::input::Input;
 
 /// Enrich: name the first couple of changed files so the agent sees WHAT
 /// changed, not just how many lines.
-pub(crate) fn build_diff_preview(inp:&Input<'_>) -> String {
+pub(crate) fn build_diff_preview(inp: &Input<'_>) -> String {
 	let f = inp.raw.matches("diff --git").count();
 	let a = inp.raw.lines().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count();
 	let d = inp.raw.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
-	let mut files:Vec<String> = inp
+	let mut files: Vec<String> = inp
 		.raw
 		.lines()
 		.filter_map(|l| l.strip_prefix("diff --git "))

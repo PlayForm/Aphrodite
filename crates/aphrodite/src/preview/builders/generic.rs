@@ -14,7 +14,7 @@ use crate::preview::text::sample_long::sample_long_line;
 /// head (SHALLOW). Now: skip structural noise lines (lone braces/brackets) to
 /// the first MEANINGFUL line (the first key / statement), and sample
 /// head+tail for very long lines.
-pub(crate) fn build_generic_preview(type_str:&str, inp:&Input<'_>) -> String {
+pub(crate) fn build_generic_preview(type_str: &str, inp: &Input<'_>) -> String {
 	let hint = first_meaningful_line(inp.raw)
 		.map(|l| sample_long_line(&l))
 		.filter(|s| !s.is_empty());

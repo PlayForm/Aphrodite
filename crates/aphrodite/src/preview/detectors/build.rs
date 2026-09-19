@@ -6,7 +6,7 @@ use crate::preview::input::Input;
 /// `warning:`, `-->`) - >=2 markers, or a verb plus an error/warning line.
 /// A lone `error: broke` terminal trace does NOT count (stays on the
 /// terminal arm).
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
+pub(crate) fn detect(inp: &Input<'_>) -> bool {
 	let build_verbs = inp
 		.non_empty
 		.iter()

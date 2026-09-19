@@ -12,7 +12,7 @@ use crate::preview::line::failure::is_failure_line;
 /// `Compiling` line, both hiding the actual error. Never success-looking:
 /// with no error line found, fall back to the last non-empty line (tail =
 /// most recent state).
-pub(crate) fn build_error_preview(inp:&Input<'_>) -> String {
+pub(crate) fn build_error_preview(inp: &Input<'_>) -> String {
 	let hint = inp
 		.raw
 		.lines()

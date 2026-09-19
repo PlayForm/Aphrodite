@@ -4,7 +4,7 @@ use crate::preview::input::Input;
 
 /// `commit <hash>` blocks: ≥1 block, and either ≥2 blocks or an `Author:`
 /// line (a lone `commit ` line in prose is not a log).
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
+pub(crate) fn detect(inp: &Input<'_>) -> bool {
 	let commit_lines = inp
 		.non_empty
 		.iter()

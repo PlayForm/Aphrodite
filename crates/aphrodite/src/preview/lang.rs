@@ -11,7 +11,7 @@
 /// Rust needs a fn/impl/struct/enum signature AND one of `->`/`&`/`use`;
 /// Python needs `def ` AND import/class/from/self.; Go needs func/package
 /// AND `import (`; JS/TS needs function/const/=> AND import/export.
-pub(crate) fn detect_language(content:&str) -> Option<&'static str> {
+pub(crate) fn detect_language(content: &str) -> Option<&'static str> {
 	if content.lines().count() <= 3 {
 		return None;
 	}

@@ -3,7 +3,7 @@
 /// True for a top-level YAML key line (`name: webapp`): a lowercase
 /// identifier key, no leading indent, non-empty value side allowed. Log-marker
 /// keys are excluded so compiler logs are never mis-tagged as yaml.
-pub(crate) fn is_yaml_key_line(line:&str) -> bool {
+pub(crate) fn is_yaml_key_line(line: &str) -> bool {
 	if line.starts_with(' ') || line.as_bytes().first() == Some(&9) {
 		return false;
 	}

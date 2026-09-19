@@ -5,7 +5,7 @@ use crate::preview::input::Input;
 /// git/unified headers or a hunk: `diff --git `, a `--- `/`+++ ` pair, or an
 /// `@@ ` hunk with ≥1 real delta line (`+`/`-` content, excluding the `+++`/
 /// `---` header lines themselves).
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
+pub(crate) fn detect(inp: &Input<'_>) -> bool {
 	let has_diff_git = inp.non_empty.iter().any(|l| l.trim_start().starts_with("diff --git "));
 	let has_ab_headers = {
 		let a = inp.non_empty.iter().any(|l| l.trim_start().starts_with("--- "));

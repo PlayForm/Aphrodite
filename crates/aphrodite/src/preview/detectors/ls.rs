@@ -5,7 +5,7 @@ use crate::preview::line::path::is_path_line;
 
 /// `ls -l` mode strings, or a majority of bare path-like tokens (find /
 /// plain ls).
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
+pub(crate) fn detect(inp: &Input<'_>) -> bool {
 	let ls_long = inp
 		.non_empty
 		.iter()

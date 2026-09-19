@@ -20,16 +20,14 @@ use crate::preview::line::failure::is_failure_line;
 /// 4. (Phase 6) the terminal exit-code override (`hooks.rs:379-381`) folds
 ///    in as an explicit terminal-path rule - it must NOT become a universal
 ///    detector, or every `"Error:"` line would classify terminal.
-pub(crate) fn resolve_effective_type<'a>(hint:&'a str, inp:&Input<'_>) -> Cow<'a, str> {
+pub(crate) fn resolve_effective_type<'a>(hint: &'a str, inp: &Input<'_>) -> Cow<'a, str> {
 	match hint {
 		"text" | "terminal" | "log" | "" | "plain" | "tool_result" => {
 			detect_semantic_type(inp.raw).map(Cow::Borrowed).unwrap_or(Cow::Borrowed(hint))
 		},
-		"build_output" | "build_error" => {
-			match detect_semantic_type(inp.raw) {
-				Some("test") if !inp.raw.lines().any(is_failure_line) => Cow::Borrowed("test"),
-				_ => Cow::Borrowed(hint),
-			}
+		"build_output" | "build_error" => match detect_semantic_type(inp.raw) {
+			Some("test") if !inp.raw.lines().any(is_failure_line) => Cow::Borrowed("test"),
+			_ => Cow::Borrowed(hint),
 		},
 		other => Cow::Borrowed(other),
 	}

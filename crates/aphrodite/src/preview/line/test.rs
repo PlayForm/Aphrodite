@@ -2,7 +2,7 @@
 //! result lines, and `N passed` / `Tests: N` number probes.
 
 /// `running N tests` header (bare test logs without a summary line).
-pub(crate) fn is_running_tests_line(t:&str) -> bool {
+pub(crate) fn is_running_tests_line(t: &str) -> bool {
 	let rest = match t.strip_prefix("running ") {
 		Some(r) => r,
 		None => return false,
@@ -25,7 +25,7 @@ pub(crate) fn is_running_tests_line(t:&str) -> bool {
 }
 
 /// `test <name> ... ok|FAILED|ignored` line.
-pub(crate) fn is_test_result_line(t:&str) -> bool {
+pub(crate) fn is_test_result_line(t: &str) -> bool {
 	let rest = match t.strip_prefix("test ") {
 		Some(r) => r,
 		None => return false,
@@ -50,7 +50,7 @@ pub(crate) fn is_test_result_line(t:&str) -> bool {
 }
 
 /// `N passed` / `N failed` anywhere on a line (pytest summaries).
-pub(crate) fn has_number_before(line:&str, kw:&str) -> bool {
+pub(crate) fn has_number_before(line: &str, kw: &str) -> bool {
 	match line.find(kw) {
 		Some(i) => line[..i].trim_end().chars().last().map(|c| c.is_ascii_digit()).unwrap_or(false),
 		None => false,
@@ -58,16 +58,14 @@ pub(crate) fn has_number_before(line:&str, kw:&str) -> bool {
 }
 
 /// `Tests: N` jest summary line.
-pub(crate) fn has_number_after(line:&str, kw:&str) -> bool {
+pub(crate) fn has_number_after(line: &str, kw: &str) -> bool {
 	match line.find(kw) {
-		Some(i) => {
-			line[i + kw.len()..]
-				.trim_start()
-				.chars()
-				.next()
-				.map(|c| c.is_ascii_digit())
-				.unwrap_or(false)
-		},
+		Some(i) => line[i + kw.len()..]
+			.trim_start()
+			.chars()
+			.next()
+			.map(|c| c.is_ascii_digit())
+			.unwrap_or(false),
 		None => false,
 	}
 }

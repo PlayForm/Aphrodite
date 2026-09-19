@@ -10,7 +10,7 @@ use crate::preview::line::warning::is_warning_line;
 /// repeated occurrences, matched inside unrelated words, and missed
 /// capitalized `Error:` (Python/Swift/clang output) - a genuinely failed
 /// build could render as `0E`.
-pub(crate) fn build_build_preview(inp:&Input<'_>) -> String {
+pub(crate) fn build_build_preview(inp: &Input<'_>) -> String {
 	let e = inp.raw.lines().filter(|l| is_error_line(l)).count();
 	let w = inp.raw.lines().filter(|l| is_warning_line(l)).count();
 	// Enrich: surface the first error MESSAGE (e.g. `E0432: unresolved

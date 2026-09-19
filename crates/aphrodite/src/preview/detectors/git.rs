@@ -11,7 +11,7 @@ use crate::preview::line::git_status::git_status_code;
 /// Phase 6 extension: `On branch ` long-form (`git status` without
 /// `--porcelain`) counts as git too - the proxy classifier recognized it and
 /// dropping it would regress those dumps to `text`.
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
+pub(crate) fn detect(inp: &Input<'_>) -> bool {
 	let on_branch = inp
 		.raw
 		.lines()

@@ -19,7 +19,7 @@ use crate::state::{ActiveDirective, AphroditeState};
 /// in aphrodite.toml; this constant is the fallback when the key is absent.
 /// Rendered once (turn_counter == 0) by `build_first_turn_injection`, then
 /// dropped. Empty string disables it entirely.
-pub const SHIPPED_SESSION_INJECT:&str = "\
+pub const SHIPPED_SESSION_INJECT: &str = "\
 [APHRODITE] v{VERSION} active.
   This session is running with CCR compression. Tool outputs larger than a
   few hundred bytes are replaced with markers like <<<CCR:hash|type|size>>>.
@@ -38,7 +38,7 @@ pub const SHIPPED_SESSION_INJECT:&str = "\
 /// Build the one-shot first-turn injection from the configured `session_inject`
 /// template. Returns empty string if `state.session_inject` is empty or the
 /// turn has advanced past 0 (first-turn only).
-pub fn build_first_turn_injection(state:&AphroditeState) -> String {
+pub fn build_first_turn_injection(state: &AphroditeState) -> String {
 	if state.session_inject.is_empty() || state.turn_counter > 0 {
 		return String::new();
 	}
@@ -61,7 +61,7 @@ pub fn build_first_turn_injection(state:&AphroditeState) -> String {
 /// `est_request_bytes` is reserved for the P9 telemetry line (chars/4 estimate)
 /// and is accepted now so callers don't have to change signature later; T1
 /// itself does not render a telemetry line.
-pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<usize>) -> String {
+pub fn build_turn_context(state: &mut AphroditeState, est_request_bytes: Option<usize>) -> String {
 	let _ = est_request_bytes; // reserved for P9/T27 telemetry line
 
 	let budget = state.flow_budget_chars;
@@ -84,7 +84,7 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	};
 
 	// Assemble top-down, then drop from the bottom until within budget.
-	let mut sections:Vec<String> = Vec::new();
+	let mut sections: Vec<String> = Vec::new();
 	if !session_inject.is_empty() {
 		sections.push(format!("[aphrodite: first-turn orientation]\n{}", session_inject.trim_end()));
 	}
@@ -115,20 +115,22 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 
 /// Number of leading "never-drop" sections currently present (directives +
 /// nudge block). Used to compute the floor for bottom-up dropping.
-fn nudges_present(state:&AphroditeState) -> bool {
+fn nudges_present(state: &AphroditeState) -> bool {
 	state
 		.ephemeral_directives
 		.iter()
 		.any(|e| e.inline.is_some() && e.expires_after_turn.is_none_or(|exp| exp >= state.turn_counter))
 }
 
-fn join_sections(sections:&[String]) -> String { sections.join("\n") }
+fn join_sections(sections: &[String]) -> String {
+	sections.join("\n")
+}
 
 /// Render at most 2 active inline nudges as `[nudge: <text>]` lines, newest
 /// wins (P3/T9). An entry renders while it has not expired
 /// (`expires_after_turn >= turn_counter`, or `None` = permanent).
-pub fn render_nudges(state:&AphroditeState) -> String {
-	let mut lines:Vec<String> = state
+pub fn render_nudges(state: &AphroditeState) -> String {
+	let mut lines: Vec<String> = state
 		.ephemeral_directives
 		.iter()
 		.rev() // newest first
@@ -146,12 +148,12 @@ pub fn render_nudges(state:&AphroditeState) -> String {
 /// after `ttl_turns` (P3/T9). `ttl_turns = 1` is a one-shot: rendered on the
 /// next turn, purged at the following `post_llm_call`. At most 4 ephemeral
 /// entries are stored; pushing a 5th drops the oldest.
-pub fn push_nudge(state:&mut AphroditeState, text:&str, ttl_turns:usize) {
+pub fn push_nudge(state: &mut AphroditeState, text: &str, ttl_turns: usize) {
 	let expires = Some(state.turn_counter + ttl_turns);
 	state.ephemeral_directives.push(ActiveDirective {
-		name:String::new(),
-		inline:Some(text.to_string()),
-		expires_after_turn:expires,
+		name: String::new(),
+		inline: Some(text.to_string()),
+		expires_after_turn: expires,
 	});
 	while state.ephemeral_directives.len() > 4 {
 		state.ephemeral_directives.remove(0);
@@ -161,7 +163,7 @@ pub fn push_nudge(state:&mut AphroditeState, text:&str, ttl_turns:usize) {
 /// Purge expired ephemeral directives (P3/T9). Called from `post_llm_call`
 /// AFTER `next_turn` advances the counter, so a nudge pushed during turn N
 /// (expiring at N + ttl) renders in turn N+1's context exactly once for ttl=1.
-pub fn purge_expired_nudges(state:&mut AphroditeState) {
+pub fn purge_expired_nudges(state: &mut AphroditeState) {
 	let counter = state.turn_counter;
 	state
 		.ephemeral_directives
@@ -171,10 +173,10 @@ pub fn purge_expired_nudges(state:&mut AphroditeState) {
 // ── Turn-telemetry helpers (P2) ────────────────────────────
 
 /// FNV-1a offset basis / prime (64-bit).
-const FNV_OFFSET:u64 = 0xCBF2_9CE4_8422_2325;
-const FNV_PRIME:u64 = 0x0000_0100_0000_01B3;
+const FNV_OFFSET: u64 = 0xCBF2_9CE4_8422_2325;
+const FNV_PRIME: u64 = 0x0000_0100_0000_01B3;
 
-fn fnv1a(bytes:&[u8]) -> u64 {
+fn fnv1a(bytes: &[u8]) -> u64 {
 	let mut hash = FNV_OFFSET;
 	for &b in bytes {
 		hash ^= b as u64;
@@ -186,7 +188,7 @@ fn fnv1a(bytes:&[u8]) -> u64 {
 /// Keys whose values are volatile noise (change run-to-run for the same logical
 /// call) - stripped before hashing so the same command twice yields the same
 /// signature (P2/T7).
-const VOLATILE_KEYS:&[&str] = &["timeout", "timestamp", "session_id", "tool_call_id"];
+const VOLATILE_KEYS: &[&str] = &["timeout", "timestamp", "session_id", "tool_call_id"];
 
 /// FNV-1a signature of `tool` + normalized args (P2/P8 similarity key).
 ///
@@ -194,7 +196,7 @@ const VOLATILE_KEYS:&[&str] = &["timeout", "timestamp", "session_id", "tool_call
 /// keys stripped, so the same logical call hashes stably; a different file path
 /// yields a different signature. Terminal calls (args carrying a `command`
 /// string) normalize to the trimmed command string.
-pub fn normalize_args_sig(tool:&str, args:Option<&serde_json::Value>) -> u64 {
+pub fn normalize_args_sig(tool: &str, args: Option<&serde_json::Value>) -> u64 {
 	let mut buf = String::new();
 	buf.push_str(tool);
 	buf.push('\u{1}');
@@ -203,7 +205,7 @@ pub fn normalize_args_sig(tool:&str, args:Option<&serde_json::Value>) -> u64 {
 		if let Some(cmd) = v.get("command").and_then(|c| c.as_str()) {
 			buf.push_str(cmd.trim_end());
 		} else if let Some(obj) = v.as_object() {
-			let mut keys:Vec<&String> = obj.keys().filter(|k| !VOLATILE_KEYS.contains(&k.as_str())).collect();
+			let mut keys: Vec<&String> = obj.keys().filter(|k| !VOLATILE_KEYS.contains(&k.as_str())).collect();
 			keys.sort();
 			for k in keys {
 				buf.push_str(k);
@@ -222,7 +224,7 @@ pub fn normalize_args_sig(tool:&str, args:Option<&serde_json::Value>) -> u64 {
 /// FNV-1a signature of an error: `error_type` + first line of `error_message`
 /// (P2/P7). Distinct compiler errors differ on line 1, so this stays
 /// discriminating without over-matching.
-pub fn error_sig(error_type:Option<&str>, error_message:Option<&str>) -> u64 {
+pub fn error_sig(error_type: Option<&str>, error_message: Option<&str>) -> u64 {
 	let mut buf = String::new();
 	buf.push_str(error_type.unwrap_or(""));
 	buf.push('\u{1}');
@@ -236,17 +238,17 @@ pub fn error_sig(error_type:Option<&str>, error_message:Option<&str>) -> u64 {
 /// events with `turn > turn_counter - n`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WindowStats {
-	pub reads:usize,
-	pub writes:usize,
-	pub searches:usize,
-	pub errors:usize,
-	pub distinct_error_sigs:usize,
-	pub new_files:usize,
-	pub total_calls:usize,
+	pub reads: usize,
+	pub writes: usize,
+	pub searches: usize,
+	pub errors: usize,
+	pub distinct_error_sigs: usize,
+	pub new_files: usize,
+	pub total_calls: usize,
 }
 
 /// Compute `WindowStats` over the last `n` turns (P2/T7).
-pub fn turn_window(state:&AphroditeState, n:usize) -> WindowStats {
+pub fn turn_window(state: &AphroditeState, n: usize) -> WindowStats {
 	let floor = state.turn_counter.saturating_sub(n);
 	let mut stats = WindowStats::default();
 	let mut error_sigs = std::collections::HashSet::new();
@@ -284,23 +286,23 @@ mod tests {
 		state::{MarkerEntry, ToolEvent},
 	};
 
-	fn state_with_directive(name:&str, body:&str) -> AphroditeState {
+	fn state_with_directive(name: &str, body: &str) -> AphroditeState {
 		let mut s = AphroditeState::default();
 		s.directives
-			.insert(name.into(), Directive { name:name.into(), content:body.into() });
+			.insert(name.into(), Directive { name: name.into(), content: body.into() });
 		s.active_directives = vec![name.into()];
 		s
 	}
 
-	fn add_marker(s:&mut AphroditeState, hash:&str, turn:usize) {
+	fn add_marker(s: &mut AphroditeState, hash: &str, turn: usize) {
 		s.record_marker(MarkerEntry {
-			hash:hash.into(),
-			ccr_type:"text".into(),
-			size:100,
-			preview:"[text] some preview content here".into(),
+			hash: hash.into(),
+			ccr_type: "text".into(),
+			size: 100,
+			preview: "[text] some preview content here".into(),
 			turn,
-			center:None,
-			meta:None,
+			center: None,
+			meta: None,
 		});
 	}
 
@@ -374,41 +376,41 @@ mod tests {
 		let mut s = AphroditeState::default();
 		s.turn_counter = 10;
 		s.record_tool_event(ToolEvent {
-			turn:10,
-			tool:"read_file".into(),
-			sig:1,
-			ok:true,
-			error_sig:None,
-			bytes:100,
-			wrote_path:None,
+			turn: 10,
+			tool: "read_file".into(),
+			sig: 1,
+			ok: true,
+			error_sig: None,
+			bytes: 100,
+			wrote_path: None,
 		});
 		s.record_tool_event(ToolEvent {
-			turn:10,
-			tool:"write_file".into(),
-			sig:2,
-			ok:true,
-			error_sig:None,
-			bytes:50,
-			wrote_path:Some("src/a.rs".into()),
+			turn: 10,
+			tool: "write_file".into(),
+			sig: 2,
+			ok: true,
+			error_sig: None,
+			bytes: 50,
+			wrote_path: Some("src/a.rs".into()),
 		});
 		s.record_tool_event(ToolEvent {
-			turn:9,
-			tool:"terminal".into(),
-			sig:3,
-			ok:false,
-			error_sig:Some(42),
-			bytes:20,
-			wrote_path:None,
+			turn: 9,
+			tool: "terminal".into(),
+			sig: 3,
+			ok: false,
+			error_sig: Some(42),
+			bytes: 20,
+			wrote_path: None,
 		});
 		// old event outside the window
 		s.record_tool_event(ToolEvent {
-			turn:2,
-			tool:"read_file".into(),
-			sig:4,
-			ok:true,
-			error_sig:None,
-			bytes:0,
-			wrote_path:None,
+			turn: 2,
+			tool: "read_file".into(),
+			sig: 4,
+			ok: true,
+			error_sig: None,
+			bytes: 0,
+			wrote_path: None,
 		});
 		let w = turn_window(&s, 5);
 		assert_eq!(w.reads, 1);

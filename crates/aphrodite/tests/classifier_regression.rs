@@ -13,7 +13,7 @@ use std::path::PathBuf;
 /// Absolute path to the bench corpus fixture, or `None` if this checkout has
 /// no bench/corpus (packaged tarball) - tests then fall back to inline
 /// content with the same shape, so they never hard-depend on repo layout.
-fn corpus_fixture(name:&str) -> Option<String> {
+fn corpus_fixture(name: &str) -> Option<String> {
 	let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../bench/corpus").join(name);
 	std::fs::read_to_string(p).ok()
 }

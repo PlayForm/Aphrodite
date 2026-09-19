@@ -10,7 +10,7 @@ use crate::preview::input::Input;
 /// Detect the CCR content-type string for a blob (e.g. `source_code`, `build`,
 /// `json_array`). Thin wrapper over the Headroom classifier so downstream
 /// crates (aphrodite-hermes) don't need a direct headroom-core dependency.
-pub fn detect_type(content:&str) -> String {
+pub fn detect_type(content: &str) -> String {
 	transforms::content_detector::detect_content_type(content)
 		.content_type
 		.as_str()
@@ -40,7 +40,7 @@ pub fn detect_type(content:&str) -> String {
 /// values; search/log/terminal are stubs returning None until Phase 6).
 /// Adding a shape = one chain line + one `detectors/<shape>.rs` file;
 /// reordering a priority = moving one line.
-pub fn detect_semantic_type(content:&str) -> Option<&'static str> {
+pub fn detect_semantic_type(content: &str) -> Option<&'static str> {
 	let inp = Input::new(content)?;
 	None
 		.or_else(|| detectors::json::detect(&inp).then_some("json"))

@@ -3,7 +3,7 @@
 /// Git porcelain / short-status code for a line (`M `, ` M`, `A `, `D `, `R `,
 /// `??`, `UU`, etc.), or `None`. Two leading columns (staged, unstaged) then a
 /// space then a path.
-pub(crate) fn git_status_code(line:&str) -> Option<&str> {
+pub(crate) fn git_status_code(line: &str) -> Option<&str> {
 	let b = line.as_bytes();
 	if b.len() < 4 {
 		return None;

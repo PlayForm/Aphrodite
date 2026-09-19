@@ -5,7 +5,7 @@ use crate::preview::line::lint::is_lint_line;
 
 /// Linter output (ruff/eslint/clippy/flake8): surface the first issue line
 /// (`path:line:col: CODE message`, or `error:`/`warning:` lines).
-pub(crate) fn build_lint_preview(inp:&Input<'_>) -> String {
+pub(crate) fn build_lint_preview(inp: &Input<'_>) -> String {
 	let hint = inp
 		.raw
 		.lines()

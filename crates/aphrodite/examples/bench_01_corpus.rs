@@ -30,15 +30,15 @@ fn bin_path() -> std::path::PathBuf {
         .map(|p| p.join(bin_name))
         .unwrap_or_else(|| bin_name.into())
 }
-const CACHE_PORT:u16 = 49797;
-const TOKEN_PORT:u16 = 49798;
+const CACHE_PORT: u16 = 49797;
+const TOKEN_PORT: u16 = 49798;
 
 // ── proxy lifecycle ────────────────────────────────────────────────
 
 struct Proxy {
-	child:std::process::Child,
-	port:u16,
-	mode:&'static str,
+	child: std::process::Child,
+	port: u16,
+	mode: &'static str,
 }
 impl Drop for Proxy {
 	fn drop(&mut self) {
@@ -47,7 +47,7 @@ impl Drop for Proxy {
 	}
 }
 
-fn spawn(mode:&'static str, port:u16) -> Proxy {
+fn spawn(mode: &'static str, port: u16) -> Proxy {
 	let listen = format!("127.0.0.1:{}", port);
 	// Isolate CCR storage per bench run so this never touches the operator's
 	// real ~/.hermes/aphrodite/ccr.db (token mode only opens SQLite there).
@@ -94,7 +94,7 @@ fn spawn(mode:&'static str, port:u16) -> Proxy {
 
 // ── HTTP via curl (no extra deps) ──────────────────────────────────
 
-fn ccr_create(port:u16, content:&str) -> Option<serde_json::Value> {
+fn ccr_create(port: u16, content: &str) -> Option<serde_json::Value> {
 	let body = serde_json::json!({"content": content}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -113,7 +113,7 @@ fn ccr_create(port:u16, content:&str) -> Option<serde_json::Value> {
 }
 
 /// POST /retrieve  body: {"hash": "..."}
-fn ccr_retrieve(port:u16, hash:&str) -> bool {
+fn ccr_retrieve(port: u16, hash: &str) -> bool {
 	let body = serde_json::json!({"hash": hash}).to_string();
 	let out = Command::new("curl")
 		.args([
@@ -135,8 +135,8 @@ fn ccr_retrieve(port:u16, hash:&str) -> bool {
 // ── corpus ─────────────────────────────────────────────────────────
 
 struct Sample {
-	label:&'static str,
-	content:String,
+	label: &'static str,
+	content: String,
 }
 
 fn corpus() -> Vec<Sample> {
@@ -263,21 +263,21 @@ fn corpus() -> Vec<Sample> {
 
 #[derive(Default)]
 struct Row {
-	orig:usize,
-	marker:usize,
-	compressed:bool,
-	retrieve_ok:bool,
-	retrieve_attempted:bool,
-	latency_ms:u128,
+	orig: usize,
+	marker: usize,
+	compressed: bool,
+	retrieve_ok: bool,
+	retrieve_attempted: bool,
+	latency_ms: u128,
 }
 
-fn run(proxy:&Proxy, samples:&[Sample]) -> Vec<(&'static str, Row)> {
+fn run(proxy: &Proxy, samples: &[Sample]) -> Vec<(&'static str, Row)> {
 	let mut rows = Vec::new();
 	for s in samples {
 		let t0 = Instant::now();
 		let res = ccr_create(proxy.port, &s.content);
 		let latency = t0.elapsed().as_millis();
-		let mut row = Row { orig:s.content.len(), latency_ms:latency, ..Default::default() };
+		let mut row = Row { orig: s.content.len(), latency_ms: latency, ..Default::default() };
 		if let Some(v) = res {
 			// CcrCreateResponse serializes `token_savings_ratio`, never
 			// `compression_ratio` (proxy.rs's CcrCreateResponse struct).
@@ -315,7 +315,7 @@ fn run(proxy:&Proxy, samples:&[Sample]) -> Vec<(&'static str, Row)> {
 	rows
 }
 
-fn print_report(mode:&str, rows:&[(&'static str, Row)]) {
+fn print_report(mode: &str, rows: &[(&'static str, Row)]) {
 	eprintln!("\n{}", "─".repeat(80));
 	eprintln!("  mode={}  {} samples", mode, rows.len());
 	eprintln!(
@@ -342,11 +342,11 @@ fn print_report(mode:&str, rows:&[(&'static str, Row)]) {
 			r.latency_ms
 		);
 	}
-	let misses:usize = rows.iter().filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok).count();
-	let hits:usize = rows.iter().filter(|(_, r)| r.retrieve_ok).count();
-	let compr:usize = rows.iter().filter(|(_, r)| r.compressed).count();
-	let total_orig:usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.orig).sum();
-	let total_mark:usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.marker).sum();
+	let misses: usize = rows.iter().filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok).count();
+	let hits: usize = rows.iter().filter(|(_, r)| r.retrieve_ok).count();
+	let compr: usize = rows.iter().filter(|(_, r)| r.compressed).count();
+	let total_orig: usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.orig).sum();
+	let total_mark: usize = rows.iter().filter(|(_, r)| r.compressed).map(|(_, r)| r.marker).sum();
 	eprintln!("{}", "─".repeat(80));
 	eprintln!(
 		"  compressed={} passthrough={}  retrieve hits={} misses={}",
@@ -384,7 +384,7 @@ fn main() {
 	print_report("cache", &cache_rows);
 	print_report("token", &token_rows);
 
-	let misses:usize = cache_rows
+	let misses: usize = cache_rows
 		.iter()
 		.chain(token_rows.iter())
 		.filter(|(_, r)| r.retrieve_attempted && !r.retrieve_ok)

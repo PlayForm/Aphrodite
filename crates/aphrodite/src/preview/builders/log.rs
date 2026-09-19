@@ -7,7 +7,7 @@ use crate::preview::line::failure::is_failure_line;
 /// Log output: the LAST non-empty line is the most recent state, and an
 /// error/failure line (if any) is the signal that matters - prefer it over
 /// the tail so a log ending in noise never hides the error.
-pub(crate) fn build_log_preview(inp:&Input<'_>) -> String {
+pub(crate) fn build_log_preview(inp: &Input<'_>) -> String {
 	let hint = inp
 		.raw
 		.lines()

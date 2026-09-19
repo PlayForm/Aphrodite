@@ -9,21 +9,21 @@ use std::path::Path;
 use crate::state::{AphroditeState, MarkerEntry};
 
 /// Maximum file size for prefetch (10MB).
-const MAX_PREFETCH_SIZE:u64 = 10 * 1024 * 1024;
+const MAX_PREFETCH_SIZE: u64 = 10 * 1024 * 1024;
 
 /// Outcome of reading one path, before any state mutation.
 pub enum ReadOutcome {
 	Missing,
 	Error,
-	SkippedSize { size:u64 },
-	Loaded { content:String, size:u64 },
+	SkippedSize { size: u64 },
+	Loaded { content: String, size: u64 },
 }
 
 /// Read every path from disk - no state access, so this never needs to hold
 /// whatever lock guards the caller's `AphroditeState` (F9: a global
 /// process/handle lock held across file I/O serializes every other
 /// session's every call behind one slow/cold-mount read).
-pub fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
+pub fn read_paths(paths: &[String]) -> Vec<(String, ReadOutcome)> {
 	paths
 		.iter()
 		.map(|path_str| {
@@ -49,7 +49,7 @@ pub fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
 /// Classify and store already-read file contents into `state`. Pure state
 /// mutation + JSON assembly - no I/O, so this is the only part that needs
 /// the lock.
-pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutcome)>) -> serde_json::Value {
+pub fn insert_outcomes(state: &mut AphroditeState, outcomes: Vec<(String, ReadOutcome)>) -> serde_json::Value {
 	let total = outcomes.len();
 	let mut results = Vec::with_capacity(total);
 	let mut loaded = 0u32;
@@ -82,13 +82,13 @@ pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutc
 
 				state.inline_store_put(hash.clone(), content);
 				state.record_marker(MarkerEntry {
-					hash:hash.clone(),
-					ccr_type:type_str.to_string(),
-					size:size as usize,
-					preview:preview.clone(),
-					turn:state.turn_counter,
-					center:None,
-					meta:Some({
+					hash: hash.clone(),
+					ccr_type: type_str.to_string(),
+					size: size as usize,
+					preview: preview.clone(),
+					turn: state.turn_counter,
+					center: None,
+					meta: Some({
 						let mut m = std::collections::HashMap::new();
 						m.insert("path".to_string(), path_str.clone());
 						m
@@ -139,7 +139,7 @@ pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutc
 /// this directly. Callers that want to read files *before* taking their
 /// lock - the point of this split - call `read_paths` then `insert_outcomes`
 /// separately; see the `aphrodite_dispatch` "prefetch" arm in `lib.rs`.
-pub fn prefetch_files(state:&mut AphroditeState, paths:&[String]) -> serde_json::Value {
+pub fn prefetch_files(state: &mut AphroditeState, paths: &[String]) -> serde_json::Value {
 	insert_outcomes(state, read_paths(paths))
 }
 

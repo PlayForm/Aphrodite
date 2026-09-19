@@ -15,6 +15,7 @@ pub mod builders;
 pub mod detect;
 pub mod detectors;
 pub mod input;
+#[cfg(feature = "proxy")]
 pub mod lang;
 pub mod line;
 pub mod r#type;

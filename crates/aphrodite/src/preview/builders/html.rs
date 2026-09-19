@@ -3,7 +3,7 @@
 use crate::preview::input::Input;
 
 /// HTML preview: title, heading count, link count, body size estimate.
-pub(crate) fn build_html_preview(inp:&Input<'_>) -> String {
+pub(crate) fn build_html_preview(inp: &Input<'_>) -> String {
 	// Extract <title>…</title> text (anywhere on a line, case-insensitive).
 	let title = inp.raw.lines().find_map(|l| {
 		let lower = l.to_lowercase();
@@ -22,11 +22,11 @@ pub(crate) fn build_html_preview(inp:&Input<'_>) -> String {
 	let imgs = inp.raw.matches("<img ").count() + inp.raw.matches("<IMG ").count();
 	let scripts = inp.raw.matches("<script").count() + inp.raw.matches("<SCRIPT").count();
 
-	let mut parts:Vec<String> = Vec::new();
+	let mut parts: Vec<String> = Vec::new();
 	if let Some(t) = title {
 		parts.push(t);
 	}
-	let mut stats:Vec<String> = Vec::new();
+	let mut stats: Vec<String> = Vec::new();
 	if headings > 0 {
 		stats.push(format!("{}h", headings));
 	}

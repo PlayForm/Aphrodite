@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use crate::{state::AphroditeState, struct_extract::floor_boundary};
 
 /// Full catalog result with items, by_type grouping, stats.
-pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
-	let items:Vec<serde_json::Value> = state
+pub fn build_catalog(state: &AphroditeState, mode: &str) -> serde_json::Value {
+	let items: Vec<serde_json::Value> = state
 		.recent_markers
 		.iter()
 		.map(|m| {
@@ -37,12 +37,12 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 		.collect();
 
 	// Group by type
-	let mut by_type:HashMap<String, Vec<String>> = HashMap::new();
+	let mut by_type: HashMap<String, Vec<String>> = HashMap::new();
 	for m in &state.recent_markers {
 		by_type.entry(m.ccr_type.clone()).or_default().push(m.hash.clone());
 	}
 
-	let by_type_json:serde_json::Map<String, serde_json::Value> = by_type
+	let by_type_json: serde_json::Map<String, serde_json::Value> = by_type
 		.iter()
 		.map(|(t, hashes)| {
 			(
@@ -62,7 +62,7 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 	// its small fixed template overhead) is the best available stand-in -
 	// this is still far closer to reality than reporting the full original
 	// size as "saved", which is what a 100%-compression ratio would claim.
-	let total_saved:usize = state
+	let total_saved: usize = state
 		.recent_markers
 		.iter()
 		.map(|m| m.size.saturating_sub(m.preview.len()))
@@ -82,7 +82,7 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 
 	// TOC mode adds retrieve recommendations
 	if mode == "toc" && !items.is_empty() {
-		let recommendations:Vec<String> = state
+		let recommendations: Vec<String> = state
 			.recent_markers
 			.iter()
 			.take(10)
@@ -96,7 +96,7 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 }
 
 /// Format catalog as markdown table (for LLM consumption).
-pub fn format_catalog_table(state:&AphroditeState) -> String {
+pub fn format_catalog_table(state: &AphroditeState) -> String {
 	let items = &state.recent_markers;
 	if items.is_empty() {
 		return "No compressed items yet.".to_string();
@@ -126,7 +126,7 @@ pub fn format_catalog_table(state:&AphroditeState) -> String {
 	lines.join("\n")
 }
 
-fn fmt_size(bytes:usize) -> String {
+fn fmt_size(bytes: usize) -> String {
 	if bytes >= 1024 * 1024 {
 		format!("{:.1}MB", bytes as f64 / (1024.0 * 1024.0))
 	} else if bytes >= 1024 {
@@ -151,22 +151,22 @@ mod tests {
 	fn test_catalog_with_items() {
 		let mut s = AphroditeState::default();
 		s.record_marker(crate::state::MarkerEntry {
-			hash:"abc123def456".into(),
-			ccr_type:"code_rust".into(),
-			size:1024,
-			preview:"[code:3fns 42L]".into(),
-			turn:1,
-			center:None,
-			meta:None,
+			hash: "abc123def456".into(),
+			ccr_type: "code_rust".into(),
+			size: 1024,
+			preview: "[code:3fns 42L]".into(),
+			turn: 1,
+			center: None,
+			meta: None,
 		});
 		s.record_marker(crate::state::MarkerEntry {
-			hash:"def789abc012".into(),
-			ccr_type:"diff".into(),
-			size:2048,
-			preview:"[diff:1F +2/-1 10L]".into(),
-			turn:1,
-			center:None,
-			meta:None,
+			hash: "def789abc012".into(),
+			ccr_type: "diff".into(),
+			size: 2048,
+			preview: "[diff:1F +2/-1 10L]".into(),
+			turn: 1,
+			center: None,
+			meta: None,
 		});
 
 		let cat = build_catalog(&s, "full");
@@ -184,13 +184,13 @@ mod tests {
 	fn test_toc_mode() {
 		let mut s = AphroditeState::default();
 		s.record_marker(crate::state::MarkerEntry {
-			hash:"abc".into(),
-			ccr_type:"text".into(),
-			size:100,
-			preview:"[text]".into(),
-			turn:1,
-			center:None,
-			meta:None,
+			hash: "abc".into(),
+			ccr_type: "text".into(),
+			size: 100,
+			preview: "[text]".into(),
+			turn: 1,
+			center: None,
+			meta: None,
 		});
 
 		let cat = build_catalog(&s, "toc");

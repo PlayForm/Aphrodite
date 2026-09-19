@@ -4,8 +4,8 @@ use serde_json::Value as JsonValue;
 
 /// True when a JSON object is a Hermes wrapper envelope whose raw-JSON preview
 /// is intentional (the payload is inside the wrapper, not the key list).
-pub(crate) fn is_envelope_json_object(obj:&serde_json::Map<String, JsonValue>) -> bool {
-	const GUARD:&[&str] = &[
+pub(crate) fn is_envelope_json_object(obj: &serde_json::Map<String, JsonValue>) -> bool {
+	const GUARD: &[&str] = &[
 		"output",
 		"exit_code",
 		"diff",
