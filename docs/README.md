@@ -90,11 +90,6 @@ the 1.5.0 binary and 2.2.0 plugin.
 - [Hermes Tool Output Schemas](guides/hermes-tool-output-schemas.md) - the
   43-shape tool-by-tool output catalog
 
-## Release Notes
-
-- [Release Notes Index](release-notes/README.md) - v1.4.0 through v1.4.6,
-  what shipped in each
-
 ## Roadmap
 
 - [Centers](centers.md) - AI-conversation memory annotations; shipped vs.
