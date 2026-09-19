@@ -83,10 +83,10 @@ and coherent, or the claim is a lie):
     - Development has since gone further (`c636c74` removed the S2 navigation feature, `fe374d3`
       wired `preview_max_chars`) - picking `932a86d` now would regress those, so SKIP is correct.
 
-### 4.3 `c50a962` / `785b96c` fix(docs): README absolute `tree/Current` URLs - ALREADY IN DEVELOPMENT
+### 4.3 `c50a962` / `785b96c` fix(docs): README absolute `tree/Development` URLs - ALREADY IN DEVELOPMENT
 
 - Partner cites `be50538` (identical message to `c50a962`). Auditor confirms `be50538` exists.
-- Working tree at HEAD: `crates/aphrodite/README.md` 4 x `tree/Current`, `crates/aphrodite-hermes/README.md` 5 x `tree/Current`, root `README.md` 6 x `tree/Current`; **zero** relative `../../docs` links remain in either crate README (`grep -c` = 0). URLs point at `tree/Current` as required.
+- Working tree at HEAD: `crates/aphrodite/README.md` 4 x `tree/Development`, `crates/aphrodite-hermes/README.md` 5 x `tree/Development`, root `README.md` 6 x `tree/Development`; **zero** relative `../../docs` links remain in either crate README (`grep -c` = 0). URLs point at `tree/Development` as required.
 
 ### 4.4 Gitlink bump (the only parent-lane write)
 

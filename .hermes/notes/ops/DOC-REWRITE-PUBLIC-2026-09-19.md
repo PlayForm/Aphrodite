@@ -10,8 +10,10 @@ references, no task-queue sections, no feedback-note phrasing, no
 
 ## Verified ground facts (2026-09-19, from source)
 
-- Default branch: `Current` (docs must link `tree/Current`, not
-  `tree/Development`).
+- Default branch: `Current` on GitHub, but the working branch is
+  `Development` - ALL repo links in every .md file must use
+  `tree/Development` (user correction 2026-09-19: links follow the branch
+  the repo is developed on).
 - Binary 1.4.6, plugin 2.1.4 (`plugin.yaml`, `BINARY_VERSION`, both Cargo.toml).
 - Hooks: SIX (`on_session_start`, `pre_tool_call`, `transform_tool_result`,
   `transform_terminal_output`, `pre_llm_call`, `post_llm_call`) -
@@ -73,7 +75,7 @@ references, no task-queue sections, no feedback-note phrasing, no
 - Wave 4: PAIR-7 stale-content audit (agent-feedback + APHRODITE-HEADROOM /
   HEADROOM-FORK-DIFF + tool-output-schemas), PAIR-8 guides/ migration
 - Orchestrator (LAST, after all agents): docs/README.md index + root README.md
-    - ALL link updates (tree/Current), prettier + link + mermaid verification.
+    - ALL link updates (tree/Development), prettier + link + mermaid verification.
 
 ## Per-child contract (verbatim in every brief)
 
@@ -84,8 +86,9 @@ references, no task-queue sections, no feedback-note phrasing, no
 2. Diagrams: mermaid fences must be valid (balanced ```mermaid blocks, valid
    mermaid syntax, no `file:line` inside diagrams that breaks rendering);
    ASCII diagrams stay inside code fences.
-3. Public cleanliness: no internal process artifacts, no `tree/Development`
-   links (use `tree/Current`), no file:line citations as "proof" in prose
+3. Public cleanliness: no internal process artifacts, no `tree/Current`
+   links (every repo link uses `tree/Development` - the development branch),
+   no file:line citations as "proof" in prose
    (style guide: docs describe behavior directly).
 4. Style: docs/README.md style guide - explain then detail, tables over
    prose, no placeholder content, roadmap ideas labeled.
@@ -151,7 +154,7 @@ Resumed by orchestrator after the morning session died on provider 429/401s.
 - [ ] Wave 4 PAIR-8: docs/guides/ migration (brief staged
       .hermes/tmp/DOC-REWRITE-BRIEF-PAIR8.md)
 - [ ] Orchestrator LAST: docs/README.md index + root README.md + ALL link
-      updates (tree/Current), prettier + link + mermaid verification.
+      updates (tree/Development), prettier + link + mermaid verification.
 
 Orchestrator mermaid pass already done on docs/examples/llm-view.md Scenario
 4: labels quoted (["..."]) - fixes the DIAMOND_START parse error; the x4

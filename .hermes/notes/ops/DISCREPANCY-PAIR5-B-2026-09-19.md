@@ -13,7 +13,7 @@ and docs/tool-relay/callbacks.md against live source. Format:
 - [2026-09-19] docs/tool-relay/tools.md: test description "compress, retrieve, search, stats, files, diff, proxy health" stale; the tool only round-trips compress -> retrieve on built-in samples and reports proxy health (crates/aphrodite-hermes/src/schemas.rs:232-239, tools.rs:533-573)
 - [2026-09-19] docs/tool-relay/tools.md: "active directive bodies injected ... appended after the catalog summary" stale; directives are an always-survive section assembled BEFORE the droppable recall catalog (crates/aphrodite/src/flow.rs:51-58, 91-104)
 - [2026-09-19] docs/tool-relay/tools.md: "markers stay resolvable for the life of the session" needs the caveat that markers do NOT survive a dylib hot-reload (crates/aphrodite-hermes/src/schemas.rs:68-69)
-- [2026-09-19] docs/tool-relay/tools.md: link to tree/Development/docs/ccr/content-types.md stale; the content-type taxonomy moved to docs/classification/content-types.md and public links must use tree/Current (default branch is Current)
+- [2026-09-19] docs/tool-relay/tools.md: link to tree/Development/docs/ccr/content-types.md stale; the content-type taxonomy moved to docs/classification/content-types.md and public links must use tree/Development (default branch is Current)
 - [2026-09-19] docs/tool-relay/tools.md: troubleshooting links used tree/Development; stale, default branch is Current
 
 ## callbacks.md

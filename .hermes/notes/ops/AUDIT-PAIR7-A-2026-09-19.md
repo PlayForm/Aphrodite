@@ -124,7 +124,7 @@ B's .hermes/notes/HEADROOM-FORK-DIFF.md; the two fork-divergence docs stay toget
   Cargo.toml or Cargo.lock (grep: zero matches). Feature absent in 1.4.6. STALE.
 - L159: links `.../tree/Development/docs/HEADROOM-FORK-DIFF.md` - default branch is
   Current (remotes/Source/HEAD -> Source/Current; git branch -a). Violates the
-  tree/Current link rule; target file is moving internal anyway. STALE.
+  tree/Development link rule; target file is moving internal anyway. STALE.
 
 ### Verified-OK evidence (in case any table row is salvaged)
 

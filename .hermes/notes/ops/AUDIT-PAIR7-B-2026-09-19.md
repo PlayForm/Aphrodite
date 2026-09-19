@@ -70,7 +70,7 @@ Rewrite to functionality-only; scrub list below.
 
 ### STALE evidence
 
-- L5 + L22: GitHub links use `tree/Development` - must be `tree/Current` (default branch is Current).
+- L5 + L22: GitHub links use `tree/Development` - must be `tree/Development` (default branch is Current).
 - L5: links `docs/ccr/content-types.md` - file ABSENT (docs/ccr/ holds only backends/,
   lifecycle.md, marker-format.md). Taxonomy now lives at docs/classification/content-types.md.
 - L10 + L27: "22 classification types" - shipped taxonomy is larger: docs/classification/
@@ -98,7 +98,7 @@ Rewrite to functionality-only; scrub list below.
 - Preview-shape examples (`[type:...]`) are consistent with the `[ct: metadata]` layout
   emitted by crates/aphrodite/src/proxy.rs:1915-1920 (proxy_format_ccr_output).
 
-Rewrite requirements: fix tree/Development -> tree/Current (L5, L22); re-point L5 to
+Rewrite requirements: fix tree/Development -> tree/Development (L5, L22); re-point L5 to
 docs/classification/content-types.md; drop classifier-playbook framing (L9-16) and the
 WIP section (L315-339); drop the Maintain/ path (L7) or describe it as internal-only;
 align the taxonomy table with docs/classification/content-types.md or defer to it as

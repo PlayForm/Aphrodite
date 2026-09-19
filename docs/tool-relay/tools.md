@@ -73,7 +73,7 @@ agent calls directly.
 Detects a content type automatically unless a `type` hint is given (a hint of
 `"text"` is treated as no hint). Hashes and stores the content, then returns
 `{hash, type, size, preview, marker}`. The marker is what goes into context
-instead of the content; see [Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/classification/content-types.md)
+instead of the content; see [Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
 for the taxonomy behind the type field.
 
 ## 2. aphrodite_retrieve
@@ -230,7 +230,7 @@ Matches case-insensitively against each entry's preview line and CCR type only
 
 An unknown directive name returns `{error}` and changes nothing. Active
 directive bodies are injected into every turn through the `pre_llm_call` hook -
-see [Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md)
+see [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md)
 for the full mechanism.
 
 ## 8. aphrodite_test
@@ -258,7 +258,7 @@ Compresses built-in samples in-process and checks that each round-trips
 byte-identical, then reports proxy health alongside. `status` is `"ok"` only
 when every check passed. Returns
 `{mode, status: "ok"|"fail", passed, total, checks: [{type, hash, roundtrip}], proxies}`.
-This is the same tool [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
+This is the same tool [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
 points to for confirming things work without a full Hermes session.
 
 ## 9. aphrodite_catalog
@@ -365,5 +365,5 @@ aphrodite`; dylib hot-reloads on mtime change"}`.
 treated as no hint - the type is auto-detected instead. `aphrodite_search`'s
 `type` filter matches the same taxonomy (e.g. `source_code`, `terminal`,
 `build_output`, `diff`, `json`, `search`, `text`). See
-[Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/classification/content-types.md)
+[Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
 for the full classification reference.

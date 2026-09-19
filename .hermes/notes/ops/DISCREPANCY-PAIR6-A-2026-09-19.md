@@ -3,7 +3,7 @@
 Append-only. Format: `- [date] file: claim X stale; source says Y (file:line)`.
 Scope: docs/examples/llm-view.md rewritten against .hermes/examples/ captures and source.
 
-- [2026-09-19] docs/examples/llm-view.md: cross-references used `tree/Development` links; default GitHub branch is `Current` (verified by step engine; all links must be tree/Current).
+- [2026-09-19] docs/examples/llm-view.md: cross-references used `tree/Development` links; default GitHub branch is `Current` (verified by step engine; all links must be tree/Development).
 - [2026-09-19] docs/examples/llm-view.md: compressed example labeled "v1.3.2"; binary is 1.4.6 (plugin.yaml, BINARY_VERSION, both Cargo.toml).
 - [2026-09-19] docs/examples/llm-view.md: Scenario 1 marker metadata `[code_rust: lang=rs;fns=main,run_single,proxy_handler;structs=AppState,Secret;impls=AppState;traits=CcrStore;ln=414]` - fabricated format; real code preview is `[code:9fns fn new(cap:usize) -> Arc<Self> 112L]` (previews/model_family-code_first.md P03, compression/code_multiplier-3.0.md C18; source_code type, code_first template `[{type}:{fns}fns ... {sigs} {ln}L]`).
 - [2026-09-19] docs/examples/llm-view.md: conversation flow claimed `threshold_for(code_rust) → 4KB (×4)`; default `code_multiplier` is 3.0, scaling tool_threshold_token 512 to 1536 bytes for code types (compression/code_multiplier-3.0.md C18).

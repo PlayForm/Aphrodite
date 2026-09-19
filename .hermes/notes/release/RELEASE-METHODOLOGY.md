@@ -292,7 +292,7 @@ git -C plugins/aphrodite branch --contains "$(git ls-tree Source/Development plu
 git -C plugins/aphrodite branch --contains "$(git ls-tree Source/Current plugins/aphrodite | awk '{print $3}')"
 # 4. Keyword scan for branch-identity statements in the wrong branch's files
 git grep -n -E 'Current|Development' Source/Development Source/Current -- .github/workflows .gitmodules
-#    (docs/README tree/Current links, release notes, and taxonomy notes are
+#    (docs/README tree/Development links, release notes, and taxonomy notes are
 #    content describing the dual-line model, not identity - do not flag them)
 ```
 

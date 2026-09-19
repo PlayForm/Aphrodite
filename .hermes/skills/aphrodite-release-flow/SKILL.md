@@ -177,7 +177,7 @@ https://crates.io/api/v1/crates/<crate>` → `max_version`. If the number
   (`crates/<crate>/README.md` - what cargo auto-includes), NOT the root
   README, are what crates.io shows. Relative links there render as
   `blob/HEAD`. Before publishing, make every link absolute
-  `tree/Current` URLs in ALL package READMEs and the root.
+  `tree/Development` URLs in ALL package READMEs and the root.
 - **Embedded templates drift**: `crates/aphrodite/templates/*` are baked
   into the binary via `include_str!` (`setup.rs` CONFIG_TEMPLATE, shim). A
   stale template means fresh `aphrodite setup` writes a config missing keys

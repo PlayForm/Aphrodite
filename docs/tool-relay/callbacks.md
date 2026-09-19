@@ -21,7 +21,7 @@ Python. The hooks that fire around tool results:
 
 A compressed result is not lost - the marker handed back is resolvable through
 `aphrodite_retrieve` for the life of the session. See
-[Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md)
+[Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md)
 for the full hook reference.
 
 ## Tool relay callback
@@ -169,7 +169,7 @@ sent. `notify_key` is optional and only adds the Bearer header when present.
 Exposed at `/metrics` as `aphrodite_notify_success_total`,
 `aphrodite_notify_failure_total`, `aphrodite_tool_relay_calls_total`,
 `aphrodite_tool_relay_success_total`, and `aphrodite_tool_relay_failure_total`.
-See [Prometheus Metrics](https://github.com/PlayForm/Aphrodite/tree/Current/docs/metrics/prometheus.md)
+See [Prometheus Metrics](https://github.com/PlayForm/Aphrodite/tree/Development/docs/metrics/prometheus.md)
 for the full metrics reference.
 
 `/tool/relay` is one of the loopback-restricted management routes: it accepts

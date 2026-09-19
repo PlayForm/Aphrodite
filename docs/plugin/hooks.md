@@ -155,11 +155,11 @@ stale poll-worker tasks.
 Each setting has an environment-variable equivalent (`APHRODITE_TOOL_THRESHOLD_TOKEN`,
 `APHRODITE_TERMINAL_THRESHOLD`, `APHRODITE_FLOW_BUDGET_CHARS`,
 `APHRODITE_CHAIN_SPLIT`); environment overrides TOML, which overrides the
-default. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md)
+default. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md)
 for the full schema.
 
 ## See also
 
-- [Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md) - the `[directives: ...]` block injected by `pre_llm_call`
-- [Context Engine](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/context-engine.md) - the Hermes context-engine integration point
-- [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md) - the tools these hooks coordinate with
+- [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md) - the `[directives: ...]` block injected by `pre_llm_call`
+- [Context Engine](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/context-engine.md) - the Hermes context-engine integration point
+- [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/tools.md) - the tools these hooks coordinate with

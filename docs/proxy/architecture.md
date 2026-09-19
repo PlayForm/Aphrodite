@@ -7,7 +7,7 @@ requests from a response cache, relays tools on request, and exposes
 management endpoints for stats, retrieval, and CCR control. This page covers
 the listener model, shared state, routing, middleware, streaming, and
 lifecycle; the individual handlers are documented in
-[Handlers](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/handlers.md).
+[Handlers](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/handlers.md).
 
 ## Two-Listener Model
 
