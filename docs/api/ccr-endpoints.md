@@ -1,26 +1,24 @@
 # CCR Management Endpoints
 
-These endpoints let the Python plugin, Hermes agent, and external tools
-create, list, and delete compressed content entries directly.
+These loopback-only endpoints let external tools and scripts create, list, and
+delete compressed content entries in the CCR store directly, and hot-reload
+the compression configuration. The Hermes plugin itself compresses and
+retrieves in-process through its dylib bindings - these HTTP routes are for
+anything outside the plugin process.
 
 ## Authentication
 
-All three endpoints are loopback only, and require
-`Authorization: Bearer <token>` when `APHRODITE_MGMT_TOKEN` is set (unset =
-any loopback caller, back-compat with a one-time startup warning). This is
-the management-route auth introduced in v1.3.2 - a hostile local page could
-previously issue a CORS "simple request" that lands as a write (seed CCR
-entries) even though it can't read the reply. Note this is a different token
-from `notify_key` below, which authenticates the _outbound_ notification
-callback.
+All four routes are loopback only, and require `Authorization: Bearer <token>`
+when `APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat
+with a one-time startup warning). This management-route auth closes a real
+gap: a hostile local page can issue a CORS "simple request" that lands as a
+write (seeding CCR entries) even though it cannot read the reply. Note this
+token is distinct from `notify_key` below, which authenticates the outbound
+notification callback.
 
 ## POST /ccr/create
 
-Creates a new CCR entry. Supports both JSON and raw octet-stream bodies.
-
-### Access
-
-Loopback only + mgmt token (see [Authentication](#authentication)).
+Creates a new CCR entry. Accepts a JSON body or raw octet-stream bytes.
 
 ### JSON Mode
 
@@ -37,6 +35,9 @@ Loopback only + mgmt token (see [Authentication](#authentication)).
 }
 ```
 
+`key` overrides the content hash; `ttl_seconds` defaults to 3600; `tags` is
+optional. With no `key`, the hash is computed from the content itself.
+
 **Response:**
 
 ```json
@@ -49,17 +50,20 @@ Loopback only + mgmt token (see [Authentication](#authentication)).
 }
 ```
 
+`compressed_size`/`marker_size` are the bare hash length - this endpoint's
+wire contract is the hash, not a rendered marker. `token_savings_ratio` is
+`original_size / hash_length` (1.0 for empty content).
+
 ### Octet-Stream Mode
 
 **Content-Type:** `application/octet-stream`
 
-**Request:** Raw UTF-8 bytes as body.
-
-**Response:** Same JSON schema as JSON mode.
+Raw UTF-8 bytes as the body; the hash is computed from the content. Response
+is the same JSON schema as JSON mode.
 
 ### Notification
 
-If `notify_url` configured: async POST with:
+If `notify_url` is configured, an async POST fires on success:
 
 ```json
 {
@@ -83,6 +87,12 @@ If `notify_url` configured: async POST with:
 | ------ | ---------------------------------- |
 | 400    | Invalid JSON body                  |
 | 400    | Invalid UTF-8 in octet-stream body |
+| 500    | Backend store write failed         |
+| 503    | CCR not enabled                    |
+
+A 503 (rather than a fabricated success) is returned when the CCR store is
+disabled - e.g. token mode with `--no-ccr-marker` - so callers never receive a
+hash that would 404 on a later `/retrieve`.
 
 ### Types
 
@@ -116,11 +126,8 @@ pub struct CcrNotification {
 
 ## GET /ccr/list
 
-Returns CCR entry count and backend info.
-
-### Access
-
-Loopback only + mgmt token (see [Authentication](#authentication)).
+Returns the CCR entry count and backend info (no listing of individual
+entries).
 
 ### Response (CCR enabled)
 
@@ -141,21 +148,15 @@ Loopback only + mgmt token (see [Authentication](#authentication)).
 }
 ```
 
-### Fields
-
 | Field     | Description                                           |
 | --------- | ----------------------------------------------------- |
-| `entries` | Number of live entries in CCR store                   |
+| `entries` | Number of live entries in the CCR store               |
 | `backend` | `"sqlite"` (token mode) or `"in_memory"` (cache mode) |
 | `mode`    | `"token"` or `"cache"`                                |
 
 ## DELETE /ccr/{hash}
 
 Deletes a specific CCR entry by hash.
-
-### Access
-
-Loopback only + mgmt token (see [Authentication](#authentication)).
 
 ### Response (200 OK)
 
@@ -184,34 +185,41 @@ Loopback only + mgmt token (see [Authentication](#authentication)).
 }
 ```
 
-### Implementation
+## POST /reload
 
-```rust
-pub async fn handle_ccr_delete(
-    State(state): State<Arc<AppState>>,
-    axum::extract::Path(hash): axum::extract::Path<String>,
-) -> impl IntoResponse {
-    match &state.ccr {
-        Some(ccr) => {
-            let existed = ccr_del(ccr, &hash).await;
-            if existed {
-                (StatusCode::OK, Json({"deleted": true, "hash": hash}))
-            } else {
-                (StatusCode::NOT_FOUND, Json({"deleted": false, "hash": hash, "error": "not found"}))
-            }
-        },
-        None => (StatusCode::SERVICE_UNAVAILABLE, Json({"error": "CCR not enabled"})),
-    }
+Hot-reloads `aphrodite.toml` (or `APHRODITE_CONFIG_PATH`) and applies the
+`[compression]` thresholds to the live proxy state - cache/token/inline
+thresholds and the code multiplier. The `[previews] preview_max_chars` cap is
+kept in sync too. Other `[compression]` keys are echoed for visibility but not
+applied by the proxy.
+
+### Response (200 OK)
+
+```json
+{
+	"reloaded": true,
+	"applied": true,
+	"config": "aphrodite.toml",
+	"compression": {
+		"tool_threshold_cache": 2000,
+		"tool_threshold_token": 3000,
+		"inline_threshold": 500,
+		"code_multiplier": 2.0
+	},
+	"parsed_only": {
+		"auto_expand": null,
+		"auto_expand_limit": null,
+		"terminal_threshold": null,
+		"engine_threshold_pct": null,
+		"catalog_mode": null
+	}
 }
 ```
 
-## Python Plugin Usage
+### Response (500 Internal Server Error)
 
-The Python plugin uses `POST /ccr/create` extensively:
-
-| Caller                     | Usage                                                   |
-| -------------------------- | ------------------------------------------------------- |
-| `_compress_via_proxy`      | Sends `Content-Type: application/octet-stream`          |
-| `_compress_handler`        | Gets a hash back and mirrors it in the inline store     |
-| `_store_conversation_turn` | Sends turn data and stores the result in `_conv_index`  |
-| Context engine             | Sends packed messages, gets a hash, and builds a marker |
+```json
+{
+	"error": "failed to reload: <parse error>"
+}
+```

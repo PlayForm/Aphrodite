@@ -1,12 +1,15 @@
 # Proxy Handlers
 
-Aphrodite exposes HTTP endpoints for proxying LLM API requests, managing CCR
-entries, executing tool relay calls, and health checks.
+The proxy exposes HTTP handlers for proxying LLM API requests, managing CCR
+entries, executing tool relay calls, and health checks. This page documents
+each handler's endpoint, request/response contract, and behavior; the routing
+table, auth model, and middleware are in
+[Proxy Architecture](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md).
 
 Every management handler below (everything except `proxy_handler` and
 `health_check`) additionally requires `Authorization: Bearer <token>` once
 `APHRODITE_MGMT_TOKEN` is set - see
-[Architecture: Management-Route Authentication](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#management-route-authentication).
+[Architecture: Management-Route Authentication](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#management-route-authentication).
 
 ## proxy_handler
 
@@ -18,7 +21,7 @@ Catch-all handler. Forwards any request to the upstream LLM API.
 ANY /{*path}  (e.g., POST /v1/chat/completions)
 ```
 
-Registered as the fallback route.
+Registered as the fallback route with a 64 MB body limit.
 
 ### Signature
 
@@ -35,62 +38,68 @@ pub async fn proxy_handler(
 ### Flow
 
 ```
-1. Increment requests_total, request_body_bytes
-2. Generate UUID request ID (short: first 8 chars)
-3. If dev mode: log incoming headers (authorization redacted)
-4. Build upstream URL: {api_url}/{path}
-5. Determine if Chat Completions request; pick the HTTP client -
-   "stream": true requests go out on stream_client (no total timeout)
-6. Compute cache key (FNV-1a(api_key:model:messages)) for Chat Completions
-   (skipped for streaming requests - they are never cached)
-7. Check LLM response cache:
-   a. HIT → return cached response with X-Aphrodite-Cache: HIT
+1. Increment requests_total, request_body_bytes; generate a short UUID request ID
+2. In dev mode, log incoming headers (authorization redacted)
+3. Build upstream URL: {api_url}/{path} (query string included)
+4. Detect Chat Completions (path == /v1/chat/completions); compute the
+   response-cache key (FNV-1a) - streaming requests produce no key
+5. Check the response cache:
+   a. HIT → return cached body with X-Aphrodite-Cache: HIT (no upstream call)
    b. MISS → continue
-8. Retry loop (3 attempts):
-   a. Build reqwest request (strip host, auth, content-length, x-aphrodite-* headers)
+6. Pick the HTTP client: "stream": true requests go out on stream_client
+   (no total timeout)
+7. Retry loop (3 attempts, connect-phase errors only):
+   a. Build the reqwest request, stripping hop-by-hop and internal headers
    b. Forward to upstream
-   c. On transport error: exponential backoff + jitter
-9. On success: extract response
-   a. Track upstream_errors_4xx/5xx
-   b. If Content-Type is text/event-stream: forward chunk-by-chunk
-      (Body::from_stream), propagate upstream headers, add
-      X-Aphrodite-Streamed: true, count bytes into response_body_bytes,
-      count mid-stream chunk errors into sse_stream_errors - skip
-      compression and caching entirely, done
-   c. Read response body
-   d. Track upstream_latency_micros, response_body_bytes
-   e. If Chat Completions + CCR enabled:
-      - Extract x-headroom-budget from inbound headers
-      - compress_chat_completion() (message.content only -
-        tool_calls[].function.arguments is never compressed)
-      - If compressed: set X-Aphrodite-Compressed: true, store in response_cache
-   f. Otherwise: return raw, store in response_cache
-10. On failure: track upstream_timeouts, return 502 BAD_GATEWAY with a
-    generic {"error": "upstream request failed"} body - the transport
-    error's detail (which can embed the upstream URL/host) is recorded
-    server-side in last_errors, never leaked to the client
+   c. On connect error: exponential backoff + jitter, retry
+   d. On other transport errors: fail fast on the first attempt
+8. On success:
+   a. Track upstream_errors_4xx/5xx by status code
+   b. If Content-Type is text/event-stream: forward chunk-by-chunk via a body
+      stream, propagate upstream headers, add X-Aphrodite-Streamed: true,
+      count bytes into response_body_bytes and mid-stream chunk errors into
+      sse_stream_errors - skip compression and caching entirely, done
+   c. Buffer the body (64 MB cap); track upstream_latency_micros and
+      response_body_bytes
+   d. If Chat Completions + CCR enabled:
+      - Read the x-headroom-budget header for adaptive aggressiveness
+      - compress_chat_completion() - message.content only; tool_calls[].function.arguments is never compressed
+      - If compressed: set X-Aphrodite-Compressed: true, store in the response cache
+   e. Otherwise: return raw, store in the response cache (2xx, ≤1 MB)
+9. On failure: track upstream_timeouts (timeout) or upstream_connect_errors
+   (other transport failures), return 502 BAD_GATEWAY with a generic
+   {"error": "upstream request failed"} body - the transport error's detail
+   (which can embed the upstream URL/host) is recorded server-side in
+   last_errors, never leaked to the client
 ```
 
 ### Response Headers
 
-| Header                   | Value                           | When                                 |
-| ------------------------ | ------------------------------- | ------------------------------------ |
-| `Content-Type`           | application/json; charset=utf-8 | Always                               |
-| `X-Aphrodite-Cache`      | HIT or MISS                     | Chat Completions                     |
-| `X-Aphrodite-Compressed` | true                            | When compression occurred            |
-| `X-Aphrodite-Streamed`   | true                            | SSE (text/event-stream) responses    |
-| `X-Aphrodite-Fill-Pct`   | float (0.0-99.0)                | Chat Completions (from fill_pct/100) |
+| Header                   | Value                           | When                                                                              |
+| ------------------------ | ------------------------------- | --------------------------------------------------------------------------------- |
+| `Content-Type`           | application/json; charset=utf-8 | Cache-hit and compressed paths; the raw path propagates the upstream content type |
+| `X-Aphrodite-Cache`      | HIT or MISS                     | Chat Completions                                                                  |
+| `X-Aphrodite-Compressed` | true                            | When compression occurred                                                         |
+| `X-Aphrodite-Streamed`   | true                            | SSE (text/event-stream) responses                                                 |
+| `X-Aphrodite-Fill-Pct`   | float (0.0-99.0)                | Chat Completions (from fill_pct/100)                                              |
+
+Upstream response headers are propagated on the JSON path, with hop-by-hop
+headers (`content-length`, `content-type`, `transfer-encoding`, `connection`,
+`keep-alive`) skipped.
 
 ### Forwarded Headers
 
-Stripped before forwarding:
+Stripped or overridden before forwarding:
 
-| Header           | Reason                           |
-| ---------------- | -------------------------------- |
-| `host`           |                                  |
-| `authorization`  | Replaced with configured API key |
-| `content-length` | Recalculated from body           |
-| `x-aphrodite-*`  | Internal                         |
+| Header            | Reason                                               |
+| ----------------- | ---------------------------------------------------- |
+| `host`            | Removed                                              |
+| `authorization`   | Replaced with the configured upstream API key        |
+| `content-length`  | Recalculated from the body                           |
+| `content-type`    | Force-set to application/json; charset=utf-8         |
+| `accept`          | Force-set to application/json                        |
+| `accept-encoding` | Stripped entirely - client has no gzip/brotli decode |
+| `x-aphrodite-*`   | Internal                                             |
 
 ## handle_tool_relay
 
@@ -113,45 +122,50 @@ POST /tool/relay
 }
 ```
 
-### Response
+### Response (sync)
 
 ```json
 {
-    "success": true,
-    "result": { ... },
-    "error": null,
-    "async_call": false
+	"success": true,
+	"result": { ... },
+	"error": null,
+	"async_call": false
 }
 ```
 
 ### Tools Handled
 
-| Tool                 | Behavior                    |
-| -------------------- | --------------------------- |
-| `aphrodite_retrieve` | inline_ccr → CCR store      |
-| `aphrodite_compress` | inline (<256B) or CCR store |
-| `aphrodite_list`     | ccr.len()                   |
+| Tool                 | Behavior                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aphrodite_retrieve` | inline_ccr first, then the CCR store; returns `{"found": true, "content": ...}`                                                                         |
+| `aphrodite_compress` | inline store (below the inline threshold, also mirrored to the durable backend) or CCR store; returns `{"compressed": marker, "hash", "original_size"}` |
+| `aphrodite_list`     | `{"entries": N, "backend": "in_memory"                                                                                                                  | "sqlite"}` |
 
 ### Validation
 
-- `aphrodite_retrieve` requires `hash` param (400 if missing, even with query)
+- `aphrodite_retrieve` requires the `hash` param - a request with only `query`
+  and no `hash` returns 400 BAD_REQUEST.
+- Unknown tool names return an error result.
+- `_ccr_center` is an optional param for `aphrodite_compress` (marker center
+  annotation).
 
 ### Callback (async mode)
 
 When `callback_url` is provided:
 
-1. SSRF protection: only `https://` URLs accepted
-2. Tool execution spawns on `task_tracker`
-3. Result POSTed to callback_url with 5s timeout
-4. Response: `async_call: true`, stateless
+1. SSRF protection: only `https://` URLs accepted - anything else returns
+   400 with `callback_url must use the https scheme`.
+2. Tool execution spawns on the `task_tracker`.
+3. Result POSTed to the callback URL with a 5s timeout; success/failure is
+   counted into `tool_relay_success`/`tool_relay_failure`.
+4. Response: `async_call: true`, stateless.
 
-### Auth
-
-Callback uses Bearer token via `notify_key` (from config).
+The callback POST carries no Authorization header (unlike `/ccr/create`
+notifications, which attach `notify_key`).
 
 ## handle_ccr_create
 
-Programmatic CCR entry creation. Accepts JSON or raw octet-stream.
+Programmatic CCR entry creation. Accepts JSON or a raw octet-stream body.
 
 ### Endpoint
 
@@ -172,7 +186,8 @@ POST /ccr/create
 
 ### Octet-Stream Mode
 
-Raw bytes treated as content. Hash computed via `compute_key()` (BLAKE3).
+Raw bytes treated as the content; the hash is computed via BLAKE3
+(`compute_key`), a `key` cannot be supplied.
 
 ### Response
 
@@ -186,9 +201,20 @@ Raw bytes treated as content. Hash computed via `compute_key()` (BLAKE3).
 }
 ```
 
+`compressed_size` and `marker_size` equal the bare hash length - the endpoint
+contract is the hash, not a rendered marker.
+
+### Errors
+
+| Status | Body                                                                     | When                                    |
+| ------ | ------------------------------------------------------------------------ | --------------------------------------- |
+| 400    | `{"error": "invalid JSON: ..."}` or `{"error": "invalid UTF-8 in body"}` | Malformed body                          |
+| 503    | `{"error": "CCR not enabled"}`                                           | No CCR backend (e.g. `--no-ccr-marker`) |
+| 500    | `{"error": "failed to store content in CCR backend"}`                    | Store write failed                      |
+
 ### Notification
 
-If `notify_url` configured: fires async POST with `CcrNotification`:
+If `notify_url` is configured, fires an async POST with a `CcrNotification`:
 
 ```json
 {
@@ -200,11 +226,12 @@ If `notify_url` configured: fires async POST with `CcrNotification`:
 }
 ```
 
-Auth: Bearer token via `notify_key`. Timeout: 5s.
+Auth: `Authorization: Bearer <notify_key>` when `notify_key` is set. Timeout:
+5s. Success/failure counted into `notify_success`/`notify_failure`.
 
 ## handle_ccr_list
 
-List CCR entry count.
+Reports the CCR entry count and backend kind (no listing of actual entries).
 
 ### Endpoint
 
@@ -222,9 +249,11 @@ GET /ccr/list
 }
 ```
 
+With no CCR backend: `{"entries": 0, "message": "CCR not enabled"}`.
+
 ## handle_ccr_delete
 
-Delete a CCR entry by hash.
+Deletes a CCR entry by hash.
 
 ### Endpoint
 
@@ -250,9 +279,44 @@ DELETE /ccr/{hash}
 { "error": "CCR not enabled" }
 ```
 
+## handle_ccr_reload
+
+Hot-reloads `aphrodite.toml` and applies the `[compression]` thresholds
+(cache, token, inline, code multiplier) plus the preview cap to the live
+`AppState`.
+
+### Endpoint
+
+```
+POST /reload
+```
+
+### Response
+
+```json
+{
+	"reloaded": true,
+	"applied": true,
+	"config": "aphrodite.toml",
+	"compression": {
+		"tool_threshold_cache": 8192,
+		"tool_threshold_token": 1024,
+		"inline_threshold": 256,
+		"code_multiplier": 3.0
+	},
+	"parsed_only": { ... }
+}
+```
+
+`parsed_only` echoes `[compression]` keys that have no consumer in the proxy
+path (auto-expand, terminal threshold, engine threshold, catalog mode) - they
+are reported for visibility but not applied. A parse failure returns 500 with
+the error message.
+
 ## health_check
 
-Health check endpoint. Always returns 200 - capability state conveyed in body.
+Liveness endpoint. Always returns 200 - capability state is conveyed in the
+body, since CCR is optional.
 
 ### Endpoint
 
@@ -260,7 +324,9 @@ Health check endpoint. Always returns 200 - capability state conveyed in body.
 GET /health
 ```
 
-Public (no loopback enforcement).
+Public (no loopback enforcement, no management token) so external
+load-balancer probes work. Does not call the upstream - see
+`/health/upstream` for that.
 
 ### Response
 
@@ -269,14 +335,17 @@ Public (no loopback enforcement).
 	"status": "healthy",
 	"ccr": true,
 	"mode": "token",
-	"version": "1.3.6",
+	"version": "1.4.6",
 	"fill_pct": 90.0
 }
 ```
 
+`version` reports the compiled `CARGO_PKG_VERSION`; `fill_pct` is the current
+headroom fill percentage (0.0-99.0).
+
 ## handle_retrieve
 
-Resolve CCR markers to original content.
+Resolves CCR markers to original content.
 
 ### Endpoint
 
@@ -309,14 +378,15 @@ POST /retrieve
 
 ### Retrieve Flow
 
-1. Validate hash (required, 400 if missing)
-2. Check inline_ccr (LruCache, lock dropped before await)
-3. Fallback to CCR backend (SQLite/InMemory via blocking thread)
-4. Apply query filter (case-insensitive, max 512 chars)
+1. Validate hash (required - 400 if missing); the hash is normalized (a
+   `|type|size` marker-body suffix and surrounding whitespace are stripped).
+2. Check inline_ccr (LRU cache, lock dropped before any await).
+3. Fall back to the CCR backend (SQLite/In-memory via a blocking thread).
+4. Apply the query filter (case-insensitive substring, capped at 512 chars).
 5. Apply pagination (offset + limit, clamped to a 10,000-line cap); set
-   `truncated: true` when the returned window doesn't cover the whole
-   document
-6. Return with source tracking
+   `truncated: true` when the returned window does not cover the whole
+   document, and prepend a `[lines a-b/total]` header to the content.
+6. Return with source tracking.
 
 Full request/response schemas, the pagination contract, and the `truncated`
-flag semantics: [Retrieve Endpoint](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/retrieve.md).
+flag semantics: [Retrieve Endpoint](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/retrieve.md).

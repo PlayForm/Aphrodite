@@ -1,349 +1,165 @@
 # Plugin Hooks
 
-> **Historical document.** Everything below describes the retired fat-Python
-> plugin implementation (functions like `_transform_tool_result`,
-> `_pre_llm_hook`, module-level constants like `TOOL_THRESHOLD_TOKEN`). That
-> code no longer exists: `plugins/aphrodite/__init__.py` is now a 300-line
-> thin ctypes loader, and all hook/compression logic lives in the Rust
-> crates. The five hook names and overall lifecycle order below are still
-> accurate; the per-function internals, thresholds, and code snippets are
-> not - see `crates/aphrodite-hermes/src/lib.rs` (hook dispatch C ABI) and
-> `crates/aphrodite/src/hooks.rs` (actual transform/threshold logic,
-> `state.rs` for current default thresholds) for the real implementation.
+The plugin registers six hooks with Hermes. Every hook is a thin dispatch that
+forwards its arguments to the Rust dylib (`libaphrodite_hermes.dylib`); the
+dylib holds all of the actual behavior and replies with JSON that the Python
+module hands back to Hermes.
 
-|> One behavior the Rust implementation added that this page's Python-era
-|> lifecycle never had: `pre_llm_call` now also injects the active
-|> **directives** block (behavioral instructions) alongside the catalog
-|> summary - see [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md).
-|>
-|> The Rust implementation also restores the first-turn session injection that
-|> the Python-era docstring described: `flow::build_turn_context` injects a
-|> one-shot orientation block on turn 0 (from the `[prompts] session_inject`
-|> TOML key, defaulting to `SHIPPED_SESSION_INJECT`) — see
-|> [First-Turn Injection](#1-on_session_start) below for the Rust behavior.
+Registration is driven by the dylib's hook list: on plugin load the shim asks
+the dylib for its hook names and registers one callback per name, so the six
+hooks below are always registered together. `plugin.yaml` declares the same
+set under `provides_hooks`.
 
-The aphrodite Python plugin is a thin loader that delegates to the Rust dylib
-(`libaphrodite_hermes.dylib`) for all compression logic. Hooks registered in
-`plugin.yaml` route through the dylib's C ABI functions to five hook handlers
-covering session start, tool results, terminal output, and LLM calls.
+| Hook                        | Purpose                                                        | When it fires                          |
+| --------------------------- | -------------------------------------------------------------- | -------------------------------------- |
+| `on_session_start`          | Reset all per-session state to a clean baseline                | A Hermes session starts                |
+| `pre_tool_call`             | Auto-background long-running calls; split chained commands     | Before a tool executes                 |
+| `transform_tool_result`     | Compress large tool results into CCR markers                   | After every tool call                  |
+| `transform_terminal_output` | Compress large terminal output into CCR markers                | After every terminal execution         |
+| `pre_llm_call`              | Inject directives, nudges, and the recall catalog              | Before each LLM request                |
+| `post_llm_call`             | Archive the turn, advance the counter, expire stale state      | After each LLM response                |
 
-## Hook Registration
-
-```yaml
-provides_hooks:
-    - on_session_start
-    - transform_tool_result
-    - pre_llm_call
-    - transform_terminal_output
-    - post_llm_call
+```mermaid
+flowchart TD
+    S["Session starts"] --> H1["on_session_start - reset per-session state"]
+    H1 --> T["User turn"]
+    T --> P1["pre_tool_call - auto-background, chain split"]
+    P1 --> X["Tool or terminal runs"]
+    X --> T1["transform_tool_result or transform_terminal_output - compress to marker"]
+    T1 --> P2["pre_llm_call - inject directives and catalog"]
+    P2 --> L["LLM responds"]
+    L --> P3["post_llm_call - archive turn, advance counter"]
+    P3 --> T
 ```
 
-## Lifecycle Order
-
-```
-Session Start
-  │
-  ├─ on_session_start → _inject_session_instruction (first pre_llm_call only)
-  │
-User Message
-  │
-  ├─ pre_llm_call → _pre_llm_hook
-  │     ├─ Scan conversation for CCR markers
-  │     ├─ Auto-expand small tool markers
-  │     ├─ Compress old conversation turns to CCR
-  │     ├─ Build catalog: markers, files, turn memory, engine stats, git
-  │     └─ Inject as ephemeral system message
-  │
-Tool Call
-  │
-  ├─ transform_tool_result → _transform_tool_result
-  │     ├─ Skip: essential tools, compress/retrieve/stats, existing CCR markers
-  │     ├─ Skip: below threshold (< 1024 token, < 8192 cache)
-  │     ├─ Skip: above MAX_REQUEST_BODY_SIZE (100MB)
-  │     ├─ Classify: _classify_content → metadata
-  │     ├─ Compress: proxy (:9798/:9797) → marker
-  │     └─ Fallback: inline compression → marker
-  │
-Terminal Execution
-  │
-  ├─ transform_terminal_output → _transform_terminal_hook
-  │     ├─ Skip: below TERMINAL_THRESHOLD (2048)
-  │     ├─ Build detection: collapse repeated lines
-  │     ├─ Compress via proxy or inline
-  │     └─ Return marker with summary
-  │
-LLM Response
-  │
-  └─ post_llm_call → _store_conversation_turn
-        ├─ Pack turn (user + assistant)
-        ├─ Send to proxy /ccr/create
-        └─ Store in _conv_index
-```
-
-## 1. on_session_start
-
-**Rust implementation (current):** `session::on_session_start` resets all per-session
-state (`turn_counter`, `conv_index`, `recent_markers`, `referenced_files`,
-`tool_events`, `ephemeral_directives`, etc.) to a clean baseline. It does NOT
-inject anything — the first-turn orientation is injected lazily by
-`flow::build_turn_context` on the **first** `pre_llm_call` (when
-`turn_counter == 0`).
-
-**First-turn session injection:** On turn 0, `build_turn_context` prepends a
-`[aphrodite: first-turn orientation]` section built from the
-`session_inject` string loaded from `[prompts]` in `aphrodite.toml`. The string
-is interpolated with `{VERSION}` → the compiled-in `CARGO_PKG_VERSION`. This
-section has the highest survival priority (always-survive, top of the budget
-drop order) so it always reaches the model on the first turn, then vanishes
-forever after.
-
-The default template (compiled into `flow::SHIPPED_SESSION_INJECT`) reads:
-
-```
-[APHRODITE] v{VERSION} active.
-  This session is running with CCR compression. Tool outputs larger than a
-  few hundred bytes are replaced with markers like <<<CCR:hash|type|size>>>.
-  The marker IS the content — retrieve it before acting on it:
-  aphrodite_retrieve(hash) → full original content (sub-ms, local).
-  After EVERY tool call: scan for <<<CCR: and retrieve ALL markers first.
-  NEVER re-read a file you already have a marker for. Use aphrodite_catalog
-  to see stored entries, aphrodite_prefetch for background file loads, and
-  aphrodite_directive("list") for active behavioral directives.
-  Layer 2: per-turn catalog injected below each turn.
-  Layer 3: load the aphrodite-tool-guide skill for full tool reference.
-```
-
-Set `[prompts] session_inject = ""` in `aphrodite.toml` to suppress it entirely.
-The compiled default is used when the key is absent, so even a minimal config
-gets orientation on the first turn.
-
-> **Historical note:** The Python-era docs described a `_inject_session_instruction()`
-> function guarded by a `_session_instruction_injected` flag. That code no longer
-> exists; the Rust flow assembler (`flow::build_turn_context` →
-> `build_first_turn_injection`) is the current implementation.
-
-## 2. transform_tool_result
-
-### Signature
-
-```python
-def _transform_tool_result(
-    tool_name="", args=None, result="", tool_call_id="", task_id="",
-    session_id="", turn_id="", api_request_id="", duration_ms=0,
-    status="", error_type="", error_message="", **kwargs
-):
-```
-
-### Skip Conditions
-
-| Condition                      | Rationale                     |
-| ------------------------------ | ----------------------------- |
-| `_DEV` (passthrough mode)      | Dev mode disables compression |
-| Empty/whitespace result        | Nothing to compress           |
-| Tool in skip set               | Essential tools stay raw      |
-| Result < threshold             | Below compression minimum     |
-| Result > MAX_REQUEST_BODY_SIZE | Above 100MB guard             |
-| Existing CCR marker in result  | Already compressed            |
-
-### Skip Set
-
-**When token proxy alive:**
-
-```python
-_ESSENTIAL_TOOLS | {"aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
-```
-
-Where
-`_ESSENTIAL_TOOLS = {"skill_view", "skills_list", "skill_manage", "memory", "session_search", "read_file", "read_terminal"}`
-
-**When only cache proxy alive (or inline):**
-
-```python
-_ESSENTIAL_TOOLS | {"execute_code", "patch", "write_file", "search_files", "todo",
-                    "aphrodite_retrieve", "aphrodite_compress", "aphrodite_stats"}
-```
-
-More tools pass through raw to reduce cache proxy load on frequent operations.
-
-### Compression Threshold
-
-```python
-threshold = TOOL_THRESHOLD_TOKEN if token_alive else TOOL_THRESHOLD_CACHE if cache_alive else INLINE_THRESHOLD
-```
-
-| Config               | Default | Condition                 |
-| -------------------- | ------- | ------------------------- |
-| TOOL_THRESHOLD_TOKEN | 1,024   | Token proxy alive         |
-| TOOL_THRESHOLD_CACHE | 8,192   | Only cache proxy alive    |
-| INLINE_THRESHOLD     | 4,096   | No proxy, inline fallback |
-
-### Compression Priority
-
-1. **Proxy compression**: token (:9798) preferred, cache (:9797) fallback
-2. **Inline fallback**: Python-side inline store
-3. **Passthrough**: if all fail, return raw
-
-### Metadata Extraction
-
-`_extract_tool_metadata(tool_name, args, result)` extracts:
-
-| Tool           | Extracted fields                                                |
-| -------------- | --------------------------------------------------------------- |
-| `read_file`    | `fn`, `ext`, `lines`, `names` (def/class/fn/struct/trait names) |
-| `search_files` | `q` (pattern), `files` (count)                                  |
-| `terminal`     | `exit` (exit code), `last` (last line)                          |
-| Other tools    | Returns `None`                                                  |
-
-### Marker Type
-
-```python
-marker_type = "aphrodite" if tool_name.startswith("aphrodite_") else "tool"
-```
-
-Aphrodite meta-tools get auto-expanded inline; regular tool results stay as
-markers.
-
-## 3. pre_llm_call
-
-### Signature
-
-```python
-def _pre_llm_hook(conversation_history=None, user_message=None, **kwargs):
-```
-
-### Flow (Simplified)
-
-1. **Refresh alive cache**: probe both proxy ports
-2. **Headroom feedback**: query proxy fill_pct, set budget
-3. **Inject session instruction** (first call only)
-4. **Pass x-headroom-\* headers** to proxy
-5. **Scan for CCR markers** (incremental - only new tool/system messages)
-6. **Auto-expand small tool markers** (< AUTO_EXPAND_LIMIT, type=aphrodite) -
-   replace in-line
-7. **Compress old conversation turns** (turns > 6) → CCR
-8. **Build catalog**:
-    - AUTO line: build status, git status, proxy health
-    - Debug banner (full/debug mode)
-    - Git diff summary
-    - Compression wrapping summary (by type)
-    - Per-turn hint with counts
-    - Engine stats
-    - Turn archive link
-    - Full CCR catalog (grouped by type)
-    - Conversation memory (last 3 turns)
-    - Referenced file tree
-    - Context size warning (>100 msgs)
-    - Read-intent detection
-9. **Inject catalog as ephemeral system message**
-
-### Catalog Modes
-
-| Mode      | Output                                                                       |
-| --------- | ---------------------------------------------------------------------------- |
-| `full`    | Full catalog: all markers with previews, file tree, turn memory, debug info  |
-| `compact` | By-type summary: `{N} items ({size} saved) - {n} [code_rust] {n} [error]...` |
-| `tool`    | Minimal: `{N} items compressed`. Early-returns when no markers               |
-
-### Read-Intent Detection
-
-```python
-_READ_KEYWORDS = {"read", "show", "view", "get", "cat", "display", "retrieve",
-                   "fetch", "look", "see", "open", "inspect", "check", "print",
-                   "dump", "output"}
-```
-
-If user message contains any keyword + markers exist → inject recent CCR hashes
-for direct retrieval.
-
-### Headroom Feedback Loop
-
-```
-pre_llm_hook → query proxy /stats → read fill_pct →
-  set x-headroom-budget on outbound headers → proxy uses budget to adjust thresholds
-
-Fill calculation:
-  ratio_ema = compression_ratio_ema
-  pct = 100 - (ratio_ema / 20), clamped [1..99]
-```
-
-| Fill (`pct`) | Budget multiplier              |
-| ------------ | ------------------------------ |
-| < 25         | 0.25× (aggressive compression) |
-| < 50         | 0.50×                          |
-| < 75         | 0.75×                          |
-| ≥ 75         | 1.00× (default)                |
-
-## 4. transform_terminal_output
-
-### Signature
-
-```python
-def _transform_terminal_hook(command="", output="", returncode=0, **kwargs):
-```
-
-### Threshold
-
-```python
-TERMINAL_THRESHOLD = 2_048  # from APHRODITE_TERMINAL_THRESHOLD env var
-```
-
-### Build Output Detection
-
-If first line starts with `Compiling`, `Finished`, `error:`, `warning:`,
-`Running`, `PASSED`, `FAILED`, `test result:`:
-
-- Collapse repeated consecutive lines
-- Extract unique error/warning patterns
-- Store full output in CCR
-- Return summary: `<<<CCR:hash|build|size>>> [build: N lines, M unique patterns]
-  | errors: ...
-
-### Regular Terminal Output
-
-Same compression priority as tool results: proxy → inline → passthrough.
-
-### Marker Format
-
-```
-<<<CCR:hash|terminal|size>>> PREVIEW…(use aphrodite_retrieve)
-```
-
-## 5. post_llm_call
-
-### Signature
-
-```python
-def _store_conversation_turn(conversation_history=None, assistant_response=None, turn_id=0, **kwargs):
-```
-
-### Flow
-
-1. Check proxy alive (token preferred)
-2. Pack turn: `{turn, user: last_user, assistant: capped_resp[:4096]}`
-3. POST to proxy `/ccr/create`
-4. Store in `_conv_index[tnum] = (hash, summary, size)`
-5. Cap at 100 turns (LRU eviction)
-
-### Turn Summary Format
-
-```
-T{tnum}: {user_msg_first_chars}… → {assistant_response_first_200_chars} [{file_tags}]
-```
-
-## Compression Thresholds Per Hook
-
-| Hook                        | Threshold Config                            | Default     | Bypass                                             |
-| --------------------------- | ------------------------------------------- | ----------- | -------------------------------------------------- |
-| transform_tool_result       | TOOL_THRESHOLD_TOKEN / TOOL_THRESHOLD_CACHE | 1024 / 8192 | \_DEV, skip set, < threshold, >100MB, existing CCR |
-| transform_terminal_output   | TERMINAL_THRESHOLD                          | 2048        | \_DEV, < threshold, existing CCR                   |
-| pre_llm_call (turn archive) | ctx_len > 30, turns > 6, packed > 500B      | -           | No proxy                                           |
-| pre_llm_call (catalog)      | Always (if markers/files/engine)            | -           | quiet_mode=1                                       |
-
-## Dev Mode
-
-Set `APHRODITE_PASSTHROUGH=1` or `HERMES_DEV=1`:
-
-- `_transform_tool_result`: returns result unchanged
-- `_transform_terminal_hook`: returns output unchanged
-- `_pre_llm_hook`: returns early
-- `_store_conversation_turn`: returns early
+## on_session_start
+
+Fires when a Hermes session starts. It resets every piece of per-session
+state to a clean baseline: the turn counter, the conversation index, recent
+markers, referenced files, tool-event telemetry, ephemeral directives, and
+the manual directive latch.
+
+It injects nothing. The one-shot first-turn orientation is rendered later by
+the context assembler on the first `pre_llm_call` (see below), so a session
+reset followed by a fresh turn behaves exactly like a new session.
+
+## pre_tool_call
+
+Fires before a tool executes and can modify the pending call. Two
+interventions are possible, both driven by the poll worker and chain-split
+features:
+
+- **Auto-backgrounding.** When the poll worker is enabled
+  (`APHRODITE_POLL_WORKER`, default on), a `terminal` or `process` call whose
+  command matches the long-running patterns is rewritten to run in the
+  background: the hook returns a modify action with `background: true` and
+  `notify_on_complete: true`, and Hermes runs the tool asynchronously. The
+  agent observes completion through its normal poll flow. `process` calls
+  with `action: poll` are never backgrounded - they are checks, not work.
+- **Chain splitting.** When chain splitting is enabled
+  (`APHRODITE_CHAIN_SPLIT=1` or `[compression] chain_split = true`, default
+  off), a chained terminal command (`cd x && cargo build && cargo test`) is
+  rewritten with invisible segment markers, provided it has at least
+  `chain_split_min_segments` segments. The marker-splitting lets
+  `transform_terminal_output` compress each segment into its own CCR marker,
+  so the model sees several compact previews instead of one large blob.
+
+If neither intervention applies, the call passes through unchanged.
+
+## transform_tool_result
+
+Fires after every tool call with the tool's result. The pipeline:
+
+1. **Telemetry.** The call's status, error type/message, arguments, and
+   duration are recorded into the tool-event ring, which feeds the
+   error-loop and phase detectors. Empty results are skipped here.
+2. **Skip gates.** A result is left untouched when it is empty; when the tool
+   is in the essential set (`skill_view`, `skills_list`, `skill_manage`,
+   `memory`, `session_search`, `read_file`, `read_terminal` - the agent needs
+   raw output); when it is one of Aphrodite's own tools or a headroom helper
+   (already compact metadata, and compressing `aphrodite_retrieve` would
+   replace resolved content with another marker); or when it is below the
+   tool threshold (default 4,096 characters; `0` disables the gate and always
+   compresses).
+3. **Classify.** The content-type detector assigns a type; generic
+   text/log/plain results get a semantic upgrade (git status, ls, test, grep)
+   so the preview carries high-signal shape.
+4. **Store.** The content is hashed (BLAKE3), stored in the inline store, and
+   replaced by a marker of the form `<<<CCR:hash|type|size>>>` with a preview.
+   Hermes swaps the tool output for the marker; retrieval returns the exact
+   original bytes.
+
+File references are tracked before the skip gates, so `read_file` and
+`search_files` results are recorded for `aphrodite_files` and the catalog
+even when they are never compressed.
+
+## transform_terminal_output
+
+Fires after every terminal execution. The pipeline mirrors tool results:
+
+1. **Telemetry.** The command and return code are recorded; a non-zero exit
+   code marks the event as a failure and feeds the error-loop detector.
+2. **Chain split.** When chain splitting is enabled and the output carries
+   the segment markers injected by `pre_tool_call`, each segment is
+   compressed into its own marker (unconditional, before the threshold gate,
+   so marked output never leaks raw). Per-segment error hints are merged into
+   previews.
+3. **Threshold gate.** Unmarked output below the terminal threshold (default
+   1,024 characters; `0` disables the gate) passes through untouched.
+4. **Classify and store.** Output containing `exit code:` or `Error:` is
+   typed `terminal`; other output gets the normal content-type detection with
+   the same semantic upgrade as tool results. Above-threshold content is
+   hashed, stored, and replaced by a marker.
+
+## pre_llm_call
+
+Fires before each LLM request. It first runs the poll-worker checkpoint
+(pushing status nudges for running, completed, and failed background tasks),
+then the single context assembler composes the per-turn injection. The
+assembler builds every section in a fixed order under one hard byte cap
+(`flow_budget_chars`, default 4,000), dropping sections from the bottom when
+over budget:
+
+1. First-turn orientation (`[aphrodite: first-turn orientation]`, turn 0 only)
+2. `[directives: ...]` block - never dropped
+3. `[nudge: ...]` one-shots, at most two - never dropped
+4. Background-task status
+5. `[recall]` catalog summary - the first section dropped under budget
+   pressure
+
+The first-turn orientation is built from the `[prompts] session_inject`
+template (default compiled into the binary, `{VERSION}` interpolated to the
+plugin version). It is injected once on turn 0, then never again; an empty
+string disables it entirely.
+
+The hook returns `{"context": ...}`, which Hermes injects into the model's
+turn. When the assembled context is empty, nothing is injected.
+
+## post_llm_call
+
+Fires after each LLM response. It archives the last marker recorded this
+turn into the conversation index (so `aphrodite_diff` can report per-turn
+compressions), advances the turn counter, purges expired nudges (after the
+counter advances, so a one-shot nudge renders exactly once), and expires
+stale poll-worker tasks.
+
+## Thresholds
+
+| Hook                        | Setting                          | Default | Bypass                                            |
+| --------------------------- | -------------------------------- | ------- | ------------------------------------------------- |
+| `transform_tool_result`     | `[compression] tool_threshold_token` | 4,096 | empty, essential tools, self tools, below threshold; `0` = always compress |
+| `transform_terminal_output` | `[compression] terminal_threshold`   | 1,024 | empty, below threshold; `0` = always compress     |
+| `pre_llm_call`              | `[flow] budget_chars`            | 4,000  | recall catalog dropped first; directives and nudges never drop |
+| `pre_tool_call` (chain split) | `[compression] chain_split_min_segments` | -    | feature off by default (`chain_split = false`)    |
+
+Each setting has an environment-variable equivalent (`APHRODITE_TOOL_THRESHOLD_TOKEN`,
+`APHRODITE_TERMINAL_THRESHOLD`, `APHRODITE_FLOW_BUDGET_CHARS`,
+`APHRODITE_CHAIN_SPLIT`); environment overrides TOML, which overrides the
+default. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md)
+for the full schema.
+
+## See also
+
+- [Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md) - the `[directives: ...]` block injected by `pre_llm_call`
+- [Context Engine](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/context-engine.md) - the Hermes context-engine integration point
+- [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md) - the tools these hooks coordinate with

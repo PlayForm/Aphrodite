@@ -1,22 +1,23 @@
 # Prometheus Metrics
 
-All proxy operations expose counters, gauges, and histograms at `/metrics` in
-Prometheus text format for monitoring, alerting, and dashboard visualization.
+All proxy operations expose counters, gauges, and histograms at `GET /metrics`
+in the Prometheus text exposition format, for monitoring, alerting, and
+dashboards. This page is the full metric catalog - see
+[Metrics Endpoint](../api/metrics-endpoint.md) for the endpoint behavior and
+raw output shape, and [Metrics Queries](queries.md) for ready-made PromQL.
 
 ## Endpoint
 
-```
-GET /metrics
-Content-Type: text/plain; version=0.0.4
-```
+| Method | Path       | Content-Type                | Auth |
+| ------ | ---------- | --------------------------- | ---- |
+| GET    | `/metrics` | `text/plain; version=0.0.4` | None |
 
 No auth - intentional for local-only deployments (loopback-enforced). Firewall
 or reverse-proxy auth layer recommended for production.
 
-## All 28 Metrics
+## Metric Catalog
 
-28 distinct metric names, matching the live `/metrics` output documented in
-[Metrics Endpoint](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/metrics-endpoint.md) name-for-name.
+28 distinct metric names, matching the `/metrics` output name-for-name.
 
 ### Request Counters
 
@@ -70,7 +71,7 @@ or reverse-proxy auth layer recommended for production.
 | `aphrodite_notify_success_total` | counter | -      | Successful callback notifications |
 | `aphrodite_notify_failure_total` | counter | -      | Failed callback notifications     |
 
-See [Callbacks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/callbacks.md) for how these are triggered.
+See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 
 ### Upstream Errors
 
@@ -107,23 +108,23 @@ See [Callbacks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool
 
 Latency is tracked in 5 fixed buckets, each holding a cumulative count:
 
-| Bucket Index | le value | Range            |
-| ------------ | -------- | ---------------- |
-| 0            | 0.001    | < 1ms            |
-| 1            | 0.01     | 1ms - 10ms       |
-| 2            | 0.1      | 10ms - 100ms     |
-| 3            | 1.0      | 100ms - 1s       |
-| 4            | +Inf     | ≥ 1s (unbounded) |
+| Bucket Index | le value | Range             |
+| ------------ | -------- | ----------------- |
+| 0            | 0.001    | < 1ms             |
+| 1            | 0.01     | 1ms - 10ms        |
+| 2            | 0.1      | 10ms - 100ms      |
+| 3            | 1.0      | 100ms - 1s        |
+| 4            | +Inf     | >= 1s (unbounded) |
 
-Buckets are cumulative in the Prometheus output, as required by the format:
-each bucket's count includes all observations from lower buckets. The last
-bucket is labeled `+Inf`, not `10.0` - it catches every sample ≥ 1s
-(including 30s+ outliers), and the explicit `+Inf` bucket is what makes
+Buckets are cumulative in the output, as the format requires: each bucket's
+count includes all observations from lower buckets. The last bucket is labeled
+`+Inf`, not `10.0` - it catches every sample at or above 1s (including long
+outliers), and the explicit `+Inf` bucket is what makes
 `histogram_quantile()` work at all.
 
 ## Example Output
 
-```
+```text
 aphrodite_requests_total{mode="token"} 15423
 aphrodite_requests_compressed_total{mode="token"} 12001
 aphrodite_tokens_saved_total 15432000
@@ -159,10 +160,10 @@ aphrodite_response_body_bytes_total 187000000
 aphrodite_upstream_latency_seconds_total 180.000000
 ```
 
-## stats_json() Schema
+## /stats JSON Schema
 
-`/metrics` is built from the same underlying stats as `/stats`. Full JSON
-schema:
+`/metrics` is built from the same underlying stats as `/stats`, which returns
+the full JSON object:
 
 ```json
 {
@@ -190,7 +191,7 @@ schema:
     "compressions_by_type": {"code_rust": u64, ...},
     "compression_ratio_ema": f64,
     "last_errors": ["error string", ...],         // last 5, most recent first
-    "request_history": [                              // last 50
+    "request_history": [                          // last 50
         {"id": "uuid8", "method": "POST", "path": "/v1/...", "status": 200, "compressed": true, "elapsed_ms": 1234}
     ],
     "inline_ccr": {"hits": u64, "misses": u64},
@@ -203,15 +204,20 @@ schema:
 }
 ```
 
+`compression_ratio_ema` is stored at x100 precision in the proxy and divided
+by 100 for output.
+
 ## Endpoint: /stats
 
-Returns the JSON above directly. Loopback only, plus
-`Authorization: Bearer <token>` when `APHRODITE_MGMT_TOKEN` is set
-(`/metrics` itself stays exempt so scrapers keep working).
+Loopback only, plus `Authorization: Bearer <token>` when
+`APHRODITE_MGMT_TOKEN` is set (`/metrics` itself stays exempt so scrapers keep
+working). Returns the JSON object above directly. Also serves `/history` for
+the request-history array alone.
 
 ## Endpoint: /stats/db
 
-Returns database-level stats, only available for the SQLite backend:
+Database-level stats, available only for the SQLite (token-mode) backend -
+the in-memory backend has no database to report:
 
 ```json
 {
@@ -222,3 +228,9 @@ Returns database-level stats, only available for the SQLite backend:
 	"database_size_bytes": 52428800
 }
 ```
+
+`total_bytes_compressed` is an estimate (24 bytes per entry, matching the
+24-char BLAKE3 hex key); originals are stored uncompressed. When the backend
+is in-memory or CCR is disabled, the endpoint still returns HTTP 200 with
+`{"error": "stats_db not available for this backend" | "CCR not enabled",
+"mode": ...}`.

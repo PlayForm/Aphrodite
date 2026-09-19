@@ -1,0 +1,23 @@
+# DISCREPANCY-PAIR4-A-2026-09-19
+
+Append-only log for docs/proxy/ rewrites (PAIR-4-A). Verified against live
+source on 2026-09-19 (branch Development, binary 1.4.6).
+
+- [2026-09-19] docs/proxy/architecture.md: CORS claim stale - `CorsLayer::permissive()` was removed; the proxy has no CORS layer at all (no legitimate browser-based consumer, cross-origin reads of /history//retrieve//ccr/* were the only effect) (crates/aphrodite/src/main.rs:631-637).
+- [2026-09-19] docs/proxy/architecture.md: "Body limit 1 MB" stale/incomplete - the 1 MB cap applies to management routes only; the catch-all /{*path} route has its own 64 MB limit (large agent conversations) (main.rs:607-623).
+- [2026-09-19] docs/proxy/architecture.md: routing-table access for /favicon.ico, /robots.txt, / stale - they live inside the restricted router, so when APHRODITE_MGMT_TOKEN is set they require the bearer token like every other management route; only /metrics (path check) and /{*path} (separate router) and /health are exempt (main.rs:618, 622, 765-767).
+- [2026-09-19] docs/proxy/architecture.md: "4 Mutex-protected structures" stale - AppState now has 6 Mutex fields (request_history, inline_ccr, last_errors, compressions_by_type, response_cache, upstream_health_cache) (proxy.rs:209-309).
+- [2026-09-19] docs/proxy/architecture.md: response_cache shape stale - entries are (Instant, Vec<u8>) TTL-stamped from response_cache_ttl (reuses ccr_ttl_seconds) and expired on the hit path, not plain Vec<u8> forever (proxy.rs:255-259, 825-838).
+- [2026-09-19] docs/proxy/architecture.md: /health/upstream stale - the upstream probe is cached with a 60s TTL (upstream_health_cache) so monitors don't re-probe the real upstream on every poll (proxy.rs:302-309; main.rs:431-452).
+- [2026-09-19] docs/proxy/architecture.md: config path list incomplete - resolution is APHRODITE_CONFIG_PATH → ./aphrodite.toml (CWD) → ~/.hermes/aphrodite/aphrodite.toml; the ~/.hermes fallback was missing (main.rs:124-133).
+- [2026-09-19] docs/proxy/architecture.md: two-listener table "Tool Relay: No/Yes by mode" stale - tool_relay is an independent per-proxy config flag (default false, --tool-relay or TOML tool_relay = true), not implied by ProxyMode (config.rs:191-193, 388).
+- [2026-09-19] docs/proxy/retry.md: retry scope stale - only connect-phase failures (reqwest e.is_connect(): refused, DNS, TLS, connect timeout) are retried; post-send timeouts and other transport errors fail fast on the first attempt (double-billing guard on POST /v1/chat/completions) (proxy.rs:1066-1085).
+- [2026-09-19] docs/proxy/retry.md: final-failure counter stale - upstream_timeouts increments only when the final error e.is_timeout(); all other transport failures increment upstream_connect_errors (proxy.rs:1294-1299).
+- [2026-09-19] docs/proxy/compression.md: noisy-type threshold stale - linter/build_output/log return the base threshold unchanged, not base/2 (proxy.rs:475).
+- [2026-09-19] docs/proxy/compression.md: code-type threshold stale - code types use base × code_multiplier (default 3.0, live-configurable via [compression] code_multiplier / APHRODITE_CODE_MULTIPLIER), not hardcoded base×4 (proxy.rs:492-494; resolve_thresholds proxy.rs:132-134).
+- [2026-09-19] docs/proxy/compression.md: headroom budget formula stale - replaced by a linear curve 0.50 + (fill%/100) × 0.50 clamped to [0.50, 1.0] (never below 0.5×); the old stepped 0.25/0.50/0.75/1.00 mapping is gone (proxy.rs:2096-2102).
+- [2026-09-19] docs/proxy/compression.md: cache-hit token-savings stale - a response-cache hit adds the full cached body length in bytes to tokens_saved; the "/4 bytes-per-token" heuristic was removed (proxy.rs:972-977).
+- [2026-09-19] docs/proxy/compression.md: token-marker format stale - smart markers render as three lines (preview line, [type: metadata] structure line, <<<CCR:hash|type|size>>> marker line), not a flat one-line hash|type|size|metadata_flat form (proxy.rs:1915-1918).
+- [2026-09-19] docs/proxy/handlers.md: forwarded-header list incomplete - content-type and accept are force-set to fixed values (not forwarded) and accept-encoding is stripped entirely (the client is built without gzip/brotli decode, so forwarding it returns undecodable binary) (proxy.rs:1036-1053).
+- [2026-09-19] docs/proxy/handlers.md: tool-relay callback auth stale - the async callback POST carries no Authorization header; only /ccr/create notifications attach Bearer notify_key (proxy.rs:2264-2270 vs 2483-2486).
+- [2026-09-19] docs/proxy/handlers.md: health example version stale - /health reports CARGO_PKG_VERSION (1.4.6), not the old 1.3.6 literal (proxy.rs:2713).

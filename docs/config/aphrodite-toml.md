@@ -6,12 +6,12 @@ This file is Aphrodite's own proxy/engine config - a **different file** from Her
 
 ## File location
 
-|                              |                                                                                                                                                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Default                      | `aphrodite.toml` in the current working directory                                                                                                                                                      |
-| Fallback (default path only) | `~/.hermes/aphrodite/aphrodite.toml` - where `aphrodite setup` writes its generated config                                                                                                             |
-| Override                     | `APHRODITE_CONFIG_PATH` environment variable                                                                                                                                                           |
-| If missing                   | Falls back to CLI-flag mode (single proxy, see [CLI equivalents](#cli-equivalents))                                                                                                                    |
+|                              |                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| Default                      | `aphrodite.toml` in the current working directory                                          |
+| Fallback (default path only) | `~/.hermes/aphrodite/aphrodite.toml` - where `aphrodite setup` writes its generated config |
+| Override                     | `APHRODITE_CONFIG_PATH` environment variable                                               |
+| If missing                   | Falls back to CLI-flag mode (single proxy, see [CLI equivalents](#cli-equivalents))        |
 
 The `~/.hermes/aphrodite/aphrodite.toml` fallback only applies when `APHRODITE_CONFIG_PATH` was **not** explicitly set - an explicit override that points at a nonexistent file still falls through to CLI-flag mode rather than silently redirecting elsewhere. `aphrodite setup` writes its generated config (with `{cache_port}` / `{token_port}` placeholders substituted) from the same embedded template that ships as `aphrodite.toml.example` in the repo root.
 
@@ -73,22 +73,22 @@ The root `aphrodite.toml.example` ships the full annotated version, including th
 
 ## `[[proxies]]` fields
 
-| Field                       | Meaning                                                                        | Default                                  |
-| --------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------- |
-| `name`                      | Proxy label, also used for port-override matching                               | listen address                            |
-| `listen`                    | Bind address (loopback-only unless changed - see below)                         | `127.0.0.1:9797`                         |
-| `mode`                      | `"cache"` or `"token"` - backend + compression threshold (see [Modes](#modes))  | `"token"`                                 |
-| `api_key`                   | Upstream API key, overrides `[defaults]`                                        | -                                         |
-| `api_url`                   | Upstream API base URL, overrides `[defaults]`                                   | -                                         |
-| `model`                     | Model name to forward, overrides `[defaults]`                                   | -                                         |
-| `tool_relay`                | Enable the `/tool/relay` endpoint                                               | `false`                                   |
-| `dev`                       | Verbose request/response logging                                                | `false`                                   |
-| `ccr_ttl_seconds`           | CCR entry time-to-live, seconds                                                 | `3600`                                    |
-| `ccr_db_path`               | SQLite path for the token proxy                                                 | `~/.hermes/aphrodite/ccr.db`              |
-| `notify_url` / `notify_key` | Hermes callback URL + bearer token for CCR-create notifications                 | -                                         |
-| `timeout`                   | Upstream request timeout, seconds (clamped to 600)                              | `300`                                     |
-| `max_context`               | Max context tokens                                                              | `1,000,000`                               |
-| `max_output`                | Max output tokens (must be less than `max_context`)                             | `384,000`                                 |
+| Field                       | Meaning                                                                        | Default                      |
+| --------------------------- | ------------------------------------------------------------------------------ | ---------------------------- |
+| `name`                      | Proxy label, also used for port-override matching                              | listen address               |
+| `listen`                    | Bind address (loopback-only unless changed - see below)                        | `127.0.0.1:9797`             |
+| `mode`                      | `"cache"` or `"token"` - backend + compression threshold (see [Modes](#modes)) | `"token"`                    |
+| `api_key`                   | Upstream API key, overrides `[defaults]`                                       | -                            |
+| `api_url`                   | Upstream API base URL, overrides `[defaults]`                                  | -                            |
+| `model`                     | Model name to forward, overrides `[defaults]`                                  | -                            |
+| `tool_relay`                | Enable the `/tool/relay` endpoint                                              | `false`                      |
+| `dev`                       | Verbose request/response logging                                               | `false`                      |
+| `ccr_ttl_seconds`           | CCR entry time-to-live, seconds                                                | `3600`                       |
+| `ccr_db_path`               | SQLite path for the token proxy                                                | `~/.hermes/aphrodite/ccr.db` |
+| `notify_url` / `notify_key` | Hermes callback URL + bearer token for CCR-create notifications                | -                            |
+| `timeout`                   | Upstream request timeout, seconds (clamped to 600)                             | `300`                        |
+| `max_context`               | Max context tokens                                                             | `1,000,000`                  |
+| `max_output`                | Max output tokens (must be less than `max_context`)                            | `384,000`                    |
 
 `[defaults]` accepts `api_url`, `model`, `ccr_ttl_seconds`, and `api_key`; each applies to every proxy that doesn't set its own value. No provider-specific defaults are baked in - `api_url` / `model` resolve from env or config, and fall back to `https://api.openai.com` / `default-model` only when neither is set.
 
@@ -100,25 +100,25 @@ One shared table feeds two independent consumers:
 
 **Drives the Rust proxy** (env var wins over these if set; editing and saving, or `POST /reload`, applies immediately with no restart):
 
-| Field                  | Meaning                                                                    | Env override                     | Compiled default | Shipped example |
-| ---------------------- | -------------------------------------------------------------------------- | -------------------------------- | ---------------- | --------------- |
-| `tool_threshold_token` | Token-proxy compression threshold, bytes                                   | `APHRODITE_TOOL_THRESHOLD_TOKEN` | `1024`           | `512`           |
-| `tool_threshold_cache` | Cache-proxy compression threshold, bytes                                   | `APHRODITE_TOOL_THRESHOLD_CACHE` | `8192`           | `4096`          |
-| `inline_threshold`     | Inline-vs-durable CCR storage cutoff, bytes                                | `APHRODITE_INLINE_THRESHOLD`     | `256`            | `2048`          |
-| `code_multiplier`      | Multiplies the threshold for `code_*` content types (keeps code inline)    | `APHRODITE_CODE_MULTIPLIER`      | `3.0`            | `3.0`           |
+| Field                  | Meaning                                                                 | Env override                     | Compiled default | Shipped example |
+| ---------------------- | ----------------------------------------------------------------------- | -------------------------------- | ---------------- | --------------- |
+| `tool_threshold_token` | Token-proxy compression threshold, bytes                                | `APHRODITE_TOOL_THRESHOLD_TOKEN` | `1024`           | `512`           |
+| `tool_threshold_cache` | Cache-proxy compression threshold, bytes                                | `APHRODITE_TOOL_THRESHOLD_CACHE` | `8192`           | `4096`          |
+| `inline_threshold`     | Inline-vs-durable CCR storage cutoff, bytes                             | `APHRODITE_INLINE_THRESHOLD`     | `256`            | `2048`          |
+| `code_multiplier`      | Multiplies the threshold for `code_*` content types (keeps code inline) | `APHRODITE_CODE_MULTIPLIER`      | `3.0`            | `3.0`           |
 
 The compiled defaults apply when neither env nor TOML sets a value; the shipped example config sets the values in the last column, so installations using it see those instead.
 
 **Drives the Hermes-plugin dylib session** (a separate process/codepath from the Rust proxy, read once at dylib load):
 
-| Field                        | Meaning                                                                               | Env override                          | Default |
-| ---------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------- | ------- |
-| `terminal_threshold`         | Terminal-output compression threshold, bytes - gates `transform_terminal_output`      | `APHRODITE_TERMINAL_THRESHOLD`        | `1024`  |
-| `poll_worker`                | Auto-backgrounding of slow `terminal` / `process` calls (pre-tool-call rewrite)        | `APHRODITE_POLL_WORKER`               | `true`  |
-| `chain_split`                | Opt-in fine-grained command splitting (`SEG_MARKER` segments); off by default         | `APHRODITE_CHAIN_SPLIT`               | `false` |
-| `chain_split_min_segments`   | Floor for the adaptive split threshold                                                | `APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS`  | `2`     |
-| `chain_split_max_segments`   | Cap for the adaptive split threshold                                                  | `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS`  | `6`     |
-| `context_engine`             | Status flag exposed via `aphrodite_stats` / `aphrodite_config_get`; the standalone HTTP proxy never reads it | `APHRODITE_CONTEXT_ENGINE` | `true` |
+| Field                      | Meaning                                                                                                      | Env override                         | Default |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------- |
+| `terminal_threshold`       | Terminal-output compression threshold, bytes - gates `transform_terminal_output`                             | `APHRODITE_TERMINAL_THRESHOLD`       | `1024`  |
+| `poll_worker`              | Auto-backgrounding of slow `terminal` / `process` calls (pre-tool-call rewrite)                              | `APHRODITE_POLL_WORKER`              | `true`  |
+| `chain_split`              | Opt-in fine-grained command splitting (`SEG_MARKER` segments); off by default                                | `APHRODITE_CHAIN_SPLIT`              | `false` |
+| `chain_split_min_segments` | Floor for the adaptive split threshold                                                                       | `APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS` | `2`     |
+| `chain_split_max_segments` | Cap for the adaptive split threshold                                                                         | `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS` | `6`     |
+| `context_engine`           | Status flag exposed via `aphrodite_stats` / `aphrodite_config_get`; the standalone HTTP proxy never reads it | `APHRODITE_CONTEXT_ENGINE`           | `true`  |
 
 The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_protect_last`, `engine_min_msgs`) is parsed into the dylib session state and exposed the same way, but is **not consulted by any compression decision** - it is populated for visibility, not load-bearing. (`engine_threshold_pct` has no effect on the engine; the shipped example sets it to 45 as the documented value, with 100+ as the escape hatch to disable engine compression entirely.)
 
@@ -126,16 +126,16 @@ The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_p
 
 ## `[previews]` and `[prompts]`
 
-| Section      | Field                  | Meaning                                                                                        | Status                          |
-| ------------ | ---------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------- |
-| `[previews]` | `preview_max_chars`    | Caps the rendered preview string, in chars; absent/0 = unlimited                                | Wired (env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > unlimited; shipped example `120`) |
-| `[previews]` | `model_family`         | `"compact"` \| `"code_first"` \| `"balance"` - preview template family                          | Reserved - no reader            |
-| `[previews]` | `code_structure_map`   | Include function/struct/class signatures in code previews                                       | Reserved - no reader            |
-| `[previews]` | `rust_preview_lines`   | Lines of Rust source to include in previews                                                     | Reserved - no reader            |
-| `[prompts]`  | `session_inject`       | First-turn orientation text injected by `pre_llm_call` on turn 0; `""` disables                 | Wired (env `APHRODITE_SESSION_INJECT` > TOML > shipped builtin) |
-| `[prompts]`  | `retrieve_guidance`    | `"minimal"` \| `"standard"` \| `"verbose"` - how much the system prompt explains CCR retrieval   | Reserved - no reader            |
-| `[prompts]`  | `ccr_marker_hint`      | Append a retrieval hint after markers                                                           | Reserved - no reader            |
-| `[prompts]`  | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output                                            | Reserved - no reader            |
+| Section      | Field                  | Meaning                                                                                        | Status                                                                              |
+| ------------ | ---------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `[previews]` | `preview_max_chars`    | Caps the rendered preview string, in chars; absent/0 = unlimited                               | Wired (env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > unlimited; shipped example `120`) |
+| `[previews]` | `model_family`         | `"compact"` \| `"code_first"` \| `"balance"` - preview template family                         | Reserved - no reader                                                                |
+| `[previews]` | `code_structure_map`   | Include function/struct/class signatures in code previews                                      | Reserved - no reader                                                                |
+| `[previews]` | `rust_preview_lines`   | Lines of Rust source to include in previews                                                    | Reserved - no reader                                                                |
+| `[prompts]`  | `session_inject`       | First-turn orientation text injected by `pre_llm_call` on turn 0; `""` disables                | Wired (env `APHRODITE_SESSION_INJECT` > TOML > shipped builtin)                     |
+| `[prompts]`  | `retrieve_guidance`    | `"minimal"` \| `"standard"` \| `"verbose"` - how much the system prompt explains CCR retrieval | Reserved - no reader                                                                |
+| `[prompts]`  | `ccr_marker_hint`      | Append a retrieval hint after markers                                                          | Reserved - no reader                                                                |
+| `[prompts]`  | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output                                           | Reserved - no reader                                                                |
 
 "Reserved - no reader" means the values parse cleanly but nothing in the current codebase reads them back out; changing them does not change behavior, so treat them as reserved until that's confirmed. `[previews] preview_max_chars` and `[prompts] session_inject` are the two keys in these sections that do have live effects.
 
@@ -152,17 +152,17 @@ Nothing in the codebase renders previews from these templates - preview strings 
 active = ["focus", "foresight"]  # e.g. ["focus", "foresight"]
 ```
 
-| Field    | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Field    | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `active` | Which loaded directives start active. Directive `.md` files are discovered from `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` → `~/.hermes/aphrodite/directives/` → binary-relative - the **first directory that exists** wins, and an existing-but-empty directives dir is intentional (no custom directives). If no directory exists, built-in directives are used. Names in `active` that aren't in the loaded set are silently filtered out; if `active` resolves empty while directives ARE loaded, the session seeds `focus` / `foresight` / `lazy` from the loaded set instead. Loading is never gated on this list being non-empty. |
 
 Read by the Hermes-plugin dylib session, not the Rust proxy. The active set is fully runtime-mutable via the `aphrodite_directive` tool - see [Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md) for the complete feature reference.
 
 ## `[flow]`
 
-| Field          | Meaning                                                                                          | Env override                    | Default  | Shipped example |
-| -------------- | ------------------------------------------------------------------------------------------------ | ------------------------------- | -------- | --------------- |
-| `budget_chars` | Hard cap for ALL per-turn injected context (directives + nudges + recall catalog + retrieve hint) | `APHRODITE_FLOW_BUDGET_CHARS`   | `4000`   | `2600`          |
+| Field          | Meaning                                                                                           | Env override                  | Default | Shipped example |
+| -------------- | ------------------------------------------------------------------------------------------------- | ----------------------------- | ------- | --------------- |
+| `budget_chars` | Hard cap for ALL per-turn injected context (directives + nudges + recall catalog + retrieve hint) | `APHRODITE_FLOW_BUDGET_CHARS` | `4000`  | `2600`          |
 
 Sections drop bottom-up when over budget; directives and nudges never drop. Dylib-session only - the Rust proxy never reads `[flow]`.
 
@@ -179,20 +179,20 @@ Stops at the first non-empty value. This chain is TOML-first by design; the two 
 
 ## Default value chain
 
-| Field                       | Resolution                                                                                                                        |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Field                       | Resolution                                                                                                                         |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `listen`                    | `proxy.listen` → `127.0.0.1:9797`, then `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT` override just the port (name/mode-matched) |
-| `mode`                      | `proxy.mode` → `"token"` (unknown values fall back with a warning) - no env override in multi-proxy mode                          |
-| `api_url`                   | `APHRODITE_API_URL` → `proxy.api_url` → `defaults.api_url` → `https://api.openai.com`                                             |
-| `model`                     | `APHRODITE_MODEL` → `proxy.model` → `defaults.model` → `"default-model"`                                                          |
-| `ccr_ttl_seconds`           | `APHRODITE_CCR_TTL` → `proxy.ccr_ttl_seconds` → `defaults.ccr_ttl_seconds` → `3600`                                               |
-| `ccr_db_path`               | `APHRODITE_DB` → `proxy.ccr_db_path` (non-empty) → `~/.hermes/aphrodite/ccr.db` (or `/tmp` fallback)                              |
-| `notify_url` / `notify_key` | `APHRODITE_NOTIFY_URL` / `APHRODITE_NOTIFY_KEY` → `proxy.notify_url` / `notify_key` → unset                                       |
-| `tool_relay`                | `proxy.tool_relay` → `false`                                                                                                      |
-| `dev`                       | `proxy.dev` → `false`                                                                                                             |
-| `timeout`                   | `proxy.timeout` → `300` (clamped to a max of `600` with a warning)                                                                |
-| `max_context`               | `proxy.max_context` → `1,000,000`                                                                                                 |
-| `max_output`                | `proxy.max_output` → `384,000`                                                                                                    |
+| `mode`                      | `proxy.mode` → `"token"` (unknown values fall back with a warning) - no env override in multi-proxy mode                           |
+| `api_url`                   | `APHRODITE_API_URL` → `proxy.api_url` → `defaults.api_url` → `https://api.openai.com`                                              |
+| `model`                     | `APHRODITE_MODEL` → `proxy.model` → `defaults.model` → `"default-model"`                                                           |
+| `ccr_ttl_seconds`           | `APHRODITE_CCR_TTL` → `proxy.ccr_ttl_seconds` → `defaults.ccr_ttl_seconds` → `3600`                                                |
+| `ccr_db_path`               | `APHRODITE_DB` → `proxy.ccr_db_path` (non-empty) → `~/.hermes/aphrodite/ccr.db` (or `/tmp` fallback)                               |
+| `notify_url` / `notify_key` | `APHRODITE_NOTIFY_URL` / `APHRODITE_NOTIFY_KEY` → `proxy.notify_url` / `notify_key` → unset                                        |
+| `tool_relay`                | `proxy.tool_relay` → `false`                                                                                                       |
+| `dev`                       | `proxy.dev` → `false`                                                                                                              |
+| `timeout`                   | `proxy.timeout` → `300` (clamped to a max of `600` with a warning)                                                                 |
+| `max_context`               | `proxy.max_context` → `1,000,000`                                                                                                  |
+| `max_output`                | `proxy.max_output` → `384,000`                                                                                                     |
 
 ## Hot-reload
 
@@ -210,10 +210,10 @@ Stops at the first non-empty value. This chain is TOML-first by design; the two 
 
 ## Modes
 
-| Mode      | Backend   | Compression threshold | Notes                                                                          |
-| --------- | --------- | --------------------- | ------------------------------------------------------------------------------ |
-| `"token"` | SQLite    | >1 KB (`1024`)        | Durable CCR storage; supports tool relay (per-proxy flag, default `false`)      |
-| `"cache"` | In-memory | >8 KB (`8192`)        | Lightweight caching; `tool_relay` is independent of mode, not disabled by it    |
+| Mode      | Backend   | Compression threshold | Notes                                                                        |
+| --------- | --------- | --------------------- | ---------------------------------------------------------------------------- |
+| `"token"` | SQLite    | >1 KB (`1024`)        | Durable CCR storage; supports tool relay (per-proxy flag, default `false`)   |
+| `"cache"` | In-memory | >8 KB (`8192`)        | Lightweight caching; `tool_relay` is independent of mode, not disabled by it |
 
 Thresholds are the compiled defaults; the shipped example config lowers them (see `[compression]` above). The token proxy's SQLite path comes from `ccr_db_path` (or the default below) and its TTL from `ccr_ttl_seconds`; the cache proxy's in-memory store uses the same TTL.
 

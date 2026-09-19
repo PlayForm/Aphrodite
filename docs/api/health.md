@@ -1,26 +1,23 @@
 # Health Endpoint
 
-Gives external load balancers and monitoring systems a fast, public health
-check that doesn't require loopback access. It's the only endpoint
-intentionally exempt from loopback enforcement.
+`GET /health` is the public liveness check for load balancers and monitoring
+systems. It always returns HTTP 200 - capability state (CCR enabled, mode,
+context fill) is conveyed in the JSON body instead of the status code, because
+CCR is optional/opt-in.
 
 ## Endpoint
 
-```
-GET /health
-```
+| Method | Path      | Access | Auth |
+| ------ | --------- | ------ | ---- |
+| GET    | `/health` | Public | None |
 
 ## Access
 
-**Public** - no loopback enforcement. The only endpoint exempt from the
-`loopback_only` middleware:
-
-```rust
-// Public route (no loopback enforcement) merged with restricted routes
-let app = Router::new()
-    .route("/health", get(health_check))
-    .merge(restricted)  // includes all loopback-only routes
-```
+`/health` is the only route exempt from loopback enforcement and from
+management-token auth. It is registered on its own router without either
+middleware layer, so external probes reach it without credentials. Everything
+else - including `/metrics` (loopback-only, token-exempt) - sits behind the
+loopback gate.
 
 ## Response
 
@@ -29,27 +26,32 @@ let app = Router::new()
 	"status": "healthy",
 	"ccr": true,
 	"mode": "token",
-	"version": "1.3.6",
+	"version": "1.4.6",
 	"fill_pct": 90.0
 }
 ```
 
-Always returns HTTP 200 - capability state conveyed via JSON body (CCR is
-optional/opt-in).
-
 ## Fields
 
-| Field      | Type   | Description                         |
-| ---------- | ------ | ----------------------------------- |
-| `status`   | string | Always `"healthy"`                  |
-| `ccr`      | bool   | Whether CCR store is enabled        |
-| `mode`     | string | `"cache"` or `"token"`              |
-| `version`  | string | `CARGO_PKG_VERSION`                 |
-| `fill_pct` | float  | Context fill percentage (0.0-100.0) |
+| Field      | Type   | Description                                                        |
+| ---------- | ------ | ------------------------------------------------------------------ |
+| `status`   | string | Always `"healthy"`                                                 |
+| `ccr`      | bool   | Whether the CCR store is enabled (disabled with `--no-ccr-marker`) |
+| `mode`     | string | `"cache"` or `"token"`                                             |
+| `version`  | string | Binary version (`CARGO_PKG_VERSION`)                               |
+| `fill_pct` | float  | Context fill percentage, clamped to the range 1.0-99.0             |
 
-## Note
+## fill_pct
 
-`/health` does NOT probe the upstream API. For upstream health, use
-`/health/upstream` (loopback-only, and gated by `APHRODITE_MGMT_TOKEN` when
-set). `/health` itself is deliberately exempt from both loopback enforcement
-and management-route auth so external load balancers keep working.
+`fill_pct` is derived from the compression-ratio EMA: `100 - (ratio_ema / 20)`,
+clamped to 1-99 and stored at x100 precision (the JSON body divides by 100).
+It initializes at 90.0 and recomputes after every compression. A higher
+compression ratio lowers the fill percentage, signaling more context headroom.
+
+## Upstream Health
+
+`/health` does not probe the upstream API - a 200 here does not mean the model
+provider is reachable. For upstream health use `GET /health/upstream`
+(loopback only, gated by `APHRODITE_MGMT_TOKEN` when set): it probes
+`GET {api_url}/models` with the configured API key, caches the result for 60
+seconds, and returns `{"upstream": bool, "cached": bool}`.

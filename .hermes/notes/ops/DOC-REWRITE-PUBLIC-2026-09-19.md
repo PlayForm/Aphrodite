@@ -112,7 +112,12 @@ Resumed by orchestrator after the morning session died on provider 429/401s.
 - [x] Wave 1 PAIR-2-D: docs/classification/ (landed deleg_1bd50bd5, 417s; REAL
       content-type count = 30 not 26; content-types.md moved; 6 discrepancy
       entries)
-- [~] Wave 2 PAIR-3-A/B: docs/config/ + docs/install/ (RUNNING deleg_2389d5bf)
+- [x] Wave 2 PAIR-3-A/B: docs/config/ + docs/install/ (landed: A deleg_abec2877
+      956s 15 disc; B deleg_e505e0b8 530s 10 disc; both prettier-clean)
+- [x] Wave 2 PAIR-4-A/B: docs/proxy/ + docs/api/ + docs/metrics/ (landed
+      deleg_6e117e0c: A 723s 18 disc, B 539s 9 disc; both prettier-clean)
+- [~] Wave 3 PAIR-5-A/B: docs/plugin/ + docs/tool-relay/ (RUNNING
+      deleg_e4b3f0f2)
 - [ ] Wave 2 PAIR-4-A/B: docs/proxy/ + docs/api/ + docs/metrics/ (briefs
       staged .hermes/tmp/DOC-REWRITE-BRIEF-PAIR4-A.md / PAIR4-B.md)
 - [ ] Wave 3 PAIR-5-A/B: docs/plugin/ + docs/tool-relay/ (briefs staged

@@ -1,20 +1,23 @@
 # Metrics Endpoint
 
-Exposes Prometheus-compatible metrics for monitoring and dashboarding. It's
-always available on loopback without authentication, which is intentional for
+`GET /metrics` exposes proxy counters, gauges, and a latency histogram in the
+Prometheus text exposition format for scraping, alerting, and dashboards. It
+is always available on loopback without authentication - intentional for
 local-only deployments.
 
 ## Endpoint
 
-```
-GET /metrics
-```
+| Method | Path       | Access   | Auth |
+| ------ | ---------- | -------- | ---- |
+| GET    | `/metrics` | Loopback | None |
 
 ## Access
 
-Loopback only - subject to `loopback_only` middleware. No auth - `/metrics`
-stays exempt even when `APHRODITE_MGMT_TOKEN` gates the other management
-routes, so Prometheus scrapers keep working unmodified.
+Loopback only (subject to `loopback_only` middleware, which also validates the
+`Host` header). No auth: `/metrics` stays token-exempt even when
+`APHRODITE_MGMT_TOKEN` gates the other management routes, so Prometheus
+scrapers keep working unmodified. In production, add a reverse-proxy auth
+layer or firewall this endpoint if it must be exposed.
 
 ## Content-Type
 
@@ -24,11 +27,15 @@ text/plain; version=0.0.4
 
 ## Format
 
-Prometheus text exposition format - one metric per line with optional labels.
+Prometheus text exposition format - one metric per line, optional `mode`,
+`code`, and `le` labels. All values are read from atomic counters with relaxed
+ordering, so no locking is involved. The output is built from the same stats
+object as `/stats`.
 
-## Metrics Output
+## Emitted Metrics
 
-28 metrics in total (verified against a live `curl /metrics` response):
+28 distinct metric names. Latency buckets are cumulative (see below), so the
+5 bucket lines share one name:
 
 ```
 aphrodite_requests_total{mode="token"} N
@@ -68,38 +75,21 @@ aphrodite_upstream_latency_seconds_total N.NNNNNN
 
 ## Latency Histogram
 
-Buckets are cumulative; the last bucket is unbounded (`+Inf`), not a `10.0`
-label - it catches every sample >= 1s, including 30s+ outliers, so labeling
-it `10.0` would have made Prometheus consumers assume everything in it is
-<= 10s and mis-compute quantiles:
+Latency is tracked in a 5-element atomic counter array with the boundaries
+`<1ms`, `<10ms`, `<100ms`, `<1s`, and everything else. Output buckets are
+cumulative, as the format requires; the last bucket is labeled `+Inf`, not
+`10.0` - it catches every sample at or above 1s, including long outliers, and
+the explicit `+Inf` bucket is what makes `histogram_quantile()` work:
 
 ```
-aphrodite_latency_seconds_bucket{le="0.001"} <1ms_count
-aphrodite_latency_seconds_bucket{le="0.01"}  <10ms_count
-aphrodite_latency_seconds_bucket{le="0.1"}   <100ms_count
-aphrodite_latency_seconds_bucket{le="1.0"}   <1s_count
-aphrodite_latency_seconds_bucket{le="+Inf"}  everything_count (total, satisfies histogram_quantile())
-aphrodite_latency_seconds_count               total count
-aphrodite_latency_seconds_sum                 total seconds (float)
+aphrodite_latency_seconds_bucket{le="0.001"} <1ms count
+aphrodite_latency_seconds_bucket{le="0.01"}  <10ms cumulative count
+aphrodite_latency_seconds_bucket{le="0.1"}   <100ms cumulative count
+aphrodite_latency_seconds_bucket{le="1.0"}   <1s cumulative count
+aphrodite_latency_seconds_bucket{le="+Inf"}  total count
+aphrodite_latency_seconds_count              total count
+aphrodite_latency_seconds_sum                total seconds (float, 6dp)
 ```
 
-The buckets are backed by a 5-element atomic counter array covering ranges
-<1ms, <10ms, <100ms, <1s, and everything else (labeled `+Inf`).
-
-## Build Logic
-
-```rust
-let stats = s.stats_json();
-let mut out = String::new();
-// ... for each metric: push_str(&format!(...))
-return (StatusCode::OK, [(CONTENT_TYPE, "text/plain; version=0.0.4")], out)
-```
-
-Values come from atomic counters read with relaxed ordering, so there's no
-locking involved.
-
-## Security Note
-
-No authentication - intentional for local-only deployments with loopback
-enforcement. In production, add a reverse-proxy auth layer or firewall this
-endpoint if exposed.
+See [Prometheus Metrics](../metrics/prometheus.md) for the full catalog with
+types, labels, and example queries.
