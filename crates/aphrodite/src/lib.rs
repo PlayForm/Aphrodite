@@ -146,11 +146,21 @@ fn to_json_ok(v:&serde_json::Value) -> *mut c_char {
 		.unwrap_or(std::ptr::null_mut())
 }
 
+/// Convert a caller-supplied C string pointer into an owned `String`.
+///
+/// # Safety
+/// `ptr`, if non-null, must point to a valid, NUL-terminated C string that
+/// stays valid for the duration of this call (the standard `CStr::from_ptr`
+/// contract). Every caller in this crate passes pointers received directly
+/// from the C ABI call, which are expected to uphold that contract.
 unsafe fn cstr(ptr:*const c_char) -> Option<String> {
 	if ptr.is_null() {
 		return None;
 	}
-	Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+	// SAFETY: `ptr` is non-null here, and per the safety contract of this
+	// function it points to a valid, NUL-terminated C string that remains
+	// valid for the duration of this call.
+	Some(unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned())
 }
 
 fn check_content(content:&str) -> Result<(), &'static str> {
@@ -778,10 +788,18 @@ mod ffi_tests {
 
 	fn cs(s:&str) -> CString { CString::new(s).unwrap() }
 
+	/// # Safety
+	/// `ptr` must be non-null and point to a valid, NUL-terminated C string
+	/// allocated by the C ABI (freed here via `aphrodite_free_string`).
 	unsafe fn take(ptr:*mut c_char) -> String {
 		assert!(!ptr.is_null(), "expected non-null C string");
-		let s = CStr::from_ptr(ptr).to_string_lossy().into_owned();
-		aphrodite_free_string(ptr);
+		// SAFETY: `ptr` is asserted non-null above and, per the safety
+		// contract of this function, points to a valid, NUL-terminated C
+		// string that is not aliased elsewhere.
+		let s = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		// SAFETY: `ptr` was allocated by the C ABI, which owns the
+		// corresponding `aphrodite_free_string` deallocation routine.
+		unsafe { aphrodite_free_string(ptr) };
 		s
 	}
 

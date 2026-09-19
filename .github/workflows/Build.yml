@@ -105,10 +105,10 @@ jobs:
           echo "/tmp/onnxruntime-linux-x64-1.21.0/lib" | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
           sudo ldconfig
 
-      - name: Setup Rust (stable 1.96.0)
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+      - name: Setup Rust (nightly, latest)
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
         with:
-          toolchain: 1.96.0
+          toolchain: nightly
           targets: ${{ matrix.target }}
 
       - name: Cache cargo

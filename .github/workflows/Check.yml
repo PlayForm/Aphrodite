@@ -59,10 +59,15 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Rust (stable 1.96.0)
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+      - name: Setup Rust (nightly, latest)
+        # Repo-wide toolchain is LATEST NIGHTLY (rust-toolchain.toml channel
+        # = "nightly"): build, test, clippy, and fmt all run on the same
+        # nightly. `toolchain: nightly` resolves to whatever the latest
+        # nightly is on the day the workflow runs - deliberately never a
+        # dated pin.
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
         with:
-          toolchain: 1.96.0
+          toolchain: nightly
           components: rustfmt, clippy
 
       - name: Cache cargo
@@ -88,22 +93,16 @@ jobs:
         # vendor/headroom lints this repo doesn't own.
         run: cargo clippy -p aphrodite -p aphrodite-hermes -- -D warnings
 
-      - name: Setup Rust (nightly, fmt only)
-        # rustfmt.toml sets `unstable_features = true` and relies on several
-        # nightly-only options (notably `space_after_colon = false`, the
-        # repo's established no-space type-annotation style). Under stable,
-        # rustfmt silently drops those settings instead of erroring, which
-        # makes `cargo fmt --check` want to reformat the entire existing
-        # codebase (1235 diff hunks, verified locally) - a false-positive
-        # gate, not a real regression. A pinned dated nightly is carried
-        # solely for this one step; every other job uses stable.
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
-        with:
-          toolchain: nightly-2026-05-01
-          components: rustfmt
-
+      # rustfmt.toml sets `unstable_features = true` and relies on
+      # nightly-only options (notably `space_after_colon = false`, the
+      # repo's established no-space type-annotation style). Stable rustfmt
+      # silently drops those settings instead of erroring, which turns the
+      # check into a false-positive gate. No separate setup is needed here
+      # anymore: nightly IS the repo-wide toolchain (rust-toolchain.toml
+      # channel = "nightly", same as the Rust job setup above), so `cargo
+      # fmt` runs on the latest nightly and honors rustfmt.toml natively.
       - name: cargo fmt --check
-        run: cargo +nightly-2026-05-01 fmt --all -- --check
+        run: cargo fmt --all -- --check
 
   Test:
     name: cargo test
@@ -113,10 +112,15 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Rust (stable 1.96.0)
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07), pins to rust-toolchain.toml's 1.96.0
+      - name: Setup Rust (nightly, latest)
+        # Repo-wide toolchain is LATEST NIGHTLY (rust-toolchain.toml channel
+        # = "nightly"): build, test, clippy, and fmt all run on the same
+        # nightly. `toolchain: nightly` resolves to whatever the latest
+        # nightly is on the day the workflow runs - deliberately never a
+        # dated pin.
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
         with:
-          toolchain: 1.96.0
+          toolchain: nightly
           components: rustfmt, clippy
 
       - name: Cache cargo

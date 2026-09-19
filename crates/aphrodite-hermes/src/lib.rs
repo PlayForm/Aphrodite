@@ -216,7 +216,10 @@ unsafe fn cstr_to_string(ptr:*const c_char) -> String {
 	if ptr.is_null() {
 		String::new()
 	} else {
-		CStr::from_ptr(ptr).to_string_lossy().into_owned()
+		// SAFETY: `ptr` is non-null here, and per the safety contract of this
+		// function it points to a valid, NUL-terminated C string that stays
+		// valid for the duration of this call.
+		unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned()
 	}
 }
 

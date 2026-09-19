@@ -12,7 +12,7 @@
 #
 # Configuration:
 #   .editorconfig  - Shared indent/newline rules (shfmt reads this)
-#   rustfmt.toml   - rustfmt options (nightly, edition 2021)
+#   rustfmt.toml   - rustfmt options (nightly, edition 2024)
 #   .prettierignore - Paths excluded from Prettier formatting
 #
 # TOML is handled by taplo/even-better-toml, Python by ruff - neither is
