@@ -10,62 +10,21 @@ templates are B2's (untouched here). No commit (auto-committer sweeps).
 All four changes are in `crates/aphrodite-hermes/src/tools.rs`; line numbers
 below are pre-fix (shifted after edits).
 
-### 1. Deleted the `ok` collapse (tools.rs:123-126)
-
-The success-bool branch
-`if ok.as_bool() == Some(true) && obj.len() <= 2 { return Some(("ok", "text")) }`
-is removed. It fired on ANY success-plus-one-key envelope and replaced the whole
-payload with a 2-byte fragment, producing the reported `[text:1L 2B | ok]`.
-Every genuine Hermes envelope is caught by the branches above it
-(`output`/`exit_code`, `diff`, `error`), so a success-only object is a user
-payload: it now falls through to `detect_type` / the caller hint.
-
-### 2. Guarded the success-string arm (tools.rs:127-131)
-
-The string-success branch now requires a SINGLE-key object (`obj.len() <= 1`).
-`{"success": "wrote 3 files"}` still extracts; `{"success": "ok", "data": [1]}`
-no longer collapses to the word.
-
-### 3. Guarded the priority-key arm (tools.rs:167-172)
-
-`description|summary|result|message|preview|found` now only collapse for
-SINGLE-key objects. `{"result": "ok", "data": {...}}` (any size) no longer
-collapses to `ok` - the same bug class as the deleted success-bool collapse,
-previously ungated by any size. Consequence: a multi-key skill_view-shaped
-object (`{"name": ..., "description": ...}`) now previews as its own JSON
-instead of the description fragment (honest; the description remains visible in
-the payload). The pinned table row encoding the old collapse was updated to
-`None` (test catching up with intent).
-
-### 4. Caller-hint-wins in `compress_into` (tools.rs:193-198)
-
-When `unwrap_hermes_result` returns `Some` AND the caller passed a non-default
-`type` hint (`!empty && != "text"`), the hint wins over the unwrap verdict. For
-JSON payloads (`{`-starting) the preview is built from the FULL content - an
-unwrap fragment produces a wrong `[text:1L 2B | ok]` that counts the fragment,
-not the stored payload, and drops the shape signal. No-hint behavior is
-bit-identical (Hermes envelopes still unwrap; the pinned terminal-envelope test
-passes unchanged).
+| Change                                                 | Before (1.4.5)                                                                                                                                                                                                                                                                                                                                    | After (fixed)                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deleted the `ok` collapse (tools.rs:123-126)           | the success-bool branch `if ok.as_bool() == Some(true) && obj.len() <= 2 { return Some(("ok", "text")) }` fired on ANY success-plus-one-key envelope and replaced the whole payload with a 2-byte fragment, producing the reported `[text:1L 2B \| ok]`                                                                                           | branch is removed; every genuine Hermes envelope is caught by the branches above it (`output`/`exit_code`, `diff`, `error`), so a success-only object is a user payload: it now falls through to `detect_type` / the caller hint                                                                                                                                                                                                                                |
+| Guarded the success-string arm (tools.rs:127-131)      | `{"success": "ok", "data": [1]}` collapsed to the word                                                                                                                                                                                                                                                                                            | the string-success branch now requires a SINGLE-key object (`obj.len() <= 1`); `{"success": "wrote 3 files"}` still extracts; `{"success": "ok", "data": [1]}` no longer collapses to the word                                                                                                                                                                                                                                                                  |
+| Guarded the priority-key arm (tools.rs:167-172)        | `description\|summary\|result\|message\|preview\|found` collapsed for ANY object size; `{"result": "ok", "data": {...}}` collapsed to `ok` (same bug class as the deleted success-bool collapse, previously ungated by any size); multi-key skill_view-shaped objects (`{"name": ..., "description": ...}`) previewed as the description fragment | the priority keys now only collapse for SINGLE-key objects; `{"result": "ok", "data": {...}}` (any size) no longer collapses to `ok`; a multi-key skill_view-shaped object now previews as its own JSON (honest; the description remains visible in the payload). The pinned table row encoding the old collapse was updated to `None` (test catching up with intent)                                                                                           |
+| Caller-hint-wins in `compress_into` (tools.rs:193-198) | when `unwrap_hermes_result` returns `Some`, the unwrap verdict won and the caller's `type` hint was dropped; JSON previews counted the unwrap fragment (wrong `[text:1L 2B \| ok]`)                                                                                                                                                               | when `unwrap_hermes_result` returns `Some` AND the caller passed a non-default `type` hint (`!empty && != "text"`), the hint wins over the unwrap verdict; for JSON payloads (`{`-starting) the preview is built from the FULL content - an unwrap fragment would count the fragment, not the stored payload, and drops the shape signal. No-hint behavior is bit-identical (Hermes envelopes still unwrap; the pinned terminal-envelope test passes unchanged) |
 
 ## What changed (WS2-tools) - honest `total_count` (tools.rs:135-156)
 
-1. **`matches_text` support:** the real Hermes `search_files` shape ships
-   `matches_text` (path-grouped `path\n  <line>: <content>`) instead of a
-   `matches` array. It is now normalized to the same grep-style
-   `path:line:content` lines the search preview counts - a real search no longer
-   collapses to `[search:1L]`.
-2. **`take(20)` cap removed:** one grep-style line per REAL match is emitted
-   (the lines feed only the preview, never stored/hashed, so no size cost). A
-   5,000-hit search no longer previews as `[search:20 hits ...]`.
-3. **Zero / count-only results surface the REAL total:**
-   `{"total_count": 0, "matches": []}` and
-   `{"total_count": 5, "truncated": true}` return the label as type `text` so
-   the generic arm renders `0 total` / `5 total (truncated)` instead of an
-   unreadable `[search:1L]` whose count is invisible.
-4. **`total_count`-only data objects are not hijacked:**
-   `{"total_count": 42, "items": [...]}` (no
-   `matches`/`matches_text`/`matches_format`/`truncated`) falls through and
-   previews as itself instead of becoming a fake `search` marker.
+| Change                                               | Before (1.4.5)                                                                                                                                                              | After (fixed)                                                                                                                                                                          |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`matches_text` support**                           | the real Hermes `search_files` shape ships `matches_text` (path-grouped `path\n  <line>: <content>`) instead of a `matches` array; a real search collapses to `[search:1L]` | normalized to the same grep-style `path:line:content` lines the search preview counts - a real search no longer collapses to `[search:1L]`                                             |
+| **`take(20)` cap removed**                           | only 20 grep-style lines emitted; a 5,000-hit search previews as `[search:20 hits ...]`                                                                                     | one grep-style line per REAL match is emitted (the lines feed only the preview, never stored/hashed, so no size cost); a 5,000-hit search no longer previews as `[search:20 hits ...]` |
+| **Zero / count-only results surface the REAL total** | `{"total_count": 0, "matches": []}` and `{"total_count": 5, "truncated": true}` preview as an unreadable `[search:1L]` whose count is invisible                             | return the label as type `text` so the generic arm renders `0 total` / `5 total (truncated)`                                                                                           |
+| **`total_count`-only data objects are not hijacked** | `{"total_count": 42, "items": [...]}` becomes a fake `search` marker                                                                                                        | falls through (no `matches`/`matches_text`/`matches_format`/`truncated`) and previews as itself                                                                                        |
 
 ## Before -> after (preview strings, rebuilt `target/release/libaphrodite_hermes.dylib`)
 
@@ -89,10 +48,10 @@ fixed). "Before" = 1.4.5 behavior, from
 | terminal envelope no hint                                              | `[terminal:2L exit code: 1]`        | unchanged `[terminal:2L exit code: 1]`                                                              |
 | terminal envelope + hint `tool_result`                                 | hint dropped (type terminal/text)   | `[tool_result:1L 58B \| {"output": "error: broke\nexit code: 1\n", "exit_code": 1}]` (hint wins)    |
 
-Hook path (`transform_tool_result`, what the LLM sees): a 1,212-byte real search
-envelope compressed via the hook now previews
-`[search:25 hits in 25 files \| f0.rs:0 …]` - real count, no `[search:1L]`.
-Sub-threshold payloads pass through raw (`null` marker) as before - unchanged.
+| Hook path (`transform_tool_result`, what the LLM sees)  | Before (1.4.5)                   | After (fixed)                                            |
+| ------------------------------------------------------- | -------------------------------- | -------------------------------------------------------- |
+| 1,212-byte real search envelope compressed via the hook | `[search:1L]`                    | `[search:25 hits in 25 files \| f0.rs:0 …]` - real count |
+| Sub-threshold payloads                                  | pass through raw (`null` marker) | unchanged - pass through raw (`null` marker) as before   |
 
 ## Test results
 
@@ -122,15 +81,11 @@ Sub-threshold payloads pass through raw (`null` marker) as before - unchanged.
 
 ### Pinned table (`test_unwrap_hermes_result_table`) updates - pins that encoded the buggy collapse now encode the fix
 
-- `{"success": true}`: `Some(("ok", "text"))` -> `None`; added
-  `{"success": true, "data": ...}` -> `None`, `{"success": "ok", "data": [1]}`
-  -> `None`.
-- `search without matches`: type `search` -> `text` (`5 total (truncated)` label
-  now renders visibly); added `matches_text` row -> `search` lines, and
-  `{"total_count": 42, "items": [...]}` -> `None`.
-- `priority key fallback` 2-key row: `Some(("does a thing", "text"))` -> `None`;
-  added single-key `{"description": ...}` -> extract (surviving guarded
-  behavior) and `{"result": "ok", "data": ...}` -> `None`.
+| pinned table case                 | before                           | after                                                                                                                                                          |
+| --------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{"success": true}`               | `Some(("ok", "text"))`           | `None`; added `{"success": true, "data": ...}` -> `None`, `{"success": "ok", "data": [1]}` -> `None`                                                           |
+| `search without matches`          | type `search`                    | type `text` (`5 total (truncated)` label now renders visibly); added `matches_text` row -> `search` lines, and `{"total_count": 42, "items": [...]}` -> `None` |
+| `priority key fallback` 2-key row | `Some(("does a thing", "text"))` | `None`; added single-key `{"description": ...}` -> extract (surviving guarded behavior) and `{"result": "ok", "data": ...}` -> `None`                          |
 
 ## Notes / deviations from FIXDESIGN
 

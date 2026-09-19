@@ -14,27 +14,11 @@ init). `crates/aphrodite-hermes/src/tools.rs` is partner B1's file - NOT touched
 
 ### 1.1 WS2-preview - honest build arm (`crates/aphrodite/src/preview.rs`)
 
-The build arm previously tallied with `content.matches("error").count()` /
-`content.matches("warning").count()` - substring counting that inflated lines with
-repeated occurrences, matched inside unrelated words (`noerror`, `error-prone`), and
-MISSED capitalized `Error:` (Python/Swift/clang output). A genuinely failed build could
-render as `0E`. It also never surfaced a FAILING test run: `test result: FAILED. 3 failed`
-previewed as `[build:0E 0W 3L]` - a failing run looked exactly like a clean build
-(battery top-5 offender #2).
-
-Now:
-
-- **Line-based tallies:** `error`/`warning` counts come from `is_error_line` /
-  `is_warning_line` (rustc/clang/gcc `error[E0432]:`, `error:`, `Error:`, `ERROR`,
-  `panicked at`, `file:line: error[`, Python `ValueError:`/`Exception:`; warning
-  equivalents). Counts are honest per line, case-insensitive on the conventional forms.
-- **Failure honesty:** when no error/warning line is tallied but the output carries a
-  FAILURE signal (`FAILED`, `FAIL`, `--- FAIL:`, non-zero `N failed` via
-  `is_failure_line`), the failure summary line is surfaced instead of a clean-looking
-  `[build:0E 0W N L]`. `0 failed` (passing runs) never matches, so clean summaries stay
-  clean.
-- The first-error-message enrichment now matches the same markers as the tally (a
-  capitalized `Error:` line is surfaced, not just counted).
+| Behavior                       | Before (1.4.5)                                                                                                                                                                                                                                                                                                                   | After (fixed)                                                                                                                                                                                                                                                                                                         |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Line-based tallies             | tallied with `content.matches("error").count()` / `content.matches("warning").count()` - substring counting that inflated lines with repeated occurrences, matched inside unrelated words (`noerror`, `error-prone`), and MISSED capitalized `Error:` (Python/Swift/clang output). A genuinely failed build could render as `0E` | `error`/`warning` counts come from `is_error_line` / `is_warning_line` (rustc/clang/gcc `error[E0432]:`, `error:`, `Error:`, `ERROR`, `panicked at`, `file:line: error[`, Python `ValueError:`/`Exception:`; warning equivalents). Counts are honest per line, case-insensitive on the conventional forms             |
+| Failure honesty                | never surfaced a FAILING test run: `test result: FAILED. 3 failed` previewed as `[build:0E 0W 3L]` - a failing run looked exactly like a clean build (battery top-5 offender #2)                                                                                                                                                 | when no error/warning line is tallied but the output carries a FAILURE signal (`FAILED`, `FAIL`, `--- FAIL:`, non-zero `N failed` via `is_failure_line`), the failure summary line is surfaced instead of a clean-looking `[build:0E 0W N L]`. `0 failed` (passing runs) never matches, so clean summaries stay clean |
+| First-error-message enrichment | followed the old substring matching - a capitalized `Error:` line was counted, not surfaced                                                                                                                                                                                                                                      | now matches the same markers as the tally (a capitalized `Error:` line is surfaced, not just counted)                                                                                                                                                                                                                 |
 
 Verified on the production dylib path (`aphrodite_compress` with the Hermes
 `{"output":...,"exit_code":N}` wrapper, which routes to `build_output`),
@@ -50,16 +34,11 @@ restype/argtypes and forces `c_void_p`):
 
 ### 1.2 WS2-preview - honest error/linter/log arms (`preview.rs`)
 
-`error`, `linter`/`lint`, and `log` types previously fell into the generic `_` arm, which
-shows the FIRST non-empty line - for a Python traceback that is
-`Traceback (most recent call last):` (the header, not the error), for a compiler log the
-first `Compiling` line (innocuous), hiding the actual failure. Dedicated arms now:
-
-- **`error`:** first real error/failure line (`is_error_line`/`is_failure_line`), else the
-  last non-empty line (tail = most recent state).
-- **`linter` / `lint`:** first issue line (`path:line:col:` prefix, `E###`/`W###`/`F###`
-  codes via `is_lint_line`, `error:`/`warning:` lines), else tail.
-- **`log`:** error/failure line if any (signal wins), else the last non-empty line (tail).
+| Behavior              | Before (1.4.5)                                                                                                                                                                                   | After (fixed)                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `error` arm           | fell into the generic `_` arm, which shows the FIRST non-empty line - for a Python traceback that is `Traceback (most recent call last):` (the header, not the error), hiding the actual failure | first real error/failure line (`is_error_line`/`is_failure_line`), else the last non-empty line (tail = most recent state)      |
+| `linter` / `lint` arm | generic `_` arm - first non-empty line                                                                                                                                                           | first issue line (`path:line:col:` prefix, `E###`/`W###`/`F###` codes via `is_lint_line`, `error:`/`warning:` lines), else tail |
+| `log` arm             | generic `_` arm - for a compiler log the first `Compiling` line (innocuous), hiding the actual failure                                                                                           | error/failure line if any (signal wins), else the last non-empty line (tail)                                                    |
 
 Verified via the release dylib through the plugin's hardened FFI path
 (`aphrodite_compress` with explicit type hint):
@@ -73,11 +52,10 @@ Verified via the release dylib through the plugin's hardened FFI path
 
 ### 1.3 WS4 - wire `preview_max_chars` end-to-end
 
-`PreviewsConfig.preview_max_chars` (`crates/aphrodite/src/config.rs`) was declared but
-never read anywhere (ROOT-CAUSE §3 confirmed exactly 2 occurrences, both declarations).
-The cap is now enforced at the single choke point - the end of `build_preview` - so every
-path (proxy, hooks, prefetch, poll_worker, engine C-ABI, and the Hermes dylib) renders
-bounded previews.
+| Behavior                                                    | Before (1.4.5)                                                                                                                                                                | After (1.4.6)                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preview_max_chars` enforcement                             | `PreviewsConfig.preview_max_chars` (`crates/aphrodite/src/config.rs`) was declared but never read anywhere (ROOT-CAUSE §3 confirmed exactly 2 occurrences, both declarations) | the cap is now enforced at the single choke point - the end of `build_preview` - so every path (proxy, hooks, prefetch, poll_worker, engine C-ABI, and the Hermes dylib) renders bounded previews                                                    |
+| End-to-end verification (env override, no config file edit) | no cap applied (unlimited previews)                                                                                                                                           | `APHRODITE_PREVIEW_MAX_CHARS=20` on a 311-byte prose payload produced `[text:1L 311B \| so…]` - exactly 20 chars, closing bracket + `…` preserved. The shipped config default (120) bounds the normal case; absent key = unlimited (legacy behavior) |
 
 Wiring path:
 
@@ -99,10 +77,8 @@ Wiring path:
 6. `crates/aphrodite/templates/aphrodite.toml`: comment updated (the key was already
    documented at `preview_max_chars = 120`).
 
-Verified end-to-end on the dylib (env override, no config file edit):
-`APHRODITE_PREVIEW_MAX_CHARS=20` on a 311-byte prose payload produced
-`[text:1L 311B | so…]` - exactly 20 chars, closing bracket + `…` preserved. The shipped
-config default (120) bounds the normal case; absent key = unlimited (legacy behavior).
+Verified end-to-end on the dylib (env override, no config file edit): see the
+`preview_max_chars` enforcement table above.
 
 ## 2. Tests
 

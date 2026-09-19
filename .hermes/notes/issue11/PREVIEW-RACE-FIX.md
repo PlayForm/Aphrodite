@@ -5,24 +5,22 @@ Date: 2026-09-18 · Branch: Development · Not committed (auto-committer sweeps)
 ## Symptom
 
 `cargo test -p aphrodite --lib preview` is flaky: parent-agent runs observed a
-varying **21-25 failures per run** (44 / 41 / 40 passing across 3 runs). The
-variance is the fingerprint of the known race: the process-global
-`PREVIEW_MAX_CHARS` `AtomicU32` (`crates/aphrodite/src/preview.rs`) is mutated
-by tests via `set_preview_max_chars()` while OTHER content-asserting tests run
-in parallel and read the truncated cap → previews come out shorter than the
-assertions expect → assert fails. The failure set varies because which
-unguarded test happens to read the cap mid-mutation depends on thread
-scheduling.
+varying **21-25 failures per run** (44 / 41 / 40 passing across 3 runs), while
+local baseline runs (3x, this session, BEFORE any change) were 65 passed / 0
+failed - the race did NOT reproduce locally. The variance is the fingerprint of
+the known race: the process-global `PREVIEW_MAX_CHARS` `AtomicU32`
+(`crates/aphrodite/src/preview.rs`) is mutated by tests via
+`set_preview_max_chars()` while OTHER content-asserting tests run in parallel
+and read the truncated cap → previews come out shorter than the assertions
+expect → assert fails. The failure set varies because which unguarded test
+happens to read the cap mid-mutation depends on thread scheduling.
 
-## Baseline (pre-fix) failing-test list per run
-
-Local baseline runs (3x, this session, BEFORE any change):
-
-| Run | Result                                                |
-| --- | ----------------------------------------------------- |
-| 1   | 65 passed / 0 failed - race did NOT reproduce locally |
-| 2   | 65 passed / 0 failed - race did NOT reproduce locally |
-| 3   | 65 passed / 0 failed - race did NOT reproduce locally |
+| Run context                  | Result                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| Local baseline run 1         | 65 passed / 0 failed - race did NOT reproduce locally                   |
+| Local baseline run 2         | 65 passed / 0 failed - race did NOT reproduce locally                   |
+| Local baseline run 3         | 65 passed / 0 failed - race did NOT reproduce locally                   |
+| Parent-agent runs (observed) | varying **21-25 failures per run** (44 / 41 / 40 passing across 3 runs) |
 
 The race is timing/thread-count dependent and did not fire on this machine,
 but the parent-agent's observed 21-25 failures per run is the same signature.

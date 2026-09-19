@@ -6,11 +6,12 @@ Date: 2026-09-18 (EEST) · Branch: Development · Binary 1.4.6 / plugin 2.1.4 ·
 
 After Agent B's Issue #11 residual rewrite landed (commits 3b8b5d3, 1d202b2
 regex-drop, 7674456 detection), `cargo test -p aphrodite --lib preview`
-failed with a VARYING 21-25 failures per run. A race-fix agent added
-`cap_guard()` to 20 tests (lib.rs, marker.rs, proxy.rs) and reported "3x
-green" - but its baseline runs never reproduced the failure (0 failing),
-while the parent session consistently saw 21-25. Its guard additions did NOT
-fix the suite (still 22-24 failing per run when the parent re-ran it).
+failed with a VARYING 21-25 failures per run:
+
+| Attempt                                                                       | What happened                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| race-fix agent: added `cap_guard()` to 20 tests (lib.rs, marker.rs, proxy.rs) | reported "3x green" - but its baseline runs never reproduced the failure (0 failing), while the parent session consistently saw 21-25. Its guard additions did NOT fix the suite (still 22-24 failing per run when the parent re-ran it)                                                |
+| parent's actual root cause (leaked env var)                                   | the session shell had `APHRODITE_PREVIEW_MAX_CHARS=20` exported - left over from the Issue #11 battery agent's cap verification probe (it set the env var to prove the WS4 cap works end-to-end, and the export persisted in the terminal session env, inherited by every `cargo test`) |
 
 ## The actual root cause (found by the parent, not the race-fix agent)
 
@@ -47,12 +48,13 @@ green while the parent's terminal did inherit it.
 
 ## Verification
 
-- WITH `APHRODITE_PREVIEW_MAX_CHARS=20` set: `cargo test -p aphrodite --lib
-preview` 3x -> 65 passed / 0 failed each (hermetic fix holds).
-- Full suite: 377 + 16 + 5 + 2 + 4 + 2 = 406 passed / 0 failed (1 ignored).
-- `Maintain/check_ffi_contract.py`: PASS (0 violations).
-- repro: SURVIVED (no crash).
-- prettier --check on config_loader.rs: clean.
+| Check                                                                             | Before (non-hermetic test)                                                                        | After (hermetic fix)                                         |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `cargo test -p aphrodite --lib preview` WITH `APHRODITE_PREVIEW_MAX_CHARS=20` set | varying 21-25 failures per run (the race-fix agent's guard-additions attempt still 22-24 failing) | 3x → 65 passed / 0 failed each (hermetic fix holds)          |
+| Full suite                                                                        | -                                                                                                 | 377 + 16 + 5 + 2 + 4 + 2 = 406 passed / 0 failed (1 ignored) |
+| `Maintain/check_ffi_contract.py`                                                  | -                                                                                                 | PASS (0 violations)                                          |
+| repro                                                                             | -                                                                                                 | SURVIVED (no crash)                                          |
+| prettier --check on config_loader.rs                                              | -                                                                                                 | clean                                                        |
 
 ## Lessons
 

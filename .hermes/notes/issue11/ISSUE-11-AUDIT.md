@@ -14,223 +14,18 @@
 
 Gate: content trimmed starts with `{` **and** parses as a JSON object, else `None` (lines 70-74). There is NO "known Hermes envelope" check - any JSON object is eligible.
 
-**#:** 0
-
-**Branch (lines):** Gate (70-74)
-
-**Envelope shape detected:** any JSON object
-
-**Returns (content, type):**
-
-```text
--
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-everything below
-```
-
-**User-visible symptom:** -
-
----
-
-**#:** 1
-
-**Branch (lines):** Terminal (81-107)
-
-**Envelope shape detected:** `output` string + `exit_code` key present, non-empty output
-
-**Returns (content, type):**
-
-```text
-(output, `terminal` if contains "exit code:"/"Error:"; `build_error` if contains "error["/"error: could not"; `build_output` if contains Compiling/Finished/Running/test result:/Building/Installing/warning:; else `detect_type(output)`)
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"output":"hello","exit_code":0}`; `{"output":"Compiling x","exit_code":0}`; `{"output":"boom\nexit code: 1","exit_code":1}` - any API response that happens to use an "output"+"exit_code" field pair
-```
-
-**User-visible symptom:** type flips to terminal/build_output/build_error/text; preview shows only the inner fragment
-
----
-
-**#:** 2
-
-**Branch (lines):** Diff (110-114)
-
-**Envelope shape detected:** non-empty `diff` string
-
-**Returns (content, type):**
-
-```text
-(diff, detect_type(diff))
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"diff":"-a\n+b\n","status":"x"}` - a data object with a "diff" field
-```
-
-**User-visible symptom:** type/preview of the diff fragment, rest of object hidden
-
----
-
-**#:** 3
-
-**Branch (lines):** Error (115-122)
-
-**Envelope shape detected:** `error` string; "Found…matches" prefix → text; else non-empty and not starting `{`/`[`
-
-**Returns (content, type):**
-
-```text
-(msg, `text`)
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"error":"rate limit exceeded","code":429,"retry_after":5}` - a real API error envelope
-```
-
-**User-visible symptom:** marker shows only the message; `code`/`retry_after` invisible in type/preview; hint dropped
-
----
-
-**#:** 4
-
-**Branch (lines):** **Success-bool collapse (123-126)**
-
-**Envelope shape detected:** `success` == `true` AND `obj.len() <= 2`
-
-**Returns (content, type):**
-
-```text
-**hardcoded (`"ok"`, `"text"`)**
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"success":true}`; `{"success":true,"data":{...}}`; `{"success":true,"status":"ok"}` - **the ISSUE-11 repro shape**
-```
-
-**User-visible symptom:** **`[text:1L 2B | ok]`**, type text, caller hint discarded (reported bug)
-
----
-
-**#:** 5
-
-**Branch (lines):** Success-string (127-131)
-
-**Envelope shape detected:** `success` is non-empty string not starting `{`
-
-**Returns (content, type):**
-
-```text
-(msg, `text`)
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"success":"ok","request_id":"r-1"}`; `{"success":"wrote 3 files"}`
-```
-
-**User-visible symptom:** same `[text:1L 2B | ok]`-style collapse to the string, type text
-
----
-
-**#:** 6
-
-**Branch (lines):** Search (134-156)
-
-**Envelope shape detected:** `total_count` as u64 (matches[] optional)
-
-**Returns (content, type):**
-
-```text
-fabricated grep lines `path:line:content` (≤20) or `"N total"`/`"N total (truncated)"`; type `search`
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"total_count":42,"items":[...]}`; `{"total_count":3,"matches":[{"path":"x","line":1,"content":"y"}]}` - any data object with a total_count key
-```
-
-**User-visible symptom:** type `search`; preview is fabricated grep text or bare "42 total"; search previews only count `file:line:` lines so result can be `[search:1L]`
-
----
-
-**#:** 7
-
-**Branch (lines):** File-read content (158-162)
-
-**Envelope shape detected:** `content` string
-
-**Returns (content, type):**
-
-```text
-(text, detect_type(text))
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"content":"hi","id":42,"role":"assistant"}` - the acknowledged 01-F2 test case (tools.rs:636)
-```
-
-**User-visible symptom:** type text, preview `[text:1L 2B | hi]`; round-trip intact but marker type/preview collapse (pinned as "acceptable" by test)
-
----
-
-**#:** 8
-
-**Branch (lines):** Priority keys (167-174)
-
-**Envelope shape detected:** first of `description`/`summary`/`result`/`message`/`preview`/`found` as non-empty string not starting `{`/`[`
-
-**Returns (content, type):**
-
-```text
-(s, `text`) - **no size guard**
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
-`{"result":"ok","data":{...},"meta":"m"}` (any size); `{"message":"hello","code":200}`
-```
-
-**User-visible symptom:** collapses to that one string, type text - same "ok" symptom at any object size
-
----
-
-**#:** 9
-
-**Branch (lines):** None (176)
-
-**Envelope shape detected:** no shape matched
-
-**Returns (content, type):**
-
-```text
-None → detect_type + caller hint honored (tools.rs:196-198)
-```
-
-**False-positive risk - legitimate user JSON that trips it:**
-
-```text
--
-```
-
-**User-visible symptom:** correct path (only safe route)
+| #   | Branch (lines)                      | Envelope shape detected                                                                                        | Returns (content, type)                                                                                                                                                                                                                        | False-positive risk - legitimate user JSON that trips it                                                                                                                                                | User-visible symptom                                                                                                                            |
+| --- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | Gate (70-74)                        | any JSON object                                                                                                | -                                                                                                                                                                                                                                              | everything below                                                                                                                                                                                        | -                                                                                                                                               |
+| 1   | Terminal (81-107)                   | `output` string + `exit_code` key present, non-empty output                                                    | ``(output, `terminal` if contains "exit code:"/"Error:"; `build_error` if contains "error["/"error: could not"; `build_output` if contains Compiling/Finished/Running/test result:/Building/Installing/warning:; else `detect_type(output)`)`` | `{"output":"hello","exit_code":0}`; `{"output":"Compiling x","exit_code":0}`; `{"output":"boom\nexit code: 1","exit_code":1}` - any API response that happens to use an "output"+"exit_code" field pair | type flips to terminal/build_output/build_error/text; preview shows only the inner fragment                                                     |
+| 2   | Diff (110-114)                      | non-empty `diff` string                                                                                        | `(diff, detect_type(diff))`                                                                                                                                                                                                                    | `{"diff":"-a\n+b\n","status":"x"}` - a data object with a "diff" field                                                                                                                                  | type/preview of the diff fragment, rest of object hidden                                                                                        |
+| 3   | Error (115-122)                     | `error` string; "Found…matches" prefix → text; else non-empty and not starting `{`/`[`                         | ``(msg, `text`)``                                                                                                                                                                                                                              | `{"error":"rate limit exceeded","code":429,"retry_after":5}` - a real API error envelope                                                                                                                | marker shows only the message; `code`/`retry_after` invisible in type/preview; hint dropped                                                     |
+| 4   | **Success-bool collapse (123-126)** | `success` == `true` AND `obj.len() <= 2`                                                                       | **hardcoded (`"ok"`, `"text"`)**                                                                                                                                                                                                               | `{"success":true}`; `{"success":true,"data":{...}}`; `{"success":true,"status":"ok"}` - **the ISSUE-11 repro shape**                                                                                    | **`[text:1L 2B \| ok]`**, type text, caller hint discarded (reported bug)                                                                       |
+| 5   | Success-string (127-131)            | `success` is non-empty string not starting `{`                                                                 | ``(msg, `text`)``                                                                                                                                                                                                                              | `{"success":"ok","request_id":"r-1"}`; `{"success":"wrote 3 files"}`                                                                                                                                    | same `[text:1L 2B \| ok]`-style collapse to the string, type text                                                                               |
+| 6   | Search (134-156)                    | `total_count` as u64 (matches[] optional)                                                                      | fabricated grep lines `path:line:content` (≤20) or `"N total"`/`"N total (truncated)"`; type `search`                                                                                                                                          | `{"total_count":42,"items":[...]}`; `{"total_count":3,"matches":[{"path":"x","line":1,"content":"y"}]}` - any data object with a total_count key                                                        | type `search`; preview is fabricated grep text or bare "42 total"; search previews only count `file:line:` lines so result can be `[search:1L]` |
+| 7   | File-read content (158-162)         | `content` string                                                                                               | `(text, detect_type(text))`                                                                                                                                                                                                                    | `{"content":"hi","id":42,"role":"assistant"}` - the acknowledged 01-F2 test case (tools.rs:636)                                                                                                         | type text, preview `[text:1L 2B \| hi]`; round-trip intact but marker type/preview collapse (pinned as "acceptable" by test)                    |
+| 8   | Priority keys (167-174)             | first of `description`/`summary`/`result`/`message`/`preview`/`found` as non-empty string not starting `{`/`[` | ``(s, `text`)`` - **no size guard**                                                                                                                                                                                                            | `{"result":"ok","data":{...},"meta":"m"}` (any size); `{"message":"hello","code":200}`                                                                                                                  | collapses to that one string, type text - same "ok" symptom at any object size                                                                  |
+| 9   | None (176)                          | no shape matched                                                                                               | `None` → detect_type + caller hint honored (tools.rs:196-198)                                                                                                                                                                                  | -                                                                                                                                                                                                       | correct path (only safe route)                                                                                                                  |
 
 Ordering matters: 1→9 is checked sequentially; an object matching multiple shapes is captured by the first. All branches run before the caller's `type` hint is consulted - `Some(...)` unconditionally overrides the hint (tools.rs:193-199).
 
@@ -240,70 +35,23 @@ Ordering matters: 1→9 is checked sequentially; an object matching multiple sha
 
 All work happened in a single day (2026-07-14), five commits, in `crates/aphrodite` then `crates/aphrodite-hermes`:
 
-**When:** -
-
-**Commit:** tags `Aphrodite/v1.2.0`, `v1.2.1`, `v1.2.2`
-
-**What:** no extract/unwrap anywhere (grep 0/0/0)
-
-**Bug state:** clean
-
----
-
-**When:** 2026-07-14
-
-**Commit:** **bf181d7** ("Version: 1.2.8")
-
-**What:** introduced `extract_hermes_result(content, classified_type)` in core `crates/aphrodite/src/hooks.rs` (75 lines). Gated on `classified_type.starts_with("json")` - only ran when the classifier already said JSON. Branches: output/exit_code, diff, error|success-string (`"result: {msg}"`), total_count (`"{N} results found"`), content. **Lossy: hashed AND stored the extracted fragment** (`compute_key(eff_content)`, `inline_store_put(hash, eff_content)`) - retrieval returned the fragment, not the original wrapper. No success-bool branch. Hook path only.
-
-**Bug state:** lossy round-trip + json-gated misclassification
-
----
-
-**When:** 2026-07-14
-
-**Commit:** **9e52762** ("v1.2.9")
-
-**What:** wired extract into bridge `compress_into` (tools.rs) - the explicit `aphrodite_compress` tool path now unwraps too. Still lossy store.
-
-**Bug state:** explicit path now affected
-
----
-
-**When:** 2026-07-14
-
-**Commit:** **e25aa85**
-
-**What:** "Preserve original content in CCR store while improving preview": hash/store ORIGINAL content; extraction used only for type/preview. Damage narrows to type/preview-only - the current bug shape.
-
-**Bug state:** preview-only false positives
-
----
-
-**When:** 2026-07-14
-
-**Commit:** **8f138c1**
-
-**What:** moved function from core hooks.rs to bridge tools.rs as `unwrap_hermes_result` (Option<(String,String)>); **dropped the `starts_with("json")` gate** (any `{` object now unwraps); **ADDED the success-bool `"ok"` collapse (123-126) and success-string branch (127-131)** - the ISSUE-11 branch was born here (`git log -S '"ok".to_string()'` → only 8f138c1).
-
-**Bug state:** **ISSUE-11 branch introduced**
-
----
-
-**When:** 2026-07-14
-
-**Commit:** **26218a5**
-
-**What:** empty-terminal handling (F12): output-empty falls through to error; added terminal/build heuristics, "Found…matches" error branch, search matches-content builder, priority-keys fallback (167-174).
-
-**Bug state:** branch table reaches its current 9-shape form
+| When       | Commit                                      | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Bug state                                       |
+| ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| -          | tags `Aphrodite/v1.2.0`, `v1.2.1`, `v1.2.2` | no extract/unwrap anywhere (grep 0/0/0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | clean                                           |
+| 2026-07-14 | **bf181d7** ("Version: 1.2.8")              | introduced `extract_hermes_result(content, classified_type)` in core `crates/aphrodite/src/hooks.rs` (75 lines). Gated on `classified_type.starts_with("json")` - only ran when the classifier already said JSON. Branches: output/exit_code, diff, error\|success-string (`"result: {msg}"`), total_count (`"{N} results found"`), content. **Lossy: hashed AND stored the extracted fragment** (`compute_key(eff_content)`, `inline_store_put(hash, eff_content)`) - retrieval returned the fragment, not the original wrapper. No success-bool branch. Hook path only. | lossy round-trip + json-gated misclassification |
+| 2026-07-14 | **9e52762** ("v1.2.9")                      | wired extract into bridge `compress_into` (tools.rs) - the explicit `aphrodite_compress` tool path now unwraps too. Still lossy store.                                                                                                                                                                                                                                                                                                                                                                                                                                    | explicit path now affected                      |
+| 2026-07-14 | **e25aa85**                                 | "Preserve original content in CCR store while improving preview": hash/store ORIGINAL content; extraction used only for type/preview. Damage narrows to type/preview-only - the current bug shape.                                                                                                                                                                                                                                                                                                                                                                        | preview-only false positives                    |
+| 2026-07-14 | **8f138c1**                                 | moved function from core hooks.rs to bridge tools.rs as `unwrap_hermes_result` (Option<(String,String)>); **dropped the `starts_with("json")` gate** (any `{` object now unwraps); **ADDED the success-bool `"ok"` collapse (123-126) and success-string branch (127-131)** - the ISSUE-11 branch was born here (`git log -S '"ok".to_string()'` → only 8f138c1).                                                                                                                                                                                                         | **ISSUE-11 branch introduced**                  |
+| 2026-07-14 | **26218a5**                                 | empty-terminal handling (F12): output-empty falls through to error; added terminal/build heuristics, "Found…matches" error branch, search matches-content builder, priority-keys fallback (167-174).                                                                                                                                                                                                                                                                                                                                                                      | branch table reaches its current 9-shape form   |
 
 **Released versions containing it** (verified by grepping each tag):
 
-- `extract_hermes_result`/`unwrap_hermes_result`: NOT in v1.2.0-v1.2.2; present from **Aphrodite/v1.3.1** onward (tools.rs, 6 hits).
-- Success-bool `"ok"` branch (`'"ok".to_string()'`): present in **v1.3.1, v1.3.5, v1.3.7, v1.4.2, v1.4.3, v1.4.4, v1.4.5** (count 1 each).
-- **Reporter's v1.3.7: bug fully present** - `unwrap_hermes_result` at tools.rs:66, unwrap applied in `compress_into` (tools.rs:191), original content stored (tools.rs:203). The v1.3.7 shape is functionally identical to 1.4.5.
-- **1.4.5: present** (code + empirical dylib repro in ISSUE-11-VERIFY-1.4.5.md). NOT fixed across the whole 1.3.x/1.4.x line.
+| Version / artifact | `unwrap_hermes_result`                                                                                                                                                                | success-bool `"ok"` branch                                                           |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| v1.2.0 - v1.2.2    | `extract_hermes_result`/`unwrap_hermes_result`: NOT present (grep 0/0/0)                                                                                                              | -                                                                                    |
+| v1.3.1 onward      | present (tools.rs, 6 hits)                                                                                                                                                            | present in **v1.3.1, v1.3.5, v1.3.7, v1.4.2, v1.4.3, v1.4.4, v1.4.5** (count 1 each) |
+| Reporter's v1.3.7  | `unwrap_hermes_result` at tools.rs:66, unwrap applied in `compress_into` (tools.rs:191), original content stored (tools.rs:203) - the v1.3.7 shape is functionally identical to 1.4.5 | **bug fully present**                                                                |
+| 1.4.5              | present (code + empirical dylib repro in ISSUE-11-VERIFY-1.4.5.md)                                                                                                                    | present - **NOT fixed across the whole 1.3.x/1.4.x line**                            |
 
 ---
 
@@ -329,14 +77,16 @@ All work happened in a single day (2026-07-14), five commits, in `crates/aphrodi
 
 The heuristic cannot distinguish a Hermes envelope from a user JSON payload. On BOTH the explicit compress path and the hook path, any object matching a wrapper shape gets its type/preview rewritten:
 
-1. **`success:true` + ≤2 keys** → literal `"ok"`, type `text`, preview `[text:1L 2B | ok]` - **the reported ISSUE-11 symptom**. (tools.rs:123-126; test tools.rs:570 pins it.)
-2. **`success` string** (`"ok"`, `"wrote 3 files"`, …) → collapses to that string, type `text`. (tools.rs:127-131)
-3. **`result`/`message`/`description`/`summary`/`preview`/`found` string field, ANY object size** → collapses to that one string, type `text` - same "ok" symptom at any size (tools.rs:167-174; no len guard).
-4. **`content` string field** → collapses to inner string, type = detect of fragment (usually `text`), e.g. `{"content":"hi","id":42}` → `[text:1L 2B | hi]` (tools.rs:158-162; the 01-F2 test knowingly accepts the type/preview collapse).
-5. **`output` + `exit_code` pair** → inner fragment classified `terminal`/`build_output`/`build_error`/`text`; a legit API response with these keys is mislabeled and its extra fields hidden (tools.rs:81-107).
-6. **`total_count` (+`matches`) key** → type `search`, preview is fabricated grep lines (`path:line:content`) or bare "N total"; a data object with a `total_count` field becomes type `search` (tools.rs:134-156).
-7. **`diff` string field** → type from diff fragment, rest of object hidden (tools.rs:110-114).
-8. **`error` string field** (non-JSON-starting) → only the message survives in type/preview, `code`/`retry_after`/other fields invisible (tools.rs:115-122).
+| #   | false-positive input shape                                                                     | resulting type / preview (symptom)                                                                                                                       | source                                                                       |
+| --- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | **`success:true` + ≤2 keys**                                                                   | literal `"ok"`, type `text`, preview `[text:1L 2B \| ok]` - **the reported ISSUE-11 symptom**                                                            | tools.rs:123-126; test tools.rs:570 pins it                                  |
+| 2   | **`success` string** (`"ok"`, `"wrote 3 files"`, …)                                            | collapses to that string, type `text`                                                                                                                    | tools.rs:127-131                                                             |
+| 3   | **`result`/`message`/`description`/`summary`/`preview`/`found` string field, ANY object size** | collapses to that one string, type `text` - same "ok" symptom at any size                                                                                | tools.rs:167-174; no len guard                                               |
+| 4   | **`content` string field**                                                                     | collapses to inner string, type = detect of fragment (usually `text`), e.g. `{"content":"hi","id":42}` → `[text:1L 2B \| hi]`                            | tools.rs:158-162; the 01-F2 test knowingly accepts the type/preview collapse |
+| 5   | **`output` + `exit_code` pair**                                                                | inner fragment classified `terminal`/`build_output`/`build_error`/`text`; a legit API response with these keys is mislabeled and its extra fields hidden | tools.rs:81-107                                                              |
+| 6   | **`total_count` (+`matches`) key**                                                             | type `search`, preview is fabricated grep lines (`path:line:content`) or bare "N total"; a data object with a `total_count` field becomes type `search`  | tools.rs:134-156                                                             |
+| 7   | **`diff` string field**                                                                        | type from diff fragment, rest of object hidden                                                                                                           | tools.rs:110-114                                                             |
+| 8   | **`error` string field** (non-JSON-starting)                                                   | only the message survives in type/preview, `code`/`retry_after`/other fields invisible                                                                   | tools.rs:115-122                                                             |
 
 Common consequences across ALL shapes:
 

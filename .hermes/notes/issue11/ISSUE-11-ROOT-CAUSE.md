@@ -116,15 +116,13 @@ let (classify_content, eff_type) = if let Some((c, t)) = unwrap_hermes_result(co
 
 **Effect:**
 
-- Repro (`type: "tool_result"` + JSON): type stays `tool_result`, preview becomes the generic arm over the full
-  payload (`[tool_result:1L 737B | {"..."...}]` - first 60 chars) - correct type, honest preview.
-- Plain text with `type: "tool_result"`: unchanged (`[tool_result:3L 37B | === CRON LIST ===]`).
-- No hint (default): behavior unchanged - Hermes envelopes still unwrap (`{"output"..., "exit_code"}` → `terminal`),
-  so pinned tests `tools.rs:654` (type "terminal") and `lib.rs:852` (hook path unwraps) still pass.
-- Storage/retrieval: untouched (hash/store still use original `content`).
-- The `_` arm of `build_preview` (preview.rs:294-304) needs no change - it already renders `[<type>:L B | first-line]`
-  for any unknown type; for a JSON object classified as `json`/`json_array` (no-hint case) the json arm (preview.rs:574)
-  already produces a good `[json:Nkeys ...]` preview.
+| Case                                            | Before (1.4.5)                                                                        | After (1.4.6)                                                                                                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repro (`type: "tool_result"` + JSON)            | type `text`, preview `[text:1L 2B \| ok]` (fragment preview; caller's hint discarded) | type stays `tool_result`, preview becomes the generic arm over the full payload (`[tool_result:1L 737B \| {"..."...}]` - first 60 chars) - correct type, honest preview |
+| Plain text with `type: "tool_result"`           | `[tool_result:3L 37B \| === CRON LIST ===]`                                           | unchanged                                                                                                                                                               |
+| No hint (default)                               | Hermes envelopes still unwrap (`{"output"..., "exit_code"}` → `terminal`)             | behavior unchanged - pinned tests `tools.rs:654` (type "terminal") and `lib.rs:852` (hook path unwraps) still pass                                                      |
+| Storage/retrieval                               | hash/store use original `content`                                                     | untouched                                                                                                                                                               |
+| `_` arm of `build_preview` (preview.rs:294-304) | already renders `[<type>:L B \| first-line]` for any unknown type                     | needs no change; for a JSON object classified as `json`/`json_array` (no-hint case) the json arm (preview.rs:574) already produces a good `[json:Nkeys ...]` preview    |
 
 **Alternative/complementary (classifier-side, optional, lower priority):** in `unwrap_hermes_result`, drop the
 hardcoded `"ok"` collapse (tools.rs:123-126, `obj.len() <= 2` + bool `success`) - a bare `{"success": true}` IS the
