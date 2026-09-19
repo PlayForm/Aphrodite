@@ -1322,14 +1322,21 @@ pub async fn proxy_handler(
 }
 
 /// Detect content type for adaptive compression strategy.
+///
+/// 1.5.0 REFACTOR-PLAN §7: the old 145-line parallel classifier is gone -
+/// this is now a THIN call site over the single detection pipeline
+/// (`crate::preview::detect_semantic_type`) with the per-language code
+/// refinement (`preview/lang.rs`). Envelope JSON (`exit_code`/`status`) is
+/// deliberately excluded from `json` by the pipeline's envelope guard (the
+/// raw-JSON preview is the payload, WS1); the proxy keeps that one explicit
+/// check so tool envelopes still get the tool_output arm.
 fn proxy_detect_content_type(content:&str) -> &'static str {
-	let first_line = content.lines().next().unwrap_or("");
-
-	// Structured output detection
+	// tool_output envelope: the pipeline's json detector + envelope guard
+	// exclude Hermes wrapper envelopes from `json` on purpose (raw-JSON
+	// preview is the payload); recognize them here so the stored type still
+	// routes to the tool_output alias arm on the json builder.
 	if content.starts_with('{') || content.starts_with('[') {
-		// Validate JSON before classifying
 		if serde_json::from_str::<serde_json::Value>(content).is_err() {
-			// Not valid JSON despite starting with { or [ - treat as text
 			return "text";
 		}
 		if content.contains("exit_code") || content.contains("\"status\"") {
@@ -1337,135 +1344,50 @@ fn proxy_detect_content_type(content:&str) -> &'static str {
 		}
 		return "json";
 	}
-
-	// Code detection - language-specific (before broad error check)
-	if content.lines().count() > 3 {
-		// Rust - require fn keyword PLUS one of arrow, borrow, or use
-		// to distinguish from Python/JavaScript that happens to contain "fn "
-		if content.lines().any(|l| {
-			let t = l.trim_start();
-			t.starts_with("fn ")
-				|| t.starts_with("pub fn ")
-				|| t.starts_with("async fn ")
-				|| t.starts_with("pub async fn ")
-				|| t.starts_with("impl ")
-				|| t.starts_with("struct ")
-				|| t.starts_with("pub struct ")
-				|| t.starts_with("enum ")
-				|| t.starts_with("pub enum ")
-		}) && (content.contains("-> ") || content.contains("&") || content.contains("use "))
-		{
-			return "code_rust";
-		}
-		// Python
-		if content.contains("def ")
-			&& (content.contains("import ")
-				|| content.contains("class ")
-				|| content.contains("from ")
-				|| content.contains("self."))
-		{
-			return "code_python";
-		}
-		// Go
-		if (content.contains("func ") || content.contains("package ")) && content.contains("import (") {
-			return "code_go";
-		}
-		// JS/TS
-		if (content.contains("function ") || content.contains("const ") || content.contains("=> "))
-			&& (content.contains("import ") || content.contains("export "))
-		{
-			return "code_js";
-		}
-		// Generic code
-		if content.contains("fn ")
-			|| content.contains("def ")
-			|| content.contains("class ")
-			|| content.contains("import ")
-			|| content.contains("pub fn")
-		{
-			return "code";
-		}
+	match crate::preview::detect_semantic_type(content) {
+		// Language refinement: shape "code" → code_rust/python/go/js.
+		Some("code") => crate::preview::lang::detect_language(content).unwrap_or("code"),
+		Some(t) => t,
+		// Proxy-path glue: the pipeline deliberately leaves error/linter/
+		// build_output hint-supplied (the caller hint or classifier supplies
+		// them), but this gateway path HAS no hint. Keep the first-line
+		// recognition so un-hinted tracebacks/lint dumps/build logs keep
+		// their honest arms (WS2 - a traceback previewing as `[text:... |
+		// Traceback (most recent call last):]` is the misleading-preview bug
+		// class). diff/git/gitlog/log are already pipeline detectors.
+		None => {
+			let first_line = content.lines().next().unwrap_or("");
+			if first_line.contains("error")
+				|| first_line.contains("Error")
+				|| first_line.contains("ERROR")
+				|| first_line.contains("Traceback")
+				|| first_line.contains("panic")
+				|| first_line.starts_with("thread '")
+			{
+				"error"
+			} else if first_line.starts_with("Compiling ")
+				|| first_line.starts_with("   Compiling ")
+				|| first_line.contains("Finished")
+				|| first_line.starts_with("running ")
+				|| first_line.starts_with("test ")
+			{
+				"build_output"
+			} else if first_line.starts_with("error[E")
+				|| first_line.starts_with("error: ")
+				|| first_line.starts_with("warning[")
+				|| first_line.starts_with("warning: ")
+				|| first_line.contains("|") && (first_line.contains("error") || first_line.contains("warning"))
+				|| first_line.contains("mypy")
+				|| first_line.contains("clippy")
+				|| first_line.contains("eslint")
+				|| first_line.contains("tsc ")
+			{
+				"linter"
+			} else {
+				"text"
+			}
+		},
 	}
-
-	// Aphrodite-side semantic detection runs BEFORE the loose first-line prefix
-	// heuristics below (which misfire on e.g. a `test result:` summary line -
-	// classified `build_output` by the `test ` prefix - or grep hits whose text
-	// happens to contain "error"). The detector is conservative (strong
-	// line-prefix / marker signals, majority votes) so it only fires on a
-	// genuine git-status / ls / test / grep / git-log shape, and it keeps the
-	// proxy path in parity with the hook/FFI path (which runs the same detector).
-	if let Some(t) = crate::preview::detect_semantic_type(content) {
-		return t;
-	}
-
-	// Error output - always keep visible
-	if first_line.contains("error")
-		|| first_line.contains("Error")
-		|| first_line.contains("ERROR")
-		|| first_line.contains("Traceback")
-		|| first_line.contains("panic")
-		|| first_line.starts_with("thread '")
-	{
-		return "error";
-	}
-
-	// Build/test output patterns
-	if first_line.starts_with("Compiling ")
-		|| first_line.starts_with("   Compiling ")
-		|| first_line.contains("Finished")
-		|| first_line.starts_with("running ")
-		|| first_line.starts_with("test ")
-	{
-		return "build_output";
-	}
-
-	// Linter output patterns
-	if first_line.starts_with("error[E")
-		|| first_line.starts_with("error: ")
-		|| first_line.starts_with("warning[")
-		|| first_line.starts_with("warning: ")
-		|| first_line.contains("|") && (first_line.contains("error") || first_line.contains("warning"))
-		|| first_line.contains("mypy")
-		|| first_line.contains("clippy")
-		|| first_line.contains("eslint")
-		|| first_line.contains("tsc ")
-	{
-		return "linter";
-	}
-
-	// Diff output
-	if first_line.starts_with("diff --git ")
-		|| first_line.starts_with("@@ -")
-		|| first_line.starts_with("+++ ")
-		|| first_line.starts_with("--- ")
-	{
-		return "diff";
-	}
-
-	// Git output
-	if first_line.starts_with("commit ") || first_line.starts_with("On branch ") {
-		return "git";
-	}
-
-	// Log output - only if content has explicit log markers
-	if content.lines().any(|l| {
-		let t = l.trim();
-		t.starts_with('[')
-			&& (t.contains("INFO")
-				|| t.contains("WARN")
-				|| t.contains("ERROR")
-				|| t.contains("DEBUG")
-				|| t.contains("TRACE")
-				|| t.contains("FATAL")
-				|| t.contains("PANIC"))
-	}) || content.lines().any(|l| {
-		let t = l.trim();
-		// Timestamp pattern: ISO-like or syslog-like date at start
-		t.starts_with(|c:char| c.is_ascii_digit()) && t.len() > 10 && (t.contains(':') || t.contains('-'))
-	}) {
-		return "log";
-	}
-	"text"
 }
 
 /// Generate structured metadata for CCR markers based on content type.
@@ -1917,159 +1839,20 @@ fn proxy_format_ccr_output(preview:&str, ct:&str, metadata:&str, center:Option<&
 	format!("{preview}\n[{ct}: {metadata}{center_seg}]\n<<<CCR:{hash}|{ct}|{size}>>>")
 }
 
-/// Build a smart content-type-aware preview for the CCR output.
-///
-/// Returns the most informative excerpt based on content type:
-/// - Code: first 3 lines (imports + first signature)
-/// - Error: the actual error line, not the traceback header
-/// - Diff: first file changed
-/// - JSON: key count summary
-/// - Default: first line, ~250 chars
-fn proxy_build_preview(content:&str, ct:&str) -> String {
-	// Parity + DEFAULT (report 09 §5): route common semantic shapes through the
-	// SAME `crate::preview::build_preview` the Hermes hook/FFI path uses, so
-	// both paths emit an IDENTICAL, self-describing `[type:...]` preview instead
-	// of drifting. Applies to the newly-enriched shapes (git status, ls, test,
-	// grep, git log) plus generic buckets the Aphrodite-side detector can
-	// upgrade. The proxy's own richer per-language arms below stay authoritative
-	// for code/error/json.
-	if matches!(
-		ct,
-		"git" | "git_status" | "gitlog" | "git_log" | "ls" | "dir" | "test" | "test_output" | "grep" | "log"
-	) || (matches!(ct, "text" | "terminal") && crate::preview::detect_semantic_type(content).is_some())
-	{
-		return crate::preview::build_preview(ct, content);
-	}
-	match ct {
-		"code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
-			// Code: structure-map preview - extract fn/def/class/struct sigs
-			let mut fns:Vec<&str> = Vec::new();
-			let mut structs:Vec<&str> = Vec::new();
-			let mut impls:Vec<&str> = Vec::new();
-			let mut classes:Vec<&str> = Vec::new();
-			let mut budget:usize = 280;
-
-			for line in content.lines() {
-				if budget == 0 {
-					break;
-				}
-				let trimmed = line.trim();
-				if trimmed.is_empty() {
-					continue;
-				}
-
-				// Rust patterns
-				if ct == "code_rust" || ct == "code" {
-					if trimmed.strip_prefix("fn ").is_some() {
-						let sig:String = trimmed.chars().take(58).collect();
-						fns.push(trimmed); // store ref, build later
-						budget = budget.saturating_sub(sig.len() + 2);
-					} else if trimmed.strip_prefix("pub fn ").is_some() {
-						let sig:String = trimmed.chars().take(58).collect();
-						fns.push(trimmed);
-						budget = budget.saturating_sub(sig.len() + 2);
-					} else if trimmed.starts_with("struct ") || trimmed.starts_with("pub struct ") {
-						let s:String = trimmed.chars().take(50).collect();
-						structs.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					} else if trimmed.starts_with("impl ") {
-						let s:String = trimmed.chars().take(50).collect();
-						impls.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					}
-				}
-				// Python patterns
-				if ct == "code_python" || ct == "code" {
-					if (trimmed.starts_with("def ") || trimmed.starts_with("async def ")) && trimmed.ends_with(':') {
-						let s:String = trimmed.chars().take(58).collect();
-						fns.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					} else if trimmed.starts_with("class ") && trimmed.ends_with(':') {
-						let s:String = trimmed.chars().take(50).collect();
-						classes.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					}
-				}
-				// Go patterns
-				if ct == "code_go" && trimmed.starts_with("func ") {
-					let s:String = trimmed.chars().take(58).collect();
-					fns.push(trimmed);
-					budget = budget.saturating_sub(s.len() + 2);
-				}
-			}
-
-			// Build summary line: [code_rust:3fns|2structs|1impl crate::proxy]
-			let mut parts:Vec<String> = Vec::new();
-			if !fns.is_empty() {
-				parts.push(format!("{}fns", fns.len()));
-			}
-			if !structs.is_empty() {
-				parts.push(format!("{}structs", structs.len()));
-			}
-			if !impls.is_empty() {
-				parts.push(format!("{}impls", impls.len()));
-			}
-			if !classes.is_empty() {
-				parts.push(format!("{}classes", classes.len()));
-			}
-			let summary = if parts.is_empty() { "?".to_string() } else { parts.join("|") };
-
-			// Show first 2 signatures inline
-			let sig_previews:Vec<String> = fns.iter().take(2).map(|s| s.chars().take(56).collect::<String>()).collect();
-			let sig_str = sig_previews.join("; ");
-
-			let lines = content.lines().count();
-			format!("[{ct}:{summary} {sig_str} {lines}L]").chars().take(300).collect()
-		},
-		"error" => {
-			// Error: find the actual error line, skip traceback noise
-			let err_line = content
-				.lines()
-				.find(|l| l.contains("Error:") || l.contains("error[") || l.contains("panicked"))
-				.unwrap_or_else(|| content.lines().next().unwrap_or(""));
-			err_line.chars().take(300).collect()
-		},
-		"diff" => {
-			// Diff: show which files changed
-			let files:Vec<&str> = content.lines().filter(|l| l.starts_with("diff --git ")).take(2).collect();
-			if files.is_empty() {
-				content.lines().next().unwrap_or("").chars().take(200).collect()
-			} else {
-				files.join("\n").chars().take(300).collect()
-			}
-		},
-		"json" | "tool_output" => {
-			// JSON: first line + key count
-			let first = content.lines().next().unwrap_or("");
-			let key_count = content.matches("\":").count();
-			format!("{} … {} keys", first.chars().take(150).collect::<String>(), key_count)
-		},
-		"build_output" => {
-			// Build: show status line
-			content
-				.lines()
-				.find(|l| l.contains("Compiling") || l.contains("Finished") || l.contains("error"))
-				.unwrap_or_else(|| content.lines().next().unwrap_or(""))
-				.chars()
-				.take(250)
-				.collect()
-		},
-		_ => {
-			// Default: first line, ~250 chars
-			content.lines().next().unwrap_or("").chars().take(250).collect()
-		},
-	}
-}
-
 /// Create a CCR marker with preview and structure for the LLM.
 ///
 /// Uses [`format_ccr_output`] for the output layout. The LLM reads the
 /// preview + structure first, then decides whether to call
 /// aphrodite_retrieve for the full content.
+///
+/// 1.5.0 (REFACTOR-PLAN §7): the parallel `proxy_build_preview` is GONE -
+/// ALL types route through the single core builder (`crate::preview::build_preview`),
+/// the same one the Hermes hook/FFI path uses, so proxy and hook previews
+/// can never drift. LLM-visible marker text converged on core formats.
 fn smart_marker(hash:&str, content:&str, ct:&str, center:Option<&str>) -> String {
 	let size = content.len();
 	let metadata = generate_metadata(content, ct);
-	let preview = proxy_build_preview(content, ct);
+	let preview = crate::preview::build_preview(ct, content);
 	proxy_format_ccr_output(&preview, ct, &metadata, center, hash, size)
 }
 
@@ -3078,18 +2861,22 @@ code_multiplier = 6.5
 	}
 
 	// ── T3: build_preview ────────────────────────────────────────
+	// 1.5.0 (REFACTOR-PLAN §7): `proxy_build_preview` is GONE - the proxy
+	// routes ALL types through the single core builder
+	// (`crate::preview::build_preview`, same as the Hermes hook/FFI path),
+	// so these pins now exercise the shared builder directly.
 	#[test]
 	fn test_build_preview_code_has_ct_prefix() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
-		let preview = proxy_build_preview(src, "code_rust");
-		assert!(preview.starts_with("[code_rust:"));
+		let preview = crate::preview::build_preview("code_rust", src);
+		assert!(preview.starts_with("[code:"), "core code arm expected, got {preview}");
 	}
 
-	// ── Parity (report 09 §5): for the common semantic shapes the proxy path
-	// (`proxy_build_preview`) must emit the IDENTICAL preview string the Hermes
-	// hook/FFI path emits (`crate::preview::build_preview`), so the two code
-	// paths never drift. Both are wired to the same shared builder + detector.
+	// ── Parity (1.5.0): the proxy path IS the hook path - `smart_marker` and
+	// the Hermes hook/FFI path both call `crate::preview::build_preview`, so
+	// previews can never drift by construction. The pins below prove the
+	// classify → build round-trip still yields enriched `[type:...]` previews.
 	#[test]
 	fn test_proxy_and_hook_previews_are_identical_for_semantic_shapes() {
 		let _g = crate::preview::preview_cap_test_guard();
@@ -3098,12 +2885,15 @@ code_multiplier = 6.5
 		let ripgrep = "src/a.rs:12:hit one\nsrc/a.rs:20:hit two\nsrc/b.rs:5:hit three";
 		let ls = "-rw-r--r-- 1 u g 10 x a.rs\n-rw-r--r-- 1 u g 10 x b.rs\ndrwxr-xr-x 2 u g 64 x sub";
 		for content in [git_status, cargo_test, ripgrep, ls] {
-			// Both paths independently classify then build - the results must match.
+			// Classify via the proxy path, build via the single core builder -
+			// the same call `smart_marker` makes.
 			let ct = proxy_detect_content_type(content);
-			let proxy_preview = proxy_build_preview(content, ct);
-			let hook_preview = crate::preview::build_preview(ct, content);
-			assert_eq!(proxy_preview, hook_preview, "preview drift for ct={ct} content={content:?}");
-			assert!(proxy_preview.starts_with('['), "expected enriched preview, got {proxy_preview}");
+			let preview = crate::preview::build_preview(ct, content);
+			assert!(preview.starts_with('['), "expected enriched preview, got {preview}");
+			assert!(
+				preview.contains(&format!("{ct}")),
+				"preview must be self-describing for ct={ct}: {preview}"
+			);
 		}
 	}
 
@@ -3111,7 +2901,7 @@ code_multiplier = 6.5
 	fn test_build_preview_error_has_ct_prefix_via_error_line() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "some noise\nerror[E0308]: mismatched types\nmore noise\n";
-		let preview = proxy_build_preview(src, "error");
+		let preview = crate::preview::build_preview("error", src);
 		assert!(preview.contains("error[E0308]"));
 	}
 
@@ -3119,15 +2909,15 @@ code_multiplier = 6.5
 	fn test_build_preview_diff_has_ct_prefix() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "diff --git a/x b/x\n--- a/x\n+++ a/x\n";
-		let preview = proxy_build_preview(src, "diff");
-		assert!(preview.starts_with("diff --git"));
+		let preview = crate::preview::build_preview("diff", src);
+		assert!(preview.starts_with("[diff:"), "core diff arm expected, got {preview}");
 	}
 
 	#[test]
 	fn test_build_preview_json_has_ct_prefix() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "{\"a\":1,\"b\":2}\n";
-		let preview = proxy_build_preview(src, "json");
+		let preview = crate::preview::build_preview("json", src);
 		assert!(preview.contains("keys"));
 	}
 

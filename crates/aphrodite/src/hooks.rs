@@ -174,19 +174,15 @@ fn transform_tool_result_inner(
 			// semantic detector upgrade a generic classification (git status,
 			// ls, test, grep, git log) so the reported `type` AND the preview
 			// both carry the high-signal shape. Detection stays in Aphrodite's
-			// layer - the vendored classifier is untouched.
+			// layer - the vendored classifier is untouched. Single
+			// type-resolution contract (1.5.0 REFACTOR-PLAN §5).
 			let base = transforms::content_detector::detect_content_type(content)
 				.content_type
 				.as_str()
 				.to_string();
-			let t = match base.as_str() {
-				"text" | "log" | "plain" | "" => {
-					crate::preview::detect_semantic_type(content)
-						.map(|s| s.to_string())
-						.unwrap_or(base)
-				},
-				_ => base,
-			};
+			let inp = crate::preview::input::Input::new(content)
+				.unwrap_or_else(|| crate::preview::input::Input::empty(content));
+			let t = crate::preview::r#type::resolve_effective_type(&base, &inp).into_owned();
 			(t, content)
 		},
 	};
@@ -381,16 +377,12 @@ fn transform_terminal_output_inner(
 			} else {
 				// Terminal output is very often a git status / ls / test / grep
 				// dump; upgrade a generic classification via Aphrodite's detector
-				// so the preview is high-signal on the terminal path too.
+				// so the preview is high-signal on the terminal path too. Single
+				// type-resolution contract (1.5.0 REFACTOR-PLAN §5).
 				let base = ct.as_str().to_string();
-				match base.as_str() {
-					"text" | "log" | "plain" | "" => {
-						crate::preview::detect_semantic_type(content)
-							.map(|s| s.to_string())
-							.unwrap_or(base)
-					},
-					_ => base,
-				}
+				let inp = crate::preview::input::Input::new(content)
+					.unwrap_or_else(|| crate::preview::input::Input::empty(content));
+				crate::preview::r#type::resolve_effective_type(&base, &inp).into_owned()
 			};
 			(t, content)
 		},
