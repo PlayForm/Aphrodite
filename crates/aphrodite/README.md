@@ -75,7 +75,7 @@ src/
 
 ## C ABI (25 functions)
 
-The 25 `#[no_mangle] extern "C"` exports in `lib.rs` (22 written out plus 3
+The 25 `#[unsafe(no_mangle)] extern "C"` exports in `lib.rs` (22 written out plus 3
 macro-generated: `aphrodite_compress`, `aphrodite_transform`,
 `aphrodite_terminal`) form the core C ABI. The `aphrodite-hermes` bridge
 crate links this crate as an rlib and exposes its own higher-level ABI

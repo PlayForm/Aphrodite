@@ -242,7 +242,7 @@ fn guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -> *mut c_ch
 /// Dispatch an aphrodite tool call by name.
 /// Returns JSON result string. Caller must free with
 /// aphrodite_hermes_free_string.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name:*const c_char, args_json:*const c_char) -> *mut c_char {
 	let name = unsafe { cstr_to_string(tool_name) };
 	let args = unsafe { cstr_to_string(args_json) };
@@ -257,7 +257,7 @@ pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name:*const c_char, args_j
 }
 
 /// List all registered Hermes tool schemas as JSON array.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_list_tools() -> *mut c_char {
 	guarded(|| {
 		let schemas = schemas::all_schemas();
@@ -266,7 +266,7 @@ pub extern "C" fn aphrodite_hermes_list_tools() -> *mut c_char {
 }
 
 /// Get a single tool schema by name.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_get_schema(tool_name:*const c_char) -> *mut c_char {
 	let name = unsafe { cstr_to_string(tool_name) };
 	guarded(std::panic::AssertUnwindSafe(move || {
@@ -278,7 +278,7 @@ pub extern "C" fn aphrodite_hermes_get_schema(tool_name:*const c_char) -> *mut c
 }
 
 /// Free a string returned by any aphrodite_hermes_* function.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_free_string(s:*mut c_char) {
 	if !s.is_null() {
 		unsafe {
@@ -288,7 +288,7 @@ pub extern "C" fn aphrodite_hermes_free_string(s:*mut c_char) {
 }
 
 /// Version of this crate.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_version() -> *mut c_char {
 	guarded(|| to_c_string(&serde_json::json!({"version": env!("CARGO_PKG_VERSION")}).to_string()))
 }
@@ -306,7 +306,7 @@ pub extern "C" fn aphrodite_hermes_version() -> *mut c_char {
 ///   - `pre_llm_call` - return `{"context": "..."}` to inject a catalog
 ///     summary.
 ///   - `on_session_start` / `post_llm_call` - lifecycle; return value ignored.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:*const c_char) -> *mut c_char {
 	let name = unsafe { cstr_to_string(hook_name) };
 	let args = unsafe { cstr_to_string(args_json) };
@@ -496,7 +496,7 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 }
 
 /// Return all tool schemas as a JSON array.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_get_schemas() -> *mut c_char {
 	guarded(|| {
 		let schemas = schemas::all_schemas();
@@ -505,7 +505,7 @@ pub extern "C" fn aphrodite_hermes_get_schemas() -> *mut c_char {
 }
 
 /// Return hook names as a JSON array.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_get_hooks() -> *mut c_char {
 	// Hermes invokes the session hook as `on_session_start` (the `on_` prefix is
 	// required by its VALID_HOOKS table); registering `session_start` silently
@@ -526,7 +526,7 @@ pub extern "C" fn aphrodite_hermes_get_hooks() -> *mut c_char {
 }
 
 /// Probe proxy health via TCP connect.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_proxy_health() -> *mut c_char {
 	guarded(|| to_c_string(&proxy_health().to_string()))
 }
@@ -548,7 +548,7 @@ pub extern "C" fn aphrodite_hermes_proxy_health() -> *mut c_char {
 /// `{"status":"ok","dir":...,"written":[...],"skipped":[...],"warnings":[...]}`
 /// - always `status:"ok"` (failures degrade to warnings). Caller must free
 ///   with `aphrodite_hermes_free_string`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir:*const c_char) -> *mut c_char {
 	let home = unsafe { cstr_to_string(home_dir) };
 	guarded(std::panic::AssertUnwindSafe(move || {
