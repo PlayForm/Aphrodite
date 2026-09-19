@@ -1,174 +1,73 @@
 # Context Engine
 
-When the agent's conversation context fills beyond a threshold, the engine
-compresses middle messages into CCR markers, keeping only the head and tail
-raw. This avoids losing context entirely (unlike summarization-based
-compressors) while saving significant token budget.
+The context engine is an optional integration point with Hermes' own
+context-management slot. It is a thin, **non-destructive** engine: it records
+token usage and defers compression decisions to Hermes, because the actual
+compression already happens in the transform hooks and the compression proxy.
+It exists so Hermes' context-engine slot is filled without double-compressing
+the conversation.
 
 ## Activation
+
+The plugin manifest declares the capability:
 
 ```yaml
 # plugin.yaml
 provides_context_engine: true
 ```
 
+The engine instance is registered only when explicitly requested:
+
 ```bash
 APHRODITE_CONTEXT_ENGINE=1
 ```
 
-Set `context.engine: aphrodite` in Hermes config.yaml.
+Without the flag the plugin registers hooks and tools only and runs the
+hook + proxy path. If registration fails (for example the host does not
+expose the `ContextEngine` base class), the plugin logs a warning and
+continues on the hook + proxy path - registration is best-effort, never
+fatal.
 
-## Class
+Hermes selects the registered engine by name; the plugin registers under the
+name `aphrodite`.
 
-```python
-class AphroditeContextEngine(ContextEngine):
-    threshold_percent = ENGINE_THRESHOLD_PCT     # default 50
-    protect_first_n = ENGINE_PROTECT_FIRST        # default 1
-    protect_last_n = ENGINE_PROTECT_LAST          # default 1
-    min_messages_to_compress = ENGINE_MIN_MSGS    # default 4
-```
+## What the engine does
 
-## Threshold Semantics
+The registered engine is a small subclass of Hermes' `ContextEngine`:
 
-| Value         | Behavior                                               |
-| ------------- | ------------------------------------------------------ |
-| -1            | Always compress (any context fill triggers)            |
-| 0             | Disabled (never compress)                              |
-| >0 (e.g., 50) | Compress when prompt_tokens ≥ context_length × pct/100 |
+| Method                 | Behavior                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `name`                 | `"aphrodite"`                                                                                                  |
+| `update_from_response` | Records `prompt_tokens`, `completion_tokens`, and `total_tokens` from each response's usage payload            |
+| `should_compress`      | Always returns `False` - defers to Hermes' own threshold accounting; the proxy and hooks do the heavy lifting  |
+| `compress`             | Returns the transcript **unchanged** - non-destructive, because the transform hooks already shrink tool output |
 
-## Compress Algorithm
+The engine never forces a compaction, never rewrites messages, and never
+touches the inline store. Compression of large tool and terminal output
+happens in `transform_tool_result` and `transform_terminal_output` - see
+[Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md).
 
-```
-compress(messages, current_tokens, focus_topic):
-    1. If len(messages) ≤ min_messages_to_compress → return unchanged
-    2. Determine head_n = max(protect_first_n, 1)
-    3. Editing detection:
-       a. Scan last 10 messages for tool role + editing keywords
-          (wrote|patched|modified|created|deleted|successfully|written)
-       b. If editing: tail_n = max(tail_n, 8)  -  protect active edits
-    4. Clamp tail_n ≤ len(messages) - head_n
-    5. Sweep orphan tool messages into tail:
-       a. Forward scan from boundary: include tool messages
-       b. Backward scan for owning assistant (has tool_calls)
-    6. Split: head = [:head_n], middle = [head_n:-tail_n], tail = [-tail_n:]
-    7. If len(middle) < 3 → return unchanged
-    8. Pack middle messages → JSON (conditionally include tool_call_id, tool_calls)
-    9. If packed < 200 bytes → return unchanged
-   10. Try proxy compression (token preferred, cache fallback)
-   11. If no proxy: inline compression fallback
-   12. Store in inline store, append to recent_markers
-   13. Build marker:
-       <<<CCR:hash|context|size|engine>>>
-       These messages were offloaded to reduce context.
-       Retrieve with: aphrodite_retrieve(hash).
-       The {protect_last_n} messages below are your active context.
-   14. Return: head + [marker system message] + tail
-   15. Fire hook: aphrodite_engine_compressed
-```
+## Engine configuration
 
-## Message Packing
+The dylib session carries engine-related settings, exposed through the
+dylib's config surface (`aphrodite_stats`, `config_get`, `config_set`) for
+observability. The standalone HTTP proxy never reads them and has no gated
+behavior tied to them.
 
-```python
-def _pack_msg(messages):
-    for m in messages:
-        entry = {"role": role, "content": content}
-        if tool_call_id and role == "tool": entry["tool_call_id"] = tool_call_id
-        if tool_calls: entry["tool_calls"] = tool_calls
-    return json.dumps(out, separators=(",", ":"))
-```
+| Setting                     | Env Var                          | TOML key                       | Default |
+| --------------------------- | -------------------------------- | ------------------------------ | ------- |
+| Engine enabled (dylib flag) | `APHRODITE_CONTEXT_ENGINE`       | `[compression] context_engine` | true    |
+| Threshold percent           | `APHRODITE_ENGINE_THRESHOLD_PCT` | `engine_threshold_pct`         | 45      |
+| Protect first N             | `APHRODITE_ENGINE_PROTECT_FIRST` | `engine_protect_first`         | 2       |
+| Protect last N              | `APHRODITE_ENGINE_PROTECT_LAST`  | `engine_protect_last`          | 5       |
+| Min messages                | `APHRODITE_ENGINE_MIN_MSGS`      | `engine_min_msgs`              | 8       |
 
-Compact JSON - no whitespace.
+Threshold semantics (per the shipped manifest comment): `-1` always
+compresses, `0` disables, `>0` is the fill percentage. Environment overrides
+TOML, which overrides the default.
 
-## Editing Detection
+## See also
 
-The editing-detection regex:
-
-```python
-re.compile(r"\b(?:wrote|patched|modified|created|deleted|successfully|written)\b", re.IGNORECASE)
-```
-
-When editing is detected in the last 10 messages: `tail_n = max(tail_n, 8)` -
-protects more context to avoid losing the agent's editing momentum.
-
-## Orphan Tool Message Sweep
-
-This handles the case where compressing middle messages would break
-tool_call → tool_result pairing:
-
-1. Forward sweep: include trailing tool messages (orphan without their owning
-   assistant)
-2. Backward sweep: include the assistant that owns those tool messages (has
-   `tool_calls`)
-3. Re-clamp to prevent exceeding message count
-
-## Mutual Exclusion
-
-The context engine and `compression.enabled` SHOULD NOT both be active - the
-engine provides a different strategy (compress middle, keep head/tail) vs.
-per-tool compression (compress individual tool outputs).
-
-## Hooks
-
-The engine fires `aphrodite_engine_compressed` hook (if
-hermes_cli.plugins.invoke_hook available):
-
-```python
-_fire_hook("aphrodite_engine_compressed", engine=self, stats={
-    "messages_compressed": middle_len,
-    "packed_size": packed_len,
-    "hash": hash_val,
-    "count": self.compression_count,
-})
-```
-
-Other plugins can listen and react (e.g., tracking compression frequency).
-
-## Status
-
-`get_status()` returns:
-
-```python
-{
-    "last_prompt_tokens": int,
-    "threshold_tokens": int,      # context_length * threshold_pct / 100
-    "context_length": int,
-    "usage_percent": float,       # min(100, tokens/context_length * 100)
-    "compression_count": int,
-}
-```
-
-## Session Lifecycle
-
-### on_session_start
-
-```python
-def on_session_start(self, session_id="", **kw):
-    self.session_id = session_id
-```
-
-### on_session_reset
-
-Resets all state: tokens, compression count, inline store, conv_index, turn
-counter, file refs, markers, git cache.
-
-## Integration Points
-
-| Component       | Integration                                              |
-| --------------- | -------------------------------------------------------- |
-| Proxy           | Same /ccr/create endpoint for compression                |
-| Inline store    | `_inline_store_put(hash, packed)` for fallback           |
-| Recent markers  | Appends `{"hash", "type": "context", "size", "preview"}` |
-| pre_llm_hook    | Shows engine stats in catalog                            |
-| aphrodite_stats | Returns engine status and stats                          |
-
-## Default Configuration
-
-| Setting         | Default | Env Var                        |
-| --------------- | ------- | ------------------------------ |
-| Threshold %     | 50      | APHRODITE_ENGINE_THRESHOLD_PCT |
-| Protect first N | 1       | APHRODITE_ENGINE_PROTECT_FIRST |
-| Protect last N  | 1       | APHRODITE_ENGINE_PROTECT_LAST  |
-| Min messages    | 4       | APHRODITE_ENGINE_MIN_MSGS      |
-
-With context_length=1,000,000 and threshold=50%: engine compresses when
-prompt_tokens ≥ 500,000.
+- [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md) - where the actual per-turn compression happens
+- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md) - the `[compression]` section in context
+- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md) - the env-var equivalents

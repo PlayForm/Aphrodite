@@ -10,14 +10,14 @@ the dylib for its hook names and registers one callback per name, so the six
 hooks below are always registered together. `plugin.yaml` declares the same
 set under `provides_hooks`.
 
-| Hook                        | Purpose                                                        | When it fires                          |
-| --------------------------- | -------------------------------------------------------------- | -------------------------------------- |
-| `on_session_start`          | Reset all per-session state to a clean baseline                | A Hermes session starts                |
-| `pre_tool_call`             | Auto-background long-running calls; split chained commands     | Before a tool executes                 |
-| `transform_tool_result`     | Compress large tool results into CCR markers                   | After every tool call                  |
-| `transform_terminal_output` | Compress large terminal output into CCR markers                | After every terminal execution         |
-| `pre_llm_call`              | Inject directives, nudges, and the recall catalog              | Before each LLM request                |
-| `post_llm_call`             | Archive the turn, advance the counter, expire stale state      | After each LLM response                |
+| Hook                        | Purpose                                                    | When it fires                  |
+| --------------------------- | ---------------------------------------------------------- | ------------------------------ |
+| `on_session_start`          | Reset all per-session state to a clean baseline            | A Hermes session starts        |
+| `pre_tool_call`             | Auto-background long-running calls; split chained commands | Before a tool executes         |
+| `transform_tool_result`     | Compress large tool results into CCR markers               | After every tool call          |
+| `transform_terminal_output` | Compress large terminal output into CCR markers            | After every terminal execution |
+| `pre_llm_call`              | Inject directives, nudges, and the recall catalog          | Before each LLM request        |
+| `post_llm_call`             | Archive the turn, advance the counter, expire stale state  | After each LLM response        |
 
 ```mermaid
 flowchart TD
@@ -145,12 +145,12 @@ stale poll-worker tasks.
 
 ## Thresholds
 
-| Hook                        | Setting                          | Default | Bypass                                            |
-| --------------------------- | -------------------------------- | ------- | ------------------------------------------------- |
-| `transform_tool_result`     | `[compression] tool_threshold_token` | 4,096 | empty, essential tools, self tools, below threshold; `0` = always compress |
-| `transform_terminal_output` | `[compression] terminal_threshold`   | 1,024 | empty, below threshold; `0` = always compress     |
-| `pre_llm_call`              | `[flow] budget_chars`            | 4,000  | recall catalog dropped first; directives and nudges never drop |
-| `pre_tool_call` (chain split) | `[compression] chain_split_min_segments` | -    | feature off by default (`chain_split = false`)    |
+| Hook                          | Setting                                  | Default | Bypass                                                                     |
+| ----------------------------- | ---------------------------------------- | ------- | -------------------------------------------------------------------------- |
+| `transform_tool_result`       | `[compression] tool_threshold_token`     | 4,096   | empty, essential tools, self tools, below threshold; `0` = always compress |
+| `transform_terminal_output`   | `[compression] terminal_threshold`       | 1,024   | empty, below threshold; `0` = always compress                              |
+| `pre_llm_call`                | `[flow] budget_chars`                    | 4,000   | recall catalog dropped first; directives and nudges never drop             |
+| `pre_tool_call` (chain split) | `[compression] chain_split_min_segments` | -       | feature off by default (`chain_split = false`)                             |
 
 Each setting has an environment-variable equivalent (`APHRODITE_TOOL_THRESHOLD_TOKEN`,
 `APHRODITE_TERMINAL_THRESHOLD`, `APHRODITE_FLOW_BUDGET_CHARS`,
