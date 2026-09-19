@@ -86,9 +86,13 @@ references, no task-queue sections, no feedback-note phrasing, no
 2. Diagrams: mermaid fences must be valid (balanced ```mermaid blocks, valid
    mermaid syntax, no `file:line` inside diagrams that breaks rendering);
    ASCII diagrams stay inside code fences.
-3. Public cleanliness: no internal process artifacts, no `tree/Current`
-   links (every repo link uses `tree/Development` - the development branch),
-   no file:line citations as "proof" in prose
+3. Public cleanliness: no internal process artifacts, no branch links
+   that contradict the file's own branch context - infer the branch per
+   file at edit time (`git symbolic-ref --short HEAD`; the branch the
+   file was halted on / will be viewed from decides the link, so a file
+   on the Development working line gets `tree/Development`, never a
+   blanket `tree/Current` or hardcoded rule), no file:line citations as
+   "proof" in prose
    (style guide: docs describe behavior directly).
 4. Style: docs/README.md style guide - explain then detail, tables over
    prose, no placeholder content, roadmap ideas labeled.

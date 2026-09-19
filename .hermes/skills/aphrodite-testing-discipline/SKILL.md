@@ -53,7 +53,9 @@ call, and free via the same handle that allocated.
   copy and not the debug build.
 - Verify the version handshake before trusting results:
   `mod._call_json(dylib, "aphrodite_hermes_version")` must equal
-  `plugins/aphrodite/BINARY_VERSION` (currently 1.4.6).
+  `plugins/aphrodite/BINARY_VERSION` (read the CURRENT value from that file
+  at handshake time - the number is a live property, never a remembered
+  constant).
 - The plugin's own test suites are the ground truth:
     - `cargo test -p aphrodite` (lib + all bins)
     - `cargo test -p aphrodite-hermes`

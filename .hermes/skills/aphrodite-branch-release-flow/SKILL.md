@@ -78,12 +78,12 @@ A promotion branch (`promote/vX.Y.Z`) is OPTIONAL review scaffolding, NOT
 architecture. Both `Current` branches are unprotected, so direct promotion
 works; use the PR branch only when review is actually required.
 
-| Need                  | Best mechanism                                                      |
-| --------------------- | ------------------------------------------------------------------- |
-| Maximum simplicity    | Promote directly on Current (clean tree + checks)                   |
-| Mandatory code review | `promote/vX.Y.Z` from Current, one snapshot commit, PR, then delete |
-| Urgent production fix | Commit on Current, then `git cherry-pick -x` into Development       |
-| Release candidate     | Prerelease tag (`Aphrodite/v1.4.3-rc.1`), never a branch            |
+| Need                  | Best mechanism                                                                                                                                                  |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Maximum simplicity    | Promote directly on Current (clean tree + checks)                                                                                                               |
+| Mandatory code review | `promote/vX.Y.Z` from Current, one snapshot commit, PR, then delete                                                                                             |
+| Urgent production fix | Commit on Current, then `git cherry-pick -x` into Development                                                                                                   |
+| Release candidate     | Prerelease tag (pattern `Aphrodite/vX.Y.Z-rc.N` - the actual version is read from the current BINARY_VERSION/plugin version at tag time, never a fixed example) |
 
 Do NOT cherry-pick normal feature commits from Development down into
 Current - it duplicates SHAs and makes every release a series of conflict

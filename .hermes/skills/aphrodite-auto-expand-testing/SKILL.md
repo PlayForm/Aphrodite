@@ -26,7 +26,10 @@ is the retrieve-first doctrine (see `aphrodite-tool-testing`).
 - `APHRODITE_NO_AUTO_EXPAND` and `APHRODITE_AUTO_EXPAND` both have **zero
   consumers** in source - never use either; they silently change nothing.
 - Live `~/.hermes/aphrodite/aphrodite.toml` still carries `auto_expand = true`
-  and `auto_expand_limit = 102400` as leftover keys - they are inert.
+  and `auto_expand_limit = 102400` as leftover keys - they are inert
+  (parsed config fields, echoed in the status response only - see
+  `config.rs:250-251` / `proxy.rs:2668-2669`; the value 102400 is a live
+  local file property, read it from that file if it matters, never assume).
 
 Consequence: markers appear raw unless the context engine already resolved
 them. Whenever you SEE a marker, `aphrodite_retrieve(hash)` it immediately -
@@ -34,8 +37,11 @@ retrieval is the only path that guarantees content.
 
 ## The Three Layers
 
-1. **Proxy response compression** (Rust, :9798) - compresses provider RESPONSE
-   messages. Produces `<<<CCR:...>>>` in model responses. Always active.
+1. **Proxy response compression** (Rust, token listener - the port is a
+   config property, read it from the running proxy / `aphrodite.toml`
+   `ports` (default token :9798); verify live, never assume) - compresses
+   provider RESPONSE messages. Produces `<<<CCR:...>>>` in model responses.
+   Always active.
 2. **Context engine** - compresses MIDDLE messages in conversation_history
    into a CCR marker when the threshold is reached. Fires on turn 2+; the LLM
    sees markers and polls via `aphrodite_retrieve()`.
@@ -94,6 +100,11 @@ regardless of config.
 | Engine threshold forced low | `<<<CCR:hash\|context\|N>>>`  | Full content     |
 | Terminal output > 512 bytes | `<<<CCR:hash\|terminal\|N>>>` | Full content     |
 
+The 512-byte terminal threshold is a config property (`[compression]
+terminal_threshold`, env-overridable `APHRODITE_TERMINAL_THRESHOLD`) - read
+it from the live config at probe time, never hardcode; the matrix row is
+the shipped default snapshot, not a constant.
+
 ## Pitfalls
 
 - never chase `auto_expand` config to explain raw markers - the keys have no
@@ -102,7 +113,9 @@ regardless of config.
   has a consumer; they silently change nothing
 - never test with a single-turn session (`hermes -z`) - the context engine
   needs turn 2+
-- don't confuse the layers - the proxy compresses provider responses (:9798);
+- don't confuse the layers - the proxy compresses provider responses (token
+  listener port is a config property, default :9798 - read live, don't
+  assume);
   the engine compresses conversation middle messages
 - protected first/last messages (`engine_protect_first` / `engine_protect_last`)
   stay raw regardless of threshold

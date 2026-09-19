@@ -118,9 +118,11 @@ aphrodite_directive(action="swap", name="explore")  # swap directives
 
 ## Proxy Architecture (context)
 
-- **Token proxy** (`:9798`) - token-level compression; management endpoints
-  require an API key.
-- **Cache proxy** (`:9797`) - cache-mode compression; management endpoints
+- **Token proxy** (token listener - port is a config property, default
+  `:9798`; read live from `aphrodite.toml` `ports`, never assume) -
+  token-level compression; management endpoints require an API key.
+- **Cache proxy** (cache listener - port is a config property, default
+  `:9797`; read live) - cache-mode compression; management endpoints
   accept any loopback caller.
 - Both share the CCR database at `~/.hermes/aphrodite/ccr.db`.
 - Binary: `~/.hermes/aphrodite/binaries/aphrodite` (auto-updated).

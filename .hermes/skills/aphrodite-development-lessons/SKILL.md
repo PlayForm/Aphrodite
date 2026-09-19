@@ -26,6 +26,15 @@ auto_expand_limit = 51200
 
 or per-session: `APHRODITE_AUTO_EXPAND=1 hermes --profile dev-aphrodite`
 
+Property note: `auto_expand` / `auto_expand_limit` are PARSED config fields
+(`config.rs:250-251`) but have no active consumer in the current compression
+pipeline - they are echoed only in a status response (proxy.rs:2668-2669),
+so this snippet is a session-convention snapshot, not a working toggle.
+Verify what actually gates auto-expansion live (see
+`aphrodite-auto-expand-testing` for the current mechanism and matrix) before
+trusting the keys to change behavior; the retrieve-first rule is the
+reliable answer to raw markers.
+
 For the full mechanism and test protocol, see `aphrodite-auto-expand-testing`.
 
 **When you see a CCR marker**, retrieve it with `aphrodite_retrieve(hash)` -

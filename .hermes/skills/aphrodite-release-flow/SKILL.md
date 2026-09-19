@@ -102,8 +102,9 @@ or push unasked.
    plugin commit. The user explicitly requires this ordering.
 3. Tag on the release-sync commit, never on a later style/cleanup tip - a
    post-release ruff reformat or gitlink cleanup does NOT move the tag
-   (plugin v2.1.3 sits on the `release: sync v2.1.3` commit, not the
-   reformat commit that followed it).
+   (historical example: plugin v2.1.3 sat on its `release: sync v2.1.3`
+   commit, not the reformat commit that followed it - the version number
+   and commit are read from git history at audit time, never assumed).
 4. Version bumps ride the release; the plugin submodule's `BINARY_VERSION`
    and the parent gitlink float are the LAST commits of a hotfix cycle.
 5. Pick the hotfix up to Development later with `git cherry-pick -x` - see
@@ -176,8 +177,16 @@ https://crates.io/api/v1/crates/<crate>` → `max_version`. If the number
 - **Package READMEs render on crates.io**: the crate dir READMEs
   (`crates/<crate>/README.md` - what cargo auto-includes), NOT the root
   README, are what crates.io shows. Relative links there render as
-  `blob/HEAD`. Before publishing, make every link absolute
-  `tree/Development` URLs in ALL package READMEs and the root.
+  `blob/HEAD`. Write every link absolute to the file's OWN branch context
+    - infer it per file, never blanket-assume: check the branch the file was
+      halted on and will be viewed from (`git symbolic-ref --short HEAD`; for
+      the dual line, which branch owns the file AFTER the merge - Development
+      files → `tree/Development`, files staged for the Current distribution
+      line → `tree/Current`). The link branch must match the branch the reader
+      finds the file on; each file is a halted process and the branch you spin
+      it on defines its final content, so no hardcoded `tree/Development` (or
+      `tree/Current`) instruction survives contact with the tree - the agent
+      stages the branch per file at edit time.
 - **Embedded templates drift**: `crates/aphrodite/templates/*` are baked
   into the binary via `include_str!` (`setup.rs` CONFIG_TEMPLATE, shim). A
   stale template means fresh `aphrodite setup` writes a config missing keys
