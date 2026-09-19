@@ -22,6 +22,7 @@
 // side effect of wiring up a CI clippy gate.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+mod debug;
 mod directives;
 mod schemas;
 mod tools;
@@ -113,7 +114,7 @@ pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// `transform_terminal_output` (first non-None string wins; non-strings pass
 /// through). So return the CCR marker string when compression happened, and
 /// `null` otherwise to leave the original output untouched.
-pub(crate) fn replacement_from(r:&serde_json::Value) -> serde_json::Value {
+pub(crate) fn replacement_from(r:&serde_json::Value, session:&str) -> serde_json::Value {
 	if r.get("chain_split").and_then(|v| v.as_bool()).unwrap_or(false) {
 		// Fine-grained chain split, invisibility contract: the LLM must see
 		// exactly what it would for any compressed output - the NATURAL
@@ -134,7 +135,17 @@ pub(crate) fn replacement_from(r:&serde_json::Value) -> serde_json::Value {
 	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false)
 		&& let Some(marker) = r.get("marker").and_then(|v| v.as_str())
 	{
-		return serde_json::Value::String(marker.to_string());
+		// Per-session debug (flag file): prepend a `[aphrodite-debug ...]`
+		// line before the CCR marker when the toggle is on for this session,
+		// so the session sees what the engine did without retrieving. Quiet
+		// path (flag off) costs one stat() and returns the marker unchanged.
+		let mut out = String::with_capacity(marker.len() + 128);
+		if let Some(line) = debug::debug_line(r, session) {
+			out.push_str(&line);
+			out.push('\n');
+		}
+		out.push_str(marker);
+		return serde_json::Value::String(out);
 	}
 	serde_json::Value::Null
 }
@@ -435,7 +446,11 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 						classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
 						&meta,
 					);
-					replacement_from(&r)
+					// Per-session debug: the caller's session_id rides in the
+					// hook kwargs - thread it so the flag resolves against the
+					// session tree (root scoped flag wins, global fallback).
+					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+					replacement_from(&r, sid)
 				},
 				"transform_terminal_output" => {
 					let classify = crate::tools::unwrap_hermes_result(term_content);
@@ -451,7 +466,8 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 						command,
 						returncode,
 					);
-					replacement_from(&r)
+					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+					replacement_from(&r, sid)
 				},
 				"pre_llm_call" => {
 					// 05-P1/T1: route this - the ONLY pre_llm_call arm Hermes
@@ -465,6 +481,16 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					// `args.len()` is the request-size proxy for the P9 telemetry
 					// line (Hermes serializes conversation_history into the
 					// kwargs JSON).
+					// Per-session debug: pre_llm_call is the ONE hook Hermes
+					// threads `parent_session_id` through (turn_context.py:
+					// 698-706), so record session -> parent here to build the
+					// tree the debug flag resolves against.
+					if let (Some(sid), Some(pid)) = (
+						parsed.get("session_id").and_then(|v| v.as_str()),
+						parsed.get("parent_session_id").and_then(|v| v.as_str()),
+					) {
+						debug::record_session(sid, pid);
+					}
 					let context = aphrodite::flow::build_turn_context(state, Some(args.len()));
 					if context.is_empty() {
 						serde_json::Value::Null
@@ -620,7 +646,7 @@ mod tests {
 				}
 			]
 		});
-		let out = replacement_from(&r);
+		let out = replacement_from(&r, "test-session");
 		let s = out.as_str().expect("chain_split must yield a string");
 		// Natural markers, one per line.
 		assert!(s.starts_with("<<<CCR:aaaa|terminal|120>>>"));
@@ -644,8 +670,8 @@ mod tests {
 			"preview": "[text:42B] hi",
 			"marker": "<<<CCR:cccc|text|42>>>\n[text:42B] hi"
 		});
-		let s = replacement_from(&r);
-		assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
+		let s = replacement_from(&r, "test-session");
+			assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
 	}
 
 	#[test]

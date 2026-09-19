@@ -51,7 +51,8 @@ pub fn all_schemas() -> Vec<serde_json::Value> {
 		schema_prefetch(),
 		schema_prefetch_status(),
 		schema_rebuild(),
-	]
+			schema_debug(),
+		]
 }
 
 /// Get a single tool schema by name.
