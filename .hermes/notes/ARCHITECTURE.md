@@ -72,7 +72,9 @@ cbindgen 0.29 -> aphrodite_hermes.h
 
 ## 5. Preview system (post-Issue #11 WS1/2/4)
 
-- `build_preview` (`crates/aphrodite/src/preview.rs`) is the shared builder
+- `build_preview` (`crates/aphrodite/src/preview/mod.rs` - atomized dir module
+  per REFACTOR-PLAN-1.5.0 §4: `detectors/`, `builders/`, `line/`, `text/`) is
+  the shared builder
   for every hook/FFI/C-ABI/bridge path; `proxy_build_preview` is the proxy's
   parallel builder (WS3 parity deferred).
 - WS4 wired `[previews] preview_max_chars` end-to-end: env
