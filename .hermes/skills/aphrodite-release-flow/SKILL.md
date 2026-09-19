@@ -41,7 +41,10 @@ version = "X" }` dep pin must move TOGETHER in one ceremony (cargo check
   them (the plugin's tests rarely do).
 - **Every file is classified by phase/kind/layer**: the repo's
   `.hermes/classification/` (TAXONOMY.md + four pass files + README index,
-  295 files) encodes the dual-line flow as an HPC code `{K}{P}{L}-{N}`
+  ~295 files at last count - the file count is a live property of that
+  directory, re-derive with `find .hermes/classification -type f | wc -l`
+  when it matters, never assume) encodes the dual-line flow as an HPC code
+  `{K}{P}{L}-{N}`
   with ceremony annotations (`→C`/`→D` destination, `+tag`, `+bump`,
   `+float`, `+guard`, `∅` never-crosses, `@R` ritual-only, `✝` absence =
   deleted process whose absence IS the ceremony rule, `@A` archival,

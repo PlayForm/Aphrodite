@@ -315,18 +315,31 @@ sequential `_turn_counter` for memory indexing.
 ## Content-Addressable Store Pattern
 
 Every compression operation first checks the local cache before hitting the
-proxy ("pop the API"). Same content → same SHA256 hash → cache hit → no API
-call.
+proxy ("pop the API"). Same content → same key → cache hit → no API call.
+The keying is a live implementation property: v1.4.6 uses BLAKE3
+(`blake3::hash`, 40-hex, `setup.rs:208`; marker docs: `compute_key(bytes) →
+BLAKE3 40-hex`) - SHA256 appears only as the download checksum verifier
+(`setup.rs:469`), never as the content key. The inline store lives in the
+Rust engine (`AphroditeState.inline_store`, `state.rs`), not in Python - the
+plugin is a pure loader and has no `_inline_store`. Re-derive the hash
+algorithm from source before relying on it; never assume SHA256.
 
 ```python
+# Python-side equivalent no longer exists in the pure-loader plugin; the
+# store is Rust (`inline_store`, state.rs). This is the historical shape.
 h = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
 if h in _inline_store:
     return cached_result  # cache hit
 # Only call proxy on miss
 ```
 
-Applied in `_compress_handler` and `_transform_tool_result` CCR path;
-`_resolve_one` also caches retrieved content in `_inline_store`.
+The historical Python implementation applied this in `_compress_handler`
+and `_transform_tool_result`; `_resolve_one` also cached retrieved content
+in `_inline_store`. In the current pure-loader plugin those Python
+handlers and the store do not exist - the equivalents live in the Rust
+engine (compress/resolve paths, `inline_store` in `state.rs`). Grep the
+live source before writing cache logic; the module layout is a property
+that moved.
 
 ## Bi-Directional Store
 
