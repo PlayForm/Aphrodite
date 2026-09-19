@@ -190,12 +190,12 @@ The `model_family` setting (`compact`, `code_first`, `balance`) selects which
 preview template renders the summary. The same content therefore produces
 different preview text:
 
-| Content                            | compact (Claude)                 | code_first (DeepSeek/Qwen)                                          | balance                                                 |
-| ---------------------------------- | -------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
-| Directory listing (`ls`)           | `[ls:68 files 32 dirs            | .json×13 .txt×13 .py×11]`                                           | same (ls template is family-independent)                | same |
-| Rust source (`source_code`)        | metadata only                    | `[code:9fns fn new(cap:usize) -> Arc<Self> 112L]` (signature first) | `[code:9fns fn new(cap:usize) -> Arc<Self> 113L]`       |
-| Go source (`source_code`)          | metadata only                    | -                                                                   | `[code:9fns func Process0(r *Record0, depth int) 607L]` |
-| Terminal output with `#[test]` fns | `[test:0 pass 0 fail 0 ignored]` | `[test:0 pass 0 fail 0 ignored]`                                    | `[test:0 pass 0 fail 0 ignored]`                        |
+| Content                            | compact (Claude)                                   | code_first (DeepSeek/Qwen)                                          | balance                                                 |
+| ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
+| Directory listing (`ls`)           | `[ls:68 files 32 dirs \| .json×13 .txt×13 .py×11]` | same (ls template is family-independent)                            | same                                                    |
+| Rust source (`source_code`)        | metadata only                                      | `[code:9fns fn new(cap:usize) -> Arc<Self> 112L]` (signature first) | `[code:9fns fn new(cap:usize) -> Arc<Self> 113L]`       |
+| Go source (`source_code`)          | metadata only                                      | -                                                                   | `[code:9fns func Process0(r *Record0, depth int) 607L]` |
+| Terminal output with `#[test]` fns | `[test:0 pass 0 fail 0 ignored]`                   | `[test:0 pass 0 fail 0 ignored]`                                    | `[test:0 pass 0 fail 0 ignored]`                        |
 
 Two more preview knobs from the captures:
 
@@ -210,13 +210,13 @@ Two more preview knobs from the captures:
 Byte economics of the real captures above - raw stored bytes versus the
 marker-plus-preview block that actually enters the model's context:
 
-| Content             | Raw bytes | Marker + preview | Ratio | What the model sees                     |
-| ------------------- | --------- | ---------------- | ----- | --------------------------------------- |
-| Directory listing   | 5,889     | ~106 chars       | ~56x  | Marker + `[ls:68 files 32 dirs ...]`    |
-| Rust source file    | 2,645     | ~115 chars       | ~23x  | Marker + `[code:9fns fn new(...) 112L]` |
-| JSON tool output    | 1,728     | ~104 chars       | ~17x  | Marker + `[json:5keys 116L ...]`        |
-| Git diff            | 987       | ~114 chars       | ~9x   | Marker + `[diff:1F +31/-0 40L ...]`     |
-| Build error (rustc) | 801       | ~117 chars       | ~7x   | Marker + `[build:2E 0W 11L              | error[E0308]: ...]` |
+| Content             | Raw bytes | Marker + preview | Ratio | What the model sees                               |
+| ------------------- | --------- | ---------------- | ----- | ------------------------------------------------- |
+| Directory listing   | 5,889     | ~106 chars       | ~56x  | Marker + `[ls:68 files 32 dirs ...]`              |
+| Rust source file    | 2,645     | ~115 chars       | ~23x  | Marker + `[code:9fns fn new(...) 112L]`           |
+| JSON tool output    | 1,728     | ~104 chars       | ~17x  | Marker + `[json:5keys 116L ...]`                  |
+| Git diff            | 987       | ~114 chars       | ~9x   | Marker + `[diff:1F +31/-0 40L ...]`               |
+| Build error (rustc) | 801       | ~117 chars       | ~7x   | Marker + `[build:2E 0W 11L \| error[E0308]: ...]` |
 
 Ratios are byte compression of the relayed result; actual token savings depend
 on the tokenizer. The rule of thumb holds across all five: the model sees the

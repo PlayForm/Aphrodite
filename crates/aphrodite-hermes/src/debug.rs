@@ -34,9 +34,12 @@ use std::{
 /// with the number of distinct sessions, which is small per process.
 static SESSION_PARENTS:OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
-/// The most recently seen session id (updated on every hook dispatch). The
-/// `aphrodite_debug` tool has no session in its args - it toggles whatever
-/// session the surrounding hooks belong to, which is the calling session.
+/// The most recently seen session id, updated ONLY by `record_session` -
+/// i.e. the `pre_llm_call` hook (turn_context.py threads session_id through
+/// it). The `aphrodite_debug` tool has no session in its args: it toggles
+/// whatever session the current LLM turn belongs to, so the flag must track
+/// the turn's session, NOT whichever transform hook fired last (subagent
+/// results could otherwise redirect the toggle to the wrong root).
 static LAST_SESSION:OnceLock<Mutex<String>> = OnceLock::new();
 
 /// flag-file path -> (mtime, enabled) cache; one entry per distinct flag.
@@ -163,6 +166,19 @@ fn current_root() -> String {
 	session_chain(&last).last().cloned().unwrap_or_else(|| last.clone())
 }
 
+/// The most recently seen session id (the current LLM turn's session, set by
+/// `pre_llm_call`). Fallback for hooks Hermes does NOT thread session_id
+/// through - `transform_terminal_output` passes only command/output/
+/// returncode/task_id/env_type (terminal_tool_result.py:144), so the terminal
+/// arm falls back to this instead of losing the session scope.
+pub(crate) fn last_session() -> String {
+	LAST_SESSION
+		.get_or_init(|| Mutex::new(String::new()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner)
+		.clone()
+}
+
 /// Set (or clear) the debug flag for the CURRENT session tree - the tool
 /// entry point for `aphrodite_debug`. Returns the resolved root session id
 /// and the flag path written, so the caller can report both.
@@ -186,15 +202,6 @@ pub(crate) fn set_enabled_current(on:bool) -> Result<(String, String), String> {
 /// when the flag is on for `session`; `None` when off (no allocation on the
 /// quiet path).
 pub(crate) fn debug_line(r:&serde_json::Value, session:&str) -> Option<String> {
-	if !session.is_empty() {
-		// Any transform hook that names a session updates the tool's notion
-		// of "current session" too (the debug tool takes no session arg).
-		let mut last = LAST_SESSION
-			.get_or_init(|| Mutex::new(String::new()))
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner);
-		*last = session.to_string();
-	}
 	if !enabled_for(session) {
 		return None;
 	}

@@ -139,7 +139,7 @@ POST /tool/relay
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aphrodite_retrieve` | inline_ccr first, then the CCR store; returns `{"found": true, "content": ...}`                                                                         |
 | `aphrodite_compress` | inline store (below the inline threshold, also mirrored to the durable backend) or CCR store; returns `{"compressed": marker, "hash", "original_size"}` |
-| `aphrodite_list`     | `{"entries": N, "backend": "in_memory"                                                                                                                  | "sqlite"}` |
+| `aphrodite_list`     | `{"entries": N, "backend": "in_memory" \| "sqlite"}`                                                                                                    |
 
 ### Validation
 

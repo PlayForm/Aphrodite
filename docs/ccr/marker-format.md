@@ -93,22 +93,22 @@ Three classifiers feed the `type` field.
 
 First-match-wins over the content (`proxy::proxy_detect_content_type`):
 
-| Type           | Detection                                                                                                       |
-| -------------- | --------------------------------------------------------------------------------------------------------------- |
-| `tool_output`  | Valid JSON starting with `{` or `[` and containing `exit_code` or `"status"`                                    |
-| `json`         | Valid JSON starting with `{` or `[`                                                                             |
-| `code_rust`    | A line starts with `fn `/`pub fn `/`async fn `/`impl `/`struct `/`enum ` AND content has `-> `, `&`, or `use `  |
-| `code_python`  | Contains `def ` AND one of `import `/`class `/`from `/`self.`                                                   |
-| `code_go`      | Contains (`func ` or `package `) AND `import (`                                                                 |
-| `code_js`      | Contains (`function ` or `const ` or `=> `) AND (`import ` or `export `)                                        |
-| `code`         | Fallback: contains `fn `, `def `, `class `, `import `, or `pub fn`                                              |
-| `error`        | First line contains `error`/`Error`/`ERROR`/`Traceback`/`panic` or starts with `thread '`                       |
-| `build_output` | First line starts with `Compiling `/`  Compiling`, contains `Finished`, or starts with `running `/`test `       |
-| `linter`       | First line starts with `error[E`/`error: `/`warning[`/`warning: `, contains `                                   | `+ error/warning, or mentions`mypy`/`clippy`/`eslint`/`tsc ` |
-| `diff`         | First line starts with `diff --git `/`@@ -`/`+++ `/`--- `                                                       |
-| `git`          | First line starts with `commit ` or `On branch `                                                                |
-| `log`          | A line has a bracketed `INFO`/`WARN`/`ERROR`/`DEBUG`/`TRACE`/`FATAL`/`PANIC` marker, or a timestamp-shaped line |
-| `text`         | Fallback: none of the above matched                                                                             |
+| Type           | Detection                                                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tool_output`  | Valid JSON starting with `{` or `[` and containing `exit_code` or `"status"`                                                                  |
+| `json`         | Valid JSON starting with `{` or `[`                                                                                                           |
+| `code_rust`    | A line starts with `fn `/`pub fn `/`async fn `/`impl `/`struct `/`enum ` AND content has `-> `, `&`, or `use `                                |
+| `code_python`  | Contains `def ` AND one of `import `/`class `/`from `/`self.`                                                                                 |
+| `code_go`      | Contains (`func ` or `package `) AND `import (`                                                                                               |
+| `code_js`      | Contains (`function ` or `const ` or `=> `) AND (`import ` or `export `)                                                                      |
+| `code`         | Fallback: contains `fn `, `def `, `class `, `import `, or `pub fn`                                                                            |
+| `error`        | First line contains `error`/`Error`/`ERROR`/`Traceback`/`panic` or starts with `thread '`                                                     |
+| `build_output` | First line starts with `Compiling `/`  Compiling`, contains `Finished`, or starts with `running `/`test `                                     |
+| `linter`       | First line starts with `error[E`/`error: `/`warning[`/`warning: `, contains `\|` + error/warning, or mentions `mypy`/`clippy`/`eslint`/`tsc ` |
+| `diff`         | First line starts with `diff --git `/`@@ -`/`+++ `/`--- `                                                                                     |
+| `git`          | First line starts with `commit ` or `On branch `                                                                                              |
+| `log`          | A line has a bracketed `INFO`/`WARN`/`ERROR`/`DEBUG`/`TRACE`/`FATAL`/`PANIC` marker, or a timestamp-shaped line                               |
+| `text`         | Fallback: none of the above matched                                                                                                           |
 
 Code detection only runs on content with more than 3 lines. Invalid JSON
 starting with `{` or `[` is treated as `text`.
@@ -175,7 +175,7 @@ control characters are stripped, and `|` in metadata values is replaced with
 | Rule                     | Proxy pipeline                              | Hook / FFI pipeline       |
 | ------------------------ | ------------------------------------------- | ------------------------- |
 | Format                   | `KEY=VALUE;KEY=VALUE` (flat, `;`-delimited) | same                      |
-| `                        | ` in values                                 | replaced with `/`         | replaced with `/` |
+| `\|` in values           | replaced with `/`                           | replaced with `/`         |
 | Newlines / control chars | stripped                                    | stripped                  |
 | Total cap                | 400 chars                                   | 300 chars                 |
 | Truncation               | char-safe                                   | char-safe, `...` appended |

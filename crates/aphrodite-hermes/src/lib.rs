@@ -466,8 +466,14 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 						command,
 						returncode,
 					);
+					// Hermes does NOT thread session_id through
+					// transform_terminal_output (terminal_tool_result.py:144
+					// passes only command/output/returncode/task_id/env_type) -
+					// fall back to the current turn's session so terminal
+					// output keeps the same session scope as tool results.
 					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-					replacement_from(&r, sid)
+					let sid = if sid.is_empty() { crate::debug::last_session() } else { sid.to_string() };
+					replacement_from(&r, &sid)
 				},
 				"pre_llm_call" => {
 					// 05-P1/T1: route this - the ONLY pre_llm_call arm Hermes
