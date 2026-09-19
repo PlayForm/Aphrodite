@@ -147,18 +147,18 @@ pub async fn proxy_handler(State(state): State<Arc<AppState>>, method: Method, .
 
 ```mermaid
 graph TD
-    A[Turn 1: LLM sets hint=code_rust] --> B[HintContext: {Code(rust)}]
-    B --> C[Turn 2: read_file proxy.rs]
-    C --> D[Compression: ×4 threshold, extract fns+structs]
-    D --> E[LLM sees: structure preview]
-    E --> F[Turn 3: LLM sets hint=debug]
-    F --> G[HintContext: {Code(rust), Debug}]
-    G --> H[Turn 4: cargo build fails]
-    H --> I[Compression: error visible, full trace, deeper preview]
-    I --> J[LLM sees: error line + structure + marker]
-    J --> K[Turn 5: LLM retrieves full content]
-    K --> L[aphrodite_retrieve hash=abc123]
-    L --> M[Returns full content  -  hint context applied to format]
+    A["Turn 1: LLM sets hint=code_rust"] --> B["HintContext: {Code(rust)}"]
+    B --> C["Turn 2: read_file proxy.rs"]
+    C --> D["Compression: x4 threshold, extract fns+structs"]
+    D --> E["LLM sees: structure preview"]
+    E --> F["Turn 3: LLM sets hint=debug"]
+    F --> G["HintContext: {Code(rust), Debug}"]
+    G --> H["Turn 4: cargo build fails"]
+    H --> I["Compression: error visible, full trace, deeper preview"]
+    I --> J["LLM sees: error line + structure + marker"]
+    J --> K["Turn 5: LLM retrieves full content"]
+    K --> L["aphrodite_retrieve hash=abc123"]
+    L --> M["Returns full content - hint context applied to format"]
 
     style B fill:#e1f5fe
     style G fill:#e1f5fe
