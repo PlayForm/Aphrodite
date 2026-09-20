@@ -4,7 +4,7 @@ Aphrodite compresses context before it hits the LLM - through a reverse proxy
 for any OpenAI-compatible client, or as a native Hermes plugin with hook-level
 interception. CCR (Compress-Cache-Retrieve) storage, a 30-type classifier,
 context engine, and prefetch pipeline - all under 1ms. This tree documents
-the 1.5.0 binary and 2.2.0 plugin.
+the 1.5.1 binary and 2.2.0 plugin.
 
 ## Getting Started
 

@@ -4,7 +4,10 @@ Owner: `aphrodite-release-workflow` (publishing gates; this file is the
 evidence for the owned headroom publish). The ceremony that executes the
 publish is `Publish.yml` via `gh workflow run Publish -f publish_crates=true`
 
-- never run `cargo publish` locally without `CARGO_REGISTRY_TOKEN`.
+- never run `cargo publish` locally without `CARGO_REGISTRY_TOKEN`. The
+  release ceremony (`aphrodite-release-flow` Step I5) carries the fork into
+  EVERY parent release cycle; this note is the evidence + checklist for that
+  leg.
 
 ## Irreversibility (governs everything below)
 
@@ -14,34 +17,85 @@ publish is `Publish.yml` via `gh workflow run Publish -f publish_crates=true`
 - `cargo publish` needs `CARGO_REGISTRY_TOKEN` (CI secret). Never run it
   locally without that token.
 
-## Facts (verified 2026-09-20 at parent commit `a81acab6`)
+## Facts (live state, re-derive at release time)
 
 - `vendor/headroom` is a git submodule → `PlayForm/Headroom.git`, branch
-  `Current`.
+  `Current` (remote `Source`).
+- Fork HEAD (observed 2026-09-20, parent Development `a81acab6`):
+  `02706ea1a3dcd9956ae8cbba4d17e19d6ab174f1` (`02706ea1`).
 - Publishable crate: `vendor/headroom/crates/headroom-core/Cargo.toml`,
   published under package name **`aphrodite-headroom-core`** (its `name`
-  field). Verified version: **`0.1.2`**.
-- Parent pin: `crates/aphrodite/Cargo.toml` (line 55):
+  field). Crate version on the fork tree: **`0.1.2`** (live on crates.io,
+  published 2026-07-14; 0.1.1 on 07-13). **`0.1.3` is the planned next
+  bump** - the fork holds ~14 unpublished fork commits since the 0.1.2 bump.
+- Last published fork commit: `c6b61470` ("fix(package): update repository
+  URL and bump version to 0.1.2") - the delta-check comparison base and the
+  version the crates.io index serves.
+- Parent pin: `crates/aphrodite/Cargo.toml` (line 55 - observational):
   `headroom-core = { package = "aphrodite-headroom-core", path = "../../vendor/headroom/crates/headroom-core", version = "0.1.2", default-features = false }`.
 - Sibling crates inside the fork reference it via
   `headroom-core = { package = "aphrodite-headroom-core", path = "../headroom-core" }`
   (headroom-ffi, headroom-parity, headroom-proxy, headroom-py).
 - `Cargo.lock` regenerates on the next `cargo build` (it tracks the package
   name, not the path); no manual edit needed.
+- Fork release tags use the fork's OWN scheme `aphrodite-vX.Y.Z` (last:
+  `aphrodite-v0.9.4`); **proposed next fork tag: `aphrodite-v0.10.0`** -
+  NEVER the parent `Aphrodite/v*` scheme.
 
-## Publish trigger (dispatch-gated ONLY)
+## Mandatory release-cycle tracking (every parent release)
+
+- EVERY parent release cycle compares the fork's current HEAD against the
+  last published commit and carries any delta into the release:
+  `git -C vendor/headroom log c6b61470..HEAD --oneline` (last published =
+  the commit carrying the version live on crates.io).
+- The fork change ledger: `vendor/headroom/CHANGELOG.md` +
+  `vendor/headroom/RELEASE-CYCLE.md` - the fork's release record; update
+  both per cycle.
+
+## Bump BEFORE dispatch (or CI skips you)
 
 `Publish.yml` job `Publish-Headroom-Core` (`needs: [Test]`,
-`working-directory: vendor/headroom`, `environment: Release`):
+`working-directory: vendor/headroom`, `environment: Release`) reads the fork
+crate version and checks it against the crates.io index; if that version is
+already live, the publish step is skipped (lines 143-161 - observational;
+read the `if:` conditions at the tag commit):
 
-- The version-check step runs on both events (`workflow_dispatch` with
-  `publish_crates` OR tag push).
-- The actual publish step is gated on
-  `workflow_dispatch && inputs.publish_crates && published == 'false'` -
-  **a plain `Aphrodite/v*` tag push NEVER publishes headroom-core** (unlike
-  `aphrodite`/`aphrodite-hermes`, whose publish steps carry
-  `|| startsWith(github.ref, 'refs/tags/Aphrodite/')` - see the trigger table
-  in the owning SKILL.md, Gate R7).
+```yaml
+- name: Check if aphrodite-headroom-core version is already published
+  if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_crates) || startsWith(github.ref, 'refs/tags/Aphrodite/') }}
+  id: check
+  working-directory: vendor/headroom
+  run: |
+      VERSION=$(grep '^version' crates/headroom-core/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+      echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      if curl -sL "https://index.crates.io/ap/hr/aphrodite-headroom-core" | grep -q "\"vers\":\"$VERSION\""; then
+        echo "published=true" >> "$GITHUB_OUTPUT"
+      else
+        echo "published=false" >> "$GITHUB_OUTPUT"
+      fi
+
+- name: Publish aphrodite-headroom-core to crates.io (opt-in)
+  if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates && steps.check.outputs.published == 'false' }}
+  working-directory: vendor/headroom
+  run: cargo publish -p aphrodite-headroom-core --no-verify
+  env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+```
+
+Rule: **bump the fork crate version BEFORE dispatching.** The check reads
+`crates/headroom-core/Cargo.toml` at the parent-recorded gitlink; if that
+version is already in the index the publish step is skipped (`published ==
+'false'` is false). A stale fork version therefore publishes NOTHING - the
+job goes green and the release silently ships the old crate. Bump fork crate
+
+- parent pin together, float the gitlink, THEN dispatch.
+
+The publish step is gated on
+`workflow_dispatch && inputs.publish_crates && published == 'false'` - **a
+plain `Aphrodite/v*` tag push NEVER publishes headroom-core** (unlike
+`aphrodite`/`aphrodite-hermes`, whose publish steps carry
+`|| startsWith(github.ref, 'refs/tags/Aphrodite/')` - see the trigger table
+in the owning SKILL.md, Gate R7).
 
 Trigger:
 
@@ -53,6 +107,33 @@ Dependency order enforced by `needs:`: Test → Publish-Headroom-Core →
 Publish-Aphrodite → Publish-Hermes. If headroom-core is not published first,
 `Publish-Aphrodite` fails (its `path + version` dep strips the `path` key on
 publish, so the matching version must already exist on crates.io).
+
+## Fork tag convention (create BEFORE dispatch)
+
+- Fork tags use `aphrodite-vX.Y.Z` in the fork repo (PlayForm/Headroom,
+  branch `Current`) - NEVER the parent `Aphrodite/v*` scheme (last fork tag:
+  `aphrodite-v0.9.4`; proposed next: `aphrodite-v0.10.0`).
+- Create the fork tag BEFORE dispatching `Publish.yml` - CI publishes the
+  parent-recorded gitlink tree, so the parent gitlink must float to the
+  tagged fork commit carrying the new version (see Gitlink trap below).
+
+## 1.5.0 gap - canonical failure (the published-version trap)
+
+- `aphrodite-headroom-core` 0.1.2 published to crates.io **2026-07-14**
+  (0.1.1 on 07-13).
+- The 1.5.0 release published `aphrodite` 1.5.0 + `aphrodite-hermes` 1.5.0
+  but SKIPPED the headroom publish: the version check saw 0.1.2 already live
+  → `published=true` → the publish step condition
+  (`workflow_dispatch && publish_crates && published == 'false'`) evaluated
+  false → skip.
+- The fork meanwhile held ~14 unpublished commits since the 0.1.2 bump
+  (`c6b61470` → `02706ea1`): upstream `headroomlabs-ai/headroom@main` merge
+  `43dc9836` (Aug 7), ml feature default-off, package-name reference fix,
+  ml-cluster dep pin, Sep 18-19 nightly-toolchain syntax batch.
+- **Nothing failed, no red job** - a silent gap. External consumers of
+  `aphrodite` 1.5.0 resolved the OLD 0.1.2. The version number alone lies:
+  "already published" ≠ "fork tree published". This is why the delta check is
+  mandatory.
 
 ## Version availability check (read-only, before claiming a number)
 
@@ -84,8 +165,11 @@ commit in the submodule, then float the parent gitlink before dispatching.
 
 ## Post-event consumer verification (publisher's claim is not proof)
 
-- Index serves the exact version: `curl -fsS
-https://index.crates.io/ap/hr/aphrodite-headroom-core | grep '"vers"'`.
+- Index serves the EXACT NEW version - the check that catches the trap
+  recurring (seeing only the old 0.1.2 means the skip fired again):
+  `curl -fsS https://index.crates.io/ap/hr/aphrodite-headroom-core | grep '"vers"'`.
+- API `max_version` equals the released version:
+  `curl -A <ua> https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version`.
 - A fresh resolve succeeds without the path-only fallback:
   `cargo update -p aphrodite-headroom-core --precise <version>` then
   `cargo tree -i aphrodite-headroom-core` in a clean checkout.

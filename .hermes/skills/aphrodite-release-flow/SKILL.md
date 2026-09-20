@@ -625,6 +625,82 @@ git submodule status plugins/aphrodite                             # no '+'
 - Parent Current release-sync commit (pushed); identity verified (phase
   exit).
 
+### Step I5 - Headroom fork leg (mandatory fork publication tracking)
+
+**Purpose:** Carry the `vendor/headroom` fork delta into THIS release - the
+fork crate is a first-class release artifact, and a stale fork version makes
+CI skip the publish silently (the 1.5.0 published-version trap). Tracking
+contract: `vendor/headroom/RELEASE-CYCLE.md` + `vendor/headroom/CHANGELOG.md`
+(the fork's release record - update both per cycle).
+
+**Preconditions**
+
+- Steps I1-I4 passed; Current tree clean; HEAD + remote tip captured.
+
+**Do**
+
+```sh
+# 1. Fork delta since the last published commit (last published = the commit
+#    carrying the version live on crates.io - the 0.1.2 bump c6b61470):
+git -C vendor/headroom log <last-published-commit>..HEAD --oneline
+# 2. ANY delta => bump the fork crate version AND the parent pin TOGETHER
+#    (vendor/headroom/crates/headroom-core/Cargo.toml `version` AND
+#    crates/aphrodite/Cargo.toml line 55 - cargo check fails otherwise),
+#    update vendor/headroom/RELEASE-CYCLE.md + CHANGELOG.md, commit + push
+#    the fork's Current branch:
+git -C vendor/headroom push Source Current
+# 3. Fork tag BEFORE dispatch (fork scheme aphrodite-vX.Y.Z, e.g.
+#    aphrodite-v0.10.0 - NEVER the parent Aphrodite/v* scheme); pauses for
+#    human approval like Step R4:
+git -C vendor/headroom tag aphrodite-v<X.Y.Z> <fork-commit>
+git -C vendor/headroom push Source Current --tags
+# 4. Headroom-fork release notes per the vNEXT-draft convention (retrospective
+#    mode, separate from the binary notes:
+#    .hermes/release-notes/headroom-fork-vNEXT-draft.md - fork tag scheme +
+#    the `aphrodite-headroom-core` package name)
+# 5. Float the parent gitlink to the TAGGED fork commit (CI publishes the
+#    parent-recorded gitlink tree, not the local submodule HEAD) and push:
+git -C vendor/headroom checkout <fork-tag-commit>
+git add vendor/headroom
+git commit -m "build(submodule): point vendor/headroom at <fork commit>"
+git push Source Current
+```
+
+**Verify**
+
+```sh
+git submodule status vendor/headroom    # no '+'
+git ls-tree HEAD vendor/headroom        # tagged fork commit recorded
+curl -A <ua> https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version
+```
+
+**Expected**
+
+- Delta = 0, OR the fork crate + parent pin moved together, the fork tag
+  exists BEFORE dispatch, and the gitlink floats to the tagged fork commit.
+
+**Stop if**
+
+- A fork delta exists but the fork crate version was NOT bumped - the version
+  check sees the old version live on crates.io and skips silently (1.5.0
+  trap: ~14 unpublished commits, nothing failed, old 0.1.2 kept shipping).
+- The fork tag would be created after dispatch; the parent pin moved without
+  the fork crate (or vice versa).
+
+**Recovery**
+
+- Permitted: bump to the next free number and re-verify (crates.io versions
+  are immutable - never reuse a burned version).
+- Prohibited: dispatching with a stale fork version; re-tagging the fork.
+
+**Produces**
+
+- Fork tag + parent gitlink float + headroom-fork notes. Dispatch order
+  (Publish.yml `needs:` chain): Test → Publish-Headroom-Core →
+  Publish-Aphrodite → Publish-Hermes - headroom publishes FIRST; run
+  `gh workflow run Publish -f publish_crates=true` in Step R6, only after
+  this leg (phase exit).
+
 ---
 
 ## Phase Release - tag, artifacts, registry (4 irreversible events)
@@ -923,22 +999,31 @@ from the consumer's perspective, not the publisher's.
 
 ```sh
 # The tag push already ran cargo publish (per the accepted trigger audit) -
-# do NOT re-dispatch; verify instead:
+# do NOT re-dispatch for aphrodite / aphrodite-hermes; verify instead:
 curl -A <ua> https://crates.io/api/v1/crates/aphrodite | grep max_version
 curl -A <ua> https://crates.io/api/v1/crates/aphrodite-hermes | grep max_version
-# if aphrodite-headroom-core publishing is intended, it is DISPATCH-gated:
-# workflow_dispatch with publish_crates=true (aphrodite-release-workflow §2/§7)
+# IF Step I5 carried a fork delta, dispatch the headroom publish now - the
+# fork leg (crate + parent pin bumped, fork tag + gitlink float) MUST have
+# run first, else the version check skips the stale version silently (the
+# 1.5.0 published-version trap); needs chain: Test -> Publish-Headroom-Core
+# -> Publish-Aphrodite -> Publish-Hermes (headroom publishes FIRST):
+gh workflow run Publish -f publish_crates=true
+# then verify the headroom publish landed (see the reference note):
+curl -A <ua> https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version
 ```
 
 **Verify**
 
 - The crates.io index/API serves the new versions; a consumer `cargo add` /
-  `cargo install` resolves them.
+  `cargo install` resolves them. For headroom: the index must serve the NEW
+  fork version - seeing only the old 0.1.2 means the skip fired again
+  (`references/headroom-publish.md` "Post-event consumer verification").
 
 **Expected**
 
-- `max_version` == the released version for both crates; optional headroom
-  publish is deliberate, not accidental.
+- `max_version` == the released version for the published crates; the
+  headroom dispatch happens only when Step I5 carried a fork delta -
+  deliberate, never accidental.
 
 **Stop if**
 
@@ -1368,6 +1453,8 @@ Development`). Re-creating any hook or the prepare script is a ceremony
 
 - `aphrodite-release-workflow` - version ledger, artifact contract matrix,
   Gate R7 definitions, publishing separation, release-notes standards.
+- `vendor/headroom/CHANGELOG.md` + `vendor/headroom/RELEASE-CYCLE.md` - fork
+  change ledger / tracking contract (updated per cycle in Step I5).
 - `aphrodite-boundaries` - git repair taxonomy, branch-owned identity
   contract, human approval boundaries, failure policy.
 - `aphrodite-orientation` - mandatory preflight gate; owns the Orient phase.
@@ -1389,19 +1476,20 @@ Development`). Re-creating any hook or the prepare script is a ceremony
 
 ## Claim-to-Test Matrix
 
-| Claim                                                      | Evidence source                                                                | Test                                                                                        | Pass condition                                                         | Failure response                                                                                                               |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Tag push side effects are exactly as audited               | Workflow files at the exact tag commit                                         | Gate R7: build the trigger table from the actual files at the tag commit                    | Only accepted jobs reachable from the tag                              | Change the workflow or halt the tag                                                                                            |
-| Tag push publishes `aphrodite` + `aphrodite-hermes` crates | Publish.yml publish-step `if:` conditions at the tag commit                    | `git show <tag>:.github/workflows/Publish.yml                                               | grep -n 'startsWith(github.ref'`                                       | Both publish steps carry `\|\| startsWith(github.ref, 'refs/tags/Aphrodite/')` (current state) or the audit records the change | Accept the side effect explicitly or halt the tag |
-| `aphrodite-headroom-core` is never tag-published           | Publish.yml Publish-Headroom-Core publish-step `if:`                           | Read the publish-step `if:` at the tag commit                                               | `workflow_dispatch && publish_crates && published == 'false'` only     | Treat any tag-reachable headroom publish as unexpected - stop                                                                  |
-| Identity never crosses a transplant                        | `.gitmodules`, workflow triggers, plugin gitlink                               | B4 scan + I9 diff at the 3 contract points (I1, I4, R1)                                     | Zero identity hits; identity diffs empty                               | ABORT the ceremony; fix the offending branch                                                                                   |
-| Auto.yml heartbeat does not leak (verified `a81acab6`)     | Auto.yml `branch:` on both refs                                                | B4 scan step 1                                                                              | Each copy pushes its OWN branch                                        | Fix the leaking copy; re-run B4                                                                                                |
-| `BINARY_VERSION` moves LAST                                | `plugins/aphrodite/BINARY_VERSION` + release asset list                        | Compare bump-commit order against tag + Build completion; `_check_version_published` silent | Bump commit is after tag/assets; no download pointer to missing assets | Defer the bump; never tag with a pointer to missing assets                                                                     |
-| Plugin commit validated before parent gitlink update       | Plugin gitlink + fresh-process probe                                           | Step I3: load the plugin commit in a fresh process, version pair check                      | Plugin loads; `aphrodite_rebuild` matches                              | Fix the plugin commit; do not float the gitlink                                                                                |
-| Empty cherry-pick is already-contained                     | `git diff <HEAD> <source> -- <paths>`                                          | Step H4                                                                                     | Diff empty → skip the commit                                           | Treat as success, not failure                                                                                                  |
-| Cherry-pick never commits leftover markers                 | Staged file set after every `--continue`                                       | `git diff HEAD~1 HEAD --name-only                                                           | xargs grep -l '<<<<<<<'`                                               | Zero matches                                                                                                                   | Fix + `git commit --amend --no-edit`              |
-| Protected paths unchanged after any transplant             | `git diff HEAD -- .gitmodules .github/workflows plugins/aphrodite`             | I9 at post-restore (I4) + post-sync (H5)                                                    | Empty                                                                  | Controlled restore; never blanket checkout                                                                                     |
-| Runtime evidence matches the release claim                 | `aphrodite_stats` / `aphrodite_rebuild` / `aphrodite_test`                     | Observe phase battery                                                                       | Versions agree; round trips pass; previews honest                      | Stale dylib → restart + re-probe; classify preview defects before touching code                                                |
-| Every irreversible event pauses for human approval         | Steps R4-R6 + `aphrodite-boundaries`                                           | Dry-run the 4-event separation with a simulated ceremony                                    | Workflow halts at each `Ready for approval` boundary                   | Enforce the gate; never chain events in one script                                                                             |
-| `.githooks` stay removed                                   | `git config core.hooksPath`; `ls .githooks`; `package.json` prepare            | Grep parent + submodule for hooks/prepare remnants                                          | Unset/absent everywhere; no phantom vector re-introduced               | Re-create nothing; report the violation                                                                                        |
-| Version numbers match their ledger authority               | Cargo.tomls, dep pin, `package.json`, `plugin.yaml`, `BINARY_VERSION`, gitlink | Step P1 ledger read                                                                         | Each row equals its authority; known `package.json` lag recorded       | Fix the manifest before claiming; report the drift                                                                             |
+| Claim                                                      | Evidence source                                                                                 | Test                                                                                        | Pass condition                                                                  | Failure response                                                                                                               |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Tag push side effects are exactly as audited               | Workflow files at the exact tag commit                                                          | Gate R7: build the trigger table from the actual files at the tag commit                    | Only accepted jobs reachable from the tag                                       | Change the workflow or halt the tag                                                                                            |
+| Tag push publishes `aphrodite` + `aphrodite-hermes` crates | Publish.yml publish-step `if:` conditions at the tag commit                                     | `git show <tag>:.github/workflows/Publish.yml                                               | grep -n 'startsWith(github.ref'`                                                | Both publish steps carry `\|\| startsWith(github.ref, 'refs/tags/Aphrodite/')` (current state) or the audit records the change | Accept the side effect explicitly or halt the tag |
+| `aphrodite-headroom-core` is never tag-published           | Publish.yml Publish-Headroom-Core publish-step `if:`                                            | Read the publish-step `if:` at the tag commit                                               | `workflow_dispatch && publish_crates && published == 'false'` only              | Treat any tag-reachable headroom publish as unexpected - stop                                                                  |
+| Identity never crosses a transplant                        | `.gitmodules`, workflow triggers, plugin gitlink                                                | B4 scan + I9 diff at the 3 contract points (I1, I4, R1)                                     | Zero identity hits; identity diffs empty                                        | ABORT the ceremony; fix the offending branch                                                                                   |
+| Auto.yml heartbeat does not leak (verified `a81acab6`)     | Auto.yml `branch:` on both refs                                                                 | B4 scan step 1                                                                              | Each copy pushes its OWN branch                                                 | Fix the leaking copy; re-run B4                                                                                                |
+| `BINARY_VERSION` moves LAST                                | `plugins/aphrodite/BINARY_VERSION` + release asset list                                         | Compare bump-commit order against tag + Build completion; `_check_version_published` silent | Bump commit is after tag/assets; no download pointer to missing assets          | Defer the bump; never tag with a pointer to missing assets                                                                     |
+| Plugin commit validated before parent gitlink update       | Plugin gitlink + fresh-process probe                                                            | Step I3: load the plugin commit in a fresh process, version pair check                      | Plugin loads; `aphrodite_rebuild` matches                                       | Fix the plugin commit; do not float the gitlink                                                                                |
+| Empty cherry-pick is already-contained                     | `git diff <HEAD> <source> -- <paths>`                                                           | Step H4                                                                                     | Diff empty → skip the commit                                                    | Treat as success, not failure                                                                                                  |
+| Cherry-pick never commits leftover markers                 | Staged file set after every `--continue`                                                        | `git diff HEAD~1 HEAD --name-only                                                           | xargs grep -l '<<<<<<<'`                                                        | Zero matches                                                                                                                   | Fix + `git commit --amend --no-edit`              |
+| Protected paths unchanged after any transplant             | `git diff HEAD -- .gitmodules .github/workflows plugins/aphrodite`                              | I9 at post-restore (I4) + post-sync (H5)                                                    | Empty                                                                           | Controlled restore; never blanket checkout                                                                                     |
+| Runtime evidence matches the release claim                 | `aphrodite_stats` / `aphrodite_rebuild` / `aphrodite_test`                                      | Observe phase battery                                                                       | Versions agree; round trips pass; previews honest                               | Stale dylib → restart + re-probe; classify preview defects before touching code                                                |
+| Every irreversible event pauses for human approval         | Steps R4-R6 + `aphrodite-boundaries`                                                            | Dry-run the 4-event separation with a simulated ceremony                                    | Workflow halts at each `Ready for approval` boundary                            | Enforce the gate; never chain events in one script                                                                             |
+| `.githooks` stay removed                                   | `git config core.hooksPath`; `ls .githooks`; `package.json` prepare                             | Grep parent + submodule for hooks/prepare remnants                                          | Unset/absent everywhere; no phantom vector re-introduced                        | Re-create nothing; report the violation                                                                                        |
+| Version numbers match their ledger authority               | Cargo.tomls, dep pin, `package.json`, `plugin.yaml`, `BINARY_VERSION`, gitlink                  | Step P1 ledger read                                                                         | Each row equals its authority; known `package.json` lag recorded                | Fix the manifest before claiming; report the drift                                                                             |
+| Fork delta is carried into every release                   | `git -C vendor/headroom log <last-published-commit>..HEAD` + `vendor/headroom/RELEASE-CYCLE.md` | Step I5 fork-delta check                                                                    | Delta = 0, or fork crate + parent pin bumped together, fork tag before dispatch | Publish the fork with the release; never ship a stale fork version (1.5.0 trap)                                                |

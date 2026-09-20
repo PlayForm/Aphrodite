@@ -373,11 +373,53 @@ a release claim:
 
 The owned fork crate `aphrodite-headroom-core` (published from
 `vendor/headroom/crates/headroom-core/Cargo.toml`; parent pin
-`crates/aphrodite/Cargo.toml` line 55: `package = "aphrodite-headroom-core",
-version = "0.1.2"`). Publish is dispatch-gated (never a tag push), versions
-are immutable, and CI publishes the **parent-recorded gitlink tree**, not the
-local submodule HEAD. Full evidence note and checklist:
+`crates/aphrodite/Cargo.toml` line 55 - observational, re-derive live:
+`package = "aphrodite-headroom-core", version = "0.1.2"`; **`0.1.3` is the
+planned next fork release**). Publish is dispatch-gated (never a tag push),
+versions are immutable, and CI publishes the **parent-recorded gitlink tree**,
+not the local submodule HEAD. Full evidence note and checklist:
 `references/headroom-publish.md`.
+
+### Mandatory fork release-cycle tracking (every parent release)
+
+The fork is a first-class, tracked part of **EVERY** parent release cycle -
+never an optional afterthought. Before any parent release:
+
+- Compare the fork's current HEAD against the last published commit
+  (`git -C vendor/headroom log <last-published-commit>..HEAD --oneline`;
+  last published = the commit carrying the version live on crates.io - the
+  0.1.2 bump `c6b61470`).
+- Carry **any** delta into the release: bump the fork crate version AND the
+  parent pin (`crates/aphrodite/Cargo.toml` line 55) together, create the
+  fork release tag (fork scheme `aphrodite-vX.Y.Z`, never the parent
+  `Aphrodite/v*` scheme), then dispatch `Publish.yml` with
+  `publish_crates=true` so the fork publishes FIRST in the `needs:` chain
+  (Test → Publish-Headroom-Core → Publish-Aphrodite → Publish-Hermes).
+- The fork's change ledger is `vendor/headroom/CHANGELOG.md` +
+  `vendor/headroom/RELEASE-CYCLE.md` - update both per cycle; they are the
+  fork's release record and the delta-check tracking contract.
+
+### Published-version trap (canonical failure example: 1.5.0)
+
+The 1.5.0 release (2026-07-14) published `aphrodite` 1.5.0 +
+`aphrodite-hermes` 1.5.0 but SKIPPED the headroom publish: `Publish.yml`'s
+version check (Publish-Headroom-Core job, lines 143-161 - observational) saw
+`0.1.2` already in the crates.io index → `published=true` → the publish step
+(`workflow_dispatch && publish_crates && published == 'false'`) skipped -
+while the fork held ~14 unpublished commits since the 0.1.2 bump. **Nothing
+failed, no red job - a silent gap**: external consumers of `aphrodite` 1.5.0
+resolved the OLD 0.1.2. The trap: a stale fork version looks "already
+published", so CI happily skips it. Every release cycle MUST therefore
+compare the fork tree, not just the version number.
+
+### Version source of truth (live-read, never a doc number)
+
+- Authority: `vendor/headroom/crates/headroom-core/Cargo.toml` `version` +
+  the parent pin `crates/aphrodite/Cargo.toml` line 55 - they move together
+  in one ceremony (bump fork crate + pin together, never one alone).
+- The §1 ledger's 5 rows are unchanged by the fork; the fork crate rides the
+  parent pin as its own authority path. Claim numbers via the availability
+  check in `references/headroom-publish.md`; never reuse a burned version.
 
 ## Related
 
@@ -392,14 +434,15 @@ local submodule HEAD. Full evidence note and checklist:
 
 ## Claim-to-Test Matrix
 
-| Claim                                                               | Evidence source                                                                                                                                                         | Test                                                                                               | Pass condition                                                                                                                           | Failure response                                                             |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Ledger rows match their authority manifests                         | `crates/aphrodite/Cargo.toml`, `crates/aphrodite-hermes/Cargo.toml`, `plugins/aphrodite/plugin.yaml`, `plugins/aphrodite/BINARY_VERSION`, `package.json`, README badges | Read each authority path at release time                                                           | Each row equals its authority; no drift (the `package.json` 1.4.6-vs-1.5.0 lag is the known failure case)                                | Fix the manifest before claiming; report the drift                           |
-| Tag push side effects are exactly as audited                        | Workflow files at the exact tag commit                                                                                                                                  | Gate R7: build the trigger table from the actual files                                             | Only accepted jobs reachable from the tag                                                                                                | Change the workflow or halt the tag                                          |
-| Tag push reaches `cargo publish` for `aphrodite`/`aphrodite-hermes` | Publish.yml publish-step `if:` conditions                                                                                                                               | `grep -A3 'Publish to crates.io' .github/workflows/Publish.yml` at the tag commit                  | Conditions include `startsWith(github.ref, 'refs/tags/Aphrodite/')` on both jobs (current state) - or the audit table records the change | Accept the side effect explicitly or halt the tag                            |
-| `aphrodite-headroom-core` is never published by a tag push          | Publish.yml Publish-Headroom-Core step                                                                                                                                  | Read the publish-step `if:` at the tag commit                                                      | `workflow_dispatch && inputs.publish_crates && published == 'false'` only                                                                | Treat any tag-reachable headroom publish as an unexpected side effect - stop |
-| Consumer download names match release assets                        | Build.yml staging names + download.sh/download.ps1 asset names                                                                                                          | `gh release view "Aphrodite/v<ver>" --json assets` vs matrix section 4                             | Every required name present (12 assets)                                                                                                  | Do NOT bump `BINARY_VERSION`; fix artifact build/attach                      |
-| Missing optional asset degrades, never bricks setup                 | `download.sh` SUMS path, `setup/dylib.rs` optional arm                                                                                                                  | Simulate a missing `SHA256SUMS-<target>.txt` and a missing `libaphrodite.dylib` in a clean install | Warning + continue; setup completes                                                                                                      | Fix the consumer script; re-run the simulation                               |
-| Proposed registry version is available                              | crates.io index/API                                                                                                                                                     | `curl -A <ua> https://crates.io/api/v1/crates/<crate>` / index URL                                 | `max_version` (or `vers`) does not contain the proposed number                                                                           | Claim the next number; never re-publish                                      |
-| Release note is publishable                                         | Draft file                                                                                                                                                              | Grep for `{PENDING}` / `DO NOT PUBLISH` / bare compare link                                        | Zero matches; Summary + Changes present                                                                                                  | Fix the note before publish                                                  |
-| Every irreversible event pauses for human approval                  | This skill + `aphrodite-boundaries`                                                                                                                                     | Dry-run the 4-event separation with a simulated ceremony                                           | Workflow halts at each `Ready for approval` boundary                                                                                     | Enforce the gate; never chain events in one script                           |
+| Claim                                                               | Evidence source                                                                                                                                                         | Test                                                                                               | Pass condition                                                                                                                           | Failure response                                                                |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Ledger rows match their authority manifests                         | `crates/aphrodite/Cargo.toml`, `crates/aphrodite-hermes/Cargo.toml`, `plugins/aphrodite/plugin.yaml`, `plugins/aphrodite/BINARY_VERSION`, `package.json`, README badges | Read each authority path at release time                                                           | Each row equals its authority; no drift (the `package.json` 1.4.6-vs-1.5.0 lag is the known failure case)                                | Fix the manifest before claiming; report the drift                              |
+| Tag push side effects are exactly as audited                        | Workflow files at the exact tag commit                                                                                                                                  | Gate R7: build the trigger table from the actual files                                             | Only accepted jobs reachable from the tag                                                                                                | Change the workflow or halt the tag                                             |
+| Tag push reaches `cargo publish` for `aphrodite`/`aphrodite-hermes` | Publish.yml publish-step `if:` conditions                                                                                                                               | `grep -A3 'Publish to crates.io' .github/workflows/Publish.yml` at the tag commit                  | Conditions include `startsWith(github.ref, 'refs/tags/Aphrodite/')` on both jobs (current state) - or the audit table records the change | Accept the side effect explicitly or halt the tag                               |
+| `aphrodite-headroom-core` is never published by a tag push          | Publish.yml Publish-Headroom-Core step                                                                                                                                  | Read the publish-step `if:` at the tag commit                                                      | `workflow_dispatch && inputs.publish_crates && published == 'false'` only                                                                | Treat any tag-reachable headroom publish as an unexpected side effect - stop    |
+| Consumer download names match release assets                        | Build.yml staging names + download.sh/download.ps1 asset names                                                                                                          | `gh release view "Aphrodite/v<ver>" --json assets` vs matrix section 4                             | Every required name present (12 assets)                                                                                                  | Do NOT bump `BINARY_VERSION`; fix artifact build/attach                         |
+| Missing optional asset degrades, never bricks setup                 | `download.sh` SUMS path, `setup/dylib.rs` optional arm                                                                                                                  | Simulate a missing `SHA256SUMS-<target>.txt` and a missing `libaphrodite.dylib` in a clean install | Warning + continue; setup completes                                                                                                      | Fix the consumer script; re-run the simulation                                  |
+| Proposed registry version is available                              | crates.io index/API                                                                                                                                                     | `curl -A <ua> https://crates.io/api/v1/crates/<crate>` / index URL                                 | `max_version` (or `vers`) does not contain the proposed number                                                                           | Claim the next number; never re-publish                                         |
+| Release note is publishable                                         | Draft file                                                                                                                                                              | Grep for `{PENDING}` / `DO NOT PUBLISH` / bare compare link                                        | Zero matches; Summary + Changes present                                                                                                  | Fix the note before publish                                                     |
+| Every irreversible event pauses for human approval                  | This skill + `aphrodite-boundaries`                                                                                                                                     | Dry-run the 4-event separation with a simulated ceremony                                           | Workflow halts at each `Ready for approval` boundary                                                                                     | Enforce the gate; never chain events in one script                              |
+| Fork delta is carried into every release                            | `git -C vendor/headroom log <last-published-commit>..HEAD` + `vendor/headroom/RELEASE-CYCLE.md`                                                                         | Step I5 fork-delta check (`aphrodite-release-flow`)                                                | Delta = 0, or fork crate + parent pin bumped together and fork tag exists before dispatch                                                | Publish the fork with the release; never ship a stale fork version (1.5.0 trap) |
