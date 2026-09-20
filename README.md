@@ -15,7 +15,7 @@
 
 [![release](https://img.shields.io/static/v1?label=release&message=v1.5.1&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.2.0&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.1.5&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
 [![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE)
 
