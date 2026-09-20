@@ -78,8 +78,8 @@ Precedence subtleties:
 
 ## Key call sites
 
-- `MultiConfig::resolve` (env>TOML>default chains) - `crates/aphrodite/src/config.rs:301`
-- `env_bool` / `env_parse_warn` / `apply_port_override` - `crates/aphrodite/src/config.rs:18,33,410`
+- `MultiConfig::resolve` (env>TOML>default chains) - `crates/aphrodite/src/config/`
+- `env_bool` / `env_parse_warn` / `apply_port_override` - `crates/aphrodite/src/config/`
 - `Config::{load,get_bool,get_u64,get_string}` - `crates/aphrodite/src/config_loader.rs:23,75,89,109`
 - `Config::apply_compression` - `crates/aphrodite/src/config_loader.rs:133`
 - `resolve_thresholds` (proxy defaults + env) - `crates/aphrodite/src/proxy.rs:130`

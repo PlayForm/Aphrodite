@@ -6,7 +6,7 @@ and the fixed logic in Python and asserts on that replica - it always passes
 regardless of what the current Rust code does, so it can never catch a Rust
 regression. The live regression tests (which exercise the real Rust code) are
 the `regression_*`-named tests in `crates/aphrodite/src/proxy.rs` and
-`crates/aphrodite/src/resolve.rs` - run them with `cargo test -p aphrodite
+`crates/aphrodite/src/resolve/` - run them with `cargo test -p aphrodite
 regression_`. See `.plans/09-testing-quality.md` F2 for the full rationale.
 
 Each file in this directory is **self-contained** and exercises exactly one bug

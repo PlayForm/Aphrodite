@@ -174,8 +174,8 @@ Relationships / invariants:
 
 ## Key call sites
 
-- `AphroditeState`, `MarkerEntry`, `ToolEvent`, `ActiveDirective`, `SplitEvent` - `crates/aphrodite/src/state.rs:27,193,160,183,210`
-- `Directive` / `build_directive_context` - `crates/aphrodite/src/directives.rs:56,157`
+- `AphroditeState`, `MarkerEntry`, `ToolEvent`, `ActiveDirective`, `SplitEvent` - `crates/aphrodite/src/state/`
+- `Directive` / `build_directive_context` - `crates/aphrodite/src/directives/`
 - `WindowStats` / `normalize_args_sig` / `turn_window` - `crates/aphrodite/src/flow.rs:240,199,251`
 - `AppState` / `ResolvedThresholds` - `crates/aphrodite/src/proxy.rs:189,113`
 - `CcrStore` trait + backends - `vendor/headroom/crates/headroom-core/src/ccr/mod.rs:40` (+ `backends/`)

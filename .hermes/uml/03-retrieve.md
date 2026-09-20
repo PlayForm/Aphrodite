@@ -95,6 +95,6 @@ newline).
 
 - `handle_retrieve` - `crates/aphrodite/src/retrieve.rs:47`
 - `filter_content` / `paginate` - `crates/aphrodite/src/retrieve.rs:164,200`
-- `resolve::expand` / `resolve_recursive` / `resolve_one` - `crates/aphrodite/src/resolve.rs:185,115,60`
-- `find_markers` / `parse_marker_hash` - `crates/aphrodite/src/resolve.rs:28,22`
-- `normalize_hash` / `extract_hashes` (HASH_RE) - `crates/aphrodite/src/marker.rs:14,167,162`
+- `resolve::expand` / `resolve_recursive` / `resolve_one` - `crates/aphrodite/src/resolve/`
+- `find_markers` / `parse_marker_hash` - `crates/aphrodite/src/resolve/`
+- `normalize_hash` / `extract_hashes` (HASH_RE) - `crates/aphrodite/src/marker/`

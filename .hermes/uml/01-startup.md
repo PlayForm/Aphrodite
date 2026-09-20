@@ -157,7 +157,7 @@ test or FFI assertion fails, `register()` logs "plugin disabled" and returns.
 - `run()` config path resolution + bind-before-spawn - `crates/aphrodite/src/main.rs:98,229`
 - config hot-reload watcher - `crates/aphrodite/src/main.rs:251`
 - `run_single()` router + serve - `crates/aphrodite/src/main.rs:371`
-- `MultiConfig::resolve` / `apply_port_override` - `crates/aphrodite/src/config.rs:301,410`
+- `MultiConfig::resolve` / `apply_port_override` - `crates/aphrodite/src/config/`
 - `proxy::build_state` (CCR backend selection) - `crates/aphrodite/src/proxy.rs:656`
 - `resolve_thresholds` - `crates/aphrodite/src/proxy.rs:130`
 - `SqliteCcrStore::open` / `InMemoryCcrStore::with_capacity_and_ttl` - `vendor/headroom/crates/headroom-core/src/ccr/backends/{sqlite.rs:113,in_memory.rs:100}`

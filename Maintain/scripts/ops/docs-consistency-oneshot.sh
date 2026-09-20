@@ -60,7 +60,7 @@ Link to the repo root when the target is the submodule directory itself.
 
 JOB 3 - counts. Fix stale tool/hook/classifier-type/port claims ONLY when you
 verify them against code first (crates/aphrodite-hermes/src/schemas.rs,
-crates/aphrodite/src/config.rs, lib.rs). Otherwise leave and note.
+crates/aphrodite/src/config/, lib.rs). Otherwise leave and note.
 
 Scope: README.md, docs/**, crates/*/README.md, Maintain/*.md, plugins/aphrodite
 BINARY_VERSION. Do NOT touch target/, node_modules/, vendor/ internals, .plans/.
