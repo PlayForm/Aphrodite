@@ -458,7 +458,8 @@ pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 	// recorded marker is usually the least informative (e.g. a tiny confirm
 	// echo), while the largest carries the most content for the conversation
 	// index. Ties keep the later-recorded entry.
-	if let Some(largest) = state.recent_markers
+	if let Some(largest) = state
+		.recent_markers
 		.iter()
 		.filter(|m| m.turn == state.turn_counter)
 		.max_by_key(|m| m.size)

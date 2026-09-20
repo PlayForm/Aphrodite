@@ -256,12 +256,7 @@ mod tests {
 		assert_eq!(first["by_type"].to_string(), second["by_type"].to_string());
 		// BTreeMap emits keys sorted, so the order is deterministic and
 		// inspectable.
-		let keys:Vec<&str> = first["by_type"]
-			.as_object()
-			.unwrap()
-			.keys()
-			.map(|k| k.as_str())
-			.collect();
+		let keys:Vec<&str> = first["by_type"].as_object().unwrap().keys().map(|k| k.as_str()).collect();
 		assert_eq!(keys, vec!["code_rust", "diff", "text"]);
 	}
 

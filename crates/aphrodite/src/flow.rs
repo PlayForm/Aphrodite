@@ -110,9 +110,8 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	// pressure). Session inject non-empty, directives non-empty, nudges
 	// present; keep the min with the section count so an empty turn never
 	// underflows the floor.
-	let always_survive = (!session_inject.is_empty()) as usize
-		+ (!directives.is_empty()) as usize
-		+ nudges_present(state) as usize;
+	let always_survive =
+		(!session_inject.is_empty()) as usize + (!directives.is_empty()) as usize + nudges_present(state) as usize;
 	let always_survive = always_survive.min(sections.len());
 	while join_sections(&sections).len() > budget && sections.len() > always_survive {
 		sections.pop();
@@ -359,10 +358,7 @@ mod tests {
 		);
 		assert!(ctx.contains("[directives:"), "directives must survive: {ctx}");
 		assert!(ctx.contains("[nudge:"), "nudge must survive: {ctx}");
-		assert!(
-			!ctx.contains("[recall]"),
-			"catalog must be the only section dropped: {ctx}"
-		);
+		assert!(!ctx.contains("[recall]"), "catalog must be the only section dropped: {ctx}");
 	}
 
 	// ── T2: the retrieve-hint boilerplate is no longer emitted per turn

@@ -29,25 +29,25 @@ impl Config {
 		];
 
 		for path in &search_paths {
-				if let Ok(content) = std::fs::read_to_string(path) {
-					match content.parse::<toml::Table>() {
-						Ok(table) => return Self { raw:table, overrides:HashMap::new() },
-						Err(err) => {
-							// Fix 22 (inspection): a found-but-broken TOML file
-							// used to fall through silently to the next search
-							// path (or defaults) - warn so a broken local
-							// aphrodite.toml is not ignored without indication.
-							tracing::warn!(
-								path = %path.display(),
-								error = %err,
-								"aphrodite.toml found but failed to parse; skipping"
-							);
-						},
-					}
+			if let Ok(content) = std::fs::read_to_string(path) {
+				match content.parse::<toml::Table>() {
+					Ok(table) => return Self { raw:table, overrides:HashMap::new() },
+					Err(err) => {
+						// Fix 22 (inspection): a found-but-broken TOML file
+						// used to fall through silently to the next search
+						// path (or defaults) - warn so a broken local
+						// aphrodite.toml is not ignored without indication.
+						tracing::warn!(
+							path = %path.display(),
+							error = %err,
+							"aphrodite.toml found but failed to parse; skipping"
+						);
+					},
 				}
-				// File not found/unreadable is the normal search miss - keep
-				// looking.
 			}
+			// File not found/unreadable is the normal search miss - keep
+			// looking.
+		}
 
 		Self::default()
 	}
@@ -643,9 +643,7 @@ mod tests {
 
 	impl tracing::Subscriber for WarnCapture {
 		fn enabled(&self, _m:&tracing::Metadata<'_>) -> bool { true }
-		fn new_span(&self, _s:&tracing::span::Attributes<'_>) -> tracing::span::Id {
-		tracing::span::Id::from_u64(1)
-	}
+		fn new_span(&self, _s:&tracing::span::Attributes<'_>) -> tracing::span::Id { tracing::span::Id::from_u64(1) }
 		fn record(&self, _span:&tracing::span::Id, _values:&tracing::span::Record<'_>) {}
 		fn record_follows_from(&self, _span:&tracing::span::Id, _follows:&tracing::span::Id) {}
 		fn enter(&self, _span:&tracing::span::Id) {}
@@ -676,9 +674,7 @@ mod tests {
 		std::fs::write(&broken, "[compression\nenabled = false\n").unwrap();
 
 		let (tx, rx) = std::sync::mpsc::channel();
-		let cfg = tracing::subscriber::with_default(WarnCapture { tx }, || {
-			Config::load_from(broken.to_str().unwrap())
-		});
+		let cfg = tracing::subscriber::with_default(WarnCapture { tx }, || Config::load_from(broken.to_str().unwrap()));
 
 		let _ = std::fs::remove_file(&broken);
 		// Resolution behavior unchanged: a broken file yields defaults.

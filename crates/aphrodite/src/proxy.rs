@@ -110,7 +110,13 @@ const fn initial_fill_pct() -> u64 {
 	// the initial EMA is always non-zero. `clamp` is not const-stable on
 	// this toolchain, so mirror the [1, 99] clamp with plain comparisons.
 	let raw = 100u64.saturating_sub(INITIAL_RATIO_EMA / 20);
-	let pct = if raw < 1 { 1 } else if raw > 99 { 99 } else { raw };
+	let pct = if raw < 1 {
+		1
+	} else if raw > 99 {
+		99
+	} else {
+		raw
+	};
 	pct * 100
 }
 
@@ -744,9 +750,8 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 								.join("aphrodite")
 								.join("ccr.db");
 							tracing::warn!(
-								"home directory unavailable (HOME unset or not absolute) - \
-								 falling back to {}: the SQLite CCR database will not \
-								 survive a container restart",
+								"home directory unavailable (HOME unset or not absolute) - falling back to {}: the \
+								 SQLite CCR database will not survive a container restart",
 								fallback.display()
 							);
 							fallback
@@ -861,9 +866,7 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 /// stays the authority for every other spelling and falls through to it
 /// on any non-match.
 fn body_wants_stream(body:&[u8]) -> bool {
-	if body.windows(13).any(|w| w == b"\"stream\":true")
-		|| body.windows(14).any(|w| w == b"\"stream\": true")
-	{
+	if body.windows(13).any(|w| w == b"\"stream\":true") || body.windows(14).any(|w| w == b"\"stream\": true") {
 		return true;
 	}
 	serde_json::from_slice::<serde_json::Value>(body)

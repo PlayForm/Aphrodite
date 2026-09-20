@@ -58,7 +58,10 @@ mod tests {
 
 	fn active(name:&str, content:&str) -> (HashMap<String, Directive>, Vec<String>) {
 		let mut all = HashMap::new();
-		all.insert(name.to_string(), Directive { name:name.to_string(), content:content.to_string() });
+		all.insert(
+			name.to_string(),
+			Directive { name:name.to_string(), content:content.to_string() },
+		);
 		let active = vec![name.to_string()];
 		(all, active)
 	}
