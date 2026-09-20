@@ -95,6 +95,25 @@ const RESPONSE_CACHE_MAX_BODY_BYTES:usize = 1024 * 1024;
 /// bypass this limit entirely - they're chunked at the protocol level.
 const RESPONSE_MAX_BODY_BYTES:usize = 64 * 1024 * 1024; // 64 MB
 
+/// Initial compression-ratio EMA (×100: 2.0×) - conservative startup value
+/// that avoids a startup scale-up in `threshold_for`'s auto-tune. Single
+/// source of truth for the `compression_ratio_ema` initializers in
+/// `build_state` and the test fixtures (W2-8) so the two can never diverge
+/// again.
+const INITIAL_RATIO_EMA:u64 = 200;
+
+/// Initial `fill_pct` (×100), computed from `INITIAL_RATIO_EMA` exactly the
+/// way `AppState::compute_fill_pct` does (90.00% at the 2.0× initial EMA) -
+/// a const fn so the manual 9000/200 sync can never drift (W2-8).
+const fn initial_fill_pct() -> u64 {
+	// compute_fill_pct's `ratio_ema == 0` → 99 branch is unreachable here:
+	// the initial EMA is always non-zero. `clamp` is not const-stable on
+	// this toolchain, so mirror the [1, 99] clamp with plain comparisons.
+	let raw = 100u64.saturating_sub(INITIAL_RATIO_EMA / 20);
+	let pct = if raw < 1 { 1 } else if raw > 99 { 99 } else { raw };
+	pct * 100
+}
+
 /// Live-resolved compression thresholds (report 07 F2/F4/T15): env var >
 /// TOML `[compression]` value > compiled-in default, the same precedence
 /// pattern `apply_port_override` already uses for the listen port. Computed
@@ -177,6 +196,39 @@ async fn ccr_len(ccr:&Arc<dyn CcrStore>) -> usize {
 /// Shared proxy state: upstream client config, CCR backend, and all
 /// counters/caches used by request handlers. Wrapped in `Arc` and cloned
 /// into every axum handler.
+///
+/// The 47 public fields fall into three discipline groups:
+/// - **Write-once configuration**: `client`, `stream_client`, `api_url`,
+///   `model`, `api_key`, `ccr`, `add_markers`, `mode`, `tool_relay`,
+///   `notify_url`, `notify_key`, `dev`, `response_cache_ttl`,
+///   `task_tracker` - set in `build_state` and never mutated afterward
+///   (hot-reload re-writes the atomic threshold fields below, not these).
+/// - **Live-tunable atomics**: `cache_compress_threshold`,
+///   `token_compress_threshold`, `inline_ccr_threshold`,
+///   `code_multiplier_x100` (re-written by config reload), plus
+///   `compression_ratio_ema` and `fill_pct` (re-written by the compression
+///   feedback loop). These are the only fields that change in place after
+///   startup.
+/// - **Monotonic counters**: `requests_total`, `requests_compressed`,
+///   `tokens_saved`, `ccr_hits`, `ccr_misses`, `ccr_created`,
+///   `tool_relay_calls`, `cache_hits`, `cache_misses`, `inline_ccr_hits`,
+///   `inline_ccr_misses`, `tool_relay_success`, `tool_relay_failure`,
+///   `notify_success`, `notify_failure`, `upstream_errors_4xx`,
+///   `upstream_errors_5xx`, `upstream_timeouts`, `upstream_connect_errors`,
+///   `sse_stream_errors`, `ccr_store_entries`, `ccr_store_bytes`,
+///   `request_body_bytes`, `response_body_bytes`, `upstream_latency_micros`,
+///   `total_latency_micros` - only ever incremented via `fetch_add`, never
+///   reassigned; `latency_buckets` is a fixed histogram of the same class.
+///
+/// The remaining lock-guarded fields (`request_history`, `inline_ccr`,
+/// `last_errors`, `compressions_by_type`, `response_cache`,
+/// `upstream_health_cache`) are mutable state accessed only under their
+/// mutex.
+///
+/// Discipline: every field belongs to exactly one group; moving one (or
+/// adding a new one) requires deliberate review. The structural split into
+/// a write-once `AppConfig` plus an `AppCounters` struct is deliberately
+/// deferred to a dedicated refactor pass.
 pub struct AppState {
 	pub client:HttpClient,
 	/// 02-F2: a separate client with no total `.timeout()`, used only for
@@ -210,6 +262,9 @@ pub struct AppState {
 	/// Inline CCR for tiny entries - no round-trip needed (< INLINE_CCR_THRESHOLD
 	/// bytes). Lock uses `.lock().map(...)` - same poison safety pattern.
 	/// Bounded to 1024 entries via LruCache to prevent unbounded memory growth.
+	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
+	/// lock is NEVER held across an `.await`; any future code that must hold
+	/// it across one switches this field to `tokio::sync::Mutex`.
 	pub inline_ccr:std::sync::Mutex<lru::LruCache<String, String>>,
 
 	// Stats
@@ -252,6 +307,9 @@ pub struct AppState {
 	/// minute 0 of a long session was replayed unchanged at minute 90, silently
 	/// diverging from what a fresh (possibly temperature>0) upstream call would
 	/// return. Checked against `response_cache_ttl` on the hit path.
+	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
+	/// lock is NEVER held across an `.await`; any future code that must hold
+	/// it across one switches this field to `tokio::sync::Mutex`.
 	pub response_cache:std::sync::Mutex<lru::LruCache<u64, (std::time::Instant, Vec<u8>)>>,
 	/// TTL applied to `response_cache` entries - reuses `cli.ccr_ttl_seconds`
 	/// so cached LLM responses don't outlive the CCR content they were
@@ -335,6 +393,15 @@ pub struct AppState {
 /// The estimate is clamped so the ratio never goes below 1.0× (a
 /// compressor can't expand content beyond the original size in the
 /// worst case - it stores the literal).
+///
+/// W2-7: the 0.97 coefficient below is a DELIBERATE conservative
+/// direction - it systematically under-estimates compression for highly
+/// repetitive content, so the estimator errs toward compressing MORE
+/// (a smaller estimated size → higher ratio → more aggressive
+/// thresholds), which is the safe side for a gating heuristic. The
+/// estimate is a gating heuristic for the compression decision, NOT the
+/// actual compressed size - the real size is whatever the CCR backend
+/// produces.
 fn estimate_compressed_size(content:&str) -> usize {
 	use std::collections::HashSet;
 
@@ -663,11 +730,28 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		ProxyMode::Token if !cli.no_ccr_marker => {
 			let db_path = cli.ccr_db_path.as_ref().map_or_else(
 				|| {
-					dirs::home_dir()
-						.unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-						.join(".hermes")
-						.join("aphrodite")
-						.join("ccr.db")
+					match dirs::home_dir() {
+						Some(home) => home.join(".hermes").join("aphrodite").join("ccr.db"),
+						None => {
+							// W2-3: degrade, never bail. A missing home dir
+							// (HOME unset or not an absolute path) used to
+							// silently fall back to /tmp, which a container
+							// restart wipes - the whole SQLite CCR database
+							// vanished with it. Warn loudly so the operator
+							// knows the DB is ephemeral, and keep going.
+							let fallback = std::path::PathBuf::from("/tmp")
+								.join(".hermes")
+								.join("aphrodite")
+								.join("ccr.db");
+							tracing::warn!(
+								"home directory unavailable (HOME unset or not absolute) - \
+								 falling back to {}: the SQLite CCR database will not \
+								 survive a container restart",
+								fallback.display()
+							);
+							fallback
+						},
+					}
 				},
 				|p| p.clone(),
 			);
@@ -726,12 +810,12 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		ccr_misses:AtomicU64::new(0),
 		ccr_created:AtomicU64::new(0),
 		tool_relay_calls:AtomicU64::new(0),
-		compression_ratio_ema:AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
+		compression_ratio_ema:AtomicU64::new(INITIAL_RATIO_EMA),
 		response_cache:Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
 		response_cache_ttl:std::time::Duration::from_secs(cli.ccr_ttl_seconds),
 		cache_hits:AtomicU64::new(0),
 		cache_misses:AtomicU64::new(0),
-		fill_pct:AtomicU64::new(9000), // 90.00% - moderate fill initial default
+		fill_pct:AtomicU64::new(initial_fill_pct()),
 		task_tracker:TaskTracker::new(),
 
 		inline_ccr_hits:AtomicU64::new(0),
@@ -765,7 +849,23 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 /// total timeout) instead of the bounded `state.client` - the upstream
 /// `Content-Type` isn't known until headers come back, by which point a
 /// bounded client's timeout is already ticking against the whole response.
+///
+/// W2-4: a full serde parse on every request just to read one boolean is
+/// wasteful, so there is a byte-exact fast path first: scan for the two
+/// canonical byte patterns `"stream":true` (no spaces) and `"stream": true`
+/// (one space) - the key's quotes are part of the pattern, so an
+/// escaped-quote mention inside a string value (`\"stream\": true`) can
+/// never match: the backslash breaks the contiguous bytes, and valid JSON
+/// never contains an unescaped `"` inside a string. Returning `true` only
+/// on an exact match keeps false positives impossible; the parse below
+/// stays the authority for every other spelling and falls through to it
+/// on any non-match.
 fn body_wants_stream(body:&[u8]) -> bool {
+	if body.windows(13).any(|w| w == b"\"stream\":true")
+		|| body.windows(14).any(|w| w == b"\"stream\": true")
+	{
+		return true;
+	}
 	serde_json::from_slice::<serde_json::Value>(body)
 		.ok()
 		.and_then(|v| v.get("stream").and_then(|s| s.as_bool()))
@@ -822,6 +922,13 @@ fn cache_key_from_body(body:&[u8], api_key:&str) -> Option<u64> {
 /// without this, a marker minted at minute 0 of a long session gets its
 /// cached response replayed unchanged at minute 90, silently diverging from
 /// what a fresh (possibly temperature>0) upstream call would return.
+///
+/// W2-9: the expiry probe uses `peek`, which deliberately does NOT promote
+/// recency (it is the lru crate's non-promoting read) - an about-to-be-
+/// evicted expired entry is not kept warm just because it was inspected.
+/// A live hit uses `get`, which DOES promote the entry to
+/// most-recently-used, so the LRU eviction order stays honest and only
+/// reflects entries that are actually served.
 fn response_cache_get(state:&AppState, ck:u64) -> Option<Vec<u8>> {
 	state.response_cache.lock().ok().and_then(|mut cache| {
 		let expired = cache
@@ -1024,6 +1131,9 @@ pub async fn proxy_handler(
 	// `body_vec.clone()` forced on every request (bug 18-P9: up to 4 copies
 	// of a 1MB body under retry load).
 	let body_bytes = bytes::Bytes::from(body_vec);
+	// Retry loop: up to 3 attempts total with at most 2 retries - the
+	// `attempt < 3` guard below means attempt 3 never retries, it records
+	// the final failure instead. Only connect-phase failures retry (F17).
 	for attempt in 1..=3u32 {
 		let req = http_client
 			.request(method.clone(), &url)
@@ -1069,9 +1179,9 @@ pub async fn proxy_handler(
 				// may have been accepted by the upstream; blindly retrying a
 				// non-idempotent `POST /v1/chat/completions` risks double
 				// token billing, and combined with the 300s per-attempt
-				// timeout, 3 blind retries could hold a client for ~15
-				// minutes. Non-connect errors now fail fast on the first
-				// attempt instead.
+				// timeout, up to 3 attempts (at most 2 retries) could hold a
+				// client for ~15 minutes. Non-connect errors now fail fast on
+				// the first attempt instead.
 				if attempt < 3 && e.is_connect() {
 					let base_ms = 100 * 2u64.pow(attempt - 1);
 					let jitter = rand::random::<f64>() * 0.5 + 0.75; // 0.75x to 1.25x
@@ -1357,11 +1467,11 @@ fn proxy_detect_content_type(content:&str) -> &'static str {
 		// class). diff/git/gitlog/log are already pipeline detectors.
 		None => {
 			let first_line = content.lines().next().unwrap_or("");
-			if first_line.contains("error")
-				|| first_line.contains("Error")
-				|| first_line.contains("ERROR")
-				|| first_line.contains("Traceback")
-				|| first_line.contains("panic")
+			if first_line.starts_with("error")
+				|| first_line.starts_with("Error")
+				|| first_line.starts_with("ERROR")
+				|| first_line.starts_with("Traceback")
+				|| first_line.starts_with("panic")
 				|| first_line.starts_with("thread '")
 			{
 				"error"
@@ -1376,7 +1486,7 @@ fn proxy_detect_content_type(content:&str) -> &'static str {
 				|| first_line.starts_with("error: ")
 				|| first_line.starts_with("warning[")
 				|| first_line.starts_with("warning: ")
-				|| first_line.contains("|") && (first_line.contains("error") || first_line.contains("warning"))
+				|| (first_line.contains("|") && (first_line.contains("error") || first_line.contains("warning")))
 				|| first_line.contains("mypy")
 				|| first_line.contains("clippy")
 				|| first_line.contains("eslint")
@@ -2532,7 +2642,7 @@ pub(crate) mod tests {
 			ccr_misses:AtomicU64::new(0),
 			ccr_created:AtomicU64::new(0),
 			tool_relay_calls:AtomicU64::new(0),
-			compression_ratio_ema:AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
+			compression_ratio_ema:AtomicU64::new(INITIAL_RATIO_EMA),
 			request_history:Mutex::new(VecDeque::new()),
 			inline_ccr:Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
 			latency_buckets:[
@@ -2549,7 +2659,7 @@ pub(crate) mod tests {
 			response_cache_ttl:std::time::Duration::from_secs(3600),
 			cache_hits:AtomicU64::new(0),
 			cache_misses:AtomicU64::new(0),
-			fill_pct:AtomicU64::new(9000),
+			fill_pct:AtomicU64::new(initial_fill_pct()),
 			task_tracker:TaskTracker::new(),
 			inline_ccr_hits:AtomicU64::new(0),
 			inline_ccr_misses:AtomicU64::new(0),
@@ -2785,6 +2895,23 @@ code_multiplier = 6.5
 	#[test]
 	fn test_detect_content_type_error_first_line() {
 		let _g = crate::preview::preview_cap_test_guard();
+		assert_eq!(
+			proxy_detect_content_type("Traceback (most recent call last):\n  File \"x.py\", line 1\nValueError: bad\n"),
+			"error"
+		);
+	}
+
+	#[test]
+	fn test_detect_content_type_comment_mentioning_error_is_not_error() {
+		let _g = crate::preview::preview_cap_test_guard();
+		// W2-6: the first-line error markers are `starts_with`, not
+		// `contains` - a Rust doc comment line mentioning "error recovery"
+		// (starting with `///`) must not classify as an error, while a real
+		// traceback first line still does.
+		assert_ne!(
+			proxy_detect_content_type("/// Handles error recovery gracefully.\nThe system continues.\n"),
+			"error"
+		);
 		assert_eq!(
 			proxy_detect_content_type("Traceback (most recent call last):\n  File \"x.py\", line 1\nValueError: bad\n"),
 			"error"
@@ -3029,6 +3156,46 @@ code_multiplier = 6.5
 		assert!(!body_wants_stream(b"not json"));
 	}
 
+	#[test]
+	fn test_body_wants_stream_large_body_flag_at_end() {
+		// W2-4 fast path: the flag sits after a large messages array, so a
+		// byte scan (not the full serde parse) must find it.
+		let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
+		for i in 0..500 {
+			if i > 0 {
+				body.push(',');
+			}
+			body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
+		}
+		body.push_str("],\"stream\":true}");
+		assert!(body_wants_stream(body.as_bytes()));
+	}
+
+	#[test]
+	fn test_body_wants_stream_flag_in_message_string_escaped_quotes() {
+		// W2-4: the pattern inside a message string has escaped quotes
+		// (`\"stream\": true`), which insert backslash bytes and break the
+		// contiguous byte pattern - the fast path must not fire, and the
+		// parse (authority) returns false since `stream` is not a key.
+		let body = br#"{"messages":[{"role":"user","content":"the docs say \"stream\": true"}]}"#;
+		assert!(!body_wants_stream(body));
+	}
+
+	#[test]
+	fn test_body_wants_stream_large_body_without_flag() {
+		// W2-4: large body with no `stream` key anywhere - fast path misses
+		// and the parse agrees.
+		let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
+		for i in 0..500 {
+			if i > 0 {
+				body.push(',');
+			}
+			body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
+		}
+		body.push_str("]}");
+		assert!(!body_wants_stream(body.as_bytes()));
+	}
+
 	fn test_state() -> AppState {
 		use std::{collections::HashMap, sync::Mutex};
 		AppState {
@@ -3051,7 +3218,7 @@ code_multiplier = 6.5
 			ccr_misses:AtomicU64::new(0),
 			ccr_created:AtomicU64::new(0),
 			tool_relay_calls:AtomicU64::new(0),
-			compression_ratio_ema:AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
+			compression_ratio_ema:AtomicU64::new(INITIAL_RATIO_EMA),
 			request_history:Mutex::new(VecDeque::new()),
 			inline_ccr:Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
 			latency_buckets:[
@@ -3068,7 +3235,7 @@ code_multiplier = 6.5
 			response_cache_ttl:std::time::Duration::from_secs(3600),
 			cache_hits:AtomicU64::new(0),
 			cache_misses:AtomicU64::new(0),
-			fill_pct:AtomicU64::new(9000),
+			fill_pct:AtomicU64::new(initial_fill_pct()),
 			task_tracker:TaskTracker::new(),
 			inline_ccr_hits:AtomicU64::new(0),
 			inline_ccr_misses:AtomicU64::new(0),

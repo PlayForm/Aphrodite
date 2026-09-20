@@ -186,3 +186,32 @@ source before dispatch.
 Verification: `cargo test -p aphrodite` (proxy:: plus full suite), `cargo
 clippy -p aphrodite --lib -- -D warnings`. Same wave rules as Wave 1 (no
 commits, patch/write_file only, tabs, report actual output).
+
+## Wave 2 results (delegation deleg_14301d25)
+
+First dispatch died instantly (8s, HTTP 401 first call - documented transient
+pattern); solo re-dispatch landed all 9 items (98 API calls, 1013s).
+
+| #    | Item                                                                                                                                                      | Status                  |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| W2-1 | AppState field-category doc comment (structural split deferred)                                                                                           | ✅                      |
+| W2-2 | std-Mutex-never-across-await rule comment                                                                                                                 | ✅                      |
+| W2-3 | `/tmp` fallback WARN (HOME unset), degrade not bail                                                                                                       | ✅                      |
+| W2-4 | `body_wants_stream` byte-exact fast path; agent corrected the spec: real JSON is `"stream":true` (key quote included), unquoted pattern could never match | ✅                      |
+| W2-5 | retry comment: up to 3 attempts (at most 2 retries)                                                                                                       | ✅                      |
+| W2-6 | error arm `contains` → `starts_with` + parens on `                                                                                                        | ` arm + regression test | ✅  |
+| W2-7 | conservative 0.97 direction comment                                                                                                                       | ✅                      |
+| W2-8 | `INITIAL_RATIO_EMA` const + `initial_fill_pct()` const fn at all 3 init sites                                                                             | ✅                      |
+| W2-9 | peek-no-promote vs get-promote comment                                                                                                                    | ✅                      |
+
+Parent verification: lib 393 passed / 0 failed / 1 ignored (+4 new proxy
+tests); clippy `-- -D warnings` clean (pre-existing toml manifest advisory
+only); all 9 sites grepped on disk.
+
+## Auto-committer note (2026-09-20)
+
+The external auto-committer swept Wave 1 into commit `a0dec1e` ("apply
+inspection wave of state, catalog, and session correctness fixes", 18 files,
++836/-121) - including the ledger note and the three external aphrodite-hermes
+rustfmt diffs. Not fought (legitimate session work). Wave 2 (`proxy.rs`) was
+still uncommitted at close; the sweep picks it up or the user's Save tool does.
