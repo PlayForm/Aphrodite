@@ -79,6 +79,11 @@ vX.Y.Z` → push.
    → float the plugin gitlink to S-Current tip → verify I9 + `git submodule
 status` shows no `+` → commit `release: sync vX.Y.Z from Development` →
    push.
+   (This protected-path restore is a DELIBERATE versioned reset of
+   branch-identity files to their committed state - the ceremony's
+   invariant. It is NOT a repair mechanism: for corrupted working content,
+   fix the file manually with read_file + write_file, never git reset/
+   checkout.)
 4. Tag **on the release-sync commit**, push the tag. Build.yml fires on
    `refs/tags/Aphrodite/*` (branch-agnostic).
 5. GitHub release from the tag (notes via --notes-file, never inline
@@ -146,7 +151,12 @@ Current's tree is test-free with dev-scaffolding absent.
    resolution and get COMMITTED. If one slipped in: fix, `git add`,
    `git commit --amend --no-edit`.
 7. Restore branch-owned identity after any pick that touches the gitlink:
-   `git checkout HEAD -- plugins/aphrodite`.
+   `git checkout HEAD -- plugins/aphrodite`. (This is a DELIBERATE
+   versioned restore of branch-identity files - the ceremony's protected
+   paths - NOT a repair mechanism. For corrupted working content, never
+   `git checkout`/`git reset`; fix the file manually with read_file +
+   write_file, preserving the intended content - see
+   aphrodite-testing-discipline's "repair in place" rule.)
 8. Verify before pushing: protected paths unchanged vs pre-pick HEAD
    (`git diff <pre-pick-HEAD> HEAD -- .gitmodules .github/workflows
 plugins/aphrodite` empty); every picked commit's files exist in HEAD

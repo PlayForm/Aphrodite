@@ -127,6 +127,27 @@ verifying preview behavior, exercise both:
   the ideas re-derived - never paste the source's sections or code blocks
   verbatim, and never drop a copy of the source file into the repo. The
   user's words: "I said rewrite, not copy over".
+- **Huge one-row-per-line tables: never write escaped newlines.** The HPC
+  classification docs (`.hermes/classification/*.md`) are tables with one
+  row per line; a bad write emits literal `\n` escape sequences that smash
+  dozens of rows onto ONE physical line (a 15KB line - "truncated on the
+  same line"). The signature: `grep -c '\\n  |' file` > 0, or a line >5KB.
+  Prevention: (1) always patch/write with REAL newlines - never `\\n` in
+  content; (2) after ANY edit, run
+  `awk '{print NR": "length($0)}' file | sort -t: -k2 -rn | head` and check
+  the max line length stays in the low thousands; (3) verify with
+  `grep -c '\\n  |' file` == 0.
+- **Never `git reset`/`checkout` a file to "restore" it - repair in place.**
+  A corrupted write still contains the intended content (escaped newlines
+  are recoverable data). Restoring from git THROWS THE WORK AWAY. Instead:
+  read the file, find the improper section, and fix exactly that - e.g.
+  split literal `\n` sequences back into real line breaks, preserving every
+  row the author intended. If the working tree was already reset, recover
+  the original blob from git's object store: `git fsck --lost-found`, match
+  the blob size (`git cat-file -s <hash>`), extract with
+  `git cat-file blob <hash>`, repair, and re-write. The user's rule: "when
+  I want you to restore a file, actually look at the content and replace
+  the improper sections" - never a git reset.
 
 ## Verification Checklist
 
