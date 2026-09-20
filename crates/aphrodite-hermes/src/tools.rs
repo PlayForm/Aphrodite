@@ -596,12 +596,14 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 	m.insert("aphrodite_debug", |args| {
 		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
 		match crate::debug::set_enabled_current(on) {
-			Ok((session, flag)) => serde_json::json!({
-				"status": "ok",
-				"debug": on,
-				"session": session,
-				"flag": flag,
-			}),
+			Ok((session, flag)) => {
+				serde_json::json!({
+					"status": "ok",
+					"debug": on,
+					"session": session,
+					"flag": flag,
+				})
+			},
 			Err(e) => serde_json::json!({"error": e}),
 		}
 	});

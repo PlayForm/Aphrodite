@@ -69,7 +69,29 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 	// Check inline_ccr first (lock dropped before any .await to avoid !Send
 	// MutexGuard)
 	let mut content = {
-		let inline_hit = state.inline_ccr.lock().ok().and_then(|mut map| map.get(&hash).cloned());
+		// Fix 20 (inspection): the old `.lock().ok().and_then(...)` silently
+		// converted a poisoned mutex into a cache miss, so every request fell
+		// through to the CCR backend and callers saw confusing 404s. A
+		// poisoned lock is a broken-process condition - surface it as an
+		// explicit 500 instead of a miss. The guard is still dropped before
+		// any `.await` (the `Ok` arm's closure ends before the fallback
+		// backend path below).
+		let inline_hit = match state.inline_ccr.lock() {
+			Ok(mut map) => map.get(&hash).cloned(),
+			Err(_) => {
+				return (
+					StatusCode::INTERNAL_SERVER_ERROR,
+					Json(RetrieveResponse {
+						found:false,
+						content:None,
+						source:"none".into(),
+						error:Some("inline_ccr lock poisoned; cannot serve /retrieve".into()),
+						truncated:false,
+					}),
+				)
+					.into_response();
+			},
+		};
 		if let Some(cached) = inline_hit {
 			state.inline_ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 			state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -273,6 +295,37 @@ mod tests {
 				assert_eq!(body["found"], true, "hash arg {hash_arg:?} must resolve: {body:?}");
 				assert_eq!(body["content"], "<the real content>");
 			}
+		});
+	}
+
+	// ── Fix 20 (inspection): a poisoned inline_ccr lock must surface as an
+	// explicit 500 with a clear error - NOT silently degrade into a cache
+	// miss (which turned every request into a confusing 404). ──
+	#[test]
+	fn test_handle_retrieve_poisoned_inline_ccr_lock_returns_500() {
+		let state = crate::proxy::tests::test_state_with_ccr();
+		// Poison the mutex: panic while holding the guard (contained via
+		// catch_unwind so it stays inside this test).
+		let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+			let _guard = state.inline_ccr.lock().unwrap();
+			panic!("intentional poison of inline_ccr");
+		}));
+		assert!(state.inline_ccr.is_poisoned(), "test precondition: lock must be poisoned");
+		let state = Arc::new(state);
+
+		tokio::runtime::Runtime::new().unwrap().block_on(async {
+			let resp = handle_retrieve(
+				State(state.clone()),
+				Json(RetrieveRequest { hash:Some("abc123".into()), query:None, offset:0, limit:0 }),
+			)
+			.await
+			.into_response();
+			assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+			let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+			let body:serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+			assert_eq!(body["found"], false);
+			let err = body["error"].as_str().unwrap();
+			assert!(err.contains("poisoned"), "error must identify the poisoned lock: {err}");
 		});
 	}
 

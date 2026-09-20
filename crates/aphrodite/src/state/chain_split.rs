@@ -47,6 +47,11 @@ impl AphroditeState {
 	/// Returns the event id when the hash belonged to a chain split.
 	pub fn note_split_retrieval(&mut self, hash:&str) -> Option<usize> {
 		let eid = self.split_segment_map.remove(hash)?;
+		// The linear scan below is bounded by SPLIT_EVENT_CAP (16) events -
+		// deliberately not restructured (fix 7): an id→event map would need
+		// an extra index kept in sync on ring eviction for at most 16
+		// elements, so the scan is the simpler, equivalent choice. The
+		// adaptation behavior this feeds is intentionally untouched.
 		if let Some(ev) = self.split_events.iter_mut().find(|e| e.id == eid) {
 			ev.retrieved = ev.retrieved.saturating_add(1);
 		}

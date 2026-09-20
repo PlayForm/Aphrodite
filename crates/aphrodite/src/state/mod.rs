@@ -41,6 +41,14 @@ pub const DEFAULT_INLINE_BYTE_BUDGET:usize = 256 * 1024 * 1024;
 /// Cap on the chain-split consequence ledger (events kept for adaptation).
 const SPLIT_EVENT_CAP:usize = 16;
 
+/// Cap on the per-tool-call telemetry ring (P2); oldest evicted from the
+/// front.
+const TOOL_EVENT_CAP:usize = 200;
+/// Cap on the recent-marker catalog; oldest evicted from the front.
+const RECENT_MARKERS_CAP:usize = 200;
+/// Cap on the referenced-files list; least-recently-referenced evicted.
+const REFERENCED_FILES_CAP:usize = 100;
+
 /// Minimum split events recorded before the threshold adapts - avoids
 /// adapting on noise from a single split.
 const SPLIT_ADAPT_MIN_EVENTS:usize = 4;
@@ -50,10 +58,13 @@ pub struct AphroditeState {
 	/// Inline content store: {hash: content}. The `HashMap` gives O(1)
 	/// get/put/contains (was an O(n) `VecDeque` linear scan per op - bug
 	/// 18-P14); `inline_order` preserves LRU recency so eviction can drop
-	/// the least-recently-used entry from the back in O(1).
+	/// the least-recently-used entry in O(1).
 	pub inline_store:HashMap<String, String>,
-	/// LRU order of `inline_store` keys; front = most-recent, back = LRU.
-	pub inline_order:VecDeque<String>,
+	/// LRU recency order of `inline_store` keys (unit values). Capacity is
+	/// `INLINE_MAX + 1` so the cache never self-evicts before the explicit
+	/// `evict_over_budget` loop in `inline_store_put` (fix 1: previously a
+	/// `VecDeque` whose promotion/upsert needed an O(n) `retain` scan).
+	pub inline_order:lru::LruCache<String, ()>,
 	/// Running total of `content.len()` across every entry in `inline_store`,
 	/// maintained incrementally by `inline_store_put` so eviction doesn't
 	/// need an O(n) rescan on every insert (report 05 F11).
@@ -64,8 +75,11 @@ pub struct AphroditeState {
 	/// Defaults to [`DEFAULT_INLINE_BYTE_BUDGET`]; see
 	/// `inline_store_byte_budget`/`set_inline_store_byte_budget`.
 	inline_store_byte_budget:usize,
-	/// Recent CCR markers for catalog: [{hash, type, size, preview, turn}]
-	pub recent_markers:Vec<MarkerEntry>,
+	/// Recent CCR markers for catalog: [{hash, type, size, preview, turn}].
+	/// `VecDeque` (fix 6): `record_marker` pushes back and pops the front
+	/// while over `RECENT_MARKERS_CAP`, so the oldest marker always sits at
+	/// index 0.
+	pub recent_markers:VecDeque<MarkerEntry>,
 	/// Conversation index: {turn_num: (hash, summary, size)} - the last
 	/// marker archived per turn by `session::archive_turn`, called from
 	/// `hooks::post_llm_call` (report 06 F11/T13: previously `archive_turn`
@@ -135,10 +149,11 @@ pub struct AphroditeState {
 	/// Fine-grained chain splitting: rewrite chained shell commands
 	/// (`a && b && c`) with segment markers and split the output into
 	/// per-segment CCR entries, so the agent sees N compact previews
-	/// instead of one giant blob. Struct default true; `apply_compression`
-	/// resolves the shipped config default to false (opt-in per session
-	/// via `APHRODITE_CHAIN_SPLIT=1` or TOML `[compression] chain_split`).
-	/// Env: `APHRODITE_CHAIN_SPLIT`, TOML: `[compression] chain_split`.
+	/// instead of one giant blob. Struct default false (fix 2), matching
+	/// the shipped config default; `apply_compression` resolves the TOML/env
+	/// override (opt-in per session via `APHRODITE_CHAIN_SPLIT=1` or TOML
+	/// `[compression] chain_split`). Env: `APHRODITE_CHAIN_SPLIT`, TOML:
+	/// `[compression] chain_split`.
 	pub chain_split_enabled:bool,
 	// ── Tier 1 teaching loop: adaptive split threshold ──
 	/// Current minimum segment count for chain splitting. Only chains with
@@ -182,10 +197,12 @@ impl Default for AphroditeState {
 	fn default() -> Self {
 		Self {
 			inline_store:HashMap::with_capacity(INLINE_MAX),
-			inline_order:VecDeque::with_capacity(INLINE_MAX),
+			// +1 headroom: the LruCache must never self-evict before the
+			// explicit evict loop enforces INLINE_MAX and the byte budget.
+			inline_order:lru::LruCache::new(std::num::NonZeroUsize::new(INLINE_MAX + 1).unwrap()),
 			inline_store_bytes:0,
 			inline_store_byte_budget:DEFAULT_INLINE_BYTE_BUDGET,
-			recent_markers:Vec::new(),
+			recent_markers:VecDeque::new(),
 			conv_index:HashMap::new(),
 			referenced_files:VecDeque::new(),
 			turn_counter:0,
@@ -212,7 +229,7 @@ impl Default for AphroditeState {
 			tool_events:VecDeque::new(),
 			bg_tasks:VecDeque::new(),
 			poll_worker_enabled:true,
-			chain_split_enabled:true,
+			chain_split_enabled:false,
 			chain_split_min_segments:2,
 			chain_split_floor:2,
 			chain_split_max_segments:6,

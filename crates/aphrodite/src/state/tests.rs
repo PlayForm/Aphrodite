@@ -18,10 +18,12 @@ fn test_inline_store_lru_promotion() {
 	let mut s = AphroditeState::default();
 	s.inline_store_put("a".into(), "first".into());
 	s.inline_store_put("b".into(), "second".into());
-	// Get "a" promotes it to front (most-recent in `inline_order`)
+	// Get "a" promotes it to most-recent (front of `inline_order`)
 	let _ = s.inline_store_get("a");
-	// "a" should now be at the front of the LRU order
-	assert_eq!(s.inline_order.front().map(|h| h.as_str()), Some("a"));
+	// "a" should now be at the front of the LRU order (`LruCache::iter`
+	// yields most-recent first).
+	let order:Vec<String> = s.inline_order.iter().map(|(k, _)| k.clone()).collect();
+	assert_eq!(order.first().map(String::as_str), Some("a"));
 }
 
 #[test]
@@ -90,7 +92,8 @@ fn test_inline_store_lowering_budget_evicts_immediately() {
 #[test]
 fn test_record_marker_eviction() {
 	let mut s = AphroditeState::default();
-	for i in 0..250 {
+	const RECORDED:usize = 250;
+	for i in 0..RECORDED {
 		s.record_marker(MarkerEntry {
 			hash:format!("h{}", i),
 			ccr_type:"text".into(),
@@ -101,8 +104,11 @@ fn test_record_marker_eviction() {
 			meta:None,
 		});
 	}
-	assert!(s.recent_markers.len() <= 200);
-	assert_eq!(s.recent_markers[0].hash, "h50"); // First 50 evicted
+	assert!(s.recent_markers.len() <= RECENT_MARKERS_CAP);
+	// Eviction arithmetic: RECORDED - cap = 250 - 200 = 50 dropped from the
+	// front; front eviction keeps index zero as the oldest survivor (h50).
+	const EVICTED:usize = RECORDED - RECENT_MARKERS_CAP;
+	assert_eq!(s.recent_markers[0].hash, format!("h{EVICTED}"));
 }
 
 #[test]

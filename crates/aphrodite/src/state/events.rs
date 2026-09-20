@@ -1,4 +1,4 @@
-use super::AphroditeState;
+use super::{AphroditeState, TOOL_EVENT_CAP};
 
 /// One recorded tool/terminal call (P2/T6). Only hashes of args/errors are
 /// stored, never raw args, so no PII lands in state.
@@ -21,12 +21,12 @@ pub struct ToolEvent {
 }
 
 impl AphroditeState {
-	/// Record a per-call tool event into the bounded ring (P2/T6). Caps at 200
-	/// entries, evicting the front (oldest) - same eviction style as
-	/// `recent_markers`.
+	/// Record a per-call tool event into the bounded ring (P2/T6). Caps at
+	/// `TOOL_EVENT_CAP` (200) entries, evicting the front (oldest) - same
+	/// eviction style as `recent_markers`.
 	pub fn record_tool_event(&mut self, event:ToolEvent) {
 		self.tool_events.push_back(event);
-		while self.tool_events.len() > 200 {
+		while self.tool_events.len() > TOOL_EVENT_CAP {
 			self.tool_events.pop_front();
 		}
 	}

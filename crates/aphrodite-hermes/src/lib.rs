@@ -677,7 +677,7 @@ mod tests {
 			"marker": "<<<CCR:cccc|text|42>>>\n[text:42B] hi"
 		});
 		let s = replacement_from(&r, "test-session");
-			assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
+		assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
 	}
 
 	#[test]
