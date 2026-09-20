@@ -797,7 +797,7 @@ mod ffi_tests {
 		let s = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
 		// SAFETY: `ptr` was allocated by the C ABI, which owns the
 		// corresponding `aphrodite_free_string` deallocation routine.
-		unsafe { aphrodite_free_string(ptr) };
+		aphrodite_free_string(ptr);
 		s
 	}
 

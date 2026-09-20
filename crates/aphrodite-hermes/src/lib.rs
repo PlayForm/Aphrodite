@@ -950,7 +950,7 @@ mod tests {
 		);
 
 		let (hash, preview) = with_shared(|state| {
-			let last = state.recent_markers.last().expect("hook must record a marker");
+			let last = state.recent_markers.back().expect("hook must record a marker");
 			(last.hash.clone(), last.preview.clone())
 		});
 		assert!(
