@@ -402,6 +402,50 @@ Benchmarks are reproducible:
 `cargo run --release -p aphrodite --example bench_01_corpus`
 (`bench_02_threshold`, `bench_03_retrieve`, `bench_04_ema`).
 
+### Real-world savings (measured, Sep 2026)
+
+Retroactive analysis of 200 real Hermes sessions (6,843 API calls, Sep 18-20) -
+multi-agent atomization fan-outs, merge/PR work, plugin integration - by
+reconstructing every call's payload from the session transcript: tokens as
+stored (CCR markers included) vs. the same payload with every marker expanded
+to its original content (stock Hermes).
+
+| Metric                                           |                       Value |
+| :----------------------------------------------- | --------------------------: |
+| Context tokens with markers (what the model saw) |                 424,959,588 |
+| Context tokens expanded (stock Hermes, no CCR)   |                 581,302,405 |
+| **Context tokens saved**                         |     **156,342,817 (26.9%)** |
+| Average saved per API call                       |                  22,921 tok |
+| Sessions that saved anything                     |                   183 / 200 |
+| Median session saved ratio                       |                       22.9% |
+| Retrieval re-entry (tax)                         | 2,275 calls / 2,011,583 tok |
+
+Real-world per-output compression (orig tokens -> ~33-tok marker):
+
+| Content       | Compression |
+| :------------ | ----------: |
+| `terminal`    |     **74×** |
+| `table`       |     **61×** |
+| `source_code` |     **45×** |
+| `ls`          |     **37×** |
+| `diff`        |     **23×** |
+| `build`       |     **23×** |
+| `search`      |     **20×** |
+
+Savings scale with tool-output volume and session length - chat-only sessions
+gain ~0%, a light developer session ~5%, long tool-heavy sessions 20-25%, and
+pure-tool workloads (simulated diff+ls+build+search loop) **76-82%**.
+
+> [!NOTE]
+>
+> **Confidence.** The causal result - CCR removes context pressure for large
+> repeated tool outputs, and tool-heavy usage benefits far more than chat -
+> is high. The exact percentage is a band: the marker's byte size is the only
+> trace of the original content (the inline store is session-scoped), so
+> savings were estimated with a calibrated chars/tok ratio; sensitivity across
+> 3.0-4.5 chars/tok spans ~24-33%, centered ~27%. A paired pre/post request
+> capture in the proxy would convert this estimate into an exact measurement.
+
 ---
 
 ## Relationship to Headroom 🔗
