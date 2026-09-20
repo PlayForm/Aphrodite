@@ -25,25 +25,6 @@ no chain/split/segment vocabulary, no storage internals. The story the LLM
 sees stays the same; the machinery changes underneath, and behavior is
 learned from consequences, not from instructions about the mechanism.
 
-## Design principle: usage, not mechanism
-
-Directives teach the LLM **retrieval vocabulary and decision-making only**:
-
-- how to read a `<<<CCR:hash|type|size>>>` marker (hash = the key, type =
-  kind of content, size = how large),
-- when to retrieve vs. skip (retrieve when the next action needs the full
-  content; act on the marker alone when the type/size already answers),
-- how to find content (`aphrodite_search`, `aphrodite_catalog`,
-  `aphrodite_prefetch`) and prefer granular over wholesale retrieval,
-- retrieval fallbacks (a failed `aphrodite_retrieve` falls back to the
-  original tool for that specific item).
-
-They must **never** explain the compression mechanism - no marker-injection
-details, no chain/split/segment vocabulary, no storage internals (SQLite,
-LRU, hot-reload, engine state). The story the LLM sees stays the same; the
-machinery changes underneath, and behavior is learned from consequences, not
-from instructions about the mechanism.
-
 ## Built-in directives
 
 The binary ships seven directives, baked in at compile time and materialized
@@ -87,7 +68,7 @@ active = []                        # e.g. ["focus", "foresight"]
 `active` only seeds which loaded directives start active. Names not found in
 the loaded set are filtered out rather than erroring. Everything else -
 activation, deactivation, stacking - happens at runtime through the tool
-below. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md#directives)
+below. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md#directives)
 for where this section sits in the full schema.
 
 ## Injection mechanics
@@ -102,7 +83,7 @@ tight; the recall catalog is the first section to go.
 [directives: focus]
 focus:
   focus - targeted execution, marker-aware retrieval
-Markers are content. A <<<CCR:hash|type|size>>> marker in tool output
+  Markers are content. A <<<CCR:hash|type|size>>> marker in tool output
   stands in for the content you asked for. The hash is the key:
   aphrodite_retrieve(hash) returns the full text.
 ```
@@ -117,7 +98,7 @@ Markers are content. A <<<CCR:hash|type|size>>> marker in tool output
 ## The `aphrodite_directive` tool
 
 Registered in the Hermes bridge's tool registry with this schema (see
-[Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md#7-aphrodite_directive)
+[Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/tools.md#7-aphrodite_directive)
 for its place in the full 13-tool reference):
 
 ```json
@@ -164,7 +145,7 @@ per-turn.
 
 ## See also
 
-- [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md) - the `pre_llm_call` lifecycle this feature rides
-- [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/tools.md) - full tool reference
-- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md) - the `[directives]` section in context
-- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md) - the separate config path that feeds the dylib session
+- [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md) - the `pre_llm_call` lifecycle this feature rides
+- [Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/tools.md) - full tool reference
+- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md) - the `[directives]` section in context
+- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md) - the separate config path that feeds the dylib session

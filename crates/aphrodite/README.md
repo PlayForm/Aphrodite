@@ -9,7 +9,7 @@ embedding; the Hermes plugin loads the bridge crate's `libaphrodite_hermes.dylib
 instead - see `crates/aphrodite-hermes/README.md`).
 
 [crates.io](https://crates.io/crates/aphrodite) ·
-[docs](https://github.com/PlayForm/Aphrodite/tree/Current/docs/README.md)
+[docs](https://github.com/PlayForm/Aphrodite/tree/Development/docs/README.md)
 
 ---
 
@@ -75,7 +75,7 @@ src/
 
 ## C ABI (25 functions)
 
-The 25 `#[no_mangle] extern "C"` exports in `lib.rs` (22 written out plus 3
+The 25 `#[unsafe(no_mangle)] extern "C"` exports in `lib.rs` (22 written out plus 3
 macro-generated: `aphrodite_compress`, `aphrodite_transform`,
 `aphrodite_terminal`) form the core C ABI. The `aphrodite-hermes` bridge
 crate links this crate as an rlib and exposes its own higher-level ABI
@@ -96,11 +96,11 @@ header, not from these exports.
 
 ## See Also
 
-- [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/README.md) - which artifact you
+- [Installing Aphrodite](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/README.md) - which artifact you
   need, per-platform install guides, troubleshooting
-- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md) - full
+- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md) - full
   TOML schema this crate's `config.rs` deserializes
-- [Hermes Integration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/hermes-integration.md) - how this binary's
+- [Hermes Integration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/hermes-integration.md) - how this binary's
   sibling dylib crate (`aphrodite-hermes`) plugs into Hermes Agent
 
 ## License

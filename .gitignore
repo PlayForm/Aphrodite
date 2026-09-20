@@ -6,14 +6,13 @@
 # ────────────────────────────────────────────────────────────────────────────
 
 # ── Rust / Cargo ─────────────────────────────────────────────────────────────
-# Bare `target/` (no leading slash) matches build dirs at ANY depth.
+# Bare `target/` (no leading slash) matches build dirs at ANY depth - root,
+# bench/compression, Maintain/dynamic_hooks/rust, etc.
 target/
 **/*.rs.bk
 *.pdb
 
 # ── Python ───────────────────────────────────────────────────────────────────
-# The Hermes plugin (plugins/aphrodite) is Python - consumers may pip-install
-# it, so standard Python build/venv/cache artifacts are ignored.
 __pycache__/
 *.py[cod]
 *$py.class
@@ -27,16 +26,42 @@ build/
 venv/
 env/
 
-# ruff runs on the release line (Check.yml uses ruff.toml) - local runs drop
-# their cache here. pytest/mypy are development-line only and never run here.
+# Python tool caches
 .ruff_cache/
+.pytest_cache/
+.mypy_cache/
 
-# ── Generic artifacts ────────────────────────────────────────────────────────
+# ── Hermes / dev artifacts ───────────────────────────────────────────────────
+# Re-include against a machine-global excludesFile that ignores `.hermes`
+# (verified via `git check-ignore -v`: the repo's .gitignore is checked AFTER
+# core.excludesFile, so a repo-level negation can override it - but a leading
+# `./` is not valid gitignore syntax and never matched anything; a prior
+# "restore" of this line kept the same dead pattern under a mistaken
+# diagnosis). `.hermes` is the tracked dev archive - never ignore it.
+!.hermes/
+!.hermes/**
+
+# `.hermes/tmp/` is the repo-local scratch dir (moved out of /tmp): the
+# CONTENTS are ignored (probe scripts, generated fixtures, research dumps -
+# see `.hermes/skills/aphrodite-testing-discipline`), but the directory
+# itself stays tracked via its `.gitkeep`.
+.hermes/tmp/*
+!.hermes/tmp/.gitkeep
+
+.headroom/
 *.log
 *.lock
 *.tar.gz
 
-# ── Aphrodite proxy binary (legacy plugin-dir copy, kept as fallback) ───────
+# ── Profiles - keep local, ship only examples ───────────────────────────────
+# `dir/` + `!dir/sub/` never re-includes anything below an excluded directory
+# (report 12 F7) - the correct shape is `dir/*` plus explicit re-includes for
+# both the subdirectory entry and its contents.
+
+# ── Test artifacts ──────────────────────────────────────────────────────────
+plugins/aphrodite/.test-results.json
+
+# ── Aphrodite proxy binary (copied to profile/plugin dirs at build) ────────
 plugins/aphrodite/aphrodite
 
 # ── Local config (not committed) ────────────────────────────────────────────
@@ -45,6 +70,12 @@ aphrodite.local.toml
 
 # ── IDE / editors ───────────────────────────────────────────────────────────
 .idea/
+# .vscode is excluded EXCEPT settings.json, which is shared. The bare
+# `!.vscode/settings.json` under an excluded dir is a no-op; re-include the
+# dir first, re-exclude its contents, then re-include the file.
+!.vscode/
+.vscode/**
+!.vscode/settings.json
 *.swp
 *.swo
 *~
@@ -64,7 +95,7 @@ pnpm-lock.yaml
 *.key
 id_rsa*
 
-# ── Catch-all leaks / runtime state (the plugin runs against this line) ──────
+# ── Catch-all leaks / runtime state ──────────────────────────────────────────
 **/state.db*
 **/auth.json
 **/auth.lock
@@ -72,3 +103,29 @@ id_rsa*
 **/.skills_*
 **/.update_check
 **/.DS_Sccp_*.txt
+.cargo_check_output.txt
+
+# ── Benchmark outputs (machine-generated; never tracked) ────────────────────
+bench/conversational/results/**
+!bench/conversational/results/.gitkeep
+bench/conversational/__pycache__/
+bench/results/proxy-bench-*-*.json
+bench/results/tmp/bench-rendered.toml
+bench/results/tmp/ccr-bench.db
+bench/results/tmp/ccr-bench.db-shm
+bench/results/tmp/ccr-bench.db-wal
+bench/results/wire-compat-*-*.json
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+placeholder/
+.bench
+
+.hermes/examples/compression/*.md
+.hermes/examples/defaults/*.md
+.hermes/examples/directives/*.md
+.hermes/examples/env-vars/*.md
+.hermes/examples/flow/*.md
+.hermes/examples/previews/*.md
+.hermes/examples/prompts/*.md
+.hermes/examples/proxies/*.md
+.hermes/examples/templates/*.md

@@ -116,14 +116,14 @@ fn main() {
 	// Copy-on-change: byte-identical header ⇒ the ABI did not move ⇒ the
 	// committed _bindings.py is still exactly what this header produces, so
 	// skip the ctypesgen + finalize chain entirely.
-	if let Ok(prev) = std::fs::read(&header_path) {
-		if prev == header_bytes {
-			cargo_warning(
-				"header unchanged - skipping ctypesgen/finalize (committed plugins/aphrodite/_bindings.py already \
-				 matches this ABI)",
-			);
-			return;
-		}
+	if let Ok(prev) = std::fs::read(&header_path)
+		&& prev == header_bytes
+	{
+		cargo_warning(
+			"header unchanged - skipping ctypesgen/finalize (committed plugins/aphrodite/_bindings.py already matches \
+			 this ABI)",
+		);
+		return;
 	}
 
 	if let Err(e) = std::fs::write(&header_path, &header_bytes) {
@@ -226,11 +226,11 @@ fn probe_ctypesgen() -> Option<(Vec<String>, String)> {
 		vec!["ctypesgen".to_string()],
 	] {
 		let probe = Command::new(&candidate[0]).args(&candidate[1..]).arg("--version").output();
-		if let Ok(out) = probe {
-			if out.status.success() {
-				let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
-				return Some((candidate, version));
-			}
+		if let Ok(out) = probe
+			&& out.status.success()
+		{
+			let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+			return Some((candidate, version));
 		}
 	}
 	None

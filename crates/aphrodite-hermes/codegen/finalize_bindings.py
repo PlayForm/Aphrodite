@@ -41,7 +41,7 @@ impossible):
 
 3. VALIDATE the contract with a PURE-AST validator - nothing in the
    generated source is ever EXECUTED at build time (ast.parse + compile
-   without exec; mirrors the FFI contract checker's approach): every
+   without exec; mirrors Maintain/check_ffi_contract.py's approach): every
    pointer-returning export parsed from the header must be declared with a
    pointer-width restype (``c_void_p`` after the rewrite - NEVER ``c_int``),
    argtypes must match the header's parameter counts, errcheck must be
@@ -354,7 +354,7 @@ def validate(final_source, header_fns, header_text, required, raw_path):
 
     Parses the finalized source with ``ast`` and inspects only ``ast.Assign``
     nodes whose target is ``NAME.restype/argtypes/errcheck`` (the exact
-    approach the FFI contract checker uses), then verifies: the
+    approach Maintain/check_ffi_contract.py uses), then verifies: the
     declared export set equals the header's, every pointer-returning export
     has a pointer-width restype (c_void_p after the rewrite), argtypes counts
     match the header, errcheck is never applied, and every --required export

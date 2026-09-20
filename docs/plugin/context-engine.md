@@ -45,7 +45,7 @@ The registered engine is a small subclass of Hermes' `ContextEngine`:
 The engine never forces a compaction, never rewrites messages, and never
 touches the inline store. Compression of large tool and terminal output
 happens in `transform_tool_result` and `transform_terminal_output` - see
-[Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md).
+[Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md).
 
 ## Engine configuration
 
@@ -68,6 +68,6 @@ TOML, which overrides the default.
 
 ## See also
 
-- [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/hooks.md) - where the actual per-turn compression happens
-- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/aphrodite-toml.md) - the `[compression]` section in context
-- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md) - the env-var equivalents
+- [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md) - where the actual per-turn compression happens
+- [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md) - the `[compression]` section in context
+- [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md) - the env-var equivalents

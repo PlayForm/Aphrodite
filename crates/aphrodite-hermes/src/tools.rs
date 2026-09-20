@@ -77,39 +77,39 @@ pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 	// falls through to the `error`/`success` branches instead of aborting
 	// extraction entirely (F12) - a failed command with empty stdout is
 	// exactly the case where the error string IS the payload.
-	if let (Some(output), Some(_exit)) = (obj.get("output").and_then(|o| o.as_str()), obj.get("exit_code")) {
-		if !output.is_empty() {
-			// Terminal outputs are often short and don't trigger the headroom
-			// classifier's build_output pattern. Add explicit heuristics so
-			// cargo output, test runs, and shell traces get meaningful previews.
-			let ct:String = if output.contains("exit code:") || output.contains("Error:") {
-				"terminal".into()
-			} else if output.contains("   Compiling")
-				|| output.contains("    Finished")
-				|| output.contains("   Running")
-				|| output.contains("test result:")
-				|| output.contains("   Building")
-				|| output.contains("   Installing")
-				|| output.contains("warning:")
-				|| output.contains("error[")
-			{
-				if output.contains("error[") || output.contains("error: could not") {
-					"build_error".into()
-				} else {
-					"build_output".into()
-				}
+	if let (Some(output), Some(_exit)) = (obj.get("output").and_then(|o| o.as_str()), obj.get("exit_code"))
+		&& !output.is_empty()
+	{
+		// Terminal outputs are often short and don't trigger the headroom
+		// classifier's build_output pattern. Add explicit heuristics so
+		// cargo output, test runs, and shell traces get meaningful previews.
+		let ct:String = if output.contains("exit code:") || output.contains("Error:") {
+			"terminal".into()
+		} else if output.contains("   Compiling")
+			|| output.contains("    Finished")
+			|| output.contains("   Running")
+			|| output.contains("test result:")
+			|| output.contains("   Building")
+			|| output.contains("   Installing")
+			|| output.contains("warning:")
+			|| output.contains("error[")
+		{
+			if output.contains("error[") || output.contains("error: could not") {
+				"build_error".into()
 			} else {
-				aphrodite::detect_type(output)
-			};
-			return Some((output.to_string(), ct));
-		}
+				"build_output".into()
+			}
+		} else {
+			aphrodite::detect_type(output)
+		};
+		return Some((output.to_string(), ct));
 	}
 
 	// ── Patch / write_file: {"success":...,"diff":"...","error":"..."} ──
-	if let Some(diff) = obj.get("diff").and_then(|d| d.as_str()) {
-		if !diff.is_empty() {
-			return Some((diff.to_string(), aphrodite::detect_type(diff)));
-		}
+	if let Some(diff) = obj.get("diff").and_then(|d| d.as_str())
+		&& !diff.is_empty()
+	{
+		return Some((diff.to_string(), aphrodite::detect_type(diff)));
 	}
 	if let Some(msg) = obj.get("error").and_then(|m| m.as_str()) {
 		if msg.starts_with("Found") && msg.contains("matches") {
@@ -131,10 +131,12 @@ pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 		// objects (e.g. {"success": "wrote 3 files"}) - multi-key payloads
 		// like {"success": "ok", "data": [...]} must not collapse to the
 		// word either.
-		if let Some(msg) = ok.as_str() {
-			if obj.len() <= 1 && !msg.is_empty() && !msg.starts_with('{') {
-				return Some((msg.to_string(), "text".to_string()));
-			}
+		if let Some(msg) = ok.as_str()
+			&& obj.len() <= 1
+			&& !msg.is_empty()
+			&& !msg.starts_with('{')
+		{
+			return Some((msg.to_string(), "text".to_string()));
 		}
 	}
 
@@ -161,22 +163,22 @@ pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 		// to "[search:1L]" ("N total" has no file:line: rows for the
 		// preview regex to count). Normalize it to the same grep-style
 		// lines so the preview shows the real hit count and files.
-		if lines.is_empty() {
-			if let Some(text) = obj.get("matches_text").and_then(|t| t.as_str()) {
-				let mut cur_path:Option<&str> = None;
-				for raw in text.lines() {
-					let t = raw.trim();
-					if t.is_empty() {
-						continue;
+		if lines.is_empty()
+			&& let Some(text) = obj.get("matches_text").and_then(|t| t.as_str())
+		{
+			let mut cur_path:Option<&str> = None;
+			for raw in text.lines() {
+				let t = raw.trim();
+				if t.is_empty() {
+					continue;
+				}
+				if raw.trim_start().len() != raw.len() {
+					// Indented row under the current path: "<line>: <content>".
+					if let (Some(p), Some((lno, rest))) = (cur_path, t.split_once(':')) {
+						lines.push(format!("{}:{}:{}", p, lno.trim(), rest.trim_start()));
 					}
-					if raw.trim_start().len() != raw.len() {
-						// Indented row under the current path: "<line>: <content>".
-						if let (Some(p), Some((lno, rest))) = (cur_path, t.split_once(':')) {
-							lines.push(format!("{}:{}:{}", p, lno.trim(), rest.trim_start()));
-						}
-					} else {
-						cur_path = Some(t);
-					}
+				} else {
+					cur_path = Some(t);
 				}
 			}
 		}
@@ -221,10 +223,12 @@ pub(crate) fn unwrap_hermes_result(content:&str) -> Option<(String, String)> {
 	let priority_keys = ["description", "summary", "result", "message", "preview", "found"];
 	if obj.len() <= 1 {
 		for key in &priority_keys {
-			if let Some(s) = obj.get(*key).and_then(|v| v.as_str()) {
-				if !s.is_empty() && !s.starts_with('{') && !s.starts_with('[') {
-					return Some((s.to_string(), "text".to_string()));
-				}
+			if let Some(s) = obj.get(*key).and_then(|v| v.as_str())
+				&& !s.is_empty()
+				&& !s.starts_with('{')
+				&& !s.starts_with('[')
+			{
+				return Some((s.to_string(), "text".to_string()));
 			}
 		}
 	}

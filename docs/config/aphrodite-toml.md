@@ -1,8 +1,8 @@
 # aphrodite.toml
 
-Aphrodite's proxy listeners and compression engine are configured through a single TOML file. This page documents every section, field, precedence rule, and validation check; the companion page [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md) lists every env var that overrides a value here.
+Aphrodite's proxy listeners and compression engine are configured through a single TOML file. This page documents every section, field, precedence rule, and validation check; the companion page [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md) lists every env var that overrides a value here.
 
-This file is Aphrodite's own proxy/engine config - a **different file** from Hermes Agent's `config.yaml`. See [Troubleshooting: two separate config files](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#two-separate-config-files) if you came here looking for Hermes-side keys like `plugins.enabled` or `context.engine`.
+This file is Aphrodite's own proxy/engine config - a **different file** from Hermes Agent's `config.yaml`. See [Troubleshooting: two separate config files](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#two-separate-config-files) if you came here looking for Hermes-side keys like `plugins.enabled` or `context.engine`.
 
 ## File location
 
@@ -156,7 +156,7 @@ active = ["focus", "foresight"]  # e.g. ["focus", "foresight"]
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `active` | Which loaded directives start active. Directive `.md` files are discovered from `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` → `~/.hermes/aphrodite/directives/` → binary-relative - the **first directory that exists** wins, and an existing-but-empty directives dir is intentional (no custom directives). If no directory exists, built-in directives are used. Names in `active` that aren't in the loaded set are silently filtered out; if `active` resolves empty while directives ARE loaded, the session seeds `focus` / `foresight` / `lazy` from the loaded set instead. Loading is never gated on this list being non-empty. |
 
-Read by the Hermes-plugin dylib session, not the Rust proxy. The active set is fully runtime-mutable via the `aphrodite_directive` tool - see [Directives](https://github.com/PlayForm/Aphrodite/tree/Current/docs/plugin/directives.md) for the complete feature reference.
+Read by the Hermes-plugin dylib session, not the Rust proxy. The active set is fully runtime-mutable via the `aphrodite_directive` tool - see [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md) for the complete feature reference.
 
 ## `[flow]`
 

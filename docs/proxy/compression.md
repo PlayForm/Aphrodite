@@ -17,7 +17,7 @@ path (using the rendered marker length) and the direct `/ccr/create` endpoint
 | Exempt content                    | Why                                                                                                                                                                                                                                 |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tool_calls[].function.arguments` | Client-executable JSON, not model-facing prose - a real OpenAI-tools client (no Aphrodite plugin) can't parse a CCR marker as JSON, so compressing it broke every tool call it made. Only `message.content` is a compression target |
-| SSE streams (`text/event-stream`) | Forwarded chunk-by-chunk, never buffered - markers can't be spliced into a live stream. See [Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#streaming-sse)            |
+| SSE streams (`text/event-stream`) | Forwarded chunk-by-chunk, never buffered - markers can't be spliced into a live stream. See [Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#streaming-sse)        |
 
 ## Full Pipeline
 
@@ -98,7 +98,7 @@ rather than swapped for an unresolvable hash.
 (JSON/tool output, language-specific code, error, build output, linter, diff,
 git, log, text, plus semantic detection for git status / git log / ls / test /
 grep shapes). The full type taxonomy is documented in
-[CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/classification/content-types.md).
+[CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md).
 
 ## 2. Threshold Computation
 
@@ -186,7 +186,7 @@ requests and listeners.
 
 CCR backends store the original content bytes as-is - the "compression" is the
 marker substitution in the LLM-facing response, not a byte-level codec. See
-[CCR: Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/lifecycle.md) for the store/retrieve contract.
+[CCR: Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/lifecycle.md) for the store/retrieve contract.
 
 ## 5. Marker Generation
 
@@ -243,7 +243,7 @@ from the classifier is always honored as-is.
 The rendered preview length is capped by `[previews] preview_max_chars`
 (`APHRODITE_PREVIEW_MAX_CHARS` env var, applied end-to-end including
 hot-reload). See also
-[CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Current/docs/classification/content-types.md) for the underlying type taxonomy.
+[CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md) for the underlying type taxonomy.
 
 ## 6. EMA Update
 

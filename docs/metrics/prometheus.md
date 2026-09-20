@@ -71,7 +71,7 @@ or reverse-proxy auth layer recommended for production.
 | `aphrodite_notify_success_total` | counter | -      | Successful callback notifications |
 | `aphrodite_notify_failure_total` | counter | -      | Failed callback notifications     |
 
-See [Callbacks](https://github.com/PlayForm/Aphrodite/tree/Current/docs/tool-relay/callbacks.md) for how these are triggered.
+See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 
 ### Upstream Errors
 

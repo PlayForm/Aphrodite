@@ -4,7 +4,7 @@ members = ["crates/aphrodite", "crates/aphrodite-hermes"]
 exclude = ["Maintain/dynamic_hooks"]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 rust-version = "1.88"
 license = "CC0-1.0"
 repository = "https://github.com/PlayForm/Aphrodite"

@@ -32,12 +32,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	);
 
 	// Git commit hash (short form)
-	if let Ok(output) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output() {
-		if output.status.success() {
-			let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
-			if !hash.is_empty() {
-				println!("cargo:rustc-env=APHRODITE_GIT_HASH={}", hash);
-			}
+	if let Ok(output) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output()
+		&& output.status.success()
+	{
+		let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+		if !hash.is_empty() {
+			println!("cargo:rustc-env=APHRODITE_GIT_HASH={}", hash);
 		}
 	}
 
@@ -56,12 +56,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!("cargo:rustc-env=APHRODITE_TARGET={}", env::var("TARGET").unwrap_or_default());
 
 	// Rustc version
-	if let Ok(output) = Command::new("rustc").arg("--version").output() {
-		if output.status.success() {
-			let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-			if !version.is_empty() {
-				println!("cargo:rustc-env=APHRODITE_RUSTC_VERSION={}", version);
-			}
+	if let Ok(output) = Command::new("rustc").arg("--version").output()
+		&& output.status.success()
+	{
+		let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+		if !version.is_empty() {
+			println!("cargo:rustc-env=APHRODITE_RUSTC_VERSION={}", version);
 		}
 	}
 

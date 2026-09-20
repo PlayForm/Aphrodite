@@ -1,7 +1,7 @@
 # Metrics Queries
 
 PromQL reference for monitoring and alerting on Aphrodite proxy metrics - see
-[Prometheus Metrics](https://github.com/PlayForm/Aphrodite/tree/Current/docs/metrics/prometheus.md) for the full metric catalog these queries
+[Prometheus Metrics](prometheus.md) for the full metric catalog these queries
 draw on. Every metric name below is cross-checked against the actual `/metrics`
 output.
 

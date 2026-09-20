@@ -102,7 +102,7 @@ them ahead of time, pick one:
 
 If none of these ran and you skip straight to enabling the plugin, Hermes
 will try to auto-download for you on first launch - if that doesn't work,
-see [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#proxy-doesnt-auto-launch).
+see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
 
 ### Step 4: Enable the plugin
 
@@ -117,7 +117,7 @@ Answer `Y` if prompted to allow tool overrides.
 
 Before trusting Hermes to launch the proxy for you, confirm the binary itself
 runs. This does **not** require a real upstream API key or a Hermes session -
-see [Troubleshooting: verify the proxy without Hermes](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
+see [Troubleshooting: verify the proxy without Hermes](troubleshooting.md#verify-the-proxy-without-hermes)
 for the placeholder-key pattern and what a healthy response looks like.
 
 ### Step 6: Configure

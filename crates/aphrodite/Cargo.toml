@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite"
-version = "1.4.6"
+version = "1.5.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -20,6 +20,31 @@ exclude = ["examples/", "tests/", "benches/", ".hermes/", ".plans/"]
 [[bin]]
 name = "aphrodite"
 path = "src/main.rs"
+required-features = ["proxy"]
+
+[[example]]
+name = "bench_01_corpus"
+path = "examples/bench_01_corpus.rs"
+required-features = ["proxy"]
+
+[[example]]
+name = "bench_02_threshold"
+path = "examples/bench_02_threshold.rs"
+required-features = ["proxy"]
+
+[[example]]
+name = "bench_03_retrieve"
+path = "examples/bench_03_retrieve.rs"
+required-features = ["proxy"]
+
+[[example]]
+name = "bench_04_ema"
+path = "examples/bench_04_ema.rs"
+required-features = ["proxy"]
+
+[[example]]
+name = "bench_05_type_coverage"
+path = "examples/bench_05_type_coverage.rs"
 required-features = ["proxy"]
 
 [lib]

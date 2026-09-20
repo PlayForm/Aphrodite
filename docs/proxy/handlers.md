@@ -4,12 +4,12 @@ The proxy exposes HTTP handlers for proxying LLM API requests, managing CCR
 entries, executing tool relay calls, and health checks. This page documents
 each handler's endpoint, request/response contract, and behavior; the routing
 table, auth model, and middleware are in
-[Proxy Architecture](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md).
+[Proxy Architecture](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md).
 
 Every management handler below (everything except `proxy_handler` and
 `health_check`) additionally requires `Authorization: Bearer <token>` once
 `APHRODITE_MGMT_TOKEN` is set - see
-[Architecture: Management-Route Authentication](https://github.com/PlayForm/Aphrodite/tree/Current/docs/proxy/architecture.md#management-route-authentication).
+[Architecture: Management-Route Authentication](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#management-route-authentication).
 
 ## proxy_handler
 
@@ -389,4 +389,4 @@ POST /retrieve
 6. Return with source tracking.
 
 Full request/response schemas, the pagination contract, and the `truncated`
-flag semantics: [Retrieve Endpoint](https://github.com/PlayForm/Aphrodite/tree/Current/docs/api/retrieve.md).
+flag semantics: [Retrieve Endpoint](https://github.com/PlayForm/Aphrodite/tree/Development/docs/api/retrieve.md).

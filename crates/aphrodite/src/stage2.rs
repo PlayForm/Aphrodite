@@ -44,11 +44,11 @@ fn reduce_json(content:&str) -> Option<String> {
 		},
 		serde_json::Value::Array(arr) => {
 			let mut s = format!("[json_list:{} items]", arr.len());
-			if let Some(first) = arr.first() {
-				if let Some(obj) = first.as_object() {
-					let keys:Vec<&str> = obj.keys().map(|k| k.as_str()).take(10).collect();
-					s.push_str(&format!(" schema: {}", keys.join(", ")));
-				}
+			if let Some(first) = arr.first()
+				&& let Some(obj) = first.as_object()
+			{
+				let keys:Vec<&str> = obj.keys().map(|k| k.as_str()).take(10).collect();
+				s.push_str(&format!(" schema: {}", keys.join(", ")));
 			}
 			s
 		},

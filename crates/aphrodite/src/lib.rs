@@ -146,11 +146,21 @@ fn to_json_ok(v:&serde_json::Value) -> *mut c_char {
 		.unwrap_or(std::ptr::null_mut())
 }
 
+/// Convert a caller-supplied C string pointer into an owned `String`.
+///
+/// # Safety
+/// `ptr`, if non-null, must point to a valid, NUL-terminated C string that
+/// stays valid for the duration of this call (the standard `CStr::from_ptr`
+/// contract). Every caller in this crate passes pointers received directly
+/// from the C ABI call, which are expected to uphold that contract.
 unsafe fn cstr(ptr:*const c_char) -> Option<String> {
 	if ptr.is_null() {
 		return None;
 	}
-	Some(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+	// SAFETY: `ptr` is non-null here, and per the safety contract of this
+	// function it points to a valid, NUL-terminated C string that remains
+	// valid for the duration of this call.
+	Some(unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned())
 }
 
 fn check_content(content:&str) -> Result<(), &'static str> {
@@ -168,10 +178,10 @@ fn check_content(content:&str) -> Result<(), &'static str> {
 
 // ── C ABI ────────────────────────────────────────────────────────────
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_version() -> *mut c_char { CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw() }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_free_string(s:*mut c_char) {
 	if !s.is_null() {
 		unsafe {
@@ -180,7 +190,7 @@ pub extern "C" fn aphrodite_free_string(s:*mut c_char) {
 	}
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 	// `on_session_start`, not `session_start`: Hermes's VALID_HOOKS table
 	// requires the `on_` prefix - registering the bare name silently no-ops
@@ -202,7 +212,7 @@ pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 	.into_raw()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 	let path = unsafe { cstr(config_path) }.unwrap_or_default();
 	guarded(std::panic::AssertUnwindSafe(move || {
@@ -219,14 +229,14 @@ pub extern "C" fn aphrodite_init(config_path:*const c_char) -> *mut c_char {
 	}))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_destroy(handle:*const c_char) {
 	if let Ok(hid) = unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		handles().as_mut().and_then(|m| m.remove(&hid));
 	}
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_classify(content:*const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
@@ -245,7 +255,7 @@ pub extern "C" fn aphrodite_classify(content:*const c_char) -> *mut c_char {
 /// per call. Use `aphrodite_init` + `aphrodite_dispatch` (stateful, handle-based)
 /// instead. This stub keeps the ABI symbol alive for any legacy consumer that
 /// hasn't migrated yet.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_call_hook(_hook:*const c_char, _args:*const c_char) -> *mut c_char {
 	to_json_error("aphrodite_call_hook is stateless and deprecated; use aphrodite_init + aphrodite_dispatch")
 }
@@ -254,7 +264,7 @@ pub extern "C" fn aphrodite_call_hook(_hook:*const c_char, _args:*const c_char) 
 
 macro_rules! stateful {
     ($name:ident, |$s:ident, $($arg:ident : $ty:ty),*| $body:expr) => {
-        #[no_mangle] pub extern "C" fn $name(handle: *const c_char, $($arg: *const c_char),*) -> *mut c_char {
+        #[unsafe(no_mangle)] pub extern "C" fn $name(handle: *const c_char, $($arg: *const c_char),*) -> *mut c_char {
             let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() { Ok(id) => id, Err(_) => return to_json_error("invalid handle") };
             $(let $arg = unsafe { cstr($arg) }.unwrap_or_default();)*
             match with_state(hid, |$s| $body) {
@@ -297,7 +307,7 @@ stateful!(aphrodite_compress, |s, content:*const c_char, hint:*const c_char| {
 // aphrodite_retrieve is a manual override below - returns raw content, not JSON
 
 // Override: retrieve returns raw content, not JSON-wrapped
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_retrieve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -336,7 +346,7 @@ stateful!(aphrodite_terminal, |s, content:*const c_char| {
 	hooks::transform_terminal_output(s, &content)
 });
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -348,7 +358,7 @@ pub extern "C" fn aphrodite_session_start(handle:*const c_char) -> *mut c_char {
 	}
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -366,7 +376,7 @@ pub extern "C" fn aphrodite_catalog(handle:*const c_char, mode:*const c_char) ->
 	}))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -388,7 +398,7 @@ pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 	}))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -421,7 +431,7 @@ pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> 
 	}
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -446,7 +456,7 @@ pub extern "C" fn aphrodite_search(handle:*const c_char, query:*const c_char) ->
 	}))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_directive(handle:*const c_char, action:*const c_char, name:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -465,7 +475,7 @@ pub extern "C" fn aphrodite_directive(handle:*const c_char, action:*const c_char
 	}))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -491,7 +501,7 @@ pub extern "C" fn aphrodite_config_get(handle:*const c_char, key:*const c_char) 
 	}))
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_config_set(handle:*const c_char, key:*const c_char, value:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -534,7 +544,7 @@ pub use preview::{build_preview, detect_type};
 
 /// Universal hook dispatcher. Python calls this for every hook handler.
 /// Returns JSON-wrapped result or raw string if content-only.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_dispatch(
 	handle:*const c_char,
 	hook_name:*const c_char,
@@ -575,7 +585,7 @@ pub extern "C" fn aphrodite_dispatch(
 		None
 	});
 
-	let result = match with_state(hid, |s| {
+	match with_state(hid, |s| {
 		match name.as_ref() {
 			"on_session_start" | "session_start" => hooks::on_session_start(s),
 			"transform_tool_result" => hooks::transform_tool_result(s, content, tool),
@@ -655,13 +665,11 @@ pub extern "C" fn aphrodite_dispatch(
 	}) {
 		Ok(v) => to_json_ok(&v),
 		Err(e) => to_json_error(&e),
-	};
-
-	result
+	}
 }
 
 /// Filter lines by query - port of _resolve.py _filter_lines
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
@@ -675,7 +683,7 @@ pub extern "C" fn aphrodite_filter_lines(content:*const c_char, query:*const c_c
 }
 
 /// Resolve hash with full recursive expansion - port of _resolve.py
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_resolve(handle:*const c_char, hash:*const c_char) -> *mut c_char {
 	let hid = match unsafe { cstr(handle) }.unwrap_or_default().parse::<usize>() {
 		Ok(id) => id,
@@ -694,7 +702,7 @@ pub extern "C" fn aphrodite_resolve(handle:*const c_char, hash:*const c_char) ->
 }
 
 /// Generate preview for content - port of _marker/preview.py
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_preview(content:*const c_char, ccr_type:*const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
@@ -708,7 +716,7 @@ pub extern "C" fn aphrodite_preview(content:*const c_char, ccr_type:*const c_cha
 }
 
 /// Stage 2 semantic reduction - port of _stage2.py
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_stage2(content:*const c_char, ccr_type:*const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
@@ -724,7 +732,7 @@ pub extern "C" fn aphrodite_stage2(content:*const c_char, ccr_type:*const c_char
 }
 
 /// Code structure extraction - port of _core/struct.py
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_struct_extract(content:*const c_char, language:*const c_char) -> *mut c_char {
 	let c = match unsafe { cstr(content) } {
 		Some(s) => s,
@@ -778,10 +786,18 @@ mod ffi_tests {
 
 	fn cs(s:&str) -> CString { CString::new(s).unwrap() }
 
+	/// # Safety
+	/// `ptr` must be non-null and point to a valid, NUL-terminated C string
+	/// allocated by the C ABI (freed here via `aphrodite_free_string`).
 	unsafe fn take(ptr:*mut c_char) -> String {
 		assert!(!ptr.is_null(), "expected non-null C string");
-		let s = CStr::from_ptr(ptr).to_string_lossy().into_owned();
-		aphrodite_free_string(ptr);
+		// SAFETY: `ptr` is asserted non-null above and, per the safety
+		// contract of this function, points to a valid, NUL-terminated C
+		// string that is not aliased elsewhere.
+		let s = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		// SAFETY: `ptr` was allocated by the C ABI, which owns the
+		// corresponding `aphrodite_free_string` deallocation routine.
+		unsafe { aphrodite_free_string(ptr) };
 		s
 	}
 
