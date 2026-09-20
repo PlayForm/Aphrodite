@@ -1,6 +1,6 @@
 **[Compare Aphrodite/v1.5.0...Aphrodite/v1.5.1](https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.5.0...Aphrodite/v1.5.1)**
 
-## Aphrodite 1.5.1 💋 Plugin v2.2.0
+## Aphrodite 1.5.1 💋 Plugin v2.1.5
 
 ### Summary
 
@@ -51,7 +51,7 @@ and the fork gets tag `aphrodite-v0.10.0`.
 | `aphrodite-x86_64-apple-darwin`      | macOS Intel              |
 | `aphrodite-x86_64-unknown-linux-gnu` | Linux x86_64             |
 | `aphrodite-x86_64-pc-windows-msvc`   | Windows x86_64           |
-| Plugin v2.2.0                        | Hermes (standalone repo) |
+| Plugin v2.1.5                        | Hermes (standalone repo) |
 
 Plus `aphrodite-headroom-core` 0.1.3 on crates.io (new in 1.5.1).
 
