@@ -30,10 +30,23 @@ impl Config {
 
 		for path in &search_paths {
 			if let Ok(content) = std::fs::read_to_string(path) {
-				if let Ok(table) = content.parse::<toml::Table>() {
-					return Self { raw:table, overrides:HashMap::new() };
+				match content.parse::<toml::Table>() {
+					Ok(table) => return Self { raw:table, overrides:HashMap::new() },
+					Err(err) => {
+						// Fix 22 (inspection): a found-but-broken TOML file
+						// used to fall through silently to the next search
+						// path (or defaults) - warn so a broken local
+						// aphrodite.toml is not ignored without indication.
+						tracing::warn!(
+							path = %path.display(),
+							error = %err,
+							"aphrodite.toml found but failed to parse; skipping"
+						);
+					},
 				}
 			}
+			// File not found/unreadable is the normal search miss - keep
+			// looking.
 		}
 
 		Self::default()
@@ -50,8 +63,18 @@ impl Config {
 	/// honored env var overrides at all).
 	pub fn load_from(path:&str) -> Self {
 		if let Ok(content) = std::fs::read_to_string(path) {
-			if let Ok(table) = content.parse::<toml::Table>() {
-				return Self { raw:table, overrides:HashMap::new() };
+			match content.parse::<toml::Table>() {
+				Ok(table) => return Self { raw:table, overrides:HashMap::new() },
+				Err(err) => {
+					// Fix 22 (inspection): same warn-on-parse-error treatment
+					// as `load()` - the explicit-path init used to silently
+					// fall back to defaults on a broken file.
+					tracing::warn!(
+						path = %path,
+						error = %err,
+						"aphrodite.toml found but failed to parse; using defaults"
+					);
+				},
 			}
 		}
 		Self::default()
@@ -65,10 +88,16 @@ impl Config {
 
 	/// Resolve bool: override → env → toml[section][key] → default
 	pub fn get_bool(&self, env_key:&str, section:&str, key:&str, default:bool) -> bool {
+		// Fix 21 (inspection): values are matched case-insensitively -
+		// `TRUE`/`True`/`tRuE` previously resolved to false because the
+		// exact lowercase comparison missed them. Only `true`/`1` (after
+		// ASCII-lowercasing) still count as true; `YES`/`on` stay false.
 		if let Some(v) = self.overrides.get(env_key) {
+			let v = v.to_ascii_lowercase();
 			return v == "true" || v == "1";
 		}
 		if let Ok(v) = std::env::var(env_key) {
+			let v = v.to_ascii_lowercase();
 			return v == "true" || v == "1";
 		}
 		self.section(section)
@@ -219,10 +248,10 @@ impl Config {
 		//   3. binary-relative (portable install: shipped directives/ next to
 		//      the executable, e.g. the Hermes plugin dir).
 		let mut dirs:Vec<std::path::PathBuf> = Vec::new();
-		if let Ok(env_dir) = std::env::var("APHRODITE_DIRECTIVES_DIR") {
-			if !env_dir.trim().is_empty() {
-				dirs.push(std::path::PathBuf::from(env_dir));
-			}
+		if let Ok(env_dir) = std::env::var("APHRODITE_DIRECTIVES_DIR")
+			&& !env_dir.trim().is_empty()
+		{
+			dirs.push(std::path::PathBuf::from(env_dir));
 		}
 		dirs.push(std::path::PathBuf::from("directives"));
 		dirs.push(home_aphrodite.join("directives"));
@@ -454,12 +483,12 @@ mod tests {
 
 		let original = std::env::current_dir().unwrap();
 		std::env::set_current_dir(&cwd_dir).unwrap();
-		std::env::set_var("APHRODITE_DIRECTIVES_DIR", &env_dir);
+		unsafe { std::env::set_var("APHRODITE_DIRECTIVES_DIR", &env_dir) };
 
 		let mut state = crate::state::AphroditeState::default();
 		Config::default().apply_compression(&mut state);
 
-		std::env::remove_var("APHRODITE_DIRECTIVES_DIR");
+		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
 		std::env::set_current_dir(&original).unwrap();
 		let _ = std::fs::remove_dir_all(&env_dir);
 		let _ = std::fs::remove_dir_all(&cwd_dir);
@@ -535,5 +564,149 @@ mod tests {
 		if let Some(v) = env_backup {
 			unsafe { std::env::set_var("APHRODITE_PREVIEW_MAX_CHARS", v) };
 		}
+	}
+
+	// ── Fix 21 (inspection): `get_bool` must accept uppercase/mixed-case
+	// `TRUE`/`True`/`tRuE` and `1` through BOTH the overrides map and the
+	// environment path - the old exact lowercase comparison silently
+	// resolved them to false. Only `true`/`1` (after ASCII-lowercasing)
+	// count as true; `YES`/`on`/`0`/`FALSE` stay false. ──
+	#[test]
+	fn test_get_bool_override_case_insensitive() {
+		let mut cfg = Config::default();
+		for (value, expected) in [
+			("TRUE", true),
+			("True", true),
+			("tRuE", true),
+			("1", true),
+			("YES", false),
+			("on", false),
+			("0", false),
+			("FALSE", false),
+		] {
+			cfg.set_override("APHRODITE_TEST_BOOL_CASE", value);
+			assert_eq!(
+				cfg.get_bool("APHRODITE_TEST_BOOL_CASE", "compression", "enabled", true),
+				expected,
+				"override value {value:?} must resolve to {expected}"
+			);
+		}
+	}
+
+	#[test]
+	fn test_get_bool_env_case_insensitive() {
+		// Env-mutating tests serialize on CWD_GUARD (same rationale as the
+		// directives tests below).
+		let _g = CWD_GUARD.get_or_init(|| std::sync::Mutex::new(())).lock().unwrap();
+		const KEY:&str = "APHRODITE_TEST_BOOL_CASE_ENV";
+		// Hermetic (Rule 5): back up any prior value, remove it, set per
+		// case, then remove and restore - a stray value must never leak
+		// into this suite or later runs.
+		let backup = std::env::var(KEY).ok();
+		unsafe { std::env::remove_var(KEY) };
+
+		let cfg = Config::default();
+		for (value, expected) in [
+			("TRUE", true),
+			("True", true),
+			("tRuE", true),
+			("1", true),
+			("YES", false),
+			("on", false),
+			("0", false),
+			("FALSE", false),
+		] {
+			unsafe { std::env::set_var(KEY, value) };
+			assert_eq!(
+				cfg.get_bool(KEY, "compression", "enabled", true),
+				expected,
+				"env value {value:?} must resolve to {expected}"
+			);
+		}
+
+		unsafe { std::env::remove_var(KEY) };
+		if let Some(v) = backup {
+			unsafe { std::env::set_var(KEY, v) };
+		}
+	}
+
+	// ── Fix 22 (inspection): a found-but-broken TOML file must emit a
+	// tracing warn (path + parse error) instead of silently falling through
+	// to the next search path / defaults; resolution behavior itself is
+	// unchanged (broken => defaults, valid => parsed, missing => defaults). ──
+
+	/// Minimal tracing subscriber that records WARN event text, so a test
+	/// can assert a `tracing::warn!` actually fired.
+	struct WarnCapture {
+		tx:std::sync::mpsc::Sender<String>,
+	}
+
+	impl tracing::Subscriber for WarnCapture {
+		fn enabled(&self, _m:&tracing::Metadata<'_>) -> bool { true }
+		fn new_span(&self, _s:&tracing::span::Attributes<'_>) -> tracing::span::Id { tracing::span::Id::from_u64(1) }
+		fn record(&self, _span:&tracing::span::Id, _values:&tracing::span::Record<'_>) {}
+		fn record_follows_from(&self, _span:&tracing::span::Id, _follows:&tracing::span::Id) {}
+		fn enter(&self, _span:&tracing::span::Id) {}
+		fn exit(&self, _span:&tracing::span::Id) {}
+		fn event(&self, e:&tracing::Event<'_>) {
+			if *e.metadata().level() != tracing::Level::WARN {
+				return;
+			}
+			let mut s = String::new();
+			struct Rec<'a>(&'a mut String);
+			impl tracing::field::Visit for Rec<'_> {
+				fn record_debug(&mut self, _f:&tracing::field::Field, v:&dyn std::fmt::Debug) {
+					self.0.push_str(&format!("{v:?} "));
+				}
+			}
+			e.record(&mut Rec(&mut s));
+			let _ = self.tx.send(s);
+		}
+	}
+
+	#[test]
+	fn test_load_from_broken_toml_warns_and_returns_defaults() {
+		let stamp = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_nanos();
+		let broken = std::env::temp_dir().join(format!("aphrodite-cfg-broken-{stamp}.toml"));
+		std::fs::write(&broken, "[compression\nenabled = false\n").unwrap();
+
+		let (tx, rx) = std::sync::mpsc::channel();
+		let cfg = tracing::subscriber::with_default(WarnCapture { tx }, || Config::load_from(broken.to_str().unwrap()));
+
+		let _ = std::fs::remove_file(&broken);
+		// Resolution behavior unchanged: a broken file yields defaults.
+		assert!(cfg.get_bool("NONEXISTENT", "compression", "enabled", true));
+		// ...and the warn fired, naming the path and the parse failure.
+		let msg = rx
+			.recv_timeout(std::time::Duration::from_secs(5))
+			.expect("warn must be emitted for a broken TOML file");
+		assert!(msg.contains("failed to parse"), "warn must mention the parse failure: {msg}");
+		assert!(
+			msg.contains(broken.to_str().unwrap()),
+			"warn must include the offending path: {msg}"
+		);
+	}
+
+	#[test]
+	fn test_load_from_valid_and_missing() {
+		let stamp = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_nanos();
+		let valid = std::env::temp_dir().join(format!("aphrodite-cfg-valid-{stamp}.toml"));
+		std::fs::write(&valid, "[compression]\nenabled = false\n").unwrap();
+		let cfg = Config::load_from(valid.to_str().unwrap());
+		let _ = std::fs::remove_file(&valid);
+		assert!(
+			!cfg.get_bool("NONEXISTENT", "compression", "enabled", true),
+			"a valid file must parse and win over the default"
+		);
+
+		// Missing path: defaults, no panic.
+		let cfg = Config::load_from(&format!("/nonexistent/aphrodite-{stamp}.toml"));
+		assert!(cfg.get_bool("NONEXISTENT", "compression", "enabled", true));
 	}
 }

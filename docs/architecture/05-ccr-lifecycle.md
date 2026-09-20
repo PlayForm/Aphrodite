@@ -78,8 +78,8 @@ stateDiagram-v2
 
 | Concern                                                   | Module                                                                        |
 | --------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `evict_over_budget` / `inline_store_put`                  | `crates/aphrodite/src/state.rs`                                               |
-| `record_marker` (cap 200) / `record_tool_event` (cap 200) | `crates/aphrodite/src/state.rs`                                               |
+| `evict_over_budget` / `inline_store_put`                  | `crates/aphrodite/src/state/`                                                 |
+| `record_marker` (cap 200) / `record_tool_event` (cap 200) | `crates/aphrodite/src/state/`                                                 |
 | `archive_turn` (conv_index cap 50)                        | `crates/aphrodite/src/session.rs`                                             |
 | EMA update / `compute_fill_pct`                           | `crates/aphrodite/src/proxy.rs`                                               |
 | Backend TTL: `SqliteCcrStore` / `InMemoryCcrStore`        | `vendor/headroom/crates/headroom-core/src/ccr/backends/{sqlite,in_memory}.rs` |

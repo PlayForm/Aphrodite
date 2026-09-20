@@ -13,11 +13,11 @@
 > type-aware classifier, TOML-driven, dylib hot-reload.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/static/v1?label=release&message=v1.4.6&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/static/v1?label=release&message=v1.5.0&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.1.4&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.2.0&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
-[![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Current/LICENSE)
+[![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE)
 
 ---
 
@@ -43,7 +43,7 @@ On first launch the plugin auto-downloads the `aphrodite` binary from
 > [!IMPORTANT]
 >
 > Use the Hermes plugin method on Windows too - `download.ps1` is a native
-> PowerShell equivalent. See [docs/install/windows.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/install/windows.md).
+> PowerShell equivalent. See [docs/install/windows.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/windows.md).
 
 ### Option B: cargo install (standalone binary)
 
@@ -170,7 +170,7 @@ first match wins, and each type carries its own compression threshold tier.
 > the high-signal shapes - `git`, `gitlog`, `grep`, `ls`, `test` - before the
 > preview is built. Detection is conservative (line-prefix patterns, majority
 > votes), so ordinary prose is never mis-tagged.
-> Full taxonomy: [docs/ccr/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/ccr/content-types.md).
+> Full taxonomy: [docs/classification/content-types.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md).
 
 ### Threshold Tiers
 
@@ -369,7 +369,7 @@ code_multiplier     = 3.0    # multiply threshold for code_* content types
 ```
 
 Each `[compression]` field is overridable via an `APHRODITE_*` env var
-(see [docs/config/env-vars.md](https://github.com/PlayForm/Aphrodite/tree/Current/docs/config/env-vars.md)).
+(see [docs/config/env-vars.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md)).
 
 > [!TIP]
 >
@@ -398,6 +398,66 @@ Cache and token modes measure identical ratios;
 End-to-end latency is 8-40 ms (includes the HTTP round-trip);
 classification alone is 40-123 ns.
 
+Benchmarks are reproducible:
+`cargo run --release -p aphrodite --example bench_01_corpus`
+(`bench_02_threshold`, `bench_03_retrieve`, `bench_04_ema`).
+
+### Real-world savings (measured, Sep 2026)
+
+Retroactive analysis of 200 real Hermes sessions (6,843 API calls, Sep 18-20) -
+multi-agent atomization fan-outs, merge/PR work, plugin integration - by
+reconstructing every call's payload from the session transcript: tokens as
+stored (CCR markers included) vs. the same payload with every marker expanded
+to its original content (stock Hermes).
+
+| Metric                                           |                       Value |
+| :----------------------------------------------- | --------------------------: |
+| Context tokens with markers (what the model saw) |                 424,959,588 |
+| Context tokens expanded (stock Hermes, no CCR)   |                 581,302,405 |
+| **Context tokens saved**                         |     **156,342,817 (26.9%)** |
+| Average saved per API call                       |                  22,921 tok |
+| Sessions that saved anything                     |                   183 / 200 |
+| Median session saved ratio                       |                       22.9% |
+| Retrieval re-entry (tax)                         | 2,275 calls / 2,011,583 tok |
+
+Real-world per-output compression (orig tokens -> ~33-tok marker):
+
+| Content       | Compression |
+| :------------ | ----------: |
+| `terminal`    |     **74×** |
+| `table`       |     **61×** |
+| `source_code` |     **45×** |
+| `ls`          |     **37×** |
+| `diff`        |     **23×** |
+| `build`       |     **23×** |
+| `search`      |     **20×** |
+
+Savings scale with tool-output volume and session length - chat-only sessions
+gain ~0%, a light developer session ~5%, long tool-heavy sessions 20-25%, and
+pure-tool workloads (simulated diff+ls+build+search loop) **76-82%**.
+
+> [!NOTE]
+>
+> **Confidence.** The causal result - CCR removes context pressure for large
+> repeated tool outputs, and tool-heavy usage benefits far more than chat -
+> is high. The exact percentage is a band: the marker's byte size is the only
+> trace of the original content (the inline store is session-scoped), so
+> savings were estimated with a calibrated chars/tok ratio; sensitivity across
+> 3.0-4.5 chars/tok spans ~24-33%, centered ~27%. A paired pre/post request
+> capture in the proxy would convert this estimate into an exact measurement.
+
+---
+
+## Relationship to Headroom 🔗
+
+Aphrodite embeds [Headroom](https://github.com/PlayForm/headroom) - a custom fork tracked
+as a git submodule at `vendor/headroom/`.
+Headroom provides the content transforms (classifier, smart crusher, tokenizer);
+Aphrodite adds the preview pipeline, CCR storage, Hermes integration, and
+dual-proxy architecture.
+
+→ See [docs/architecture/10-component.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/architecture/10-component.md) for how the fork integrates.
+
 ---
 
 ## Contributing 🤝
@@ -416,7 +476,7 @@ First-time contributors are especially welcome.
 
 ## License 📜
 
-Released under [CC0-1.0](https://github.com/PlayForm/Aphrodite/tree/Current/LICENSE) - public domain.
+Released under [CC0-1.0](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE) - public domain.
 
 ---
 

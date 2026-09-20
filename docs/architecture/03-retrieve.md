@@ -85,6 +85,6 @@ flowchart TD
 | ------------------------------------------------------- | ---------------------------------- |
 | `handle_retrieve`                                       | `crates/aphrodite/src/retrieve.rs` |
 | `filter_content` / `paginate`                           | `crates/aphrodite/src/retrieve.rs` |
-| `resolve::expand` / `resolve_recursive` / `resolve_one` | `crates/aphrodite/src/resolve.rs`  |
-| `find_markers` / `parse_marker_hash`                    | `crates/aphrodite/src/resolve.rs`  |
-| `normalize_hash` / `extract_hashes` (HASH_RE)           | `crates/aphrodite/src/marker.rs`   |
+| `resolve::expand` / `resolve_recursive` / `resolve_one` | `crates/aphrodite/src/resolve/`    |
+| `find_markers` / `parse_marker_hash`                    | `crates/aphrodite/src/resolve/`    |
+| `normalize_hash` / `extract_hashes` (HASH_RE)           | `crates/aphrodite/src/marker/`     |

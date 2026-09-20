@@ -145,7 +145,7 @@ The layout self-heal and the directives materialize are best-effort by design: e
 | Config path resolution + bind-before-spawn                            | `crates/aphrodite/src/main.rs`                                                |
 | Config hot-reload watcher                                             | `crates/aphrodite/src/main.rs`                                                |
 | Per-listener router + serve                                           | `crates/aphrodite/src/main.rs`                                                |
-| `MultiConfig::resolve` / `apply_port_override`                        | `crates/aphrodite/src/config.rs`                                              |
+| `MultiConfig::resolve` / `apply_port_override`                        | `crates/aphrodite/src/config/`                                                |
 | `proxy::build_state` (CCR backend selection)                          | `crates/aphrodite/src/proxy.rs`                                               |
 | `resolve_thresholds`                                                  | `crates/aphrodite/src/proxy.rs`                                               |
 | `SqliteCcrStore` / `InMemoryCcrStore`                                 | `vendor/headroom/crates/headroom-core/src/ccr/backends/{sqlite,in_memory}.rs` |

@@ -17,6 +17,10 @@ pub fn on_session_start(state:&mut AphroditeState) -> serde_json::Value {
 	state.manual_directive_turn = None;
 	state.last_emitted_marker_count = 0;
 	state.last_emitted_file_count = 0;
+	// Reset the adaptive chain-split threshold to the configured floor (the
+	// initial value) so a threshold adapted in a previous session doesn't
+	// leak into this one. Uses the configured floor, not a hardcoded number.
+	state.chain_split_min_segments = state.chain_split_floor;
 
 	serde_json::json!({
 		"status": "ok",
@@ -58,15 +62,21 @@ pub fn get_conv_index(state:&AphroditeState) -> Vec<serde_json::Value> {
 		.collect()
 }
 
-/// Per-turn catalog summary — delta-only emission for markers AND files (04-F1/F4).
+/// Per-turn catalog summary - delta-only emission for markers AND files (04-F1/F4).
 ///
 /// Markers: +N new compressions this turn, or "no change" cache-stable line.
 /// Files: +N new files this turn, or "no change" cache-stable line.
 /// Archived turns: count only (changes slowly, ~40 chars, acceptable).
+///
+/// Once-per-turn contract: `flow::build_turn_context` is the only production
+/// caller and invokes this exactly once per turn. The `last_emitted_*`
+/// watermarks are committed only after the summary string is fully
+/// assembled, so a failure while building the string can never desync the
+/// delta bookkeeping from what was actually emitted; calling this again
+/// within the same turn therefore reports "no change" for both deltas.
 pub fn catalog_summary(state:&mut AphroditeState) -> String {
 	let current_markers = state.recent_markers.len();
 	let prev_markers = state.last_emitted_marker_count;
-	state.last_emitted_marker_count = current_markers;
 
 	let mut parts = vec![];
 
@@ -100,17 +110,23 @@ pub fn catalog_summary(state:&mut AphroditeState) -> String {
 	// ── Delta files (04-F4) ──
 	let current_files = state.referenced_files.len();
 	let prev_files = state.last_emitted_file_count;
-	state.last_emitted_file_count = current_files;
 
 	if current_files > 0 {
 		let new_files = current_files.saturating_sub(prev_files);
 		if new_files > 0 {
+			// `record_file` pushes new entries to the FRONT of the deque,
+			// so the new ones sit at the front; take from the front, then
+			// reverse so names render in insertion order (oldest-of-new
+			// first). Reading from the back would select the OLDEST entries
+			// and misreport old files as new.
 			let names:Vec<String> = state
 				.referenced_files
 				.iter()
-				.rev()
 				.take(new_files)
 				.map(|(p, t)| format!("{} ({})", p, t))
+				.collect::<Vec<_>>()
+				.into_iter()
+				.rev()
 				.collect();
 			parts.push(format!(
 				"+{} new file{}: {}. {} total.",
@@ -136,7 +152,15 @@ pub fn catalog_summary(state:&mut AphroditeState) -> String {
 		}
 	}
 
-	parts.join(" ")
+	let summary = parts.join(" ");
+
+	// Commit both watermarks only now, after the string is fully assembled:
+	// the two counters advance together, and a mid-build failure can't leave
+	// one side of the delta bookkeeping ahead of the other (Fix 4).
+	state.last_emitted_marker_count = current_markers;
+	state.last_emitted_file_count = current_files;
+
+	summary
 }
 
 #[cfg(test)]
@@ -216,15 +240,30 @@ mod tests {
 		let mut s = AphroditeState::default();
 		// No files yet
 		assert!(catalog_summary(&mut s).is_empty());
-		// Add files
-		s.referenced_files.push_back(("src/a.rs".into(), "read_file".into()));
-		s.referenced_files.push_back(("src/b.rs".into(), "write_file".into()));
+		// Add files the production way: record_file pushes to the FRONT of
+		// the deque, so the delta must read from the front and reverse into
+		// insertion order (Fix 16).
+		s.record_file("src/a.rs".into(), "read_file".into());
+		s.record_file("src/b.rs".into(), "write_file".into());
 		let r1 = catalog_summary(&mut s);
 		assert!(r1.contains("+2 new files"));
-		assert!(r1.contains("src/b.rs (write_file)"));
-		// Same files, next turn — no change
+		assert!(r1.contains("src/a.rs (read_file), src/b.rs (write_file)"));
+		// Same files, next turn - no change
 		let r2 = catalog_summary(&mut s);
 		assert!(r2.contains("no change"));
+	}
+
+	#[test]
+	fn test_session_start_resets_chain_split_threshold() {
+		let mut s = AphroditeState::default();
+		// Simulate a previous session that adapted the threshold upward
+		// (and a non-default configured floor, so the reset is proven to
+		// restore the configured value, not a hardcoded constant).
+		s.chain_split_floor = 3;
+		s.chain_split_min_segments = 9;
+		on_session_start(&mut s);
+		assert_eq!(s.chain_split_min_segments, s.chain_split_floor);
+		assert_eq!(s.chain_split_min_segments, 3);
 	}
 
 	#[test]

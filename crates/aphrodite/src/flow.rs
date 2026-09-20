@@ -103,8 +103,15 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	if !recall.is_empty() {
 		sections.push(format!("[recall]\n{}\n", recall.trim_end()));
 	}
+	// Count only PRESENT always-survive sections (fix 11: the old
+	// `is_empty() as usize` casts were inverted - they counted ABSENT
+	// sections, so a turn with an inject + directive + nudge present could
+	// compute always_survive == 1 and drop directives/nudges under budget
+	// pressure). Session inject non-empty, directives non-empty, nudges
+	// present; keep the min with the section count so an empty turn never
+	// underflows the floor.
 	let always_survive =
-		session_inject.is_empty() as usize + directives.is_empty() as usize + nudges_present(state) as usize;
+		(!session_inject.is_empty()) as usize + (!directives.is_empty()) as usize + nudges_present(state) as usize;
 	let always_survive = always_survive.min(sections.len());
 	while join_sections(&sections).len() > budget && sections.len() > always_survive {
 		sections.pop();
@@ -154,7 +161,9 @@ pub fn push_nudge(state:&mut AphroditeState, text:&str, ttl_turns:usize) {
 		expires_after_turn:expires,
 	});
 	while state.ephemeral_directives.len() > 4 {
-		state.ephemeral_directives.remove(0);
+		// Evict the oldest (front). `drain(..1)` was chosen over a VecDeque
+		// type change to keep the field type stable for consumers (fix 12).
+		state.ephemeral_directives.drain(..1);
 	}
 }
 
@@ -322,6 +331,34 @@ mod tests {
 			!ctx.contains("[recall]"),
 			"catalog must be dropped first under budget pressure: {ctx}"
 		);
+	}
+
+	// ── Fix 11 regression: turn zero with all three always-survive sections
+	// (session inject + directive + nudge) plus many markers must drop the
+	// recall catalog while keeping all three alive. The old inverted
+	// always_survive (== 1 here) would have dropped the nudge and directive
+	// too. ──
+	#[test]
+	fn test_budget_keeps_all_always_survive_sections_on_turn_zero() {
+		let mut s = state_with_directive("focus", "stay targeted, minimal tool usage");
+		s.session_inject = SHIPPED_SESSION_INJECT.to_string();
+		s.turn_counter = 0;
+		push_nudge(&mut s, "check marker sizes before retrieving", 1);
+		// 50 markers so the recall catalog is large and must drop.
+		for i in 0..50 {
+			add_marker(&mut s, &format!("hash{i:040}"), i);
+		}
+		// Budget well below the three always-survive sections combined, so
+		// only the recall catalog may drop.
+		s.flow_budget_chars = 600;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[aphrodite: first-turn orientation]"),
+			"session inject must survive: {ctx}"
+		);
+		assert!(ctx.contains("[directives:"), "directives must survive: {ctx}");
+		assert!(ctx.contains("[nudge:"), "nudge must survive: {ctx}");
+		assert!(!ctx.contains("[recall]"), "catalog must be the only section dropped: {ctx}");
 	}
 
 	// ── T2: the retrieve-hint boilerplate is no longer emitted per turn

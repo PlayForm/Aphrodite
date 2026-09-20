@@ -95,6 +95,31 @@ const RESPONSE_CACHE_MAX_BODY_BYTES:usize = 1024 * 1024;
 /// bypass this limit entirely - they're chunked at the protocol level.
 const RESPONSE_MAX_BODY_BYTES:usize = 64 * 1024 * 1024; // 64 MB
 
+/// Initial compression-ratio EMA (×100: 2.0×) - conservative startup value
+/// that avoids a startup scale-up in `threshold_for`'s auto-tune. Single
+/// source of truth for the `compression_ratio_ema` initializers in
+/// `build_state` and the test fixtures (W2-8) so the two can never diverge
+/// again.
+const INITIAL_RATIO_EMA:u64 = 200;
+
+/// Initial `fill_pct` (×100), computed from `INITIAL_RATIO_EMA` exactly the
+/// way `AppState::compute_fill_pct` does (90.00% at the 2.0× initial EMA) -
+/// a const fn so the manual 9000/200 sync can never drift (W2-8).
+const fn initial_fill_pct() -> u64 {
+	// compute_fill_pct's `ratio_ema == 0` → 99 branch is unreachable here:
+	// the initial EMA is always non-zero. `clamp` is not const-stable on
+	// this toolchain, so mirror the [1, 99] clamp with plain comparisons.
+	let raw = 100u64.saturating_sub(INITIAL_RATIO_EMA / 20);
+	let pct = if raw < 1 {
+		1
+	} else if raw > 99 {
+		99
+	} else {
+		raw
+	};
+	pct * 100
+}
+
 /// Live-resolved compression thresholds (report 07 F2/F4/T15): env var >
 /// TOML `[compression]` value > compiled-in default, the same precedence
 /// pattern `apply_port_override` already uses for the listen port. Computed
@@ -177,6 +202,39 @@ async fn ccr_len(ccr:&Arc<dyn CcrStore>) -> usize {
 /// Shared proxy state: upstream client config, CCR backend, and all
 /// counters/caches used by request handlers. Wrapped in `Arc` and cloned
 /// into every axum handler.
+///
+/// The 47 public fields fall into three discipline groups:
+/// - **Write-once configuration**: `client`, `stream_client`, `api_url`,
+///   `model`, `api_key`, `ccr`, `add_markers`, `mode`, `tool_relay`,
+///   `notify_url`, `notify_key`, `dev`, `response_cache_ttl`,
+///   `task_tracker` - set in `build_state` and never mutated afterward
+///   (hot-reload re-writes the atomic threshold fields below, not these).
+/// - **Live-tunable atomics**: `cache_compress_threshold`,
+///   `token_compress_threshold`, `inline_ccr_threshold`,
+///   `code_multiplier_x100` (re-written by config reload), plus
+///   `compression_ratio_ema` and `fill_pct` (re-written by the compression
+///   feedback loop). These are the only fields that change in place after
+///   startup.
+/// - **Monotonic counters**: `requests_total`, `requests_compressed`,
+///   `tokens_saved`, `ccr_hits`, `ccr_misses`, `ccr_created`,
+///   `tool_relay_calls`, `cache_hits`, `cache_misses`, `inline_ccr_hits`,
+///   `inline_ccr_misses`, `tool_relay_success`, `tool_relay_failure`,
+///   `notify_success`, `notify_failure`, `upstream_errors_4xx`,
+///   `upstream_errors_5xx`, `upstream_timeouts`, `upstream_connect_errors`,
+///   `sse_stream_errors`, `ccr_store_entries`, `ccr_store_bytes`,
+///   `request_body_bytes`, `response_body_bytes`, `upstream_latency_micros`,
+///   `total_latency_micros` - only ever incremented via `fetch_add`, never
+///   reassigned; `latency_buckets` is a fixed histogram of the same class.
+///
+/// The remaining lock-guarded fields (`request_history`, `inline_ccr`,
+/// `last_errors`, `compressions_by_type`, `response_cache`,
+/// `upstream_health_cache`) are mutable state accessed only under their
+/// mutex.
+///
+/// Discipline: every field belongs to exactly one group; moving one (or
+/// adding a new one) requires deliberate review. The structural split into
+/// a write-once `AppConfig` plus an `AppCounters` struct is deliberately
+/// deferred to a dedicated refactor pass.
 pub struct AppState {
 	pub client:HttpClient,
 	/// 02-F2: a separate client with no total `.timeout()`, used only for
@@ -210,6 +268,9 @@ pub struct AppState {
 	/// Inline CCR for tiny entries - no round-trip needed (< INLINE_CCR_THRESHOLD
 	/// bytes). Lock uses `.lock().map(...)` - same poison safety pattern.
 	/// Bounded to 1024 entries via LruCache to prevent unbounded memory growth.
+	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
+	/// lock is NEVER held across an `.await`; any future code that must hold
+	/// it across one switches this field to `tokio::sync::Mutex`.
 	pub inline_ccr:std::sync::Mutex<lru::LruCache<String, String>>,
 
 	// Stats
@@ -252,6 +313,9 @@ pub struct AppState {
 	/// minute 0 of a long session was replayed unchanged at minute 90, silently
 	/// diverging from what a fresh (possibly temperature>0) upstream call would
 	/// return. Checked against `response_cache_ttl` on the hit path.
+	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
+	/// lock is NEVER held across an `.await`; any future code that must hold
+	/// it across one switches this field to `tokio::sync::Mutex`.
 	pub response_cache:std::sync::Mutex<lru::LruCache<u64, (std::time::Instant, Vec<u8>)>>,
 	/// TTL applied to `response_cache` entries - reuses `cli.ccr_ttl_seconds`
 	/// so cached LLM responses don't outlive the CCR content they were
@@ -302,7 +366,7 @@ pub struct AppState {
 	/// TTL cache for the `/health/upstream` probe result: `(ok, checked_at)`.
 	/// F19: without this, a monitor polling `/health/upstream` every 10-15s
 	/// re-probes the real upstream on every single call - the exact cost
-	/// class a dev example documents (a live
+	/// class `Maintain/examples/08_health_upstream.py` documents (a live
 	/// upstream call was already removed from the plain `/health` endpoint
 	/// for this reason; `/health/upstream` just re-introduced it under a
 	/// different path).
@@ -335,6 +399,15 @@ pub struct AppState {
 /// The estimate is clamped so the ratio never goes below 1.0× (a
 /// compressor can't expand content beyond the original size in the
 /// worst case - it stores the literal).
+///
+/// W2-7: the 0.97 coefficient below is a DELIBERATE conservative
+/// direction - it systematically under-estimates compression for highly
+/// repetitive content, so the estimator errs toward compressing MORE
+/// (a smaller estimated size → higher ratio → more aggressive
+/// thresholds), which is the safe side for a gating heuristic. The
+/// estimate is a gating heuristic for the compression decision, NOT the
+/// actual compressed size - the real size is whatever the CCR backend
+/// produces.
 fn estimate_compressed_size(content:&str) -> usize {
 	use std::collections::HashSet;
 
@@ -663,11 +736,27 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		ProxyMode::Token if !cli.no_ccr_marker => {
 			let db_path = cli.ccr_db_path.as_ref().map_or_else(
 				|| {
-					dirs::home_dir()
-						.unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-						.join(".hermes")
-						.join("aphrodite")
-						.join("ccr.db")
+					match dirs::home_dir() {
+						Some(home) => home.join(".hermes").join("aphrodite").join("ccr.db"),
+						None => {
+							// W2-3: degrade, never bail. A missing home dir
+							// (HOME unset or not an absolute path) used to
+							// silently fall back to /tmp, which a container
+							// restart wipes - the whole SQLite CCR database
+							// vanished with it. Warn loudly so the operator
+							// knows the DB is ephemeral, and keep going.
+							let fallback = std::path::PathBuf::from("/tmp")
+								.join(".hermes")
+								.join("aphrodite")
+								.join("ccr.db");
+							tracing::warn!(
+								"home directory unavailable (HOME unset or not absolute) - falling back to {}: the \
+								 SQLite CCR database will not survive a container restart",
+								fallback.display()
+							);
+							fallback
+						},
+					}
 				},
 				|p| p.clone(),
 			);
@@ -726,12 +815,12 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		ccr_misses:AtomicU64::new(0),
 		ccr_created:AtomicU64::new(0),
 		tool_relay_calls:AtomicU64::new(0),
-		compression_ratio_ema:AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
+		compression_ratio_ema:AtomicU64::new(INITIAL_RATIO_EMA),
 		response_cache:Mutex::new(lru::LruCache::new(NonZeroUsize::new(128).unwrap())),
 		response_cache_ttl:std::time::Duration::from_secs(cli.ccr_ttl_seconds),
 		cache_hits:AtomicU64::new(0),
 		cache_misses:AtomicU64::new(0),
-		fill_pct:AtomicU64::new(9000), // 90.00% - moderate fill initial default
+		fill_pct:AtomicU64::new(initial_fill_pct()),
 		task_tracker:TaskTracker::new(),
 
 		inline_ccr_hits:AtomicU64::new(0),
@@ -765,7 +854,21 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 /// total timeout) instead of the bounded `state.client` - the upstream
 /// `Content-Type` isn't known until headers come back, by which point a
 /// bounded client's timeout is already ticking against the whole response.
+///
+/// W2-4: a full serde parse on every request just to read one boolean is
+/// wasteful, so there is a byte-exact fast path first: scan for the two
+/// canonical byte patterns `"stream":true` (no spaces) and `"stream": true`
+/// (one space) - the key's quotes are part of the pattern, so an
+/// escaped-quote mention inside a string value (`\"stream\": true`) can
+/// never match: the backslash breaks the contiguous bytes, and valid JSON
+/// never contains an unescaped `"` inside a string. Returning `true` only
+/// on an exact match keeps false positives impossible; the parse below
+/// stays the authority for every other spelling and falls through to it
+/// on any non-match.
 fn body_wants_stream(body:&[u8]) -> bool {
+	if body.windows(13).any(|w| w == b"\"stream\":true") || body.windows(14).any(|w| w == b"\"stream\": true") {
+		return true;
+	}
 	serde_json::from_slice::<serde_json::Value>(body)
 		.ok()
 		.and_then(|v| v.get("stream").and_then(|s| s.as_bool()))
@@ -822,6 +925,13 @@ fn cache_key_from_body(body:&[u8], api_key:&str) -> Option<u64> {
 /// without this, a marker minted at minute 0 of a long session gets its
 /// cached response replayed unchanged at minute 90, silently diverging from
 /// what a fresh (possibly temperature>0) upstream call would return.
+///
+/// W2-9: the expiry probe uses `peek`, which deliberately does NOT promote
+/// recency (it is the lru crate's non-promoting read) - an about-to-be-
+/// evicted expired entry is not kept warm just because it was inspected.
+/// A live hit uses `get`, which DOES promote the entry to
+/// most-recently-used, so the LRU eviction order stays honest and only
+/// reflects entries that are actually served.
 fn response_cache_get(state:&AppState, ck:u64) -> Option<Vec<u8>> {
 	state.response_cache.lock().ok().and_then(|mut cache| {
 		let expired = cache
@@ -1024,6 +1134,9 @@ pub async fn proxy_handler(
 	// `body_vec.clone()` forced on every request (bug 18-P9: up to 4 copies
 	// of a 1MB body under retry load).
 	let body_bytes = bytes::Bytes::from(body_vec);
+	// Retry loop: up to 3 attempts total with at most 2 retries - the
+	// `attempt < 3` guard below means attempt 3 never retries, it records
+	// the final failure instead. Only connect-phase failures retry (F17).
 	for attempt in 1..=3u32 {
 		let req = http_client
 			.request(method.clone(), &url)
@@ -1069,9 +1182,9 @@ pub async fn proxy_handler(
 				// may have been accepted by the upstream; blindly retrying a
 				// non-idempotent `POST /v1/chat/completions` risks double
 				// token billing, and combined with the 300s per-attempt
-				// timeout, 3 blind retries could hold a client for ~15
-				// minutes. Non-connect errors now fail fast on the first
-				// attempt instead.
+				// timeout, up to 3 attempts (at most 2 retries) could hold a
+				// client for ~15 minutes. Non-connect errors now fail fast on
+				// the first attempt instead.
 				if attempt < 3 && e.is_connect() {
 					let base_ms = 100 * 2u64.pow(attempt - 1);
 					let jitter = rand::random::<f64>() * 0.5 + 0.75; // 0.75x to 1.25x
@@ -1220,12 +1333,12 @@ pub async fn proxy_handler(
 					// error body as a real chat completion. TTL-stamped (F5,
 					// report 06) so it's checked against `response_cache_ttl` on
 					// the hit path instead of replaying forever.
-					if let Some(ck) = cache_key {
-						if status.is_success() && body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES {
-							if let Ok(mut cache) = state.response_cache.lock() {
-								cache.put(ck, (std::time::Instant::now(), body.clone()));
-							}
-						}
+					if let Some(ck) = cache_key
+						&& status.is_success()
+						&& body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES
+						&& let Ok(mut cache) = state.response_cache.lock()
+					{
+						cache.put(ck, (std::time::Instant::now(), body.clone()));
 					}
 					let mut builder = Response::builder().status(status);
 					builder = copy_upstream_headers(builder, &upstream_headers);
@@ -1272,12 +1385,12 @@ pub async fn proxy_handler(
 			);
 			// Store raw response in LLM cache if applicable - success only (F2, see
 			// the compressed-path cache write above for the full rationale).
-			if let Some(ck) = cache_key {
-				if status.is_success() && resp_body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES {
-					if let Ok(mut cache) = state.response_cache.lock() {
-						cache.put(ck, (std::time::Instant::now(), resp_body.to_vec()));
-					}
-				}
+			if let Some(ck) = cache_key
+				&& status.is_success()
+				&& resp_body.len() <= RESPONSE_CACHE_MAX_BODY_BYTES
+				&& let Ok(mut cache) = state.response_cache.lock()
+			{
+				cache.put(ck, (std::time::Instant::now(), resp_body.to_vec()));
 			}
 			let mut builder = Response::builder().status(status);
 			builder = copy_upstream_headers(builder, &upstream_headers);
@@ -1322,14 +1435,21 @@ pub async fn proxy_handler(
 }
 
 /// Detect content type for adaptive compression strategy.
+///
+/// 1.5.0 REFACTOR-PLAN §7: the old 145-line parallel classifier is gone -
+/// this is now a THIN call site over the single detection pipeline
+/// (`crate::preview::detect_semantic_type`) with the per-language code
+/// refinement (`preview/lang.rs`). Envelope JSON (`exit_code`/`status`) is
+/// deliberately excluded from `json` by the pipeline's envelope guard (the
+/// raw-JSON preview is the payload, WS1); the proxy keeps that one explicit
+/// check so tool envelopes still get the tool_output arm.
 fn proxy_detect_content_type(content:&str) -> &'static str {
-	let first_line = content.lines().next().unwrap_or("");
-
-	// Structured output detection
+	// tool_output envelope: the pipeline's json detector + envelope guard
+	// exclude Hermes wrapper envelopes from `json` on purpose (raw-JSON
+	// preview is the payload); recognize them here so the stored type still
+	// routes to the tool_output alias arm on the json builder.
 	if content.starts_with('{') || content.starts_with('[') {
-		// Validate JSON before classifying
 		if serde_json::from_str::<serde_json::Value>(content).is_err() {
-			// Not valid JSON despite starting with { or [ - treat as text
 			return "text";
 		}
 		if content.contains("exit_code") || content.contains("\"status\"") {
@@ -1337,135 +1457,50 @@ fn proxy_detect_content_type(content:&str) -> &'static str {
 		}
 		return "json";
 	}
-
-	// Code detection - language-specific (before broad error check)
-	if content.lines().count() > 3 {
-		// Rust - require fn keyword PLUS one of arrow, borrow, or use
-		// to distinguish from Python/JavaScript that happens to contain "fn "
-		if content.lines().any(|l| {
-			let t = l.trim_start();
-			t.starts_with("fn ")
-				|| t.starts_with("pub fn ")
-				|| t.starts_with("async fn ")
-				|| t.starts_with("pub async fn ")
-				|| t.starts_with("impl ")
-				|| t.starts_with("struct ")
-				|| t.starts_with("pub struct ")
-				|| t.starts_with("enum ")
-				|| t.starts_with("pub enum ")
-		}) && (content.contains("-> ") || content.contains("&") || content.contains("use "))
-		{
-			return "code_rust";
-		}
-		// Python
-		if content.contains("def ")
-			&& (content.contains("import ")
-				|| content.contains("class ")
-				|| content.contains("from ")
-				|| content.contains("self."))
-		{
-			return "code_python";
-		}
-		// Go
-		if (content.contains("func ") || content.contains("package ")) && content.contains("import (") {
-			return "code_go";
-		}
-		// JS/TS
-		if (content.contains("function ") || content.contains("const ") || content.contains("=> "))
-			&& (content.contains("import ") || content.contains("export "))
-		{
-			return "code_js";
-		}
-		// Generic code
-		if content.contains("fn ")
-			|| content.contains("def ")
-			|| content.contains("class ")
-			|| content.contains("import ")
-			|| content.contains("pub fn")
-		{
-			return "code";
-		}
+	match crate::preview::detect_semantic_type(content) {
+		// Language refinement: shape "code" → code_rust/python/go/js.
+		Some("code") => crate::preview::lang::detect_language(content).unwrap_or("code"),
+		Some(t) => t,
+		// Proxy-path glue: the pipeline deliberately leaves error/linter/
+		// build_output hint-supplied (the caller hint or classifier supplies
+		// them), but this gateway path HAS no hint. Keep the first-line
+		// recognition so un-hinted tracebacks/lint dumps/build logs keep
+		// their honest arms (WS2 - a traceback previewing as `[text:... |
+		// Traceback (most recent call last):]` is the misleading-preview bug
+		// class). diff/git/gitlog/log are already pipeline detectors.
+		None => {
+			let first_line = content.lines().next().unwrap_or("");
+			if first_line.starts_with("error")
+				|| first_line.starts_with("Error")
+				|| first_line.starts_with("ERROR")
+				|| first_line.starts_with("Traceback")
+				|| first_line.starts_with("panic")
+				|| first_line.starts_with("thread '")
+			{
+				"error"
+			} else if first_line.starts_with("Compiling ")
+				|| first_line.starts_with("   Compiling ")
+				|| first_line.contains("Finished")
+				|| first_line.starts_with("running ")
+				|| first_line.starts_with("test ")
+			{
+				"build_output"
+			} else if first_line.starts_with("error[E")
+				|| first_line.starts_with("error: ")
+				|| first_line.starts_with("warning[")
+				|| first_line.starts_with("warning: ")
+				|| (first_line.contains("|") && (first_line.contains("error") || first_line.contains("warning")))
+				|| first_line.contains("mypy")
+				|| first_line.contains("clippy")
+				|| first_line.contains("eslint")
+				|| first_line.contains("tsc ")
+			{
+				"linter"
+			} else {
+				"text"
+			}
+		},
 	}
-
-	// Aphrodite-side semantic detection runs BEFORE the loose first-line prefix
-	// heuristics below (which misfire on e.g. a `test result:` summary line -
-	// classified `build_output` by the `test ` prefix - or grep hits whose text
-	// happens to contain "error"). The detector is conservative (strong
-	// line-prefix / marker signals, majority votes) so it only fires on a
-	// genuine git-status / ls / test / grep / git-log shape, and it keeps the
-	// proxy path in parity with the hook/FFI path (which runs the same detector).
-	if let Some(t) = crate::preview::detect_semantic_type(content) {
-		return t;
-	}
-
-	// Error output - always keep visible
-	if first_line.contains("error")
-		|| first_line.contains("Error")
-		|| first_line.contains("ERROR")
-		|| first_line.contains("Traceback")
-		|| first_line.contains("panic")
-		|| first_line.starts_with("thread '")
-	{
-		return "error";
-	}
-
-	// Build/test output patterns
-	if first_line.starts_with("Compiling ")
-		|| first_line.starts_with("   Compiling ")
-		|| first_line.contains("Finished")
-		|| first_line.starts_with("running ")
-		|| first_line.starts_with("test ")
-	{
-		return "build_output";
-	}
-
-	// Linter output patterns
-	if first_line.starts_with("error[E")
-		|| first_line.starts_with("error: ")
-		|| first_line.starts_with("warning[")
-		|| first_line.starts_with("warning: ")
-		|| first_line.contains("|") && (first_line.contains("error") || first_line.contains("warning"))
-		|| first_line.contains("mypy")
-		|| first_line.contains("clippy")
-		|| first_line.contains("eslint")
-		|| first_line.contains("tsc ")
-	{
-		return "linter";
-	}
-
-	// Diff output
-	if first_line.starts_with("diff --git ")
-		|| first_line.starts_with("@@ -")
-		|| first_line.starts_with("+++ ")
-		|| first_line.starts_with("--- ")
-	{
-		return "diff";
-	}
-
-	// Git output
-	if first_line.starts_with("commit ") || first_line.starts_with("On branch ") {
-		return "git";
-	}
-
-	// Log output - only if content has explicit log markers
-	if content.lines().any(|l| {
-		let t = l.trim();
-		t.starts_with('[')
-			&& (t.contains("INFO")
-				|| t.contains("WARN")
-				|| t.contains("ERROR")
-				|| t.contains("DEBUG")
-				|| t.contains("TRACE")
-				|| t.contains("FATAL")
-				|| t.contains("PANIC"))
-	}) || content.lines().any(|l| {
-		let t = l.trim();
-		// Timestamp pattern: ISO-like or syslog-like date at start
-		t.starts_with(|c:char| c.is_ascii_digit()) && t.len() > 10 && (t.contains(':') || t.contains('-'))
-	}) {
-		return "log";
-	}
-	"text"
 }
 
 /// Generate structured metadata for CCR markers based on content type.
@@ -1917,159 +1952,20 @@ fn proxy_format_ccr_output(preview:&str, ct:&str, metadata:&str, center:Option<&
 	format!("{preview}\n[{ct}: {metadata}{center_seg}]\n<<<CCR:{hash}|{ct}|{size}>>>")
 }
 
-/// Build a smart content-type-aware preview for the CCR output.
-///
-/// Returns the most informative excerpt based on content type:
-/// - Code: first 3 lines (imports + first signature)
-/// - Error: the actual error line, not the traceback header
-/// - Diff: first file changed
-/// - JSON: key count summary
-/// - Default: first line, ~250 chars
-fn proxy_build_preview(content:&str, ct:&str) -> String {
-	// Parity + DEFAULT (report 09 §5): route common semantic shapes through the
-	// SAME `crate::preview::build_preview` the Hermes hook/FFI path uses, so
-	// both paths emit an IDENTICAL, self-describing `[type:...]` preview instead
-	// of drifting. Applies to the newly-enriched shapes (git status, ls, test,
-	// grep, git log) plus generic buckets the Aphrodite-side detector can
-	// upgrade. The proxy's own richer per-language arms below stay authoritative
-	// for code/error/json.
-	if matches!(
-		ct,
-		"git" | "git_status" | "gitlog" | "git_log" | "ls" | "dir" | "test" | "test_output" | "grep" | "log"
-	) || (matches!(ct, "text" | "terminal") && crate::preview::detect_semantic_type(content).is_some())
-	{
-		return crate::preview::build_preview(ct, content);
-	}
-	match ct {
-		"code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
-			// Code: structure-map preview - extract fn/def/class/struct sigs
-			let mut fns:Vec<&str> = Vec::new();
-			let mut structs:Vec<&str> = Vec::new();
-			let mut impls:Vec<&str> = Vec::new();
-			let mut classes:Vec<&str> = Vec::new();
-			let mut budget:usize = 280;
-
-			for line in content.lines() {
-				if budget == 0 {
-					break;
-				}
-				let trimmed = line.trim();
-				if trimmed.is_empty() {
-					continue;
-				}
-
-				// Rust patterns
-				if ct == "code_rust" || ct == "code" {
-					if trimmed.strip_prefix("fn ").is_some() {
-						let sig:String = trimmed.chars().take(58).collect();
-						fns.push(trimmed); // store ref, build later
-						budget = budget.saturating_sub(sig.len() + 2);
-					} else if trimmed.strip_prefix("pub fn ").is_some() {
-						let sig:String = trimmed.chars().take(58).collect();
-						fns.push(trimmed);
-						budget = budget.saturating_sub(sig.len() + 2);
-					} else if trimmed.starts_with("struct ") || trimmed.starts_with("pub struct ") {
-						let s:String = trimmed.chars().take(50).collect();
-						structs.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					} else if trimmed.starts_with("impl ") {
-						let s:String = trimmed.chars().take(50).collect();
-						impls.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					}
-				}
-				// Python patterns
-				if ct == "code_python" || ct == "code" {
-					if (trimmed.starts_with("def ") || trimmed.starts_with("async def ")) && trimmed.ends_with(':') {
-						let s:String = trimmed.chars().take(58).collect();
-						fns.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					} else if trimmed.starts_with("class ") && trimmed.ends_with(':') {
-						let s:String = trimmed.chars().take(50).collect();
-						classes.push(trimmed);
-						budget = budget.saturating_sub(s.len() + 2);
-					}
-				}
-				// Go patterns
-				if ct == "code_go" && trimmed.starts_with("func ") {
-					let s:String = trimmed.chars().take(58).collect();
-					fns.push(trimmed);
-					budget = budget.saturating_sub(s.len() + 2);
-				}
-			}
-
-			// Build summary line: [code_rust:3fns|2structs|1impl crate::proxy]
-			let mut parts:Vec<String> = Vec::new();
-			if !fns.is_empty() {
-				parts.push(format!("{}fns", fns.len()));
-			}
-			if !structs.is_empty() {
-				parts.push(format!("{}structs", structs.len()));
-			}
-			if !impls.is_empty() {
-				parts.push(format!("{}impls", impls.len()));
-			}
-			if !classes.is_empty() {
-				parts.push(format!("{}classes", classes.len()));
-			}
-			let summary = if parts.is_empty() { "?".to_string() } else { parts.join("|") };
-
-			// Show first 2 signatures inline
-			let sig_previews:Vec<String> = fns.iter().take(2).map(|s| s.chars().take(56).collect::<String>()).collect();
-			let sig_str = sig_previews.join("; ");
-
-			let lines = content.lines().count();
-			format!("[{ct}:{summary} {sig_str} {lines}L]").chars().take(300).collect()
-		},
-		"error" => {
-			// Error: find the actual error line, skip traceback noise
-			let err_line = content
-				.lines()
-				.find(|l| l.contains("Error:") || l.contains("error[") || l.contains("panicked"))
-				.unwrap_or_else(|| content.lines().next().unwrap_or(""));
-			err_line.chars().take(300).collect()
-		},
-		"diff" => {
-			// Diff: show which files changed
-			let files:Vec<&str> = content.lines().filter(|l| l.starts_with("diff --git ")).take(2).collect();
-			if files.is_empty() {
-				content.lines().next().unwrap_or("").chars().take(200).collect()
-			} else {
-				files.join("\n").chars().take(300).collect()
-			}
-		},
-		"json" | "tool_output" => {
-			// JSON: first line + key count
-			let first = content.lines().next().unwrap_or("");
-			let key_count = content.matches("\":").count();
-			format!("{} … {} keys", first.chars().take(150).collect::<String>(), key_count)
-		},
-		"build_output" => {
-			// Build: show status line
-			content
-				.lines()
-				.find(|l| l.contains("Compiling") || l.contains("Finished") || l.contains("error"))
-				.unwrap_or_else(|| content.lines().next().unwrap_or(""))
-				.chars()
-				.take(250)
-				.collect()
-		},
-		_ => {
-			// Default: first line, ~250 chars
-			content.lines().next().unwrap_or("").chars().take(250).collect()
-		},
-	}
-}
-
 /// Create a CCR marker with preview and structure for the LLM.
 ///
 /// Uses [`format_ccr_output`] for the output layout. The LLM reads the
 /// preview + structure first, then decides whether to call
 /// aphrodite_retrieve for the full content.
+///
+/// 1.5.0 (REFACTOR-PLAN §7): the parallel `proxy_build_preview` is GONE -
+/// ALL types route through the single core builder (`crate::preview::build_preview`),
+/// the same one the Hermes hook/FFI path uses, so proxy and hook previews
+/// can never drift. LLM-visible marker text converged on core formats.
 fn smart_marker(hash:&str, content:&str, ct:&str, center:Option<&str>) -> String {
 	let size = content.len();
 	let metadata = generate_metadata(content, ct);
-	let preview = proxy_build_preview(content, ct);
+	let preview = crate::preview::build_preview(ct, content);
 	proxy_format_ccr_output(&preview, ct, &metadata, center, hash, size)
 }
 
@@ -2106,70 +2002,70 @@ async fn compress_chat_completion(
 		let message = choice.get_mut("message")?;
 
 		// Compress text content with smart markers
-		if let Some(content_val) = message.get_mut("content") {
-			if let Some(content) = content_val.as_str() {
-				let ct = proxy_detect_content_type(content);
-				let threshold = (state.threshold_for(ct).max(base_threshold) as f64 * budget_mult) as usize;
-				if content.len() > threshold {
-					if let Some(ccr) = &state.ccr {
-						let hash = compute_key(content.as_bytes());
-						// F4: only replace `content` with a marker if the content is
-						// actually retrievable under `hash` - either it was already
-						// there (cache hit) or this `put` succeeded. A failed put
-						// (store full/locked/panicked) must NOT be followed by
-						// swapping the response for an unresolvable marker - that
-						// would permanently destroy content that never reached the
-						// client any other way.
-						let stored = if ccr_get(ccr, &hash).await.is_some() {
-							state.ccr_hits.fetch_add(1, Ordering::Relaxed);
-							true
-						} else {
-							state.ccr_misses.fetch_add(1, Ordering::Relaxed);
-							let ok = ccr_put(ccr, &hash, content).await;
-							if ok {
-								state.ccr_created.fetch_add(1, Ordering::Relaxed);
-							} else {
-								tracing::error!(hash = %hash, "ccr_put failed - leaving content uncompressed to avoid data loss");
-							}
-							ok
-						};
-						if stored {
-							let (compressed, orig_len) = {
-								let compressed = match state.mode {
-									ProxyMode::Cache => cache_marker(&hash, content, ct, None),
-									ProxyMode::Token => smart_marker(&hash, content, ct, None),
-								};
-								let len = content.len();
-								state.record_compression(ct);
-								(compressed, len)
-							};
-							let marker_len = compressed.len();
-							// Savings = bytes actually removed from the response
-							// (original content minus the rendered marker that
-							// replaces it), not the bare hash length - the marker
-							// is hundreds of chars longer than the 40-char hash,
-							// so subtracting only `hash.len()` overstated savings
-							// (report 05 F5). Unit is bytes throughout - see
-							// `tokens_saved`'s field doc for the naming caveat.
-							state
-								.tokens_saved
-								.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
-							*content_val = serde_json::Value::String(compressed);
-							did_compress = true;
-							state.update_compression_ratio(orig_len, marker_len);
-						}
-					}
-				} else if content.len() > state.inline_ccr_threshold() {
-					// Below compression threshold but above inline threshold: store in inline_ccr
-					// so later retrievals can find tiny entries without a backend round-trip.
+		if let Some(content_val) = message.get_mut("content")
+			&& let Some(content) = content_val.as_str()
+		{
+			let ct = proxy_detect_content_type(content);
+			let threshold = (state.threshold_for(ct).max(base_threshold) as f64 * budget_mult) as usize;
+			if content.len() > threshold {
+				if let Some(ccr) = &state.ccr {
 					let hash = compute_key(content.as_bytes());
-					if let Ok(mut map) = state.inline_ccr.lock() {
-						if map.contains(&hash) {
-							state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+					// F4: only replace `content` with a marker if the content is
+					// actually retrievable under `hash` - either it was already
+					// there (cache hit) or this `put` succeeded. A failed put
+					// (store full/locked/panicked) must NOT be followed by
+					// swapping the response for an unresolvable marker - that
+					// would permanently destroy content that never reached the
+					// client any other way.
+					let stored = if ccr_get(ccr, &hash).await.is_some() {
+						state.ccr_hits.fetch_add(1, Ordering::Relaxed);
+						true
+					} else {
+						state.ccr_misses.fetch_add(1, Ordering::Relaxed);
+						let ok = ccr_put(ccr, &hash, content).await;
+						if ok {
+							state.ccr_created.fetch_add(1, Ordering::Relaxed);
 						} else {
-							state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
-							map.put(hash, content.to_string());
+							tracing::error!(hash = %hash, "ccr_put failed - leaving content uncompressed to avoid data loss");
 						}
+						ok
+					};
+					if stored {
+						let (compressed, orig_len) = {
+							let compressed = match state.mode {
+								ProxyMode::Cache => cache_marker(&hash, content, ct, None),
+								ProxyMode::Token => smart_marker(&hash, content, ct, None),
+							};
+							let len = content.len();
+							state.record_compression(ct);
+							(compressed, len)
+						};
+						let marker_len = compressed.len();
+						// Savings = bytes actually removed from the response
+						// (original content minus the rendered marker that
+						// replaces it), not the bare hash length - the marker
+						// is hundreds of chars longer than the 40-char hash,
+						// so subtracting only `hash.len()` overstated savings
+						// (report 05 F5). Unit is bytes throughout - see
+						// `tokens_saved`'s field doc for the naming caveat.
+						state
+							.tokens_saved
+							.fetch_add(orig_len.saturating_sub(marker_len) as u64, Ordering::Relaxed);
+						*content_val = serde_json::Value::String(compressed);
+						did_compress = true;
+						state.update_compression_ratio(orig_len, marker_len);
+					}
+				}
+			} else if content.len() > state.inline_ccr_threshold() {
+				// Below compression threshold but above inline threshold: store in inline_ccr
+				// so later retrievals can find tiny entries without a backend round-trip.
+				let hash = compute_key(content.as_bytes());
+				if let Ok(mut map) = state.inline_ccr.lock() {
+					if map.contains(&hash) {
+						state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+					} else {
+						state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
+						map.put(hash, content.to_string());
 					}
 				}
 			}
@@ -2302,11 +2198,11 @@ async fn execute_tool_relay(
 			// exact-match only.
 			let hash = crate::marker::normalize_hash(hash_raw);
 			// Check inline_ccr first (no round-trip needed for tiny entries)
-			if let Ok(mut map) = state.inline_ccr.lock() {
-				if let Some(content) = map.get(hash) {
-					state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
-					return Ok(serde_json::json!({"found": true, "content": content.clone()}));
-				}
+			if let Ok(mut map) = state.inline_ccr.lock()
+				&& let Some(content) = map.get(hash)
+			{
+				state.inline_ccr_hits.fetch_add(1, Ordering::Relaxed);
+				return Ok(serde_json::json!({"found": true, "content": content.clone()}));
 			}
 			state.inline_ccr_misses.fetch_add(1, Ordering::Relaxed);
 			// Fallback to CCR store
@@ -2749,7 +2645,7 @@ pub(crate) mod tests {
 			ccr_misses:AtomicU64::new(0),
 			ccr_created:AtomicU64::new(0),
 			tool_relay_calls:AtomicU64::new(0),
-			compression_ratio_ema:AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
+			compression_ratio_ema:AtomicU64::new(INITIAL_RATIO_EMA),
 			request_history:Mutex::new(VecDeque::new()),
 			inline_ccr:Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
 			latency_buckets:[
@@ -2766,7 +2662,7 @@ pub(crate) mod tests {
 			response_cache_ttl:std::time::Duration::from_secs(3600),
 			cache_hits:AtomicU64::new(0),
 			cache_misses:AtomicU64::new(0),
-			fill_pct:AtomicU64::new(9000),
+			fill_pct:AtomicU64::new(initial_fill_pct()),
 			task_tracker:TaskTracker::new(),
 			inline_ccr_hits:AtomicU64::new(0),
 			inline_ccr_misses:AtomicU64::new(0),
@@ -2863,11 +2759,11 @@ code_multiplier = 6.5
 		.unwrap();
 
 		// No other test in this crate reads/writes APHRODITE_CONFIG_PATH.
-		std::env::set_var("APHRODITE_CONFIG_PATH", &path);
+		unsafe { std::env::set_var("APHRODITE_CONFIG_PATH", &path) };
 		let state = std::sync::Arc::new(test_state());
 		let rt = tokio::runtime::Runtime::new().unwrap();
 		let resp = rt.block_on(handle_ccr_reload(State(state.clone()))).into_response();
-		std::env::remove_var("APHRODITE_CONFIG_PATH");
+		unsafe { std::env::remove_var("APHRODITE_CONFIG_PATH") };
 		let _ = std::fs::remove_file(&path);
 
 		assert_eq!(resp.status(), axum::http::StatusCode::OK);
@@ -3009,6 +2905,23 @@ code_multiplier = 6.5
 	}
 
 	#[test]
+	fn test_detect_content_type_comment_mentioning_error_is_not_error() {
+		let _g = crate::preview::preview_cap_test_guard();
+		// W2-6: the first-line error markers are `starts_with`, not
+		// `contains` - a Rust doc comment line mentioning "error recovery"
+		// (starting with `///`) must not classify as an error, while a real
+		// traceback first line still does.
+		assert_ne!(
+			proxy_detect_content_type("/// Handles error recovery gracefully.\nThe system continues.\n"),
+			"error"
+		);
+		assert_eq!(
+			proxy_detect_content_type("Traceback (most recent call last):\n  File \"x.py\", line 1\nValueError: bad\n"),
+			"error"
+		);
+	}
+
+	#[test]
 	fn test_detect_content_type_diff() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let d = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,3 +1,4 @@\n+added a \
@@ -3078,18 +2991,22 @@ code_multiplier = 6.5
 	}
 
 	// ── T3: build_preview ────────────────────────────────────────
+	// 1.5.0 (REFACTOR-PLAN §7): `proxy_build_preview` is GONE - the proxy
+	// routes ALL types through the single core builder
+	// (`crate::preview::build_preview`, same as the Hermes hook/FFI path),
+	// so these pins now exercise the shared builder directly.
 	#[test]
 	fn test_build_preview_code_has_ct_prefix() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "fn add(a:i32, b:i32) -> i32 {\n    a + b\n}\n";
-		let preview = proxy_build_preview(src, "code_rust");
-		assert!(preview.starts_with("[code_rust:"));
+		let preview = crate::preview::build_preview("code_rust", src);
+		assert!(preview.starts_with("[code:"), "core code arm expected, got {preview}");
 	}
 
-	// ── Parity (report 09 §5): for the common semantic shapes the proxy path
-	// (`proxy_build_preview`) must emit the IDENTICAL preview string the Hermes
-	// hook/FFI path emits (`crate::preview::build_preview`), so the two code
-	// paths never drift. Both are wired to the same shared builder + detector.
+	// ── Parity (1.5.0): the proxy path IS the hook path - `smart_marker` and
+	// the Hermes hook/FFI path both call `crate::preview::build_preview`, so
+	// previews can never drift by construction. The pins below prove the
+	// classify → build round-trip still yields enriched `[type:...]` previews.
 	#[test]
 	fn test_proxy_and_hook_previews_are_identical_for_semantic_shapes() {
 		let _g = crate::preview::preview_cap_test_guard();
@@ -3098,12 +3015,15 @@ code_multiplier = 6.5
 		let ripgrep = "src/a.rs:12:hit one\nsrc/a.rs:20:hit two\nsrc/b.rs:5:hit three";
 		let ls = "-rw-r--r-- 1 u g 10 x a.rs\n-rw-r--r-- 1 u g 10 x b.rs\ndrwxr-xr-x 2 u g 64 x sub";
 		for content in [git_status, cargo_test, ripgrep, ls] {
-			// Both paths independently classify then build - the results must match.
+			// Classify via the proxy path, build via the single core builder -
+			// the same call `smart_marker` makes.
 			let ct = proxy_detect_content_type(content);
-			let proxy_preview = proxy_build_preview(content, ct);
-			let hook_preview = crate::preview::build_preview(ct, content);
-			assert_eq!(proxy_preview, hook_preview, "preview drift for ct={ct} content={content:?}");
-			assert!(proxy_preview.starts_with('['), "expected enriched preview, got {proxy_preview}");
+			let preview = crate::preview::build_preview(ct, content);
+			assert!(preview.starts_with('['), "expected enriched preview, got {preview}");
+			assert!(
+				preview.contains(&format!("{ct}")),
+				"preview must be self-describing for ct={ct}: {preview}"
+			);
 		}
 	}
 
@@ -3111,7 +3031,7 @@ code_multiplier = 6.5
 	fn test_build_preview_error_has_ct_prefix_via_error_line() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "some noise\nerror[E0308]: mismatched types\nmore noise\n";
-		let preview = proxy_build_preview(src, "error");
+		let preview = crate::preview::build_preview("error", src);
 		assert!(preview.contains("error[E0308]"));
 	}
 
@@ -3119,15 +3039,15 @@ code_multiplier = 6.5
 	fn test_build_preview_diff_has_ct_prefix() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "diff --git a/x b/x\n--- a/x\n+++ a/x\n";
-		let preview = proxy_build_preview(src, "diff");
-		assert!(preview.starts_with("diff --git"));
+		let preview = crate::preview::build_preview("diff", src);
+		assert!(preview.starts_with("[diff:"), "core diff arm expected, got {preview}");
 	}
 
 	#[test]
 	fn test_build_preview_json_has_ct_prefix() {
 		let _g = crate::preview::preview_cap_test_guard();
 		let src = "{\"a\":1,\"b\":2}\n";
-		let preview = proxy_build_preview(src, "json");
+		let preview = crate::preview::build_preview("json", src);
 		assert!(preview.contains("keys"));
 	}
 
@@ -3239,6 +3159,46 @@ code_multiplier = 6.5
 		assert!(!body_wants_stream(b"not json"));
 	}
 
+	#[test]
+	fn test_body_wants_stream_large_body_flag_at_end() {
+		// W2-4 fast path: the flag sits after a large messages array, so a
+		// byte scan (not the full serde parse) must find it.
+		let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
+		for i in 0..500 {
+			if i > 0 {
+				body.push(',');
+			}
+			body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
+		}
+		body.push_str("],\"stream\":true}");
+		assert!(body_wants_stream(body.as_bytes()));
+	}
+
+	#[test]
+	fn test_body_wants_stream_flag_in_message_string_escaped_quotes() {
+		// W2-4: the pattern inside a message string has escaped quotes
+		// (`\"stream\": true`), which insert backslash bytes and break the
+		// contiguous byte pattern - the fast path must not fire, and the
+		// parse (authority) returns false since `stream` is not a key.
+		let body = br#"{"messages":[{"role":"user","content":"the docs say \"stream\": true"}]}"#;
+		assert!(!body_wants_stream(body));
+	}
+
+	#[test]
+	fn test_body_wants_stream_large_body_without_flag() {
+		// W2-4: large body with no `stream` key anywhere - fast path misses
+		// and the parse agrees.
+		let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
+		for i in 0..500 {
+			if i > 0 {
+				body.push(',');
+			}
+			body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
+		}
+		body.push_str("]}");
+		assert!(!body_wants_stream(body.as_bytes()));
+	}
+
 	fn test_state() -> AppState {
 		use std::{collections::HashMap, sync::Mutex};
 		AppState {
@@ -3261,7 +3221,7 @@ code_multiplier = 6.5
 			ccr_misses:AtomicU64::new(0),
 			ccr_created:AtomicU64::new(0),
 			tool_relay_calls:AtomicU64::new(0),
-			compression_ratio_ema:AtomicU64::new(200), // initial: 2.0x - conservative, avoids startup scale-up
+			compression_ratio_ema:AtomicU64::new(INITIAL_RATIO_EMA),
 			request_history:Mutex::new(VecDeque::new()),
 			inline_ccr:Mutex::new(lru::LruCache::new(NonZeroUsize::new(1024).unwrap())),
 			latency_buckets:[
@@ -3278,7 +3238,7 @@ code_multiplier = 6.5
 			response_cache_ttl:std::time::Duration::from_secs(3600),
 			cache_hits:AtomicU64::new(0),
 			cache_misses:AtomicU64::new(0),
-			fill_pct:AtomicU64::new(9000),
+			fill_pct:AtomicU64::new(initial_fill_pct()),
 			task_tracker:TaskTracker::new(),
 			inline_ccr_hits:AtomicU64::new(0),
 			inline_ccr_misses:AtomicU64::new(0),
@@ -3634,9 +3594,9 @@ code_multiplier = 6.5
 	}
 
 	// ── T15 (F2): regression tests for the historical corpus examples ────
-	// These exercise the real Rust code (unlike Python example
-	// re-implementations of the buggy/fixed logic, which can never
-	// catch a Rust regression).
+	// These exercise the real Rust code (unlike Maintain/examples/*.py,
+	// which re-implement the buggy/fixed logic in Python and can never
+	// catch a Rust regression - see Maintain/examples/README.md).
 
 	/// Corpus 07_tokens_saved.py: the AtomicU64 must actually be incremented
 	/// on the real compression path, not just exist unused in /stats.

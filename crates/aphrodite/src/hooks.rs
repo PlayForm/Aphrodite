@@ -106,14 +106,52 @@ fn wrote_path_from(tool_name:&str, args:Option<&serde_json::Value>, content:&str
 	}
 	if let Some(v) = args {
 		for key in ["path", "file", "file_path", "filename"] {
-			if let Some(p) = v.get(key).and_then(|x| x.as_str()) {
-				if !p.is_empty() {
-					return Some(p.to_string());
-				}
+			if let Some(p) = v.get(key).and_then(|x| x.as_str())
+				&& !p.is_empty()
+			{
+				return Some(p.to_string());
 			}
 		}
 	}
 	extract_file_path(content, tool_name)
+}
+
+/// Resolve the reported `type` and the content the preview is built from.
+///
+/// Shared by the tool-result and terminal-output paths (F14): both resolve
+/// an optional classify pair, falling back to Aphrodite's semantic detector
+/// with a single terminal override, so the reported `type` AND the preview
+/// both carry the high-signal shape. Detection stays in Aphrodite's layer -
+/// the vendored classifier is untouched. Single type-resolution contract
+/// (1.5.0 REFACTOR-PLAN §5).
+///
+/// `terminal_hint` enables the override: terminal output carrying an
+/// `exit code:` / `Error:` line is always typed `terminal`, no matter what
+/// the detector says. The tool path passes `false`, the terminal path
+/// `true`.
+fn resolve_type_and_classify_content<'a>(
+	content:&'a str,
+	classify:Option<(&'a str, &'a str)>,
+	terminal_hint:bool,
+) -> (String, &'a str) {
+	match classify {
+		Some((c, t)) => (t.to_string(), c),
+		None => {
+			let ct = transforms::content_detector::detect_content_type(content).content_type;
+			let t = if terminal_hint && (content.contains("exit code:") || content.contains("Error:")) {
+				"terminal".to_string()
+			} else {
+				// Terminal output is very often a git status / ls / test / grep
+				// dump; upgrade a generic classification via Aphrodite's detector
+				// so the preview is high-signal on the terminal path too.
+				let base = ct.as_str().to_string();
+				let inp = crate::preview::input::Input::new(content)
+					.unwrap_or_else(|| crate::preview::input::Input::empty(content));
+				crate::preview::r#type::resolve_effective_type(&base, &inp).into_owned()
+			};
+			(t, content)
+		},
+	}
 }
 
 fn transform_tool_result_inner(
@@ -144,10 +182,10 @@ fn transform_tool_result_inner(
 	// never recorded. Skipping compression and recording a reference are
 	// independent decisions; do both regardless of which tools land in
 	// which list.
-	if state.file_tools.contains(&tool_name.to_string()) {
-		if let Some(path) = extract_file_path(content, tool_name) {
-			state.record_file(path, tool_name.to_string());
-		}
+	if state.file_tools.contains(&tool_name.to_string())
+		&& let Some(path) = extract_file_path(content, tool_name)
+	{
+		state.record_file(path, tool_name.to_string());
 	}
 
 	// Skip essential tools
@@ -167,29 +205,7 @@ fn transform_tool_result_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let (type_str, classify_content):(String, &str) = match classify {
-		Some((c, t)) => (t.to_string(), c),
-		None => {
-			// Extend the "terminal" override pattern: let Aphrodite's own
-			// semantic detector upgrade a generic classification (git status,
-			// ls, test, grep, git log) so the reported `type` AND the preview
-			// both carry the high-signal shape. Detection stays in Aphrodite's
-			// layer - the vendored classifier is untouched.
-			let base = transforms::content_detector::detect_content_type(content)
-				.content_type
-				.as_str()
-				.to_string();
-			let t = match base.as_str() {
-				"text" | "log" | "plain" | "" => {
-					crate::preview::detect_semantic_type(content)
-						.map(|s| s.to_string())
-						.unwrap_or(base)
-				},
-				_ => base,
-			};
-			(t, content)
-		},
-	};
+	let (type_str, classify_content) = resolve_type_and_classify_content(content, classify, false);
 	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 
 	state.inline_store_put(hash.clone(), content.to_string());
@@ -320,11 +336,11 @@ fn transform_terminal_output_inner(
 				// message, so skip the hint there (no duplication). The hint
 				// is merged INSIDE the preview's brackets: `[text:2L 63B |
 				// scanning... ⚠ grep: ...]`, never appended after the `]`.
-				if !preview.contains("error[") {
-					if let Some(hint) = crate::chain_split::segment_error_hint(seg_text) {
-						let inner = preview.trim_end_matches(']');
-						preview = format!("{} ⚠ {}]", inner, hint);
-					}
+				if !preview.contains("error[")
+					&& let Some(hint) = crate::chain_split::segment_error_hint(seg_text)
+				{
+					let inner = preview.trim_end_matches(']');
+					preview = format!("{} ⚠ {}]", inner, hint);
 				}
 				let marker = ccr_marker(&seg_hash, &type_str, seg_text.len(), &preview, None, None, None);
 				total_marker += marker.len();
@@ -372,29 +388,7 @@ fn transform_terminal_output_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
-	let (type_str, classify_content):(String, &str) = match classify {
-		Some((c, t)) => (t.to_string(), c),
-		None => {
-			let ct = transforms::content_detector::detect_content_type(content).content_type;
-			let t = if content.contains("exit code:") || content.contains("Error:") {
-				"terminal".to_string()
-			} else {
-				// Terminal output is very often a git status / ls / test / grep
-				// dump; upgrade a generic classification via Aphrodite's detector
-				// so the preview is high-signal on the terminal path too.
-				let base = ct.as_str().to_string();
-				match base.as_str() {
-					"text" | "log" | "plain" | "" => {
-						crate::preview::detect_semantic_type(content)
-							.map(|s| s.to_string())
-							.unwrap_or(base)
-					},
-					_ => base,
-				}
-			};
-			(t, content)
-		},
-	};
+	let (type_str, classify_content) = resolve_type_and_classify_content(content, classify, true);
 
 	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 	state.inline_store_put(hash.clone(), content.to_string());
@@ -454,14 +448,23 @@ pub fn pre_llm_call(state:&mut AphroditeState) -> serde_json::Value {
 
 /// Post-LLM call hook - archive turn.
 ///
-/// Archives the last marker recorded this turn into `conv_index` before
-/// advancing the turn counter (report 06 F11/T13) - previously `archive_turn`
+/// Archives the largest marker recorded this turn into `conv_index` before
+/// advancing the turn counter (report 06 F11/T13/F13) - previously `archive_turn`
 /// was never called from any hook, so `conv_index` stayed empty forever and
 /// `aphrodite_diff` always returned zero turns despite compressions
 /// happening every turn.
 pub fn post_llm_call(state:&mut AphroditeState) -> serde_json::Value {
-	if let Some(last) = state.recent_markers.iter().rev().find(|m| m.turn == state.turn_counter) {
-		let (hash, summary, size) = (last.hash.clone(), last.preview.clone(), last.size);
+	// Archive the LARGEST marker recorded this turn (T13/F13): the last
+	// recorded marker is usually the least informative (e.g. a tiny confirm
+	// echo), while the largest carries the most content for the conversation
+	// index. Ties keep the later-recorded entry.
+	if let Some(largest) = state
+		.recent_markers
+		.iter()
+		.filter(|m| m.turn == state.turn_counter)
+		.max_by_key(|m| m.size)
+	{
+		let (hash, summary, size) = (largest.hash.clone(), largest.preview.clone(), largest.size);
 		crate::session::archive_turn(state, &hash, &summary, size);
 	}
 	crate::session::next_turn(state);
@@ -612,6 +615,36 @@ mod tests {
 		assert_eq!(s.turn_counter, 3);
 		assert_eq!(s.conv_index.len(), 1, "post_llm_call must archive the turn");
 		assert_eq!(s.conv_index[&2].0, "hash42");
+	}
+
+	// ── T13 (F13): when a turn records several markers, post_llm_call must
+	// archive the LARGEST one, not merely the last recorded - the reverse
+	// find picked the least informative marker (e.g. a tiny confirm echo
+	// recorded after a big tool dump).
+	#[test]
+	fn test_post_llm_call_archives_largest_same_turn_marker() {
+		let mut s = AphroditeState::default();
+		s.turn_counter = 7;
+		let record = |s:&mut AphroditeState, hash:&str, size:usize| {
+			s.record_marker(MarkerEntry {
+				hash:hash.into(),
+				ccr_type:"text".into(),
+				size,
+				preview:format!("[text] {}", size),
+				turn:7,
+				center:None,
+				meta:None,
+			});
+		};
+		record(&mut s, "large", 900);
+		// Two smaller markers recorded AFTER the large one - the old
+		// reverse-find would have picked one of these.
+		record(&mut s, "small-1", 40);
+		record(&mut s, "small-2", 41);
+		let _ = post_llm_call(&mut s);
+		assert_eq!(s.turn_counter, 8);
+		assert_eq!(s.conv_index.len(), 1, "post_llm_call must archive the turn");
+		assert_eq!(s.conv_index[&7].0, "large", "largest same-turn marker must win");
 	}
 
 	// ── Poll-worker integration tests ──────────────────────────

@@ -8,7 +8,7 @@ repository.workspace = true
 description = "aphrodite: Chat Completions proxy with CCR, tool relay, and programmatic CCR for Hermes agent integration."
 exclude = ["examples/", "tests/", "benches/", ".hermes/", ".plans/"]
 # NOTE: do NOT add `*.md` here. `src/builtin_directives/*.md` are embedded into
-# the binary via `include_str!` (see src/directives.rs) and MUST ship in the
+# the binary via `include_str!` (see src/directives/) and MUST ship in the
 # crates.io tarball. Cargo does NOT auto-include `include_str!` targets, so a
 # recursive `*.md` exclude previously stripped them from v1.3.8, producing a
 # tarball that failed to compile on `cargo install`. Removing `*.md` from
@@ -62,9 +62,6 @@ url = { version = "2.5.8", optional = true }
 uuid = { version = "1.26.1", features = ["v4"], optional = true }
 lru = { version = "0.18.4", optional = true }
 dirs = { version = "7.0.0" }
-
-chrono = { version = "0.4.45", features = ["serde"] }
-
 toml = "1.1.6+spec-1.1.0"
 notify = { version = "8.2.0", optional = true }
 regex = "1.13.1"
