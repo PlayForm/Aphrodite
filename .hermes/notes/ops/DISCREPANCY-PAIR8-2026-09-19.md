@@ -6,16 +6,16 @@ verified stale against source on 2026-09-19 and corrected in the rewrite.
 - [2026-09-19] docs/hermes-integration.md:20: "All five hooks register in
   plugin.yaml" stale; the plugin registers SIX hooks
   (plugins/aphrodite/plugin.yaml:7-13 provides_hooks;
-  plugins/aphrodite/__init__.py:1144-1175 registers one callback per name
+  plugins/aphrodite/**init**.py:1144-1175 registers one callback per name
   from aphrodite_hermes_get_hooks) - pre_tool_call was missing from the doc.
 - [2026-09-19] docs/hermes-integration.md:17: context_engine listed as a
   hook in the architecture diagram; it is not a hook - plugin.yaml:28
   declares provides_context_engine, and the Hermes context engine registers
-  only when APHRODITE_CONTEXT_ENGINE=1 (plugins/aphrodite/__init__.py:1206-1214);
+  only when APHRODITE_CONTEXT_ENGINE=1 (plugins/aphrodite/**init**.py:1206-1214);
   the per-turn catalog is injected via pre_llm_call by default.
 - [2026-09-19] docs/hermes-integration.md:12,26: proxy launch attributed to
   on_session_start; proxies actually launch at plugin load via _start_proxy()
-  with a health-probe skip (plugins/aphrodite/__init__.py:890,1216;
+  with a health-probe skip (plugins/aphrodite/**init**.py:890,1216;
   APHRODITE_NO_AUTO_LAUNCH opt-out at 915).
 - [2026-09-19] docs/hermes-integration.md:4,90: tree/Development links;
   default branch is Current (remotes/Source/HEAD -> Source/Current).

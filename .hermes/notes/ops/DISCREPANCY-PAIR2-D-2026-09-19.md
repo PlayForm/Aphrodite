@@ -15,8 +15,8 @@ PAIR-2, classification category).
   classifier with its own registry (build_error, search_results,
   process_output, search_files, tabular, json_list, tool, terminal,
   aphrodite, context, build, compress) and a 5,000-char detection order; no
-  Python classifier exists - plugins/aphrodite/__init__.py is a thin ctypes
-  shim (grep classify: 0 hits in plugin and templates/__init__.py mirror);
+  Python classifier exists - plugins/aphrodite/**init**.py is a thin ctypes
+  shim (grep classify: 0 hits in plugin and templates/**init**.py mirror);
   classification is entirely Rust-side. build_error/terminal/search survive
   only via tools.rs unwrap_hermes_result.
 - [2026-09-19] docs/ccr/content-types.md: "Code (×4)" threshold stale; code

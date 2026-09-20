@@ -7,10 +7,10 @@ Partner (B) audits docs/HEADROOM-FORK-DIFF.md + docs/hermes-tool-output-schemas.
 
 ## Verdict summary
 
-| File                          | Verdict        | Destination                                       |
-| ----------------------------- | -------------- | ------------------------------------------------- |
-| docs/agent-feedback.md        | MOVE-INTERNAL  | .hermes/notes/agent-feedback.md (internal archive)|
-| docs/APHRODITE-HEADROOM.md    | MOVE-INTERNAL  | .hermes/notes/APHRODITE-HEADROOM.md (internal)    |
+| File                       | Verdict       | Destination                                        |
+| -------------------------- | ------------- | -------------------------------------------------- |
+| docs/agent-feedback.md     | MOVE-INTERNAL | .hermes/notes/agent-feedback.md (internal archive) |
+| docs/APHRODITE-HEADROOM.md | MOVE-INTERNAL | .hermes/notes/APHRODITE-HEADROOM.md (internal)     |
 
 Rationale (both): fork-divergence/feedback docs were already removed from the release
 line in 1.4.6 (.hermes/release-notes/v1.4.6.md:54-56); internal process artifacts are
@@ -63,7 +63,7 @@ convention as partner B's .hermes/notes/HEADROOM-FORK-DIFF.md).
   docs/ccr/backends/in-memory.md:36,39, docs/proxy/architecture.md:20-21 (8192/1024 byte
   thresholds, 10,000 entries, ccr_ttl_seconds default 3600).
 - L340-342: linter/build_output/log pinned at BASE, not halved - proxy.rs:475.
-- L352-354: runtime home ~/.hermes/aphrodite (ccr.db, binaries/) - __init__.py:34,145,317,
+- L352-354: runtime home ~/.hermes/aphrodite (ccr.db, binaries/) - **init**.py:34,145,317,
   501,519,801,919; ccr.db joined at proxy.rs:670.
 - L290-314: first-turn session_inject from [prompts] session_inject, SHIPPED_SESSION_INJECT
   fallback - config_loader.rs:293-301, flow.rs:18.
@@ -113,13 +113,13 @@ B's .hermes/notes/HEADROOM-FORK-DIFF.md; the two fork-divergence docs stay toget
   (aphrodite.toml.example:59). STALE.
 - L41: "Python side uses SHA-256 independently - hashes differ but are consistent within
   each language" - FALSE: zero hashing code in the Python plugin (0 "hash" matches in
-  plugins/aphrodite/__init__.py; _bindings.py FFI exposes no hash symbol; sha256/blake3/
+  plugins/aphrodite/**init**.py; _bindings.py FFI exposes no hash symbol; sha256/blake3/
   hashlib only in download.sh binary-integrity check + layout_check.py). CCR hash is Rust
   BLAKE3 40-hex via headroom_core (hooks.rs:28-29). Also self-contradicts L28 of the same
   doc ("Identical CCR hash, marker format, inline store between Rust proxy and Python
   plugin"). STALE.
 - L85: "Location: ~/.hermes/aphrodite/aphrodite" - canonical path is
-  ~/.hermes/aphrodite/binaries/aphrodite (__init__.py:317,343,501,519,801,919). STALE.
+  ~/.hermes/aphrodite/binaries/aphrodite (**init**.py:317,343,501,519,801,919). STALE.
 - L25: "Rhai scripting ... (--features scripting)" - no rhai/scripting in any crates/*
   Cargo.toml or Cargo.lock (grep: zero matches). Feature absent in 1.4.6. STALE.
 - L159: links `.../tree/Development/docs/HEADROOM-FORK-DIFF.md` - default branch is
@@ -157,10 +157,10 @@ commit sweep). Keep paired with .hermes/notes/HEADROOM-FORK-DIFF.md.
 - [2026-09-19] docs/APHRODITE-HEADROOM.md:19: auto-expand "off by default"; shipped
   auto_expand = true (aphrodite.toml.example:59).
 - [2026-09-19] docs/APHRODITE-HEADROOM.md:41: "Python side uses SHA-256 independently";
-  no hashing code in plugins/aphrodite/ (0 hash matches in __init__.py); CCR hash is Rust
+  no hashing code in plugins/aphrodite/ (0 hash matches in **init**.py); CCR hash is Rust
   BLAKE3 (hooks.rs:28-29); contradicts the doc's own L28 parity claim.
 - [2026-09-19] docs/APHRODITE-HEADROOM.md:85: binary at ~/.hermes/aphrodite/aphrodite;
-  real path ~/.hermes/aphrodite/binaries/aphrodite (__init__.py:317,343,501,519,801,919).
+  real path ~/.hermes/aphrodite/binaries/aphrodite (**init**.py:317,343,501,519,801,919).
 - [2026-09-19] docs/APHRODITE-HEADROOM.md:25: Rhai scripting feature-gated hooks; no rhai/
   scripting in crates Cargo.toml or Cargo.lock (absent in 1.4.6).
 - [2026-09-19] docs/APHRODITE-HEADROOM.md:159: tree/Development link; default branch is

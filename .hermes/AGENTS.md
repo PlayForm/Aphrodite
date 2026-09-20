@@ -5,13 +5,13 @@ Welcome! You're working on Aphrodite: a blazing-fast CCR compression engine
 `<<<CCR:hash|type|size>>>` markers so agents keep full context at a fraction
 of the token cost. Read this file first - it is the map.
 
-## Current state (verified 2026-09-18)
+## Current state (verified 2026-09-20)
 
-- **Binary 1.4.6** - `crates/aphrodite` (plus `crates/aphrodite-hermes`,
+- **Binary 1.5.0** - `crates/aphrodite` (plus `crates/aphrodite-hermes`,
   `package.json`, `plugins/aphrodite/BINARY_VERSION`). For live values ask
   `aphrodite --version` / `aphrodite_stats`, never trust a hardcoded doc
   number.
-- **Plugin 2.1.4** - `plugins/aphrodite` is a git submodule
+- **Plugin 2.2.0** - `plugins/aphrodite` is a git submodule
   (PlayForm/Aphrodite-Hermes, remote `Source`). It is a **pure loader**: all
   compression/engine logic lives in the Rust dylib
   (`libaphrodite_hermes.dylib`); the FFI bindings are **generated**
@@ -22,7 +22,7 @@ of the token cost. Read this file first - it is the map.
   (binary + dylib, auto-downloaded/auto-updated), `directives/`,
   `hotreload/` (dylib hot-reloads on mtime), `ccr.db`. The layout
   self-heals on start (re-copies binaries/directives/hotreload).
-- **Skills live dev-side** in `.hermes/skills/` (13 skills) and auto-load
+- **Skills live dev-side** in `.hermes/skills/` (17 skills) and auto-load
   because the repo is listed in `skills.trusted_project_dirs`
   (`~/.hermes/config.yaml`) - never ship them with the plugin, never re-trust.
 - **Issue #11 preview machinery (landed in 1.4.6)** - honest previews: the
@@ -48,7 +48,7 @@ of the token cost. Read this file first - it is the map.
 | Forked deps     | `vendor/headroom/` (submodule; `aphrodite-headroom-core`)                       |
 | Config          | `aphrodite.toml.example` (tracked); `aphrodite.toml` (local, gitignored)        |
 | Runtime         | `~/.hermes/aphrodite/`                                                          |
-| Release         | `.hermes/release/RELEASE-TEMPLATE.md`, `.hermes/release-notes/` (v1.4.0…v1.4.3) |
+| Release         | `.hermes/release/RELEASE-TEMPLATE.md`, `.hermes/release-notes/` (v1.4.0…v1.4.6) |
 | Dev archive     | `.hermes/` - skills/, tmp/ (scratch), scripts/, classification/, notes/, uml/   |
 | Maintenance     | `Maintain/` (scripts/, tests/, CHANGELOG.md)                                    |
 
@@ -61,9 +61,9 @@ of the token cost. Read this file first - it is the map.
   to touch it) and the plugin keeps running old code while the proxy looks
   alive.
 - **Pane 1**: `hermes --profile dev-aphrodite` - test in production.
-- Enable auto-expand for dev sessions (`APHRODITE_AUTO_EXPAND=1` or TOML);
-  when you see a `<<<CCR:...>>>` marker, `aphrodite_retrieve(hash)` it -
-  never re-read the source file behind it.
+- Auto-expand is **inert configuration** (parsed, no active consumer) - never
+  enable it to debug markers; when you see a `<<<CCR:...>>>` marker,
+  `aphrodite_retrieve(hash)` it - never re-read the source file behind it.
 - Scratch belongs in `.hermes/tmp/` (gitignored contents, tracked
   `.gitkeep`), NEVER `/tmp`; gzip/tar.gz bulky fixtures in place.
 
@@ -87,21 +87,30 @@ Run all gates before any release claim; report what commands printed, never
 
 ## Dev-side skills (auto-load; edit the files directly)
 
-- `aphrodite-release-flow` v2.0.0 - THE release/hotfix ceremony, incl. B4.
-  (`aphrodite-branch-release-flow` v1.1.0 is DEPRECATED - archive only.)
+- `aphrodite-release-flow` v2.1.0 - THE release/hotfix ceremony, incl. B4
+  and the pre-tag trigger audit (Gate R7).
+  (`aphrodite-branch-release-flow` is ARCHIVED - historical only, do not execute.)
+- `aphrodite-release-workflow` v2.1.0 - release gates: version ledger,
+  artifact contract matrix, publishing separation, release-notes standards,
+  crates.io publishing.
+- `aphrodite-boundaries` - universal stop conditions and repair constraints;
+  `aphrodite-orientation` - mandatory preflight gate before any live procedure.
 - `aphrodite-testing-discipline` - probe/test rules: exercise the real
   plugin, no raw ctypes, scratch in `.hermes/tmp/`, env-var hermeticity.
 - `aphrodite-tool-testing` - the 13 CCR tools + retrieve-first rule.
+- `aphrodite-hook-reference` v2.0.0 - dispatcher; the five contract skills
+  (`aphrodite-hook-contracts`, `aphrodite-context-engine-contract`,
+  `aphrodite-ccr-protocol`, `aphrodite-compression-safety`,
+  `aphrodite-engine-observability`) own the details.
 - `aphrodite-operations` - compressed-session workflow, rebuild, dep pins.
-- `aphrodite-release-workflow` - release gates, version-sync locations,
-  release-notes standards, crates.io publishing.
-- `aphrodite-hook-reference` - exact Hermes hook invocations.
-- `aphrodite-benchmarking` - proxy smoke/cache/threshold benchmarking.
-- `aphrodite-auto-expand-testing` - auto-expand behavior matrix.
-- `aphrodite-cargo-upgrade`, `aphrodite-upgrade-breakpoints` - silent
-  breakage checklists for dep upgrades.
-- `aphrodite-development-lessons` - session setup + imperative pitfalls.
-- `aphrodite-v0.8.6-patterns` - historical snapshot only.
+- `aphrodite-development` - session setup + imperative pitfalls
+  (supersedes `aphrodite-development-lessons`).
+- `aphrodite-benchmarking` - reproducible proxy smoke/cache/threshold
+  benchmarking.
+- `aphrodite-auto-expand-testing` - auto-expand is inert config; retrieve is
+  the only reliable path.
+- `aphrodite-cargo-upgrade` - dep-upgrade decision tree
+  (absorbs `aphrodite-upgrade-breakpoints`).
 
 ## Standing rules
 

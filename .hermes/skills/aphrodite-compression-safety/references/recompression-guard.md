@@ -1,3 +1,10 @@
+> **STALE-ALERT (2026-09-20, Development):** This reference is historical
+> evidence. The plugin is now a pure loader - the Python-side `_transform_*`
+> handlers and `_CCR_RE` guard no longer exist; the skip logic lives in the
+> Rust dylib transform path. The guard rule itself is still canonical
+> (owner: `aphrodite-compression-safety`): retrieval/diagnostic tool results
+> are never re-compressed.
+
 # Re-Compression Guard (v1.8.1+)
 
 The `_transform_tool_result` and `_transform_terminal_hook` both compress

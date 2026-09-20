@@ -1,11 +1,19 @@
 ---
 name: aphrodite-upgrade-breakpoints
-description: Cargo upgrade breakpoints for aphrodite + headroom - required by the
-    standalone plugin repo and release workflow.
-version: 1.0.1
+description: "Use when upgrading cargo deps on aphrodite + headroom. Silent-breakage checklist - absorbed into aphrodite-operations and aphrodite-cargo-upgrade."
+version: 1.0.2
 ---
 
 # Aphrodite Upgrade Breakpoints
+
+> ## CONSOLIDATED - absorbed 2026-09-18
+>
+> **Content absorbed into `aphrodite-operations`** (rebuild path resolution,
+> `--version` handling, standalone plugin repo) **and `aphrodite-cargo-upgrade`**
+> (silent dep breakpoints). Do NOT extend this skill - read those two first.
+> Snapshot preserved in `.hermes/notes/ops/ARCHIVE-2026-09-18/`. The body below
+> is retained as historical evidence; its `_hooks/rebuild.py` references
+> predate the pure-loader merge - the plugin has no `_hooks/` anymore.
 
 Checklist of things that break silently when upgrading cargo deps or
 refactoring.

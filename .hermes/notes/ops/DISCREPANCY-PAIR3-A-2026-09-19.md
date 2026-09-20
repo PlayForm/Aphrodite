@@ -7,8 +7,8 @@ Append-only.
 
 - [2026-09-19] aphrodite-toml.md + env-vars.md: API-key fallback chain claimed
   `proxy.api_key -> defaults.api_key -> APHRODITE_API_KEY -> DEEPSEEK_API_KEY ->
-  HEADROOM_DEEPSEEK_KEY -> error`; source: chain is `proxy.api_key -> defaults.api_key ->
-  APHRODITE_API_KEY` then error - the two provider-specific keys have NO reader anywhere
+HEADROOM_DEEPSEEK_KEY -> error`; source: chain is `proxy.api_key -> defaults.api_key ->
+APHRODITE_API_KEY` then error - the two provider-specific keys have NO reader anywhere
   (crates/aphrodite/src/config.rs:307-318; DEEPSEEK_API_KEY/HEADROOM_DEEPSEEK_KEY appear
   only in a test that removes them, config.rs:657-658).
 - [2026-09-19] env-vars.md: `APHRODITE_TOOL_THRESHOLD_TOKEN` / `APHRODITE_TOOL_THRESHOLD_CACHE` /
@@ -21,7 +21,7 @@ Append-only.
 - [2026-09-19] env-vars.md: `APHRODITE_CONTEXT_ENGINE` default claimed off; source: the dylib
   status flag defaults TRUE via `get_bool(..., true)` (crates/aphrodite/src/config_loader.rs:126),
   while Hermes-side ContextEngine registration stays gated on the env var being "1"/"true"
-  (plugins/aphrodite/__init__.py:1206).
+  (plugins/aphrodite/**init**.py:1206).
 - [2026-09-19] aphrodite-toml.md: `[previews]`/`[prompts]` caveat claimed neither section "has
   any effect"; source: `[previews] preview_max_chars` is wired end-to-end (main.rs:141,
   proxy.rs:2646, config_loader.rs:313-315) and `[prompts] session_inject` is live
@@ -33,9 +33,9 @@ Append-only.
 - [2026-09-19] env-vars.md: `APHRODITE_PREVIEW_MAX_CHARS` was undocumented; source: live reader
   env > TOML > code default unlimited (config_loader.rs:314); shipped example value 120.
 - [2026-09-19] env-vars.md: undocumented env vars with live readers: `APHRODITE_HOME`
-  (plugins/aphrodite/__init__.py:150, crates/aphrodite/templates/__init__.py:150,
+  (plugins/aphrodite/**init**.py:150, crates/aphrodite/templates/**init**.py:150,
   crates/aphrodite-hermes/src/directives.rs:51), `APHRODITE_DIRECTIVES_DIR`
-  (config_loader.rs:222, __init__.py:88), `APHRODITE_POLL_WORKER` (config_loader.rs:155),
+  (config_loader.rs:222, **init**.py:88), `APHRODITE_POLL_WORKER` (config_loader.rs:155),
   `APHRODITE_CHAIN_SPLIT` / `APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS` /
   `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS` (config_loader.rs:162-184), `APHRODITE_FLOW_BUDGET_CHARS`
   (config_loader.rs:152), `APHRODITE_SESSION_INJECT` (config_loader.rs:297-302).

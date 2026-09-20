@@ -1,3 +1,10 @@
+> **STALE-ALERT (2026-09-20, Development):** Historical incident record.
+> The tool names in this file (`headroom_retrieve`, `headroom_stats`) are
+> retired; the current retrieval family is `aphrodite_*`
+> (`aphrodite_retrieve`, `aphrodite_stats`, `aphrodite_search`,
+> `aphrodite_catalog`, ...). The skip-list rule is canonical and enforced by
+> the Rust transform path (owner: `aphrodite-compression-safety`).
+
 # CCR Compression: Skip List and Infinite Recursion
 
 Discovered 2026-06-15. Critical pitfall for any Hermes plugin that provides CCR

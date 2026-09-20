@@ -1,3 +1,12 @@
+> **STALE-ALERT (2026-09-20, Development):** This reference is historical
+> evidence. Verified current source differs: the key is BLAKE3 first-40 hex
+> (`vendor/headroom/crates/headroom-core/src/ccr/mod.rs` `compute_key`), not
+> SHA-256/12-16 hex; the LLM-facing marker is `<<<CCR:hash|type|size>>>` with
+> preview/structure on the lines ABOVE the marker, no `mode` field
+> (`crates/aphrodite/src/proxy.rs` `proxy_format_ccr_output`); parsing is in
+> `crates/aphrodite/src/resolve/parse.rs` + `marker/parse.rs`. Canonical
+> grammar: `aphrodite-ccr-protocol`.
+
 # CCR Marker Format & Compression Pipeline (v1.9.0+)
 
 ## Marker Format

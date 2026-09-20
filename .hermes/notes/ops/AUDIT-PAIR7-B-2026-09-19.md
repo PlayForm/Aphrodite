@@ -7,11 +7,11 @@ Partner (A) audits docs/agent-feedback.md + docs/APHRODITE-HEADROOM.md in parall
 
 ## Verdict summary
 
-| File                               | Verdict      | Destination                                             |
-| ---------------------------------- | ------------ | ------------------------------------------------------- |
-| docs/HEADROOM-FORK-DIFF.md         | MOVE-INTERNAL| .hermes/notes/HEADROOM-FORK-DIFF.md (internal archive)  |
-| docs/hermes-tool-output-schemas.md | KEEP-PUBLIC  | rewrite functionality-only -> docs/guides/hermes-tool-output-schemas.md |
-| docs/centers.md                    | KEEP-PUBLIC  | keep at docs/centers.md; fix 2 stale Python rows (L68-69) |
+| File                               | Verdict       | Destination                                                             |
+| ---------------------------------- | ------------- | ----------------------------------------------------------------------- |
+| docs/HEADROOM-FORK-DIFF.md         | MOVE-INTERNAL | .hermes/notes/HEADROOM-FORK-DIFF.md (internal archive)                  |
+| docs/hermes-tool-output-schemas.md | KEEP-PUBLIC   | rewrite functionality-only -> docs/guides/hermes-tool-output-schemas.md |
+| docs/centers.md                    | KEEP-PUBLIC   | keep at docs/centers.md; fix 2 stale Python rows (L68-69)               |
 
 ## Ground-fact cross-check (all verified against source)
 
@@ -19,7 +19,7 @@ Partner (A) audits docs/agent-feedback.md + docs/APHRODITE-HEADROOM.md in parall
   transform_terminal_output, pre_llm_call, post_llm_call -
   crates/aphrodite-hermes/src/lib.rs:335,336,409,442,458,477.
 - Default branch = Current: `git branch -a` shows `remotes/Source/HEAD -> Source/Current`; local `Current` exists.
-- Runtime home ~/.hermes/aphrodite: plugins/aphrodite/__init__.py:35,145,155,163,299,317,343,501.
+- Runtime home ~/.hermes/aphrodite: plugins/aphrodite/**init**.py:35,145,155,163,299,317,343,501.
 - Installers: plugins/aphrodite/download.sh + download.ps1 PRESENT; Maintain/install.sh ABSENT; .githooks/ ABSENT; profiles/ ABSENT.
 - chain_split shipped default false: aphrodite.toml.example:71; docs/config/aphrodite-toml.md:118; .hermes/release-notes/v1.4.6.md:9.
 - preview_max_chars shipped default 120: docs/ccr/marker-format.md:149; docs/config/aphrodite-toml.md:60,131; crates/aphrodite/src/proxy.rs:2645-2646.
@@ -115,12 +115,12 @@ disclaimer: only v1 implemented; v2-v4 are sketches) and matches the style rule.
 ### Shipped vs sketch labeling (verified against 1.4.6 source)
 
 - v1 (current) - SHIPPED, Rust side verified:
-  - L65 `format_ccr_output` `;center=X` in structure line: crates/aphrodite/src/proxy.rs:1915-1920
-    (`let center_seg = center.map(|c| format!(";center={c}"))` -> `[{ct}: {metadata}{center_seg}]`).
-  - L66 `smart_marker` `center: Option<&str>`: crates/aphrodite/src/proxy.rs:2069-2073.
-  - L67 Rust tool relay `_ccr_center` from params: crates/aphrodite-hermes/src/tools.rs:305
-    (`args.get("_ccr_center")`), schemas.rs:84 (schema exposure); marker.rs:39 (ccr_marker
-    center param); marker format documented publicly at docs/ccr/marker-format.md:42,49-50,184.
+    - L65 `format_ccr_output` `;center=X` in structure line: crates/aphrodite/src/proxy.rs:1915-1920
+      (`let center_seg = center.map(|c| format!(";center={c}"))` -> `[{ct}: {metadata}{center_seg}]`).
+    - L66 `smart_marker` `center: Option<&str>`: crates/aphrodite/src/proxy.rs:2069-2073.
+    - L67 Rust tool relay `_ccr_center` from params: crates/aphrodite-hermes/src/tools.rs:305
+      (`args.get("_ccr_center")`), schemas.rs:84 (schema exposure); marker.rs:39 (ccr_marker
+      center param); marker format documented publicly at docs/ccr/marker-format.md:42,49-50,184.
 - v2 Bucketed / v3 Accumulative / v4 center-as-filesystem - SKETCH, unimplemented:
   no bucket/accumulate/centers-fs code anywhere (grep over crates/aphrodite/src +
   crates/aphrodite-hermes/src found nothing). L3-6 disclaimer is correct; keep.
@@ -128,7 +128,7 @@ disclaimer: only v1 implemented; v2-v4 are sketches) and matches the style rule.
 ### STALE evidence (must fix in rewrite)
 
 - L68: "Python `_ccr_marker` | `center=None` param" - no `_ccr_marker` symbol exists in
-  plugins/aphrodite/ (only __init__.py, _bindings.py, layout_check.py; grep for
+  plugins/aphrodite/ (only **init**.py, _bindings.py, layout_check.py; grep for
   `_ccr_marker`/`center` -> zero matches). STALE.
 - L69: "Python `_compress_handler` | `X-Aphrodite-Center` header" - `X-Aphrodite-Center`
   has ZERO matches in the entire repo outside docs/centers.md:69 itself. STALE.

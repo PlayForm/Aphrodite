@@ -1,9 +1,13 @@
 ---
 name: aphrodite-branch-release-flow
-description: "DEPRECATED - superseded by aphrodite-release-flow v2.0.0 (use that for all release/sync/hotfix work). Retained as an archive only."
+description: "Use when reading historical context only. DO NOT EXECUTE - superseded by aphrodite-release-flow v2.0.0 (use that for all release/sync/hotfix work). Retained as an archive only."
+status: archived
+do_not_execute: true
+successor: aphrodite-release-flow
+historical_cutoff: 2026-09-18
 version: 1.1.0
 platforms: [macos]
-tags: [aphrodite, release, branch, cherry-pick, submodule, deprecated]
+tags: [aphrodite, release, branch, cherry-pick, submodule, deprecated, archived]
 ---
 
 # Aphrodite Branch Release Flow
@@ -14,7 +18,9 @@ tags: [aphrodite, release, branch, cherry-pick, submodule, deprecated]
 > hotfix path, sync-back, and every pitfall now live there. Do NOT load or
 > follow this skill for new release work - read `aphrodite-release-flow`
 > first. This file is retained as an archive (never deleted) so the v1.1.0
-> flow and its variant-traps stay greppable.
+> flow and its variant-traps stay greppable. This archive may be updated
+> only to correct archival metadata - never to add or change workflow
+> instructions.
 
 One-line policy:
 
@@ -78,12 +84,12 @@ A promotion branch (`promote/vX.Y.Z`) is OPTIONAL review scaffolding, NOT
 architecture. Both `Current` branches are unprotected, so direct promotion
 works; use the PR branch only when review is actually required.
 
-| Need                  | Best mechanism                                                      |
-| --------------------- | ------------------------------------------------------------------- |
-| Maximum simplicity    | Promote directly on Current (clean tree + checks)                   |
-| Mandatory code review | `promote/vX.Y.Z` from Current, one snapshot commit, PR, then delete |
-| Urgent production fix | Commit on Current, then `git cherry-pick -x` into Development       |
-| Release candidate     | Prerelease tag (`Aphrodite/v1.4.3-rc.1`), never a branch            |
+| Need                  | Best mechanism                                                                                                                                                  |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Maximum simplicity    | Promote directly on Current (clean tree + checks)                                                                                                               |
+| Mandatory code review | `promote/vX.Y.Z` from Current, one snapshot commit, PR, then delete                                                                                             |
+| Urgent production fix | Commit on Current, then `git cherry-pick -x` into Development                                                                                                   |
+| Release candidate     | Prerelease tag (pattern `Aphrodite/vX.Y.Z-rc.N` - the actual version is read from the current BINARY_VERSION/plugin version at tag time, never a fixed example) |
 
 Do NOT cherry-pick normal feature commits from Development down into
 Current - it duplicates SHAs and makes every release a series of conflict

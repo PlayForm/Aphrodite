@@ -22,9 +22,9 @@ backends/inline.md). Child C of PAIR-2.
   canonical order (crates/aphrodite/src/proxy.rs:798-816).
 - [2026-09-19] docs/ccr/backends/sqlite.md: schema claimed
   hash/original/created_at/ttl_seconds with purge `WHERE created_at +
-  ttl_seconds <= now`; actual schema adds last_accessed (schema v2) and
+ttl_seconds <= now`; actual schema adds last_accessed (schema v2) and
   expiry is `last_accessed + ttl_seconds < now OR created_at + max_lifetime
-  < now` (sliding idle window, max lifetime 8x TTL), purge runs from get AND
+< now` (sliding idle window, max lifetime 8x TTL), purge runs from get AND
   put debounced 60s (vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs:16-25,158-177,204-206).
 - [2026-09-19] docs/ccr/backends/in-memory.md: claimed DEFAULT_TTL 300s
   (5 min); actual DEFAULT_TTL is 1,800s (30 min) with a sliding idle window

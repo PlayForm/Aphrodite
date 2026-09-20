@@ -1,3 +1,11 @@
+> **STALE-ALERT (2026-09-20, Development):** Historical evidence. The
+> `status: healthy|degraded` dichotomy shown below is STALE - the current
+> `GET /health` always returns HTTP 200 with `{"status": "healthy", "ccr":
+<bool>, "mode", "version", "fill_pct"}` and never calls upstream
+> (`crates/aphrodite/src/proxy.rs:2480-2501`); upstream reachability is the
+> separate, TTL-cached `GET /health/upstream`. Canonical contract:
+> `aphrodite-engine-observability`.
+
 # Proxy Health + Retry Patterns (v1.9.0+)
 
 ## Python `_alive()` - 5-Second TTL Cache
