@@ -25,4 +25,4 @@ serde_json = { workspace = true }
 # _bindings.py is the committed artifact; build.rs degrades to the committed
 # copy whenever the codegen tools are unavailable (see CODEGEN.md).
 [build-dependencies]
-cbindgen = "0.29"
+cbindgen = "0.29.4"
