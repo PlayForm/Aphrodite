@@ -65,13 +65,13 @@ jobs:
         # nightly. `toolchain: nightly` resolves to whatever the latest
         # nightly is on the day the workflow runs - deliberately never a
         # dated pin.
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
         with:
           toolchain: nightly
           components: rustfmt, clippy
 
       - name: Cache cargo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/
@@ -118,13 +118,13 @@ jobs:
         # nightly. `toolchain: nightly` resolves to whatever the latest
         # nightly is on the day the workflow runs - deliberately never a
         # dated pin.
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
         with:
           toolchain: nightly
           components: rustfmt, clippy
 
       - name: Cache cargo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/
@@ -144,7 +144,7 @@ jobs:
         run: cargo test --manifest-path Maintain/dynamic_hooks/rust/Cargo.toml
 
       - name: Install uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
       - name: Build aphrodite-hermes dylib for FFI tests
         run: cargo build --release -p aphrodite-hermes
