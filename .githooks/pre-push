@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# pre-push - before any push from the parent, auto-commit updated
+# submodule gitlinks so the pushed ref never carries a stale pointer.
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+exec "$DIR/lib/bump-submodule-gitlinks.sh"

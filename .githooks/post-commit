@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# post-commit - after every parent commit, auto-commit any updated
+# submodule gitlinks so the parent never leaves an orphaned pointer.
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+exec "$DIR/lib/bump-submodule-gitlinks.sh"

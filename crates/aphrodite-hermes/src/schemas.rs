@@ -51,7 +51,6 @@ pub fn all_schemas() -> Vec<serde_json::Value> {
 		schema_prefetch(),
 		schema_prefetch_status(),
 		schema_rebuild(),
-		schema_debug(),
 	]
 }
 
@@ -352,29 +351,6 @@ fn schema_rebuild() -> serde_json::Value {
 			command to run outside the session. Takes no arguments. \
 			Returns {status: \"ok\", version, proxies, hint}.",
 		"parameters": no_params()
-	})
-}
-
-fn schema_debug() -> serde_json::Value {
-	json!({
-		"name": "aphrodite_debug",
-		"description": "Toggle per-session debug output on or off (Rust-side only). \
-			When on, every compressed tool result in this session tree (this session \
-			plus its subagents/delegated tasks) gets a `[aphrodite-debug ...]` line \
-			prepended before the CCR marker; other sessions stay quiet. The flag is a \
-			file in the runtime home, scoped to the ROOT session id - subagents \
-			resolve to the same root and inherit the toggle. \
-			Returns {status, debug, session, flag}.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"on": {
-					"type": "boolean",
-					"description": "true = enable debug for this session tree, false = disable. Omitted defaults to true."
-				}
-			},
-			"additionalProperties": false
-		}
 	})
 }
 

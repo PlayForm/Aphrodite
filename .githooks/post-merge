@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# post-merge - after a merge in the parent, auto-commit any updated
+# submodule gitlinks resulting from the merge.
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+exec "$DIR/lib/bump-submodule-gitlinks.sh"

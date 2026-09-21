@@ -36,10 +36,9 @@ static SESSION_PARENTS:OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new(
 
 /// The most recently seen session id, updated ONLY by `record_session` -
 /// i.e. the `pre_llm_call` hook (turn_context.py threads session_id through
-/// it). The `aphrodite_debug` tool has no session in its args: it toggles
-/// whatever session the current LLM turn belongs to, so the flag must track
-/// the turn's session, NOT whichever transform hook fired last (subagent
-/// results could otherwise redirect the toggle to the wrong root).
+/// it). It tracks the current LLM turn's session, NOT whichever transform
+/// hook fired last (subagent results could otherwise redirect the scope to
+/// the wrong root).
 static LAST_SESSION:OnceLock<Mutex<String>> = OnceLock::new();
 
 /// flag-file path -> (mtime, enabled) cache; one entry per distinct flag.
@@ -159,18 +158,6 @@ pub(crate) fn enabled_for(session:&str) -> bool {
 	false
 }
 
-/// Resolve the most recently seen session's ROOT id.
-fn current_root() -> String {
-	let last = LAST_SESSION
-		.get_or_init(|| Mutex::new(String::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	if last.is_empty() {
-		return String::new();
-	}
-	session_chain(&last).last().cloned().unwrap_or_else(|| last.clone())
-}
-
 /// The most recently seen session id (the current LLM turn's session, set by
 /// `pre_llm_call`). Fallback for hooks Hermes does NOT thread session_id
 /// through - `transform_terminal_output` passes only command/output/
@@ -196,31 +183,6 @@ pub(crate) fn last_session() -> String {
 		.ok()
 		.map(|s| s.trim().to_string())
 		.unwrap_or_default()
-}
-
-/// Set (or clear) the debug flag for the CURRENT session tree - the tool
-/// entry point for `aphrodite_debug`. Returns the resolved root session id
-/// and the flag path written, so the caller can report both.
-///
-/// Uses the persisted session id (falling back to `session.current` across
-/// hot-reloads, same as `last_session`): a reload wipes LAST_SESSION, and
-/// without the file fallback the toggle would report "no session context"
-/// until the next `pre_llm_call`.
-pub(crate) fn set_enabled_current(on:bool) -> Result<(String, String), String> {
-	let root = current_root();
-	let root = if root.is_empty() { last_session() } else { root };
-	if root.is_empty() {
-		return Err("no session context yet - hooks have not fired in this process".to_string());
-	}
-	let flag = flag_path_for(&root);
-	std::fs::write(&flag, if on { "on" } else { "off" }).map_err(|e| format!("write {}: {}", flag.display(), e))?;
-	// Invalidate the mtime cache so the next read picks up the new value.
-	let key = flag.to_string_lossy().into_owned();
-	if let Some(cache) = FLAG_CACHE.get() {
-		let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-		guard.remove(&key);
-	}
-	Ok((root, flag.to_string_lossy().into_owned()))
 }
 
 /// Build a `[aphrodite-debug ...]` prefix line from a compression result
