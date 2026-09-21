@@ -65,7 +65,7 @@ jobs:
       # `.hermes/RELEASE-TEMPLATE.md` by the release process (see SKILL.md),
       # not auto-generated here.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -106,13 +106,13 @@ jobs:
           sudo ldconfig
 
       - name: Setup Rust (nightly, latest)
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
         with:
           toolchain: nightly
           targets: ${{ matrix.target }}
 
       - name: Cache cargo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/
@@ -171,7 +171,7 @@ jobs:
           cat "SHA256SUMS-${TARGET}.txt"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: aphrodite-${{ matrix.target }}
           path: |
@@ -184,7 +184,7 @@ jobs:
       # each matrix job only attaches its own files here.
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           # Trailing * catches the Windows `.exe`; fail loudly if a rename slips.
           files: |
