@@ -21,11 +21,8 @@ __pycache__/
 .venv/
 venv/
 
-# Shell - shfmt owns .sh / .bash
-*.sh
+# Shell - prettier-plugin-sh owns .sh (format via Maintain/Format.sh)
 *.bash
-*.env.sh
-.env.sh
 
 # ═══════════════════════════════════════════════
 # Vendored / submodules / generated code

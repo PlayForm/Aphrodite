@@ -1,5 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/prettierrc",
+	"plugins": ["prettier-plugin-sh"],
 	"useTabs": true,
 	"tabWidth": 4,
 	"semi": true,
