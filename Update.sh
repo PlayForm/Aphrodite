@@ -45,9 +45,9 @@ print_status "Starting Update.sh script"
 	# then adds the newline only when the source line had one (tracked by
 	# $Newline). Prevents `while read` from dropping an unterminated last line.
 	append_line() {
-		\printf '%s' "$1" >>"$temp_file"
+		\printf '%s' "$1" >> "$temp_file"
 
-		[ "${Newline:-1}" -eq 1 ] && \printf '\n' >>"$temp_file"
+		[ "${Newline:-1}" -eq 1 ] && \printf '\n' >> "$temp_file"
 	}
 
 	Newline=1
@@ -75,7 +75,7 @@ print_status "Starting Update.sh script"
 				print_status "No reference specified"
 			fi
 
-			IFS='/' read -r -a parts <<<"$action_name"
+			IFS='/' read -r -a parts <<< "$action_name"
 
 			if [ ${#parts[@]} -lt 2 ]; then
 				print_error "Invalid action name: $action_name"
@@ -104,9 +104,9 @@ print_status "Starting Update.sh script"
 
 			# Get the latest tag - use the newest semantic version from ALL tags,
 			# not just tags[0] (the API returns tags in an arbitrary order).
-			latest_tag=$(\gh api "repos/$repo_part/tags?per_page=100" | \jq -r '.[].name' |
-				\grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' |
-				\sed 's/^v//' | \sort -V | tail -1 | \sed 's/^/v/')
+			latest_tag=$(\gh api "repos/$repo_part/tags?per_page=100" | \jq -r '.[].name' \
+				| \grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' \
+				| \sed 's/^v//' | \sort -V | tail -1 | \sed 's/^/v/')
 
 			if [ -z "$latest_tag" ] || [ "$latest_tag" = "v" ]; then
 				# Fallback: no semver tags found, take the first available tag.
@@ -177,7 +177,7 @@ print_status "Starting Update.sh script"
 		else
 			append_line "$line"
 		fi
-	done <"$file"
+	done < "$file"
 
 	\mv "$temp_file" "$file"
 
