@@ -25,7 +25,7 @@
 
 set -e
 
-Current=$(cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd)
+Current=$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1 && pwd)
 Root="$Current/.."
 
 #===============================================================================
@@ -40,7 +40,7 @@ FormatLineEndings() {
 	\echo "========================================"
 	\echo ""
 
-	if ! command -v dos2unix >/dev/null 2>&1; then
+	if ! command -v dos2unix > /dev/null 2>&1; then
 		\echo "Error: dos2unix is not installed."
 		\echo "  macOS:  brew install dos2unix"
 		\echo "  Linux:  apt install dos2unix  /  dnf install dos2unix"
@@ -77,8 +77,8 @@ FormatLineEndings() {
 		-not -path "*/Generated/*" \
 		-not -path "*/.generated/*" \
 		-not -path "*/gen/*" \
-		-not -path "*/bin/*" |
-		xargs dos2unix -q
+		-not -path "*/bin/*" \
+		| xargs dos2unix -q
 
 	\echo ""
 	\echo "Line ending conversion complete."
@@ -97,13 +97,12 @@ FormatShell() {
 	cd "$Root"
 
 	\echo "→ Installing dependencies…"
-	pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+	pnpm install --frozen-lockfile 2> /dev/null || pnpm install
 
 	\echo "→ Running Prettier on shell scripts…"
 	pnpm exec prettier --write \
 		--ignore-path .prettierignore \
-		"**/*.sh" \
-		"*.sh"
+		"**/*.sh"
 
 	\echo ""
 	\echo "Shell formatting complete."
@@ -122,7 +121,7 @@ FormatPrettier() {
 	cd "$Root"
 
 	\echo "→ Installing dependencies…"
-	pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+	pnpm install --frozen-lockfile 2> /dev/null || pnpm install
 
 	\echo "→ Running Prettier (md, json, yaml)…"
 	pnpm exec prettier --write \
@@ -130,11 +129,7 @@ FormatPrettier() {
 		"**/*.md" \
 		"**/*.json" \
 		"**/*.yml" \
-		"**/*.yaml" \
-		"*.md" \
-		"*.json" \
-		"*.yml" \
-		"*.yaml"
+		"**/*.yaml"
 
 	\echo ""
 	\echo "Prettier formatting complete."
@@ -179,8 +174,8 @@ FormatRust() {
 		-not -path "*/deps/*" \
 		-not -path "*/Generated/*" \
 		-not -path "*/.generated/*" \
-		-not -path "*/gen/*" |
-		xargs -I {} sh -c \
+		-not -path "*/gen/*" \
+		| xargs -I {} sh -c \
 			'rustup run nightly rustfmt --config-path rustfmt.toml "$1" 2>/dev/null || true' \
 			-- {}
 
@@ -199,37 +194,37 @@ FormatRust() {
 #===============================================================================
 
 case "${1:-}" in
-dos2unix)
-	FormatLineEndings
-	;;
-shell)
-	FormatShell
-	;;
-prettier)
-	FormatPrettier
-	;;
-rust)
-	FormatRust
-	;;
-"")
-	FormatLineEndings
-	FormatShell
-	FormatPrettier
-	FormatRust
-	\echo "→ Format complete."
-	;;
---help | -h)
-	\echo "Usage: $0 [dos2unix|shell|prettier|rust]"
-	\echo ""
-	\echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
-	\echo "  shell     Format shell scripts with Prettier (prettier-plugin-sh)"
-	\echo "  prettier  Format Markdown/JSON/YAML with Prettier"
-	\echo "  rust      Format Rust with rustfmt (nightly)"
-	\echo "  (no arg)  Run all four in order"
-	;;
-*)
-	\echo "Unknown target: $1"
-	\echo "Use --help for usage information"
-	exit 1
-	;;
+	dos2unix)
+		FormatLineEndings
+		;;
+	shell)
+		FormatShell
+		;;
+	prettier)
+		FormatPrettier
+		;;
+	rust)
+		FormatRust
+		;;
+	"")
+		FormatLineEndings
+		FormatShell
+		FormatPrettier
+		FormatRust
+		\echo "→ Format complete."
+		;;
+	--help | -h)
+		\echo "Usage: $0 [dos2unix|shell|prettier|rust]"
+		\echo ""
+		\echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
+		\echo "  shell     Format shell scripts with Prettier (prettier-plugin-sh)"
+		\echo "  prettier  Format Markdown/JSON/YAML with Prettier"
+		\echo "  rust      Format Rust with rustfmt (nightly)"
+		\echo "  (no arg)  Run all four in order"
+		;;
+	*)
+		\echo "Unknown target: $1"
+		\echo "Use --help for usage information"
+		exit 1
+		;;
 esac

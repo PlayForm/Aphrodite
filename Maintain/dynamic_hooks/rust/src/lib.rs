@@ -1,5 +1,7 @@
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
+use std::{
+	ffi::{CStr, CString},
+	os::raw::c_char,
+};
 
 // ── Public C ABI (the stable surface) ─────────────────────────────────────
 //   These signatures NEVER change. New hooks are added inside `call_hook`.
@@ -18,7 +20,7 @@ pub extern "C" fn aphrodite_hooks() -> *mut c_char {
 /// - json_args: JSON object with hook-specific fields
 /// Caller must free with aphrodite_free_string.
 #[no_mangle]
-pub extern "C" fn aphrodite_call_hook(hook_name: *const c_char, json_args: *const c_char) -> *mut c_char {
+pub extern "C" fn aphrodite_call_hook(hook_name:*const c_char, json_args:*const c_char) -> *mut c_char {
 	// This fixture is the copy-paste template for third-party hook dylibs
 	// (see the header comment above) - both null-checking pointers and
 	// catch_unwind-guarding the call are load-bearing here: a template that
@@ -29,11 +31,13 @@ pub extern "C" fn aphrodite_call_hook(hook_name: *const c_char, json_args: *cons
 	let name = unsafe { CStr::from_ptr(hook_name) }.to_string_lossy().into_owned();
 	let args = unsafe { CStr::from_ptr(json_args) }.to_string_lossy().into_owned();
 
-	let result = std::panic::catch_unwind(|| match name.as_ref() {
-		"session_start" => on_session_start(&args),
-		"transform_tool_result" => transform_tool_result(&args),
-		"transform_terminal_output" => transform_terminal_output(&args),
-		other => format!(r#"{{"error":"unknown hook: {}"}}"#, other),
+	let result = std::panic::catch_unwind(|| {
+		match name.as_ref() {
+			"session_start" => on_session_start(&args),
+			"transform_tool_result" => transform_tool_result(&args),
+			"transform_terminal_output" => transform_terminal_output(&args),
+			other => format!(r#"{{"error":"unknown hook: {}"}}"#, other),
+		}
 	})
 	.unwrap_or_else(|_| r#"{"error":"panicked in aphrodite_call_hook"}"#.to_string());
 
@@ -42,13 +46,11 @@ pub extern "C" fn aphrodite_call_hook(hook_name: *const c_char, json_args: *cons
 
 /// Get dylib version.
 #[no_mangle]
-pub extern "C" fn aphrodite_version() -> *mut c_char {
-	CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw()
-}
+pub extern "C" fn aphrodite_version() -> *mut c_char { CString::new(env!("CARGO_PKG_VERSION")).unwrap().into_raw() }
 
 /// Free a string returned by any aphrodite_* function.
 #[no_mangle]
-pub extern "C" fn aphrodite_free_string(s: *mut c_char) {
+pub extern "C" fn aphrodite_free_string(s:*mut c_char) {
 	if s.is_null() {
 		return;
 	}
@@ -59,20 +61,20 @@ pub extern "C" fn aphrodite_free_string(s: *mut c_char) {
 
 // ── Hook implementations (this is what you edit + rebuild) ─────────────────
 
-fn on_session_start(_args: &str) -> String {
+fn on_session_start(_args:&str) -> String {
 	format!(
 		r#"{{"status":"ok","msg":"💋 aphrodite v{} - dylib loaded"}}"#,
 		env!("CARGO_PKG_VERSION")
 	)
 }
 
-fn transform_tool_result(args: &str) -> String {
+fn transform_tool_result(args:&str) -> String {
 	let content = extract_field(args, "content").unwrap_or_default();
 	let preview = classify(&content);
 	format!(r#"{{"status":"ok","preview":"{}"}}"#, escape_json(&preview))
 }
 
-fn transform_terminal_output(args: &str) -> String {
+fn transform_terminal_output(args:&str) -> String {
 	let content = extract_field(args, "content").unwrap_or_default();
 	let preview = classify(&content);
 	format!(r#"{{"status":"ok","preview":"{}"}}"#, escape_json(&preview))
@@ -80,7 +82,7 @@ fn transform_terminal_output(args: &str) -> String {
 
 // ── Classifier (your compression logic lives here) ─────────────────────────
 
-fn classify(content: &str) -> String {
+fn classify(content:&str) -> String {
 	let lines = content.lines().count();
 	let chars = content.len();
 	let first_line = content.lines().next().unwrap_or("").chars().take(60).collect::<String>();
@@ -100,7 +102,7 @@ fn classify(content: &str) -> String {
 // \"hi\""}` truncates at the escaped quote instead of the real closing one,
 // silently corrupting content containing escaped quotes. Acceptable for a
 // zero-dependency test fixture; a real dylib should use serde_json.
-fn extract_field(json: &str, key: &str) -> Option<String> {
+fn extract_field(json:&str, key:&str) -> Option<String> {
 	let pat = format!(r#""{}""#, key);
 	let start = json.find(&pat)? + pat.len();
 	let after = &json[start..];
@@ -111,12 +113,12 @@ fn extract_field(json: &str, key: &str) -> Option<String> {
 		let end = val_start[1..].find('"')?;
 		Some(unescape(&val_start[1..=end]))
 	} else {
-		let end = val_start.find(|c: char| c == ',' || c == '}').unwrap_or(val_start.len());
+		let end = val_start.find(|c:char| c == ',' || c == '}').unwrap_or(val_start.len());
 		Some(val_start[..end].trim().to_string())
 	}
 }
 
-fn escape_json(s: &str) -> String {
+fn escape_json(s:&str) -> String {
 	s.replace('\\', "\\\\")
 		.replace('"', "\\\"")
 		.replace('\n', "\\n")
@@ -124,7 +126,7 @@ fn escape_json(s: &str) -> String {
 		.replace('\t', "\\t")
 }
 
-fn unescape(s: &str) -> String {
+fn unescape(s:&str) -> String {
 	s.replace("\\\"", "\"")
 		.replace("\\\\", "\\")
 		.replace("\\n", "\n")

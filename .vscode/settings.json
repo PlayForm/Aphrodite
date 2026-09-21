@@ -25,7 +25,7 @@
     "editor.tabSize": 4
   },
   "[shellscript]": {
-    "editor.defaultFormatter": "mkhl.shfmt",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.insertSpaces": false,
     "editor.tabSize": 4
   },

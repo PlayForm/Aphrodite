@@ -31,7 +31,7 @@ check_tracked_content() {
 	local pattern="$1"
 	local label="$2"
 	local matches
-	matches=$(git grep -InE "$pattern" -- . ':!Maintain/scripts/ops/check-no-runtime-state.sh' 2>/dev/null || true)
+	matches=$(git grep -InE "$pattern" -- . ':!Maintain/scripts/ops/check-no-runtime-state.sh' 2> /dev/null || true)
 	if [ -n "$matches" ]; then
 		echo "REPO-GUARD: $label found in tracked file contents:" >&2
 		echo "$matches" >&2
