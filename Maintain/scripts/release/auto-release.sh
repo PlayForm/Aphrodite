@@ -24,7 +24,7 @@ cd "$REPO_ROOT"
 # release pipeline (commit/tag/push) follows the branch it was started on
 # (Development, Current, ...). Override with RELEASE_BRANCH env var; falls
 # back to Current on a detached HEAD rather than pushing nothing.
-RELEASE_BRANCH="${RELEASE_BRANCH:-$(git symbolic-ref --short HEAD 2>/dev/null || echo Current)}"
+RELEASE_BRANCH="${RELEASE_BRANCH:-$(git symbolic-ref --short HEAD 2> /dev/null || echo Current)}"
 echo "[release] branch: $RELEASE_BRANCH"
 
 # Sync submodules to their remote tracking branches - OPT-IN ONLY
@@ -49,7 +49,7 @@ fi
 
 # Stage all changes
 git add -u
-git add docs/ Maintain/scripts/ plugins/aphrodite/ 2>/dev/null || true
+git add docs/ Maintain/scripts/ plugins/aphrodite/ 2> /dev/null || true
 
 # Use provided message or auto-generate from last commit
 if [ -z "$MSG" ]; then
@@ -110,14 +110,14 @@ echo "[bump] README release badge + package.json → $NEW"
 # Matches bare $CURRENT too, not just v$CURRENT: the /health example that
 # escaped the `v`-anchored sed above would also have escaped a `v`-anchored
 # guard, which is how it survived several releases unnoticed.
-if grep -rn "$CURRENT" README.md "$REPO_ROOT/package.json" 2>/dev/null; then
+if grep -rn "$CURRENT" README.md "$REPO_ROOT/package.json" 2> /dev/null; then
 	echo "ERROR: stale $CURRENT reference(s) found above after bumping to v$NEW - fix the sed pattern that missed them" >&2
 	exit 1
 fi
 
 # Always keep BINARY_VERSION tracking the binary version, regardless of
 # whether a plugin version source was found below.
-echo "$NEW" >plugins/aphrodite/BINARY_VERSION
+echo "$NEW" > plugins/aphrodite/BINARY_VERSION
 
 # ── Plugin version bump (submodule files - may not all exist) ──
 # Plugin version track is independent of binary version track
@@ -140,7 +140,7 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 	[[ -f plugins/aphrodite/pyproject.toml ]] && sed -i '' "s/version = \"$PLUGIN_CURRENT\"/version = \"$PLUGIN_NEW\"/" plugins/aphrodite/pyproject.toml
 	[[ -f plugins/aphrodite/__init__.py ]] && sed -i '' "s/aphrodite v$PLUGIN_CURRENT -/aphrodite v$PLUGIN_NEW -/" plugins/aphrodite/__init__.py
 	echo "[bump] plugin $PLUGIN_CURRENT → $PLUGIN_NEW"
-	if grep -rn "plugin-v$PLUGIN_CURRENT-purple" README.md 2>/dev/null; then
+	if grep -rn "plugin-v$PLUGIN_CURRENT-purple" README.md 2> /dev/null; then
 		echo "ERROR: stale plugin-v$PLUGIN_CURRENT-purple badge found after bumping to v$PLUGIN_NEW" >&2
 		exit 1
 	fi
@@ -157,10 +157,10 @@ if [[ -n "$PLUGIN_CURRENT" ]]; then
 	(
 		cd plugins/aphrodite
 		git add plugin.yaml BINARY_VERSION
-		[[ -f pyproject.toml ]] && git add pyproject.toml 2>/dev/null || true
-		[[ -f __init__.py ]] && git add __init__.py 2>/dev/null || true
+		[[ -f pyproject.toml ]] && git add pyproject.toml 2> /dev/null || true
+		[[ -f __init__.py ]] && git add __init__.py 2> /dev/null || true
 		git commit -m "release: plugin v$PLUGIN_NEW" || echo "[submodule] nothing to commit"
-		git tag "v$PLUGIN_NEW" 2>/dev/null || echo "[submodule] tag v$PLUGIN_NEW already exists"
+		git tag "v$PLUGIN_NEW" 2> /dev/null || echo "[submodule] tag v$PLUGIN_NEW already exists"
 	)
 	git -C plugins/aphrodite push "$SUBMODULE_REMOTE" "$SUBMODULE_BRANCH" 2>&1 | tail -1 || true
 	[ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("submodule push branch $SUBMODULE_BRANCH")
@@ -183,8 +183,8 @@ echo "[test] OK"
 # Commit version bump + tag (no editor prompts)
 git add -u
 git commit -m "release(aphrodite): v$NEW - $MSG"
-git tag -d "Aphrodite/v$NEW" 2>/dev/null || true
-GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2>/dev/null || git tag "Aphrodite/v$NEW"
+git tag -d "Aphrodite/v$NEW" 2> /dev/null || true
+GIT_EDITOR=true git tag -a "Aphrodite/v$NEW" -m "v$NEW" 2> /dev/null || git tag "Aphrodite/v$NEW"
 echo "[release] Aphrodite/v$NEW tagged"
 
 # Push - always sync with remote
@@ -196,8 +196,8 @@ echo "[push] done"
 
 # Sync submodule pointer - plugin v$PLUGIN_NEW is now committed + tagged in submodule
 SUBMODULE_SHA=$(cd plugins/aphrodite && git rev-parse HEAD)
-git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2>/dev/null
-git commit -m "chore: sync aphrodite submodule → plugin v$PLUGIN_NEW" 2>/dev/null || echo "[sync] submodule pointer already current"
+git update-index --cacheinfo 160000,"$SUBMODULE_SHA",plugins/aphrodite 2> /dev/null
+git commit -m "chore: sync aphrodite submodule → plugin v$PLUGIN_NEW" 2> /dev/null || echo "[sync] submodule pointer already current"
 git push "$REMOTE" "$RELEASE_BRANCH" 2>&1 | tail -1 || true
 [ "${PIPESTATUS[0]}" -eq 0 ] || FAILURES+=("push submodule sync")
 echo "[sync] submodules done"

@@ -12,26 +12,26 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case "${1:-}" in
---stop)
-	bash "$SCRIPT_DIR/proxy-9797.sh" --stop 2>/dev/null || true
-	bash "$SCRIPT_DIR/proxy-9798.sh" --stop 2>/dev/null || true
-	echo "All proxies stopped"
-	exit 0
-	;;
---status)
-	echo "=== :9797 (Rust cache) ==="
-	bash "$SCRIPT_DIR/proxy-9797.sh" --status 2>/dev/null || echo "DOWN"
-	echo ""
-	echo "=== :9798 (Rust token) ==="
-	bash "$SCRIPT_DIR/proxy-9798.sh" --status 2>/dev/null || echo "DOWN"
-	exit 0
-	;;
-"") ;;
-*)
-	echo "Unknown option: $1" >&2
-	echo "Usage: $0 [--stop|--status]" >&2
-	exit 1
-	;;
+	--stop)
+		bash "$SCRIPT_DIR/proxy-9797.sh" --stop 2> /dev/null || true
+		bash "$SCRIPT_DIR/proxy-9798.sh" --stop 2> /dev/null || true
+		echo "All proxies stopped"
+		exit 0
+		;;
+	--status)
+		echo "=== :9797 (Rust cache) ==="
+		bash "$SCRIPT_DIR/proxy-9797.sh" --status 2> /dev/null || echo "DOWN"
+		echo ""
+		echo "=== :9798 (Rust token) ==="
+		bash "$SCRIPT_DIR/proxy-9798.sh" --status 2> /dev/null || echo "DOWN"
+		exit 0
+		;;
+	"") ;;
+	*)
+		echo "Unknown option: $1" >&2
+		echo "Usage: $0 [--stop|--status]" >&2
+		exit 1
+		;;
 esac
 
 echo "Launching all Aphrodite proxies..."

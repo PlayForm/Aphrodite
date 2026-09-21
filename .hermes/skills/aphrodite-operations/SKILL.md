@@ -107,15 +107,18 @@ repair, or version-truth advice applies.
 
 ```sh
 git rev-parse --show-toplevel
-test -f Cargo.toml && test -f crates/aphrodite/Cargo.toml; echo "WORKSPACE:$?"
-test -d ~/.hermes/aphrodite/binaries && test -f ~/.hermes/aphrodite/aphrodite.toml; echo "RUNTIME_HOME:$?"
-ls plugins/aphrodite/plugin.yaml plugins/aphrodite/BINARY_VERSION 2>/dev/null; echo "LAYOUT:$?"
+test -f Cargo.toml && test -f crates/aphrodite/Cargo.toml
+echo "WORKSPACE:$?"
+test -d ~/.hermes/aphrodite/binaries && test -f ~/.hermes/aphrodite/aphrodite.toml
+echo "RUNTIME_HOME:$?"
+ls plugins/aphrodite/plugin.yaml plugins/aphrodite/BINARY_VERSION 2> /dev/null
+echo "LAYOUT:$?"
 ```
 
 **Verify**
 
 ```sh
-readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite 2>/dev/null
+readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite 2> /dev/null
 ```
 
 **Expected**

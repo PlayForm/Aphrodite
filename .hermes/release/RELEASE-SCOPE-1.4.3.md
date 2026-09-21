@@ -46,7 +46,7 @@ path or explicitly deferred), and nothing unlisted crosses.
 test -f Maintain/release-notes-v1.4.3.md && grep -q '1.4.3' crates/aphrodite/Cargo.toml
 grep -q '2.1.3' plugins/aphrodite/plugin.yaml
 # OUT excluded from Current after sync:
-git -C Current diff HEAD -- .hermes bench skills .github/workflows .gitmodules | wc -l  # 0
+git -C Current diff HEAD -- .hermes bench skills .github/workflows .gitmodules | wc -l # 0
 # chain_split default off:
 grep -q 'chain_split = false' aphrodite.toml
 ```

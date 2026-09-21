@@ -7,7 +7,7 @@ set -euo pipefail
 
 TAG="${1:-}"
 TITLE="${2:-}"
-shift 2 2>/dev/null || true
+shift 2 2> /dev/null || true
 BODY="${*:-}"
 
 if [ -z "$TAG" ]; then
@@ -22,7 +22,7 @@ fi
 # exclude "v1.20".
 PREV=$(git tag -l 'Aphrodite/v*' --sort=-v:refname | grep -vx "$TAG" | head -1)
 
-cat <<EOF
+cat << EOF
 **[Compare ${PREV}...${TAG}](https://github.com/PlayForm/Aphrodite/compare/${PREV}...${TAG})**
 
 ${BODY}

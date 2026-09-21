@@ -226,41 +226,41 @@ Run from P root; S commands via `-C`. S has no dual track and no protected
 paths, so the S squash uses the S-Development **tip** (`b6fecad`):
 
 ```sh
-git -C plugins/aphrodite status --porcelain          # clean or ABORT (V8)
+git -C plugins/aphrodite status --porcelain # clean or ABORT (V8)
 git -C plugins/aphrodite checkout Current
 git -C plugins/aphrodite pull --ff-only Source Current
-git -C plugins/aphrodite merge --squash Development   # tree@b6fecad; 5b62d68 survives
-git -C plugins/aphrodite status --porcelain           # review staged diff (6 commits' content)
+git -C plugins/aphrodite merge --squash Development # tree@b6fecad; 5b62d68 survives
+git -C plugins/aphrodite status --porcelain         # review staged diff (6 commits' content)
 git -C plugins/aphrodite commit -m "release: sync v2.1.3"
 git -C plugins/aphrodite push Source Current
-git -C plugins/aphrodite tag v2.1.3                   # collision-free (verified §1)
+git -C plugins/aphrodite tag v2.1.3 # collision-free (verified §1)
 git -C plugins/aphrodite push Source v2.1.3
 ```
 
 ### 7.2 Release 1 - parent sync at the CUTOFF `8521b27`, tag `Aphrodite/v1.4.3`
 
 ```sh
-git status --porcelain                                # clean or ABORT (V8)
-git checkout Current && git pull --ff-only Source Current   # tip = 0028705
-git merge --squash 8521b27                            # DEVIATION 1: cutoff SHA, not Development tip
-git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite .hermes bench skills  # DEVIATION 2
+git status --porcelain                                                                    # clean or ABORT (V8)
+git checkout Current && git pull --ff-only Source Current                                 # tip = 0028705
+git merge --squash 8521b27                                                                # DEVIATION 1: cutoff SHA, not Development tip
+git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite .hermes bench skills # DEVIATION 2
 git -C plugins/aphrodite fetch Source Current
-git -C plugins/aphrodite checkout -B Current Source/Current   # float to the v2.1.3 sync commit
+git -C plugins/aphrodite checkout -B Current Source/Current # float to the v2.1.3 sync commit
 git add plugins/aphrodite
 # ---- verify before commit ----
-git diff HEAD -- .gitmodules .github/workflows .hermes bench skills   # empty (I9)
-git submodule status                                    # no '+' (I2)
-git grep -c 'adapt_chain_split_threshold' -- crates/aphrodite/src/state.rs        # 0 (no Tier 1, D1)
-git grep -c 'error_hint' -- crates/aphrodite/src/chain_split.rs                    # 0 (no Tier 3, D1)
-git show :aphrodite.toml | grep 'chain_split = false'   # opt-in OFF (D2)
-git diff --stat 0028705 HEAD                            # expected: ~80-100 files (see §1 prediction)
+git diff HEAD -- .gitmodules .github/workflows .hermes bench skills        # empty (I9)
+git submodule status                                                       # no '+' (I2)
+git grep -c 'adapt_chain_split_threshold' -- crates/aphrodite/src/state.rs # 0 (no Tier 1, D1)
+git grep -c 'error_hint' -- crates/aphrodite/src/chain_split.rs            # 0 (no Tier 3, D1)
+git show :aphrodite.toml | grep 'chain_split = false'                      # opt-in OFF (D2)
+git diff --stat 0028705 HEAD                                               # expected: ~80-100 files (see §1 prediction)
 # ---- commit / push / tag / release ----
 git commit -m "release: sync v1.4.3 from Development"
 git push Source Current
 git tag Aphrodite/v1.4.3 && git push Source Aphrodite/v1.4.3
 # GitHub release from the tag, notes via --notes-file Maintain/release-notes-v1.4.3.md
 #   (add a "chain-split (opt-in, default OFF)" bullet; Build.yml fires on refs/tags/Aphrodite/*)
-git checkout Development                               # I10 - working copy home
+git checkout Development # I10 - working copy home
 ```
 
 Conflict rule if any (V2): keep Current's content (e.g. `0028705`'s `.gitignore`
@@ -286,24 +286,24 @@ git add -A && git commit -m "chore(release): bump v1.5.0"
 P sync at the Development tip (includes `85771ee` + `50ff098` + bump):
 
 ```sh
-git status --porcelain                                # clean or ABORT (V8)
-git checkout Current && git pull --ff-only Source Current   # tip = the v1.4.3 sync commit
-git merge --squash Development                        # tree@tip - standard ceremony, no cutoff needed
+git status --porcelain                                    # clean or ABORT (V8)
+git checkout Current && git pull --ff-only Source Current # tip = the v1.4.3 sync commit
+git merge --squash Development                            # tree@tip - standard ceremony, no cutoff needed
 git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite .hermes bench skills
 git -C plugins/aphrodite fetch Source Current
-git -C plugins/aphrodite checkout -B Current Source/Current   # = v2.1.3 commit (unchanged) unless §7.1 ran
+git -C plugins/aphrodite checkout -B Current Source/Current # = v2.1.3 commit (unchanged) unless §7.1 ran
 git add plugins/aphrodite
 # ---- verify before commit ----
-git diff HEAD -- .gitmodules .github/workflows .hermes bench skills   # empty (I9)
-git submodule status                                    # no '+' (I2)
-git grep -c 'adapt_chain_split_threshold' -- crates/aphrodite/src/state.rs   # > 0 (Tier 1 present - D1 flipped)
-git grep -c 'error_hint' -- crates/aphrodite/src/chain_split.rs             # > 0 (Tier 3 present)
-git show :aphrodite.toml | grep 'chain_split = false'   # still opt-in OFF (D2)
+git diff HEAD -- .gitmodules .github/workflows .hermes bench skills        # empty (I9)
+git submodule status                                                       # no '+' (I2)
+git grep -c 'adapt_chain_split_threshold' -- crates/aphrodite/src/state.rs # > 0 (Tier 1 present - D1 flipped)
+git grep -c 'error_hint' -- crates/aphrodite/src/chain_split.rs            # > 0 (Tier 3 present)
+git show :aphrodite.toml | grep 'chain_split = false'                      # still opt-in OFF (D2)
 git commit -m "release: sync v1.5.0 from Development"
 git push Source Current
 git tag Aphrodite/v1.5.0 && git push Source Aphrodite/v1.5.0
 # GitHub release --notes-file Maintain/release-notes-v1.5.0.md (Tier 1 + Tier 3 bullets)
-git checkout Development                               # I10
+git checkout Development # I10
 ```
 
 ## 8. PR-branch variant (NOT used for 1.4.3/1.5.0; documented for when review is mandatory)
@@ -313,15 +313,15 @@ Current, branch deleted after tagging:
 
 ```sh
 git checkout Current && git pull --ff-only Source Current
-git checkout -b promote/v1.4.3 Current                 # or promote/v1.5.0
-git merge --squash 8521b27                             # cutoff for 1.4.3; `Development` for 1.5.0
+git checkout -b promote/v1.4.3 Current # or promote/v1.5.0
+git merge --squash 8521b27             # cutoff for 1.4.3; `Development` for 1.5.0
 git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite .hermes bench skills
 # … float gitlink + verify as §7.2/§7.3 …
 git commit -m "release: sync v1.4.3 from Development"
-git push Source promote/v1.4.3                         # open PR promote/v1.4.3 → Current; review; merge
+git push Source promote/v1.4.3 # open PR promote/v1.4.3 → Current; review; merge
 git checkout Current && git pull --ff-only Source Current
 git tag Aphrodite/v1.4.3 && git push Source Aphrodite/v1.4.3
-git branch -D promote/v1.4.3                           # delete - never lingers in the graph
+git branch -D promote/v1.4.3 # delete - never lingers in the graph
 git checkout Development
 ```
 
@@ -421,7 +421,7 @@ git checkout Development
 **Check (on the released state):**
 
 ```sh
-git show Aphrodite/v1.4.3:aphrodite.toml                                                                                                                                                                                   | grep 'chain_split = false'
+git show Aphrodite/v1.4.3:aphrodite.toml | grep 'chain_split = false'
 ```
 
 ---
@@ -472,9 +472,9 @@ skill ceremony exactly.
 ## 11. Post-release verification (after BOTH tracks)
 
 ```sh
-git tag -l 'Aphrodite/v1.4.*' 'Aphrodite/v1.5.*'            # exactly the two new tags on Current
-git -C plugins/aphrodite tag -l 'v2.1.*'                    # v2.1.3 present, no duplicate
-git log --oneline --first-parent Current | head -5          # A then B then 0028705
-git submodule status                                        # no '+' in P
-git branch --show-current                                   # Development everywhere
+git tag -l 'Aphrodite/v1.4.*' 'Aphrodite/v1.5.*'   # exactly the two new tags on Current
+git -C plugins/aphrodite tag -l 'v2.1.*'           # v2.1.3 present, no duplicate
+git log --oneline --first-parent Current | head -5 # A then B then 0028705
+git submodule status                               # no '+' in P
+git branch --show-current                          # Development everywhere
 ```

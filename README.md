@@ -55,9 +55,9 @@ The two routes are alternatives: if you install via git clone, you do not need
 **`Terminal`** (binary + config only)
 
 ```sh
-cargo install aphrodite          # proxy binary
-cargo install aphrodite-hermes   # dylib + helper bin
-aphrodite setup                  # config + data dir under ~/.hermes/aphrodite
+cargo install aphrodite        # proxy binary
+cargo install aphrodite-hermes # dylib + helper bin
+aphrodite setup                # config + data dir under ~/.hermes/aphrodite
 ```
 
 `cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/` and never

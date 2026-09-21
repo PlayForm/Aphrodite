@@ -67,14 +67,16 @@ baseline.
 ```sh
 git diff HEAD -- Cargo.lock 'crates/*/Cargo.toml' 'vendor/headroom/Cargo.toml' 'vendor/headroom/crates/*/Cargo.toml'
 cargo tree --workspace --edges normal
-rustc --version; cargo --version
+rustc --version
+cargo --version
 find . -name Cargo.toml -not -path '*/target/*' -not -path './plugins/*'
 ```
 
 **Verify**
 
 ```sh
-git status --short -- Cargo.lock 'crates/*/Cargo.toml' 'vendor/headroom/**/Cargo.toml'; echo "EXIT:$?"
+git status --short -- Cargo.lock 'crates/*/Cargo.toml' 'vendor/headroom/**/Cargo.toml'
+echo "EXIT:$?"
 ```
 
 **Expected**
@@ -147,16 +149,20 @@ cargo update -p <cluster-member> --dry-run
 ```sh
 cargo check -p aphrodite
 cargo check -p aphrodite-hermes
-cargo check --manifest-path vendor/headroom/Cargo.toml          # default-members only (skips headroom-py)
-cargo check --manifest-path vendor/headroom/Cargo.toml -p headroom-proxy   # WS/axum crate
-cargo check --manifest-path vendor/headroom/Cargo.toml -p headroom-py      # FFI boundary
-cargo check --manifest-path vendor/rtk/Cargo.toml               # vendored submodule
+cargo check --manifest-path vendor/headroom/Cargo.toml                   # default-members only (skips headroom-py)
+cargo check --manifest-path vendor/headroom/Cargo.toml -p headroom-proxy # WS/axum crate
+cargo check --manifest-path vendor/headroom/Cargo.toml -p headroom-py    # FFI boundary
+cargo check --manifest-path vendor/rtk/Cargo.toml                        # vendored submodule
 ```
 
 **Verify**
 
 ```sh
-for t in aphrodite aphrodite-hermes headroom-proxy headroom-py; do echo "$t: $(test -z "$(cargo check -p $t 2>&1 >/dev/null)"; echo $?)"; done; echo "EXIT:$?"
+for t in aphrodite aphrodite-hermes headroom-proxy headroom-py; do echo "$t: $(
+	test -z "$(cargo check -p $t 2>&1 > /dev/null)"
+	echo $?
+)"; done
+echo "EXIT:$?"
 ```
 
 **Expected**
@@ -230,7 +236,8 @@ migrate source > pin locally > pin workspace-wide > revert > defer.
 **Verify**
 
 ```sh
-grep -n '^<dep> *=' crates/*/Cargo.toml vendor/headroom/Cargo.toml vendor/headroom/crates/*/Cargo.toml; echo "EXIT:$?"
+grep -n '^<dep> *=' crates/*/Cargo.toml vendor/headroom/Cargo.toml vendor/headroom/crates/*/Cargo.toml
+echo "EXIT:$?"
 ```
 
 **Expected**
@@ -303,9 +310,12 @@ crates/aphrodite/templates/__init__.py` (drift guard).
 **Verify**
 
 ```sh
-aphrodite --version; echo "EXIT:$?"
-aphrodite_stats 2>/dev/null | head -5; echo "EXIT:$?"
-python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py; echo "EXIT:$?"
+aphrodite --version
+echo "EXIT:$?"
+aphrodite_stats 2> /dev/null | head -5
+echo "EXIT:$?"
+python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py
+echo "EXIT:$?"
 ```
 
 **Expected**
@@ -350,7 +360,8 @@ pin` entry (reason, affected surface, evidence, owner, removal condition,
 **Verify**
 
 ```sh
-grep -rn 'tokio-tungstenite\|pyo3\|sha2\|reqwest\|axum' references/breakpoints.md | wc -l; echo "EXIT:$?"
+grep -rn 'tokio-tungstenite\|pyo3\|sha2\|reqwest\|axum' references/breakpoints.md | wc -l
+echo "EXIT:$?"
 ```
 
 **Expected**

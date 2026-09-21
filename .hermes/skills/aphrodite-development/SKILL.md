@@ -109,14 +109,16 @@ any build or edit advice applies.
 ```sh
 git rev-parse --show-toplevel
 git branch --show-current
-test -f Cargo.toml && test -f crates/aphrodite/Cargo.toml && test -d crates/aphrodite-hermes; echo "WORKSPACE:$?"
-test -d ~/.hermes/aphrodite/binaries && test -f ~/.hermes/aphrodite/aphrodite.toml; echo "RUNTIME_HOME:$?"
+test -f Cargo.toml && test -f crates/aphrodite/Cargo.toml && test -d crates/aphrodite-hermes
+echo "WORKSPACE:$?"
+test -d ~/.hermes/aphrodite/binaries && test -f ~/.hermes/aphrodite/aphrodite.toml
+echo "RUNTIME_HOME:$?"
 ```
 
 **Verify**
 
 ```sh
-readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite 2>/dev/null
+readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite 2> /dev/null
 ```
 
 **Expected**
@@ -165,7 +167,8 @@ ls plugins/aphrodite/plugin.yaml plugins/aphrodite/BINARY_VERSION plugins/aphrod
 **Verify**
 
 ```sh
-test -L ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite && [ "$(readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite)" = "$PWD/plugins/aphrodite" ]; echo "SYMLINK:$?"
+test -L ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite && [ "$(readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite)" = "$PWD/plugins/aphrodite" ]
+echo "SYMLINK:$?"
 ```
 
 **Expected**

@@ -337,7 +337,7 @@ EOF
 # Normal tag pushes auto-attach every staged artifact; the glob form below is
 # only for a from-source re-attach. Glob every staged file, never name 2 of 12:
 gh release create Aphrodite/vX.Y.Z --notes-file .hermes/tmp/notes.md \
-  staging/aphrodite-* staging/libaphrodite_hermes-* staging/SHA256SUMS-*.txt
+	staging/aphrodite-* staging/libaphrodite_hermes-* staging/SHA256SUMS-*.txt
 ```
 
 ## 6. Documentation Lint (release docs)

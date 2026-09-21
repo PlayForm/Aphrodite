@@ -169,7 +169,7 @@ walkthrough and per-platform details. Short version for the plugin path:
 git clone https://github.com/PlayForm/Aphrodite-Hermes.git
 ln -s "$(pwd)/Aphrodite-Hermes" ~/.hermes/plugins/aphrodite
 hermes plugins enable aphrodite
-hermes   # restart so the plugin loads fresh
+hermes # restart so the plugin loads fresh
 ```
 
 On first launch the plugin checks `~/.hermes/aphrodite/binaries/`; if the

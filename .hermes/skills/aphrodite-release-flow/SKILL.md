@@ -168,8 +168,8 @@ row matches its authority path before any bump.
 **Do**
 
 ```sh
-curl -A <ua> https://crates.io/api/v1/crates/aphrodite | grep max_version
-curl -A <ua> https://crates.io/api/v1/crates/aphrodite-hermes | grep max_version
+curl -A < ua > https://crates.io/api/v1/crates/aphrodite | grep max_version
+curl -A < ua > https://crates.io/api/v1/crates/aphrodite-hermes | grep max_version
 # ledger authority paths (aphrodite-release-workflow §1):
 grep '^version' crates/aphrodite/Cargo.toml crates/aphrodite-hermes/Cargo.toml
 grep '"version"' package.json
@@ -181,7 +181,7 @@ git submodule status plugins/aphrodite
 **Verify**
 
 ```sh
-git status --short   # only the pre-bump state; no surprise files
+git status --short # only the pre-bump state; no surprise files
 ```
 
 **Expected**
@@ -283,7 +283,7 @@ diff -q plugins/aphrodite/__init__.py crates/aphrodite/templates/__init__.py
 **Verify**
 
 ```sh
-git diff --stat   # scoped to the intended template/docs edits
+git diff --stat # scoped to the intended template/docs edits
 ```
 
 **Expected**
@@ -377,14 +377,14 @@ stale symlink target or an already-loaded dylib are not evidence.
 cargo build --release -p aphrodite -p aphrodite-hermes
 # restart the Hermes session / plugin process so the NEW dylib is loaded;
 # then, in the fresh session:
-aphrodite_stats        # record loaded version
-aphrodite_test         # quick=1 sample, then full=3 (source_code/build/json)
+aphrodite_stats # record loaded version
+aphrodite_test  # quick=1 sample, then full=3 (source_code/build/json)
 ```
 
 **Verify**
 
 ```sh
-aphrodite_rebuild      # binary vs plugin version cross-check; must match
+aphrodite_rebuild # binary vs plugin version cross-check; must match
 ```
 
 **Expected**
@@ -500,7 +500,7 @@ git -C plugins/aphrodite push Source Current
 
 ```sh
 git -C plugins/aphrodite log -1 --oneline
-git submodule status plugins/aphrodite    # parent side: no '+'
+git submodule status plugins/aphrodite # parent side: no '+'
 ```
 
 **Expected**
@@ -539,7 +539,8 @@ commit before updating the parent gitlink).
 
 ```sh
 git -C plugins/aphrodite log -1 --format=%H
-aphrodite_stats; aphrodite_test   # in a session pointing at this plugin tree
+aphrodite_stats
+aphrodite_test # in a session pointing at this plugin tree
 # artifact availability for the named BINARY_VERSION (if it names a release):
 gh release view "Aphrodite/v<ver>" --repo PlayForm/Aphrodite --json assets -q '.assets[].name'
 ```
@@ -547,7 +548,7 @@ gh release view "Aphrodite/v<ver>" --repo PlayForm/Aphrodite --json assets -q '.
 **Verify**
 
 ```sh
-aphrodite_rebuild   # binary vs plugin version pair
+aphrodite_rebuild # binary vs plugin version pair
 ```
 
 **Expected**
@@ -605,8 +606,8 @@ git push origin Current
 **Verify**
 
 ```sh
-git diff HEAD -- .gitmodules .github/workflows plugins/aphrodite   # EMPTY (I9)
-git submodule status plugins/aphrodite                             # no '+'
+git diff HEAD -- .gitmodules .github/workflows plugins/aphrodite # EMPTY (I9)
+git submodule status plugins/aphrodite                           # no '+'
 ```
 
 **Expected**
@@ -675,9 +676,9 @@ git push Source Current
 **Verify**
 
 ```sh
-git submodule status vendor/headroom    # no '+'
-git ls-tree HEAD vendor/headroom        # tagged fork commit recorded
-curl -A <ua> https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version
+git submodule status vendor/headroom # no '+'
+git ls-tree HEAD vendor/headroom     # tagged fork commit recorded
+curl -A < ua > https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version
 ```
 
 **Expected**
@@ -746,7 +747,7 @@ git fetch Source
 git grep -n -E 'branch: (Current|Development)|branches: \[(Current|Development)\]' Source/Development Source/Current -- .github/workflows
 git show Source/Development:.gitmodules | grep -E '^branch'
 git show Source/Current:.gitmodules | grep -E '^branch'
-git diff <release-sync-commit> HEAD -- .gitmodules .github/workflows plugins/aphrodite
+git diff -- .gitmodules .github/workflows plugins/aphrodite < release-sync-commit > HEAD
 ```
 
 **Verify**
@@ -791,10 +792,10 @@ commit to be tagged - never trust remembered or documented behavior.**
 
 ```sh
 # Read the ACTUAL workflow files at the tag commit:
-git show <release-sync-commit>:.github/workflows/Publish.yml | grep -nE '^on:|tags:|workflow_dispatch|publish_crates|if:'
-git show <release-sync-commit>:.github/workflows/Build.yml | grep -nE '^on:|tags:|workflow_dispatch|if:'
-git show <release-sync-commit>:.github/workflows/Check.yml | grep -nE '^on:|tags:|branches:'
-git show <release-sync-commit>:.github/workflows/Auto.yml | grep -nE '^on:|schedule|branch:'
+git show < release-sync-commit > :.github/workflows/Publish.yml | grep -nE '^on:|tags:|workflow_dispatch|publish_crates|if:'
+git show < release-sync-commit > :.github/workflows/Build.yml | grep -nE '^on:|tags:|workflow_dispatch|if:'
+git show < release-sync-commit > :.github/workflows/Check.yml | grep -nE '^on:|tags:|branches:'
+git show < release-sync-commit > :.github/workflows/Auto.yml | grep -nE '^on:|schedule|branch:'
 # build the trigger table: event -> workflows -> jobs -> publishing side effects
 ```
 
@@ -865,8 +866,8 @@ git push origin Current
 **Verify**
 
 ```sh
-git submodule status plugins/aphrodite        # no '+'
-git ls-tree HEAD plugins/aphrodite            # intended commit
+git submodule status plugins/aphrodite # no '+'
+git ls-tree HEAD plugins/aphrodite     # intended commit
 ```
 
 **Expected**
@@ -1006,8 +1007,8 @@ from the consumer's perspective, not the publisher's.
 ```sh
 # The tag push already ran cargo publish (per the accepted trigger audit) -
 # do NOT re-dispatch for aphrodite / aphrodite-hermes; verify instead:
-curl -A <ua> https://crates.io/api/v1/crates/aphrodite | grep max_version
-curl -A <ua> https://crates.io/api/v1/crates/aphrodite-hermes | grep max_version
+curl -A < ua > https://crates.io/api/v1/crates/aphrodite | grep max_version
+curl -A < ua > https://crates.io/api/v1/crates/aphrodite-hermes | grep max_version
 # IF Step I5 carried a fork delta, dispatch the headroom publish now - the
 # fork leg (crate + parent pin bumped, fork tag + gitlink float) MUST have
 # run first, else the version check skips the stale version silently (the
@@ -1015,7 +1016,7 @@ curl -A <ua> https://crates.io/api/v1/crates/aphrodite-hermes | grep max_version
 # -> Publish-Aphrodite -> Publish-Hermes (headroom publishes FIRST):
 gh workflow run Publish -f publish_crates=true
 # then verify the headroom publish landed (see the reference note):
-curl -A <ua> https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version
+curl -A < ua > https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version
 ```
 
 **Verify**
@@ -1061,8 +1062,8 @@ diagnostics disagree with the release claim.
 **Do**
 
 ```sh
-aphrodite_stats    # version, engine_enabled, thresholds, proxy liveness
-aphrodite_rebuild  # binary vs plugin version cross-check (must match)
+aphrodite_stats   # version, engine_enabled, thresholds, proxy liveness
+aphrodite_rebuild # binary vs plugin version cross-check (must match)
 ```
 
 **Expected**
@@ -1089,7 +1090,7 @@ aphrodite_rebuild  # binary vs plugin version cross-check (must match)
 **Do**
 
 ```sh
-aphrodite_test     # quick=1 sample; full=3: source_code/build/json
+aphrodite_test # quick=1 sample; full=3: source_code/build/json
 aphrodite_catalog
 aphrodite_diff
 aphrodite_directive list
@@ -1227,7 +1228,7 @@ ceremony. The same state machine runs with Current as the workspace: Prepare
 
 ```sh
 # fix in place on Current; before committing the bump:
-curl -A <ua> https://crates.io/api/v1/crates/aphrodite | grep max_version
+curl -A < ua > https://crates.io/api/v1/crates/aphrodite | grep max_version
 # bump the binary patch to the next number; commit on Current
 ```
 
@@ -1328,9 +1329,9 @@ pick can never transplant Current's identity onto Development.
 git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite
 # (controlled restore of branch-owned identity only - the ceremony invariant,
 # NOT a repair mechanism; for corrupted working content never checkout/reset)
-git diff HEAD -- .gitmodules .github/workflows plugins/aphrodite   # EMPTY (I9)
-git submodule status plugins/aphrodite                             # no '+'
-git cat-file -e HEAD:plugins/aphrodite/__init__.py                 # picked files exist
+git diff HEAD -- .gitmodules .github/workflows plugins/aphrodite # EMPTY (I9)
+git submodule status plugins/aphrodite                           # no '+'
+git cat-file -e HEAD:plugins/aphrodite/__init__.py               # picked files exist
 ```
 
 **Expected**
@@ -1354,7 +1355,7 @@ git cat-file -e HEAD:plugins/aphrodite/__init__.py                 # picked file
 **Do**
 
 ```sh
-git log Source/Development    # confirm the remote tip
+git log Source/Development # confirm the remote tip
 ```
 
 **Expected**

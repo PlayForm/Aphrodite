@@ -32,41 +32,41 @@ NOTIFY_URL="${APHRODITE_NOTIFY_URL:-}"
 NOTIFY_KEY="${APHRODITE_NOTIFY_KEY:-}"
 
 case "${1:-}" in
---stop)
-	if [ -f "$PID_FILE" ]; then
-		PID=$(cat "$PID_FILE")
-		if kill "$PID" 2>/dev/null; then
-			echo "✓ aphrodite token (:9798) stopped (pid=$PID)"
+	--stop)
+		if [ -f "$PID_FILE" ]; then
+			PID=$(cat "$PID_FILE")
+			if kill "$PID" 2> /dev/null; then
+				echo "✓ aphrodite token (:9798) stopped (pid=$PID)"
+			fi
+			rm -f "$PID_FILE"
+		else
+			echo "No pid file at $PID_FILE"
 		fi
-		rm -f "$PID_FILE"
-	else
-		echo "No pid file at $PID_FILE"
-	fi
-	exit 0
-	;;
---status)
-	if [ -f "$PID_FILE" ]; then
-		PID=$(cat "$PID_FILE")
-		if kill -0 "$PID" 2>/dev/null; then
-			echo "✓ aphrodite token running (pid=$PID, port=$PORT)"
-			exit 0
+		exit 0
+		;;
+	--status)
+		if [ -f "$PID_FILE" ]; then
+			PID=$(cat "$PID_FILE")
+			if kill -0 "$PID" 2> /dev/null; then
+				echo "✓ aphrodite token running (pid=$PID, port=$PORT)"
+				exit 0
+			fi
 		fi
-	fi
-	echo "✗ aphrodite token not running"
-	exit 1
-	;;
-"") ;;
-*)
-	echo "Unknown option: $1" >&2
-	echo "Usage: $0 [--stop|--status]" >&2
-	exit 1
-	;;
+		echo "✗ aphrodite token not running"
+		exit 1
+		;;
+	"") ;;
+	*)
+		echo "Unknown option: $1" >&2
+		echo "Usage: $0 [--stop|--status]" >&2
+		exit 1
+		;;
 esac
 
 # Build if binary doesn't exist
 if [ ! -x "$BINARY" ]; then
 	echo "Building aphrodite (token)..."
-	source "$HOME/.cargo/env" 2>/dev/null || true
+	source "$HOME/.cargo/env" 2> /dev/null || true
 	(cd "$PROJECT_DIR" && cargo build -p aphrodite)
 	if [ -x "$PROJECT_DIR/target/debug/aphrodite" ]; then
 		BINARY="$PROJECT_DIR/target/debug/aphrodite"
@@ -96,13 +96,13 @@ if [ -n "$NOTIFY_KEY" ]; then
 	CMD+=(--notify-key "$NOTIFY_KEY")
 fi
 
-nohup "${CMD[@]}" >"$LOG_FILE" 2>&1 &
+nohup "${CMD[@]}" > "$LOG_FILE" 2>&1 &
 
 PID=$!
-echo "$PID" >"$PID_FILE"
+echo "$PID" > "$PID_FILE"
 sleep 1
 
-if kill -0 "$PID" 2>/dev/null; then
+if kill -0 "$PID" 2> /dev/null; then
 	echo "✓ aphrodite token started (pid=$PID, port=$PORT)"
 	echo "  Health:    curl http://127.0.0.1:$PORT/health"
 	echo "  Stats:     curl http://127.0.0.1:$PORT/stats"

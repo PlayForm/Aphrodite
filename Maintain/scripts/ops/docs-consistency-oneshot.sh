@@ -36,7 +36,7 @@ USAGE_FILE="${USAGE_FILE:-/tmp/aphrodite-docs-oneshot-usage.json}"
 MODEL_ARG=()
 [[ -n "${MODEL:-}" ]] && MODEL_ARG=(--model "$MODEL")
 
-read -r -d '' PROMPT <<EOF || true
+read -r -d '' PROMPT << EOF || true
 You are running headless in the Aphrodite repo. Task: ${MODE}
 
 Source of truth for the CURRENT version is crates/aphrodite/Cargo.toml = ${CUR_VER}.

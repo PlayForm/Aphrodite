@@ -39,7 +39,7 @@ and the fork gets tag `aphrodite-v0.10.0`.
   14/14 (55 asserts); `check_ffi_contract.py` 0 violations; `ruff check` ✅;
   `pyright` 0 errors
 - Lint: `cargo clippy -p aphrodite -- -D warnings` ✅; `prettier --check
-  .hermes/**/*.md` ✅
+.hermes/**/*.md` ✅
 - Runtime: `aphrodite_rebuild` -> dylib 1.5.1 loaded; `aphrodite_test` full
   -> 3/3 compress/retrieve round-trips byte-identical
 

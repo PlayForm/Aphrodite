@@ -25,8 +25,8 @@ verified, magic-byte checked) before starting the proxy. Run the script by
 hand only when you want to prefetch or when the automatic fetch failed:
 
 ```bash
-cd ~/.hermes/plugins/aphrodite   # your plugin clone
-bash download.sh                 # auto-detects version + platform
+cd ~/.hermes/plugins/aphrodite # your plugin clone
+bash download.sh               # auto-detects version + platform
 ```
 
 `download.sh` resolves the version automatically (a bundled version file,
@@ -89,7 +89,7 @@ with zero diagnostic, and a failed `ditto` used to be treated as success.
 ```bash
 git clone https://github.com/PlayForm/Aphrodite.git
 cd Aphrodite
-git submodule update --init --recursive  # required - vendored deps live in submodules
+git submodule update --init --recursive # required - vendored deps live in submodules
 cargo build --release -p aphrodite -p aphrodite-hermes
 # Binary: target/release/aphrodite
 # Dylibs: target/release/libaphrodite.dylib, target/release/libaphrodite_hermes.dylib (or .so on Linux)
@@ -132,7 +132,7 @@ and `:9798` (token) once Hermes launches the plugin (or once you launch
 ```bash
 hermes plugins disable aphrodite
 rm ~/.hermes/plugins/aphrodite
-pkill -f "aphrodite" 2>/dev/null || true   # stop any proxy still running
+pkill -f "aphrodite" 2> /dev/null || true # stop any proxy still running
 ```
 
 Also remove `~/.hermes/aphrodite/` to fully clean up the binaries, config,
