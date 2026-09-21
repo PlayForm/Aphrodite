@@ -60,7 +60,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Rust (nightly, latest)
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master (2026-07)
         with:
           toolchain: nightly
           components: rustfmt, clippy
@@ -97,7 +97,7 @@ jobs:
         # codebase (1235 diff hunks, verified locally) - a false-positive
         # gate, not a real regression. A pinned dated nightly is carried
         # solely for this one step; every other job uses stable.
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (2026-07)
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master (2026-07)
         with:
           toolchain: nightly-2026-05-01
           components: rustfmt
