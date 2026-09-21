@@ -18,7 +18,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [ ! -x "$BINARY" ]; then
-	echo "missing $BINARY - run: cargo build --release -p aphrodite" >&2
+	\echo "missing $BINARY - run: cargo build --release -p aphrodite" >&2
 	exit 1
 fi
 

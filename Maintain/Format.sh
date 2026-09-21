@@ -29,17 +29,17 @@ Root="$Current/.."
 #===============================================================================
 
 FormatLineEndings() {
-	echo "========================================"
-	echo "Format Line Endings"
-	echo "========================================"
-	echo "Tooling: dos2unix"
-	echo "========================================"
-	echo ""
+	\echo "========================================"
+	\echo "Format Line Endings"
+	\echo "========================================"
+	\echo "Tooling: dos2unix"
+	\echo "========================================"
+	\echo ""
 
 	if ! command -v dos2unix >/dev/null 2>&1; then
-		echo "Error: dos2unix is not installed."
-		echo "  macOS:  brew install dos2unix"
-		echo "  Linux:  apt install dos2unix  /  dnf install dos2unix"
+		\echo "Error: dos2unix is not installed."
+		\echo "  macOS:  brew install dos2unix"
+		\echo "  Linux:  apt install dos2unix  /  dnf install dos2unix"
 		exit 1
 	fi
 
@@ -76,25 +76,25 @@ FormatLineEndings() {
 		-not -path "*/bin/*" |
 		xargs dos2unix -q
 
-	echo ""
-	echo "Line ending conversion complete."
-	echo ""
+	\echo ""
+	\echo "Line ending conversion complete."
+	\echo ""
 }
 
 FormatShell() {
-	echo "========================================"
-	echo "Format Shell"
-	echo "========================================"
-	echo "Tooling: shfmt"
-	echo "Config:  .editorconfig (tabs, indent=4)"
-	echo "========================================"
-	echo ""
+	\echo "========================================"
+	\echo "Format Shell"
+	\echo "========================================"
+	\echo "Tooling: shfmt"
+	\echo "Config:  .editorconfig (tabs, indent=4)"
+	\echo "========================================"
+	\echo ""
 
 	if ! command -v shfmt >/dev/null 2>&1; then
-		echo "Error: shfmt is not installed."
-		echo "  macOS:  brew install shfmt"
-		echo "  Linux:  apt install shfmt  /  go install mvdan.cc/sh/v3/cmd/shfmt@latest"
-		echo "  https://github.com/mvdan/sh"
+		\echo "Error: shfmt is not installed."
+		\echo "  macOS:  brew install shfmt"
+		\echo "  Linux:  apt install shfmt  /  go install mvdan.cc/sh/v3/cmd/shfmt@latest"
+		\echo "  https://github.com/mvdan/sh"
 		exit 1
 	fi
 
@@ -125,26 +125,26 @@ FormatShell() {
 		-not -path "*/bin/*" |
 		xargs shfmt -w
 
-	echo ""
-	echo "Shell formatting complete."
-	echo ""
+	\echo ""
+	\echo "Shell formatting complete."
+	\echo ""
 }
 
 FormatPrettier() {
-	echo "========================================"
-	echo "Format Prettier"
-	echo "========================================"
-	echo "Tooling: Prettier (md, json, yaml)"
-	echo "Ignore:  .prettierignore"
-	echo "========================================"
-	echo ""
+	\echo "========================================"
+	\echo "Format Prettier"
+	\echo "========================================"
+	\echo "Tooling: Prettier (md, json, yaml)"
+	\echo "Ignore:  .prettierignore"
+	\echo "========================================"
+	\echo ""
 
 	cd "$Root"
 
-	echo "→ Installing dependencies…"
+	\echo "→ Installing dependencies…"
 	pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 
-	echo "→ Running Prettier (md, json, yaml)…"
+	\echo "→ Running Prettier (md, json, yaml)…"
 	pnpm exec prettier --write \
 		--ignore-path .prettierignore \
 		"**/*.md" \
@@ -156,21 +156,21 @@ FormatPrettier() {
 		"*.yml" \
 		"*.yaml"
 
-	echo ""
-	echo "Prettier formatting complete."
-	echo ""
+	\echo ""
+	\echo "Prettier formatting complete."
+	\echo ""
 }
 
 FormatRust() {
-	echo "========================================"
-	echo "Format Rust"
-	echo "========================================"
-	echo "Tooling: Format/Rust.py      (blank lines, first)"
-	echo "         cargo +nightly fmt  (workspace module tree, second)"
-	echo "         rustfmt direct pass (orphan files, third)"
-	echo "Config:  rustfmt.toml"
-	echo "========================================"
-	echo ""
+	\echo "========================================"
+	\echo "Format Rust"
+	\echo "========================================"
+	\echo "Tooling: Format/Rust.py      (blank lines, first)"
+	\echo "         cargo +nightly fmt  (workspace module tree, second)"
+	\echo "         rustfmt direct pass (orphan files, third)"
+	\echo "Config:  rustfmt.toml"
+	\echo "========================================"
+	\echo ""
 
 	cd "$Root"
 
@@ -209,9 +209,9 @@ FormatRust() {
 			'rustup run nightly rustfmt --config-path rustfmt.toml "$1" 2>/dev/null || true' \
 			-- {}
 
-	echo ""
-	echo "Rust formatting complete."
-	echo ""
+	\echo ""
+	\echo "Rust formatting complete."
+	\echo ""
 }
 
 #===============================================================================
@@ -236,20 +236,20 @@ rust)
 	FormatShell
 	FormatPrettier
 	FormatRust
-	echo "→ Format complete."
+	\echo "→ Format complete."
 	;;
 --help | -h)
-	echo "Usage: $0 [dos2unix|shell|prettier|rust]"
-	echo ""
-	echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
-	echo "  shell     Format shell scripts with shfmt"
-	echo "  prettier  Format Markdown/JSON/YAML with Prettier"
-	echo "  rust      Format Rust with rustfmt (nightly) + Rust.py"
-	echo "  (no arg)  Run all four in order"
+	\echo "Usage: $0 [dos2unix|shell|prettier|rust]"
+	\echo ""
+	\echo "  dos2unix  Normalize line endings (CRLF -> LF) with dos2unix"
+	\echo "  shell     Format shell scripts with shfmt"
+	\echo "  prettier  Format Markdown/JSON/YAML with Prettier"
+	\echo "  rust      Format Rust with rustfmt (nightly) + Rust.py"
+	\echo "  (no arg)  Run all four in order"
 	;;
 *)
-	echo "Unknown target: $1"
-	echo "Use --help for usage information"
+	\echo "Unknown target: $1"
+	\echo "Use --help for usage information"
 	exit 1
 	;;
 esac

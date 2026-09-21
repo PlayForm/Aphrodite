@@ -7,12 +7,12 @@ STATE_DIR="$HOME/.hermes"
 OUTPUT_FILE="$STATE_DIR/build-status.json"
 mkdir -p "$STATE_DIR"
 
-log() { echo "[$(date +%H:%M:%S)] $*"; }
+log() { \echo "[$(date +%H:%M:%S)] $*"; }
 
 write_status() {
 	local status="$1" errs="$2"
-	cat > "$OUTPUT_FILE" << JSONEOF
-{"status":"$status","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","errors":$(echo "$errs" | jq -R -s -c 'split("\n") | map(select(length > 0))')}
+	cat >"$OUTPUT_FILE" <<JSONEOF
+{"status":"$status","timestamp":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","errors":$(\echo "$errs" | jq -R -s -c 'split("\n") | map(select(length > 0))')}
 JSONEOF
 }
 
@@ -23,8 +23,8 @@ get_buffer() {
 		return 1
 	fi
 	local result
-	result=$(hermes tool mcp wezterm get_buffer --pane-id "$WEZTERM_PANE_ID" --lines 8 2> /dev/null)
-	echo "$result"
+	result=$(hermes tool mcp wezterm get_buffer --pane-id "$WEZTERM_PANE_ID" --lines 8 2>/dev/null)
+	\echo "$result"
 }
 
 # Initial status
@@ -37,7 +37,7 @@ fi
 log "Starting pane $WEZTERM_PANE_ID monitor (every 5s)"
 
 while true; do
-	buffer=$(get_buffer 2> /dev/null || true)
+	buffer=$(get_buffer 2>/dev/null || true)
 
 	if [ -z "$buffer" ]; then
 		sleep 5
@@ -45,12 +45,12 @@ while true; do
 	fi
 
 	# Extract the result value from JSON
-	content=$(echo "$buffer" | python3 -c "
+	content=$(\echo "$buffer" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 result = data.get('result', '')
 print(result)
-" 2> /dev/null || echo "$buffer")
+" 2>/dev/null || \echo "$buffer")
 
 	# Parse for patterns
 	errors=""
@@ -60,19 +60,19 @@ print(result)
 
 	while IFS= read -r line; do
 		case "$line" in
-			*"error"* | *"Error"* | *"ERROR"*)
-				if [[ "$line" != *"INFO"* && "$line" != *"error:"*"listening"* ]]; then
-					errors+="$line"$'\n'
-				fi
-				;;
-			*"Compiling"*) compiling=1 ;;
-			*"Running"*) running=1 ;;
-			*"Finished"*"successfully"* | *"Finished \`dev\`"*) finished_ok=1 ;;
-			*"warning"* | *"Warning"*)
-				# warnings are non-fatal, track them
-				;;
+		*"error"* | *"Error"* | *"ERROR"*)
+			if [[ "$line" != *"INFO"* && "$line" != *"error:"*"listening"* ]]; then
+				errors+="$line"$'\n'
+			fi
+			;;
+		*"Compiling"*) compiling=1 ;;
+		*"Running"*) running=1 ;;
+		*"Finished"*"successfully"* | *"Finished \`dev\`"*) finished_ok=1 ;;
+		*"warning"* | *"Warning"*)
+			# warnings are non-fatal, track them
+			;;
 		esac
-	done <<< "$content"
+	done <<<"$content"
 
 	if [ -n "$errors" ]; then
 		write_status "error" "$errors"
