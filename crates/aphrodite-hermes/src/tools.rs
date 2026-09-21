@@ -589,10 +589,18 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 	});
 
 	// ── debug: per-session debug toggle (Rust-side only) ──
+	// Dev-only: gated behind debug_assertions so release dylibs register
+	// exactly the 13 production tools (catalog validate rule 6 - the
+	// manifest declares 13; a release dylib registering aphrodite_debug
+	// fails `hermes plugins validate` as an undeclared tool). Dev builds
+	// (cargo watch / debug profile) keep it; `cargo build --release` drops
+	// it. The debug-prefix/session-record machinery in debug.rs remains
+	// live in both profiles (it only activates on a flag file).
 	// Flips the session-scoped flag file in the runtime home. Resolution is
 	// root-session based (see debug.rs): the CURRENT session's root id keys the
 	// flag, so subagents inherit it and other sessions stay quiet. Pure Rust -
 	// the customer-facing Python shim is untouched.
+	#[cfg(debug_assertions)]
 	m.insert("aphrodite_debug", |args| {
 		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
 		match crate::debug::set_enabled_current(on) {

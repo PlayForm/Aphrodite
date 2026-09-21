@@ -160,6 +160,7 @@ pub(crate) fn enabled_for(session:&str) -> bool {
 }
 
 /// Resolve the most recently seen session's ROOT id.
+#[cfg(debug_assertions)]
 fn current_root() -> String {
 	let last = LAST_SESSION
 		.get_or_init(|| Mutex::new(String::new()))
@@ -206,6 +207,11 @@ pub(crate) fn last_session() -> String {
 /// hot-reloads, same as `last_session`): a reload wipes LAST_SESSION, and
 /// without the file fallback the toggle would report "no session context"
 /// until the next `pre_llm_call`.
+///
+/// Dev-only: the `aphrodite_debug` tool that calls this is gated behind
+/// debug_assertions (release dylibs register exactly the 13 production
+/// tools), so this entry point is dead code in release builds.
+#[cfg(debug_assertions)]
 pub(crate) fn set_enabled_current(on:bool) -> Result<(String, String), String> {
 	let root = current_root();
 	let root = if root.is_empty() { last_session() } else { root };
