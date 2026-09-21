@@ -34,7 +34,10 @@ of the token cost. Read this file first - it is the map.
   transplant, submodule first); the **B4 branch-identity audit gate (I11)**
   runs before ANY sync/tag (keyword-scan both refs for identity leaks);
   hotfixes work directly on Current and cherry-pick back with `-x`.
-  `.githooks/` are REMOVED (2026-09-17) - never re-create them.
+  `.githooks/` re-instated (2026-09-21) - parent-only hooks (post-commit,
+  post-merge, post-checkout, pre-push) auto-commit submodule gitlink updates
+  so pointers are never orphaned; they run only in the main parent
+  (superproject guard) and only touch real mode-160000 gitlinks.
 - **Two version tracks, never conflated**: binary 1.4.x vs plugin 2.1.x.
   `BINARY_VERSION` is a live distribution pointer - bump it LAST at tag time.
 

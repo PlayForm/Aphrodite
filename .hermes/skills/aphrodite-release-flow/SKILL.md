@@ -587,6 +587,12 @@ restore) and floating the gitlink to the released plugin tip.
 ```sh
 git checkout Current
 git merge --squash <Development-cutoff>
+# selective discard of dev-only scaffolding (I2 precedent): the debug TOOL is
+# Development-only (✝, classification DEV-engine-build.md 2026-09-21) - drop
+# the tools.rs `aphrodite_debug` insert, the schemas.rs `schema_debug` entry,
+# and debug.rs `set_enabled_current`/`current_root` when staging; debug.rs
+# core (record_session/last_session/debug_line/enabled_for) CROSSES normally
+# (lib.rs session-tracking calls depend on it).
 # controlled restore of branch-owned identity ONLY (the ceremony invariant,
 # NOT a repair mechanism - boundaries' git repair taxonomy):
 git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite

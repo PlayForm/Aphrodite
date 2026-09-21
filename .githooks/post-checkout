@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# post-checkout - on a branch checkout in the parent, auto-commit any
+# updated submodule gitlinks. Args: $1 old HEAD, $2 new HEAD,
+# $3 flag (1 = branch checkout, 0 = file checkout).
+set -euo pipefail
+
+[ "${3:-0}" = "1" ] || exit 0
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+exec "$DIR/lib/bump-submodule-gitlinks.sh"
