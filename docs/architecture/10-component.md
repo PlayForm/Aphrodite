@@ -11,10 +11,9 @@ graph TB
 		end
 	end
 
-	subgraph runtimehome["~/.hermes/aphrodite (canonical runtime home)"]
-		BIN["binaries/<br/>aphrodite + libaphrodite_hermes.{dylib,so,dll}"]
+	subgraph runtimehome["$HERMES_HOME/aphrodite (canonical runtime home)"]
+		BIN["binaries/<br/>aphrodite + libaphrodite_hermes.{dylib,so,dll}<br/>(populated by explicit download.sh / aphrodite setup)"]
 		DIRS2["directives/<br/>(materialized builtins)"]
-		HOT["hotreload/<br/>&lt;name&gt;.&lt;pid&gt;.&lt;gen&gt; copies"]
 		CFG["aphrodite.toml · ccr.db · proxy-stderr.log"]
 	end
 

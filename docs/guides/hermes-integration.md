@@ -27,11 +27,12 @@ flowchart TD
 
 The plugin directory ships no binaries. It contains the loader
 (`__init__.py`), the generated FFI bindings (`_bindings.py`), the download
-scripts (`download.sh` / `download.ps1`), the layout self-heal checker
-(`layout_check.py`), and `plugin.yaml`. All logic lives in
-`libaphrodite_hermes.dylib`, which the loader resolves fresh on each call and
-smoke-tests in a subprocess before loading (a faulting image degrades to a
-graceful "plugin disabled" instead of killing the gateway).
+scripts (`download.sh` / `download.ps1`), the layout checker
+(`layout_check.py`, report-only), and `plugin.yaml`. All logic lives in
+`libaphrodite_hermes.dylib`, which the loader resolves **once per process**
+(no hot-reload) and smoke-tests in a subprocess before loading (a faulting
+image degrades to a graceful "plugin disabled" instead of killing the
+gateway).
 
 Registration is driven by the dylib: the shim asks the dylib for its hook
 names and tool schemas and registers one callback per name, so the hook set
@@ -83,22 +84,22 @@ source of what the model sees. See
 The canonical runtime home is `~/.hermes/aphrodite/`:
 
 ```
-~/.hermes/
+$HERMES_HOME/ (default ~/.hermes/)
 ├── plugins/
-│   └── aphrodite/          ← plugin symlink - a pure loader
+│   └── aphrodite/          ← Hermes-owned install location (symlink or dir)
 └── aphrodite/              ← canonical runtime home
     ├── aphrodite.toml      ← engine and proxy config
-    ├── binaries/           ← proxy binary + dylib (auto-downloaded)
+    ├── binaries/           ← proxy binary + dylib (fetched by the explicit
+    │                         download.sh / download.ps1 setup step)
     ├── ccr.db              ← SQLite CCR store (created on first run)
     ├── directives/         ← active directive files
-    ├── logs/               ← proxy and engine logs
-    └── hotreload/          ← hot-reload dylib copies
+    └── logs/               ← proxy and engine logs
 ```
 
-On plugin startup the layout self-heals toward this schema: misplaced
-config, binaries, or the CCR database are moved out of the plugin directory
-into the runtime home, and a missing plugin symlink is recreated - the
-plugin directory stays a pure loader.
+On plugin startup `layout_check.py` checks toward this schema but is
+**report-only**: deviations are logged, never moved - and the
+`plugins/aphrodite` install path is Hermes-owned (the plugin never creates
+or recreates it). The plugin directory stays a pure loader.
 
 ## Proxy subprocesses
 
@@ -160,9 +161,9 @@ diffs, the preview is enough.
 
 ## Setup
 
-There are three install paths - the Hermes plugin with auto-download
-(recommended), `cargo install aphrodite` + `aphrodite setup`, and building
-from source. See [Installing Aphrodite](../install/README.md) for the full
+There are three install paths - the Hermes plugin with an explicit
+`download.sh` / `download.ps1` setup step (recommended), `cargo install
+aphrodite` + `aphrodite setup`, and building from source. See [Installing Aphrodite](../install/README.md) for the full
 walkthrough and per-platform details. Short version for the plugin path:
 
 ```bash
@@ -172,9 +173,12 @@ hermes plugins enable aphrodite
 hermes # restart so the plugin loads fresh
 ```
 
-On first launch the plugin checks `~/.hermes/aphrodite/binaries/`; if the
-binary or the dylib is missing, it runs `download.sh` itself (SHA-256
-verified) before starting the proxy. No Rust toolchain needed.
+Before enabling the plugin, run the explicit setup step - `bash
+download.sh` (or `pwsh ./download.ps1` on Windows) - which fetches the
+binary + dylib into `~/.hermes/aphrodite/binaries/`, SHA-256 verified
+against the in-tree `SHA256SUMS.txt`. `register()` never downloads: if the
+binaries are missing it logs the setup command and the plugin stays
+disabled until they are present. No Rust toolchain needed.
 
 ## See also
 

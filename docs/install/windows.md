@@ -23,8 +23,10 @@ hermes
 explicitly). It works in both PowerShell 5.1 (built into Windows) and
 PowerShell 7+ (`pwsh`). It writes the binary and dylib into
 `%USERPROFILE%\.hermes\aphrodite\binaries\` - the canonical runtime home the
-plugin resolves on launch. The plugin fetches them itself on first launch if
-you skip the script.
+plugin resolves on launch - validating them against the in-tree
+`SHA256SUMS.txt`. The plugin **never downloads**: if you skip the script,
+`register()` logs the setup command and the plugin stays disabled until the
+binaries are present.
 
 If you're working from a local monorepo clone instead, there is no separate
 installer script to run - build the crates with cargo, then let the plugin
@@ -90,19 +92,20 @@ Copy-Item -Recurse "G:\AI\Hermes\Aphrodite-Hermes" "$env:USERPROFILE\.hermes\plu
 
 ### Step 3: Get the binary and dylib
 
-The plugin resolves them from `%USERPROFILE%\.hermes\aphrodite\binaries\`,
-and downloads them itself on first launch when they're missing. To fetch
-them ahead of time, pick one:
+The plugin resolves them from `%USERPROFILE%\.hermes\aphrodite\binaries\`
+but **never downloads** - `register()` only checks presence and logs the
+setup command when they're missing. Fetch them ahead of time with one of:
 
-| Option            | How                                                                                                                                                                                                                                                                                                                                                                                       |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Auto-download     | `pwsh ./download.ps1` from inside your plugin clone (see [Fast path](#fast-path-hermes-plugin--downloadps1)) - writes to `%USERPROFILE%\.hermes\aphrodite\binaries\`                                                                                                                                                                                                                      |
-| Download by hand  | Go to the [releases page](https://github.com/PlayForm/Aphrodite/releases), find the tag matching the version you want (tags look like `Aphrodite/v1.4.6`), download `aphrodite-x86_64-pc-windows-msvc.exe` and `libaphrodite_hermes-x86_64-pc-windows-msvc.dll`, place both in `%USERPROFILE%\.hermes\aphrodite\binaries\`, and rename them to `aphrodite.exe` and `aphrodite_hermes.dll` |
-| Build from source | `git submodule update --init --recursive && cargo build --release -p aphrodite -p aphrodite-hermes`, then copy `target\release\aphrodite.exe` and `target\release\aphrodite_hermes.dll` into `%USERPROFILE%\.hermes\aphrodite\binaries\`                                                                                                                                                  |
+| Option                          | How                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `download.ps1` (explicit setup) | `pwsh ./download.ps1` from inside your plugin clone (see [Fast path](#fast-path-hermes-plugin--downloadps1)) - writes to `%USERPROFILE%\.hermes\aphrodite\binaries\`, validated against the in-tree `SHA256SUMS.txt`                                                                                                                                                                      |
+| Download by hand                | Go to the [releases page](https://github.com/PlayForm/Aphrodite/releases), find the tag matching the version you want (tags look like `Aphrodite/v1.4.6`), download `aphrodite-x86_64-pc-windows-msvc.exe` and `libaphrodite_hermes-x86_64-pc-windows-msvc.dll`, place both in `%USERPROFILE%\.hermes\aphrodite\binaries\`, and rename them to `aphrodite.exe` and `aphrodite_hermes.dll` |
+| Build from source               | `git submodule update --init --recursive && cargo build --release -p aphrodite -p aphrodite-hermes`, then copy `target\release\aphrodite.exe` and `target\release\aphrodite_hermes.dll` into `%USERPROFILE%\.hermes\aphrodite\binaries\`                                                                                                                                                  |
 
-If none of these ran and you skip straight to enabling the plugin, Hermes
-will try to auto-download for you on first launch - if that doesn't work,
-see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
+If none of these ran and you skip straight to enabling the plugin,
+`register()` never downloads: it logs the explicit setup command and the
+plugin stays disabled until the binaries are present - see
+[Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
 
 ### Step 4: Enable the plugin
 

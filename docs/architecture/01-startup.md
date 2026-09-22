@@ -1,6 +1,6 @@
 # Process Startup & Dual-Proxy Launch
 
-`aphrodite` startup splits into two halves. The binary half resolves configuration (env > TOML > default), binds every listener before spawning any server, builds one `AppState` per listener with a CCR store backend, and arms a config-file hot-reload watcher. The Hermes plugin half runs once per Hermes home inside `register()`: it loads and smoke-tests the dylib, self-heals the runtime layout, materializes the built-in directives, registers hooks and tools, and launches the proxy when it is not already healthy.
+`aphrodite` startup splits into two halves. The binary half resolves configuration (env > TOML > default), binds every listener before spawning any server, builds one `AppState` per listener with a CCR store backend, and arms a config-file hot-reload watcher. The Hermes plugin half runs once per Hermes home inside `register()`: it loads and smoke-tests the dylib, checks the runtime layout (report-only), materializes the built-in directives, registers hooks and tools, and launches the proxy when it is not already healthy.
 
 ## Startup sequence
 
@@ -108,12 +108,12 @@ sequenceDiagram
 
     H->>R: register(ctx)
     R->>DL: _load_dylib()
-    DL->>DL: _ensure_binaries(): download.sh → ~/.hermes/aphrodite/binaries/<br/>if binary/dylib missing (version-pinned, SHA-256 verified)
+    DL->>DL: _ensure_binaries(): presence check - NEVER downloads<br/>missing → log explicit setup command (download.sh / aphrodite setup);<br/>legacy APHRODITE_AUTO_DOWNLOAD=1 opt-in runs download.sh
     DL->>PR: subprocess smoke-test (once per unique path)
-    PR-->>DL: rc==0 → load fresh unique-path copy → CDLL
+    PR-->>DL: rc==0 → CDLL on the resolved canonical path (once per process, no hot-reload)
     DL->>DL: _configure_ffi: _bindings.py bind_to → manual fallback →<br/>_REQUIRED_VOID_P assertion
     R->>LH: check_and_heal() (best-effort, never raises)
-    Note over LH: canonical layout per layout_schema.json:<br/>relocate misplaced config/binaries out of the plugin dir,<br/>quarantine stale plugin-source copies, warn on ambiguity
+    Note over LH: canonical layout per layout_schema.json v2 (report-only):<br/>detect + log deviations, quarantine stale plugin-source copies;<br/>never moves in a git checkout, never touches plugins/aphrodite (Hermes-owned)
     R->>MD: materialize_directives(home_dir=b"")
     MD-->>R: {"status":"ok","written":[...],"skipped":[...],"warnings":[...]}
     Note over MD: embeds the built-in directives from the binary<br/>(include_str!) → writes ~/.hermes/aphrodite/directives/<br/>idempotent, never overwrites user-modified files
@@ -135,7 +135,7 @@ sequenceDiagram
     end
 ```
 
-The layout self-heal and the directives materialize are best-effort by design: either failing degrades to a warning and the plugin still registers (never a raise). The dylib load itself is the one hard gate - if the smoke test or the FFI assertion fails, `register()` logs "plugin disabled" and returns.
+The layout check and the directives materialize are best-effort by design: either failing degrades to a warning and the plugin still registers (never a raise). The dylib load itself is the one hard gate - if the smoke test or the FFI assertion fails, `register()` logs "plugin disabled" and returns.
 
 ## Call sites
 
@@ -150,5 +150,5 @@ The layout self-heal and the directives materialize are best-effort by design: e
 | `resolve_thresholds`                                                  | `crates/aphrodite/src/proxy.rs`                                               |
 | `SqliteCcrStore` / `InMemoryCcrStore`                                 | `vendor/headroom/crates/headroom-core/src/ccr/backends/{sqlite,in_memory}.rs` |
 | Plugin `register()` / `_load_dylib` / `_probe_dylib` / `_start_proxy` | `plugins/aphrodite/__init__.py`                                               |
-| Layout self-heal                                                      | `plugins/aphrodite/layout_check.py` (+ `layout_schema.json`)                  |
+| Layout check (report-only)                                            | `plugins/aphrodite/layout_check.py` (+ `layout_schema.json`)                  |
 | Directives materialize FFI                                            | `crates/aphrodite-hermes/src/lib.rs`                                          |

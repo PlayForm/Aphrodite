@@ -5,7 +5,7 @@ these are all POSIX shell scripts. If you're on native PowerShell, use
 [Windows install](windows.md) instead - `download.ps1` is the direct
 PowerShell equivalent of `download.sh`.
 
-## Option 1: Hermes plugin, auto-download (recommended for most users)
+## Option 1: Hermes plugin + explicit setup (recommended for most users)
 
 The plugin is a pure loader: it does **not** bundle the binary or the dylib.
 `download.sh` lives inside the plugin and fetches them from GitHub Releases
@@ -19,20 +19,21 @@ hermes plugins enable aphrodite
 hermes
 ```
 
-On first launch the plugin checks `~/.hermes/aphrodite/binaries/`; if the
-binary or the dylib is missing, it runs `download.sh` itself (SHA-256
-verified, magic-byte checked) before starting the proxy. Run the script by
-hand only when you want to prefetch or when the automatic fetch failed:
+The plugin **never downloads**: `register()` only checks
+`~/.hermes/aphrodite/binaries/` and logs the setup command if something is
+missing. Run `download.sh` yourself as the explicit setup step (SHA-256
+verified against the in-tree `SHA256SUMS.txt`, magic-byte checked):
 
 ```bash
 cd ~/.hermes/plugins/aphrodite # your plugin clone
 bash download.sh               # auto-detects version + platform
 ```
 
-`download.sh` resolves the version automatically (a bundled version file,
-the monorepo's own Cargo.toml, or the latest published release) and detects
-your platform too - no Rust toolchain needed. You can pin both explicitly:
-`bash download.sh 1.4.6 x86_64-unknown-linux-gnu`. If the proxy never comes
+`download.sh` resolves the version automatically (the bundled
+`BINARY_VERSION` file, the monorepo's own Cargo.toml, or the latest
+published release) and detects your platform too - no Rust toolchain
+needed. You can pin both explicitly:
+`bash download.sh 1.5.1 x86_64-unknown-linux-gnu`. If the proxy never comes
 up, see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
 
 ## Option 2: `cargo install` + `aphrodite setup`
@@ -97,10 +98,10 @@ cargo build --release -p aphrodite -p aphrodite-hermes
 
 Then either:
 
-| Approach                      | What it does                                                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Let the plugin install itself | Build the crates, then enable the plugin - installation and symlinking are handled by the plugin itself (it self-heals its `~/.hermes/` layout on launch; there is no separate installer script). Point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output, or copy it into the runtime home's `binaries/` |
-| Wire things up manually       | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                                                       |
+| Approach                      | What it does                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Let the plugin install itself | Build the crates, then enable the plugin - installation is manual: point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output, or copy it into the runtime home's `binaries/`; there is no separate installer script (layout_check is report-only and never modifies the install) |
+| Wire things up manually       | Symlink the plugin directory yourself, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at your `target/{debug,release}/` build output instead of copying files around                                                                                                                                            |
 
 ## What changes after any of these
 
@@ -118,9 +119,10 @@ Then either:
     └── logs/               ← proxy/engine logs
 ```
 
-On plugin startup the layout self-heals toward this schema: misplaced
-config, binaries, or the CCR database are moved out of the plugin directory
-into the runtime home, and a missing plugin symlink is recreated - the plugin
+On plugin startup `layout_check.py` checks toward this schema but is
+**report-only**: deviations are logged, never moved - and
+`~/.hermes/plugins/aphrodite` is Hermes-owned (the plugin never creates or
+recreates that link; you made it in the install step above). The plugin
 directory stays a pure loader. Two proxy processes come up on `:9797` (cache)
 and `:9798` (token) once Hermes launches the plugin (or once you launch
 `aphrodite` yourself - see
