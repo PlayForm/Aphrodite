@@ -11,7 +11,7 @@ sequenceDiagram
     autonumber
     participant H as Hermes host
     participant PY as __init__.py _hook_dispatch
-    participant DL as _load_dylib (probe + mtime hot-reload)
+    participant DL as _load_dylib (probe + load-once-per-process)
     participant CJ as _call_json (forced restype + same-handle free)
     participant CH as aphrodite_hermes_call_hook
     participant UW as tools::unwrap_hermes_result
@@ -110,13 +110,13 @@ Both `guarded()` wrappers (core and bridge) catch panics across the FFI boundary
 
 ## Call sites
 
-| Concern                                                                        | Module                                 |
-| ------------------------------------------------------------------------------ | -------------------------------------- |
-| `_load_dylib` (probe + hot-reload), `_call_json`, `_hook_dispatch`, `register` | `plugins/aphrodite/__init__.py`        |
-| FFI setup: `_configure_ffi` / `_manual_ffi_setup` / `_REQUIRED_VOID_P`         | `plugins/aphrodite/__init__.py`        |
-| `_probe_dylib` (subprocess smoke test) / `_read_str` (NULL guard)              | `plugins/aphrodite/__init__.py`        |
-| `aphrodite_hermes_call_hook` (bridge hooks) / `replacement_from`               | `crates/aphrodite-hermes/src/lib.rs`   |
-| `tools::unwrap_hermes_result` / `tools::dispatch`                              | `crates/aphrodite-hermes/src/tools.rs` |
-| `hooks::transform_tool_result_inner` / `pre_llm_call` / `post_llm_call`        | `crates/aphrodite/src/hooks.rs`        |
-| `flow::build_turn_context` (assembler)                                         | `crates/aphrodite/src/flow.rs`         |
-| Core C ABI `guarded` / `aphrodite_dispatch`                                    | `crates/aphrodite/src/lib.rs`          |
+| Concern                                                                       | Module                                 |
+| ----------------------------------------------------------------------------- | -------------------------------------- |
+| `_load_dylib` (probe + load-once), `_call_json`, `_hook_dispatch`, `register` | `plugins/aphrodite/__init__.py`        |
+| FFI setup: `_configure_ffi` / `_manual_ffi_setup` / `_REQUIRED_VOID_P`        | `plugins/aphrodite/__init__.py`        |
+| `_probe_dylib` (subprocess smoke test) / `_read_str` (NULL guard)             | `plugins/aphrodite/__init__.py`        |
+| `aphrodite_hermes_call_hook` (bridge hooks) / `replacement_from`              | `crates/aphrodite-hermes/src/lib.rs`   |
+| `tools::unwrap_hermes_result` / `tools::dispatch`                             | `crates/aphrodite-hermes/src/tools.rs` |
+| `hooks::transform_tool_result_inner` / `pre_llm_call` / `post_llm_call`       | `crates/aphrodite/src/hooks.rs`        |
+| `flow::build_turn_context` (assembler)                                        | `crates/aphrodite/src/flow.rs`         |
+| Core C ABI `guarded` / `aphrodite_dispatch`                                   | `crates/aphrodite/src/lib.rs`          |

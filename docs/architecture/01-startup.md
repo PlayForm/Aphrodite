@@ -92,7 +92,7 @@ flowchart TD
 
 ## Plugin startup (register() - the Hermes-side half)
 
-`register()` runs once per Hermes home (one `PluginManager` per home) and is a **pure loader**: all logic lives in the dylib. Runtime artifacts (binary, dylib, `aphrodite.toml`, `ccr.db`, hot-reload cache) live under the canonical runtime home `~/.hermes/aphrodite`, never inside the plugin tree.
+`register()` runs once per Hermes home (one `PluginManager` per home) and is a **pure loader**: all logic lives in the dylib. Runtime artifacts (binary, dylib, `aphrodite.toml`, `ccr.db`, logs) live under the canonical runtime home `$HERMES_HOME/aphrodite` (else `~/.hermes/aphrodite`), never inside the plugin tree.
 
 ```mermaid
 sequenceDiagram

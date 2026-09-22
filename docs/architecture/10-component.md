@@ -1,6 +1,6 @@
 # Component Architecture
 
-Top-level components and the two boundaries that matter: the **C-ABI** (Python shim ↔ Rust dylib) and the **HTTP** boundary (LLM clients / Hermes ↔ the two loopback proxies ↔ upstream API). Runtime artifacts (binary, dylib, config, directives, hotreload cache) live in the canonical runtime home `~/.hermes/aphrodite` - the plugin dir holds only the loader + downloader, and layout self-heal (`layout_check.py` + `layout_schema.json`) repairs any misplaced runtime state back to that home at startup.
+Top-level components and the two boundaries that matter: the **C-ABI** (Python shim ↔ Rust dylib) and the **HTTP** boundary (LLM clients / Hermes ↔ the two loopback proxies ↔ upstream API). Runtime artifacts (binary, dylib, config, directives, logs) live in the canonical runtime home `~/.hermes/aphrodite` - the plugin dir holds only the loader + downloader, and layout self-heal (`layout_check.py` + `layout_schema.json`) repairs any misplaced runtime state back to that home at startup.
 
 ```mermaid
 graph TB

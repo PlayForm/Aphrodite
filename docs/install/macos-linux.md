@@ -111,12 +111,11 @@ Then either:
 └── aphrodite/              ← canonical runtime home
     ├── aphrodite.toml      ← proxy/engine config (written by `aphrodite setup`)
     ├── binaries/
-    │   ├── aphrodite       ← proxy binary (auto-downloaded, hand-placed, or built)
+    │   ├── aphrodite       ← proxy binary (shipped in-repo, fetched via download.sh, or built)
     │   └── libaphrodite_hermes.dylib   ← dylib the plugin loads (libaphrodite_hermes.so on Linux)
     ├── ccr.db              ← SQLite CCR store (created on first run)
     ├── directives/         ← active directive files
-    ├── logs/               ← proxy/engine logs
-    └── hotreload/          ← hot-reload dylib copies
+    └── logs/               ← proxy/engine logs
 ```
 
 On plugin startup the layout self-heals toward this schema: misplaced

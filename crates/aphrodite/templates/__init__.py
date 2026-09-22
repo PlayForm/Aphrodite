@@ -671,13 +671,33 @@ def _ensure_binaries() -> None:
         return
     if os.path.exists(_BINARY_PATH) and os.path.exists(_DYLIB_PATH):
         return
-    missing = [p for p in (_BINARY_PATH, _DYLIB_PATH) if not os.path.exists(p)]
+    # Shipped in-repo binaries (immutable release assets pulled into the
+    # plugin tree's binaries/ by the publish action) satisfy presence too.
+    shipped_bin = _PLUGIN_DIR / "binaries" / _BINARY_NAME
+    shipped_dylib = _PLUGIN_DIR / "binaries" / _DYLIB_NAME
+    if os.path.exists(shipped_bin) and os.path.exists(shipped_dylib):
+        _log.info(
+            "aphrodite binaries present in shipped in-repo binaries/ (%s) - "
+            "skipping explicit setup; run `aphrodite setup` to copy them to "
+            "the canonical runtime home",
+            _PLUGIN_DIR / "binaries",
+        )
+        return
+    missing = []
+    for label, p in (
+        ("proxy binary", _BINARY_PATH),
+        ("dylib", _DYLIB_PATH),
+        ("shipped proxy binary", shipped_bin),
+        ("shipped dylib", shipped_dylib),
+    ):
+        if not os.path.exists(p):
+            missing.append(f"{label} ({p})")
     _log.warning(
         "aphrodite binaries missing (%s) - the plugin will not register. "
         "Run `bash %s` or `aphrodite setup` once to fetch them "
         "(explicit setup step; register() never downloads), or set "
         "APHRODITE_AUTO_DOWNLOAD=1 for the legacy auto-fetch",
-        ", ".join(missing),
+        "; ".join(missing),
         _PLUGIN_DIR / "download.sh",
     )
 
