@@ -14,8 +14,7 @@
 //! and checks the ROOT's scoped flag - meaning a toggle on the root session
 //! applies to that session AND all its subagents/delegated tasks, but never
 //! to other sessions. Both flag reads are mtime-cached (one stat() per call
-//! when unchanged), mirroring the Python side's `_sync_debug` and the
-//! dylib's own mtime hot-reload.
+//! when unchanged), mirroring the Python side's `_sync_debug`.
 //!
 //! When enabled, `debug_line` returns a `[aphrodite-debug ...]` line that
 //! `replacement_from` prepends before the CCR marker, so the session sees
@@ -68,9 +67,10 @@ pub(crate) fn record_session(session:&str, parent:&str) {
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
 		*last = session.to_string();
 	}
-	// Persist across hot-reloads: a dylib reload wipes ALL Rust statics
-	// (__init__.py:537), so the session id is mirrored to a tiny file that
-	// `last_session()` reads back after a reload. Best-effort - a failed
+	// Persist across process restarts: a fresh Hermes process (and every
+	// separate shim exec) starts with empty Rust statics, so the session id
+	// is mirrored to a tiny file that `last_session()` reads back.
+	// Best-effort - a failed
 	// write degrades to "no persistence", never an error.
 	let _ = std::fs::write(runtime_home().join("session.current"), session);
 	if parent.is_empty() || session == parent {
@@ -178,10 +178,11 @@ fn current_root() -> String {
 /// returncode/task_id/env_type (terminal_tool_result.py:144), so the terminal
 /// arm falls back to this instead of losing the session scope.
 ///
-/// Persists across dylib hot-reloads: `record_session` also writes the id to
-/// a tiny file in the runtime home, and a reload (which wipes all Rust
-/// statics - __init__.py:537) falls back to reading that file. Without this,
-/// a mid-turn rebuild would leave terminal output with no session scope.
+/// Persists across process restarts: `record_session` also writes the id to
+/// a tiny file in the runtime home, and a fresh process (or separate shim
+/// exec) starts with empty Rust statics and falls back to reading that file.
+/// Without this, terminal output with no prior `pre_llm_call` would have no
+/// session scope.
 pub(crate) fn last_session() -> String {
 	{
 		let last = LAST_SESSION
@@ -204,9 +205,9 @@ pub(crate) fn last_session() -> String {
 /// and the flag path written, so the caller can report both.
 ///
 /// Uses the persisted session id (falling back to `session.current` across
-/// hot-reloads, same as `last_session`): a reload wipes LAST_SESSION, and
-/// without the file fallback the toggle would report "no session context"
-/// until the next `pre_llm_call`.
+/// process restarts, same as `last_session`): a fresh process wipes
+/// LAST_SESSION, and without the file fallback the toggle would report "no
+/// session context" until the next `pre_llm_call`.
 ///
 /// Dev-only: the `aphrodite_debug` tool that calls this is gated behind
 /// debug_assertions (release dylibs register exactly the 13 production

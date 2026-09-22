@@ -68,7 +68,7 @@ fn schema_compress() -> serde_json::Value {
 			marker - park bulky text here instead of carrying it in context, then pull \
 			it back with aphrodite_retrieve when you actually need it. Storage is \
 			in-process and sub-millisecond; markers stay resolvable for the life of the \
-			session but do not survive a dylib hot-reload. \
+			session but do not survive a process restart. \
 			Returns {hash, type, size, preview, marker}.",
 		"parameters": {
 			"type": "object",

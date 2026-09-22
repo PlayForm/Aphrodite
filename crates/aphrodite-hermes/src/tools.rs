@@ -584,7 +584,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 			"status": "ok",
 			"version": env!("CARGO_PKG_VERSION"),
 			"proxies": proxy_health(),
-			"hint": "rebuild via `cargo build --release -p aphrodite`; dylib hot-reloads on mtime change",
+			"hint": "rebuild via `cargo build --release -p aphrodite`; restart the session to pick up the new dylib",
 		})
 	});
 

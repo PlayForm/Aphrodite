@@ -24,7 +24,7 @@ cargo install --path crates/aphrodite
 cargo build --release -p aphrodite-hermes
 
 # 2. Bootstrap the runtime home (~/.hermes/aphrodite/: binaries/, directives/,
-#    hotreload/, ccr.db) - copies the binary and dylibs into binaries/
+#    ccr.db) - copies the binary and dylibs into binaries/
 aphrodite setup
 
 # 3. Link the plugin into Hermes's plugin directory (manual step)
@@ -32,7 +32,8 @@ ln -s "$(pwd)/plugins/aphrodite" ~/.hermes/plugins/aphrodite
 ```
 
 After source changes, rebuild and re-run `aphrodite setup` so `binaries/`
-picks up the new dylib; the plugin hot-reloads it on mtime change.
+picks up the new dylib, then restart the Hermes session (the plugin loads
+the dylib once per process - no hot-reload).
 
 ---
 

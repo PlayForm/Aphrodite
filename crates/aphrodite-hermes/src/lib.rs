@@ -711,8 +711,7 @@ mod tests {
 	// both halves route through the Rust global allocator (the crate installs
 	// no `#[global_allocator]`, so that is the default system allocator shared
 	// process-wide), the pairing holds regardless of which dylib image
-	// allocated and which freed it, and is immune to hot-reload allocator
-	// skew. This test round-trips fresh allocations (allocate → read back →
+	// allocated and which freed it. This test round-trips fresh allocations (allocate → read back →
 	// free) repeatedly; an asymmetric pairing (wrong deallocator, double
 	// free, invalid free) would abort the harness, not silently pass. ──
 	#[test]
