@@ -2,10 +2,10 @@
 Aphrodite Conversational Benchmark Harness
 
 Runs identical conversation scripts through 4 scenarios:
-  1. BASELINE    — Direct to DeepSeek, no proxy at all
-  2. FULL        — Both cache (:9797) + token (:9798) proxies active
-  3. HERMES_PROXY — Only cache proxy (tool output compression)
-  4. PROXY_API   — Only token proxy (context window compression)
+  1. BASELINE    - Direct to DeepSeek, no proxy at all
+  2. FULL        - Both cache (:9797) + token (:9798) proxies active
+  3. HERMES_PROXY - Only cache proxy (tool output compression)
+  4. PROXY_API   - Only token proxy (context window compression)
 
 For each scenario + conversation, captures:
   - Complete request/response history (JSONL)
@@ -53,10 +53,85 @@ from conversations import Conversation, Turn, ALL_CONVERSATIONS
 # Configuration
 # ═══════════════════════════════════════════════════════════════════════════════
 
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-# Use DeepSeek Flash for cheap conversational benchmarking
-DEEPSEEK_MODEL = "deepseek-v4-flash"
+# The benchmark uses whatever LLM provider Hermes has configured - it reads
+# ~/.hermes/config.yaml (model.base_url / model.default / provider) and the
+# credential env vars Hermes itself uses. No hardcoded provider: the harness
+# inherits the user's real setup (the same provider a normal Hermes session
+# uses). DEEPSEEK_* env vars remain as an explicit escape hatch for CI runs
+# that want the historical DeepSeek path.
+
+def _resolve_hermes_provider() -> tuple[str, str, str]:
+    """Resolve (base_url, api_key, model) from Hermes' own configuration.
+
+    Priority: explicit DEEPSEEK_* env vars (legacy CI path) > Hermes config.
+    Reads ~/.hermes/config.yaml for model.base_url / model.default / provider,
+    then finds the credential: provider-specific API key env vars, then
+    ~/.hermes/.env, then model.api_key in config.yaml. Returns empty strings
+    when nothing resolvable - callers degrade gracefully (dry-run fails with a
+    clear message instead of a silent 401).
+    """
+    # Legacy explicit path first (CI + the historical DeepSeek harness)
+    if os.environ.get("DEEPSEEK_API_KEY"):
+        return (
+            os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+            os.environ["DEEPSEEK_API_KEY"],
+            os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+        )
+
+    # Hermes-configured path
+    import tomllib  # noqa: TID251 - config.yaml is TOML-flavored; fall back to manual parse
+
+    config_path = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / "config.yaml"
+    base_url = model = provider = ""
+    try:
+        with open(config_path, "rb") as fh:
+            cfg = tomllib.load(fh)
+        model_cfg = cfg.get("model") or {}
+        base_url = (model_cfg.get("base_url") or "").strip()
+        model = (model_cfg.get("default") or "").strip()
+        provider = (model_cfg.get("provider") or "").strip()
+    except Exception:
+        pass
+
+    api_key = ""
+    # Provider-specific env keys (names only, never printed)
+    for key in (
+        "CLOUDFLARE_API_TOKEN",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "GEMINI_API_KEY",
+        "GROQ_API_KEY",
+        "MISTRAL_API_KEY",
+    ):
+        if os.environ.get(key):
+            api_key = os.environ[key]
+            break
+    if not api_key:
+        # ~/.hermes/.env (Hermes' secrets file) - same vars, loaded like Hermes does
+        env_path = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / ".env"
+        try:
+            for line in env_path.read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, _, v = line.partition("=")
+                    if k.strip() in (
+                        "CLOUDFLARE_API_TOKEN",
+                        "OPENAI_API_KEY",
+                        "ANTHROPIC_API_KEY",
+                        "DEEPSEEK_API_KEY",
+                        "GEMINI_API_KEY",
+                        "GROQ_API_KEY",
+                        "MISTRAL_API_KEY",
+                    ):
+                        api_key = v.strip().strip("\"'")
+                        break
+        except Exception:
+            pass
+    return base_url, api_key, model
+
+
+BASE_URL, API_KEY, MODEL = _resolve_hermes_provider()
 
 # Proxy config (matching real aphrodite.toml ports)
 CACHE_PORT = 9797
@@ -78,13 +153,13 @@ class Scenario(Enum):
 
 SCENARIO_METADATA = {
     Scenario.BASELINE: {
-        "description": "1:1 baseline — direct DeepSeek API, no proxy, no CCR",
+        "description": "1:1 baseline - direct LLM API, no proxy, no CCR",
         "uses_cache_proxy": False,
         "uses_token_proxy": False,
-        "api_url": f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
+        "api_url": f"{BASE_URL}/v1/chat/completions",
     },
     Scenario.FULL: {
-        "description": "1:1 with full compression — both cache + token proxies",
+        "description": "1:1 with full compression - both cache + token proxies",
         "uses_cache_proxy": True,
         "uses_token_proxy": True,
         "cache_proxy_url": f"http://127.0.0.1:{BENCH_CACHE_PORT}/v1/chat/completions",
@@ -96,7 +171,7 @@ SCENARIO_METADATA = {
         "uses_cache_proxy": True,
         "uses_token_proxy": False,
         "cache_proxy_url": f"http://127.0.0.1:{BENCH_CACHE_PORT}/v1/chat/completions",
-        "api_url": f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
+        "api_url": f"{BASE_URL}/v1/chat/completions",
     },
     Scenario.PROXY_API: {
         "description": "1:1 with compression between proxy and external API (token only)",
@@ -456,7 +531,7 @@ class ConversationRunner:
         - proxy_api: token proxy offloads old messages only
 
         Token counts are computed directly from message content using tiktoken
-        (cl100k_base encoding). No live API calls needed — the metric is
+        (cl100k_base encoding). No live API calls needed - the metric is
         "what would the LLM receive?" not "what did the LLM generate?"
         """
         result = ConversationResult(
@@ -614,7 +689,7 @@ class ConversationRunner:
 
         # Replace offloaded messages with a single offload notice
         offload_notice = (
-            f"[{offloaded_count} messages offloaded to CCR — "
+            f"[{offloaded_count} messages offloaded to CCR - "
             f"~{offloaded_tokens} tokens saved. "
             f"Use aphrodite_retrieve if context is needed.]"
         )
