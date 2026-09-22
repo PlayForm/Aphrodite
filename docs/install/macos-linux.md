@@ -111,7 +111,7 @@ Then either:
 └── aphrodite/              ← canonical runtime home
     ├── aphrodite.toml      ← proxy/engine config (written by `aphrodite setup`)
     ├── binaries/
-    │   ├── aphrodite       ← proxy binary (shipped in-repo, fetched via download.sh, or built)
+    │   ├── aphrodite       ← proxy binary (fetched via download.sh, hand-placed, or built)
     │   └── libaphrodite_hermes.dylib   ← dylib the plugin loads (libaphrodite_hermes.so on Linux)
     ├── ccr.db              ← SQLite CCR store (created on first run)
     ├── directives/         ← active directive files

@@ -237,3 +237,54 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
+  # The catalog pins the CHILD plugin repo (plugins/aphrodite submodule);
+  # Build.yml's Finalize job commits the fresh in-tree SHA256SUMS.txt inside
+  # the child and pushes its Current. This job advances the PARENT's gitlink
+  # to that child commit so the pinned tree carries the checksums that
+  # download.sh validates against (teknium review, PR 118488: "the shasum
+  # list has to come from Build.yml").
+  Bump-Plugin-Gitlink:
+    name: Bump plugin submodule gitlink
+    needs: [Publish-Aphrodite]
+    if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Advance child submodule to its Current tip
+        run: |
+          set -euo pipefail
+          CHILD="plugins/aphrodite"
+          # Build.yml's Finalize may still be pushing the child commit when
+          # this job starts; retry the fetch briefly so the gitlink lands on
+          # the commit carrying the fresh SHA256SUMS.txt.
+          for i in 1 2 3 4 5; do
+            if git -C "${CHILD}" fetch origin Current 2>/dev/null; then break; fi
+            echo "child fetch attempt $i failed; retrying in 10s"
+            sleep 10
+          done
+          git -C "${CHILD}" checkout -q origin/Current
+          echo "child now at: $(git -C "${CHILD}" rev-parse HEAD)"
+
+      - name: Commit the gitlink bump
+        run: |
+          set -euo pipefail
+          CHILD="plugins/aphrodite"
+          if git diff --quiet -- "${CHILD}"; then
+            echo "gitlink already at child Current tip - nothing to bump"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          V="${GITHUB_REF_NAME#Aphrodite/v}"
+          git add "${CHILD}"
+          git commit -m "chore: bump plugins/aphrodite to child Current (in-tree SHA256SUMS.txt for v${V})"
+          # The tag was pushed from Current; keep the parent's branch in sync.
+          BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo Current)"
+          git push origin "HEAD:${BRANCH}"
+

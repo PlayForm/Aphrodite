@@ -70,21 +70,22 @@ def test_happy_path():
         ok(report["warnings"] == [], f"unexpected warnings: {report['warnings']}")
 
 
-def test_misplaced_config_binaries_db():
+def test_misplaced_config_db():
     with tempfile.TemporaryDirectory() as td:
         home, src = make_tree(Path(td))
         plugin = src / "plugins" / "aphrodite"
         runtime = home / ".hermes" / "aphrodite"
         (plugin / "aphrodite.toml").write_text("plugin-cfg\n")
         (runtime / "aphrodite.toml").unlink()
+        (plugin / "ccr.db").write_text("db-bytes")  # identical to the runtime copy
+        # binaries/ in the plugin dir is EXCLUDED from the scan (never ships
+        # there; checking it is noise) - it must be left untouched.
         (plugin / "binaries").mkdir()
         (plugin / "binaries" / "aphrodite").write_bytes(b"BIN\x00\x01")
-        (plugin / "ccr.db").write_text("db-bytes")  # identical to the runtime copy
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         ok(not (plugin / "aphrodite.toml").exists(), "config still in plugin dir")
         ok((runtime / "aphrodite.toml").read_text() == "plugin-cfg\n", "config not in runtime home")
-        ok(not (plugin / "binaries").exists(), "binaries dir still in plugin dir")
-        ok((runtime / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01", "binary not moved")
+        ok((plugin / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01", "excluded binaries dir was touched")
         ok(not (plugin / "ccr.db").exists(), "ccr.db still in plugin dir")
         ok((runtime / "ccr.db").read_text() == "db-bytes", "runtime ccr.db damaged")
         ok(
@@ -103,22 +104,18 @@ def test_plugin_dir_not_symlink():
         link.mkdir()
         (link / "aphrodite.toml").write_text("cfg\n")
         (home / ".hermes" / "aphrodite" / "aphrodite.toml").unlink()
-        (link / "binaries").mkdir()
-        (link / "binaries" / "aphrodite").write_bytes(b"BB")
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
-        ok(link.is_symlink(), "plugin path was not converted to a symlink")
-        ok(link.resolve() == plugin.resolve(), "plugin link points at the wrong target")
+        # The plugin never rewrites the install layout under
+        # <hermes-home>/plugins/ at register time (catalog review, PR 118488):
+        # a real directory stays a real directory - report-only.
+        ok(not link.is_symlink(), "plugin path was converted to a symlink")
         ok(
             (home / ".hermes" / "aphrodite" / "aphrodite.toml").read_text() == "cfg\n",
             "config not moved",
         )
         ok(
-            (home / ".hermes" / "aphrodite" / "binaries" / "aphrodite").read_bytes() == b"BB",
-            "binary not moved",
-        )
-        ok(
-            any("created symlink" in a for a in report["actions_taken"]),
-            "no symlink creation action",
+            not any("created symlink" in a for a in report["actions_taken"]),
+            "symlink creation action present",
         )
 
 
@@ -133,7 +130,11 @@ def test_plugin_dir_not_symlink_nonempty():
             home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
         )
         ok(not link.is_symlink(), "non-empty plugin dir was clobbered")
-        ok(any("non-empty" in w for w in report["warnings"]), "no non-empty warning")
+        ok(not link.exists() or (link / "user-notes.txt").exists(), "user file was removed")
+        ok(
+            not any(a.startswith("created") or "symlink" in a for a in report["actions_taken"]),
+            f"unexpected actions: {report['actions_taken']}",
+        )
 
 
 def test_dangling_plugin_link():
@@ -164,7 +165,10 @@ def test_binary_symlink_into_plugin():
         rb = runtime_bin / "aphrodite"
         ok(not rb.is_symlink(), "runtime binary still a symlink")
         ok(rb.read_bytes() == b"BIN\x00\x01", "runtime binary content wrong")
-        ok(not (plugin / "binaries").exists(), "plugin binaries dir not cleaned")
+        # binaries/ inside the plugin dir is excluded from the scan - the
+        # runtime copy is replaced from it, but the plugin dir itself is
+        # never rewritten.
+        ok((plugin / "binaries" / "aphrodite").exists(), "plugin binaries dir was cleaned")
         ok(any("replaced symlink" in a for a in report["actions_taken"]), "no replace action")
 
 
@@ -181,7 +185,7 @@ def test_dry_run_no_changes():
         after = tree_snapshot(home / ".hermes")
         ok(before == after, "dry run modified the tree")
         ok(report["dry_run"] is True, "dry_run flag not reported")
-        ok(len(report["mismatches"]) >= 3, f"expected mismatches, got {report['mismatches']}")
+        ok(len(report["mismatches"]) >= 1, f"expected mismatches, got {report['mismatches']}")
         ok(
             report["actions_taken"]
             and all(a.startswith("would ") for a in report["actions_taken"]),
@@ -215,7 +219,7 @@ def test_env_config_override():
         )
 
 
-def test_missing_plugin_link_created():
+def test_missing_plugin_link_not_created():
     with tempfile.TemporaryDirectory() as td:
         home, src = make_tree(Path(td))
         link = home / ".hermes" / "plugins" / "aphrodite"
@@ -223,12 +227,14 @@ def test_missing_plugin_link_created():
         report = check_and_heal(
             home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
         )
-        ok(link.is_symlink(), "plugin symlink not created")
+        # Register-time layout rewrite under <hermes-home>/plugins/ is
+        # forbidden (catalog review, PR 118488) - a missing link is reported,
+        # never created by the plugin.
+        ok(not link.exists(), "plugin symlink was created")
         ok(
-            link.resolve() == (src / "plugins" / "aphrodite").resolve(),
-            "plugin symlink wrong target",
+            not any("created symlink" in a for a in report["actions_taken"]),
+            f"unexpected actions: {report['actions_taken']}",
         )
-        ok(any("created symlink" in a for a in report["actions_taken"]), "no create action")
 
 
 def test_missing_home_entirely():
@@ -240,7 +246,9 @@ def test_missing_home_entirely():
         (plugin / "__init__.py").write_text("# fake\n")
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         ok((home / ".hermes" / "aphrodite").is_dir(), "runtime home not created")
-        ok((home / ".hermes" / "plugins" / "aphrodite").is_symlink(), "plugin link not created")
+        # plugin link under <hermes-home>/plugins/ is report-only - never
+        # created at register time (the plugin must not touch that layout).
+        ok(not (home / ".hermes" / "plugins" / "aphrodite").exists(), "plugin link was created")
         ok(
             any(a.startswith("created directory") for a in report["actions_taken"]),
             "runtime home action missing",
@@ -299,7 +307,7 @@ def test_stray_source_ambiguous_skipped():
         ok(any("cannot compare" in w for w in report["warnings"]), "no ambiguous warning")
 
 
-def test_newer_binary_in_plugin_warn_skip():
+def test_binaries_excluded_from_plugin_scan():
     with tempfile.TemporaryDirectory() as td:
         home, src = make_tree(Path(td))
         plugin = src / "plugins" / "aphrodite"
@@ -312,9 +320,15 @@ def test_newer_binary_in_plugin_warn_skip():
         future = time.time() + 100
         os.utime(newer, (future, future))
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
-        ok((plugin / "binaries" / "aphrodite").exists(), "newer binary was removed")
+        # binaries/ inside the plugin dir is excluded from the scan entirely
+        # (never ships there; checking it is noise) - nothing is moved,
+        # warned about, or touched.
+        ok((plugin / "binaries" / "aphrodite").exists(), "plugin binaries dir was touched")
         ok((runtime_bin / "aphrodite").read_bytes() == b"OLD", "runtime binary was touched")
-        ok(any("newer" in w for w in report["warnings"]), "no newer-binary warning")
+        ok(
+            not any("binaries" in w for w in report["warnings"]),
+            f"unexpected binaries warnings: {report['warnings']}",
+        )
 
 
 def main():
