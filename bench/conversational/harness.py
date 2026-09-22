@@ -2,7 +2,7 @@
 Aphrodite Conversational Benchmark Harness
 
 Runs identical conversation scripts through 4 scenarios:
-  1. BASELINE    - Direct to DeepSeek, no proxy at all
+  1. BASELINE    - Direct to the Hermes-resolved provider, no proxy at all
   2. FULL        - Both cache (:9797) + token (:9798) proxies active
   3. HERMES_PROXY - Only cache proxy (tool output compression)
   4. PROXY_API   - Only token proxy (context window compression)
@@ -57,39 +57,44 @@ from conversations import Conversation, Turn, ALL_CONVERSATIONS
 # ~/.hermes/config.yaml (model.base_url / model.default / provider) and the
 # credential env vars Hermes itself uses. No hardcoded provider: the harness
 # inherits the user's real setup (the same provider a normal Hermes session
-# uses). DEEPSEEK_* env vars remain as an explicit escape hatch for CI runs
-# that want the historical DeepSeek path.
+# uses).
 
 def _resolve_hermes_provider() -> tuple[str, str, str]:
     """Resolve (base_url, api_key, model) from Hermes' own configuration.
 
-    Priority: explicit DEEPSEEK_* env vars (legacy CI path) > Hermes config.
     Reads ~/.hermes/config.yaml for model.base_url / model.default / provider,
-    then finds the credential: provider-specific API key env vars, then
-    ~/.hermes/.env, then model.api_key in config.yaml. Returns empty strings
-    when nothing resolvable - callers degrade gracefully (dry-run fails with a
-    clear message instead of a silent 401).
+    then finds the credential: provider-specific API key env vars (what Hermes
+    itself uses), then ~/.hermes/.env. Returns empty strings when nothing is
+    resolvable - callers degrade gracefully (dry-run fails with a clear
+    message instead of a silent 401).
     """
-    # Legacy explicit path first (CI + the historical DeepSeek harness)
-    if os.environ.get("DEEPSEEK_API_KEY"):
-        return (
-            os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            os.environ["DEEPSEEK_API_KEY"],
-            os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash"),
-        )
-
-    # Hermes-configured path
-    import tomllib  # noqa: TID251 - config.yaml is TOML-flavored; fall back to manual parse
-
     config_path = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / "config.yaml"
     base_url = model = provider = ""
     try:
-        with open(config_path, "rb") as fh:
-            cfg = tomllib.load(fh)
-        model_cfg = cfg.get("model") or {}
-        base_url = (model_cfg.get("base_url") or "").strip()
-        model = (model_cfg.get("default") or "").strip()
-        provider = (model_cfg.get("provider") or "").strip()
+        # config.yaml is YAML, not TOML - parse just the top-level `model:`
+        # block with a dependency-free scanner (covers key: value lines; the
+        # nested fallback_providers list is ignored).
+        in_model = False
+        for line in config_path.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            indent = len(line) - len(line.lstrip())
+            if indent == 0 and not in_model:
+                in_model = stripped.startswith("model:")
+                continue
+            if in_model:
+                if indent == 0:
+                    break  # next top-level key
+                if ":" in stripped and not stripped.startswith("-"):
+                    k, _, v = stripped.partition(":")
+                    v = v.strip().strip("\"'")
+                    if k.strip() == "base_url" and not base_url:
+                        base_url = v
+                    elif k.strip() == "default" and not model:
+                        model = v
+                    elif k.strip() == "provider" and not provider:
+                        provider = v
     except Exception:
         pass
 
@@ -99,7 +104,6 @@ def _resolve_hermes_provider() -> tuple[str, str, str]:
         "CLOUDFLARE_API_TOKEN",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
-        "DEEPSEEK_API_KEY",
         "GEMINI_API_KEY",
         "GROQ_API_KEY",
         "MISTRAL_API_KEY",
@@ -119,7 +123,6 @@ def _resolve_hermes_provider() -> tuple[str, str, str]:
                         "CLOUDFLARE_API_TOKEN",
                         "OPENAI_API_KEY",
                         "ANTHROPIC_API_KEY",
-                        "DEEPSEEK_API_KEY",
                         "GEMINI_API_KEY",
                         "GROQ_API_KEY",
                         "MISTRAL_API_KEY",
@@ -145,7 +148,7 @@ APHRODITE_BINARY = None  # Resolved at runtime
 
 
 class Scenario(Enum):
-    BASELINE = "baseline"  # Direct to DeepSeek, no proxy
+    BASELINE = "baseline"  # Direct to the resolved provider, no proxy
     FULL = "full"  # Both cache + token proxies
     HERMES_PROXY = "hermes_proxy"  # Cache proxy only (tool output compression)
     PROXY_API = "proxy_api"  # Token proxy only (context window compression)
@@ -228,7 +231,7 @@ class RunManifest:
     run_id: str
     timestamp: str
     aphrodite_version: str
-    deepseek_model: str
+    model: str
     scenarios_run: list[str] = field(default_factory=list)
     conversations_run: list[str] = field(default_factory=list)
     total_turns: int = 0
@@ -260,9 +263,9 @@ class ProxyManager:
 
         env = os.environ.copy()
         env["APHRODITE_CONFIG_PATH"] = "/nonexistent/aphrodite-bench.toml"
-        env["APHRODITE_API_KEY"] = DEEPSEEK_API_KEY
-        env["APHRODITE_API_URL"] = DEEPSEEK_BASE_URL
-        env["APHRODITE_MODEL"] = DEEPSEEK_MODEL
+        env["APHRODITE_API_KEY"] = API_KEY
+        env["APHRODITE_API_URL"] = BASE_URL
+        env["APHRODITE_MODEL"] = MODEL
 
         proc = subprocess.Popen(
             [
@@ -272,9 +275,9 @@ class ProxyManager:
                 "--listen",
                 listen,
                 "--api-url",
-                DEEPSEEK_BASE_URL,
+                BASE_URL,
                 "--api-key",
-                DEEPSEEK_API_KEY,
+                API_KEY,
                 "--ccr-db-path",
                 str(db_path),
             ],
@@ -346,17 +349,21 @@ class ProxyManager:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DeepSeek API client (direct, no proxy)
+# Provider API client (direct, no proxy)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class DeepSeekClient:
-    """Direct DeepSeek API client for baseline scenario."""
+class ProviderClient:
+    """Direct provider API client for the baseline scenario.
 
-    def __init__(self, api_key: str, model: str = DEEPSEEK_MODEL):
+    Uses the Hermes-resolved provider (BASE_URL / API_KEY / MODEL), the same
+    upstream a normal Hermes session talks to.
+    """
+
+    def __init__(self, api_key: str = API_KEY, model: str = MODEL, base_url: str = BASE_URL):
         self.api_key = api_key
         self.model = model
-        self.base_url = DEEPSEEK_BASE_URL
+        self.base_url = base_url
 
     def chat_completion(
         self,
@@ -399,7 +406,7 @@ class DeepSeekClient:
 class ProxyClient:
     """Client that talks to an aphrodite proxy (cache or token)."""
 
-    def __init__(self, port: int, api_key: str = DEEPSEEK_API_KEY):
+    def __init__(self, port: int, api_key: str = API_KEY):
         self.base_url = f"http://127.0.0.1:{port}"
         self.api_key = api_key
 
@@ -415,7 +422,7 @@ class ProxyClient:
             "Content-Type": "application/json",
         }
         body = {
-            "model": DEEPSEEK_MODEL,
+            "model": MODEL,
             "messages": messages,
             "stream": stream,
         }
@@ -469,7 +476,7 @@ def estimate_tokens(text: str) -> int:
     try:
         import tiktoken
 
-        enc = tiktoken.get_encoding("cl100k_base")  # GPT-4 / DeepSeek encoding
+        enc = tiktoken.get_encoding("cl100k_base")  # GPT-4 / DeepSeek-class encoding
         return len(enc.encode(text))
     except (ImportError, Exception):
         # Fallback: ~4 chars per token for English text, ~2 for code
@@ -508,14 +515,14 @@ class ConversationRunner:
         scenario: Scenario,
         output_dir: Path,
         proxy_manager: Optional[ProxyManager] = None,
-        deepseek_client: Optional[DeepSeekClient] = None,
+        provider_client: Optional[ProviderClient] = None,
         proxy_client: Optional[ProxyClient] = None,
         cache_client: Optional[ProxyClient] = None,
     ):
         self.scenario = scenario
         self.output_dir = output_dir
         self.proxy_manager = proxy_manager
-        self.deepseek = deepseek_client
+        self.provider = provider_client
         self.proxy = proxy_client  # Token proxy client (or primary)
         self.cache = cache_client  # Cache proxy client
         self.turns_dir = output_dir / "turns"
@@ -542,7 +549,7 @@ class ConversationRunner:
         # ── Compression simulation parameters ──────────────────────────
         CACHE_THRESHOLD = 4096  # Cache proxy: compress tool outputs > 4KB
         TOKEN_ENGINE_PCT = 45  # Token proxy: offload at 45% of 128k context
-        TOKEN_CONTEXT_MAX = 128_000  # DeepSeek Flash context window
+        TOKEN_CONTEXT_MAX = 128_000  # Provider context window
         TOKEN_OFFLOAD_THRESHOLD = int(TOKEN_CONTEXT_MAX * TOKEN_ENGINE_PCT / 100)  # ~57,600
         PROTECT_FIRST = 2  # Messages to protect at start (system + first)
         PROTECT_LAST = 5  # Messages to protect at end (recent)
@@ -729,9 +736,9 @@ class ConversationRunner:
                     "completion_tokens", 0
                 )
                 result["total_tokens"] = result["response"]["usage"].get("total_tokens", 0)
-        elif self.deepseek:
-            # Direct to DeepSeek
-            resp = self.deepseek.chat_completion(messages)
+        elif self.provider:
+            # Direct to the Hermes-resolved provider
+            resp = self.provider.chat_completion(messages)
             result["request"] = {"messages_count": len(messages)}
             result["response"] = resp.get("body", {})
             result["status"] = resp["status_code"]
@@ -847,7 +854,7 @@ def run_benchmark(
     bin_path = resolve_aphrodite_binary()
     print(f"[harness] Aphrodite binary: {bin_path}")
     print(f"[harness] Results dir: {results_dir}")
-    print(f"[harness] Model: {DEEPSEEK_MODEL}")
+    print(f"[harness] Model: {MODEL}")
     print(f"[harness] Scenarios: {[s.value for s in scenarios]}")
     print(f"[harness] Conversations: {[c.name for c in conversations]}")
     print()
@@ -856,13 +863,13 @@ def run_benchmark(
         run_id=run_id,
         timestamp=datetime.now(timezone.utc).isoformat(),
         aphrodite_version=_get_aphrodite_version(bin_path),
-        deepseek_model=DEEPSEEK_MODEL,
+        model=MODEL,
         scenarios_run=[s.value for s in scenarios],
         conversations_run=[c.name for c in conversations],
     )
 
     proxy_manager = ProxyManager(bin_path, results_dir)
-    deepseek_client = DeepSeekClient(DEEPSEEK_API_KEY, DEEPSEEK_MODEL)
+    provider_client = ProviderClient()
 
     try:
         for scenario in scenarios:
@@ -894,7 +901,7 @@ def run_benchmark(
                     scenario=scenario,
                     output_dir=conv_dir,
                     proxy_manager=proxy_manager,
-                    deepseek_client=deepseek_client if not proxy_client else None,
+                    provider_client=provider_client if not proxy_client else None,
                     proxy_client=proxy_client,
                     cache_client=cache_client,
                 )
@@ -926,7 +933,7 @@ def run_benchmark(
         "run_id": manifest.run_id,
         "timestamp": manifest.timestamp,
         "aphrodite_version": manifest.aphrodite_version,
-        "deepseek_model": manifest.deepseek_model,
+        "model": manifest.model,
         "scenarios_run": manifest.scenarios_run,
         "conversations_run": manifest.conversations_run,
         "total_turns": manifest.total_turns,
@@ -1036,8 +1043,7 @@ if __name__ == "__main__":
     if args.dry_run:
         bin_path = resolve_aphrodite_binary()
         print(f"✓ Aphrodite binary: {bin_path}")
-        print(f"✓ DEEPSEEK_API_KEY: {'set' if DEEPSEEK_API_KEY else 'MISSING'}")
-        print(f"✓ Model: {DEEPSEEK_MODEL}")
+        print(f"✓ Provider: base_url={'set' if BASE_URL else 'MISSING'} · api_key={'set' if API_KEY else 'MISSING'} · model={MODEL or 'MISSING'}")
         print(f"✓ Conversations: {len(ALL_CONVERSATIONS)}")
         for c in ALL_CONVERSATIONS:
             print(f"    {c.name}: {len(c.turns)} turns ({c.description})")
@@ -1055,9 +1061,9 @@ if __name__ == "__main__":
             print(f"Available: {[c.name for c in ALL_CONVERSATIONS]}")
             sys.exit(1)
 
-    if not DEEPSEEK_API_KEY:
-        print("ERROR: DEEPSEEK_API_KEY environment variable not set.")
-        print("Set it and try again: export DEEPSEEK_API_KEY=sk-...")
+    if not API_KEY:
+        print("ERROR: no provider credential resolved (API_KEY empty).")
+        print("Hermes provider resolution failed - check ~/.hermes/config.yaml and .env, or export a provider key.")
         sys.exit(1)
 
     run_benchmark(scenarios=scenarios, conversations=conversations, run_id=args.run_id)

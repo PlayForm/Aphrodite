@@ -91,20 +91,37 @@ if [ "$SKIP_BENCHMARK" = false ]; then
 	fi
 	\echo "  ✓ Python dependencies OK"
 
-	# Check for DEEPSEEK_API_KEY
-	if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+	# Check for a resolvable provider (Hermes config or provider env key)
+	# The harness resolves the provider itself; this pre-check just fails fast
+	# with a clear message when nothing is available.
+	if ! python3 - <<'PY' 2>/dev/null
+import os, sys
+from pathlib import Path
+key = os.environ.get("CLOUDFLARE_API_TOKEN") or os.environ.get("OPENAI_API_KEY") \
+    or os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GEMINI_API_KEY")
+if not key:
+    env_path = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, _, _ = line.partition("=")
+                if k.strip() in ("CLOUDFLARE_API_TOKEN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"):
+                    key = "found"
+                    break
+sys.exit(0 if key else 1)
+PY
+	then
 		\echo ""
-		\echo "ERROR: DEEPSEEK_API_KEY environment variable is not set."
+		\echo "ERROR: no provider credential resolved."
 		\echo ""
-		\echo "  The benchmark requires a DeepSeek API key to run conversations."
-		\echo "  Set it and re-run:"
-		\echo ""
-		\echo "    export DEEPSEEK_API_KEY=sk-..."
-		\echo "    ./run_all.sh"
+		\echo "  The benchmark uses whatever provider Hermes has configured."
+		\echo "  Check ~/.hermes/config.yaml and ~/.hermes/.env, or export a"
+		\echo "  provider API key (e.g. CLOUDFLARE_API_TOKEN)."
 		\echo ""
 		exit 1
 	fi
-	\echo "  ✓ DEEPSEEK_API_KEY is set"
+	\echo "  ✓ provider credential resolved"
 
 	# Ensure aphrodite binary is built
 	\echo ""
@@ -123,7 +140,7 @@ if [ "$SKIP_BENCHMARK" = false ]; then
 	\echo ""
 	\echo "  Scenarios: $([ -z "$SCENARIO" ] && \echo "ALL (baseline, full, hermes_proxy, proxy_api)" || \echo "$SCENARIO")"
 	\echo "  Conversations: $([ -z "$CONVERSATION" ] && \echo "ALL (coding_task, exploration_task, debugging_task)" || \echo "$CONVERSATION")"
-	\echo "  Model: deepseek-flash"
+	\echo "  Model: Hermes-resolved provider (see ~/.hermes/config.yaml)"
 	\echo ""
 
 	cd "$SCRIPT_DIR"
