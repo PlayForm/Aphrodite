@@ -27,8 +27,10 @@ timeout = 300
 
 # ── Shared defaults (applied to all proxies unless overridden) ──────────────
 [defaults]
-# api_url / model come from APHRODITE_API_URL / APHRODITE_MODEL env vars or the
-# proxy's own upstream configuration - no provider defaults are baked in.
+# api_url / model come from APHRODITE_API_URL / APHRODITE_MODEL env vars, the
+# proxy's own upstream configuration, or last-resort fallbacks baked into the
+# binary (https://api.openai.com / "default-model"; the dylib state defaults
+# model to "gpt-4o").
 ccr_ttl_seconds = 3600
 
 
@@ -36,7 +38,7 @@ ccr_ttl_seconds = 3600
 #  COMPRESSION  -  thresholds, engine, auto-expand, classifier poll
 # ══════════════════════════════════════════════════════════════════════════════
 [compression]
-engine_threshold_pct = 45   # default: compress at 45% context; set to 100 or higher to disable engine compression entirely (escape hatch); APHRODITE_ENGINE_THRESHOLD_PCT > TOML > default
+engine_threshold_pct = 45   # default: compress at 45% context; APHRODITE_ENGINE_THRESHOLD_PCT > TOML > default (this key is write-only/reserved - not consulted by any compression decision)
 engine_protect_first = 2    # messages to keep at start
 engine_protect_last = 5     # messages to keep at end
 engine_min_msgs = 8         # minimum messages before activating
@@ -44,17 +46,17 @@ tool_threshold_token = 512  # token proxy threshold (bytes) - lower = compress m
 tool_threshold_cache = 4096 # cache proxy threshold (bytes) - lower = compress more
 terminal_threshold = 1024   # terminal output threshold (bytes) - catch more terminal output
 inline_threshold = 2048     # inline zlib fallback threshold (bytes)
-auto_expand = true          # on: markers auto-expand inline - no aphrodite_retrieve needed for tool output
-auto_expand_limit = 102400  # cap per-expansion at 100KB (0=unlimited, but safe cap prevents context blowout)
+auto_expand = true          # DOCUMENTED BUT UNWIRED: no reader exists (reserved); auto-expand behavior is not keyed on this flag
+auto_expand_limit = 102400  # DOCUMENTED BUT UNWIRED: reserved, no reader (0=unlimited is not enforced from this key)
 catalog_mode = "tool"       # compact | full | tool
-classifier_poll = true      # skip CCR for clean outputs
+classifier_poll = true      # DOCUMENTED BUT UNWIRED: reserved, no reader (CCR skipping is not keyed on this flag)
 code_multiplier = 3.0       # multiply threshold for code types
 context_engine = true       # dylib-path only (aphrodite_stats/config_get/set,
 # aphrodite_dispatch) - a status flag exposed by
 # the C-ABI/Hermes bridge; the standalone HTTP
 # proxy (main.rs/proxy.rs) never reads it and has
 # no gated behavior tied to this key
-prefetch = true # enable aphrodite_prefetch tool
+prefetch = true # the aphrodite_prefetch tool ships regardless of this key (reserved; no reader)
 poll_worker = true # enable auto-backgrounding of slow tool calls
 chain_split = false # opt-in fine-grained command splitting; OFF by default (markers pollute redirected stdout)
 
@@ -65,7 +67,7 @@ chain_split = false # opt-in fine-grained command splitting; OFF by default (mar
 [previews]
 model_family = "code_first" # compact | code_first | balance
 code_structure_map = true   # show fn/struct/class sigs
-preview_max_chars = 120     # max chars per preview line (enforced by the preview builder; 0 = unlimited)
+preview_max_chars = 120     # caps the whole rendered preview STRING (config_loader.rs:334-344), not per line; 0 = unlimited
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -250,7 +252,7 @@ search_hint = "Use aphrodite_retrieve(hash) to expand any result hash."
 [directives]
 # Active directives loaded from directives/*.md at startup.
 # Swap mid-conversation via aphrodite_directive("swap", "explore").
-active = ["focus", "foresight"] # restored per standing feedback (feedback.md): CCR-first retrieval + anticipate/prefetch
+active = ["focus", "foresight"] # shipped default seed when the TOML list is empty (config_loader.rs:312-320); user sets override it
 
 
 # ══════════════════════════════════════════════════════════════════════════════
