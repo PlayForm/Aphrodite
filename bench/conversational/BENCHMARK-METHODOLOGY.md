@@ -231,6 +231,138 @@ producing command → subsequent fix); verify claims (latest validation marker
 before asserting "tests pass"); reduce duplicate work (surface already-read
 current file); detect contradictions (rank later, higher-authority, verified).
 
+### 2.5 Workflow-aware markers (the cognitive scaffold)
+
+Provenance + workflow meaning gives the model a **compact explanation of the
+agent's past workflow** - so even a weaker model need not reconstruct why an
+artifact exists, what it was used for, or what should happen next. This
+directly addresses weaker models' poor long-horizon state tracking and weak
+inference from raw tool history.
+
+#### The key shift
+
+A normal marker says "src/parser.rs, lines 1-180." A workflow marker says:
+
+```text
+CCR:abc123
+Read during "diagnose ParserError overlap" to compare parser.rs with codegen.rs.
+Role: evidence for planned trait extraction.
+State then: pre-edit workspace, revision 93bd1c.
+Next expected use: retrieve if choosing error-type ownership or validating the refactor.
+```
+
+#### `read_as` / workflow_role metadata (the most important field)
+
+How the information was interpreted at the moment it entered context:
+
+```yaml
+marker_id: CCR:abc123
+artifact: {kind: source_file, path: src/parser.rs, range: 1-180}
+capture: {tool: read_file, turn: 12, workspace_revision: 93bd1c}
+read_as:
+  task_phase: diagnosis
+  purpose: compare error-type definitions across parser and codegen modules
+  expected_decision: choose common error representation
+  confidence: direct_evidence
+  completeness: partial_file
+workflow:
+  preceded_by: compiler_error:E0277
+  supports: planned_refactor:error_trait_extraction
+  next_likely_actions: [retrieve src/codegen.rs comparison,
+                        inspect callers of ParserError,
+                        implement shared trait]
+freshness: {status: stale_after_turn_15}
+```
+
+#### Why weaker models benefit
+
+| Weak-model problem | Workflow marker support |
+|---|---|
+| Loses the goal after many turns | states task phase + original purpose |
+| Cannot infer why a file matters | records the decision/question the read supported |
+| Treats old content as current | includes workspace revision + stale/current status |
+| Rereads everything | suggests the next likely retrieval/action |
+| Confuses evidence with conclusions | labels source evidence vs hypothesis vs edit vs diagnostic vs verification |
+| Repeats failed approaches | stores failed attempt and why |
+| Cannot connect tools into a plan | connects predecessor, current artifact, downstream actions |
+| Makes unsupported claims | points to exact evidence + validation markers |
+
+This is a **cognitive scaffold**: the system carries workflow structure; the
+model supplies reasoning and tool choice.
+
+#### Workflow maps (task-state graph, not just transcript)
+
+```text
+User request: Unify ParserError and CodegenError
+Diagnosis:  Read parser.rs ─┐
+                            ├─> Compare overlapping error variants
+            Read codegen.rs ┘
+Plan:       Introduce shared error trait
+Execution:  Edit parser.rs; Edit codegen.rs
+Validation: cargo test failed ─> Read diagnostics ─> Fix bound ─> cargo test passed
+```
+
+The model receives a small current map, not the whole graph:
+
+```text
+WORKFLOW STATUS - error-type refactor
+Completed: compared error definitions; chose shared trait approach
+Current:   fixing generic trait-bound error after first implementation
+Evidence:  CCR:parser-read (pre-edit), CCR:codegen-read (pre-edit), CCR:build-e0277 (current failure)
+Recommended next: retrieve CCR:build-e0277, inspect the trait implementation near the reported line
+```
+
+#### Epistemic labels (never preserve model opinions as facts)
+
+Distinguish **what happened** from **what the model believed**:
+
+- `observed` - direct raw tool output or user statement
+- `inferred` - model interpretation, potentially wrong
+- `hypothesis` - an idea to test
+- `planned` - intended next step
+- `attempted` - action taken
+- `failed` - disproven path or failed execution
+- `verified` - confirmed by test/build/user approval/authoritative source
+
+Without this, an early incorrect conclusion can be reintroduced as
+authoritative memory. A low-capability model should prioritize direct, current,
+verified evidence over old hypotheses.
+
+#### The workflow receipt
+
+```text
+CCR:7ac011
+WHAT:  Build failure E0277, missing trait bound
+WHERE: cargo test, repo root, src/codegen.rs:84
+WHEN:  Turn 18, revision e7a602, after shared-error-trait edit
+HOW IT WAS READ: diagnostic evidence explaining why the first refactor failed
+WORKFLOW ROLE: blocks validation of the error-type unification task
+STATE: Current; no later successful build exists
+NEXT:  retrieve before changing generic bounds; supersede only after a new test run
+```
+
+#### Reusable workflow templates
+
+bug fix (reproduce→inspect→hypothesize→patch→test→verify); repository
+exploration (map→inspect→answer with evidence); release process
+(check→gates→build→validate→tag→restore); research (gather→assess→extract→
+resolve→synthesize); incident response (signals→hypothesis→mitigate→validate→
+document). The model receives a task-specific map instead of inventing
+disciplined workflow management from scratch.
+
+#### Adaptive assistance levels
+
+| Model capability | Marker design |
+|---|---|
+| Strong reasoning | compact provenance, optional graph lookup, model chooses actions |
+| Mid-tier | provenance + task phase + recommended markers + stale warnings |
+| Small/weak | explicit workflow state, allowed next actions, evidence hierarchy, suggested retrieval before action |
+| Highly constrained | structured state machine with limited choices + automatic validation gates |
+
+This moves routine state tracking from expensive model reasoning into
+dependable system structure, while allowing strong models to use the map
+flexibly.
+
 ## 3. Metric families
 
 ### 3.1 Cost
@@ -357,6 +489,32 @@ independently checkable success tests.
 
 Then an **ablation sweep**: change exactly one setting from full at a time.
 
+### Marker-format ablation (the provenance experiment)
+
+Test the marker design axis directly:
+
+1. Raw full context (no compression)
+2. Hash-only compressed markers
+3. Provenance-aware markers (type, source, capture turn, revision, synopsis)
+4. Provenance + workflow-map markers (read_as, task phase, next actions, epistemic labels)
+
+Evaluate separately for **strong and weak models**:
+
+- task completion and verification rate
+- wrong-file / wrong-marker retrieval rate
+- redundant read and search rate
+- failed-command and recovery-loop rate
+- stale-context errors
+- time and tokens to completion
+- plan adherence
+- ability to resume a paused task
+- difference in performance between high- and low-capability models
+
+The especially valuable finding is **capability equalization**: if
+workflow-aware markers let a cheaper model approach the task success of a more
+expensive one on long agent workflows, Aphrodite produces value beyond token
+compression.
+
 ## 5. Net-value scorecard
 
 ```
@@ -461,6 +619,22 @@ Stronger:
 > moment, and preserve completion quality with lower total resource use than
 > retaining all raw history in context.
 
+And the workflow-marker claim:
+
+> **Workflow-aware markers enable smaller models to complete long, tool-heavy
+> tasks with higher success and lower redundant tool use than source-only or
+> hash-only markers** - capability equalization, not just token savings.
+
+The larger product statement:
+
+> Aphrodite externalizes agent working memory into provenance-aware workflow
+> objects: each compressed artifact remembers not only its content, but why it
+> entered the workflow, what decision it supports, what state it belongs to,
+> and what actions should follow. This is **persistent procedural context** -
+> helping less capable models operate reliably inside sophisticated workflows
+> while helping stronger models use less context and make fewer unnecessary
+> tool calls.
+
 That is the real product: not compression as a storage trick, but **adaptive,
 measurable memory management for tool-using AI agents**.
 
@@ -483,9 +657,12 @@ measurable memory management for tool-using AI agents**.
    misleading artifacts for objective retrieval metrics.
 4. **Named memory-policy axis** - `--policy <name>` with versioned toml
    variants so the ablation sweep is executable.
-5. **Dashboard v1** - task-success parity, net savings, retrieval precision/
+5. **Marker-format axis** - `--markers <hash|provenance|workflow>` so the
+   4-way provenance ablation is runnable (hash-only → provenance →
+   provenance+workflow-map).
+6. **Dashboard v1** - task-success parity, net savings, retrieval precision/
    recall, tool-call efficiency, p50/p95 latency, Pareto frontier.
-6. **Per-fixture graders** - objective correctness beyond binary completion.
+7. **Per-fixture graders** - objective correctness beyond binary completion.
 
 ## 12. Known limitations (state in every report)
 
