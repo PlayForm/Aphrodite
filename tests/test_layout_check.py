@@ -70,29 +70,26 @@ def test_happy_path():
         ok(report["warnings"] == [], f"unexpected warnings: {report['warnings']}")
 
 
-def test_misplaced_config_db():
+def test_plugin_dir_contents_never_touched():
     with tempfile.TemporaryDirectory() as td:
         home, src = make_tree(Path(td))
         plugin = src / "plugins" / "aphrodite"
         runtime = home / ".hermes" / "aphrodite"
         (plugin / "aphrodite.toml").write_text("plugin-cfg\n")
         (runtime / "aphrodite.toml").unlink()
-        (plugin / "ccr.db").write_text("db-bytes")  # identical to the runtime copy
-        # binaries/ in the plugin dir is EXCLUDED from the scan (never ships
-        # there; checking it is noise) - it must be left untouched.
+        (plugin / "ccr.db").write_text("db-bytes")
         (plugin / "binaries").mkdir()
         (plugin / "binaries" / "aphrodite").write_bytes(b"BIN\x00\x01")
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
-        ok(not (plugin / "aphrodite.toml").exists(), "config still in plugin dir")
-        ok((runtime / "aphrodite.toml").read_text() == "plugin-cfg\n", "config not in runtime home")
-        ok((plugin / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01", "excluded binaries dir was touched")
-        ok(not (plugin / "ccr.db").exists(), "ccr.db still in plugin dir")
-        ok((runtime / "ccr.db").read_text() == "db-bytes", "runtime ccr.db damaged")
+        # The plugin dir is Hermes-owned: the plugin never moves, removes, or
+        # modifies ANYTHING inside it - report-only (catalog review, PR 118488).
+        ok((plugin / "aphrodite.toml").read_text() == "plugin-cfg\n", "config was moved out of plugin dir")
+        ok((plugin / "ccr.db").read_text() == "db-bytes", "ccr.db was moved out of plugin dir")
+        ok((plugin / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01", "plugin-dir binaries were touched")
         ok(
-            any("moved" in a for a in report["actions_taken"]),
-            f"no move actions: {report['actions_taken']}",
+            not any("moved" in a or "copy" in a for a in report["actions_taken"]),
+            f"plugin dir was modified: {report['actions_taken']}",
         )
-        ok(any("duplicate" in a for a in report["actions_taken"]), "no dedupe action")
 
 
 def test_plugin_dir_not_symlink():
@@ -109,10 +106,9 @@ def test_plugin_dir_not_symlink():
         # <hermes-home>/plugins/ at register time (catalog review, PR 118488):
         # a real directory stays a real directory - report-only.
         ok(not link.is_symlink(), "plugin path was converted to a symlink")
-        ok(
-            (home / ".hermes" / "aphrodite" / "aphrodite.toml").read_text() == "cfg\n",
-            "config not moved",
-        )
+        # Config in the plugin dir stays put - nothing inside the
+        # Hermes-owned plugin dir is ever moved (report-only).
+        ok((link / "aphrodite.toml").read_text() == "cfg\n", "config was moved out of plugin dir")
         ok(
             not any("created symlink" in a for a in report["actions_taken"]),
             "symlink creation action present",
@@ -186,11 +182,9 @@ def test_dry_run_no_changes():
         ok(before == after, "dry run modified the tree")
         ok(report["dry_run"] is True, "dry_run flag not reported")
         ok(len(report["mismatches"]) >= 1, f"expected mismatches, got {report['mismatches']}")
-        ok(
-            report["actions_taken"]
-            and all(a.startswith("would ") for a in report["actions_taken"]),
-            "dry run should only report planned actions",
-        )
+        # With the plugin dir Hermes-owned/report-only there is nothing to
+        # move; a dry run plans no actions at all.
+        ok(report["actions_taken"] == [], f"unexpected actions: {report['actions_taken']}")
 
 
 def test_env_config_override():
@@ -210,12 +204,12 @@ def test_env_config_override():
                 os.environ.pop("APHRODITE_CONFIG_PATH", None)
             else:
                 os.environ["APHRODITE_CONFIG_PATH"] = old
-        ok(custom.read_text() == "env-cfg\n", "config not moved to env path")
-        ok(not (plugin / "aphrodite.toml").exists(), "config still in plugin dir")
-        ok(any("moved" in a for a in report["actions_taken"]), "no move action")
+        # config inside the Hermes-owned plugin dir is never moved - not even
+        # to an env override target (report-only; the plugin dir is untouchable).
+        ok((plugin / "aphrodite.toml").read_text() == "env-cfg\n", "config was moved out of plugin dir")
         ok(
-            any(c["name"] == "config_present" and c["status"] == "ok" for c in report["checks"]),
-            "config check not ok after move",
+            not any("moved" in a for a in report["actions_taken"]),
+            f"plugin dir was modified: {report['actions_taken']}",
         )
 
 
@@ -262,12 +256,17 @@ def test_destination_differs_skipped():
         (plugin / "aphrodite.toml").write_text("plugin version\n")
         (home / ".hermes" / "aphrodite" / "aphrodite.toml").write_text("runtime version\n")
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
-        ok((plugin / "aphrodite.toml").exists(), "differing source was moved/overwritten")
+        # plugin-dir config is never moved, compared, or warned about - the
+        # plugin dir is Hermes-owned and untouchable.
+        ok((plugin / "aphrodite.toml").read_text() == "plugin version\n", "plugin-dir config was modified")
         ok(
             (home / ".hermes" / "aphrodite" / "aphrodite.toml").read_text() == "runtime version\n",
-            "destination was overwritten",
+            "runtime config was modified",
         )
-        ok(any("differs" in w for w in report["warnings"]), "no differs warning")
+        ok(
+            not any("moved" in a for a in report["actions_taken"]),
+            f"unexpected actions: {report['actions_taken']}",
+        )
 
 
 def test_stray_plugin_source_in_runtime_home():
