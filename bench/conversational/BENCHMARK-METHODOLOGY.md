@@ -645,17 +645,29 @@ measurable memory management for tool-using AI agents**.
 
 | Tool | Kind | Measures |
 |---|---|---|
-| `live/` (was `live_runner.py`) | live agent turns (AIAgent) | real tokens, completion, elapsed, CCR create/retrieve, per-cell manifest |
+| `live/` (was `live_runner.py`) | live agent turns (AIAgent) | real tokens, completion, elapsed, CCR create/retrieve, per-cell manifest; **3 configuration circles** (`--variants full,baseline,off`), per-cell workbench + isolated HERMES_HOME, containment audit |
 | `harness/` (was `harness.py`) | deterministic simulation | upper-bound token savings (no retrieval - labeled) |
 | `run_all.sh` | orchestration | dry-run validation + full simulation runs |
 | `visualize/` (was `visualize.py`) | charts | token comparison, timeline, compression efficiency, radar, dashboard |
+| `fixtures/` (was `conversations.py`) | task fixtures | one module per conversation, staged workbench per cell |
+
+**Implemented (2026-09-23, see `.hermes/notes/bench/BENCH-SESSION-2026-09-23.md`):**
+- 3-variant matrix (`full`/`baseline`/`off`) - the granular configuration
+  circles; `off` uses an empty-plugins per-cell HERMES_HOME (true control)
+- Per-cell workbench staging + containment audit (violations recorded per cell)
+- Provider resolution from Hermes' own config/.env (working; glm-5.3-flash
+  is the cheapest live model: $0.00000015/$0.0000005 per token)
+- First valid A/B/C (glm-variants-2): 10/6 CCR markers in full/baseline vs
+  0 in off; off = 6.5k est tokens/370s vs full = 5.0k/60s, baseline = 3.0k/89s
 
 **Gaps to close (in order):**
-1. **Live runner auth fix** - the default `auth-cloudflare-workers-ai` is
-   OAuth-based; the runner must resolve credentials exactly as Hermes does,
-   not a guessed env var. (Blocking live runs.)
+1. **Real token usage** - currently `estimated` (message-length/4). Real
+   usage lives in the API response envelopes / request dumps
+   (~/.hermes/sessions/request_dump_*.json); extract from those →
+   `token_source: response_usage`.
 2. **Executable task workspaces** - fixtures become real directories with
-   verifiable success checks.
+   verifiable success checks (only coding_task staged; the other 4 report-
+   missing and burn turns searching).
 3. **Task evidence maps** - per-milestone necessary/helpful/irrelevant/
    misleading artifacts for objective retrieval metrics.
 4. **Named memory-policy axis** - `--policy <name>` with versioned toml
@@ -666,10 +678,19 @@ measurable memory management for tool-using AI agents**.
 6. **Dashboard v1** - task-success parity, net savings, retrieval precision/
    recall, tool-call efficiency, p50/p95 latency, Pareto frontier.
 7. **Per-fixture graders** - objective correctness beyond binary completion.
+8. **Audit precision** - execute_code checked for what it does (not flagged
+   unconditionally); `cd` into sibling results paths is within the bench tree.
+9. **Multi-run variance** - N runs per circle for p50/p90 (current: 1 cell
+   per circle).
 
 ## 12. Known limitations (state in every report)
 
 - Simulation harness models no retrieval → its savings are upper bounds.
 - Live runs cost real tokens/money per matrix cell - keep the matrix small.
 - Task-success grading is binary (`completed`) until graders land.
-- Live runs require a working provider credential resolved Hermes-style.
+- Token accounting is `estimated` until real usage extraction lands (gap 1).
+- A cell without the plugin's binaries in its HERMES_HOME silently disables
+  the plugin (no compression hooks) - the staging must copy the runtime
+  (glm-variants-1 was invalid for this reason).
+- Containment audit flags execute_code unconditionally and sibling-results
+  `cd` - precision fixes pending (gap 8).
