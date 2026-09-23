@@ -11,7 +11,7 @@ from harness.proxy_manager import ProxyManager
 from harness.scenarios import BENCH_CACHE_PORT, BENCH_TOKEN_PORT, SCENARIO_METADATA, Scenario
 
 from .stats import extract_usage, proxy_manager_ccr_stats
-from .task_prompt import task_prompt_for
+from .task_prompt import task_prompt_for, workspace_for
 
 
 def run_scenario_conversation(
@@ -24,11 +24,13 @@ def run_scenario_conversation(
 ) -> dict:
     """Run one live conversation under one scenario; return a metrics dict."""
     meta = SCENARIO_METADATA[scenario]
-    prompt = task_prompt_for(conversation)
+    workspace = workspace_for(conversation)
+    prompt = task_prompt_for(conversation, workspace)
     result = {
         "scenario": scenario.value,
         "conversation": conversation.name,
         "prompt_turns": len(conversation.turns),
+        "workspace": str(workspace) if workspace else None,
         "started": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -37,7 +39,10 @@ def run_scenario_conversation(
 
     t0 = time.time()
     try:
-        run_result = agent.run_conversation(prompt, task_id=f"bench-{scenario.value}-{conversation.name}")
+        run_result = agent.run_conversation(
+            prompt,
+            task_id=f"bench-{scenario.value}-{conversation.name}",
+        )
         elapsed = time.time() - t0
     finally:
         proxy_manager.stop_all()

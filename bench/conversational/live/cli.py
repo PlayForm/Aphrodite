@@ -76,6 +76,11 @@ from fixtures import ALL_CONVERSATIONS  # noqa: E402
 
 from .agent import make_agent  # noqa: E402
 from .scenario import run_scenario_conversation  # noqa: E402
+from .task_prompt import workspace_for  # noqa: E402
+
+# The bench's DEFAULT model: cheapest live option on this Cloudflare account
+# (per Auth-Cloudflare pricing fixtures). Override with --model.
+DEFAULT_BENCH_MODEL = "@cf/zai-org/glm-5.3-flash"
 
 
 def main():
@@ -83,7 +88,10 @@ def main():
 
     parser = argparse.ArgumentParser(description="Live Aphrodite conversational benchmark")
     parser.add_argument("--provider", default=None, help="Provider (default: Hermes-configured)")
-    parser.add_argument("--model", default=None, help="Model (default: Hermes-configured)")
+    parser.add_argument(
+        "--model", default=None,
+        help=f"Model (default: {DEFAULT_BENCH_MODEL} - the bench's cheapest live option)",
+    )
     parser.add_argument("--base-url", default=None, help="API base URL (default: Hermes-configured)")
     parser.add_argument("--api-key", default=None, help="API key (default: Hermes-configured)")
     parser.add_argument("--api-mode", default=None, help="API mode (e.g. chat_completions)")
@@ -98,7 +106,7 @@ def main():
         bin_path = resolve_aphrodite_binary()
         print(f"✓ Aphrodite binary: {bin_path}")
         print(f"✓ Provider: base_url={'set' if BASE_URL else 'MISSING'} · api_key={'set' if API_KEY else 'MISSING'}")
-        print(f"✓ Model: {MODEL or '(override via --model)'}")
+        print(f"✓ Model: {MODEL or '(override via --model)'} (bench default: {DEFAULT_BENCH_MODEL})")
         print(f"✓ Conversations: {len(ALL_CONVERSATIONS)}")
         for c in ALL_CONVERSATIONS:
             print(f"    {c.name}: {len(c.turns)} scripted turns ({c.description})")
@@ -124,10 +132,8 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
 
     bin_path = resolve_aphrodite_binary()
-    model_used = args.model or MODEL
+    model_used = args.model or DEFAULT_BENCH_MODEL
     print(f"[live] run {run_id} | binary {bin_path} | model {model_used}")
-
-    agent = make_agent(args.model or MODEL, args.provider, args.base_url, args.api_key, args.api_mode, args.max_turns)
 
     all_results = []
     proxy_manager = ProxyManager(bin_path, results_dir)
@@ -136,6 +142,13 @@ def main():
             print(f"  ── {scenario.value} / {conv.name} ──")
             conv_dir = results_dir / scenario.value / conv.name
             conv_dir.mkdir(parents=True, exist_ok=True)
+            # One agent per cell: session_cwd (terminal pin) is set at agent
+            # construction, and each workspace needs its own cwd.
+            ws = workspace_for(conv)
+            agent = make_agent(
+                model_used, args.provider, args.base_url, args.api_key,
+                args.api_mode, args.max_turns, cwd=ws,
+            )
             r = run_scenario_conversation(scenario, conv, agent, proxy_manager, conv_dir, args.max_turns)
             print(
                 f"    ✓ completed={r['completed']} elapsed={r['elapsed_s']}s "

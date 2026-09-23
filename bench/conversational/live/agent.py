@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-def make_agent(model, provider, base_url, api_key, api_mode, max_turns):
+def make_agent(model, provider, base_url, api_key, api_mode, max_turns, cwd=None):
     """Build an AIAgent for the requested model (Hermes' own agent API)."""
     hermes_src = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes")) / "hermes-agent"
     if str(hermes_src) not in sys.path:
@@ -32,4 +32,8 @@ def make_agent(model, provider, base_url, api_key, api_mode, max_turns):
         kwargs["api_key"] = api_key
     if api_mode:
         kwargs["api_mode"] = api_mode
+    if cwd:
+        # session_cwd pins the terminal tool's working dir; the prompt also
+        # anchors the agent to the workspace (file tools take absolute paths).
+        kwargs["cwd"] = str(cwd)
     return AIAgent(**kwargs)
