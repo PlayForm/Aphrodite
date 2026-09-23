@@ -255,7 +255,7 @@ def main():
     model_used = args.model or MODEL
     print(f"[live] run {run_id} | binary {bin_path} | model {model_used}")
 
-    agent = make_agent(args.model, args.provider, args.base_url, args.api_key, args.api_mode, args.max_turns)
+    agent = make_agent(args.model or MODEL, args.provider, args.base_url, args.api_key, args.api_mode, args.max_turns)
 
     all_results = []
     proxy_manager = ProxyManager(bin_path, results_dir)
