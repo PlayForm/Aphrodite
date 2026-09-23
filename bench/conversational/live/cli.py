@@ -78,7 +78,7 @@ from fixtures import ALL_CONVERSATIONS  # noqa: E402
 
 from .agent import make_agent  # noqa: E402
 from .scenario import run_scenario_conversation  # noqa: E402
-from .task_prompt import workspace_for  # noqa: E402
+from .task_prompt import stage_workbench  # noqa: E402
 
 # The bench's DEFAULT model: cheapest live option on this Cloudflare account
 # (per Auth-Cloudflare pricing fixtures). Override with --model.
@@ -153,9 +153,9 @@ def main():
             print(f"  ── {scenario.value} / {conv.name} ──")
             conv_dir = results_dir / scenario.value / conv.name
             conv_dir.mkdir(parents=True, exist_ok=True)
-            # One agent per cell: session_cwd (terminal pin) is set at agent
-            # construction, and each workspace needs its own cwd.
-            ws = workspace_for(conv)
+            # Stage the cell workbench (isolated copy under results/) and pin
+            # the agent to it: session_cwd = workbench, prompt confines to it.
+            workbench = stage_workbench(conv, conv_dir)
             agent = make_agent(
                 model_used,
                 args.provider,
@@ -163,7 +163,7 @@ def main():
                 args.api_key,
                 args.api_mode,
                 args.max_turns,
-                cwd=ws,
+                cwd=workbench,
             )
             r = run_scenario_conversation(
                 scenario, conv, agent, proxy_manager, conv_dir, args.max_turns

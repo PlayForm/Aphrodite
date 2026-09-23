@@ -11,7 +11,7 @@ from harness.proxy_manager import ProxyManager
 from harness.scenarios import BENCH_CACHE_PORT, BENCH_TOKEN_PORT, SCENARIO_METADATA, Scenario
 
 from .stats import extract_usage, proxy_manager_ccr_stats
-from .task_prompt import task_prompt_for, workspace_for
+from .task_prompt import task_prompt_for
 
 
 def run_scenario_conversation(
@@ -24,13 +24,15 @@ def run_scenario_conversation(
 ) -> dict:
     """Run one live conversation under one scenario; return a metrics dict."""
     meta = SCENARIO_METADATA[scenario]
-    workspace = workspace_for(conversation)
-    prompt = task_prompt_for(conversation, workspace)
+    # The cell workbench was staged by the CLI (isolated copy under results/);
+    # the agent is confined to it. Re-staging here would wipe agent edits.
+    workbench = output_dir / "workbench"
+    prompt = task_prompt_for(conversation, workbench)
     result = {
         "scenario": scenario.value,
         "conversation": conversation.name,
         "prompt_turns": len(conversation.turns),
-        "workspace": str(workspace) if workspace else None,
+        "workbench": str(workbench),
         "started": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -89,7 +91,7 @@ def run_scenario_conversation(
         "name": conversation.name,
         "description": conversation.description,
         "prompt_turns_scripted": len(conversation.turns),
-        "workspace": str(workspace) if workspace else None,
+        "workbench": result.get("workbench"),
     }
     result["activity"] = summarize_activity(messages)
 
@@ -118,8 +120,44 @@ def run_scenario_conversation(
     (output_dir / "trajectory.json").write_text(
         json.dumps({"messages": messages}, indent=2, default=str)
     )
+    # Containment audit: flag any tool op that referenced a path outside the
+    # cell workbench (the operator's hard constraint).
+    result["containment"] = audit_containment(messages, workbench)
     (output_dir / "result.json").write_text(json.dumps(result, indent=2, default=str))
     return result
+
+
+def audit_containment(messages: list[dict], workbench: Path) -> dict:
+    """Scan a cell's messages for operations outside its workbench.
+
+    Returns {"clean": bool, "violations": [...]} where each violation names
+    the tool and the offending path/command prefix. The workbench is the ONLY
+    permitted working area - reads, writes, searches, and terminal commands
+    outside it are flagged.
+    """
+    wb = str(workbench)
+    violations = []
+    for m in messages:
+        for tc in (m.get("tool_calls") or []):
+            fn = tc.get("function", {})
+            name = fn.get("name", "")
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except Exception:
+                args = {}
+            if name in ("write_file", "patch", "read_file", "search_files"):
+                path = args.get("path") or ""
+                if path and not path.startswith(wb) and not path.startswith("./"):
+                    violations.append(f"{name}: {path}")
+            elif name == "terminal":
+                cmd = args.get("command", "")
+                # Flag commands that escape the workbench (cd .., absolute
+                # paths outside wb, find/ls over /, etc.)
+                if (".." in cmd or cmd.lstrip().startswith(("find /", "ls /", "cd /", "cat /", "grep -r /"))):
+                    violations.append(f"terminal: {cmd[:90]}")
+            elif name in ("execute_code",):
+                violations.append(f"{name}: code execution (uncontained by design)")
+    return {"clean": not violations, "violations": violations}
 
 
 def summarize_activity(messages: list[dict]) -> dict:
