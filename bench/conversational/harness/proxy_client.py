@@ -1,7 +1,9 @@
 """Client that talks to an aphrodite proxy (cache or token)."""
+
 from __future__ import annotations
 import requests
 from .provider import API_KEY, MODEL
+
 
 class ProxyClient:
     """Client that talks to an aphrodite proxy (cache or token)."""

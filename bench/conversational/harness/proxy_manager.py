@@ -1,4 +1,5 @@
 """Proxy lifecycle management for benchmark scenarios."""
+
 from __future__ import annotations
 import os
 import subprocess
@@ -6,6 +7,7 @@ import time
 import requests
 from .provider import API_KEY, BASE_URL, MODEL
 from .scenarios import BENCH_CACHE_PORT, BENCH_TOKEN_PORT, SCENARIO_METADATA
+
 
 class ProxyManager:
     """Manages aphrodite proxy processes for benchmark scenarios."""

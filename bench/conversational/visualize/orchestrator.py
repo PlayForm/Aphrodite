@@ -11,6 +11,7 @@ from .summary_dashboard import render_summary_dashboard
 from .timeline import render_timeline
 from .token_comparison import render_token_comparison
 
+
 def visualize_run(results_dir: Path) -> Path:
     """Generate all visualizations for a benchmark run.
 
@@ -45,6 +46,7 @@ def visualize_run(results_dir: Path) -> Path:
     _print_file_list(viz_dir)
 
     return viz_dir
+
 
 def _print_file_list(directory: Path):
     """List generated files with sizes."""

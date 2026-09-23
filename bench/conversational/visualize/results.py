@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+
 def load_run_results(results_dir: Path) -> dict:
     """Load all results from a benchmark run directory."""
     manifest_path = results_dir / "manifest.json"

@@ -11,6 +11,7 @@ import numpy as np
 
 from .constants import COLORS, SCENARIO_LABELS
 
+
 def render_timeline(manifest: dict, output_path: Path):
     """Per-turn token usage timeline for each scenario."""
     results = manifest.get("results", [])

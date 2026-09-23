@@ -1,10 +1,13 @@
 """Aphrodite binary resolution (env var, target dirs, cargo build fallback)."""
+
 from __future__ import annotations
 import os
 import subprocess
 import sys
 from pathlib import Path
+
 APHRODITE_BINARY = None  # Resolved at runtime
+
 
 def resolve_aphrodite_binary() -> str:
     """Find the aphrodite binary. Checks: env var, target/release, target/debug, cargo build."""
@@ -13,7 +16,9 @@ def resolve_aphrodite_binary() -> str:
         return os.environ["APHRODITE_BIN"]
 
     # Check target directories relative to the workspace root
-    workspace = Path(__file__).resolve().parent.parent.parent.parent  # harness/ -> bench/conversational -> bench -> repo root
+    workspace = (
+        Path(__file__).resolve().parent.parent.parent.parent
+    )  # harness/ -> bench/conversational -> bench -> repo root
     for profile in ["release", "debug"]:
         candidate = workspace / "target" / profile / "aphrodite"
         if candidate.exists():

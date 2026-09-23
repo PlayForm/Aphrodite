@@ -5,9 +5,11 @@ credential env vars Hermes itself uses. No hardcoded provider: the harness
 inherits the user's real setup (the same provider a normal Hermes session
 uses).
 """
+
 from __future__ import annotations
 import os
 from pathlib import Path
+
 
 def _resolve_hermes_provider() -> tuple[str, str, str]:
     """Resolve (base_url, api_key, model) from Hermes' own configuration.
@@ -82,5 +84,6 @@ def _resolve_hermes_provider() -> tuple[str, str, str]:
         except Exception:
             pass
     return base_url, api_key, model
+
 
 BASE_URL, API_KEY, MODEL = _resolve_hermes_provider()

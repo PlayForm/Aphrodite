@@ -1,4 +1,5 @@
 """Main harness entry: run_benchmark, helpers, and the CLI."""
+
 from __future__ import annotations
 import json
 import subprocess
@@ -20,6 +21,7 @@ from .proxy_manager import ProxyManager
 from .results import ConversationResult, RunManifest
 from .runner import ConversationRunner
 from .scenarios import BENCH_CACHE_PORT, BENCH_TOKEN_PORT, SCENARIO_METADATA, Scenario
+
 
 def run_benchmark(
     scenarios: Optional[list[Scenario]] = None,
@@ -151,6 +153,7 @@ def run_benchmark(
 
     return manifest
 
+
 def _save_conversation_summary(conv_dir: Path, result: ConversationResult):
     """Save per-conversation summary JSON."""
     summary = {
@@ -181,6 +184,7 @@ def _save_conversation_summary(conv_dir: Path, result: ConversationResult):
     with open(conv_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2, default=str)
 
+
 def _get_aphrodite_version(bin_path: str) -> str:
     """Get aphrodite version from binary."""
     try:
@@ -188,6 +192,7 @@ def _get_aphrodite_version(bin_path: str) -> str:
         return result.stdout.strip() or "unknown"
     except Exception:
         return "unknown"
+
 
 def _print_token_summary(manifest: RunManifest):
     """Print a summary table of token usage across scenarios."""
@@ -223,7 +228,9 @@ def main():
     if args.dry_run:
         bin_path = resolve_aphrodite_binary()
         print(f"✓ Aphrodite binary: {bin_path}")
-        print(f"✓ Provider: base_url={'set' if BASE_URL else 'MISSING'} · api_key={'set' if API_KEY else 'MISSING'} · model={MODEL or 'MISSING'}")
+        print(
+            f"✓ Provider: base_url={'set' if BASE_URL else 'MISSING'} · api_key={'set' if API_KEY else 'MISSING'} · model={MODEL or 'MISSING'}"
+        )
         print(f"✓ Conversations: {len(ALL_CONVERSATIONS)}")
         for c in ALL_CONVERSATIONS:
             print(f"    {c.name}: {len(c.turns)} turns ({c.description})")
@@ -243,7 +250,9 @@ def main():
 
     if not API_KEY:
         print("ERROR: no provider credential resolved (API_KEY empty).")
-        print("Hermes provider resolution failed - check ~/.hermes/config.yaml and .env, or export a provider key.")
+        print(
+            "Hermes provider resolution failed - check ~/.hermes/config.yaml and .env, or export a provider key."
+        )
         sys.exit(1)
 
     run_benchmark(scenarios=scenarios, conversations=conversations, run_id=args.run_id)
@@ -255,4 +264,3 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
     main()
-

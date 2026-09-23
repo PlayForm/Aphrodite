@@ -56,7 +56,9 @@ if HERMES_PYTHON.exists():
         _bench_dir = Path(__file__).resolve().parent.parent
         _env = os.environ.copy()
         _existing_pypath = _env.get("PYTHONPATH", "")
-        _env["PYTHONPATH"] = str(_bench_dir) + (os.pathsep + _existing_pypath if _existing_pypath else "")
+        _env["PYTHONPATH"] = str(_bench_dir) + (
+            os.pathsep + _existing_pypath if _existing_pypath else ""
+        )
         os.execvpe(
             str(HERMES_PYTHON),
             [str(HERMES_PYTHON), "-m", "live", *sys.argv[1:]],
@@ -89,10 +91,13 @@ def main():
     parser = argparse.ArgumentParser(description="Live Aphrodite conversational benchmark")
     parser.add_argument("--provider", default=None, help="Provider (default: Hermes-configured)")
     parser.add_argument(
-        "--model", default=None,
+        "--model",
+        default=None,
         help=f"Model (default: {DEFAULT_BENCH_MODEL} - the bench's cheapest live option)",
     )
-    parser.add_argument("--base-url", default=None, help="API base URL (default: Hermes-configured)")
+    parser.add_argument(
+        "--base-url", default=None, help="API base URL (default: Hermes-configured)"
+    )
     parser.add_argument("--api-key", default=None, help="API key (default: Hermes-configured)")
     parser.add_argument("--api-mode", default=None, help="API mode (e.g. chat_completions)")
     parser.add_argument("--scenario", default=None, help="Single scenario (default: all 4)")
@@ -105,8 +110,12 @@ def main():
     if args.dry_run:
         bin_path = resolve_aphrodite_binary()
         print(f"✓ Aphrodite binary: {bin_path}")
-        print(f"✓ Provider: base_url={'set' if BASE_URL else 'MISSING'} · api_key={'set' if API_KEY else 'MISSING'}")
-        print(f"✓ Model: {MODEL or '(override via --model)'} (bench default: {DEFAULT_BENCH_MODEL})")
+        print(
+            f"✓ Provider: base_url={'set' if BASE_URL else 'MISSING'} · api_key={'set' if API_KEY else 'MISSING'}"
+        )
+        print(
+            f"✓ Model: {MODEL or '(override via --model)'} (bench default: {DEFAULT_BENCH_MODEL})"
+        )
         print(f"✓ Conversations: {len(ALL_CONVERSATIONS)}")
         for c in ALL_CONVERSATIONS:
             print(f"    {c.name}: {len(c.turns)} scripted turns ({c.description})")
@@ -114,7 +123,9 @@ def main():
         sys.exit(0)
 
     if not (API_KEY or args.api_key):
-        print("ERROR: no provider credential resolved. Check ~/.hermes/config.yaml + .env, or pass --api-key.")
+        print(
+            "ERROR: no provider credential resolved. Check ~/.hermes/config.yaml + .env, or pass --api-key."
+        )
         sys.exit(1)
 
     scenarios = [Scenario(args.scenario)] if args.scenario else list(Scenario)
@@ -146,10 +157,17 @@ def main():
             # construction, and each workspace needs its own cwd.
             ws = workspace_for(conv)
             agent = make_agent(
-                model_used, args.provider, args.base_url, args.api_key,
-                args.api_mode, args.max_turns, cwd=ws,
+                model_used,
+                args.provider,
+                args.base_url,
+                args.api_key,
+                args.api_mode,
+                args.max_turns,
+                cwd=ws,
             )
-            r = run_scenario_conversation(scenario, conv, agent, proxy_manager, conv_dir, args.max_turns)
+            r = run_scenario_conversation(
+                scenario, conv, agent, proxy_manager, conv_dir, args.max_turns
+            )
             print(
                 f"    ✓ completed={r['completed']} elapsed={r['elapsed_s']}s "
                 f"ccr={r['ccr']} tokens={r['tokens']}"

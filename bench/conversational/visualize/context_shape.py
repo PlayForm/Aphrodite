@@ -36,6 +36,7 @@ SCENARIO_BLOCKS = {
     },
 }
 
+
 def generate_context_shape(scenario: str, total_tokens: int = 4500) -> dict:
     """Generate a context-shape descriptor for a scenario.
 

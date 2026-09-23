@@ -11,6 +11,7 @@ import numpy as np
 
 from .constants import COLORS, SCENARIO_LABELS
 
+
 def render_summary_dashboard(manifest: dict, output_path: Path):
     """Single-page summary dashboard with key metrics."""
     results = manifest.get("results", [])

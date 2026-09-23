@@ -139,7 +139,7 @@ def summarize_activity(messages: list[dict]) -> dict:
         content = str(m.get("content") or "")
         ccr_markers += content.count("<<<CCR:")
         # tool-call messages carry tool_calls lists
-        for tc in (m.get("tool_calls") or []):
+        for tc in m.get("tool_calls") or []:
             name = tc.get("function", {}).get("name", "?") if isinstance(tc, dict) else "?"
             tool_calls[name] = tool_calls.get(name, 0) + 1
             if name == "aphrodite_retrieve":

@@ -1,7 +1,9 @@
 """Direct provider API client (baseline scenario, no proxy)."""
+
 from __future__ import annotations
 import requests
 from .provider import API_KEY, BASE_URL, MODEL
+
 
 class ProviderClient:
     """Direct provider API client for the baseline scenario.

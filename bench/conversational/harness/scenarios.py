@@ -1,4 +1,5 @@
 """Scenario definitions, metadata, and bench proxy ports."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -12,6 +13,7 @@ TOKEN_PORT = 9798
 # Bench-specific ports (isolated from production)
 BENCH_CACHE_PORT = 49797
 BENCH_TOKEN_PORT = 49798
+
 
 class Scenario(Enum):
     BASELINE = "baseline"  # Direct to the resolved provider, no proxy

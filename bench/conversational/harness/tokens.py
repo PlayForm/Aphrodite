@@ -1,5 +1,7 @@
 """Estimated token counting (tiktoken when available, char/4 fallback)."""
+
 from __future__ import annotations
+
 
 def estimate_tokens(text: str) -> int:
     """Estimate token count for a string. Uses tiktoken if available."""

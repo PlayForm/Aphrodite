@@ -10,6 +10,7 @@ import numpy as np
 
 from .constants import COLORS, SCENARIO_LABELS
 
+
 def render_compression_efficiency(manifest: dict, output_path: Path):
     """Compression efficiency: prompt tokens saved vs baseline."""
     results = manifest.get("results", [])

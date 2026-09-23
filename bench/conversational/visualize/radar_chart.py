@@ -11,6 +11,7 @@ import math
 from .constants import COLORS, SCENARIO_LABELS
 from .context_shape import CONTEXT_BLOCKS, generate_context_shape
 
+
 def render_radar_chart(manifest: dict, output_path: Path):
     """Radar chart comparing context shape dimensions across scenarios."""
     scenarios = sorted(set(r["scenario"] for r in manifest.get("results", [])))

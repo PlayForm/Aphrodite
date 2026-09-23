@@ -11,6 +11,7 @@ import numpy as np
 
 from .constants import COLORS, SCENARIO_LABELS
 
+
 def render_token_comparison(manifest: dict, output_path: Path):
     """Bar chart: total tokens per scenario per conversation."""
     results = manifest.get("results", [])
