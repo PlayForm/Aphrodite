@@ -2,9 +2,12 @@
 
 **Status:** living spec - the repeatable method for measuring what Aphrodite's
 CCR compression actually buys under any model, any configuration, any task.
-**Location:** `bench/conversational/` - `live_runner.py` (real agent turns),
-`harness.py` (deterministic simulation, labeled upper bound),
-`conversations.py` (task fixtures), `visualize.py` (charts).
+**Location:** `bench/conversational/` - `live/` (real agent turns),
+`harness/` (deterministic simulation, labeled upper bound),
+`fixtures/` (task fixtures), `visualize/` (charts). Each package is
+atomized (one export per module, reverse-hierarchical); the flat
+`live_runner.py` / `harness.py` / `visualize.py` remain as thin launchers and
+`conversations.py` as a re-export shim for existing consumers.
 
 ## 0. Purpose: from compression demo to model-memory evaluation framework
 
@@ -642,10 +645,10 @@ measurable memory management for tool-using AI agents**.
 
 | Tool | Kind | Measures |
 |---|---|---|
-| `live_runner.py` | live agent turns (AIAgent) | real tokens, completion, elapsed, CCR create/retrieve, per-cell manifest |
-| `harness.py` | deterministic simulation | upper-bound token savings (no retrieval - labeled) |
+| `live/` (was `live_runner.py`) | live agent turns (AIAgent) | real tokens, completion, elapsed, CCR create/retrieve, per-cell manifest |
+| `harness/` (was `harness.py`) | deterministic simulation | upper-bound token savings (no retrieval - labeled) |
 | `run_all.sh` | orchestration | dry-run validation + full simulation runs |
-| `visualize.py` | charts | token comparison, timeline, compression efficiency, radar, dashboard |
+| `visualize/` (was `visualize.py`) | charts | token comparison, timeline, compression efficiency, radar, dashboard |
 
 **Gaps to close (in order):**
 1. **Live runner auth fix** - the default `auth-cloudflare-workers-ai` is

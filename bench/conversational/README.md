@@ -9,7 +9,7 @@ content types that trigger Aphrodite's compression paths.
 
 ## Corpus shape (what `harness.py` expects)
 
-`conversations.py` exposes three dataclasses and one registry:
+`bench/conversational/fixtures/` exposes three dataclasses and one registry:
 
 - `ToolCall(id, name, arguments)` - a tool call the assistant would make;
   `arguments` is a JSON string.
@@ -24,7 +24,7 @@ The harness consumes the corpus through these accessor calls
 (`harness.py`):
 
 ```python
-from conversations import Conversation, Turn, ALL_CONVERSATIONS
+from fixtures import Conversation, Turn, ALL_CONVERSATIONS
 # run_benchmark / ConversationRunner.run:
 conversation.name            # result dirs, manifest, --conversation filter
 conversation.description     # run banner
@@ -112,13 +112,14 @@ scratch locations, project/author identifiers are generic placeholders
 (`mylang`, `myproject`, `aphrodite` as the project under test), and the
 release script uses neutral branch/tag names (`Development`, `Current`,
 `Aphrodite/vX.Y.Z`). A regex sweep for `nikola|CORSAIR|@domain|/Users/`
-matches nothing in `conversations.py`.
+matches nothing in `fixtures/`.
 
 ## Running
 
 ```bash
 # Validate corpus + harness wiring without running anything:
 /opt/homebrew/bin/python3.13 bench/conversational/harness.py --dry-run
+# (equivalent: cd bench/conversational && python3 -m harness --dry-run)
 
 # Full run (requires DEEPSEEK_API_KEY and the aphrodite binary):
 DEEPSEEK_API_KEY=... /opt/homebrew/bin/python3.13 bench/conversational/harness.py
@@ -128,4 +129,4 @@ DEEPSEEK_API_KEY=... /opt/homebrew/bin/python3.13 bench/conversational/harness.p
 ```
 
 Results land in `bench/conversational/results/<run_timestamp>/`; see
-`harness.py` for the output schema and `visualize.py` for reporting.
+`harness/` for the output schema and `visualize/` for reporting.

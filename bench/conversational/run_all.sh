@@ -144,7 +144,7 @@ if [ "$SKIP_BENCHMARK" = false ]; then
 	\echo ""
 
 	cd "$SCRIPT_DIR"
-	python3 harness.py ${BENCH_ARGS[@]+"${BENCH_ARGS[@]}"}
+	python3 -m harness ${BENCH_ARGS[@]+"${BENCH_ARGS[@]}"}
 
 	# Find the latest results directory
 	RESULTS_DIR=$(ls -td results/*/ 2>/dev/null | head -1)
@@ -173,7 +173,7 @@ fi
 \echo "  Results dir: $RESULTS_DIR"
 
 cd "$SCRIPT_DIR"
-python3 visualize.py "$RESULTS_DIR"
+python3 -m visualize "$RESULTS_DIR"
 
 # ── Print output summary ─────────────────────────────────────────────────────
 \echo ""
