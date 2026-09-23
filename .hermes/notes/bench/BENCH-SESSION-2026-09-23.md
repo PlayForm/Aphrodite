@@ -110,6 +110,103 @@ conclusive.
 - Provider auth: CLOUDFLARE_API_TOKEN in ~/.hermes/.env (`cfut_...`); the
   harness resolves provider from config.yaml + .env.
 
+## Configuration circles (glm-variants-2, first valid A/B/C)
+
+The three configurations as data-flow diagrams. Each is a **ring around the
+same task core**: `full` wraps the agent in two proxy rings, `baseline`
+pulls compression into the agent process (one ring), `off` has no ring.
+
+### Circle 1: FULL (plugin + cache/token proxies)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  coding_task · GLM-5.3-Flash · completed ✓ · 22 msgs            │
+│  elapsed 59.8s · ~5,042 est tokens                              │
+└─────────────────────────────────────────────────────────────────┘
+
+   AIAgent (Hermes session)
+        │  tool calls
+        ▼
+   ┌──────────────┐      ┌──────────────────┐      ┌──────────────────┐
+   │  CACHE proxy │      │   TOKEN proxy    │      │   Cloudflare     │
+   │  :49797      │      │   :49798         │      │   (GLM-5.3-Flash) │
+   │  tool-output │      │  context-offload │      │                  │
+   │  compression │      │  (unused <57k)   │      │                  │
+   └──────────────┘      └──────────────────┘      └──────────────────┘
+        │  ▲
+        │  │  tool result > 4KB
+        ▼  │
+   ┌──────────────┐
+   │  CCR store   │──→ 4 markers created:
+   │  (ccr.db)    │    ls→9,776B · term→1,184B
+   └──────────────┘    text→953B · term→2,574B
+                          retrieves: 0
+```
+
+### Circle 2: BASELINE (plugin only, no proxies - inline CCR)
+
+```
+   AIAgent (Hermes session)  ·  44 msgs · 89.3s · ~2,983 est tokens
+        │
+        │  tool calls
+        ▼
+   ┌──────────────────────────────┐
+   │  aphrodite PLUGIN (dylib)    │
+   │  _ensure_binaries ✓          │
+   │  inline CCR store            │──→ 3 markers created:
+   │  (in-process, no proxy)      │    text→517B · term→3,716B
+   └──────────────────────────────┘    text→569B
+        │  ▲                            retrieves: 0
+        │  │  tool result > 4KB
+        ▼  │
+   ┌──────────────────────────────┐
+   │  Cloudflare (GLM-5.3-Flash)  │
+   └──────────────────────────────┘
+```
+
+### Circle 3: OFF (no aphrodite at all - true control)
+
+```
+   AIAgent (Hermes session)  ·  34 msgs · 370.3s · ~6,512 est tokens
+        │
+        │  tool calls
+        ▼
+   ┌──────────────────────────────┐
+   │  EMPTY plugins dir           │
+   │  (no plugin, no dylib,       │──→ 0 markers created
+   │   no CCR, no compression)    │    raw tool results every turn
+   └──────────────────────────────┘
+        │  ▲                        retrieves: 0
+        │  │  FULL tool output inline
+        ▼  │
+   ┌──────────────────────────────┐
+   │  Cloudflare (GLM-5.3-Flash)  │
+   └──────────────────────────────┘
+```
+
+### Side-by-side comparison
+
+```
+                    full          baseline        off
+   plugin           ● symlink      ● symlink       ○ empty dir
+   proxies          ● cache+token  ○ none          ○ none
+   CCR store        ● ccr.db       ● inline        ○ none
+   markers created  ● 4            ● 3             ○ 0
+   retrieves        ○ 0            ○ 0             ○ 0
+   elapsed          59.8s  ██      89.3s  ████      370.3s  ████████████████
+   est tokens       5,042  ███     2,983  ██        6,512  ████
+   completed        ✓              ✓               ✓
+```
+
+### Reading the circles
+
+- `full` - compression at the edge (two proxy rings); markerized tool outputs
+  through ccr.db; cheapest after baseline; task completes.
+- `baseline` - compression inside the agent process (one ring, inline store);
+  fewest tokens (2,983); no proxy overhead.
+- `off` - no ring; raw context every turn; highest cost (6,512) and 6× slower
+  (370s); task still completes (parity held).
+
 ## Gaps to advance (the real value is next)
 
 1. **Real token usage** - currently `estimated` (message-length/4). Real
