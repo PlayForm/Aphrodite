@@ -49,6 +49,18 @@ def stage_cell_home(cell_dir: Path, variant: str) -> Path:
             (plugins_dir / "README.txt").write_text(
                 "aphrodite plugin not found in the real home; variant degraded to off.\n"
             )
+        # The plugin's _ensure_binaries() resolves binaries from
+        # HERMES_HOME/aphrodite/binaries - WITHOUT them the plugin disables
+        # itself (no compression hooks). Copy the real runtime home (binaries,
+        # directives, config) into the cell home so full/baseline actually
+        # compress; read-only copy, never touching the real home.
+        real_runtime = REAL_HOME / "aphrodite"
+        if real_runtime.is_dir():
+            cell_runtime = cell_home / "aphrodite"
+            shutil.copytree(
+                real_runtime, cell_runtime,
+                ignore=shutil.ignore_patterns("hotreload", "*.log", "*.db-shm", "*.db-wal", "session.current"),
+            )
 
     # Read-only provider config: symlinks never touch the originals.
     for name in ("config.yaml", ".env"):
