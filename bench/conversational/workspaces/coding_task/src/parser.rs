@@ -6,13 +6,6 @@ pub enum Token {
     Semicolon,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ParserError {
-    UnexpectedToken(Token),
-    Unterminated(String),
-    EmptyInput,
-}
-
 pub fn tokenize(input: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     for part in input.split_whitespace() {
