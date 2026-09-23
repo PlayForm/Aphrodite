@@ -21,8 +21,15 @@ def run_scenario_conversation(
     proxy_manager: ProxyManager,
     output_dir: Path,
     max_turns: int,
+    variant: str = "full",
 ) -> dict:
-    """Run one live conversation under one scenario; return a metrics dict."""
+    """Run one live conversation under one scenario; return a metrics dict.
+
+    variant: "full" (plugin + proxies) | "baseline" (plugin only, no proxy) |
+    "off" (no plugin - agent built with empty-plugins HERMES_HOME). For
+    baseline/off no proxy is spawned - the difference being measured is the
+    plugin's presence, not the proxy path.
+    """
     meta = SCENARIO_METADATA[scenario]
     # The cell workbench was staged by the CLI (isolated copy under results/);
     # the agent is confined to it. Re-staging here would wipe agent edits.
@@ -31,13 +38,16 @@ def run_scenario_conversation(
     result = {
         "scenario": scenario.value,
         "conversation": conversation.name,
+        "variant": variant,
         "prompt_turns": len(conversation.turns),
         "workbench": str(workbench),
         "started": datetime.now(timezone.utc).isoformat(),
     }
 
-    # Start the proxies this scenario needs
-    proxy_manager.start_for_scenario(scenario)
+    # Start the proxies ONLY for the full variant (baseline/off are proxy-free
+    # by design - they measure plugin presence, not proxy routing).
+    if variant == "full":
+        proxy_manager.start_for_scenario(scenario)
 
     # Live persistence: append every text delta to stream.jsonl as it
     # arrives (stream_callback), so data is on disk DURING the run - usable
@@ -147,8 +157,12 @@ def audit_containment(messages: list[dict], workbench: Path) -> dict:
                 args = {}
             if name in ("write_file", "patch", "read_file", "search_files"):
                 path = args.get("path") or ""
-                if path and not path.startswith(wb) and not path.startswith("./"):
-                    violations.append(f"{name}: {path}")
+                if path:
+                    # Resolve relative paths against the workbench (the agent's
+                    # cwd) - `src/foo.rs` or `./x` are INSIDE, not escapes.
+                    resolved = (workbench / path).resolve() if not path.startswith("/") else Path(path).resolve()
+                    if not str(resolved).startswith(wb):
+                        violations.append(f"{name}: {path}")
             elif name == "terminal":
                 cmd = args.get("command", "")
                 # Flag commands that escape the workbench (cd .., absolute

@@ -76,13 +76,19 @@ from harness.proxy_manager import ProxyManager  # noqa: E402
 from harness.scenarios import Scenario  # noqa: E402
 from fixtures import ALL_CONVERSATIONS  # noqa: E402
 
-from .agent import make_agent  # noqa: E402
+from .agent import make_agent, stage_cell_home  # noqa: E402
 from .scenario import run_scenario_conversation  # noqa: E402
 from .task_prompt import stage_workbench  # noqa: E402
 
 # The bench's DEFAULT model: cheapest live option on this Cloudflare account
 # (per Auth-Cloudflare pricing fixtures). Override with --model.
 DEFAULT_BENCH_MODEL = "@cf/zai-org/glm-5.3-flash"
+
+# The granular aphrodite-variant matrix: same task, three configurations.
+#   full     - plugin + cache/token proxies (CCR via proxy)
+#   baseline - plugin only, no proxies (inline CCR)
+#   off      - empty plugins dir (NO aphrodite at all - the true control)
+DEFAULT_VARIANTS = ["full", "baseline", "off"]
 
 
 def main():
@@ -103,9 +109,24 @@ def main():
     parser.add_argument("--scenario", default=None, help="Single scenario (default: all 4)")
     parser.add_argument("--conversation", default=None, help="Single conversation (default: all)")
     parser.add_argument("--max-turns", type=int, default=40, help="Max agent iterations per task")
+    parser.add_argument(
+        "--variants", default=None,
+        help=f"Comma list of aphrodite variants: full, baseline, off (default: all 3)",
+    )
     parser.add_argument("--run-id", default=None, help="Custom run ID (default: timestamp)")
     parser.add_argument("--dry-run", action="store_true", help="Validate setup without running")
     args = parser.parse_args()
+
+    # Variants: the granular aphrodite matrix (full / baseline / off).
+    args.variants = (
+        [v.strip() for v in args.variants.split(",") if v.strip()]
+        if args.variants
+        else DEFAULT_VARIANTS
+    )
+    for v in args.variants:
+        if v not in ("full", "baseline", "off"):
+            print(f"Unknown variant: {v} (expected full, baseline, off)")
+            sys.exit(1)
 
     if args.dry_run:
         bin_path = resolve_aphrodite_binary()
@@ -117,6 +138,7 @@ def main():
             f"✓ Model: {MODEL or '(override via --model)'} (bench default: {DEFAULT_BENCH_MODEL})"
         )
         print(f"✓ Conversations: {len(ALL_CONVERSATIONS)}")
+        print(f"✓ Variants: {args.variants}")
         for c in ALL_CONVERSATIONS:
             print(f"    {c.name}: {len(c.turns)} scripted turns ({c.description})")
         print("✓ Agent API:", "importable" if (HERMES_SRC / "run_agent.py").exists() else "MISSING")
@@ -145,34 +167,51 @@ def main():
     bin_path = resolve_aphrodite_binary()
     model_used = args.model or DEFAULT_BENCH_MODEL
     print(f"[live] run {run_id} | binary {bin_path} | model {model_used}")
+    print(f"[live] variants: {args.variants}")
 
     all_results = []
     proxy_manager = ProxyManager(bin_path, results_dir)
-    for scenario in scenarios:
-        for conv in conversations:
-            print(f"  ── {scenario.value} / {conv.name} ──")
-            conv_dir = results_dir / scenario.value / conv.name
-            conv_dir.mkdir(parents=True, exist_ok=True)
-            # Stage the cell workbench (isolated copy under results/) and pin
-            # the agent to it: session_cwd = workbench, prompt confines to it.
-            workbench = stage_workbench(conv, conv_dir)
-            agent = make_agent(
-                model_used,
-                args.provider,
-                args.base_url,
-                args.api_key,
-                args.api_mode,
-                args.max_turns,
-                cwd=workbench,
-            )
-            r = run_scenario_conversation(
-                scenario, conv, agent, proxy_manager, conv_dir, args.max_turns
-            )
-            print(
-                f"    ✓ completed={r['completed']} elapsed={r['elapsed_s']}s "
-                f"ccr={r['ccr']} tokens={r['tokens']}"
-            )
-            all_results.append(r)
+    for variant in args.variants:
+        # Variant -> scenario: full runs proxies; baseline/off are plugin-only
+        # or plugin-absent (no proxy spawn at all).
+        variant_scenario = Scenario.FULL if variant == "full" else Scenario.BASELINE
+        for scenario in [variant_scenario]:
+            for conv in conversations:
+                cell_tag = f"{variant}/{conv.name}"
+                print(f"  ── {variant} / {conv.name} ──")
+                conv_dir = results_dir / variant / conv.name
+                conv_dir.mkdir(parents=True, exist_ok=True)
+                # Stage the cell workbench (isolated copy under results/) and pin
+                # the agent to it: session_cwd = workbench, prompt confines to it.
+                workbench = stage_workbench(conv, conv_dir)
+                # Stage the cell's isolated HERMES_HOME (empty plugins for off;
+                # symlinked plugin for full/baseline; config/.env symlinked R/O).
+                cell_home = stage_cell_home(conv_dir, variant)
+                agent = make_agent(
+                    model_used,
+                    args.provider,
+                    args.base_url,
+                    args.api_key,
+                    args.api_mode,
+                    args.max_turns,
+                    cwd=workbench,
+                    hermes_home=cell_home,
+                    variant=variant,
+                )
+                r = run_scenario_conversation(
+                    scenario,
+                    conv,
+                    agent,
+                    proxy_manager,
+                    conv_dir,
+                    args.max_turns,
+                    variant=variant,
+                )
+                print(
+                    f"    ✓ completed={r['completed']} elapsed={r['elapsed_s']}s "
+                    f"ccr={r['ccr']} tokens={r['tokens']}"
+                )
+                all_results.append(r)
 
     manifest = {
         "run_id": run_id,
@@ -182,6 +221,7 @@ def main():
         "model": model_used,
         "base_url": args.base_url or BASE_URL,
         "max_turns": args.max_turns,
+        "variants": args.variants,
         "scenarios": [s.value for s in scenarios],
         "conversations": [c.name for c in conversations],
         "results": all_results,
