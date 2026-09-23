@@ -392,7 +392,7 @@ mod tests {
 	/// undeclared tool (teknium review, PR 118488).
 	#[test]
 	fn test_catalog_tool_count_matches_manifest() {
-		let names: Vec<String> = all_schemas()
+		let names:Vec<String> = all_schemas()
 			.into_iter()
 			.map(|s| s["name"].as_str().expect("name must be a string").to_string())
 			.collect();
