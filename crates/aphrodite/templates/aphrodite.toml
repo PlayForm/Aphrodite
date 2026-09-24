@@ -58,6 +58,7 @@ context_engine = true       # dylib-path only (aphrodite_stats/config_get/set,
 # no gated behavior tied to this key
 prefetch = true # the aphrodite_prefetch tool ships regardless of this key (reserved; no reader)
 poll_worker = true # enable auto-backgrounding of slow tool calls
+auto_reload = false # watch aphrodite.toml and re-apply config on change (default off; session CCR state is never touched - only config fields)
 chain_split = false # opt-in fine-grained command splitting; OFF by default (markers pollute redirected stdout)
 
 
