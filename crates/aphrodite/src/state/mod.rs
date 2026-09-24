@@ -108,6 +108,11 @@ pub struct AphroditeState {
 	pub context_engine_enabled:bool,
 	pub tool_threshold:usize,
 	pub terminal_threshold:usize,
+	/// Parse-failure self-diagnosis: set when the loaded aphrodite.toml was
+	/// found but failed to parse (defaults in effect). Surfaced verbatim in
+	/// `aphrodite_stats` so a broken config is never indistinguishable from
+	/// "config not set" - the tracing warn is a no-op in the Hermes dylib.
+	pub config_error:Option<String>,
 	// RESERVED: same as engine_min_msgs above (01-F9).
 	pub catalog_mode:String,
 	pub expand_guidance:bool,
@@ -216,7 +221,8 @@ impl Default for AphroditeState {
 			engine_protect_last:5,
 			context_engine_enabled:true,
 			tool_threshold:512,
-			terminal_threshold:256,
+					terminal_threshold:256,
+					config_error:None,
 			catalog_mode:"tool".into(),
 			expand_guidance:false,
 			dev_mode:false,

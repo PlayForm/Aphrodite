@@ -363,6 +363,9 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 				"threshold_pct": state.engine_threshold_pct,
 				"tool_threshold": state.tool_threshold,
 				"terminal_threshold": state.terminal_threshold,
+				// Config self-diagnosis: present when aphrodite.toml was
+				// found but failed to parse - defaults are in effect.
+				"config_error": state.config_error,
 				// Tier 1 teaching loop telemetry: the adaptive split
 				// threshold and the consequence ledger. Diagnostics only -
 				// never rendered into the LLM's conversational view.
