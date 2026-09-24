@@ -30,7 +30,7 @@ impl Default for Config {
 /// found-but-broken config is never invisible. The caller additionally
 /// records the failure on the returned `Config` (`parse_failure`) for the
 /// `aphrodite_stats` self-diagnosis surface.
-fn warn_parse_failure(path:&std::path::Path, error:&toml::de::Error, action:&str) {
+pub(crate) fn warn_parse_failure(path:&std::path::Path, error:&toml::de::Error, action:&str) {
 	if tracing::dispatcher::has_been_set() {
 		tracing::warn!(
 			path = %path.display(),

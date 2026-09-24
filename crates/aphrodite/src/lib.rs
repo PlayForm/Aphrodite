@@ -415,12 +415,35 @@ pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> 
 	// reload blocks every other handle's every call, and it's a trap for a
 	// future `f` that calls back into another `aphrodite_*` fn (non-reentrant
 	// Mutex -> instant deadlock).
+	let mut parse_error:Option<String> = None;
 	let context_engine_enabled = if !p.is_empty() {
-		std::fs::read_to_string(p.as_str())
-			.ok()
-			.and_then(|t| t.parse::<toml::Table>().ok())
-			.and_then(|tbl| tbl.get("compression").and_then(|v| v.as_table()).cloned())
-			.and_then(|c| c.get("context_engine").and_then(|v| v.as_bool()))
+		match std::fs::read_to_string(p.as_str()) {
+			Ok(content) => match content.parse::<toml::Table>() {
+				Ok(tbl) => tbl
+					.get("compression")
+					.and_then(|v| v.as_table())
+					.cloned()
+					.and_then(|c| c.get("context_engine").and_then(|v| v.as_bool())),
+				Err(err) => {
+					// Issue #38 class: a found-but-broken TOML on the reload
+					// path used to be discarded silently (`.parse().ok()`),
+					// indistinguishable from "config not set". Warn on a
+					// real log surface (stderr fallback when no tracing
+					// subscriber exists) and record the failure on the
+					// state + response so `aphrodite_stats` can
+					// self-diagnose.
+					crate::config_loader::warn_parse_failure(
+						std::path::Path::new(p.as_str()),
+						&err,
+						"keeping previous value",
+					);
+					parse_error = Some(format!("{p}: {err}"));
+					None
+				},
+			},
+			// Unreadable/missing is the normal search miss - keep silent.
+			Err(_) => None,
+		}
 	} else {
 		None
 	};
@@ -428,7 +451,12 @@ pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> 
 		if let Some(v) = context_engine_enabled {
 			s.context_engine_enabled = v;
 		}
-		serde_json::json!({"status":"ok"})
+		if let Some(e) = &parse_error {
+			// Surface "config: defaults/previous in effect (parse failed)"
+			// on the same self-diagnosis field the loader uses.
+			s.config_error = Some(e.clone());
+		}
+		serde_json::json!({"status":"ok", "config_error":parse_error})
 	}) {
 		Ok(v) => to_json_ok(&v),
 		Err(e) => to_json_error(&e),
@@ -999,6 +1027,41 @@ mod ffi_tests {
 		// Must not panic even though the stored content contains a NUL byte.
 		let retrieved = unsafe { take(aphrodite_retrieve(handle.as_ptr(), cs(&hash).as_ptr())) };
 		assert_eq!(retrieved, "xy"); // NUL stripped, not left dangling
+		aphrodite_destroy(handle.as_ptr());
+	}
+
+	// ── Issue #38 class: `aphrodite_reload` on a found-but-broken TOML
+	// used to discard the parse error silently (`.parse().ok()`), leaving
+	// "reload did nothing" indistinguishable from "reload succeeded". Now
+	// it warns on a real surface (stderr fallback), records `config_error`
+	// on the state, and echoes it in the response. ──
+	#[test]
+	fn test_aphrodite_reload_broken_toml_records_config_error() {
+		let h = unsafe { take(aphrodite_init(std::ptr::null())) };
+		let handle = cs(&h);
+		let stamp = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_nanos();
+		let broken = std::env::temp_dir().join(format!("aphrodite-cfg-reload-ffi-{stamp}.toml"));
+		std::fs::write(&broken, "[compression\n").unwrap();
+
+		let resp = unsafe { take(aphrodite_reload(handle.as_ptr(), cs(broken.to_str().unwrap()).as_ptr())) };
+		let _ = std::fs::remove_file(&broken);
+		let v:serde_json::Value = serde_json::from_str(&resp).unwrap();
+		assert_eq!(v["status"], "ok", "reload must degrade, not fail: {resp}");
+		assert!(
+			v["config_error"].as_str().unwrap().contains(broken.to_str().unwrap()),
+			"response must carry the parse failure: {resp}"
+		);
+
+		// The state recorded it too, so `aphrodite_stats` self-diagnoses.
+		let stats = unsafe { take(aphrodite_stats(handle.as_ptr())) };
+		let sv:serde_json::Value = serde_json::from_str(&stats).unwrap();
+		assert!(
+			sv["config_error"].as_str().unwrap().contains(broken.to_str().unwrap()),
+			"stats must surface the reload parse failure: {stats}"
+		);
 		aphrodite_destroy(handle.as_ptr());
 	}
 }
