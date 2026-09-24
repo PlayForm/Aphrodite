@@ -1103,6 +1103,28 @@ mod tests {
 		assert_eq!(r["passed"], r["total"]);
 	}
 
+	// ── Config self-diagnosis: a parse-failure recorded on the shared
+	// state must surface verbatim in `aphrodite_stats` (the tracing warn
+	// is a no-op in the Hermes dylib, so this field is the only
+	// guaranteed-visible signal that defaults are in effect). ──
+	#[test]
+	fn test_stats_surfaces_config_error() {
+		let _g = crate::test_guard();
+		let broken_path = "/tmp/aphrodite-cfg-broken-test.toml";
+
+		// Simulate a found-but-broken aphrodite.toml (what
+		// `Config::load().apply_compression()` records on the state).
+		with_shared(|s| s.config_error = Some(format!("{broken_path}: TOML parse error")));
+
+		let r = dispatch("aphrodite_stats", "{}");
+		assert_eq!(r["config_error"].as_str().unwrap(), format!("{broken_path}: TOML parse error"));
+
+		// Restore the shared state so later tests are hermetic.
+		with_shared(|s| s.config_error = None);
+		let r2 = dispatch("aphrodite_stats", "{}");
+		assert!(r2["config_error"].is_null(), "config_error must be absent when config parsed fine");
+	}
+
 	#[test]
 	fn test_unknown_tool() {
 		let r = dispatch("nonexistent", "{}");
