@@ -113,6 +113,10 @@ pub struct AphroditeState {
 	/// `aphrodite_stats` so a broken config is never indistinguishable from
 	/// "config not set" - the tracing warn is a no-op in the Hermes dylib.
 	pub config_error:Option<String>,
+	/// Opt-in config auto-reload: watch aphrodite.toml and re-apply config
+	/// fields on change (default off). Only config fields are mutated -
+	/// session CCR state, directive selection, and telemetry are preserved.
+	pub auto_reload:bool,
 	// RESERVED: same as engine_min_msgs above (01-F9).
 	pub catalog_mode:String,
 	pub expand_guidance:bool,
@@ -223,6 +227,7 @@ impl Default for AphroditeState {
 			tool_threshold:512,
 					terminal_threshold:256,
 					config_error:None,
+		auto_reload:false,
 			catalog_mode:"tool".into(),
 			expand_guidance:false,
 			dev_mode:false,

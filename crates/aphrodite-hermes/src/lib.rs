@@ -75,6 +75,14 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 			// $APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120; an absent
 			// key means unlimited.
 			cfg.apply_previews();
+			// Opt-in config auto-reload (`[compression] auto_reload = true`,
+			// default off): watch aphrodite.toml and re-apply config fields
+			// on change. Only config fields are mutated - session CCR state,
+			// directive selection, and telemetry survive a reload (the
+			// dropped dylib-binary hot-reload wiped them; fa85dfa).
+			if s.auto_reload {
+				spawn_config_watcher();
+			}
 			s
 		};
 		#[cfg(test)]
@@ -96,6 +104,89 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
 	let mut guard = shared().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	f(&mut guard)
+}
+
+/// Re-apply a freshly loaded config to the session state, preserving the
+/// runtime-owned fields. `apply_compression` re-probes the directives
+/// directory and reseeds `active_directives` - the live session owns those
+/// (runtime swap/add/remove via `aphrodite_directive`), so they are
+/// snapshot/restored around the re-apply. CCR stores, telemetry, and every
+/// other runtime field are untouched by `apply_compression` itself.
+fn apply_config_reload(cfg:&aphrodite::config_loader::Config, state:&mut AphroditeState) {
+	let saved_directives = std::mem::take(&mut state.directives);
+	let saved_active = std::mem::take(&mut state.active_directives);
+	cfg.apply_compression(state);
+	state.directives = saved_directives;
+	state.active_directives = saved_active;
+	cfg.apply_previews();
+}
+
+/// Spawn the opt-in config auto-reload watcher. Mirrors the engine binary's
+/// watcher (`main.rs`): watch the config search dirs (cwd, then the user
+/// runtime home - the same precedence as `Config::load()`) non-recursively,
+/// debounce 500ms on a modify of `aphrodite.toml`, then reload.
+///
+/// Failure policy (fail-open, `aphrodite-boundaries`): a broken file keeps
+/// the previous values (like the engine watcher) and records the failure on
+/// `config_error` so `aphrodite_stats` shows "defaults in effect (parse
+/// failed)"; the loader's visible warn (stderr fallback when no tracing
+/// subscriber exists) fires on its own. Setting `auto_reload = false` in the
+/// file stops the watcher on the next successful reload.
+fn spawn_config_watcher() {
+	use notify::Watcher;
+	let _ = std::thread::Builder::new()
+		.name("aphrodite-config-watcher".into())
+		.spawn(move || {
+			let mut watch_dirs = vec![std::path::PathBuf::from(".")];
+			if let Some(home) = dirs::home_dir() {
+				watch_dirs.push(home.join(".hermes").join("aphrodite"));
+			}
+			let (tx, rx) = std::sync::mpsc::channel::<()>();
+			let mut watcher = match notify::recommended_watcher(move |res:Result<notify::Event, notify::Error>| {
+				if let Ok(ev) = res
+					&& matches!(ev.kind, notify::EventKind::Modify(_))
+					&& ev.paths.iter().any(|p| p.to_string_lossy().contains("aphrodite.toml"))
+				{
+					let _ = tx.send(());
+				}
+			}) {
+				Ok(w) => w,
+				Err(e) => {
+					eprintln!("[aphrodite] config auto-reload watcher failed to start: {e}");
+					return;
+				},
+			};
+			for dir in &watch_dirs {
+				if let Err(e) = watcher.watch(dir, notify::RecursiveMode::NonRecursive) {
+					eprintln!(
+						"[aphrodite] config auto-reload: cannot watch {}: {e}",
+						dir.display()
+					);
+				}
+			}
+			while rx.recv().is_ok() {
+				// Debounce: let the editor's write settle (same as the engine
+				// watcher's 500ms), and drain events accumulated meanwhile.
+				std::thread::sleep(std::time::Duration::from_millis(500));
+				while rx.try_recv().is_ok() {}
+				let cfg = aphrodite::config_loader::Config::load();
+				if cfg.parse_failure.is_some() {
+					// Broken file: keep the previous values, surface the
+					// failure (the loader's warn already fired).
+					with_shared(|s| s.config_error = cfg.parse_failure.clone());
+					continue;
+				}
+				let keep_watching = with_shared(|s| {
+					apply_config_reload(&cfg, s);
+					s.auto_reload
+				});
+				if !keep_watching {
+					// `auto_reload` turned off in the file - stop watching
+					// (takes effect on the next successful reload).
+					return;
+				}
+			}
+		});
 }
 
 /// Serializes tests that assert across multiple state-mutating calls, since
@@ -1125,5 +1216,42 @@ mod tests {
 			v3["args"]["command"].as_str().unwrap().contains("__APHRODITE_SEG__"),
 			"rewritten command must carry segment markers: {result3}"
 		);
+	}
+
+	// ── Config auto-reload: a fresh `Config` re-applied to the session
+	// state must update config fields (thresholds) while PRESERVING the
+	// runtime-owned directive selection (map + active list) - the exact
+	// contract of the opt-in watcher (spawn_config_watcher). CCR stores
+	// and telemetry are untouched by `apply_compression` itself. ──
+	#[test]
+	fn test_config_reload_preserves_directives_and_applies_thresholds() {
+		let _g = crate::test_guard();
+
+		let stamp = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_nanos();
+		let path = std::env::temp_dir().join(format!("aphrodite-cfg-reload-{stamp}.toml"));
+		std::fs::write(&path, "[compression]\nterminal_threshold = 2048\n").unwrap();
+		let cfg = aphrodite::config_loader::Config::load_from(path.to_str().unwrap());
+		let _ = std::fs::remove_file(&path);
+		assert!(cfg.parse_failure.is_none());
+
+		let mut state = AphroditeState::default();
+		state.terminal_threshold = 1024;
+		// Simulate a live session that swapped in a runtime directive set.
+		state
+			.directives
+			.insert("focus".into(), aphrodite::directives::Directive { name:"focus".into(), content:"stay targeted".into() });
+		state.active_directives = vec!["focus".into()];
+
+		apply_config_reload(&cfg, &mut state);
+
+		assert_eq!(state.terminal_threshold, 2048, "reload must apply new thresholds");
+		assert!(
+			state.directives.contains_key("focus"),
+			"reload must preserve the runtime directive set"
+		);
+		assert_eq!(state.active_directives, vec!["focus".to_string()], "reload must preserve active directives");
 	}
 }

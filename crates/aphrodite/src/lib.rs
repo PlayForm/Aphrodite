@@ -391,6 +391,7 @@ pub extern "C" fn aphrodite_stats(handle:*const c_char) -> *mut c_char {
 					"markers":s.recent_markers.len(),"turn":s.turn_counter,
 					"engine_enabled":s.context_engine_enabled,"threshold_pct":s.engine_threshold_pct,
 					"tool_threshold":s.tool_threshold,"terminal_threshold":s.terminal_threshold,
+					"auto_reload":s.auto_reload,
 					// Config self-diagnosis: present when aphrodite.toml was
 					// found but failed to parse - defaults are in effect.
 					"config_error":s.config_error,

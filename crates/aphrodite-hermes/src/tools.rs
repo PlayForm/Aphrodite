@@ -363,6 +363,7 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 				"threshold_pct": state.engine_threshold_pct,
 				"tool_threshold": state.tool_threshold,
 				"terminal_threshold": state.terminal_threshold,
+				"auto_reload": state.auto_reload,
 				// Config self-diagnosis: present when aphrodite.toml was
 				// found but failed to parse - defaults are in effect.
 				"config_error": state.config_error,
@@ -1118,6 +1119,11 @@ mod tests {
 
 		let r = dispatch("aphrodite_stats", "{}");
 		assert_eq!(r["config_error"].as_str().unwrap(), format!("{broken_path}: TOML parse error"));
+		assert!(
+			r["auto_reload"].as_bool().unwrap_or(true) == false,
+			"auto_reload must surface (default off): {:?}",
+			r["auto_reload"]
+		);
 
 		// Restore the shared state so later tests are hermetic.
 		with_shared(|s| s.config_error = None);

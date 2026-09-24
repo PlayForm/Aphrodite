@@ -221,6 +221,11 @@ impl Config {
 
 		// ── Poll-worker auto-backgrounding ──
 		state.poll_worker_enabled = self.get_bool("APHRODITE_POLL_WORKER", "compression", "poll_worker", true);
+		// Opt-in config auto-reload (default OFF): when true, the dylib
+		// watches aphrodite.toml and re-applies config fields on change -
+		// never session CCR state (the dropped dylib-binary hot-reload
+		// wiped it; fa85dfa). Env: `APHRODITE_AUTO_RELOAD`.
+		state.auto_reload = self.get_bool("APHRODITE_AUTO_RELOAD", "compression", "auto_reload", false);
 
 		// ── Fine-grained chain splitting ──
 		// Default OFF for release: the segment markers (`echo __APHRODITE_SEG__`)
@@ -813,5 +818,29 @@ mod tests {
 		cfg.apply_compression(&mut state);
 		assert_eq!(state.terminal_threshold, 16384);
 		assert!(state.config_error.is_none());
+	}
+
+	// ── Opt-in config auto-reload key: `[compression] auto_reload`
+	// (env `APHRODITE_AUTO_RELOAD`), default OFF. When true the dylib
+	// watches aphrodite.toml and re-applies config fields on change. ──
+	#[test]
+	fn test_auto_reload_resolution() {
+		// TOML true.
+		let cfg = Config { raw:"[compression]\nauto_reload = true\n".parse().unwrap(), overrides:HashMap::new(), parse_failure:None };
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert!(state.auto_reload, "auto_reload must resolve from TOML");
+
+		// Default off.
+		let mut state2 = crate::state::AphroditeState::default();
+		Config::default().apply_compression(&mut state2);
+		assert!(!state2.auto_reload, "auto_reload must default to off");
+
+		// Env override wins.
+		let mut cfg3 = Config::default();
+		cfg3.set_override("APHRODITE_AUTO_RELOAD", "1");
+		let mut state3 = crate::state::AphroditeState::default();
+		cfg3.apply_compression(&mut state3);
+		assert!(state3.auto_reload, "env override must enable auto_reload");
 	}
 }

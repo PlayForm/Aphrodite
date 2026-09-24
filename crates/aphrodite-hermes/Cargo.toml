@@ -18,6 +18,8 @@ path = "src/lib.rs"
 [dependencies]
 aphrodite = { path = "../aphrodite", version = "1.6.0", default-features = false }
 serde_json = { workspace = true }
+dirs = "7.0.0"
+notify = "8.2.0"
 
 # Build-time FFI codegen (cbindgen -> aphrodite_hermes.h -> ctypesgen ->
 # plugins/aphrodite/_bindings.py). These crates are consumed by build.rs and
