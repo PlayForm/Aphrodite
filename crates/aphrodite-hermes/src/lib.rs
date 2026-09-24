@@ -158,10 +158,7 @@ fn spawn_config_watcher() {
 			};
 			for dir in &watch_dirs {
 				if let Err(e) = watcher.watch(dir, notify::RecursiveMode::NonRecursive) {
-					eprintln!(
-						"[aphrodite] config auto-reload: cannot watch {}: {e}",
-						dir.display()
-					);
+					eprintln!("[aphrodite] config auto-reload: cannot watch {}: {e}", dir.display());
 				}
 			}
 			while rx.recv().is_ok() {
@@ -1240,9 +1237,10 @@ mod tests {
 		let mut state = AphroditeState::default();
 		state.terminal_threshold = 1024;
 		// Simulate a live session that swapped in a runtime directive set.
-		state
-			.directives
-			.insert("focus".into(), aphrodite::directives::Directive { name:"focus".into(), content:"stay targeted".into() });
+		state.directives.insert(
+			"focus".into(),
+			aphrodite::directives::Directive { name:"focus".into(), content:"stay targeted".into() },
+		);
 		state.active_directives = vec!["focus".into()];
 
 		apply_config_reload(&cfg, &mut state);
@@ -1252,6 +1250,10 @@ mod tests {
 			state.directives.contains_key("focus"),
 			"reload must preserve the runtime directive set"
 		);
-		assert_eq!(state.active_directives, vec!["focus".to_string()], "reload must preserve active directives");
+		assert_eq!(
+			state.active_directives,
+			vec!["focus".to_string()],
+			"reload must preserve active directives"
+		);
 	}
 }

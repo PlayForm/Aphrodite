@@ -1128,7 +1128,10 @@ mod tests {
 		// Restore the shared state so later tests are hermetic.
 		with_shared(|s| s.config_error = None);
 		let r2 = dispatch("aphrodite_stats", "{}");
-		assert!(r2["config_error"].is_null(), "config_error must be absent when config parsed fine");
+		assert!(
+			r2["config_error"].is_null(),
+			"config_error must be absent when config parsed fine"
+		);
 	}
 
 	#[test]

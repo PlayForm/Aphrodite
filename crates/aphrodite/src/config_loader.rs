@@ -446,7 +446,11 @@ mod tests {
 	// `state.flow_budget_chars`; default is 4000. ──
 	#[test]
 	fn test_flow_budget_from_toml() {
-		let cfg = Config { raw:"[flow]\nbudget_chars = 1234\n".parse().unwrap(), overrides:HashMap::new(), parse_failure:None };
+		let cfg = Config {
+			raw:"[flow]\nbudget_chars = 1234\n".parse().unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
 		assert_eq!(state.flow_budget_chars, 1234);
@@ -487,7 +491,11 @@ mod tests {
 		std::env::set_current_dir(&tmp).unwrap();
 
 		// `active` is empty - directives must still load.
-		let cfg = Config { raw:"[directives]\nactive = []\n".parse().unwrap(), overrides:HashMap::new(), parse_failure:None };
+		let cfg = Config {
+			raw:"[directives]\nactive = []\n".parse().unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
 
@@ -779,7 +787,10 @@ mod tests {
 			pf.contains(broken.to_str().unwrap()),
 			"recorded failure must name the broken path: {pf}"
 		);
-		assert!(pf.contains("TOML parse error"), "recorded failure must carry the parse error: {pf}");
+		assert!(
+			pf.contains("TOML parse error"),
+			"recorded failure must carry the parse error: {pf}"
+		);
 
 		// `aphrodite_stats` self-diagnosis surface.
 		let mut state = crate::state::AphroditeState::default();
@@ -826,7 +837,11 @@ mod tests {
 	#[test]
 	fn test_auto_reload_resolution() {
 		// TOML true.
-		let cfg = Config { raw:"[compression]\nauto_reload = true\n".parse().unwrap(), overrides:HashMap::new(), parse_failure:None };
+		let cfg = Config {
+			raw:"[compression]\nauto_reload = true\n".parse().unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
 		assert!(state.auto_reload, "auto_reload must resolve from TOML");

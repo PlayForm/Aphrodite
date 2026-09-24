@@ -418,28 +418,31 @@ pub extern "C" fn aphrodite_reload(handle:*const c_char, path:*const c_char) -> 
 	let mut parse_error:Option<String> = None;
 	let context_engine_enabled = if !p.is_empty() {
 		match std::fs::read_to_string(p.as_str()) {
-			Ok(content) => match content.parse::<toml::Table>() {
-				Ok(tbl) => tbl
-					.get("compression")
-					.and_then(|v| v.as_table())
-					.cloned()
-					.and_then(|c| c.get("context_engine").and_then(|v| v.as_bool())),
-				Err(err) => {
-					// Issue #38 class: a found-but-broken TOML on the reload
-					// path used to be discarded silently (`.parse().ok()`),
-					// indistinguishable from "config not set". Warn on a
-					// real log surface (stderr fallback when no tracing
-					// subscriber exists) and record the failure on the
-					// state + response so `aphrodite_stats` can
-					// self-diagnose.
-					crate::config_loader::warn_parse_failure(
-						std::path::Path::new(p.as_str()),
-						&err,
-						"keeping previous value",
-					);
-					parse_error = Some(format!("{p}: {err}"));
-					None
-				},
+			Ok(content) => {
+				match content.parse::<toml::Table>() {
+					Ok(tbl) => {
+						tbl.get("compression")
+							.and_then(|v| v.as_table())
+							.cloned()
+							.and_then(|c| c.get("context_engine").and_then(|v| v.as_bool()))
+					},
+					Err(err) => {
+						// Issue #38 class: a found-but-broken TOML on the reload
+						// path used to be discarded silently (`.parse().ok()`),
+						// indistinguishable from "config not set". Warn on a
+						// real log surface (stderr fallback when no tracing
+						// subscriber exists) and record the failure on the
+						// state + response so `aphrodite_stats` can
+						// self-diagnose.
+						crate::config_loader::warn_parse_failure(
+							std::path::Path::new(p.as_str()),
+							&err,
+							"keeping previous value",
+						);
+						parse_error = Some(format!("{p}: {err}"));
+						None
+					},
+				}
 			},
 			// Unreadable/missing is the normal search miss - keep silent.
 			Err(_) => None,
