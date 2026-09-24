@@ -147,8 +147,8 @@ fn main() {
 
 	// ── ctypesgen: header → raw bindings module ──
 	// `-l __APHRODITE_DYLIB__` is a placeholder only - finalize_bindings.py
-	// neutralizes the import-time library load (the plugin's hot-reload
-	// machinery owns the real CDLL handle).
+	// neutralizes the import-time library load (the plugin owns the real
+	// CDLL handle at runtime).
 	let mut cmd = Command::new(&ctypesgen_cmd[0]);
 	cmd.args(&ctypesgen_cmd[1..]);
 	let status = cmd

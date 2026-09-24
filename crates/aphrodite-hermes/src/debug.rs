@@ -14,8 +14,7 @@
 //! and checks the ROOT's scoped flag - meaning a toggle on the root session
 //! applies to that session AND all its subagents/delegated tasks, but never
 //! to other sessions. Both flag reads are mtime-cached (one stat() per call
-//! when unchanged), mirroring the Python side's `_sync_debug` and the
-//! dylib's own mtime hot-reload.
+//! when unchanged), mirroring the Python side's `_sync_debug`.
 //!
 //! When enabled, `debug_line` returns a `[aphrodite-debug ...]` line that
 //! `replacement_from` prepends before the CCR marker, so the session sees
@@ -36,9 +35,10 @@ static SESSION_PARENTS:OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new(
 
 /// The most recently seen session id, updated ONLY by `record_session` -
 /// i.e. the `pre_llm_call` hook (turn_context.py threads session_id through
-/// it). It tracks the current LLM turn's session, NOT whichever transform
-/// hook fired last (subagent results could otherwise redirect the scope to
-/// the wrong root).
+/// it). The `aphrodite_debug` tool has no session in its args: it toggles
+/// whatever session the current LLM turn belongs to, so the flag must track
+/// the turn's session, NOT whichever transform hook fired last (subagent
+/// results could otherwise redirect the toggle to the wrong root).
 static LAST_SESSION:OnceLock<Mutex<String>> = OnceLock::new();
 
 /// flag-file path -> (mtime, enabled) cache; one entry per distinct flag.
@@ -67,9 +67,10 @@ pub(crate) fn record_session(session:&str, parent:&str) {
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
 		*last = session.to_string();
 	}
-	// Persist across hot-reloads: a dylib reload wipes ALL Rust statics
-	// (__init__.py:537), so the session id is mirrored to a tiny file that
-	// `last_session()` reads back after a reload. Best-effort - a failed
+	// Persist across process restarts: a fresh Hermes process (and every
+	// separate shim exec) starts with empty Rust statics, so the session id
+	// is mirrored to a tiny file that `last_session()` reads back.
+	// Best-effort - a failed
 	// write degrades to "no persistence", never an error.
 	let _ = std::fs::write(runtime_home().join("session.current"), session);
 	if parent.is_empty() || session == parent {
@@ -158,16 +159,30 @@ pub(crate) fn enabled_for(session:&str) -> bool {
 	false
 }
 
+/// Resolve the most recently seen session's ROOT id.
+#[cfg(debug_assertions)]
+fn current_root() -> String {
+	let last = LAST_SESSION
+		.get_or_init(|| Mutex::new(String::new()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	if last.is_empty() {
+		return String::new();
+	}
+	session_chain(&last).last().cloned().unwrap_or_else(|| last.clone())
+}
+
 /// The most recently seen session id (the current LLM turn's session, set by
 /// `pre_llm_call`). Fallback for hooks Hermes does NOT thread session_id
 /// through - `transform_terminal_output` passes only command/output/
 /// returncode/task_id/env_type (terminal_tool_result.py:144), so the terminal
 /// arm falls back to this instead of losing the session scope.
 ///
-/// Persists across dylib hot-reloads: `record_session` also writes the id to
-/// a tiny file in the runtime home, and a reload (which wipes all Rust
-/// statics - __init__.py:537) falls back to reading that file. Without this,
-/// a mid-turn rebuild would leave terminal output with no session scope.
+/// Persists across process restarts: `record_session` also writes the id to
+/// a tiny file in the runtime home, and a fresh process (or separate shim
+/// exec) starts with empty Rust statics and falls back to reading that file.
+/// Without this, terminal output with no prior `pre_llm_call` would have no
+/// session scope.
 pub(crate) fn last_session() -> String {
 	{
 		let last = LAST_SESSION
@@ -183,6 +198,36 @@ pub(crate) fn last_session() -> String {
 		.ok()
 		.map(|s| s.trim().to_string())
 		.unwrap_or_default()
+}
+
+/// Set (or clear) the debug flag for the CURRENT session tree - the tool
+/// entry point for `aphrodite_debug`. Returns the resolved root session id
+/// and the flag path written, so the caller can report both.
+///
+/// Uses the persisted session id (falling back to `session.current` across
+/// process restarts, same as `last_session`): a fresh process wipes
+/// LAST_SESSION, and without the file fallback the toggle would report "no
+/// session context" until the next `pre_llm_call`.
+///
+/// Dev-only: the `aphrodite_debug` tool that calls this is gated behind
+/// debug_assertions (release dylibs register exactly the 13 production
+/// tools), so this entry point is dead code in release builds.
+#[cfg(debug_assertions)]
+pub(crate) fn set_enabled_current(on:bool) -> Result<(String, String), String> {
+	let root = current_root();
+	let root = if root.is_empty() { last_session() } else { root };
+	if root.is_empty() {
+		return Err("no session context yet - hooks have not fired in this process".to_string());
+	}
+	let flag = flag_path_for(&root);
+	std::fs::write(&flag, if on { "on" } else { "off" }).map_err(|e| format!("write {}: {}", flag.display(), e))?;
+	// Invalidate the mtime cache so the next read picks up the new value.
+	let key = flag.to_string_lossy().into_owned();
+	if let Some(cache) = FLAG_CACHE.get() {
+		let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+		guard.remove(&key);
+	}
+	Ok((root, flag.to_string_lossy().into_owned()))
 }
 
 /// Build a `[aphrodite-debug ...]` prefix line from a compression result

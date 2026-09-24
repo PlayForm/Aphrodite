@@ -10,10 +10,41 @@ use std::{collections::HashMap, path::PathBuf};
 pub struct Config {
 	raw:toml::Table,
 	overrides:HashMap<String, String>,
+	/// Set when a found `aphrodite.toml` failed to parse and the loader
+	/// fell back to defaults - carried into `AphroditeState::config_error`
+	/// so `aphrodite_stats` can surface "defaults in effect (parse failed)"
+	/// and the failure is never indistinguishable from "config not set".
+	pub parse_failure:Option<String>,
 }
 
 impl Default for Config {
-	fn default() -> Self { Self { raw:toml::Table::new(), overrides:HashMap::new() } }
+	fn default() -> Self { Self { raw:toml::Table::new(), overrides:HashMap::new(), parse_failure:None } }
+}
+
+/// Emit a parse-failure warning that actually reaches a log surface.
+///
+/// `tracing::warn!` is a silent no-op while no subscriber is installed -
+/// exactly the Hermes dylib path (the host is a Python process that never
+/// installs a Rust tracing subscriber) and the engine binary before
+/// `main()` initializes one (config loads first). Fall back to stderr so a
+/// found-but-broken config is never invisible. The caller additionally
+/// records the failure on the returned `Config` (`parse_failure`) for the
+/// `aphrodite_stats` self-diagnosis surface.
+pub(crate) fn warn_parse_failure(path:&std::path::Path, error:&toml::de::Error, action:&str) {
+	if tracing::dispatcher::has_been_set() {
+		tracing::warn!(
+			path = %path.display(),
+			error = %error,
+			"aphrodite.toml found but failed to parse; {}",
+			action
+		);
+	} else {
+		eprintln!(
+			"[aphrodite] aphrodite.toml found but failed to parse; {} ({})",
+			action,
+			path.display()
+		);
+	}
 }
 
 impl Config {
@@ -28,20 +59,21 @@ impl Config {
 				.join("aphrodite.toml"),
 		];
 
+		let mut parse_failure:Option<String> = None;
 		for path in &search_paths {
 			if let Ok(content) = std::fs::read_to_string(path) {
 				match content.parse::<toml::Table>() {
-					Ok(table) => return Self { raw:table, overrides:HashMap::new() },
+					Ok(table) => return Self { raw:table, overrides:HashMap::new(), parse_failure:None },
 					Err(err) => {
 						// Fix 22 (inspection): a found-but-broken TOML file
 						// used to fall through silently to the next search
 						// path (or defaults) - warn so a broken local
 						// aphrodite.toml is not ignored without indication.
-						tracing::warn!(
-							path = %path.display(),
-							error = %err,
-							"aphrodite.toml found but failed to parse; skipping"
-						);
+						// `parse_failure` is only recorded when the search
+						// ends on defaults (a later path may still yield a
+						// valid config).
+						warn_parse_failure(path, &err, "skipping");
+						parse_failure = Some(format!("{}: {err}", path.display()));
 					},
 				}
 			}
@@ -49,7 +81,7 @@ impl Config {
 			// looking.
 		}
 
-		Self::default()
+		Self { raw:toml::Table::new(), overrides:HashMap::new(), parse_failure }
 	}
 
 	/// Reload from disk
@@ -64,16 +96,18 @@ impl Config {
 	pub fn load_from(path:&str) -> Self {
 		if let Ok(content) = std::fs::read_to_string(path) {
 			match content.parse::<toml::Table>() {
-				Ok(table) => return Self { raw:table, overrides:HashMap::new() },
+				Ok(table) => return Self { raw:table, overrides:HashMap::new(), parse_failure:None },
 				Err(err) => {
 					// Fix 22 (inspection): same warn-on-parse-error treatment
 					// as `load()` - the explicit-path init used to silently
-					// fall back to defaults on a broken file.
-					tracing::warn!(
-						path = %path,
-						error = %err,
-						"aphrodite.toml found but failed to parse; using defaults"
-					);
+					// fall back to defaults on a broken file. `parse_failure`
+					// is recorded so `aphrodite_stats` can self-diagnose.
+					warn_parse_failure(std::path::Path::new(path), &err, "using defaults");
+					return Self {
+						raw:toml::Table::new(),
+						overrides:HashMap::new(),
+						parse_failure:Some(format!("{path}: {err}")),
+					};
 				},
 			}
 		}
@@ -152,6 +186,11 @@ impl Config {
 
 	/// Load compression settings into an AphroditeState
 	pub fn apply_compression(&self, state:&mut crate::state::AphroditeState) {
+		// Parse-failure self-diagnosis: a found-but-broken aphrodite.toml
+		// falls back to defaults - surface it in `aphrodite_stats` so
+		// "defaults in effect" is never indistinguishable from "config not
+		// set" (the tracing warn alone is a no-op in the Hermes dylib).
+		state.config_error = self.parse_failure.clone();
 		state.context_engine_enabled = self.get_bool("APHRODITE_CONTEXT_ENGINE", "compression", "context_engine", true);
 		state.engine_threshold_pct =
 			self.get_u64("APHRODITE_ENGINE_THRESHOLD_PCT", "compression", "engine_threshold_pct", 45);
@@ -182,6 +221,11 @@ impl Config {
 
 		// ── Poll-worker auto-backgrounding ──
 		state.poll_worker_enabled = self.get_bool("APHRODITE_POLL_WORKER", "compression", "poll_worker", true);
+		// Opt-in config auto-reload (default OFF): when true, the dylib
+		// watches aphrodite.toml and re-applies config fields on change -
+		// never session CCR state (the dropped dylib-binary hot-reload
+		// wiped it; fa85dfa). Env: `APHRODITE_AUTO_RELOAD`.
+		state.auto_reload = self.get_bool("APHRODITE_AUTO_RELOAD", "compression", "auto_reload", false);
 
 		// ── Fine-grained chain splitting ──
 		// Default OFF for release: the segment markers (`echo __APHRODITE_SEG__`)
@@ -391,6 +435,7 @@ mod tests {
 		let cfg = Config {
 			raw:"[compression]\ntool_threshold_token = 321\n".parse().unwrap(),
 			overrides:HashMap::new(),
+			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
@@ -401,7 +446,11 @@ mod tests {
 	// `state.flow_budget_chars`; default is 4000. ──
 	#[test]
 	fn test_flow_budget_from_toml() {
-		let cfg = Config { raw:"[flow]\nbudget_chars = 1234\n".parse().unwrap(), overrides:HashMap::new() };
+		let cfg = Config {
+			raw:"[flow]\nbudget_chars = 1234\n".parse().unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
 		assert_eq!(state.flow_budget_chars, 1234);
@@ -442,7 +491,11 @@ mod tests {
 		std::env::set_current_dir(&tmp).unwrap();
 
 		// `active` is empty - directives must still load.
-		let cfg = Config { raw:"[directives]\nactive = []\n".parse().unwrap(), overrides:HashMap::new() };
+		let cfg = Config {
+			raw:"[directives]\nactive = []\n".parse().unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
 
@@ -527,6 +580,7 @@ mod tests {
 		let cfg = Config {
 			raw:"[compression]\npoll_worker = false\n".parse().unwrap(),
 			overrides:HashMap::new(),
+			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
 		cfg.apply_compression(&mut state);
@@ -548,6 +602,7 @@ mod tests {
 		let cfg = Config {
 			raw:"[previews]\npreview_max_chars = 77\n".parse().unwrap(),
 			overrides:HashMap::new(),
+			parse_failure:None,
 		};
 		cfg.apply_previews();
 		assert_eq!(crate::preview::preview_max_chars(), 77);
@@ -708,5 +763,99 @@ mod tests {
 		// Missing path: defaults, no panic.
 		let cfg = Config::load_from(&format!("/nonexistent/aphrodite-{stamp}.toml"));
 		assert!(cfg.get_bool("NONEXISTENT", "compression", "enabled", true));
+	}
+
+	// ── Parse-failure self-diagnosis: a broken file must record itself on
+	// the Config (and via `apply_compression` on the state) so
+	// `aphrodite_stats` can surface "defaults in effect (parse failed)" -
+	// the tracing warn is a no-op in the Hermes dylib (no subscriber), so
+	// the recorded field is the only guaranteed-visible diagnostic. ──
+	#[test]
+	fn test_parse_failure_recorded_on_config_and_state() {
+		let stamp = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_nanos();
+		let broken = std::env::temp_dir().join(format!("aphrodite-cfg-broken-recorded-{stamp}.toml"));
+		std::fs::write(&broken, "[compression\nenabled = false\n").unwrap();
+
+		let cfg = Config::load_from(broken.to_str().unwrap());
+		let _ = std::fs::remove_file(&broken);
+
+		let pf = cfg.parse_failure.as_ref().expect("parse failure must be recorded");
+		assert!(
+			pf.contains(broken.to_str().unwrap()),
+			"recorded failure must name the broken path: {pf}"
+		);
+		assert!(
+			pf.contains("TOML parse error"),
+			"recorded failure must carry the parse error: {pf}"
+		);
+
+		// `aphrodite_stats` self-diagnosis surface.
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		let ce = state.config_error.as_deref().expect("config_error must be set on the state");
+		assert!(
+			ce.contains(broken.to_str().unwrap()),
+			"config_error must name the broken path: {ce}"
+		);
+	}
+
+	// ── Multibyte content in comments is valid TOML: an em dash inside a
+	// comment must parse and resolve - the fallback-to-defaults trigger is
+	// a *broken* file, never non-ASCII bytes (report claim check). ──
+	#[test]
+	fn test_load_from_multibyte_comment_parses() {
+		let stamp = std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_nanos();
+		let path = std::env::temp_dir().join(format!("aphrodite-cfg-multibyte-{stamp}.toml"));
+		std::fs::write(
+			&path,
+			"[compression]\nterminal_threshold = 16384   # bytes; was default 1024 - raised\n",
+		)
+		.unwrap();
+		let cfg = Config::load_from(path.to_str().unwrap());
+		let _ = std::fs::remove_file(&path);
+
+		assert!(
+			cfg.parse_failure.is_none(),
+			"a multibyte comment must not fail the parse: {:?}",
+			cfg.parse_failure
+		);
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.terminal_threshold, 16384);
+		assert!(state.config_error.is_none());
+	}
+
+	// ── Opt-in config auto-reload key: `[compression] auto_reload`
+	// (env `APHRODITE_AUTO_RELOAD`), default OFF. When true the dylib
+	// watches aphrodite.toml and re-applies config fields on change. ──
+	#[test]
+	fn test_auto_reload_resolution() {
+		// TOML true.
+		let cfg = Config {
+			raw:"[compression]\nauto_reload = true\n".parse().unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert!(state.auto_reload, "auto_reload must resolve from TOML");
+
+		// Default off.
+		let mut state2 = crate::state::AphroditeState::default();
+		Config::default().apply_compression(&mut state2);
+		assert!(!state2.auto_reload, "auto_reload must default to off");
+
+		// Env override wins.
+		let mut cfg3 = Config::default();
+		cfg3.set_override("APHRODITE_AUTO_RELOAD", "1");
+		let mut state3 = crate::state::AphroditeState::default();
+		cfg3.apply_compression(&mut state3);
+		assert!(state3.auto_reload, "env override must enable auto_reload");
 	}
 }

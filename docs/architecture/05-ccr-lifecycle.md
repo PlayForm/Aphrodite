@@ -31,7 +31,7 @@ stateDiagram-v2
     Decayed --> GC: dropped from index/marker ring
     Evicted --> GC: pop_back oldest (inline) / LRU tail
     Expired --> GC: backend TTL sweep on get/len
-    Retrieved --> [*]: hot-reload wipes all in-process state<br/>(new dylib image = fresh state)
+    Retrieved --> [*]: process restart wipes all in-process state<br/>(new process = fresh state)
     GC --> [*]
 ```
 
@@ -46,7 +46,7 @@ Eviction tiers:
 | `referenced_files`                    | last 100 files                                                                      | oldest dropped                                                |
 | `SqliteCcrStore` / `InMemoryCcrStore` | TTL from `ccr_ttl_seconds` (default 3600s); in-memory also capped at 10,000 entries | lazy TTL sweep on get/len                                     |
 
-A dylib hot-reload is a hard reset: a new dylib image has a fresh `OnceLock`/handles, so every prior marker becomes unresolvable at once (not a graceful per-entry transition).
+A process restart is a hard reset: a fresh process has a new `OnceLock`/handles, so every prior marker becomes unresolvable at once (not a graceful per-entry transition). The dylib is loaded once per process from the resolved path - restarting Hermes is how a new build is picked up.
 
 ## EMA compression-ratio threshold state
 

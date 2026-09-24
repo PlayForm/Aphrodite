@@ -10,10 +10,10 @@
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.
 > Up to 610× compression on the standard corpus (132× overall), ~10 ms end-to-end,
-> type-aware classifier, TOML-driven, dylib hot-reload.
+> type-aware classifier, TOML-driven, opt-in config auto-reload.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/static/v1?label=release&message=v1.5.1&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/static/v1?label=release&message=v1.6.0&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
 [![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.1.5&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
@@ -55,9 +55,9 @@ The two routes are alternatives: if you install via git clone, you do not need
 **`Terminal`** (binary + config only)
 
 ```sh
-cargo install aphrodite          # proxy binary
-cargo install aphrodite-hermes   # dylib + helper bin
-aphrodite setup                  # config + data dir under ~/.hermes/aphrodite
+cargo install aphrodite        # proxy binary
+cargo install aphrodite-hermes # dylib + helper bin
+aphrodite setup                # config + data dir under ~/.hermes/aphrodite
 ```
 
 `cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/` and never

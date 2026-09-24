@@ -363,6 +363,10 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 				"threshold_pct": state.engine_threshold_pct,
 				"tool_threshold": state.tool_threshold,
 				"terminal_threshold": state.terminal_threshold,
+				"auto_reload": state.auto_reload,
+				// Config self-diagnosis: present when aphrodite.toml was
+				// found but failed to parse - defaults are in effect.
+				"config_error": state.config_error,
 				// Tier 1 teaching loop telemetry: the adaptive split
 				// threshold and the consequence ledger. Diagnostics only -
 				// never rendered into the LLM's conversational view.
@@ -584,8 +588,36 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 			"status": "ok",
 			"version": env!("CARGO_PKG_VERSION"),
 			"proxies": proxy_health(),
-			"hint": "rebuild via `cargo build --release -p aphrodite`; dylib hot-reloads on mtime change",
+			"hint": "rebuild via `cargo build --release -p aphrodite`; restart the session to pick up the new dylib",
 		})
+	});
+
+	// ── debug: per-session debug toggle (Rust-side only) ──
+	// Dev-only: gated behind debug_assertions so release dylibs register
+	// exactly the 13 production tools (catalog validate rule 6 - the
+	// manifest declares 13; a release dylib registering aphrodite_debug
+	// fails `hermes plugins validate` as an undeclared tool). Dev builds
+	// (cargo watch / debug profile) keep it; `cargo build --release` drops
+	// it. The debug-prefix/session-record machinery in debug.rs remains
+	// live in both profiles (it only activates on a flag file).
+	// Flips the session-scoped flag file in the runtime home. Resolution is
+	// root-session based (see debug.rs): the CURRENT session's root id keys the
+	// flag, so subagents inherit it and other sessions stay quiet. Pure Rust -
+	// the customer-facing Python shim is untouched.
+	#[cfg(debug_assertions)]
+	m.insert("aphrodite_debug", |args| {
+		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
+		match crate::debug::set_enabled_current(on) {
+			Ok((session, flag)) => {
+				serde_json::json!({
+					"status": "ok",
+					"debug": on,
+					"session": session,
+					"flag": flag,
+				})
+			},
+			Err(e) => serde_json::json!({"error": e}),
+		}
 	});
 
 	// ── context engine pre-LLM hook (registered via ctx.register_context_engine) ──
@@ -1070,6 +1102,36 @@ mod tests {
 		let r = dispatch("aphrodite_test", &serde_json::json!({"mode": "full"}).to_string());
 		assert_eq!(r["status"], "ok", "smoke test should pass: {:?}", r);
 		assert_eq!(r["passed"], r["total"]);
+	}
+
+	// ── Config self-diagnosis: a parse-failure recorded on the shared
+	// state must surface verbatim in `aphrodite_stats` (the tracing warn
+	// is a no-op in the Hermes dylib, so this field is the only
+	// guaranteed-visible signal that defaults are in effect). ──
+	#[test]
+	fn test_stats_surfaces_config_error() {
+		let _g = crate::test_guard();
+		let broken_path = "/tmp/aphrodite-cfg-broken-test.toml";
+
+		// Simulate a found-but-broken aphrodite.toml (what
+		// `Config::load().apply_compression()` records on the state).
+		with_shared(|s| s.config_error = Some(format!("{broken_path}: TOML parse error")));
+
+		let r = dispatch("aphrodite_stats", "{}");
+		assert_eq!(r["config_error"].as_str().unwrap(), format!("{broken_path}: TOML parse error"));
+		assert!(
+			r["auto_reload"].as_bool().unwrap_or(true) == false,
+			"auto_reload must surface (default off): {:?}",
+			r["auto_reload"]
+		);
+
+		// Restore the shared state so later tests are hermetic.
+		with_shared(|s| s.config_error = None);
+		let r2 = dispatch("aphrodite_stats", "{}");
+		assert!(
+			r2["config_error"].is_null(),
+			"config_error must be absent when config parsed fine"
+		);
 	}
 
 	#[test]

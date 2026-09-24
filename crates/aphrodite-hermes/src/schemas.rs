@@ -51,6 +51,8 @@ pub fn all_schemas() -> Vec<serde_json::Value> {
 		schema_prefetch(),
 		schema_prefetch_status(),
 		schema_rebuild(),
+		#[cfg(debug_assertions)]
+		schema_debug(),
 	]
 }
 
@@ -66,7 +68,7 @@ fn schema_compress() -> serde_json::Value {
 			marker - park bulky text here instead of carrying it in context, then pull \
 			it back with aphrodite_retrieve when you actually need it. Storage is \
 			in-process and sub-millisecond; markers stay resolvable for the life of the \
-			session but do not survive a dylib hot-reload. \
+			session but do not survive a process restart. \
 			Returns {hash, type, size, preview, marker}.",
 		"parameters": {
 			"type": "object",
@@ -354,9 +356,76 @@ fn schema_rebuild() -> serde_json::Value {
 	})
 }
 
+#[cfg(debug_assertions)]
+fn schema_debug() -> serde_json::Value {
+	json!({
+		"name": "aphrodite_debug",
+		"description": "Toggle per-session debug output on or off (Rust-side only). \
+			When on, every compressed tool result in this session tree (this session \
+			plus its subagents/delegated tasks) gets a `[aphrodite-debug ...]` line \
+			prepended before the CCR marker; other sessions stay quiet. The flag is a \
+			file in the runtime home, scoped to the ROOT session id - subagents \
+			resolve to the same root and inherit the toggle. \
+			Returns {status, debug, session, flag}.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"on": {
+					"type": "boolean",
+					"description": "true = enable debug for this session tree, false = disable. Omitted defaults to true."
+				}
+			},
+			"additionalProperties": false
+		}
+	})
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	/// Catalog contract: the manifest declares 13 production tools; a release
+	/// dylib (debug_assertions off) must register exactly those 13, and a dev
+	/// build (debug_assertions on) adds the dev-only `aphrodite_debug` (14).
+	/// This is what `hermes plugins validate` rule 6 enforces - a release
+	/// dylib registering `aphrodite_debug` fails catalog admission as an
+	/// undeclared tool (teknium review, PR 118488).
+	#[test]
+	fn test_catalog_tool_count_matches_manifest() {
+		let names:Vec<String> = all_schemas()
+			.into_iter()
+			.map(|s| s["name"].as_str().expect("name must be a string").to_string())
+			.collect();
+		let has_debug = names.iter().any(|n| n == "aphrodite_debug");
+		let production = [
+			"aphrodite_compress",
+			"aphrodite_retrieve",
+			"aphrodite_stats",
+			"aphrodite_files",
+			"aphrodite_diff",
+			"aphrodite_search",
+			"aphrodite_directive",
+			"aphrodite_test",
+			"aphrodite_catalog",
+			"aphrodite_reclassify",
+			"aphrodite_prefetch",
+			"aphrodite_prefetch_status",
+			"aphrodite_rebuild",
+		];
+		for name in production {
+			assert!(names.iter().any(|n| n == name), "missing production tool {name}");
+		}
+		#[cfg(debug_assertions)]
+		{
+			assert_eq!(names.len(), 14, "dev build must register 14 tools (13 + aphrodite_debug)");
+			assert!(has_debug, "dev build must register aphrodite_debug");
+		}
+		#[cfg(not(debug_assertions))]
+		{
+			assert_eq!(names.len(), 13, "release build must register exactly the 13 declared tools");
+			assert!(!has_debug, "release build must NOT register dev-only aphrodite_debug");
+		}
+	}
 
 	/// Every schema must satisfy the contract the three sanitizers and the
 	/// `tool_describe` passthrough assume. A single malformed entry can 400 an

@@ -14,9 +14,9 @@ What it does (design 2 - the FFI restype bug class made structurally
 impossible):
 
 1. NEUTRALIZE the import-time library load. ctypesgen emits
-   ``_libs["X"] = load_library("X")`` at module import; the plugin's
-   hot-reload machinery loads the dylib from a fresh unique-path copy per
-   generation, so the library path can never be baked into the artifact.
+   ``_libs["X"] = load_library("X")`` at module import; the plugin owns the
+   runtime CDLL handle, so the library path can never be baked into the
+   artifact.
    The declaration loops are moved inside ``bind_to(dylib)``, which replays
    the generated restype/argtypes onto whichever ``ctypes.CDLL`` handle the
    plugin produced. Importing ``_bindings.py`` NEVER touches a library. The
@@ -194,7 +194,7 @@ BINDER_HEADER = """
 
 # ── Runtime binder (post-processed by codegen/finalize_bindings.py) ──────────
 # Importing this module NEVER loads a library (no hardcoded dylib path): the
-# plugin owns the live CDLL handle (hot-reload unique-path copy) and calls
+# plugin owns the live CDLL handle and calls
 # bind_to(dylib) to replay the declarations below onto it. The loops call
 # hasattr/getattr directly - no lookup adapter class is needed. errcheck is
 # stripped unconditionally: pointer restypes are rewritten to c_void_p FIRST

@@ -1,6 +1,6 @@
 [package]
 name = "aphrodite"
-version = "1.5.1"
+version = "1.6.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -89,7 +89,7 @@ dirs = { version = "7.0.0" }
 toml = "1.1.6+spec-1.1.0"
 notify = { version = "8.2.0", optional = true }
 regex = "1.13.1"
-blake3 = "1.8"
+blake3 = "1.8.7"
 lru = "0.18.4"
 
 [features]
@@ -111,4 +111,4 @@ proxy = [
 ]
 
 [dev-dependencies]
-proptest = "1"
+proptest = "1.11.0"

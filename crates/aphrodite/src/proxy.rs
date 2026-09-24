@@ -1018,6 +1018,22 @@ fn is_sse(content_type:Option<&axum::http::HeaderValue>) -> bool {
 		.unwrap_or(false)
 }
 
+/// Truncate a string to at most `max` bytes without splitting a UTF-8
+/// char. `&s[..max]` panics (`is_char_boundary`) when `max` lands inside a
+/// multibyte char - e.g. non-ASCII header values in the dev-mode request
+/// log. Walk back to the last char boundary instead (max 3 bytes for
+/// UTF-8).
+fn truncate_char_safe(s:&str, max:usize) -> &str {
+	if s.len() <= max {
+		return s;
+	}
+	let mut end = max;
+	while end > 0 && !s.is_char_boundary(end) {
+		end -= 1;
+	}
+	&s[..end]
+}
+
 /// Catch-all proxy handler - forwards any request to DeepSeek.
 /// Specifically handles Chat Completions API at /v1/chat/completions.
 pub async fn proxy_handler(
@@ -1039,7 +1055,7 @@ pub async fn proxy_handler(
 		for (k, v) in headers.iter() {
 			let val = v.to_str().unwrap_or("?");
 			if k.as_str().to_lowercase() != "authorization" {
-				hdr_log.push_str(&format!("  {}: {}", k.as_str(), if val.len() > 80 { &val[..80] } else { val }));
+				hdr_log.push_str(&format!("  {}: {}", k.as_str(), truncate_char_safe(val, 80)));
 			} else {
 				hdr_log.push_str("  authorization: [REDACTED]");
 			}
@@ -3794,5 +3810,33 @@ code_multiplier = 6.5
 			response.headers().get("X-Aphrodite-Streamed").is_none(),
 			"a plain JSON upstream response must not be marked as streamed"
 		);
+	}
+
+	// ── Issue #38 class: `&s[..80]` on a header value panics when byte 80
+	// splits a UTF-8 char (multibyte header values in the dev-mode request
+	// log) - the char-boundary panic class the reporter saw in the binary's
+	// string table. ──
+	#[test]
+	fn test_truncate_char_safe_never_splits_multibyte() {
+		// All-2-byte chars: 100 bytes, byte 80 lands exactly on a boundary
+		// (char 40) - must truncate to exactly 80 bytes.
+		let multibyte = "é".repeat(50);
+		let t = truncate_char_safe(&multibyte, 80);
+		assert_eq!(t.len(), 80);
+		assert!(multibyte.starts_with(t), "truncation must be a prefix");
+		assert!(t.is_char_boundary(t.len()));
+
+		// Mixed 1+2-byte chars so byte 80 lands INSIDE a char: property
+		// holds regardless of where the walk lands.
+		let mixed = "aé".repeat(40); // 120 bytes, 3-byte units
+		let t2 = truncate_char_safe(&mixed, 80);
+		assert!(t2.len() <= 80, "must never exceed the budget: {}", t2.len());
+		assert!(t2.len() >= 77, "must not over-truncate (max 3-byte walk): {}", t2.len());
+		assert!(mixed.starts_with(t2), "truncation must be a prefix");
+		assert!(t2.is_char_boundary(t2.len()));
+
+		// Short input and pure-ASCII input pass through unchanged.
+		assert_eq!(truncate_char_safe("abc", 80), "abc");
+		assert_eq!(truncate_char_safe(&"x".repeat(100), 80).len(), 80);
 	}
 }

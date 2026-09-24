@@ -26,7 +26,7 @@ fi
 
 # Guard 1: this hook belongs to the MAIN parent only. Inside a submodule
 # (vendor/*, plugins/*) a superproject exists - skip.
-if [[ -n "$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)" ]]; then
+if [[ -n "$(git rev-parse --show-superproject-working-tree 2> /dev/null || true)" ]]; then
 	exit 0
 fi
 
@@ -47,16 +47,16 @@ done
 SUBMODULES=()
 while IFS=' ' read -r key path; do
 	[[ -n "$path" ]] || continue
-	mode="$(git ls-files -s -- "$path" 2>/dev/null | awk '{print $1}')"
+	mode="$(git ls-files -s -- "$path" 2> /dev/null | awk '{print $1}')"
 	[[ "$mode" == "160000" ]] || continue
 	SUBMODULES+=("$path")
-done < <(git config -f "$ROOT/.gitmodules" --get-regexp '\.path$' 2>/dev/null)
+done < <(git config -f "$ROOT/.gitmodules" --get-regexp '\.path$' 2> /dev/null)
 
 # Guard 5: only changed pointers. `git diff HEAD` honors `ignore = dirty`,
 # so a dirty submodule worktree is never mistaken for a pointer update.
 DIRTY=()
 for SUB in "${SUBMODULES[@]:-}"; do
-	if ! git diff --quiet HEAD -- "$SUB" 2>/dev/null; then
+	if ! git diff --quiet HEAD -- "$SUB" 2> /dev/null; then
 		DIRTY+=("$SUB")
 	fi
 done
@@ -71,7 +71,7 @@ git add -- "${DIRTY[@]}"
 
 DETAILS=""
 for SUB in "${DIRTY[@]}"; do
-	NEW="$(git ls-files -s -- "$SUB" 2>/dev/null | awk '{print $2}')"
+	NEW="$(git ls-files -s -- "$SUB" 2> /dev/null | awk '{print $2}')"
 	DETAILS="$DETAILS $SUB@${NEW:0:7}"
 done
 
@@ -79,4 +79,4 @@ done
 # other staged changes into the mechanical bump. `|| true`: a transient
 # failure (e.g. the external auto-committer holding the index) converges on
 # the next parent git action.
-git commit -o -m "chore: bump submodule gitlinks:$DETAILS" --no-verify -s -- "${DIRTY[@]}" >/dev/null 2>&1 || true
+git commit -o -m "chore: bump submodule gitlinks:$DETAILS" --no-verify -s -- "${DIRTY[@]}" > /dev/null 2>&1 || true
