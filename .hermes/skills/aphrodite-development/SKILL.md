@@ -405,6 +405,15 @@ gates).
 - Context-engine activation/registration is owned by
   `aphrodite-context-engine-contract` - verify selection there, not from a
   remembered env var.
+- **The dylib path has NO tracing subscriber** - `tracing::warn!`/`info!`
+  are silent no-ops inside the Hermes host (a Python process never installs
+  a Rust subscriber), and the engine binary loads config before `main()`
+  installs one. Any diagnostic that must be seen (config parse failures,
+  degraded states) needs a stderr fallback
+  (`tracing::dispatcher::has_been_set()` -> `eprintln!`) or a state field
+  surfaced in `aphrodite_stats` (e.g. `config_error` for found-but-broken
+  aphrodite.toml). Verify with `cargo run --example` in a subscriber-less
+  process, not with unit tests (the harness installs a subscriber).
 
 ## Lifecycle phases
 
