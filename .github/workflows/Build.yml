@@ -12,7 +12,6 @@ permissions:
 on:
   push:
     tags: ["Aphrodite/v*"]
-  workflow_dispatch:
 
 env:
   ADBLOCK: true
