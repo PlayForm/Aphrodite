@@ -69,11 +69,12 @@ docs/notes/history.
 ## Dependabot red-PR merge
 
 **Dependabot auto-merge can merge fully-red PRs when checks aren't required
+
 - and a version-only bump can be invalid across a major version** (ureq 2.x
-`tls` feature does not exist in 3.x, which exposes only `_rustls`/`_test`).
-A red `cargo test` on the PR branch proves the manifest is broken; revert
-the requirement bump (keep the old major) and gate the auto-merge on
-required checks before re-approving bumps.
+  `tls` feature does not exist in 3.x, which exposes only `_rustls`/`_test`).
+  A red `cargo test` on the PR branch proves the manifest is broken; revert
+  the requirement bump (keep the old major) and gate the auto-merge on
+  required checks before re-approving bumps.
 
 ## Tag shape and tag-push detail
 

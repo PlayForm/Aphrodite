@@ -163,7 +163,7 @@ git ls-tree HEAD plugins/aphrodite     # intended commit
 **Stop if**
 
 - The release assets do not exist yet (verify with `gh release view --json
-  assets`, not optimism).
+assets`, not optimism).
 - The plugin's `_check_version_published` warns that the pinned version has
   no assets - treat that warning as a hard stop for tagging.
 

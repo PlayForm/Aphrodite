@@ -47,8 +47,8 @@ A still-running OLD gateway (plugin loaded in memory, pre-restart) RE-CREATES th
 
 ## Claim-to-test
 
-| Claim | Test | Pass condition |
-| --- | --- | --- |
-| Removal leaves no config registration | `grep -rni aphrodite ~/.hermes` | Hits only in `~/.hermes/pastes/` |
-| Removal is reversible | `test -f ~/.hermes/tmp/config.yaml.bak` | Backup present, `.env` copy at 600 |
-| Derived keys accept --force | `hermes config set known_plugin_toolsets.cli '["a2a"]' --force` | Key updates; YAML parses |
+| Claim                                 | Test                                                            | Pass condition                     |
+| ------------------------------------- | --------------------------------------------------------------- | ---------------------------------- |
+| Removal leaves no config registration | `grep -rni aphrodite ~/.hermes`                                 | Hits only in `~/.hermes/pastes/`   |
+| Removal is reversible                 | `test -f ~/.hermes/tmp/config.yaml.bak`                         | Backup present, `.env` copy at 600 |
+| Derived keys accept --force           | `hermes config set known_plugin_toolsets.cli '["a2a"]' --force` | Key updates; YAML parses           |

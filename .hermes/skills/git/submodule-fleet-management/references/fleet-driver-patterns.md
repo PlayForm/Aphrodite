@@ -56,12 +56,11 @@ br=$(git config -f .gitmodules --get submodule.$sm.branch) # CONFIGURED branch
 #   read from .gitmodules, never from the checkout - the checkout may be detached
 #   (no branch) or on a different track (plugins/aphrodite: Development in the main
 #   repo, Current in the release repo)
-git -C "$sm" fetch -q <remote> --prune
-behind=$(git -C "$sm" rev-list --count "$rec..$(git -C "$sm" rev-parse <remote>/$br)")
+git -C "$sm" fetch -q < remote > --prune
+behind=$(git -C "$sm" rev-list --count "$rec..$(git -C "$sm" rev-parse < remote > /$br)")
 #   behind=0 for every submodule => all gitlinks are current, nothing to commit
 ```
 
 - **Never hardcode the submodule's remote name - read it per checkout (`git -C "$sm" remote -v`)** - the SAME repo can be `Source` in one parent and `origin` in another.
 - **Detached checkout with a current gitlink is a no-op for the parent:** recorded gitlink == remote tip → re-attach with `git -C "$sm" checkout -B <branch> <remote>/<branch>` at the same commit; NO bump is staged. Reserve the bump for a genuinely older recorded gitlink.
 - Verify: `git branch --show-current` per submodule + `git submodule status` (no `+`) + parent `git status` (no `M <submodule>`).
-

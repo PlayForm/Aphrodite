@@ -11,7 +11,7 @@ When `skills.write_approval` was on, `skill_manage` batches land as JSON files a
 
 ## Claim-to-test
 
-| Claim | Test | Pass condition |
-| --- | --- | --- |
+| Claim                      | Test                                     | Pass condition                                |
+| -------------------------- | ---------------------------------------- | --------------------------------------------- |
 | Approval applies the queue | Read the target SKILL.md after approving | The patch's new_string is present in the file |
-| Queue cleared | `ls ~/.hermes/pending/skills/` | No .json files remain |
+| Queue cleared              | `ls ~/.hermes/pending/skills/`           | No .json files remain                         |

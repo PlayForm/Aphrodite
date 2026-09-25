@@ -32,6 +32,7 @@ excluded from EVERY formatter (`rustfmt.toml` `ignore` + `ruff.toml`
 `extend-exclude`), or any formatter pass drifts it and the assertion fails.
 
 To reformat the pair: format the SOURCE first, then copy it over the mirror
+
 - never format the mirror alone, and never run `cargo fmt --all` blindly
-over a tree containing such a pair. After any formatter pass, re-verify
-byte-equality and re-run the asserting test.
+  over a tree containing such a pair. After any formatter pass, re-verify
+  byte-equality and re-run the asserting test.

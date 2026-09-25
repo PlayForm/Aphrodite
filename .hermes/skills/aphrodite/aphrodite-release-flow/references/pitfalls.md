@@ -13,16 +13,16 @@ NO `.gitmodules`, so any 160000 entry is self-referential.
 Symptoms:
 
 - `git submodule status` INSIDE the submodule fails with `fatal: no
-  submodule mapping found in .gitmodules for path '<submodule-name>'`.
+submodule mapping found in .gitmodules for path '<submodule-name>'`.
 - The remote shows a nested `plugins/aphrodite` folder that should not
   exist.
 - `git clone --recurse-submodules` dies with `fatal: No url found for
-  submodule path 'X/X' in .gitmodules`.
+submodule path 'X/X' in .gitmodules`.
 
 Detect inside the submodule:
 
 ```sh
-git -C <submodule> ls-files -s | grep 160000   # a hit = phantom
+git -C -s < submodule > ls-files | grep 160000 # a hit = phantom
 ```
 
 Repair:

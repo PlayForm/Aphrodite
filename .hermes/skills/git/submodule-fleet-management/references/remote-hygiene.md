@@ -50,7 +50,8 @@ macOS bash 3.2 has NO `mapfile`/`readarray`, and counters inside
 loops:
 
 ```sh
-find ... > list; while IFS= read -r g; do ...; done < list
+find ... > list
+while IFS= read -r g; do ...; done < list
 ```
 
 ## Functional test (non-fork)

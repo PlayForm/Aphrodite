@@ -7,12 +7,12 @@ instances. Each section names the event, the script path under
 
 ## Configuration Field Table
 
-| Field     | Required | Description                                                |
-| --------- | -------- | ---------------------------------------------------------- |
+| Field     | Required | Description                                                   |
+| --------- | -------- | ------------------------------------------------------------- |
 | `event`   | Yes      | Must be a valid hook event (see Available events in SKILL.md) |
-| `matcher` | No       | Regex matching `tool_name` - only fires for matching tools |
-| `command` | Yes      | Shell command to execute (supports `~` expansion)          |
-| `timeout` | No       | Seconds (default 60, max 300)                              |
+| `matcher` | No       | Regex matching `tool_name` - only fires for matching tools    |
+| `command` | Yes      | Shell command to execute (supports `~` expansion)             |
+| `timeout` | No       | Seconds (default 60, max 300)                                 |
 
 ## JSON Protocol: Full stdin/stdout Examples
 
@@ -62,10 +62,10 @@ instances. Each section names the event, the script path under
 
 ```json
 {
-  "prompt": "fix the build system issues",
-  "session_id": "...",
-  "task_id": "...",
-  // other fields may be present
+	"prompt": "fix the build system issues",
+	"session_id": "...",
+	"task_id": "..."
+	// other fields may be present
 }
 ```
 

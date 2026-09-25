@@ -14,7 +14,7 @@ subcommand, and the linked reference documents the rest.
 
 ## Local claim-to-test matrix
 
-| Claim                                  | Evidence source | Test                     | Pass condition                  | Failure response               |
-| -------------------------------------- | --------------- | ------------------------ | ------------------------------- | ------------------------------ |
-| Each surface subcommand exists         | `hermes --help` | Run `hermes --help`      | `desktop`/`gui`/`dashboard`/`--tui`/`proxy` listed | Report the missing subcommand |
-| CCR proxy is not the OpenAI proxy      | `hermes proxy`  | Compare `crates/aphrodite` behavior | `hermes proxy` serves an API; CCR proxy compresses context | Fix the conflation            |
+| Claim                             | Evidence source | Test                                | Pass condition                                             | Failure response              |
+| --------------------------------- | --------------- | ----------------------------------- | ---------------------------------------------------------- | ----------------------------- |
+| Each surface subcommand exists    | `hermes --help` | Run `hermes --help`                 | `desktop`/`gui`/`dashboard`/`--tui`/`proxy` listed         | Report the missing subcommand |
+| CCR proxy is not the OpenAI proxy | `hermes proxy`  | Compare `crates/aphrodite` behavior | `hermes proxy` serves an API; CCR proxy compresses context | Fix the conflation            |

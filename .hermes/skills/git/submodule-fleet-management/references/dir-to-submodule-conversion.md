@@ -16,16 +16,16 @@ repo, superproject tracks gitlinks), do it in this order and gate every push on 
    come out DETACHED at the recorded gitlink - `git submodule status` shows `(sha)`
    instead of `(heads/Current)`; re-attach with `git -C <sub> checkout <branch>`.
 4. Integrity gate before any push: for EVERY sub, recorded gitlink (`git ls-tree HEAD
-   <sub>` / `git ls-files -s -- <sub>`) == `git -C <sub> rev-parse HEAD`; per-crate
+<sub>` / `git ls-files -s -- <sub>`) == `git -C <sub> rev-parse HEAD`; per-crate
    tracked-file counts match the pre-conversion listing; the key source file non-empty
    with the expected header (`#![allow(non_snake_case)]`); the crate manifest contains the
    crate name; root history still holds the pre-conversion files.
 5. A submodule branch that advances AFTER registration (e.g. a cleanup push) shows `+` in
    `git submodule status` - that is a gitlink bump in the superproject (`git add -f <sub>`
-   + commit per the repo's commit cadence), never a revert of the sub.
+    - commit per the repo's commit cadence), never a revert of the sub.
 6. The wipe-and-restore path (`mv <live> <Backup>`, fresh `git clone
-   --recurse-submodules`) is valid ONLY after the root's gitlinks AND every submodule
+--recurse-submodules`) is valid ONLY after the root's gitlinks AND every submodule
    branch are pushed: verify `git ls-remote <root-url>` and per-sub `git ls-remote
-   <sub-url> <branch>` reach the intended heads BEFORE recommending the wipe, then run the
+<sub-url> <branch>` reach the intended heads BEFORE recommending the wipe, then run the
    fresh clone's `git submodule status` (zero `+`/`-`, every entry `(heads/<branch>)`) as
    the restore gate.

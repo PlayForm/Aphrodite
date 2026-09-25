@@ -18,8 +18,8 @@ hermes hooks list                                                               
 
 ## Claim-to-test
 
-| Claim | Test | Pass condition |
-| --- | --- | --- |
-| `hermes config unset` removes the hook | Run `hermes config unset hooks.pre_tool_call`, then `hermes config get hooks.pre_tool_call` | Key absent; YAML parses |
-| `hermes hooks revoke` does not remove the hook | Run `hermes hooks revoke <command>`, then `hermes config get hooks.<key>` | Hook still present in `config.yaml` |
-| Survivors list is accurate | `hermes hooks list` after unset/set | Only remaining hooks appear |
+| Claim                                          | Test                                                                                        | Pass condition                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `hermes config unset` removes the hook         | Run `hermes config unset hooks.pre_tool_call`, then `hermes config get hooks.pre_tool_call` | Key absent; YAML parses             |
+| `hermes hooks revoke` does not remove the hook | Run `hermes hooks revoke <command>`, then `hermes config get hooks.<key>`                   | Hook still present in `config.yaml` |
+| Survivors list is accurate                     | `hermes hooks list` after unset/set                                                         | Only remaining hooks appear         |

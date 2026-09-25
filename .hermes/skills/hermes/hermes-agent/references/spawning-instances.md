@@ -97,8 +97,8 @@ terminal(command="tmux new-session -d -s resumed 'hermes --resume 20260225_14305
 
 ## Local claim-to-test matrix
 
-| Claim                                  | Evidence source             | Test                                                      | Pass condition                       | Failure response                        |
-| -------------------------------------- | --------------------------- | -------------------------------------------------------- | ------------------------------------ | --------------------------------------- |
-| tmux provides a real terminal          | `tmux capture-pane -t <s> -p` | `tmux new-session -d -s agent1 -x 120 -y 40 'hermes'`   | Prompt appears in the captured pane  | Send `/exit`, then `tmux kill-session`  |
-| `hermes chat -q` needs no PTY          | One-shot command output     | `terminal(command="hermes chat -q '...'", timeout=300)`  | Command exits within the timeout     | Raise timeout; fall back to tmux        |
-| `--resume <id>` restores a conversation | Session transcript          | `tmux new-session -d -s resumed 'hermes --resume <id>'`  | Conversation history is present      | Check `~/.hermes/sessions/` for the id  |
+| Claim                                   | Evidence source               | Test                                                    | Pass condition                      | Failure response                       |
+| --------------------------------------- | ----------------------------- | ------------------------------------------------------- | ----------------------------------- | -------------------------------------- |
+| tmux provides a real terminal           | `tmux capture-pane -t <s> -p` | `tmux new-session -d -s agent1 -x 120 -y 40 'hermes'`   | Prompt appears in the captured pane | Send `/exit`, then `tmux kill-session` |
+| `hermes chat -q` needs no PTY           | One-shot command output       | `terminal(command="hermes chat -q '...'", timeout=300)` | Command exits within the timeout    | Raise timeout; fall back to tmux       |
+| `--resume <id>` restores a conversation | Session transcript            | `tmux new-session -d -s resumed 'hermes --resume <id>'` | Conversation history is present     | Check `~/.hermes/sessions/` for the id |

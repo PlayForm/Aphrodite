@@ -28,10 +28,10 @@ Roles:
   against `.gitmodules` `submodule.*.path` entries, read
   `submodule.<name>.branch`, fall back to `Current` when unset. Probe the
   configured branch with `git config -f .gitmodules --get
-  submodule.<name>.branch`.
+submodule.<name>.branch`.
 - `lib/bump-submodule-gitlink.sh` (shared): detect the superproject, compute
   the relative submodule path with python3 `os.path.relpath` (GNU `realpath
-  --relative-to` does not exist on macOS), skip while the parent holds
+--relative-to` does not exist on macOS), skip while the parent holds
   `MERGE_HEAD`/`CHERRY_PICK_HEAD`, and commit `chore: bump <sub> to <short>`
   ONLY when `git -C <super> ls-files -s -- <sub>` differs from the submodule
   HEAD.
@@ -46,7 +46,7 @@ Battery (verify end-to-end, not one smoke test):
 
 1. Input: submodule commit. Output: parent auto-bump, no `+`.
 2. Input: rewind the parent's recorded pointer (`git update-index --cacheinfo
-   160000,<old>,<sub>` + commit) then `git submodule update`. Output: heals
+160000,<old>,<sub>` + commit) then `git submodule update`. Output: heals
    to `Current` + re-bumps.
 3. Input: parent-side commit. Output: submodule untouched.
 4. Repeat cycles: each bump is a fresh commit, no accumulation.
@@ -66,10 +66,10 @@ without any visible error.
   `.githooks/lib/* text eol=lf` so checkout keeps LF even under
   `core.autocrlf=true`.
 - `git add --renormalize .githooks/` fixes the INDEX but not the working tree
-  - git considers the CRLF copy "clean" under autocrlf normalization and
-  never rewrites it. Force the rewrite:
-  `rm .githooks/* .githooks/lib/* && git checkout -- .githooks/` (the delete
-  makes git re-materialize from the index with the new attributes).
+    - git considers the CRLF copy "clean" under autocrlf normalization and
+      never rewrites it. Force the rewrite:
+      `rm .githooks/* .githooks/lib/* && git checkout -- .githooks/` (the delete
+      makes git re-materialize from the index with the new attributes).
 - The `.gitattributes` rule is a TRACKED FILE: commit it on EVERY branch that
   uses the hooks. A branch that predates the rule re-CRLFs its hooks on the
   next checkout (`env: bash\r` in git stderr), and the fix on one branch
@@ -188,8 +188,9 @@ tracked in the submodule; every shared hook script gates on
 `git rev-parse --show-superproject-working-tree` being non-empty (exit 0
 otherwise). A user who downloads just the plugin repo (e.g. a machine-local
 checkout of `plugins/aphrodite`) gets no hooks, no auto-bump, and no errors
+
 - the machinery is a superproject wiring concern, never a dependency of a
-standalone clone.
+  standalone clone.
 
 Verify wiring per-clone with `git -C <sub> config --get core.hooksPath` and
 `git rev-parse --git-path hooks`; never assume a clone inherits the parent's
@@ -266,7 +267,7 @@ cover every submodule HEAD move.
 Verify the parent-side-only variant with a battery, not one smoke test:
 
 - A) submodule advances → parent commit bumps the pointer; `git submodule
-  status` shows no `+`.
+status` shows no `+`.
 - B) pointer unchanged → hook no-ops (no commit).
 - C) a plain file named like the submodule is never touched (stays
   `100644`).
@@ -293,8 +294,8 @@ moment the next `submodule update` / superproject checkout moves HEAD back to th
 SHA. Before ANY reset, check for a rescue:
 
 ```sh
-git -C <sub> symbolic-ref -q HEAD       # fails => detached
-git -C <sub> branch --contains HEAD     # empty => the commit is unreferenced
+git -C -q HEAD < sub > symbolic-ref   # fails => detached
+git -C --contains HEAD < sub > branch # empty => the commit is unreferenced
 ```
 
 Both true means a swept commit is at risk. Rescue by fast-forwarding the branch to it
