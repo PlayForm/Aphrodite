@@ -92,3 +92,14 @@ never deleted outright.
   `mv .plans .bench bench <scratch>/moved-from-current/`.
 - Then re-verify with `git status --porcelain` that nothing untracked
   remains and the tree is clean (or holds only the intended scrub commit).
+
+## Rebase prohibition and force-push authorization (worked detail)
+
+NEVER run `git rebase` - any form, any repo, ever. History cleanup is
+`git reset`/merge/commit-forward only; if removing a run of commits requires rebase,
+accept the stale commits or reset to a kept ancestor and re-commit the pointer forward.
+
+`git push --force` is authorized WHEN NEEDED, but verify first that the remote holds
+nothing real: `git fetch Source` then `git log Source/Current..Current` must show the
+remote-only commits are pure descendants of local (junk sweeps, test artifacts) before
+force-pushing. Never force over unverified remote work.

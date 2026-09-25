@@ -284,3 +284,29 @@ makes `git commit -o -- "$path"` stage EVERYTHING. Use `IFS=' '` explicitly.
 The force-configured-branch post-checkout deliberately overrides ad-hoc
 detaches in the working copy (user preference: always on the tracking
 branch); inspecting old commits needs `git show`/worktrees.
+
+## Rescuing a dangling auto-commit before any reset (worked detail)
+
+Auto-committers / background watchers commit on the detached HEAD (submodule checkouts
+are detached by design), producing a commit referenced by NO branch - it dangles the
+moment the next `submodule update` / superproject checkout moves HEAD back to the gitlink
+SHA. Before ANY reset, check for a rescue:
+
+```sh
+git -C <sub> symbolic-ref -q HEAD       # fails => detached
+git -C <sub> branch --contains HEAD     # empty => the commit is unreferenced
+```
+
+Both true means a swept commit is at risk. Rescue by fast-forwarding the branch to it
+(pure fast-forward when it descends from the branch tip - check `git merge-base
+--is-ancestor <old> <new>` first), then check out the branch:
+
+```sh
+git -C <sub> branch -f Current <sha> && git -C <sub> checkout Current
+```
+
+Afterward `git branch --contains <sha>` must list the branch. The reflog (~90 days) and a
+superproject gitlink committed at the new SHA are secondary safety nets, not guarantees.
+Enforce the invariant at the source with a pre-commit branch guard
+(`git symbolic-ref -q HEAD || exit 1`) wired into the submodule's OWN hooksPath - the
+superproject's hooks do not run for submodule commits.
