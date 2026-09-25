@@ -31,7 +31,15 @@ pub(crate) use dylib::copy_dylibs;
 #[cfg(test)]
 pub(crate) use dylib::verify_download_checksum;
 pub(crate) use verify::{self_hash, verify_hermes};
-pub(crate) use write::{CONFIG_TEMPLATE, binary_name, register_plugin, secure_perms, write_init_py, write_plugin_yaml};
+pub(crate) use write::{
+	CONFIG_TEMPLATE,
+	binary_name,
+	register_plugin,
+	secure_perms,
+	write_binary_version,
+	write_init_py,
+	write_plugin_yaml,
+};
 #[cfg(test)]
 pub(crate) use write::HERMES_PLUGIN_SHIM;
 #[cfg(target_os = "macos")]

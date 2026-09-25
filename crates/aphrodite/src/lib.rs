@@ -23,6 +23,7 @@ pub mod catalog;
 pub mod chain_split;
 pub mod config_loader;
 pub mod directives;
+pub mod home;
 pub mod flow;
 pub mod hooks;
 pub mod marker;

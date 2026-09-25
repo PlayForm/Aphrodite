@@ -33,7 +33,11 @@ use serde_json::json;
 ///      override (core crate candidate 0); materialize straight into it.
 ///   3. `$APHRODITE_HOME` - home-level override; directives go to
 ///      `<APHRODITE_HOME>/directives/`.
-///   4. `$HOME/.hermes/aphrodite` - the established user-data home.
+///   4. The shared runtime-home resolution (`aphrodite::home::runtime_home`:
+///      `$HERMES_HOME`/aphrodite, then `$HOME/.hermes/aphrodite`, then the
+///      platform user home) - one decision with the engine binary and the
+///      plugin shim, so directives can never land in a second, shadow home
+///      when `HERMES_HOME != $HOME/.hermes` (issue 40).
 ///   5. `.` - degraded fallback with a warning (never fail).
 ///
 /// Returns `(directives_dir, warnings)`.
@@ -53,17 +57,17 @@ pub(crate) fn resolve_directives_dir(home_param:&str) -> (PathBuf, Vec<String>) 
 	{
 		return (PathBuf::from(home).join("directives"), warnings);
 	}
-	if let Ok(home) = std::env::var("HOME")
-		&& !home.trim().is_empty()
-	{
-		return (
-			PathBuf::from(home.trim_end_matches('/')).join(".hermes/aphrodite/directives"),
-			warnings,
-		);
+	match aphrodite::home::runtime_home_opt() {
+		Some(home) => (home.join("directives"), warnings),
+		None => {
+			warnings.push(
+				"neither $HOME nor $HERMES_HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using \
+				 current directory"
+					.into(),
+			);
+			(PathBuf::from(".").join("directives"), warnings)
+		},
 	}
-	warnings
-		.push("neither $HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using current directory".into());
-	(PathBuf::from(".").join("directives"), warnings)
 }
 
 /// The set to provision: the core crate's embedded builtins.
@@ -285,12 +289,16 @@ mod tests {
 		let _g = env_guard();
 		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
 		unsafe { std::env::remove_var("APHRODITE_HOME") };
+		unsafe { std::env::remove_var("HERMES_HOME") };
 		unsafe { std::env::remove_var("HOME") };
 
-		// No override at all -> degraded fallback with a warning, never fails.
+		// No override at all -> the shared runtime-home resolution (the
+		// platform user home) - no warnings, never fails (issue 40: the
+		// resolution must keep working when $HOME alone is absent, because
+		// the canonical home comes from $HERMES_HOME or the platform home).
 		let (dir, warnings) = resolve_directives_dir("");
 		assert!(dir.to_string_lossy().ends_with("directives"));
-		assert!(!warnings.is_empty(), "degraded fallback must warn");
+		assert!(warnings.is_empty(), "the shared resolution must not warn: {warnings:?}");
 
 		// $APHRODITE_HOME -> <home>/directives.
 		unsafe { std::env::set_var("APHRODITE_HOME", "/tmp/aph-home") };
@@ -309,6 +317,32 @@ mod tests {
 
 		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
 		unsafe { std::env::remove_var("APHRODITE_HOME") };
+	}
+
+	#[test]
+	fn resolve_directives_dir_follows_hermes_home() {
+		// Issue 40: with HERMES_HOME set (Docker, profiles) the directives
+		// must resolve under <hermes-home>/aphrodite - the same decision the
+		// plugin shim makes - never under $HOME/.hermes/aphrodite.
+		let _g = env_guard();
+		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
+		unsafe { std::env::remove_var("APHRODITE_HOME") };
+		unsafe { std::env::remove_var("HERMES_HOME") };
+		unsafe { std::env::remove_var("HOME") };
+
+		unsafe { std::env::set_var("HERMES_HOME", "/opt/data") };
+		unsafe { std::env::set_var("HOME", "/opt/data") };
+		let (dir, warnings) = resolve_directives_dir("");
+		assert_eq!(dir, PathBuf::from("/opt/data/aphrodite/directives"));
+		assert!(warnings.is_empty());
+
+		// $HOME alone (no HERMES_HOME) keeps the legacy location.
+		unsafe { std::env::remove_var("HERMES_HOME") };
+		unsafe { std::env::set_var("HOME", "/tmp/plain-home") };
+		let (dir, _) = resolve_directives_dir("");
+		assert_eq!(dir, PathBuf::from("/tmp/plain-home/.hermes/aphrodite/directives"));
+
+		unsafe { std::env::remove_var("HOME") };
 	}
 
 	// ── FFI round-trip: the exported C ABI entry point works end-to-end. ──

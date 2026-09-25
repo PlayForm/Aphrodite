@@ -736,8 +736,13 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		ProxyMode::Token if !cli.no_ccr_marker => {
 			let db_path = cli.ccr_db_path.as_ref().map_or_else(
 				|| {
-					match dirs::home_dir() {
-						Some(home) => home.join(".hermes").join("aphrodite").join("ccr.db"),
+					// Runtime home is a single shared decision
+					// (home::runtime_home: $APHRODITE_HOME -> $HERMES_HOME ->
+					// $HOME -> platform default), so the token proxy's SQLite
+					// database lives in the same home the plugin shim resolves
+					// (issue 40) - never a second, shadow home.
+					match crate::home::runtime_home_opt() {
+						Some(home) => home.join("ccr.db"),
 						None => {
 							// W2-3: degrade, never bail. A missing home dir
 							// (HOME unset or not an absolute path) used to

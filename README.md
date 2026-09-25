@@ -13,9 +13,9 @@
 > type-aware classifier, TOML-driven, opt-in config auto-reload.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/static/v1?label=release&message=v1.6.2&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/static/v1?label=release&message=v1.6.3&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.2.2&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.2.3&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
 [![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE)
 
@@ -57,12 +57,14 @@ The two routes are alternatives: if you install via git clone, you do not need
 ```sh
 cargo install aphrodite        # proxy binary
 cargo install aphrodite-hermes # dylib + helper bin
-aphrodite setup                # config + data dir under ~/.hermes/aphrodite
+aphrodite setup                # runtime home under ~/.hermes/aphrodite + hooks-only loader in ~/.hermes/plugins/aphrodite
 ```
 
 `cargo install` copies only `[[bin]]` targets into `~/.cargo/bin/` and never
-links the plugin into Hermes. To use the Hermes plugin, follow Option A (git
-clone + `ln -s`); `aphrodite setup` prints the exact link command.
+links the plugin into Hermes. `aphrodite setup` writes the hooks-only loader
+(`plugin.yaml` + `__init__.py`) into `~/.hermes/plugins/aphrodite`, registers
+the plugin, and keeps everything else (binaries, config, state) under
+`~/.hermes/aphrodite/` - or follow Option A (git clone + `ln -s`).
 
 ### From source
 

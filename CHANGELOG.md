@@ -1,5 +1,116 @@
 # Changelog
 
+## v1.6.3 - One runtime-home decision for both halves (2026-09-25)
+
+Fixes issue #40: the plugin's Python shim and its Rust half (dylib + proxy
+binary) each resolved the runtime home on their own - the shim from
+`$HERMES_HOME`, the Rust side from `$HOME` - so whenever `HERMES_HOME !=
+$HOME/.hermes` (the shipped Docker image, profile gateways) the shim looked
+for binaries in a directory that never existed, disabled the plugin, and
+orphaned the previous runtime home (config incl. the provider API key,
+`ccr.db`). The runtime home is now ONE decision shared by both halves.
+Binary `1.6.2 → 1.6.3`, plugin `2.2.2 → 2.2.3`.
+
+- **Fix (issue #40, runtime home)**: the shim resolves the runtime home once
+  at import (`$APHRODITE_HOME` override → `<hermes-home>/aphrodite` →
+  `~/.hermes/aphrodite`) and exports it to the Rust half through
+  `APHRODITE_HOME` + `APHRODITE_DIRECTIVES_DIR` (env setdefault), so the
+  dylib and the spawned proxy binary agree by construction; per-Hermes-home
+  isolation (profiles) now extends to the Rust half. The startup log names
+  the decision: `runtime home: <path> (decided by ...)`.
+- **Fix (issue #40, upgrades)**: when the Hermes-home-derived home holds no
+  install but the pre-2.2 `~/.hermes/aphrodite` does, the legacy home is
+  ADOPTED with a one-line warning (never migrated), so upgrades keep finding
+  `binaries/` and `aphrodite.toml`. Adoption never fires for throwaway
+  homes (catalog-validate probe scratch, `~/.hermes/cache/scratch`,
+  `/tmp/hermes-*`), preserving the probe's isolation from the real install.
+- **Fix (issue #40, layout heal)**: `layout_check.py` follows the same
+  single decision (`APHRODITE_HOME` when set), so required dirs are never
+  (re)created under a second, shadow home; a relative `APHRODITE_HOME` now
+  warns.
+- **Fix (issue #40, Rust side)**: new shared `home` module
+  (`crates/aphrodite/src/home.rs`) - `runtime_home()`, `config_path()`,
+  `directives_dir()`, `ccr_db_path()` - consumed by the engine binary
+  (config fallback, ccr.db, config watcher), `aphrodite setup` (bootstraps
+  the Hermes home the plugin will use), and the dylib (directives
+  provisioning, debug flags); `$HERMES_HOME` is honored with the same
+  precedence as the shim. The unused `dirs` dependency is dropped from
+  `aphrodite-hermes`.
+- **Hardening**: the shim import can never raise on a hostile environment
+  (degraded fallback + warning); empty env overrides fall through to the
+  next precedence level; tilde expansion on Rust env paths; the layout
+  heal never crashes on symlink loops.
+- **Tests**: new `tests/test_runtime_home.py` (8 subprocess cases: default,
+  HERMES_HOME, explicit override, legacy adoption, both-installs,
+  temp/scratch homes, hostile env); `tests/test_layout_check.py` +1
+  APHRODITE_HOME-relocation case; Rust `home::tests` 7 cases (precedence
+  matrix, tilde, empty values, degraded); directives precedence tests
+  updated for the HERMES_HOME step.
+- **Docs**: plugin README gains the "Runtime home (one decision, shared by
+  both halves)" section incl. the ≤ 2.1.5 upgrade note;
+  `docs/config/env-vars.md` `APHRODITE_HOME` / `HERMES_HOME` rows corrected
+  (they previously documented the two-half divergence as behavior).
+  Fixes #40.
+
+## v1.6.2 - Release-infra SHA256SUMS regeneration + version track (2026-09-24)
+
+A version-track release pairing plugin v2.2.2 with binary 1.6.2. Its one
+functional fix: the release workflows on Current regain the in-tree
+`plugins/aphrodite/SHA256SUMS.txt` regeneration (Build.yml Finalize,
+committed inside the plugin submodule) and the child-gitlink advance
+(Publish.yml) that were lost during the 1.6.0 identity-restore. No Rust
+code in the 1.6.1 → 1.6.2 range.
+
+## v1.6.1 - Plugin manifest cleanup + version track (2026-09-24)
+
+A patch release pairing the plugin's catalog-cleanup with the binary
+version track: `provides_tools` now declares exactly the 13 production
+tools the release dylib registers - the dev-only `aphrodite_debug` tool
+(`debug_assertions`-gated out of release builds) is removed, closing the
+catalog-review rule-6 mismatch on the pinned tree. Plugin v2.2.1,
+`BINARY_VERSION` 1.6.1; the pinned nightly-2026-05-01 rustfmt
+canonicalization is carried from 1.6.0.
+
+## v1.6.0 - Config diagnostics + opt-in config auto-reload (2026-09-24)
+
+Makes config failure visible and config changes live (issue #38): a
+found-but-broken `aphrodite.toml` used to fall back to defaults with zero
+indication - `tracing::warn!` is a silent no-op in the Hermes dylib path
+and the engine binary loaded config before initializing its own subscriber.
+Parse-failure warnings now fall back to stderr on every surface,
+`aphrodite_stats` reports `config_error` ("defaults in effect (parse
+failed)" vs "config not set"), and `[compression] auto_reload = true`
+(opt-in, env `APHRODITE_AUTO_RELOAD`) re-applies config fields live on
+save. Also fixes the real `is_char_boundary` panic behind #38 (a byte-slice
+of a UTF-8 header value in the proxy's dev-mode request log), makes
+`aphrodite_reload` surface broken TOML instead of discarding it silently,
+and isolates the benchmark cells behind a per-variant `HERMES_HOME` matrix.
+Binary `1.5.1 → 1.6.0`, plugin `2.1.5 → 2.2.0`. Fixes #38.
+
+## v1.5.1 - Headroom fork publication 0.1.3 (2026-09-21)
+
+The headroom publication release: the fork's accumulated changes - upstream
+sync `43dc9836`, the nightly-toolchain migration, and the packaging/deps
+fixes - finally reach crates.io as `aphrodite-headroom-core` 0.1.3,
+replacing the stale July 0.1.2 that external consumers of 1.5.0 still
+resolved against. The parent pin in `crates/aphrodite` moves 0.1.2 → 0.1.3
+and the fork gets tag `aphrodite-v0.10.0`. Plugin `2.1.4 → 2.1.5`.
+
+## v1.5.0 - Edition-2024 + atomization + debug tool (2026-09-20)
+
+The edition-2024 + atomization release: the workspace toolchain moves to
+the latest nightly and Rust 2024 edition (unsafe-attr exports, let-chains),
+the flat `src/*.rs` files are promoted into per-item module trees
+(`state/`, `preview/`, `directives/`, `marker/`, `resolve/`, `setup/`,
+`struct_extract/`, `config/`), and the `chrono` dependency is dropped.
+Adds the `aphrodite_debug` tool (per-session debug toggle that survives
+dylib hot-reloads via a persisted session id) and lands two full inspection
+waves of correctness fixes across the state engine, catalog, session
+lifecycle, hooks pipeline, proxy, retrieve, and config loader - including
+O(1) inline-store LRU promotion, poisoned-lock HTTP 500s, and
+found-but-broken-config warnings. Binary `1.4.6 → 1.5.0`, plugin
+`2.1.4 → 2.2.0`.
+
 ## v1.4.5 - Config template refresh + provider-neutral defaults (2026-09-16)
 
 Follow-up over v1.4.4 (already published to crates.io) that equalizes the
