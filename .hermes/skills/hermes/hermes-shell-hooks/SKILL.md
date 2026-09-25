@@ -203,7 +203,8 @@ All 4 internal entry points use it: `model_tools.py::handle_function_call()`,
 ## post_tool_call: Post-Edit Formatting
 
 Fires after every tool execution; with a `matcher` gate it auto-formats files
-after `write_file`/`patch`. Routing (`.rs` → `cargo fmt` nearest Cargo.toml,
+after `write_file`/`patch`. Routing (`.rs` → `cargo fmt` nearest Cargo.toml -
+`crates/aphrodite/Cargo.toml` or `crates/aphrodite-hermes/Cargo.toml`,
 `.sh` → `shfmt`, `.js/.ts/.css/.json/.md/.yaml/.toml` → `prettier`, `.py` →
 `black`/`ruff`; skips `node_modules`, `target/`, `vendor/`, `.git/`) +
 canonical registration (normalize-dashes.sh, normalize-tabs.sh,

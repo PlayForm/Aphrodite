@@ -374,7 +374,7 @@ subprocess.run(
 - Request has an action word (`fix`, `add`, `build`, `debug`, `create`,
   `implement`) OR 4+ substantive keywords OR 2+ technical indicators (api,
   hook, server, config, pipeline)
-- Request is > 80 characters
+- Request is > 80 chars
 - NOT already cached (fast scan TTL = 30 min, librarian TTL = 24 hours)
 
 The fast scan (< 0.1s) always runs; the librarian (60-120s) only for complex
