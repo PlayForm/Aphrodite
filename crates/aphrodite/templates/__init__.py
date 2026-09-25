@@ -71,19 +71,26 @@ def _home_holds_install(home: Path) -> bool:
 
 
 def _home_is_scratch(home: Path) -> bool:
-    """True when ``home`` lives under the OS temp dir - a throwaway/scratch
-    home (the catalog-validate probe runs ``register()`` in a scratch child
-    whose ``HERMES_HOME`` is a ``tempfile.TemporaryDirectory``,
-    hermes_cli/plugin_validate.py). Legacy adoption must NEVER redirect a
-    throwaway home onto a real install: under the probe that would make the
-    layout heal and directives materialize write into the live
+    """True when ``home`` is a throwaway/scratch Hermes home: under the OS
+    temp dir (the catalog-validate probe's ``tempfile.TemporaryDirectory``),
+    under ``/tmp`` (Linux containers, ``/tmp/hermes-*`` scratch homes), or
+    under the real home's ``.hermes/cache/scratch`` (Hermes' documented
+    scratch-home pattern). Legacy adoption must NEVER redirect a throwaway
+    home onto a real install: under the probe that would make the layout
+    heal and directives materialize write into the live
     ``~/.hermes/aphrodite`` - the exact pollution PR 118488 removed.
     """
     try:
-        tmp = Path(tempfile.gettempdir())
+        scratch_roots = [
+            Path(tempfile.gettempdir()).resolve(),
+            Path("/tmp").resolve(),
+            (Path.home() / ".hermes" / "cache" / "scratch").resolve(),
+        ]
         resolved = home.resolve()
-        return resolved.is_relative_to(tmp.resolve()) or home.is_relative_to(tmp)
-    except (OSError, ValueError):
+        return any(resolved.is_relative_to(root) for root in scratch_roots)
+    except (OSError, ValueError, RuntimeError):
+        # A symlink loop or an unresolvable home must never crash the
+        # import - treat as "not scratch" and let the other guards decide.
         return False
 
 
@@ -137,7 +144,19 @@ def _runtime_home() -> tuple[Path, str]:
 # APHRODITE_DIRECTIVES_DIR when set; exporting the shim's decision here
 # makes the two halves agree by construction (issue 40 F1). setdefault
 # keeps a user-provided override authoritative.
-_RUNTIME_HOME, _HOME_DECISION = _runtime_home()
+try:
+    _RUNTIME_HOME, _HOME_DECISION = _runtime_home()
+except Exception as e:  # defensive: the shim import must NEVER raise
+    # Path.home() can raise where no user home is resolvable; a hostile
+    # APHRODITE_HOME/HERMES_HOME must degrade to a warning, never abort
+    # plugin registration (the degraded "." fallback mirrors the Rust half).
+    _log.warning(
+        "runtime home resolution failed (%s); using the current directory "
+        "as the runtime home - set APHRODITE_HOME explicitly to pin it",
+        e,
+    )
+    _RUNTIME_HOME = Path(".") / "aphrodite"
+    _HOME_DECISION = "degraded fallback"
 os.environ.setdefault("APHRODITE_HOME", str(_RUNTIME_HOME))
 os.environ.setdefault("APHRODITE_DIRECTIVES_DIR", str(_RUNTIME_HOME / "directives"))
 _log.info("aphrodite runtime home: %s (decided by %s)", _RUNTIME_HOME, _HOME_DECISION)

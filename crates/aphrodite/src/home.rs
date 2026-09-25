@@ -187,6 +187,21 @@ mod tests {
 	}
 
 	#[test]
+	fn empty_env_values_are_ignored() {
+		// Empty-string overrides must fall through to the next level, never
+		// produce an empty path (the Python shim strips empty values the
+		// same way).
+		let _g = env_guard();
+		clear_all();
+		unsafe { std::env::set_var("APHRODITE_HOME", "") };
+		unsafe { std::env::set_var("HERMES_HOME", "/tmp/hermes-home") };
+		assert_eq!(runtime_home(), PathBuf::from("/tmp/hermes-home/aphrodite"));
+		unsafe { std::env::set_var("HERMES_HOME", "") };
+		unsafe { std::env::set_var("HOME", "/tmp/plain-home") };
+		assert_eq!(runtime_home(), PathBuf::from("/tmp/plain-home/.hermes/aphrodite"));
+	}
+
+	#[test]
 	fn degraded_returns_none_and_dot() {
 		let _g = env_guard();
 		clear_all();
