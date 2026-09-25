@@ -44,36 +44,33 @@ mutation_level: publish
 
 # Aphrodite Release Workflow
 
-This skill is the canonical owner of the release **gates**; the promotion/hotfix/tag/sync
-**ceremony** is owned by `aphrodite-release-flow` (Gate R7 and the publishing separation are
-referenced from there, never duplicated). This skill is not the ceremony. Its own file writes
-are documentation only; every release mutation it gates is executed by the ceremony under a
-human approval boundary.
+Canonical owner of the release **gates**. The promotion/hotfix/tag/sync **ceremony** is owned
+by `aphrodite-release-flow` (Gate R7 and the publishing separation are referenced from there,
+never duplicated). This skill is not the ceremony; its file writes are documentation only -
+every release mutation it gates is executed by the ceremony under a human approval boundary.
 
 ## When to Use
 
-- Before any version bump, tag, artifact publish, or registry publish: verify the
-  version ledger, audit tag triggers, validate the artifact contract.
+- Before any version bump, tag, artifact publish, or registry publish: verify the version
+  ledger, audit tag triggers, validate the artifact contract.
 - Writing or auditing release notes (live or retrospective mode).
 - Publishing the owned `aphrodite-headroom-core` fork crate.
 
 ## Orientation gate (mandatory)
 
 No mutation before this gate: run the 5 read-only commands from `aphrodite-orientation`
-and record the output (repository root, branch, status, `git submodule status --recursive`,
-remotes). Capture `HEAD` and the remote tip first (`git rev-parse HEAD; git ls-remote origin <branch>`):
-the external auto-committer sweeps working-tree changes, so `git status` alone is not stable
-evidence. `git status` is not stable evidence; the pre-capture remote tip is. Stop if the root,
-branch, or submodule state is not as declared in scope. See `aphrodite-boundaries` for the
-stop/recovery rules.
+(repository root, branch, status, `git submodule status --recursive`, remotes). Capture
+`HEAD` and the remote tip first (`git rev-parse HEAD; git ls-remote origin <branch>`): the
+external auto-committer sweeps working-tree changes, so `git status` alone is not stable
+evidence; the pre-capture remote tip is. Stop if the root, branch, or submodule state is not
+as declared in scope. Stop/recovery rules: `aphrodite-boundaries`.
 
 ## 1. Version Ledger (canonical, 5 rows)
 
 The binary release version, the plugin package version, and `BINARY_VERSION` are **three
-different values with three different owners** - never one generic "version bump." A version
-bump is not one thing. The same rows live in `.hermes/governance/VERIFICATION-MATRIX.md`
-(this skill is their owner - keep them mirrored). Authority, earliest update, latest safe
-update, and verification are per row:
+different values with three different owners** - never one generic "version bump." The same
+rows live in `.hermes/governance/VERIFICATION-MATRIX.md` (owned here; keep mirrored).
+Authority, earliest update, latest safe update, and verification are per row:
 
 | Field                | Meaning                                | Authority            | Earliest update                            | Latest safe update                | Verification                                 |
 | -------------------- | -------------------------------------- | -------------------- | ------------------------------------------ | --------------------------------- | -------------------------------------------- |
@@ -83,37 +80,31 @@ update, and verification are per row:
 | Parent gitlink       | Exact plugin commit consumed by parent | Parent Current owner | Parent sync                                | Before parent release tag         | Submodule status/tree entry                  |
 | README badge/example | Documentation claim                    | Documentation owner  | After authoritative value changes          | Before release notes finalization | Render/source scan                           |
 
-Parent binary versions bump during Development prep and stay safe until the release-sync
-commit; plugin versions bump before the plugin's Current release commit. Development carries
-the builds; Current carries the distribution - those are not interchangeable update windows.
-
-Snapshot values are **evidence, not authority**: re-derive every row from its authority path
-at release time. A snapshot value is not a current value. On disagreement, fix the manifest
-before claiming a release and report the drift (known case `a81acab6`: `package.json` lagged
-at `1.4.6` vs `1.5.0`). Authority paths + 2026-09-25 snapshot values:
-`references/version-ledger-authority.md`.
+Development carries the builds (binary bump during Development prep, safe until the
+release-sync commit); Current carries the distribution (plugin bump before the plugin's
+Current release commit). Those are not interchangeable update windows. Snapshot values are
+**evidence, not authority**: re-derive every row from its authority path at release time;
+on disagreement, fix the manifest before claiming a release and report the drift (known case
+`a81acab6`: `package.json` lagged at `1.4.6` vs `1.5.0`). Authority paths + 2026-09-25
+snapshot values: `references/version-ledger-authority.md`.
 
 ### Ledger rules
 
-- **A local bump can be safe; a public distribution pointer must not be early.** A local
-  `BINARY_VERSION` bump ahead of the tag is safe when the referenced binaries already exist
-  locally (`_ensure_binaries` no-ops; `download.sh` has nothing to fetch). At **tag time**
-  "bump LAST" applies: a `BINARY_VERSION` naming a not-yet-existing release errors on every
-  download. `_check_version_published` warns before `download.sh` when the pinned
-  `BINARY_VERSION` points at a release with no assets - treat that warning as a hard stop
-  for tagging.
+- **Local bump safe; public pointer never early.** Ahead of the tag, a local `BINARY_VERSION`
+  bump is safe when the referenced binaries already exist locally (`_ensure_binaries` no-ops;
+  `download.sh` has nothing to fetch). At **tag time** "bump LAST": a `BINARY_VERSION` naming
+  a not-yet-existing release errors on every download; `_check_version_published` warns before
+  `download.sh` when the pinned `BINARY_VERSION` points at a release with no assets - treat
+  that warning as a hard stop for tagging.
 - **Two version tracks, never conflated:** binary `1.6.x` (parent crates + `package.json` +
-  README badge) vs plugin `2.2.x` (`plugin.yaml`). A binary bump and a plugin bump are
-  separate ceremonies in separate repos, even on the same release. The binary track is not
-  the plugin track.
+  README badge) vs plugin `2.2.x` (`plugin.yaml`). Binary bump and plugin bump are separate
+  ceremonies in separate repos, even on the same release.
 - **Bump together (binary track):** both parent crates + the `aphrodite-hermes` dep pin +
-  `package.json` move in one ceremony (`cargo check` fails otherwise); then `plugin.yaml` +
-  `install_message` + README badges (they drift - the badge may lag two minors); then
-  `BINARY_VERSION` LAST. `aphrodite-release-flow` executes this order; this ledger is the
-  check it runs against.
-- **Never reuse a claimed version:** check the registry before claiming a number
-  (section 3); a burned crates.io version is gone forever. A claimed-but-unpublished number
-  is not safe to reuse.
+  `package.json` in one ceremony (`cargo check` fails otherwise); then `plugin.yaml` +
+  `install_message` + README badges (the badge may lag two minors); then `BINARY_VERSION`
+  LAST. `aphrodite-release-flow` executes this order; this ledger is the check it runs against.
+- **Never reuse a claimed version:** check the registry before claiming (section 3); a burned
+  crates.io version is gone forever.
 
 ## 2. Pre-Publish Trigger Audit - Gate R7 (mandatory before ANY tag)
 
@@ -121,31 +112,28 @@ Rule: inspect the actual workflow at the exact commit to be tagged, build a trig
 never trust remembered or documented behavior. A workflow file that exists is not a workflow
 that behaves as documented; the `if:` conditions at the tag commit are the behavior.
 
-Resolution of C-002 (explicit): one release document claimed `Publish.yml` only publishes
-crates after a deliberate `workflow_dispatch`, and that a plain tag push triggers only
-Build.yml's GitHub Release artifacts. That claim is **false at commit `a81acab6`**: a plain
-`Aphrodite/v*` tag push DOES reach `cargo publish` for `aphrodite` and `aphrodite-hermes`
-(their publish steps carry `|| startsWith(github.ref, 'refs/tags/Aphrodite/')`); only
-`aphrodite-headroom-core` is truly dispatch-gated. A tag push is not a build-only event.
-Re-audit at the tag commit with `grep -A3 'Publish to crates.io' .github/workflows/Publish.yml`;
-the worked trigger table for `a81acab6` is in `references/gate-r7-trigger-audit.md`
-(evidence, not a substitute for the audit).
+Resolution of C-002: one release document claimed `Publish.yml` only publishes crates after
+a deliberate `workflow_dispatch`, and that a plain tag push triggers only Build.yml's GitHub
+Release artifacts. **False at commit `a81acab6`**: a plain `Aphrodite/v*` tag push DOES
+reach `cargo publish` for `aphrodite` and `aphrodite-hermes` (their publish steps carry
+`|| startsWith(github.ref, 'refs/tags/Aphrodite/')`); only `aphrodite-headroom-core` is truly
+dispatch-gated. A tag push is not a build-only event. Re-audit at the tag commit:
+`grep -A3 'Publish to crates.io' .github/workflows/Publish.yml`. Worked trigger table for
+`a81acab6` + environment/Finalize notes: `references/gate-r7-trigger-audit.md` (evidence,
+not a substitute for the audit).
 
 ### Gate R7 template (the ceremony runs this; definitions owned here)
 
 **Read:** workflow files at the intended release commit (`.github/workflows/*.yml`); trigger
-clauses for tag push, push branch, `workflow_dispatch`, and reusable calls (`workflow_call`).
-**Record:** which workflows trigger from this tag; which jobs publish GitHub assets; which
-jobs publish crates/packages; required secrets and manual inputs.
+clauses for tag push, push branch, `workflow_dispatch`, `workflow_call`.
+**Record:** workflows triggered by this tag; jobs publishing GitHub assets; jobs publishing
+crates/packages; required secrets and manual inputs.
 **Pass:** the release owner has explicitly accepted every triggered side effect.
 **Stop:** any unexpected publish job is reachable from the tag.
 
 ### Notes that gate behavior
 
-- Publish jobs run in `environment: Release` - required reviewers/approval rules pause jobs
-  there; that is a workflow-level human-approval boundary, not a substitute for the pre-tag
-  audit. The environment gate is not the audit.
-- Secrets: `CARGO_REGISTRY_TOKEN` (crates.io) and the default `GITHUB_TOKEN`; manual input
+- Secrets: `CARGO_REGISTRY_TOKEN` (crates.io) + default `GITHUB_TOKEN`; manual input
   `publish_crates` (boolean). `CARGO_REGISTRY_TOKEN` is named, never echoed.
 - The tag push has no already-published version check: a re-publish errors red, a
   never-published version IS published by the tag push alone. The tag push is a publish
@@ -154,6 +142,8 @@ jobs publish crates/packages; required secrets and manual inputs.
   -p aphrodite-hermes --release` plus a packaging guard asserting all six
   `src/builtin_directives/*.md` are inside the `cargo package` tarball (v1.3.8 regression:
   a recursive `*.md` exclude stripped them; `cargo install` failed to compile).
+- Publish jobs run in `environment: Release`; required reviewers/approval rules pause jobs
+  there - a workflow-level human-approval boundary, not a substitute for the pre-tag audit.
 - Build.yml's `Finalize` job fails the release if any of the 12 expected assets is missing
   (4 targets × binary + dylib + `SHA256SUMS`). 12 assets are not optional.
 
@@ -161,8 +151,7 @@ jobs publish crates/packages; required secrets and manual inputs.
 
 Separate these four events; never combine them in one opaque script invocation. `cargo
 publish` and a registry package version are **irreversible** (never re-tag or reuse a burned
-version to fix); a GitHub release body is amendable - the gates reflect that difference.
-Irreversible is not amendable.
+version); a GitHub release body is amendable - the gates reflect that difference.
 
 1. **Create the release-sync commit**
 2. **Create and push the immutable tag**
@@ -173,20 +162,17 @@ Every irreversible event requires ALL of:
 
 - **Identity confirmation** - operator, repo, branch, remote verified against scope
   (orientation gate output).
-- **Version availability check** - the proposed number is not live: crates.io index/API
-  (`curl -A <ua> https://crates.io/api/v1/crates/<crate>` → `max_version`; index URL scheme:
-  first 2 / next 2 chars of the crate name, e.g.
-  `https://index.crates.io/ap/hr/aphrodite-headroom-core`); the GitHub tag is not already
-  pushed (CLAIM - the source states this requirement without a probe command).
+- **Version availability check** - the proposed number is not live: `curl -A <ua>
+  https://crates.io/api/v1/crates/<crate>` → `max_version`; index URL = first 2 / next 2
+  chars of the crate name, e.g. `https://index.crates.io/ap/hr/aphrodite-headroom-core`;
+  tag not already pushed (CLAIM - no probe command in source).
 - **Intended artifact/package list** - the exact assets/packages this event will publish
   (section 4 matrix; section 2 trigger table).
 - **Trigger audit** - Gate R7 at the exact commit (section 2).
 - **Explicit human approval** - technical readiness never authorizes an external side effect
-  (`aphrodite-boundaries`); pause with the summary below. Technical readiness is not
-  authorization.
-- **Post-event consumer verification** - verify from the consumer's perspective, not the
-  publisher's: binary `--version`, plugin load, download resolution, registry index serving
-  the new version. The publisher's claim is not proof.
+  (`aphrodite-boundaries`); pause with the template below.
+- **Post-event consumer verification** - consumer perspective, not the publisher's: binary
+  `--version`, plugin load, download resolution, registry index serving the new version.
 
 ### Ready for approval (mandatory pause template)
 
@@ -206,16 +192,14 @@ Ready for approval:
 Consumer paths are the ground truth for what a release must ship. **Consumer download names
 must match published release assets exactly**; the **installer must not fail if an optional
 artifact is absent** (degrade with a warning - `aphrodite-boundaries` failure-policy
-"degrade", not fail-closed). Degrade is not fail-closed. Build.yml stages per matrix target:
-`aphrodite-<target>[.exe]`, `libaphrodite_hermes-<target>.{so,dylib,dll}`,
-`SHA256SUMS-<target>.txt` (4 targets × 3 = 12 assets; `Finalize` enforces all 12). Download
-base URL: `https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite/v{version}`.
-Full consumer-path matrix (macOS setup, plugin loader, Windows setup, Linux setup -
-required vs optional assets and missing-asset results): `references/artifact-contract.md`.
-
-`download.sh`/`download.ps1` also validate downloaded files (non-empty, native magic bytes
-ELF/Mach-O/PE, exact-match SHA-256 when a sums file is present) and restore any prior copy on
-failure - a checksum mismatch is a hard error.
+"degrade", not fail-closed). Build.yml stages per target: `aphrodite-<target>[.exe]`,
+`libaphrodite_hermes-<target>.{so,dylib,dll}`, `SHA256SUMS-<target>.txt` (4 targets × 3 = 12
+assets; `Finalize` enforces all 12). Download base URL:
+`https://github.com/PlayForm/Aphrodite/releases/download/Aphrodite/v{version}`. Consumer-path
+matrix (macOS setup, plugin loader, Windows setup, Linux setup; required vs optional assets):
+`references/artifact-contract.md`. `download.sh`/`download.ps1` also validate downloaded
+files (non-empty, native magic bytes ELF/Mach-O/PE, exact-match SHA-256 when a sums file is
+present) and restore any prior copy on failure - a checksum mismatch is a hard error.
 
 ### Verification before tag publication
 
@@ -232,41 +216,36 @@ gh release view "Aphrodite/v<version>" --repo PlayForm/Aphrodite --json assets \
   -q '.assets[].name' | grep -E 'aphrodite-|libaphrodite_hermes-|SHA256SUMS-'
 ```
 
-Every consumer-required name in the matrix must appear in the asset list. `BINARY_VERSION`
-is NOT bumped until this passes (ledger rule + release boundary in `aphrodite-boundaries`).
+Every consumer-required name must appear in the asset list. `BINARY_VERSION` is NOT bumped
+until this passes (ledger rule + release boundary in `aphrodite-boundaries`).
 
 ## 5. Release Notes - Content Standards
 
 Every release MUST include Summary, Changes, Infrastructure (live) or Verification
-(retrospective), What Ships, and Links. Canonical template: `.hermes/release/RELEASE-TEMPLATE.md`
-(defines **Live** vs **Retrospective** modes - retrospective never claims to have rebuilt or
-retested a shipped release). Live mode is not retrospective mode.
+(retrospective), What Ships, and Links. Template: `.hermes/release/RELEASE-TEMPLATE.md`
+(Live vs Retrospective modes - retrospective never claims to have rebuilt or retested a
+shipped release).
 
-- Drafts live in `.hermes/release-notes/` (`vNEXT-draft.md`, `headroom-fork-vNEXT-draft.md`).
-  Stage the final notes file explicitly (`.hermes/release-notes/release-notes-vX.Y.Z.md`)
-  and verify it is committed; it can drop out between `git add` and commit. A staged file is
-  not a committed file.
-- **Live mode** requires a real `### Infrastructure` section with commands you actually ran.
-  **Retrospective** replaces it with `### Verification` (commit range, diffstat) - never
-  re-test. Retrospective analysis is not a re-test.
-- Draft placeholders (`{PENDING}` in Infrastructure, `{VERSION}` / `{PLUGIN_VERSION}` in
-  title/compare link, `DO NOT PUBLISH` header) are by-design for drafts - never publish a
-  note still containing `{PENDING}`. A draft is not a publishable note.
+- Drafts in `.hermes/release-notes/` (`vNEXT-draft.md`, `headroom-fork-vNEXT-draft.md`);
+  stage the final file (`.hermes/release-notes/release-notes-vX.Y.Z.md`) and verify it is
+  committed - it can drop out between `git add` and commit. A staged file is not a committed
+  file.
+- Live mode: a real `### Infrastructure` section with commands you actually ran.
+  Retrospective: `### Verification` (commit range, diffstat) - never re-test.
+- Placeholders `{PENDING}`, `{VERSION}`, `{PLUGIN_VERSION}`, `DO NOT PUBLISH` are by-design
+  for drafts - never publish a note still containing `{PENDING}`. A draft is not a
+  publishable note.
 - Headroom-fork notes are retrospective and separate from the binary notes; they use the
   fork's `aphrodite-vX.Y.Z` tag scheme and the `aphrodite-headroom-core` package name.
-- **What Ships** lists the full fixed 4-target matrix (per RELEASE-TEMPLATE.md), never a
-  point-in-time asset snapshot; never write "no Windows release" - the slow Windows leg is a
-  timing race (CLAIM - the source states the mechanism without a probe) and Build.yml's
-  `Finalize` job fails the release if the matrix is incomplete. A point-in-time snapshot is
-  not the matrix.
-- Contributor credit: `Co-authored-by: Name <email>` trailers for co-authored work;
-  `Fixes #N` in the change bullet or commit for issue fixes.
+- **What Ships** lists the full fixed 4-target matrix, never a point-in-time asset snapshot;
+  never write "no Windows release" - the slow Windows leg is a timing race (CLAIM - no probe
+  in source) and `Finalize` fails the release if the matrix is incomplete.
+- Credit: `Co-authored-by: Name <email>` trailers; `Fixes #N` in the change bullet or commit.
 - Never ship a bare compare link with zero description. UNKNOWN - the source states the
   prohibition without a reason.
 - Never use backticks with `gh release create --notes` - the shell interprets them as
-  command substitution. Always `--notes-file` with a heredoc (notes scratch into
-  `.hermes/tmp/`, never `/tmp`). Full heredoc template + glob attach command:
-  `references/release-notes-template.md`.
+  command substitution. Always `--notes-file` with a heredoc (scratch in `.hermes/tmp/`,
+  never `/tmp`). Heredoc template + glob attach command: `references/release-notes-template.md`.
 
 ## 6. Documentation Lint (release docs)
 
@@ -276,21 +255,19 @@ draft notes) passes this checklist before a release claim:
 - Exactly one `status` field; every `deprecated`/`archived` document names a successor.
 - No active skill references an archived skill without a **Historical only - do not
   execute** label.
-- Every mutation command appears in a step with `Preconditions`, `Verify`, `Stop if`, and
+- Every mutation command appears in a step with `Preconditions`, `Verify`, `Stop if`,
   `Recovery`.
 - Every hard-coded source line is marked historical or paired with a path/function search
-  (line numbers are observational evidence, never durable coordinates). A line number is not
-  a coordinate.
-- Every threshold is labeled live-read, default, or test fixture.
-- Every environment variable has a defined consumer status: active, inactive, or removed.
-- Every mention of a branch declares its permitted branch scope.
-- Every release action has a human-approval boundary (section 3).
-- No secret-like variable is printed in any sample command (`CARGO_REGISTRY_TOKEN` is named,
-  never echoed).
-- **Release-specific:** every version claim resolves to the version ledger (section 1) - no
-  orphan numbers; artifact names in prose match Build.yml's staging names; trigger claims
-  point at the Gate R7 audit (section 2) with "re-verify at the tag commit"; no `{PENDING}` /
-  `DO NOT PUBLISH` in anything publishable; README badge values match their ledger authority.
+  (line numbers are observational evidence, never durable coordinates).
+- Every threshold labeled live-read, default, or test fixture; every env var has a defined
+  consumer status (active, inactive, removed); every branch mention declares its permitted
+  branch scope.
+- Every release action has a human-approval boundary (section 3); no secret-like variable is
+  printed in any sample command (`CARGO_REGISTRY_TOKEN` named, never echoed).
+- Release-specific: version claims resolve to the ledger (section 1) - no orphan numbers;
+  artifact names in prose match Build.yml's staging names; trigger claims point at Gate R7
+  (section 2) with "re-verify at the tag commit"; no `{PENDING}` / `DO NOT PUBLISH` in
+  anything publishable; README badge values match their ledger authority.
 
 ## 7. Headroom Fork Crate Publishing
 
@@ -299,44 +276,42 @@ The owned fork crate `aphrodite-headroom-core` is published from
 line 55 (observational, re-derive live): `package = "aphrodite-headroom-core", version = "0.1.2"`;
 `0.1.3` is the planned next fork release (CLAIM - a plan, not a published value). Publish is
 dispatch-gated (never a tag push), versions are immutable, and CI publishes the
-**parent-recorded gitlink tree**, not the local submodule HEAD. The local submodule HEAD is
-not what CI publishes. Full evidence note and checklist: `references/headroom-publish.md`.
+**parent-recorded gitlink tree**, not the local submodule HEAD. Full evidence note and
+checklist: `references/headroom-publish.md`.
 
 ### Mandatory fork release-cycle tracking (every parent release)
 
 The fork is a first-class, tracked part of **EVERY** parent release cycle - never an
-optional afterthought. An optional afterthought is not a tracked release leg. Before any
-parent release:
+optional afterthought. Before any parent release:
 
 - Compare the fork's current HEAD against the last published commit (`git -C vendor/headroom
   log <last-published-commit>..HEAD --oneline`; last published = the commit carrying the
   version live on crates.io - the 0.1.2 bump `c6b61470`).
-- Carry **any** delta into the release: bump the fork crate version AND the parent pin
-  (line 55) together, create the fork release tag (fork scheme `aphrodite-vX.Y.Z`, never the
-  parent `Aphrodite/v*` scheme), then dispatch `Publish.yml` with `publish_crates=true` so
-  the fork publishes FIRST in the `needs:` chain (Test → Publish-Headroom-Core →
-  Publish-Aphrodite → Publish-Hermes). The fork scheme is not the parent scheme.
-- Update `vendor/headroom/CHANGELOG.md` + `vendor/headroom/RELEASE-CYCLE.md` per cycle;
-  they are the fork's release record and the delta-check tracking contract.
+- Carry **any** delta: bump the fork crate version AND the parent pin (line 55) together,
+  create the fork release tag (fork scheme `aphrodite-vX.Y.Z`, never the parent
+  `Aphrodite/v*` scheme), then dispatch `Publish.yml` with `publish_crates=true` so the fork
+  publishes FIRST in the `needs:` chain (Test → Publish-Headroom-Core → Publish-Aphrodite →
+  Publish-Hermes).
+- Update `vendor/headroom/CHANGELOG.md` + `vendor/headroom/RELEASE-CYCLE.md` per cycle
+  (fork release record + delta-check tracking contract).
 
 ### Published-version trap
 
 A stale fork version looks "already published", so CI happily skips it. The 1.5.0 release
 published `aphrodite` 1.5.0 + `aphrodite-hermes` 1.5.0 but SKIPPED the headroom publish:
-`Publish.yml`'s version check (Publish-Headroom-Core job, lines 143-161 - observational) saw
-`0.1.2` already in the crates.io index → `published=true` → the publish step
+the version check (Publish-Headroom-Core job, lines 143-161 - observational) saw `0.1.2`
+already in the crates.io index → `published=true` → the publish step
 (`workflow_dispatch && publish_crates && published == 'false'`) skipped - the fork held ~14
-unpublished commits since the 0.1.2 bump (`git -C vendor/headroom log c6b61470..HEAD --oneline`
-counts them). **Nothing failed, no red job - a silent gap**: consumers of `aphrodite` 1.5.0
-resolved the OLD 0.1.2 (the post-event index check in `references/headroom-publish.md` shows
-which version the index serves). "Already published" ≠ "fork tree published". Every release
-cycle MUST compare the fork tree, not just the version number. The version number alone lies.
+unpublished commits since the 0.1.2 bump (`git -C vendor/headroom log c6b61470..HEAD
+--oneline` counts them). **Nothing failed, no red job - a silent gap**: consumers of
+`aphrodite` 1.5.0 resolved the OLD 0.1.2 (post-event index check in
+`references/headroom-publish.md` shows the served version). "Already published" ≠ "fork tree
+published" - compare the fork tree, never just the version number.
 
 ### Version source of truth (live-read, never a doc number)
 
 - Authority: `vendor/headroom/crates/headroom-core/Cargo.toml` `version` + the parent pin
-  (line 55) - they move together in one ceremony (bump fork crate + pin together, never one
-  alone). One alone is not a bump.
+  (line 55) - they move together in one ceremony; never one alone.
 - The §1 ledger's 5 rows are unchanged by the fork; the fork crate rides the parent pin as
   its own authority path. Claim numbers via the availability check in
   `references/headroom-publish.md`; never reuse a burned version.
@@ -347,7 +322,7 @@ cycle MUST compare the fork tree, not just the version number. The version numbe
   (stop/recovery, approval boundaries, failure policy), `aphrodite-orientation` (preflight).
 - `.hermes/governance/VERIFICATION-MATRIX.md` (mirror ledger rows; owned here),
   `.hermes/release/RELEASE-TEMPLATE.md` (notes contract).
-- `references/version-ledger-authority.md`, `references/gate-r7-trigger-audit.md`,
+- References: `references/version-ledger-authority.md`, `references/gate-r7-trigger-audit.md`,
   `references/artifact-contract.md`, `references/release-notes-template.md`,
   `references/headroom-publish.md`.
 
