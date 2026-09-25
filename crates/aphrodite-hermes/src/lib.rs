@@ -138,9 +138,12 @@ fn spawn_config_watcher() {
 		.name("aphrodite-config-watcher".into())
 		.spawn(move || {
 			let mut watch_dirs = vec![std::path::PathBuf::from(".")];
-			if let Some(home) = dirs::home_dir() {
-				watch_dirs.push(home.join(".hermes").join("aphrodite"));
-			}
+					// The runtime home is one shared decision (home::runtime_home:
+					// $APHRODITE_HOME -> $HERMES_HOME -> $HOME -> platform default), so
+					// the watcher follows the same home the plugin shim resolves - under
+					// a non-default Hermes home it must watch <hermes-home>/aphrodite,
+					// never $HOME/.hermes/aphrodite (issue 40).
+					watch_dirs.push(aphrodite::home::runtime_home());
 			let (tx, rx) = std::sync::mpsc::channel::<()>();
 			let mut watcher = match notify::recommended_watcher(move |res:Result<notify::Event, notify::Error>| {
 				if let Ok(ev) = res

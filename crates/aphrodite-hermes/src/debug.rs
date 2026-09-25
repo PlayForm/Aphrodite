@@ -47,11 +47,11 @@ static FLAG_CACHE:OnceLock<Mutex<HashMap<String, (f64, bool)>>> = OnceLock::new(
 const FLAG_PREFIX:&str = "debug";
 
 fn runtime_home() -> PathBuf {
-	std::env::var_os("HOME")
-		.map(PathBuf::from)
-		.unwrap_or_else(std::env::temp_dir)
-		.join(".hermes")
-		.join("aphrodite")
+	// One shared runtime-home decision (issue 40): $APHRODITE_HOME ->
+	// $HERMES_HOME -> $HOME -> platform default. Under a non-default Hermes
+	// home (Docker, profiles) the debug flags land in that home, not in a
+	// shadow $HOME/.hermes/aphrodite.
+	aphrodite::home::runtime_home_opt().unwrap_or_else(|| std::env::temp_dir().join(".hermes").join("aphrodite"))
 }
 
 /// Record session -> parent from a `pre_llm_call` invocation. Empty or

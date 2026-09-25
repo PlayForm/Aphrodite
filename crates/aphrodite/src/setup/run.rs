@@ -27,16 +27,32 @@ pub(crate) struct SetupCtx {
 
 /// Run the setup/bootstrap process.
 pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
-	let home =
-		dirs::home_dir().ok_or_else(|| SetupError::Io(io::Error::new(io::ErrorKind::NotFound, "$HOME not set")))?;
+	let hermes_home = crate::home::hermes_home_opt().ok_or_else(|| {
+		SetupError::Io(io::Error::new(
+			io::ErrorKind::NotFound,
+			"no Hermes home resolvable (set HERMES_HOME or HOME)",
+		))
+	})?;
+	// Runtime home is a single shared decision (home::runtime_home:
+	// $APHRODITE_HOME -> $HERMES_HOME -> $HOME -> platform default) so
+	// `aphrodite setup` bootstraps exactly the home the plugin shim and the
+	// running binary will use - under a non-default Hermes home (Docker,
+	// profile gateways) that is <hermes-home>/aphrodite, never a second
+	// ~/.hermes/aphrodite (issue 40).
+	let runtime_home = crate::home::runtime_home_opt().ok_or_else(|| {
+		SetupError::Io(io::Error::new(
+			io::ErrorKind::NotFound,
+			"no runtime home resolvable (set APHRODITE_HOME, HERMES_HOME, or HOME)",
+		))
+	})?;
 
 	let own_path = std::env::current_exe().map_err(SetupError::Io)?;
 	let own_hash = self_hash(&own_path);
 
 	let ctx = SetupCtx {
-		aphrodite_dir:home.join(".hermes").join("aphrodite"),
-		binaries_dir:home.join(".hermes").join("aphrodite").join("binaries"),
-		plugin_dir:home.join(".hermes").join("plugins").join("aphrodite"),
+		aphrodite_dir:runtime_home.clone(),
+		binaries_dir:runtime_home.join("binaries"),
+		plugin_dir:hermes_home.join("plugins").join("aphrodite"),
 		own_path,
 		own_hash,
 	};

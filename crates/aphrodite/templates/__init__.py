@@ -11,6 +11,7 @@ import logging
 import os
 import subprocess
 import sys
+import tempfile
 import threading
 import types
 from collections.abc import Callable
@@ -52,7 +53,96 @@ def _hermes_home() -> Path:
     return Path.home() / ".hermes"
 
 
-_BINARIES_DIR = _hermes_home() / "aphrodite" / "binaries"
+def _home_holds_install(home: Path) -> bool:
+    """True when ``home`` already carries a live Aphrodite install: a
+    ``binaries/`` directory, an ``aphrodite.toml``, or a ``ccr.db``.
+
+    Feeds the legacy-adoption rule (F2) so an upgrade never abandons the
+    home a previous version actually used - never migrate, adopt-and-warn.
+    """
+    try:
+        return (
+            (home / "binaries").is_dir()
+            or (home / "aphrodite.toml").is_file()
+            or (home / "ccr.db").is_file()
+        )
+    except OSError:
+        return False
+
+
+def _home_is_scratch(home: Path) -> bool:
+    """True when ``home`` lives under the OS temp dir - a throwaway/scratch
+    home (the catalog-validate probe runs ``register()`` in a scratch child
+    whose ``HERMES_HOME`` is a ``tempfile.TemporaryDirectory``,
+    hermes_cli/plugin_validate.py). Legacy adoption must NEVER redirect a
+    throwaway home onto a real install: under the probe that would make the
+    layout heal and directives materialize write into the live
+    ``~/.hermes/aphrodite`` - the exact pollution PR 118488 removed.
+    """
+    try:
+        tmp = Path(tempfile.gettempdir())
+        resolved = home.resolve()
+        return resolved.is_relative_to(tmp.resolve()) or home.is_relative_to(tmp)
+    except (OSError, ValueError):
+        return False
+
+
+def _runtime_home() -> tuple[Path, str]:
+    """THE single runtime-home decision for the whole plugin process.
+
+    Precedence (first match wins):
+      1. ``$APHRODITE_HOME`` - explicit override; never second-guessed.
+      2. ``<hermes-home>/aphrodite`` - the canonical home, matching the
+         shim's Hermes-home resolution and Hermes' per-Hermes-home plugin
+         managers (profiles).
+      3. Legacy ``$HOME/.hermes/aphrodite`` - ADOPTED when it is the one
+         that actually holds an install and the canonical home does not
+         (issue 40 F2: never pick a home other than the one a previous
+         version used while that one still exists - adopt-and-warn instead
+         of migrating).
+
+    Returns ``(home, decision)`` where ``decision`` names the source for the
+    startup log line (F5). The decision is exported to the Rust half via
+    ``os.environ.setdefault("APHRODITE_HOME", ...)`` at import, so the dylib
+    and the spawned proxy binary (a child process inheriting this env)
+    resolve the same directory - the two halves cannot diverge structurally
+    (F1), and per-Hermes-home isolation (profiles) extends to the Rust half.
+    """
+    override = os.environ.get("APHRODITE_HOME", "").strip()
+    if override:
+        return Path(override).expanduser(), "APHRODITE_HOME override"
+    canonical = _hermes_home() / "aphrodite"
+    legacy = Path.home() / ".hermes" / "aphrodite"
+    if (
+        not _home_holds_install(canonical)
+        and _home_holds_install(legacy)
+        and not _home_is_scratch(_hermes_home())
+    ):
+        _log.warning(
+            "adopting the pre-2.2 runtime home %s (no install under %s); "
+            "set APHRODITE_HOME to pin the location explicitly",
+            legacy,
+            canonical,
+        )
+        return legacy, "legacy ~/.hermes/aphrodite adoption"
+    if os.environ.get("HERMES_HOME", "").strip():
+        return canonical, "HERMES_HOME"
+    return canonical, "default"
+
+
+# ── Runtime home: ONE decision, exported to the Rust half ──
+# Every runtime artifact (binaries, dylib, aphrodite.toml, ccr.db,
+# directives, logs) lives under the runtime home, never inside the plugin
+# tree. The dylib and the proxy binary resolve APHRODITE_HOME /
+# APHRODITE_DIRECTIVES_DIR when set; exporting the shim's decision here
+# makes the two halves agree by construction (issue 40 F1). setdefault
+# keeps a user-provided override authoritative.
+_RUNTIME_HOME, _HOME_DECISION = _runtime_home()
+os.environ.setdefault("APHRODITE_HOME", str(_RUNTIME_HOME))
+os.environ.setdefault("APHRODITE_DIRECTIVES_DIR", str(_RUNTIME_HOME / "directives"))
+_log.info("aphrodite runtime home: %s (decided by %s)", _RUNTIME_HOME, _HOME_DECISION)
+
+_BINARIES_DIR = _RUNTIME_HOME / "binaries"
 _DYLIB_PATH = os.environ.get("APHRODITE_HERMES_DYLIB_PATH", str(_BINARIES_DIR / _DYLIB_NAME))
 _BINARY_NAME = "aphrodite.exe" if sys.platform == "win32" else "aphrodite"
 _BINARY_PATH = os.environ.get("APHRODITE_BINARY_PATH", str(_BINARIES_DIR / _BINARY_NAME))
@@ -96,16 +186,6 @@ except Exception as _bindings_err:  # ImportError (absent), SyntaxError (corrupt
     _GENERATED_BINDINGS = None  # type: ignore[assignment]
     _log.debug("generated _bindings.py unavailable (%s); using the manual FFI setup", _bindings_err)
 
-# Directives are provided by the BINARY (embedded in libaphrodite_hermes.dylib
-# via the core crate's builtin_directives) and materialized into the user-data
-# home at setup/startup - they are NOT shipped in the plugin dir anymore.
-# Point the dylib's discovery at the canonical runtime home so it reads the
-# materialized set; os.environ.setdefault keeps a user-provided
-# APHRODITE_DIRECTIVES_DIR override authoritative.
-os.environ.setdefault(
-    "APHRODITE_DIRECTIVES_DIR", str(_hermes_home() / "aphrodite" / "directives")
-)
-
 # ── Per-process dylib state ──
 # Hermes builds one PluginManager per Hermes home (root home + every
 # profile) and exec_module()s this shim once per home under a distinct
@@ -148,20 +228,12 @@ _state = _process_state()
 
 
 def _data_dir() -> Path:
-    """Plugin data directory (proxy-stderr.log, ccr state).
-
-    Defaults to ``~/.hermes/aphrodite``; ``APHRODITE_HOME`` overrides it.
-    Only the Python side honours the override - the Rust proxy/dylib keep
-    resolving ``aphrodite.toml`` and ``ccr.db`` on their own.
+    """Plugin data directory (proxy-stderr.log, ccr state): the process-wide
+    runtime home resolved once at import (``_RUNTIME_HOME``) and exported to
+    the Rust half through ``$APHRODITE_HOME`` - both halves share one
+    decision (issue 40 F1), so this is never a second, shadow home.
     """
-    try:
-        override = os.environ.get("APHRODITE_HOME")
-        if override:
-            return Path(override).expanduser()
-        return _hermes_home() / "aphrodite"
-    except Exception as e:
-        _log.warning("_data_dir: %s; falling back to <hermes-home>/aphrodite", e)
-        return _hermes_home() / "aphrodite"
+    return _RUNTIME_HOME
 
 
 def _binary_version_path() -> Path:
@@ -392,10 +464,10 @@ def _load_dylib() -> ctypes.CDLL:
         if path != _DYLIB_PATH and path != str(_BINARIES_DIR / _DYLIB_NAME):
             _log.warning(
                 "canonical dylib %s not found - using %s instead (legacy "
-                "install; run download.sh to migrate to "
-                "~/.hermes/aphrodite/binaries)",
+                "install; run download.sh to migrate to %s)",
                 _BINARIES_DIR / _DYLIB_NAME,
                 path,
+                _BINARIES_DIR,
             )
         assert os.path.exists(path), f"Dylib not found. Tried: {candidates}"
 
@@ -859,7 +931,8 @@ def _start_proxy():
         if "API key" in tail:
             _log.warning(
                 "set APHRODITE_API_KEY env var, run `aphrodite setup`, or "
-                "add api_key to the TOML at ~/.hermes/aphrodite/aphrodite.toml"
+                "add api_key to the TOML at %s",
+                _data_dir() / "aphrodite.toml",
             )
         return
 
@@ -894,8 +967,8 @@ def _start_proxy():
                 if "API key" in tail:
                     _log.warning(
                         "set APHRODITE_API_KEY env var, run `aphrodite setup`, "
-                        "or add api_key to the TOML at "
-                        "~/.hermes/aphrodite/aphrodite.toml"
+                        "or add api_key to the TOML at %s",
+                        _data_dir() / "aphrodite.toml",
                     )
             else:
                 _log.warning(

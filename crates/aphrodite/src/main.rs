@@ -127,9 +127,16 @@ async fn run() -> anyhow::Result<()> {
 	let (config_path, use_multi_config) = if use_multi_config || explicit_config_path.is_some() {
 		(config_path, use_multi_config)
 	} else {
-		match dirs::home_dir().map(|h| h.join(".hermes").join("aphrodite").join("aphrodite.toml")) {
-			Some(p) if p.exists() => (p.to_string_lossy().into_owned(), true),
-			_ => (config_path, false),
+		// Runtime home resolution is a single shared decision
+		// (home::runtime_home: $APHRODITE_HOME -> $HERMES_HOME -> $HOME ->
+		// platform default) so a setup run under a non-default Hermes home
+		// (Docker, profile gateways) finds the config the plugin shim will
+		// use - never a second, shadow home (issue 40).
+		let home_config = aphrodite::home::config_path();
+		if home_config.exists() {
+			(home_config.to_string_lossy().into_owned(), true)
+		} else {
+			(config_path, false)
 		}
 	};
 	let (multi_config, cli_fallback, log_compact) = if use_multi_config {

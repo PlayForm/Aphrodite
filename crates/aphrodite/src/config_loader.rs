@@ -52,11 +52,7 @@ impl Config {
 	pub fn load() -> Self {
 		let search_paths = vec![
 			PathBuf::from("aphrodite.toml"),
-			dirs::home_dir()
-				.unwrap_or_default()
-				.join(".hermes")
-				.join("aphrodite")
-				.join("aphrodite.toml"),
+			crate::home::config_path(),
 		];
 
 		let mut parse_failure:Option<String> = None;
@@ -275,7 +271,7 @@ impl Config {
 		// or when the on-disk directory is missing/unreadable - so a fresh
 		// install (or a missing `~/.hermes/aphrodite/directives`) gets
 		// shipped defaults without any filesystem setup and never errors.
-		let home_aphrodite = dirs::home_dir().unwrap_or_default().join(".hermes").join("aphrodite");
+		let home_aphrodite = crate::home::runtime_home();
 		// 2. binary-relative (portable install: shipped directives/ next to
 		//    the executable, e.g. the Hermes plugin dir).
 		let bin_relative = std::env::current_exe()
