@@ -5,6 +5,52 @@ Reference for the auto-synced gitlink hook set described in SKILL.md
 variant"). Each item is a worked instance of a rule; the rule itself lives
 in SKILL.md. All commands are byte-stable.
 
+## Submodule-side hook set, full detail
+
+Invariant: BOTH repos stay on their CONFIGURED tracking branch, and
+`git submodule status` / `git status` never show `+` / `M <submodule>`.
+The configured branch is `submodule.<name>.branch` in the superproject's
+`.gitmodules` - historically `Current` for every submodule, but the parent
+may point a submodule at a different branch (`Development` for a
+bump/test track while `Current` stays the stable download branch). The
+hooks must read that per-submodule branch, never hardcode `Current`:
+hardcoding yanks a Development-track submodule back to Current on every
+checkout, silently defeating the split track.
+
+Roles:
+
+- `pre-commit`: refuse detached-HEAD commits (`git symbolic-ref -q HEAD || exit 1`).
+- `post-commit`: bump the parent's gitlink to the new HEAD.
+- `post-checkout`: if detached and the submodule's CONFIGURED branch
+  (from `.gitmodules`) is set, check it out (terminates - the re-entrant
+  post-checkout sees an attached HEAD and skips), then bump the gitlink.
+  Resolve the configured branch by matching the submodule's relative path
+  against `.gitmodules` `submodule.*.path` entries, read
+  `submodule.<name>.branch`, fall back to `Current` when unset. Probe the
+  configured branch with `git config -f .gitmodules --get
+  submodule.<name>.branch`.
+- `lib/bump-submodule-gitlink.sh` (shared): detect the superproject, compute
+  the relative submodule path with python3 `os.path.relpath` (GNU `realpath
+  --relative-to` does not exist on macOS), skip while the parent holds
+  `MERGE_HEAD`/`CHERRY_PICK_HEAD`, and commit `chore: bump <sub> to <short>`
+  ONLY when `git -C <super> ls-files -s -- <sub>` differs from the submodule
+  HEAD.
+
+Mechanism: `git submodule update` checks out the recorded gitlink DETACHED
+and fires the submodule's post-checkout hook - that is the heal trigger
+point. The hook re-attaches to the configured branch and the bump re-records
+the pointer in the same operation, so the detached state never survives a
+single command.
+
+Battery (verify end-to-end, not one smoke test):
+
+1. Input: submodule commit. Output: parent auto-bump, no `+`.
+2. Input: rewind the parent's recorded pointer (`git update-index --cacheinfo
+   160000,<old>,<sub>` + commit) then `git submodule update`. Output: heals
+   to `Current` + re-bumps.
+3. Input: parent-side commit. Output: submodule untouched.
+4. Repeat cycles: each bump is a fresh commit, no accumulation.
+
 ## CRLF-ified hook files silently never run
 
 A formatter/prettier pass can CRLF-ify `.githooks/*`. The CRLF shebang fails
