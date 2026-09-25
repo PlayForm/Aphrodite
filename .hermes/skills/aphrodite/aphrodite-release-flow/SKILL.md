@@ -51,10 +51,10 @@ historical only - do not execute).
 ## Ownership boundary
 
 - **This skill owns** release promotion, hotfix, tag creation, version
-  sync-back, artifact verification - how the ceremony runs.
+  sync-back, artifact verification.
 - `aphrodite-release-workflow` owns the version ledger, artifact contract
-  matrix, Gate R7 definitions, 4-event publishing separation - what the
-  ceremony must verify. Never duplicate its tables.
+  matrix, Gate R7 definitions, 4-event publishing separation - never
+  duplicate its tables.
 - `aphrodite-boundaries` owns the git repair taxonomy, branch-owned identity
   contract, human approval boundaries.
 - `aphrodite-orientation` owns the Orient phase and the mandatory preflight
@@ -65,32 +65,26 @@ historical only - do not execute).
 - **Development ≠ Current.** Development is the workshop: it accumulates, is
   never rewritten, runs all tests + CI, carries no release tags. Current is
   the distributed line: tags, GitHub releases, and registry publishes happen
-  ONLY here. They are different products, not mergeable twins.
+  ONLY here. Different products, not mergeable twins.
 - **Branch-owned identity ≠ merge convenience.** Protected: `.gitmodules`
   branch fields, `.github/workflows/*` triggers and push targets
-  (`[Development]` vs `[Current]`), the `plugins/aphrodite` gitlink. A path
-  is never restored merely because the merge is inconvenient; only a
-  contract-declared identity path qualifies. Contract invoked at THREE
-  points: before staging (I1), after the controlled restore (I4), before tag
-  creation (R1).
+  (`[Development]` vs `[Current]`), the `plugins/aphrodite` gitlink. Only a
+  contract-declared identity path qualifies for restore. Contract invoked at
+  THREE points: before staging (I1), after the controlled restore (I4),
+  before tag creation (R1).
 - **Binary version ≠ plugin version ≠ `BINARY_VERSION`.** Binary `1.6.x`
   lives in the parent Cargo.tomls + `package.json` + README badge; plugin
   `2.2.x` lives in `plugins/aphrodite/plugin.yaml`. `BINARY_VERSION` (S) is
   the live download pointer naming which binary release the plugin pairs
   with (`download.sh`/`download.ps1` fetch it). Last recorded (CLAIM -
   re-derive live): binary `1.6.2`, plugin `2.2.2`, `BINARY_VERSION` `1.6.2`.
-  Ledger: `aphrodite-release-workflow` §1 (5 rows). Ledger rows drift: at
-  `a81acab6` `package.json` lagged at `1.4.6` while both crates read `1.5.0`
-  - fix the manifest before claiming a release and report the drift.
+  Ledger drift worked example: references/compressed-detail.md.
 - **Bump order (one ceremony):** the two parent crates + the
   `aphrodite-hermes` dep pin `aphrodite = { path = .., version = "X" }` +
   `package.json` move TOGETHER (cargo check fails otherwise); then
-  `plugin.yaml` + `install_message` + README badges (the badge may lag two
-  minors); then `BINARY_VERSION` LAST at tag time. A LOCAL `BINARY_VERSION`
-  bump ahead of the tag is safe only when the binaries already sit in
-  `~/.hermes/aphrodite/binaries` (`_ensure_binaries` no-ops) - the "bump
-  LAST" rule applies at TAG time, not local prep. Grep the OLD version
-  strings after; update any test that pins them.
+  `plugin.yaml` + `install_message` + README badges; then `BINARY_VERSION`
+  LAST at tag time. Local-prep exemption + version-string grep:
+  references/compressed-detail.md.
 - **Gitlink ≠ branch.** A superproject tracks each submodule by gitlink, a
   pinned commit SHA, never a branch. The parent gitlink is branch-owned:
   each branch floats its own - a gitlink-only bump (`chore: bump plugin
@@ -98,17 +92,16 @@ historical only - do not execute).
 - **Submodule-first ordering is mandatory** in every phase (release AND
   sync-back): plugin first, then parent.
 - **File classification:** `.hermes/classification/` (TAXONOMY.md + pass
-  files, HPC codes with ceremony annotations) decides what crosses a
-  transplant; record new removals there as ceremony rules; re-derive counts
-  live (`find .hermes/classification -type f | wc -l`). Legend:
-  references/ceremony-steps.md.
+  files, HPC codes) decides what crosses a transplant; record new removals
+  as ceremony rules; re-derive counts live (`find .hermes/classification
+  -type f | wc -l`). Legend: references/ceremony-steps.md.
 
 ## Unified lifecycle (state machine)
 
 Phase order: Orient → Prepare → Validate → Integrate → Release → Observe;
-**Recover** is entered from any hard stop. A phase may not be skipped or
-reordered; each has entry condition, allowed changes, exit evidence, hard
-stop (full table: references/ceremony-steps.md).
+**Recover** entered from any hard stop. No phase skipped/reordered; each has
+entry condition, allowed changes, exit evidence, hard stop (full table:
+references/ceremony-steps.md).
 
 - A phase transition requires the previous phase's exit evidence.
 - A hard stop sends the workflow to Recover (or stops entirely); never "fix
@@ -121,10 +114,9 @@ stop (full table: references/ceremony-steps.md).
 
 The five read-only commands from `aphrodite-orientation` (`git rev-parse
 --show-toplevel`, `git branch --show-current`, `git status --short`, `git
-submodule status --recursive`, `git remote -v`), interpreted against this
-skill's scope (PlayForm/Aphrodite + PlayForm/Aphrodite-Hermes, branches
-Development + Current, runtime modes source + installed). STOP on any
-dirty/unexpected state.
+submodule status --recursive`, `git remote -v`), interpreted against scope
+(PlayForm/Aphrodite + PlayForm/Aphrodite-Hermes, Development + Current,
+source + installed). STOP on dirty/unexpected state.
 
 **Auto-committer baseline (mandatory):** the auto-committer sweeps
 working-tree changes into commits and pushes, so `git status` is NOT stable
@@ -137,60 +129,53 @@ git rev-parse HEAD
 git ls-remote origin <branch>
 ```
 
-If the tree is dirty when a sync step is about to run, **abort the sync** -
-a staged squash set may be swept mid-ceremony (the content usually survives
-as a commit; verify with `git log`).
+Dirty tree when a sync step is about to run → **abort the sync** (a staged
+squash set may be swept mid-ceremony; content usually survives as a commit -
+verify with `git log`).
 
 ## Phase rules (walkthroughs: references/ceremony-steps.md, references/release-steps.md, references/hotfix.md)
 
 ### Prepare (Development)
 
-- The proposed version must be free: a burned crates.io version is gone
-  forever - claim the NEXT number; never tag before the version is free.
-  Every ledger row must equal its authority path (Step P1).
-- The binary track moves in ONE ceremony: cargo check fails if one crate
-  moved alone. `BINARY_VERSION` stays unchanged here - it moves LAST at tag
-  time.
-- Templates must match the live config: the shim
-  `plugins/aphrodite/__init__.py` must stay byte-identical to
-  `crates/aphrodite/templates/__init__.py` (setup.rs asserts it). Crate
-  README links render as blob/HEAD on crates.io - write every link absolute
-  to the file's OWN branch (Development → `tree/Development`, Current-staged
-  → `tree/Current`).
+- Proposed version must be free: a burned crates.io version is gone forever -
+  claim the NEXT number; never tag before free. Every ledger row must equal
+  its authority path (Step P1).
+- Binary track moves in ONE ceremony: cargo check fails if one crate moved
+  alone. `BINARY_VERSION` stays unchanged here - it moves LAST at tag time.
+- Templates must match live config: `plugins/aphrodite/__init__.py`
+  byte-identical to `crates/aphrodite/templates/__init__.py` (setup.rs
+  asserts it). Crate README links render as blob/HEAD on crates.io - write
+  links absolute to the file's OWN branch (Development → `tree/Development`,
+  Current-staged → `tree/Current`).
 
 ### Validate
 
 - Record ACTUAL gate output ("406 passed, 0 failed") - never "should pass";
   a red gate voids the release claim.
-- Runtime evidence must come from a FRESH process: a stale dylib is not
-  evidence; never conclude from the old process; restart, then re-probe
-  (`aphrodite_stats`/`aphrodite_test`/`aphrodite_rebuild`).
+- Runtime evidence from a FRESH process: a stale dylib is not evidence;
+  restart, then re-probe (`aphrodite_stats`/`aphrodite_test`/
+  `aphrodite_rebuild`).
 
 ### Integrate (Development → Current)
 
-- **B4 branch-identity audit - MANDATORY before ANY sync or tag** (points:
-  I1 before staging, I4 after the controlled restore, R1 before tag;
-  canonical text: `.hermes/notes/release/RELEASE-METHODOLOGY.md` `### B4`,
-  invariant I11). It scans workflow triggers + push targets, `.gitmodules`
-  branch fields, gitlink resolution, keywords - zero hits required. ANY hit
-  ABORTS the ceremony; record in
+- **B4 branch-identity audit - MANDATORY before ANY sync or tag.** Scans
+  workflow triggers + push targets, `.gitmodules` branch fields, gitlink
+  resolution - zero hits required; ANY hit ABORTS (record in
   `.hermes/notes/release/CEREMONY-AUDIT.md`; fix the offending branch
-  separately; never proceed past a hit "because it is only the heartbeat";
-  never checkout the other branch. Commands: references/ceremony-steps.md
-  Step I1.
+  separately; never checkout the other branch). Commands:
+  references/ceremony-steps.md Step I1.
 - **Submodule-first (bottom-up):** plugin FIRST, then parent - never a
   Development-only commit; validate the plugin commit before the parent
   gitlink moves; never float the gitlink to a non-released plugin commit.
 - **Controlled restore is identity-only:** `git checkout HEAD -- .gitmodules
-  .github/workflows plugins/aphrodite` - the ceremony invariant, NOT a
-  repair mechanism; never blanket checkout/reset.
+  .github/workflows plugins/aphrodite` - ceremony invariant, NOT repair;
+  never blanket checkout/reset.
 - **Headroom fork leg (mandatory):** fork delta → fork crate + parent pin
   TOGETHER (cargo check fails otherwise), fork tag BEFORE dispatch
   (`aphrodite-vX.Y.Z`, never `Aphrodite/v*`), gitlink to the TAGGED fork
   commit (CI publishes the parent-recorded gitlink tree, not local submodule
-  HEAD). A stale fork version makes CI skip the publish silently (1.5.0
-  trap). Tracking: `vendor/headroom/RELEASE-CYCLE.md` +
-  `vendor/headroom/CHANGELOG.md`. Dispatch in R6 only after this leg.
+  HEAD). Stale fork version → CI skips publish silently (1.5.0 trap).
+  Tracking + dispatch order: references/compressed-detail.md.
 
 ### Release
 
@@ -200,17 +185,16 @@ as a commit; verify with `git log`).
   version availability, intended artifact/package list, Gate R7, explicit
   human approval (`Ready for approval` pause), consumer verification.
 - **Gate R7 at the exact tag commit:** read the ACTUAL workflow files -
-  never trust remembered behavior. The tag push publishes `aphrodite` +
+  never trust remembered behavior. Tag push publishes `aphrodite` +
   `aphrodite-hermes` (no already-published check); `aphrodite-headroom-core`
-  is dispatch-gated, NOT tag-reachable. Any unexpected tag-reachable publish
-  → stop. Commands + snapshot: references/release-steps.md Step R2.
-- **Never re-tag; never move the tag.** The tag is immutable evidence on the
-  exact release-sync commit - a later cleanup tip must NOT move it;
-  re-tagging re-fires Build/Publish.
+  is dispatch-gated, NOT tag-reachable. Unexpected tag-reachable publish →
+  stop. Commands + snapshot: references/release-steps.md Step R2.
+- **Never re-tag; never move the tag.** Immutable evidence on the exact
+  release-sync commit; re-tagging re-fires Build/Publish.
 - **`BINARY_VERSION` bumps LAST (after assets exist):** a pre-asset bump
   404s every download; `_check_version_published` warning = hard stop.
 - **Registry:** the tag push already ran `cargo publish` - never
-  re-dispatch; verify consumer-side via the crates.io API `max_version`
+  re-dispatch; verify consumer-side via crates.io API `max_version`
   (commands: references/release-steps.md Step R6); failed publish → release
   a NEW version; never re-publish a burned version.
 - **Artifacts:** Finalize fails loudly on missing assets; 12 = 4 targets ×
@@ -227,8 +211,8 @@ as a commit; verify with `git log`).
   empty is EXPECTED; counter reset after the bump is NORMAL. Terminal output
   is CCR-compressed - scan for `<<<CCR:` and retrieve before reading on.
 - Proxies down + inline-only is the user's ACCEPTED state - no proxy-restart
-  default fix. A misleading preview is a BUG, not cosmetic; classify before
-  touching preview code (references/preview-quality-debugging.md).
+  default fix. A misleading preview is a BUG, not cosmetic (runbook:
+  references/preview-quality-debugging.md).
 
 ### Recover
 
@@ -248,24 +232,22 @@ as a commit; verify with `git log`).
 ## Hotfix on Current - the fast path
 
 Worked DIRECTLY on Current - no Development round-trip, no full ceremony.
-The same state machine runs with Current as the workspace: Prepare →
-Validate on Current, Release on Current, then Integrate = sync-back to
-Development. The user drives every commit/tag/push decision; never commit,
-tag, or push unasked.
+Same state machine, Current as workspace: Prepare → Validate on Current,
+Release on Current, then Integrate = sync-back to Development. The user
+drives every commit/tag/push decision; never commit, tag, or push unasked.
+Steps H1-H6: references/hotfix.md.
 
 - Claim the NEXT patch number, never a burned one - check crates.io
   `max_version` before the bump (Step H1).
 - `BINARY_VERSION` bumps LAST + gitlink floats LAST (rule R3): only after
-  the release assets exist (tag pushed AND Build completed).
+  release assets exist (tag pushed AND Build completed).
 - Run B4 (I1) + Gate R7 (R2) + approval pause (R4) before the tag; a
   cleanup commit does NOT move the tag.
 - **Sync-back = selective `git cherry-pick -x`, CHRONOLOGICAL, submodule
-  FIRST then parent.** PICK real fixes (setup.rs changes, config-template
-  refresh, docs URL fixes, release-notes finalization, version bumps that
-  ride the line). SKIP gitlink-only bumps (the gitlink is branch-owned,
-  Development floats its own), style-only commits on rewritten files,
-  snapshots that re-add removed content (e.g. `directives/`) or delete test
-  files. Never merge Current wholesale; never rebase picks.
+  FIRST then parent.** PICK real fixes; SKIP gitlink-only bumps, style-only
+  commits on rewritten files, snapshots re-adding removed content or
+  deleting test files (full lists: references/compressed-detail.md). Never
+  merge Current wholesale; never rebase picks.
 - **Empty cherry-pick ≠ error:** `nothing to commit, working tree clean`
   means already contained - `git diff <HEAD> <source> -- <paths>`, skip.
 - **Marker sweep after EVERY `--continue`:** a second conflict region gets
@@ -273,32 +255,28 @@ tag, or push unasked.
   `git commit --amend --no-edit` (command: references/hotfix.md Step H4).
 - **Identity re-expression guard (Step H5)** after any gitlink pick:
   controlled restore, then identity diffs empty (I9) and no `+` in `git
-  submodule status` - a pick must never transplant Current's identity onto
-  Development.
+  submodule status` - never transplant Current's identity onto Development.
 - Verify remote tip, not push output: `git log Source/Development` -
   "Everything up-to-date" is not evidence.
 
 ## Pitfalls (mechanics + probes: references/pitfalls.md)
 
-- **Never re-create the git hooks.** The `.githooks/` set was removed
-  because the auto-bump hooks were the resurrection vector for the phantom
+- **Never re-create the git hooks.** `.githooks/` was removed because the
+  auto-bump hooks were the resurrection vector for the phantom
   self-referential gitlink (`post-commit`/`post-checkout` re-staged a 160000
-  entry after every manual clear; `package.json`'s `prepare` re-installed
-  the hooks). Re-creating any hook or the `prepare` script is a ceremony
-  violation.
-- **Never ignore a phantom self-referential gitlink.** A mode-160000 entry
-  inside the submodule pointing at its OWN commit (no `.gitmodules` there,
-  so any 160000 is self-referential); detect: `git -C <submodule> ls-files
-  -s | grep 160000`. The auto-committer re-stages a fresh phantom after you
-  clear it - re-check after EVERY subsequent submodule commit; a clean check
-  at session end is the pass criterion.
-- **Never trust `git status` while the auto-committer runs.** It sweeps
-  staged squash sets and gitlink bumps into commits; verify with `git log`/
-  `git submodule status`.
+  entry; `package.json`'s `prepare` re-installed the hooks). Re-creating any
+  hook or `prepare` is a ceremony violation.
+- **Never ignore a phantom self-referential gitlink.** mode-160000 entry
+  inside the submodule pointing at its OWN commit (no `.gitmodules` there);
+  detect: `git -C <submodule> ls-files -s | grep 160000`. Auto-committer
+  re-stages a fresh phantom - re-check after EVERY subsequent submodule
+  commit; clean check at session end is the pass criterion.
+- **Never trust `git status` while the auto-committer runs.** Verify with
+  `git log`/`git submodule status`.
 - **Removing a subsystem = sweep the whole tree, then record the absence.**
   A removed `#[no_mangle]` export without the dylib expected-symbol-list
-  update kills `aphrodite_rebuild` ("missing an expected symbol") - grep the
-  tooling/check code, not just lib.rs. State the absence as a ceremony rule.
+  update kills `aphrodite_rebuild` ("missing an expected symbol"). State the
+  absence as a ceremony rule.
 - **Never let the shim or templates drift.** setup.rs asserts byte-identity
   of `templates/__init__.py` vs the live plugin `__init__.py`; stale
   templates write configs missing engine keys.
@@ -328,6 +306,7 @@ tag, or push unasked.
 - references/plugin-lifecycle.md - install layouts, key sourcing.
 - references/engine-health-debugging.md - engine probe battery (runbook).
 - references/preview-quality-debugging.md - preview defect classes (runbook).
+- references/compressed-detail.md - worked detail moved out of SKILL.md.
 - `aphrodite-branch-release-flow` - superseded; archived; **Historical
   only - do not execute**.
 
