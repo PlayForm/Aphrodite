@@ -1,15 +1,26 @@
 name: Publish
 
 concurrency:
-  group: Publish-${{ github.workflow }}-${{ github.ref }}
+  # Under workflow_run chaining github.ref is the default branch, not the
+  # tag - key the group on the triggering Build run's tag instead so a
+  # faster v1.6.4 chain can never cancel an in-flight v1.6.3 publish.
+  group: Publish-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 permissions:
   contents: write
 
+# Publish runs ONLY after Build.yml's run for the same release tag has
+# completed successfully (workflow_run chaining). The tag push itself no
+# longer starts Publish, so publishing can never race or precede the build,
+# and the gitlink bump can never run before Build.yml's Finalize has pushed
+# the child SHA256SUMS commit. Every job is gated on the triggering run's
+# conclusion + tag shape, and every checkout is pinned to that tag so the
+# published code is exactly the code Build tested.
 on:
-  push:
-    tags: ["Aphrodite/v*"]
+  workflow_run:
+    workflows: ["Build.yml"]
+    types: [completed]
 
 env:
   ADBLOCK: true
@@ -48,11 +59,17 @@ env:
 jobs:
   Test:
     name: Test
+    # Only a SUCCESSFUL Build run that was triggered by an Aphrodite release
+    # tag may start the publish chain (workflow_run chaining).
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          # Pin to the exact tag Build ran - the publish suite must test the
+          # same code, not whatever the default branch happens to be at.
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Setup Rust (nightly, latest)
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
@@ -100,12 +117,14 @@ jobs:
   Publish-Headroom-Core:
     name: Publish aphrodite-headroom-core
     needs: [Test]
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')
     runs-on: ubuntu-latest
     environment: Release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Setup Rust (nightly, latest)
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
@@ -135,7 +154,7 @@ jobs:
       # re-publishing one that's already live errors - so check first and skip
       # if it's already there.
       - name: Check if aphrodite-headroom-core version is already published
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_crates) || startsWith(github.ref, 'refs/tags/Aphrodite/') }}
+        if: ${{ startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v') }}
         id: check
         working-directory: vendor/headroom
         run: |
@@ -157,12 +176,14 @@ jobs:
   Publish-Aphrodite:
     name: Publish aphrodite
     needs: [Test, Publish-Headroom-Core]
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')
     runs-on: ubuntu-latest
     environment: Release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Setup Rust (nightly, latest)
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
@@ -188,7 +209,7 @@ jobs:
       # Publish-Headroom-Core has run, aphrodite-headroom-core is live on
       # crates.io and this succeeds.
       - name: Publish to crates.io (opt-in)
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_crates) || startsWith(github.ref, 'refs/tags/Aphrodite/') }}
+        if: ${{ startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v') }}
         run: cargo publish -p aphrodite --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -196,12 +217,14 @@ jobs:
   Publish-Hermes:
     name: Publish aphrodite-hermes
     needs: [Publish-Aphrodite]
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')
     runs-on: ubuntu-latest
     environment: Release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Setup Rust (nightly, latest)
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
@@ -226,7 +249,7 @@ jobs:
       # (Publish-Headroom-Core). Runs only on explicit workflow_dispatch with
       # publish_crates.
       - name: Publish to crates.io (opt-in)
-        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_crates) || startsWith(github.ref, 'refs/tags/Aphrodite/') }}
+        if: ${{ startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v') }}
         run: cargo publish -p aphrodite-hermes --no-verify
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -240,7 +263,9 @@ jobs:
   Bump-Plugin-Gitlink:
     name: Bump plugin submodule gitlink
     needs: [Publish-Aphrodite]
-    if: startsWith(github.ref, 'refs/tags/Aphrodite/v')
+    # workflow_run chaining: Build.yml has fully completed by now, so
+    # Finalize's child SHA256SUMS commit is already on the child's Current.
+    if: github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -249,14 +274,17 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+          # Pin to the release tag, not the default branch: the gitlink bump
+          # must commit on the line the tag was cut from.
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Advance child submodule to its Current tip
         run: |
           set -euo pipefail
           CHILD="plugins/aphrodite"
-          # Build.yml's Finalize may still be pushing the child commit when
-          # this job starts; retry the fetch briefly so the gitlink lands on
-          # the commit carrying the fresh SHA256SUMS.txt.
+          # Build.yml has completed (workflow_run) and Finalize pushed the
+          # child commit carrying the fresh SHA256SUMS.txt; the retry is
+          # belt-and-braces for remote propagation lag.
           for i in 1 2 3 4 5; do
             if git -C "${CHILD}" fetch origin Current 2>/dev/null; then break; fi
             echo "child fetch attempt $i failed; retrying in 10s"
@@ -275,7 +303,10 @@ jobs:
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          V="${GITHUB_REF_NAME#Aphrodite/v}"
+          # Under workflow_run, GITHUB_REF_NAME is the default branch, not
+          # the tag - take the version from the triggering Build run.
+          TAG="${{ github.event.workflow_run.head_branch }}"
+          V="${TAG#Aphrodite/v}"
           git add "${CHILD}"
           git commit -m "chore: bump plugins/aphrodite to child Current (in-tree SHA256SUMS.txt for v${V})"
           # The tag was pushed from Current; keep the parent's branch in sync.
