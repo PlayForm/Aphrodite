@@ -287,3 +287,31 @@ jobs:
             fi
             git -C "${CHILD}" -c http.https://github.com/.extraheader= push "https://x-access-token:${PLAYFORM_RELEASE_PAT}@github.com/PlayForm/Aphrodite-Hermes.git" Current
           fi
+
+      # The child plugin repo carries its own version tags (v2.2.x scheme,
+      # annotated; historically user-signed). Create the plugin tag from
+      # plugin.yaml's version at the freshly-pushed child tip so the pinned
+      # plugin release is findable. CI-created tags are annotated but
+      # UNSIGNED (no GPG key in the runner) - re-sign manually if the
+      # signed-tag convention must hold. Idempotent: skips when the tag
+      # already exists (re-runs, and the 1.6.4/2.2.3 cycles that skipped
+      # tagging).
+      - name: Tag the plugin release (child repo)
+        env:
+          PLAYFORM_RELEASE_PAT: ${{ secrets.PLAYFORM_RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          CHILD="plugins/aphrodite"
+          TAG="v$(grep '^version' "${CHILD}/plugin.yaml" | head -1 | sed 's/^version: *//')"
+          if git -C "${CHILD}" ls-remote --tags origin "${TAG}" 2>/dev/null | grep -q "refs/tags/${TAG}$"; then
+            echo "${TAG} already exists on the child - nothing to do"
+            exit 0
+          fi
+          git -C "${CHILD}" config --global --unset-all http.https://github.com/.extraheader || true
+          if [ -z "${PLAYFORM_RELEASE_PAT:-}" ]; then
+            echo "::error::PLAYFORM_RELEASE_PAT (Release-environment secret) is not set - cannot tag the child repo" >&2
+            exit 1
+          fi
+          git -C "${CHILD}" tag -a "${TAG}" -m "${TAG}"
+          git -C "${CHILD}" -c http.https://github.com/.extraheader= push "https://x-access-token:${PLAYFORM_RELEASE_PAT}@github.com/PlayForm/Aphrodite-Hermes.git" "${TAG}"
+          echo "plugin tagged ${TAG} at $(git -C "${CHILD}" rev-parse --short HEAD)"

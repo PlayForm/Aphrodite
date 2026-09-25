@@ -19,7 +19,10 @@ permissions:
 # published code is exactly the code Build tested.
 on:
   workflow_run:
-    workflows: ["Build.yml"]
+    # The `workflows:` list matches the referenced workflow's `name:`
+    # metadata (Build.yml declares `name: Build`), NOT the file name - a
+    # filename here silently never fires the event.
+    workflows: ["Build"]
     types: [completed]
 
 env:
