@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.6.4 - Publish chaining + shim import hygiene + cross-repo child push (2026-09-25)
+
+A release-infra and plugin-hygiene release over v1.6.3. The shim's runtime-home
+decision export moves from import time to `register()` (a module import now
+has ZERO environment side effects - CI runs every test in one process, and the
+import-time export made `layout_check` heal against the real runner home,
+breaking Development's Python FFI checks); Publish.yml stops racing the build
+and starts only after the same tag's Build.yml run completed successfully;
+and Build.yml's Finalize can finally push the in-tree checksums to the child
+repo (the 1.6.3 Finalize 403). Binary `1.6.3 → 1.6.4`, plugin `2.2.3 → 2.2.4`.
+
+- **Fix (plugin, import hygiene)**: the `APHRODITE_HOME` /
+  `APHRODITE_DIRECTIVES_DIR` exports move from import time into a new
+  `_export_runtime_home_env()` called at the top of `register()` - the dylib,
+  directives materialize, and the proxy child still inherit the same F1
+  decision, but a mere `import` of the shim no longer mutates the process
+  environment (which broke every layout_check test in CI's single-process
+  pytest run: the leak made the heal target the real `/home/runner` home).
+  Regression test `test_import_never_leaks_env`; the CI-shaped repro (shim
+  import + full layout suite in one process) passes 15/15.
+- **Chore (CI, publish chaining)**: `Publish.yml` switches from the tag-push
+  trigger to `workflow_run` on Build.yml completion - publishing can never
+  race or precede the build, and the gitlink bump can never run before
+  Finalize pushed the child SHA256SUMS commit. Every Publish job is gated on
+  `conclusion == 'success'` + the triggering tag, every checkout is pinned to
+  that tag (the published code is exactly the code Build tested), and the
+  concurrency group is keyed on the tag.
+- **Chore (CI, cross-repo child push)**: Build.yml's Finalize pushes the
+  in-tree `SHA256SUMS.txt` to `PlayForm/Aphrodite-Hermes` with the
+  `PLAYFORM_RELEASE_PAT` Release-environment secret (`GITHUB_TOKEN` is scoped
+  to the parent repo and cannot push to the child - the 1.6.3 Finalize 403);
+  the step drops the parent token's extraheader and fails loudly with an
+  `::error::` when the secret is missing. Manual child-push fallback no
+  longer needed at release time.
+
 ## v1.6.3 - One runtime-home decision for both halves (2026-09-25)
 
 Fixes issue #40: the plugin's Python shim and its Rust half (dylib + proxy

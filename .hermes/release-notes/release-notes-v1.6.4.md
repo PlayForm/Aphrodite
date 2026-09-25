@@ -1,7 +1,3 @@
-> **Draft** - planned 1.6.4 binary release note. Finalized copy staged as
-> `release-notes-v1.6.4.md` in this directory; this draft tracks the same
-> content for the next release cycle.
-
 **[Compare Aphrodite/v1.6.3...Aphrodite/1.6.4](https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.6.3...Aphrodite/1.6.4)**
 
 ## Aphrodite 1.6.4 💋 Plugin v2.2.4
