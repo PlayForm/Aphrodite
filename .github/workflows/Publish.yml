@@ -314,5 +314,17 @@ jobs:
           git commit -m "chore: bump plugins/aphrodite to child Current (in-tree SHA256SUMS.txt for v${V})"
           # The tag was pushed from Current; keep the parent's branch in sync.
           BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo Current)"
-          git push origin "HEAD:${BRANCH}"
+          # Current is branch-protected (required status checks) - GITHUB_TOKEN
+          # pushes to it are rejected (GH006). The gitlink bump then stays a
+          # manual admin push; degrade with a loud warning instead of failing
+          # the whole publish chain (the crates publish already succeeded).
+          if ! git push origin "HEAD:${BRANCH}" 2>&1 | tee /tmp/gitlink-push.log; then
+            if grep -qE "GH006|protected branch" /tmp/gitlink-push.log; then
+              echo "::warning::Current is branch-protected - the gitlink bump must be pushed manually (admin push) or by adding github-actions[bot] as a bypass actor on the Current rule; the pipeline continues"
+              exit 0
+            fi
+            echo "::error::gitlink push failed for an unexpected reason:" >&2
+            cat /tmp/gitlink-push.log >&2
+            exit 1
+          fi
 

@@ -95,3 +95,33 @@ Notes:
 - Boot takes ~4s; match responses by request `id` (the child also emits event frames).
 - If the probe prints nothing, allow more boot time and confirm no leftover
   `tui_gateway.entry` from a previous probe run.
+
+## Process forensics: the TUI's own gateway child
+
+`pgrep -f hermes` MISSES the TUI's gateway child: the Ink TUI spawns its
+own (`python3 -m tui_gateway.entry`, stdio pipes), distinct from
+`gateway run --external-supervisor` processes. Find it via
+`ps aux | grep tui_gateway` or the children of `node ui-tui/dist/entry.js`;
+inspect with `lsof -a -p <pid> -d cwd` and `ps eww -p <pid>` (env: look for
+`HERMES_CWD`, `TERMINAL_CWD`). `TERMINAL_CWD` reaches the PTY child only -
+not the TUI's gateway child or the dashboard in-memory gateway. Session
+launch dirs: `sqlite3 ~/.hermes/state.db "SELECT id, source, cwd FROM
+sessions ORDER BY started_at DESC LIMIT 6"` - `~`-launched sessions explain
+"completion shows home files". Prove the launch dir before advising: four
+sources must agree (`sessions.cwd`, `HERMES_CWD`, `TERMINAL_CWD`, gateway
+child cwd).
+
+## Probe run rules (`scripts/probe_complete_path.py`)
+
+Wait for the `gateway.ready` event frame before sending RPCs - requests
+written before boot are lost. Read stdout with `select` + timeout, never a
+blocking readline. Skip `session.create` (it can stall the entry). SIGTERM
+dumps from throwaway children land in `~/.hermes/logs/tui_gateway_crash.log`
+- respawn/SIGTERM entries there are normal lifecycle, not crashes. Set
+`PYTHONPATH` + `HERMES_PYTHON_SRC_ROOT` to the source root or the import
+guard may load a different package. Keep probe runs short - multiple gateway
+children contend for state.db. Spawn with the live env mirrored (cwd =
+HERMES_CWD = launch dir); match responses by request `id`; boot takes ~4s;
+stdio is BINARY pipes - encode the JSON-RPC frame (`frame.encode()`), or
+`stdin.write` raises `TypeError`. If the probe prints nothing, allow more
+boot time and confirm no leftover `tui_gateway.entry` from a previous run.
