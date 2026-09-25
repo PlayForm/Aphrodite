@@ -20,6 +20,7 @@ pub enum SetupError {
 pub(crate) struct SetupCtx {
 	pub(crate) aphrodite_dir:PathBuf,
 	pub(crate) binaries_dir:PathBuf,
+	pub(crate) plugin_dir:PathBuf,
 	pub(crate) own_path:PathBuf,
 	pub(crate) own_hash:String,
 }
@@ -35,6 +36,7 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	let ctx = SetupCtx {
 		aphrodite_dir:home.join(".hermes").join("aphrodite"),
 		binaries_dir:home.join(".hermes").join("aphrodite").join("binaries"),
+		plugin_dir:home.join(".hermes").join("plugins").join("aphrodite"),
 		own_path,
 		own_hash,
 	};
@@ -48,6 +50,18 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// ── Step 2: Create directory structure ──
 	fs::create_dir_all(&ctx.binaries_dir)?;
 	fs::create_dir_all(&ctx.aphrodite_dir)?;
+
+	// ── Step 2b: Prepare the Hermes plugin dir (hooks-only) ──
+	// The plugin dir holds ONLY the loader (plugin.yaml + __init__.py) that
+	// registers hooks/tools; every runtime artifact (binaries, config, state)
+	// lives in the runtime home. A stale symlink from older installs (plugin
+	// dir -> runtime home) is removed first so the loader files land as real
+	// files, never through the link into the runtime home.
+	if ctx.plugin_dir.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+		println!("removing stale plugin symlink -> {}", ctx.plugin_dir.display());
+		fs::remove_file(&ctx.plugin_dir)?;
+	}
+	fs::create_dir_all(&ctx.plugin_dir)?;
 
 	// ── Step 3: Copy self to binaries dir (always overwrite - the binary
 	// is the install payload; config is preserved unless --force) ──
@@ -87,18 +101,20 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// ── Step 8: Write __init__.py shim ──
 	write_init_py(&ctx)?;
 
+	// ── Step 8b: Write the BINARY_VERSION pin into the runtime home ──
+	write_binary_version(&ctx)?;
+
 	// ── Step 9: Register with hermes ──
 	register_plugin(&ctx)?;
 
 	println!("aphrodite installed -> {}", ctx.aphrodite_dir.display());
 	println!(
-		"plugin directory ready: {} (setup no longer symlinks it into Hermes automatically)",
+		"  binaries, config, and state: {} (everything the plugin manages)",
 		ctx.aphrodite_dir.display()
 	);
 	println!(
-		"link it manually: ln -s {} {}/plugins/aphrodite",
-		ctx.aphrodite_dir.display(),
-		home.display()
+		"  hooks registered (loader only): {}",
+		ctx.plugin_dir.display()
 	);
 
 	Ok(())

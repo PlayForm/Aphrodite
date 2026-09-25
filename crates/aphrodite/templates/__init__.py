@@ -164,6 +164,29 @@ def _data_dir() -> Path:
         return _hermes_home() / "aphrodite"
 
 
+def _binary_version_path() -> Path:
+    """BINARY_VERSION pin: the loader's own checkout pins the version it was
+    shipped against (source mode); installed layouts carry the pin in the
+    runtime home, written by `aphrodite setup`. The plugin dir itself is
+    never a runtime data location - in an installed hooks-only dir this
+    fallback simply misses and the runtime home serves."""
+    own = _PLUGIN_DIR / "BINARY_VERSION"
+    if own.exists():
+        return own
+    return _data_dir() / "BINARY_VERSION"
+
+
+def _download_script() -> Path:
+    """download.sh location: the source checkout ships it beside the loader
+    (dev loops); installed layouts would keep it in the runtime home since
+    everything the plugin downloads lives under ~/.hermes/aphrodite. Never
+    a write - the plugin never modifies its own directory."""
+    own = _PLUGIN_DIR / "download.sh"
+    if own.exists():
+        return own
+    return _data_dir() / "download.sh"
+
+
 def _dylib_candidates(plugin_dir: Path) -> list[str]:
     """Ordered dylib candidates, env override first, parent-depth guarded.
 
@@ -183,7 +206,6 @@ def _dylib_candidates(plugin_dir: Path) -> list[str]:
     candidates = [
         _DYLIB_PATH,  # APHRODITE_HERMES_DYLIB_PATH override (or canonical default) - wins when it exists
         canonical,  # canonical runtime home (where download.sh writes the verified binary)
-        str(plugin_dir.parent / "binaries" / _DYLIB_NAME),  # legacy fallback (old installs)
     ]
     parents = plugin_dir.parents
     for depth in (2, 3):
@@ -198,24 +220,14 @@ def _resolve_binary_path() -> str:
 
     APHRODITE_BINARY_PATH wins when it exists. Otherwise use
     <hermes-home>/aphrodite/binaries (where download.sh writes the
-    checksum-verified binary), then any pre-existing plugin-dir copy (with
-    a warning). Returns the last candidate (missing) when nothing exists -
-    callers log the final miss.
+    checksum-verified binary). Returns the last candidate (missing) when
+    nothing exists - callers log the final miss.
     """
     if os.path.exists(_BINARY_PATH):
         return _BINARY_PATH
     canonical = str(_BINARIES_DIR / _BINARY_NAME)
     if os.path.exists(canonical):
         return canonical
-    legacy = str(_PLUGIN_DIR.parent / "binaries" / _BINARY_NAME)
-    if os.path.exists(legacy):
-        _log.warning(
-            "canonical binary %s not found - using legacy plugin-dir copy "
-            "%s (old install; run download.sh to migrate)",
-            canonical,
-            legacy,
-        )
-        return legacy
     return _BINARY_PATH
 
 
@@ -510,7 +522,7 @@ def _check_version(dylib: ctypes.CDLL) -> None:
     try:
         loaded = _call_json(dylib, "aphrodite_hermes_version")
         loaded_version = (loaded or {}).get("version") if isinstance(loaded, dict) else None
-        expected_path = _PLUGIN_DIR / "BINARY_VERSION"
+        expected_path = _binary_version_path()
         expected_version = expected_path.read_text().strip() if expected_path.exists() else None
         if loaded_version and expected_version and loaded_version != expected_version:
             _log.warning(
@@ -577,7 +589,7 @@ def _check_version_published() -> None:
         import urllib.request
         from urllib.parse import quote
 
-        version_file = _PLUGIN_DIR / "BINARY_VERSION"
+        version_file = _binary_version_path()
         if not version_file.exists():
             return
         version = version_file.read_text().strip()
@@ -641,7 +653,7 @@ def _ensure_binaries() -> None:
             env = os.environ.copy()
             env["BINARY_DIR"] = str(_BINARIES_DIR)
             result = subprocess.run(
-                ["bash", str(_PLUGIN_DIR / "download.sh")],
+                ["bash", str(_download_script())],
                 timeout=180,
                 capture_output=True,
                 text=True,
@@ -650,15 +662,15 @@ def _ensure_binaries() -> None:
             )
         except Exception as e:
             _log.warning(
-                "failed to run %s (%s) - run download.sh manually to fetch the aphrodite binaries",
-                _PLUGIN_DIR / "download.sh",
+                "failed to run %s (%s) - run `aphrodite setup` to install the aphrodite binaries",
+                _download_script(),
                 e,
             )
             return
         if result.returncode != 0:
             tail = "\n".join(((result.stdout or "") + (result.stderr or "")).splitlines()[-15:])
             _log.warning(
-                "download.sh exited %d - run download.sh manually to fetch the "
+                "download.sh exited %d - run `aphrodite setup` to install the "
                 "aphrodite binaries; output tail:\n%s",
                 result.returncode,
                 tail,
@@ -675,12 +687,11 @@ def _ensure_binaries() -> None:
             missing.append(f"{label} ({p})")
     _log.warning(
         "aphrodite binaries missing (%s) - the plugin will not register. "
-        "Run `bash %s` or `aphrodite setup` once to fetch them from the "
-        "release (explicit setup step; register() never downloads, and the "
-        "plugin never writes into its own directory), or set "
+        "Run `aphrodite setup` once to install them into the runtime home "
+        "(explicit setup step; register() never downloads, and the plugin "
+        "never writes into its own directory), or set "
         "APHRODITE_AUTO_DOWNLOAD=1 for the legacy auto-fetch",
         "; ".join(missing),
-        _PLUGIN_DIR / "download.sh",
     )
 
 
@@ -920,10 +931,9 @@ def register(ctx: Any) -> None:
         # register, so we log and return.
         _log.error(
             "aphrodite-hermes dylib could not be loaded (%s) - plugin disabled; "
-            "run `bash %s` or `aphrodite setup` to fetch the binaries "
-            "(explicit setup step), then restart Hermes",
+            "run `aphrodite setup` to install the binaries into the runtime "
+            "home (explicit setup step), then restart Hermes",
             e,
-            _PLUGIN_DIR / "download.sh",
         )
         return
     _log.info("aphrodite-hermes dylib loaded: %s", _DYLIB_PATH)
@@ -931,15 +941,20 @@ def register(ctx: Any) -> None:
 
     # ── Layout self-heal (best-effort, never raises) ──
     # Ensure the ~/.hermes runtime layout matches the canonical schema before
-    # anything consumes it: relocates misplaced config/binaries out of the
-    # plugin dir and warns on anything ambiguous. Failures degrade to a
-    # warning - the plugin still registers.
+    # anything consumes it: runtime state belongs in ~/.hermes/aphrodite, and
+    # the plugin dir stays hooks-only. The layout_check module ships with the
+    # source checkout; installed hooks-only layouts simply skip it (debug
+    # level, no noise) - `aphrodite setup` already produced the canonical
+    # layout.
     try:
-        from .layout_check import check_and_heal
+        if (Path(__file__).resolve().parent / "layout_check.py").exists():
+            from .layout_check import check_and_heal
 
-        report = check_and_heal()
-        for w in report.get("warnings", []):
-            _log.warning("layout self-heal: %s", w)
+            report = check_and_heal()
+            for w in report.get("warnings", []):
+                _log.warning("layout self-heal: %s", w)
+        else:
+            _log.debug("layout_check.py not shipped with this install - self-heal skipped")
     except Exception as e:
         _log.warning("layout self-heal skipped: %s", e)
 

@@ -1,0 +1,90 @@
+name: Release
+
+# SHARED group with Dependabot.yml Merge → mutual exclusion for all writes to the release branch.
+concurrency:
+    group: aphrodite-release-write
+    cancel-in-progress: false
+
+permissions:
+    contents: write
+
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: "23 4 * * 1"   # weekly Mon 04:23 UTC; monthly: "23 4 1 * *"
+
+jobs:
+    Release:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
+                  fetch-tags: true
+                  token: ${{ secrets.GITHUB_TOKEN }}
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: actions/setup-node@820762026786740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: "24"   # package.json carries the binary version; keep it in lockstep
+
+            # Aphrodite's release line: Development. Point 'Source' + branch at the repo's own remote/line.
+            - run: git pull --ff-only Source Development   # fresh HEAD first
+
+            - name: Guard - skip if no commits since last tag
+              id: guard
+              run: |
+                  LAST_TAG=$(git describe --tags --match 'Aphrodite/v*' --abbrev=0 2>/dev/null || echo "")
+                  echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+                  if [ -z "$LAST_TAG" ]; then echo "skip=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+                  COUNT=$(git rev-list --count "${LAST_TAG}..HEAD")
+                  echo "commits_since=$COUNT" >> "$GITHUB_OUTPUT"
+                  [ "$COUNT" -eq 0 ] && echo "skip=true" >> "$GITHUB_OUTPUT" || echo "skip=false" >> "$GITHUB_OUTPUT"
+
+            - name: Final rebase + decide version
+              if: steps.guard.outputs.skip == 'false'
+              id: bump
+              run: |
+                  git pull --rebase Source Development || true
+                  if git log "${LAST_TAG}..HEAD" --pretty=%s | grep -qE '^feat(\(.*\))?:'; then BUMP=minor; else BUMP=patch; fi
+                  CURRENT=$(grep '^version' crates/aphrodite/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+                  MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+                  MINOR=$(echo "$CURRENT" | cut -d. -f2)
+                  PATCH=$(echo "$CURRENT" | cut -d. -f3)
+                  if [ "$BUMP" = "minor" ]; then NEXT="$MAJOR.$((MINOR+1)).0"; else NEXT="$MAJOR.$MINOR.$((PATCH+1))"; fi
+                  # Lockstep bump: both parent crates (first version line) + the hermes dep pin + package.json.
+                  sed -i "0,/^version = \"[^\"]*\"/s//version = \"$NEXT\"/" crates/aphrodite/Cargo.toml
+                  sed -i "0,/^version = \"[^\"]*\"/s//version = \"$NEXT\"/" crates/aphrodite-hermes/Cargo.toml
+                  sed -i "s/\(aphrodite = {[^}]*version = \"\)[^\"]*\"/\1$NEXT\"/" crates/aphrodite-hermes/Cargo.toml
+                  node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p));j.version='$NEXT';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+                  echo "next=$NEXT" >> "$GITHUB_OUTPUT"; echo "tag=Aphrodite/v$NEXT" >> "$GITHUB_OUTPUT"
+
+            # Fork ordering (only when vendor/headroom's crate version moved this cycle):
+            # dispatch Publish.yml (publish_crates=true) BEFORE the tag push below, then
+            # verify the fork version is live on crates.io before pushing the parent tag.
+            # (see automatic-release-pipeline pitfalls: fork-before-parent publish order)
+
+            - name: Generate notes (git-cliff)
+              if: steps.guard.outputs.skip == 'false'
+              run: |
+                  npx git-cliff --config cliff.toml --tag "${{ steps.bump.outputs.tag }}" --output CHANGELOG.md --unreleased
+                  npx git-cliff --config cliff.toml --tag "${{ steps.bump.outputs.tag }}" --unreleased --template Release.tpl > ~/.hermes/tmp/release-notes.md
+
+            - name: Commit, tag-last, push (bounded retry)
+              if: steps.guard.outputs.skip == 'false'
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add CHANGELOG.md crates/aphrodite/Cargo.toml crates/aphrodite-hermes/Cargo.toml Cargo.lock package.json
+                  git commit -m "chore(release): ${{ steps.bump.outputs.tag }}"
+                  git tag -a "${{ steps.bump.outputs.tag }}" -m "${{ steps.bump.outputs.tag }}"   # never bare (gpgsign)
+                  for i in 1 2 3; do
+                    git push --follow-tags Source Development && break
+                    git pull --rebase Source Development
+                    git tag -f -a "${{ steps.bump.outputs.tag }}" -m "${{ steps.bump.outputs.tag }}"
+                  done
+
+            - name: Create GitHub Release (the tag push drives Build.yml + Publish.yml)
+              if: steps.guard.outputs.skip == 'false'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: gh release create "${{ steps.bump.outputs.tag }}" --title "Aphrodite ${{ steps.bump.outputs.tag }}" --notes-file ~/.hermes/tmp/release-notes.md

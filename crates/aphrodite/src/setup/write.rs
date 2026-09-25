@@ -15,8 +15,13 @@ pub(crate) const CONFIG_TEMPLATE:&str = include_str!("../../templates/aphrodite.
 /// `aphrodite setup` (e.g. after `cargo install aphrodite@<newer>`) must
 /// refresh it rather than freeze it at the first-install version. Only the
 /// user-editable `aphrodite.toml` stays `--force`-gated.
+///
+/// The manifest lands in the Hermes plugin dir together with the `__init__.py`
+/// loader - that directory is hooks-only. Everything else (binaries, config,
+/// state) lives in the runtime home `~/.hermes/aphrodite`.
 pub(crate) fn write_plugin_yaml(ctx:&SetupCtx, args:&SetupArgs) -> Result<(), SetupError> {
-	let path = ctx.aphrodite_dir.join("plugin.yaml");
+	let path = ctx.plugin_dir.join("plugin.yaml");
+	fs::create_dir_all(&ctx.plugin_dir)?;
 
 	let yaml = format!(
 		r#"name: aphrodite
@@ -80,14 +85,30 @@ install_message: |
 pub(crate) const HERMES_PLUGIN_SHIM:&str = include_str!("../../templates/__init__.py");
 
 pub(crate) fn write_init_py(ctx:&SetupCtx) -> Result<(), SetupError> {
-	let path = ctx.aphrodite_dir.join("__init__.py");
+	let path = ctx.plugin_dir.join("__init__.py");
 
 	// Always overwritten (03-F8): the shim is code, not config - its FFI symbol
 	// list and registration logic must match the freshly-installed dylib, so a
 	// re-run of `aphrodite setup` must refresh a doctored/stale shim rather than
-	// preserve it.
+	// preserve it. It is the hooks-only loader in the Hermes plugin dir; the
+	// runtime home carries binaries/config/state, never the loader.
 	println!("writing __init__.py -> {}", path.display());
 	fs::write(&path, HERMES_PLUGIN_SHIM)?;
+	secure_perms(&path, 0o644)?;
+	Ok(())
+}
+
+/// Write the BINARY_VERSION pin into the runtime home.
+///
+/// The loader resolves the version it was built/shipped against from the
+/// runtime home for installed layouts (this file), falling back to its own
+/// source checkout in dev (which pins its own version). Written to the
+/// runtime home so the plugin dir never carries runtime data - binaries,
+/// pins, and state all live under `~/.hermes/aphrodite`.
+pub(crate) fn write_binary_version(ctx:&SetupCtx) -> Result<(), SetupError> {
+	let path = ctx.aphrodite_dir.join("BINARY_VERSION");
+	println!("writing BINARY_VERSION -> {}", path.display());
+	fs::write(&path, format!("{}\n", env!("CARGO_PKG_VERSION")))?;
 	secure_perms(&path, 0o644)?;
 	Ok(())
 }

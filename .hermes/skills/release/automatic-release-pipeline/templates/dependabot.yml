@@ -1,0 +1,21 @@
+version: 2
+enable-beta-ecosystems: true
+
+updates:
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule: { interval: "daily" }
+
+    - package-ecosystem: "cargo"
+      directory: "/"
+      schedule: { interval: "daily" }
+      versioning-strategy: increase
+      # Conventional commit so dep bumps bucket into the changelog's dependency section.
+      commit_message:
+          prefix: "chore"
+          prefix-development: "chore"
+          include: "scope"
+
+    # Add package-ecosystem: "npm" (directory "/") only when package.json gains
+    # real dependencies; Aphrodite's package.json carries the binary version and
+    # must NOT be auto-bumped by Dependabot.

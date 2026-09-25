@@ -22,7 +22,7 @@ of the token cost. Read this file first - it is the map.
   (binary + dylib, auto-downloaded/auto-updated), `directives/`,
   `hotreload/` (dylib hot-reloads on mtime), `ccr.db`. The layout
   self-heals on start (re-copies binaries/directives/hotreload).
-- **Skills live dev-side** in `.hermes/skills/` (17 skills) and auto-load
+- **Skills live dev-side** in `.hermes/skills/` (58 skills) and auto-load
   because the repo is listed in `skills.trusted_project_dirs`
   (`~/.hermes/config.yaml`) - never ship them with the plugin, never re-trust.
 - **Issue #11 preview machinery (landed in 1.4.6)** - honest previews: the
@@ -88,32 +88,24 @@ of the token cost. Read this file first - it is the map.
 Run all gates before any release claim; report what commands printed, never
 "should pass".
 
-## Dev-side skills (auto-load; edit the files directly)
+## Skills
 
-- `aphrodite-release-flow` v2.1.0 - THE release/hotfix ceremony, incl. B4
-  and the pre-tag trigger audit (Gate R7).
-  (`aphrodite-branch-release-flow` is ARCHIVED - historical only, do not execute.)
-- `aphrodite-release-workflow` v2.1.0 - release gates: version ledger,
-  artifact contract matrix, publishing separation, release-notes standards,
-  crates.io publishing.
-- `aphrodite-boundaries` - universal stop conditions and repair constraints;
-  `aphrodite-orientation` - mandatory preflight gate before any live procedure.
-- `aphrodite-testing-discipline` - probe/test rules: exercise the real
-  plugin, no raw ctypes, scratch in `.hermes/tmp/`, env-var hermeticity.
-- `aphrodite-tool-testing` - the 13 CCR tools + retrieve-first rule.
-- `aphrodite-hook-reference` v2.0.0 - dispatcher; the five contract skills
-  (`aphrodite-hook-contracts`, `aphrodite-context-engine-contract`,
-  `aphrodite-ccr-protocol`, `aphrodite-compression-safety`,
-  `aphrodite-engine-observability`) own the details.
-- `aphrodite-operations` - compressed-session workflow, rebuild, dep pins.
-- `aphrodite-development` - session setup + imperative pitfalls
-  (supersedes `aphrodite-development-lessons`).
-- `aphrodite-benchmarking` - reproducible proxy smoke/cache/threshold
-  benchmarking.
-- `aphrodite-auto-expand-testing` - auto-expand is inert config; retrieve is
-  the only reliable path.
-- `aphrodite-cargo-upgrade` - dep-upgrade decision tree
-  (absorbs `aphrodite-upgrade-breakpoints`).
+The repo skill library lives in `.hermes/skills/` (58 skills, 57 active + 1
+archived), organized by category; the canonical inventory (version, status,
+mutation level, successor) is `.hermes/governance/SKILL-MANIFEST.md`. Skills
+auto-load (trusted project dir) and are edited in place.
+
+| Category    | Path                                    | Count |
+| ----------- | --------------------------------------- | ----- |
+| aphrodite   | `.hermes/skills/aphrodite/`             | 18    |
+| git         | `.hermes/skills/git/`                   | 7     |
+| github      | `.hermes/skills/github/`                | 8     |
+| hermes      | `.hermes/skills/hermes/`                | 7     |
+| release     | `.hermes/skills/release/`               | 2     |
+| docs        | `.hermes/skills/docs/`                  | 2     |
+| engineering | `.hermes/skills/engineering/`           | 11    |
+| curation    | `.hermes/skills/curation/`              | 2     |
+| archived    | `.hermes/skills/benchmark-run-summary/` | 1     |
 
 ## Standing rules
 

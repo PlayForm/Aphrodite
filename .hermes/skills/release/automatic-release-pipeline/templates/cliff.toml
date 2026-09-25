@@ -1,0 +1,27 @@
+[changelog]
+header = "# Changelog\n"
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+## {{ group }}
+
+{% for commit in commits %}
+- {{ commit.message | upper_first }}\
+  {% if commit.convention_scope %} (`{{ commit.convention_scope }}`){% endif %}\
+  {% if commit.github.pr_number %} ([#{{ commit.github.pr_number }}](https://github.com/PlayForm/Aphrodite/issues/{{ commit.github.pr_number }})){% endif %}
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+commit_parsers = [
+	{ message = "^feat", group = "Add" },
+	{ message = "^fix", group = "Fix" },
+	{ message = "^chore\\(deps\\)", group = "Dependencies" },
+	{ message = "^chore", group = "Change" },
+	{ message = "^docs", group = "Change" },
+	{ message = "^refactor", group = "Change" },
+]
+tag_pattern = "Aphrodite/v*"
