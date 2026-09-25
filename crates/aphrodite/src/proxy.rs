@@ -735,36 +735,36 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 	let ccr:Option<Arc<dyn CcrStore>> = match cli.mode {
 		ProxyMode::Token if !cli.no_ccr_marker => {
 			let db_path = cli.ccr_db_path.as_ref().map_or_else(
-			|| {
-				// Runtime home is a single shared decision
-				// (home::runtime_home: $APHRODITE_HOME -> $HERMES_HOME ->
-				// $HOME -> platform default), so the token proxy's SQLite
-				// database lives in the same home the plugin shim resolves
-				// (issue 40) - never a second, shadow home.
-				match crate::home::runtime_home_opt() {
-					Some(home) => home.join("ccr.db"),
-					None => {
-						// W2-3: degrade, never bail. A missing home dir
-						// (HOME unset or not an absolute path) used to
-						// silently fall back to /tmp, which a container
-						// restart wipes - the whole SQLite CCR database
-						// vanished with it. Warn loudly so the operator
-						// knows the DB is ephemeral, and keep going.
-						let fallback = std::path::PathBuf::from("/tmp")
-							.join(".hermes")
-							.join("aphrodite")
-							.join("ccr.db");
-						tracing::warn!(
-							"home directory unavailable (HOME unset or not absolute) - falling back to {}: the \
-							 SQLite CCR database will not survive a container restart",
-							fallback.display()
-						);
-						fallback
-					},
-				}
-			},
-			|p| p.clone(),
-		);
+				|| {
+					// Runtime home is a single shared decision
+					// (home::runtime_home: $APHRODITE_HOME -> $HERMES_HOME ->
+					// $HOME -> platform default), so the token proxy's SQLite
+					// database lives in the same home the plugin shim resolves
+					// (issue 40) - never a second, shadow home.
+					match crate::home::runtime_home_opt() {
+						Some(home) => home.join("ccr.db"),
+						None => {
+							// W2-3: degrade, never bail. A missing home dir
+							// (HOME unset or not an absolute path) used to
+							// silently fall back to /tmp, which a container
+							// restart wipes - the whole SQLite CCR database
+							// vanished with it. Warn loudly so the operator
+							// knows the DB is ephemeral, and keep going.
+							let fallback = std::path::PathBuf::from("/tmp")
+								.join(".hermes")
+								.join("aphrodite")
+								.join("ccr.db");
+							tracing::warn!(
+								"home directory unavailable (HOME unset or not absolute) - falling back to {}: the \
+								 SQLite CCR database will not survive a container restart",
+								fallback.display()
+							);
+							fallback
+						},
+					}
+				},
+				|p| p.clone(),
+			);
 			// Ensure parent directories exist before opening SQLite DB.
 			// Without this, a missing ~/.hermes/aphrodite/ directory causes
 			// the token proxy to fail silently at startup while the cache

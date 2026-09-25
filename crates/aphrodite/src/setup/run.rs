@@ -73,7 +73,12 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// lives in the runtime home. A stale symlink from older installs (plugin
 	// dir -> runtime home) is removed first so the loader files land as real
 	// files, never through the link into the runtime home.
-	if ctx.plugin_dir.symlink_metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+	if ctx
+		.plugin_dir
+		.symlink_metadata()
+		.map(|m| m.file_type().is_symlink())
+		.unwrap_or(false)
+	{
 		println!("removing stale plugin symlink -> {}", ctx.plugin_dir.display());
 		fs::remove_file(&ctx.plugin_dir)?;
 	}
@@ -128,10 +133,7 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 		"  binaries, config, and state: {} (everything the plugin manages)",
 		ctx.aphrodite_dir.display()
 	);
-	println!(
-		"  hooks registered (loader only): {}",
-		ctx.plugin_dir.display()
-	);
+	println!("  hooks registered (loader only): {}", ctx.plugin_dir.display());
 
 	Ok(())
 }

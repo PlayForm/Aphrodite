@@ -50,10 +50,7 @@ pub(crate) fn warn_parse_failure(path:&std::path::Path, error:&toml::de::Error, 
 impl Config {
 	/// Load from TOML file. Returns defaults on any failure.
 	pub fn load() -> Self {
-		let search_paths = vec![
-			PathBuf::from("aphrodite.toml"),
-			crate::home::config_path(),
-		];
+		let search_paths = vec![PathBuf::from("aphrodite.toml"), crate::home::config_path()];
 
 		let mut parse_failure:Option<String> = None;
 		for path in &search_paths {

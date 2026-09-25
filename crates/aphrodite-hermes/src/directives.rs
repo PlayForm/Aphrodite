@@ -60,8 +60,11 @@ pub(crate) fn resolve_directives_dir(home_param:&str) -> (PathBuf, Vec<String>) 
 	match aphrodite::home::runtime_home_opt() {
 		Some(home) => (home.join("directives"), warnings),
 		None => {
-			warnings
-				.push("neither $HOME nor $HERMES_HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using current directory".into());
+			warnings.push(
+				"neither $HOME nor $HERMES_HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using \
+				 current directory"
+					.into(),
+			);
 			(PathBuf::from(".").join("directives"), warnings)
 		},
 	}

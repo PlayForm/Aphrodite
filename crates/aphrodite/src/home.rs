@@ -19,11 +19,7 @@
 use std::path::PathBuf;
 
 /// Non-empty env var value as a path, if set.
-fn env_path(name:&str) -> Option<PathBuf> {
-	std::env::var_os(name)
-		.filter(|v| !v.is_empty())
-		.map(PathBuf::from)
-}
+fn env_path(name:&str) -> Option<PathBuf> { std::env::var_os(name).filter(|v| !v.is_empty()).map(PathBuf::from) }
 
 /// Expand a leading `~`/`~/` (the Python shim expands env overrides with
 /// `Path.expanduser()`; the Rust side must behave identically).
@@ -44,9 +40,7 @@ fn expand_tilde(p:PathBuf) -> PathBuf {
 /// home + `.hermes`. Mirrors the plugin shim's `_hermes_home()` and
 /// `hermes_constants.get_hermes_home()`: context override -> env var ->
 /// platform default.
-pub fn hermes_home() -> PathBuf {
-	hermes_home_opt().unwrap_or_else(|| PathBuf::from("."))
-}
+pub fn hermes_home() -> PathBuf { hermes_home_opt().unwrap_or_else(|| PathBuf::from(".")) }
 
 /// `hermes_home()`, but `None` when nothing at all resolves (no env var and
 /// no platform user home) so callers that must fail loudly (e.g. `aphrodite
@@ -60,9 +54,7 @@ pub fn hermes_home_opt() -> Option<PathBuf> {
 
 /// The Hermes plugin loader dir: `<hermes-home>/plugins/aphrodite` - the
 /// hooks-only install location Hermes owns (plugin.yaml + `__init__.py`).
-pub fn plugin_dir() -> PathBuf {
-	hermes_home().join("plugins").join("aphrodite")
-}
+pub fn plugin_dir() -> PathBuf { hermes_home().join("plugins").join("aphrodite") }
 
 /// Runtime home (the user-data folder that holds `aphrodite.toml`,
 /// `binaries/`, `directives/`, `ccr.db`, logs).
@@ -80,9 +72,7 @@ pub fn plugin_dir() -> PathBuf {
 ///
 /// Degrades to `.` (never fails) - the `_opt` variant below distinguishes
 /// the degraded case for callers that need it.
-pub fn runtime_home() -> PathBuf {
-	runtime_home_opt().unwrap_or_else(|| PathBuf::from("."))
-}
+pub fn runtime_home() -> PathBuf { runtime_home_opt().unwrap_or_else(|| PathBuf::from(".")) }
 
 /// `runtime_home()`, but `None` when no home is resolvable at all (no
 /// `$APHRODITE_HOME`, no `$HERMES_HOME`, no `$HOME`, no platform user home).
@@ -100,19 +90,13 @@ pub fn runtime_home_opt() -> Option<PathBuf> {
 }
 
 /// `aphrodite.toml` under the runtime home.
-pub fn config_path() -> PathBuf {
-	runtime_home().join("aphrodite.toml")
-}
+pub fn config_path() -> PathBuf { runtime_home().join("aphrodite.toml") }
 
 /// `directives/` under the runtime home (the home-namespace directive store).
-pub fn directives_dir() -> PathBuf {
-	runtime_home().join("directives")
-}
+pub fn directives_dir() -> PathBuf { runtime_home().join("directives") }
 
 /// `ccr.db` under the runtime home (token-mode SQLite CCR database).
-pub fn ccr_db_path() -> PathBuf {
-	runtime_home().join("ccr.db")
-}
+pub fn ccr_db_path() -> PathBuf { runtime_home().join("ccr.db") }
 
 #[cfg(test)]
 mod tests {
@@ -121,7 +105,9 @@ mod tests {
 	/// Serializes tests that mutate process-global env vars.
 	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
 		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-		G.get_or_init(|| std::sync::Mutex::new(())).lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+		G.get_or_init(|| std::sync::Mutex::new(()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner)
 	}
 
 	fn clear_all() {
