@@ -48,7 +48,7 @@ mutation_level: read-only
 
 Canonical per-hook contracts for the five hooks the Aphrodite plugin documents - `on_session_start`, `transform_tool_result`, `transform_terminal_output`, `pre_llm_call`, `post_llm_call` - plus `pre_tool_call`, the sixth hook the dylib list still registers.
 
-Contracts are source-derived facts, not prose. Keyword names, call sites, and return semantics drift between Hermes releases, so every contract names the exact `invoke_hook` site to re-derive from. Line numbers are observational snapshots, not durable coordinates; identify functions and source-relative paths instead.
+Contracts are source-derived facts, not prose: keyword names, call sites, and return semantics drift between Hermes releases, so every contract names the exact `invoke_hook` site to re-derive from. Line numbers are observational snapshots, not durable coordinates; identify functions and source-relative paths instead.
 
 Confidence labels: `invariant` = architecture-level, stable unless the framework changes shape; `source-derived` = verify in the currently checked-out Hermes source before relying on it; `historical` = explanatory only, never copy into live implementation.
 
@@ -64,17 +64,17 @@ on_session_start  transform_tool_result  transform_terminal_output
 pre_llm_call  post_llm_call
 ```
 
-The dylib list additionally registers `pre_tool_call` (the fail-closed directive hook; full contract below). The registered set is therefore six in the current source. It is not five: the lib.rs module doc comment still names five, so verify the actual set against `aphrodite_hermes_get_hooks` rather than assuming:
+The dylib list additionally registers `pre_tool_call` (the fail-closed directive hook; full contract below), so the registered set is six in the current source. It is not five: the lib.rs module doc comment still names five. Verify the actual set against `aphrodite_hermes_get_hooks` rather than assuming:
 
 ```sh
 grep -n 'VALID_HOOKS' $HOME/.hermes/hermes-agent/hermes_cli/plugins.py
 ```
 
-The installed loader (`~/.hermes/aphrodite/__init__.py`; repo source at `plugins/aphrodite/__init__.py`) registers hooks verbatim from the dylib list via `ctx.register_hook(hook_name, _dispatch)` with no filtering (CLAIM: read the loader to confirm). Every handler receives Hermes' kwargs verbatim, JSON-serialized, and is dispatched to the Rust `aphrodite_hermes_call_hook` arm. Registration uses the `on_`-prefixed session names; `VALID_HOOKS` in `hermes_cli/plugins.py` is the registry of accepted names.
+The installed loader (`~/.hermes/aphrodite/__init__.py`; repo source at `plugins/aphrodite/__init__.py`) registers hooks verbatim from the dylib list via `ctx.register_hook(hook_name, _dispatch)` with no filtering (CLAIM: read the loader to confirm). Every handler receives Hermes' kwargs verbatim, JSON-serialized, dispatched to the Rust `aphrodite_hermes_call_hook` arm. Registration uses the `on_`-prefixed session names; `VALID_HOOKS` in `hermes_cli/plugins.py` is the registry of accepted names.
 
 ## Global contract (all registered hooks)
 
-- Every handler signature ends in `**kwargs`. Hermes adds fields across releases (`parent_session_id` on pre_llm_call, `tool_call_id` on transform_terminal_output); a handler without `**kwargs` breaks the moment one is added (test: the unknown-extra-keyword case in the 10-case matrix).
+- Every handler signature ends in `**kwargs`. Hermes adds fields across releases (`parent_session_id` on pre_llm_call, `tool_call_id` on transform_terminal_output); a handler without `**kwargs` breaks the moment one is added (test: the unknown-extra-keyword case in `references/hook-test-cases.md`).
 - Hook input structures are read-only unless the framework documents mutability. `conversation_history` is a copy, so in-place edits are discarded; mutating the copy is not mutating the transcript (owner: `aphrodite-boundaries`).
 - A hook that replaces output must return the original output for pass-through. An empty string is a destructive replacement, never "no change" (owner: `aphrodite-boundaries`).
 - Fail-open is the default for transform/lifecycle hooks: log a structured error and return the original content. `pre_tool_call` is the single fail-closed hook.
@@ -82,7 +82,7 @@ The installed loader (`~/.hermes/aphrodite/__init__.py`; repo source at `plugins
 
 ## Hook: on_session_start
 
-**Invocation point:** `agent/conversation_loop.py:773-776` (session-start block in the conversation run path; fire-and-forget, wrapped in try/except fail-open).
+**Invocation point:** `agent/conversation_loop.py:773-776` (session-start block; fire-and-forget, wrapped in try/except fail-open).
 
 **Registration name:** `on_session_start`. Historical bug: registering `session_start` never fired, so the proxy never auto-launched. The Rust dispatch arm still accepts the legacy alias `"session_start"`; that alias is not a valid registration name (historical: never copy into a new registration).
 
@@ -92,13 +92,13 @@ The installed loader (`~/.hermes/aphrodite/__init__.py`; repo source at `plugins
 def on_start(*, session_id: str = "", model: str = "", platform: str = "", **kwargs) -> None:
 ```
 
-**Input invariants** - `session_id` is a string; `model` and `platform` may be empty strings; Hermes can add unknown fields, so accept `**kwargs`.
+**Input invariants** - `session_id` is a string; `model`/`platform` may be empty strings; Hermes can add unknown fields - accept `**kwargs`.
 
-**Return contract** - the return value is ignored (fire-and-forget lifecycle hook). Never return a replacement string, because nothing reads it.
+**Return contract** - the return value is ignored (fire-and-forget). Never return a replacement string, because nothing reads it.
 
-**Safety boundary** - the session bootstrap point: must never compress, must never block on network. Rust-side it resets per-session state (`aphrodite::session::on_session_start`; CLAIM: read the crate to confirm).
+**Safety boundary** - session bootstrap point: must never compress, must never block on network. Rust-side it resets per-session state (`aphrodite::session::on_session_start`; CLAIM: read the crate).
 
-**Verification** - pass-through (return value ignored), handler exception (Hermes logs a warning and continues), unknown-kwarg, registered-but-never-invoked.
+**Verification** - pass-through (return ignored), handler exception (Hermes logs a warning and continues), unknown-kwarg, registered-but-never-invoked.
 
 ## Hook: pre_tool_call
 
@@ -131,7 +131,7 @@ def pre_tool_hook(
 - `{"action": "block", "message": str}`: veto; the message becomes the tool result
 - `{"action": "approve", "message": ..., "rule_key"?: ...}`: escalate the tool to the human-approval gate
 
-**Safety boundary** - fail-closed on timeout: `pre_tool_call` is the sole member of `_HOOK_TIMEOUT_FAIL_CLOSED_HOOKS` (`hermes_cli/plugins_dispatch.py`); a hung/still-running callback blocks the tool with `"pre_tool_call plugin callback timed out or is still running"`. Keep the handler bounded, because a hung callback blocks the tool; after a timeout the same callback is suppressed for 60 s (`_HOOK_TIMEOUT_SUPPRESSION_SECONDS`). Aphrodite's Rust arm returns `{"action": "modify", "args": {"background": true, "notify_on_complete": true}}` to auto-background long terminal/process commands when the poll worker is enabled (CLAIM: read `crates/aphrodite-hermes/src/lib.rs` to confirm).
+**Safety boundary** - fail-closed on timeout: `pre_tool_call` is the sole member of `_HOOK_TIMEOUT_FAIL_CLOSED_HOOKS` (`hermes_cli/plugins_dispatch.py`); a hung/still-running callback blocks the tool with `"pre_tool_call plugin callback timed out or is still running"`. Keep the handler bounded, because a hung callback blocks the tool; after a timeout the same callback is suppressed for 60 s (`_HOOK_TIMEOUT_SUPPRESSION_SECONDS`). The Rust arm returns `{"action": "modify", "args": {"background": true, "notify_on_complete": true}}` to auto-background long terminal/process commands when the poll worker is enabled (CLAIM: read `crates/aphrodite-hermes/src/lib.rs`).
 
 **Verification** - modify-merge (args changed before dispatch), block (tool result is the message), approve (approval gate), non-dict ignored, handler exception / timeout (tool blocked, message visible), unknown-kwarg.
 
@@ -166,7 +166,7 @@ def _transform_tool_result(
 
 **Return contract** - `None` or any non-string: do not claim ownership; the original `result` is used. The original `result` returned: explicit pass-through. A non-empty replacement string: replace the tool result (the first non-None string across handlers wins). An empty string: destructive replacement, permitted only by an explicit redaction rule - never use it for "no change", because it erases the result.
 
-**Safety boundary** - must bypass compression for retrieval and diagnostic tools. The skip set covers `aphrodite_retrieve`, `aphrodite_stats`, `aphrodite_search`, `aphrodite_catalog`, `aphrodite_files`, `aphrodite_diff`, `aphrodite_directive`, `aphrodite_prefetch_status` (and any other tool whose output is a retrieval/diagnostic response), because re-compressing a retrieval response creates the CCR marker-resolution loop. Must not alter a valid CCR marker without revalidating marker syntax.
+**Safety boundary** - must bypass compression for retrieval and diagnostic tools: the skip set covers `aphrodite_retrieve`, `aphrodite_stats`, `aphrodite_search`, `aphrodite_catalog`, `aphrodite_files`, `aphrodite_diff`, `aphrodite_directive`, `aphrodite_prefetch_status` (and any other tool whose output is a retrieval/diagnostic response), because re-compressing a retrieval response creates the CCR marker-resolution loop. Must not alter a valid CCR marker without revalidating marker syntax.
 
 **Verification** - pass-through, replacement, empty-result, handler exception (fail-open), unknown-kwarg, error-status (non-zero / error result still reaches the hook), large payload (threshold + marker behavior).
 
@@ -191,7 +191,7 @@ def _transform_terminal_hook(
 ) -> str | None:
 ```
 
-**Input invariants** - `output` is the complete candidate terminal output. It is not `stdout`: a handler reading `stdout` receives the `""` default and returns `""`, which made ALL terminal output empty (the historical terminal-output bug, now a negative test). `returncode` is numeric. It is not `exit_code`. `tool_call_id` was added to the invocation (from the approval context) after the older reference notes; unknown fields will keep being added, so accept `**kwargs`.
+**Input invariants** - `output` is the complete candidate terminal output. It is not `stdout`: a handler reading `stdout` receives the `""` default and returns `""`, which made ALL terminal output empty (historical terminal-output bug, now a negative test). `returncode` is numeric. It is not `exit_code`. `tool_call_id` was added to the invocation (from the approval context) after the older reference notes; unknown fields will keep being added - accept `**kwargs`.
 
 **Return contract** - `None`: do not claim ownership; allow later hook/default behavior. The original `output` value returned: explicit pass-through (must return the `output` parameter itself). A non-empty replacement string: replace the terminal output (the first non-None string across handlers wins; replacements are still subject to the output limit applied afterwards). An empty string: destructive replacement - permitted only by an explicit redaction rule, never "no change".
 
@@ -287,22 +287,9 @@ Each row is a permanent negative test: the handler signature must accept the cor
 | post_llm_call             | api_messages, response, turn_number | conversation_history, assistant_response, turn_id | Hook returned early                  |
 | on_session_start          | session_start (hook name)           | on_session_start                                  | Proxy never auto-launched            |
 
-## Hook test cases (10-case matrix, every active hook)
+## Hook test cases
 
-| Case                              | Purpose                                                                             |
-| --------------------------------- | ----------------------------------------------------------------------------------- |
-| Valid nominal invocation          | Verifies the ordinary contract                                                      |
-| Unknown extra keyword             | Ensures forward compatibility through `**kwargs`                                    |
-| Missing optional keyword          | Verifies defaults and null handling                                                 |
-| Empty text input                  | Separates pass-through from destructive output                                      |
-| Large payload                     | Exercises threshold and marker behavior                                             |
-| Error status / non-zero exit      | Confirms errors do not disappear                                                    |
-| Handler exception                 | Defines fallback and diagnostic behavior (fail-open; fail-closed for pre_tool_call) |
-| Multiple registered handlers      | Verifies ordering and first-non-None semantics                                      |
-| Hook registered but never invoked | Detects dead integration (e.g. a hook name drift)                                   |
-| Restarted process                 | Ensures results are not from a stale plugin/dylib (fresh-process test)              |
-
-The terminal hook additionally requires the sentinel-output test above.
+Run the full 10-case matrix in `references/hook-test-cases.md` for every active hook (valid nominal invocation, unknown extra keyword, missing optional keyword, empty text input, large payload, error status / non-zero exit, handler exception, multiple registered handlers, registered-but-never-invoked, restarted process). The terminal hook additionally requires the sentinel-output test above.
 
 ## Re-deriving a contract from source
 
@@ -323,6 +310,7 @@ Evidence notes moved here from `aphrodite-hook-reference` (keep as evidence; the
 - `references/hook-invocations.md` - per-hook invocation reference (v0.16.0 coordinates; the pre_api_request row is stale, see boundary notes above)
 - `references/hook-invocation-verification.md` - the source-verification recipe
 - `references/hook-parameter-mismatches.md` - wrong-param incidents mapped to correct params
+- `references/hook-test-cases.md` - the 10-case hook test matrix
 
 ## Claim-to-test matrix
 
