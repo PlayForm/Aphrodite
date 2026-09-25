@@ -83,9 +83,15 @@ def test_plugin_dir_contents_never_touched():
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         # The plugin dir is Hermes-owned: the plugin never moves, removes, or
         # modifies ANYTHING inside it - report-only (catalog review, PR 118488).
-        ok((plugin / "aphrodite.toml").read_text() == "plugin-cfg\n", "config was moved out of plugin dir")
+        ok(
+            (plugin / "aphrodite.toml").read_text() == "plugin-cfg\n",
+            "config was moved out of plugin dir",
+        )
         ok((plugin / "ccr.db").read_text() == "db-bytes", "ccr.db was moved out of plugin dir")
-        ok((plugin / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01", "plugin-dir binaries were touched")
+        ok(
+            (plugin / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01",
+            "plugin-dir binaries were touched",
+        )
         ok(
             not any("moved" in a or "copy" in a for a in report["actions_taken"]),
             f"plugin dir was modified: {report['actions_taken']}",
@@ -206,7 +212,10 @@ def test_env_config_override():
                 os.environ["APHRODITE_CONFIG_PATH"] = old
         # config inside the Hermes-owned plugin dir is never moved - not even
         # to an env override target (report-only; the plugin dir is untouchable).
-        ok((plugin / "aphrodite.toml").read_text() == "env-cfg\n", "config was moved out of plugin dir")
+        ok(
+            (plugin / "aphrodite.toml").read_text() == "env-cfg\n",
+            "config was moved out of plugin dir",
+        )
         ok(
             not any("moved" in a for a in report["actions_taken"]),
             f"plugin dir was modified: {report['actions_taken']}",
@@ -258,7 +267,10 @@ def test_destination_differs_skipped():
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         # plugin-dir config is never moved, compared, or warned about - the
         # plugin dir is Hermes-owned and untouchable.
-        ok((plugin / "aphrodite.toml").read_text() == "plugin version\n", "plugin-dir config was modified")
+        ok(
+            (plugin / "aphrodite.toml").read_text() == "plugin version\n",
+            "plugin-dir config was modified",
+        )
         ok(
             (home / ".hermes" / "aphrodite" / "aphrodite.toml").read_text() == "runtime version\n",
             "runtime config was modified",

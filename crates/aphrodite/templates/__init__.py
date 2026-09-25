@@ -139,13 +139,13 @@ def _runtime_home() -> tuple[Path, str]:
     return canonical, "default"
 
 
-# ── Runtime home: ONE decision, exported to the Rust half ──
+# ── Runtime home: ONE decision, exported to the Rust half at register() ──
 # Every runtime artifact (binaries, dylib, aphrodite.toml, ccr.db,
 # directives, logs) lives under the runtime home, never inside the plugin
 # tree. The dylib and the proxy binary resolve APHRODITE_HOME /
-# APHRODITE_DIRECTIVES_DIR when set; exporting the shim's decision here
-# makes the two halves agree by construction (issue 40 F1). setdefault
-# keeps a user-provided override authoritative.
+# APHRODITE_DIRECTIVES_DIR when set; _export_runtime_home_env() publishes
+# the decision at register() time so the two halves agree by construction
+# (issue 40 F1) - never at import, which must stay side-effect-free.
 try:
     _RUNTIME_HOME, _HOME_DECISION = _runtime_home()
 except Exception as e:  # defensive: the shim import must NEVER raise
@@ -159,9 +159,26 @@ except Exception as e:  # defensive: the shim import must NEVER raise
     )
     _RUNTIME_HOME = Path(".") / "aphrodite"
     _HOME_DECISION = "degraded fallback"
-os.environ.setdefault("APHRODITE_HOME", str(_RUNTIME_HOME))
-os.environ.setdefault("APHRODITE_DIRECTIVES_DIR", str(_RUNTIME_HOME / "directives"))
 _log.info("aphrodite runtime home: %s (decided by %s)", _RUNTIME_HOME, _HOME_DECISION)
+
+
+def _export_runtime_home_env() -> None:
+    """Export the resolved runtime home to the Rust half.
+
+    Called at register() time, NEVER at import: a mere module import must
+    not mutate the process environment - CI runs every test in one process,
+    and an import-time export made layout_check heal against the real home
+    in the runner (the Development Check failures). The dylib and the
+    spawned proxy child (a child process inheriting this env) resolve
+    APHRODITE_HOME / APHRODITE_DIRECTIVES_DIR when set, so exporting here
+    makes the two halves agree by construction (issue 40 F1); setdefault
+    keeps a user-provided override authoritative. The Rust side's own
+    $HERMES_HOME fallback (home::runtime_home) covers anything that runs
+    before register().
+    """
+    os.environ.setdefault("APHRODITE_HOME", str(_RUNTIME_HOME))
+    os.environ.setdefault("APHRODITE_DIRECTIVES_DIR", str(_RUNTIME_HOME / "directives"))
+
 
 _BINARIES_DIR = _RUNTIME_HOME / "binaries"
 _DYLIB_PATH = os.environ.get("APHRODITE_HERMES_DYLIB_PATH", str(_BINARIES_DIR / _DYLIB_NAME))
@@ -1014,6 +1031,11 @@ def register(ctx: Any) -> None:
       register_context_engine(engine)   # engine must subclass ContextEngine
     Each registration is isolated so one failure never aborts the whole plugin.
     """
+    # Export the runtime-home decision to the Rust half BEFORE anything
+    # loads it (the dylib, directives materialize, and the proxy child all
+    # read APHRODITE_HOME / APHRODITE_DIRECTIVES_DIR). Deliberately NOT at
+    # import time - a module import must have zero env side effects.
+    _export_runtime_home_env()
     try:
         dylib = _load_dylib()
     except Exception as e:

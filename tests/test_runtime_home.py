@@ -34,8 +34,14 @@ def ok(condition, message=""):
         raise AssertionError(message or "assertion failed")
 
 
-def shim_probe(extra_env):
+def shim_probe(extra_env, export=True):
     """Import the shim in a subprocess with a scrubbed + controlled env.
+
+    By default the probe ALSO calls `_export_runtime_home_env()` (the
+    register-time export, issue-40 F1) so the export assertions verify the
+    real contract; with ``export=False`` the env must stay untouched (the
+    import-time leak regression: CI runs every test in one process, and an
+    import-time export made layout_check heal against the real home).
 
     Returns (stdout_lines, stderr) with one line per probed value.
     """
@@ -44,7 +50,8 @@ def shim_probe(extra_env):
         f"spec = importlib.util.spec_from_file_location('_runtime_home_under_test', {str(PLUGIN)!r})\n"
         "m = importlib.util.module_from_spec(spec)\n"
         "spec.loader.exec_module(m)\n"
-        "print(m._RUNTIME_HOME)\n"
+        + ("m._export_runtime_home_env()\n" if export else "")
+        + "print(m._RUNTIME_HOME)\n"
         "print(m._HOME_DECISION)\n"
         "print(os.environ.get('APHRODITE_HOME', ''))\n"
         "print(os.environ.get('APHRODITE_DIRECTIVES_DIR', ''))\n"
@@ -120,7 +127,9 @@ def test_legacy_home_adopted_when_it_holds_the_install():
         (legacy / "binaries").mkdir(parents=True)
         (legacy / "binaries" / "aphrodite").write_bytes(b"BIN")
         (legacy / "aphrodite.toml").write_text("key = 'value'\n")
-        lines, stderr = shim_probe({"HERMES_HOME": str(base / "hermes"), "HOME": str(base / "home")})
+        lines, stderr = shim_probe(
+            {"HERMES_HOME": str(base / "hermes"), "HOME": str(base / "home")}
+        )
         ok(lines[0] == str(legacy), f"runtime home {lines[0]!r} != adopted legacy {legacy!r}")
         ok(lines[1] == "legacy ~/.hermes/aphrodite adoption", f"decision {lines[1]!r}")
         ok(lines[2] == str(legacy), f"APHRODITE_HOME not exported to the legacy home: {lines[2]!r}")
@@ -195,6 +204,20 @@ def test_import_never_raises_on_hostile_env():
     ok(lines[3] == "relative/aph/directives", f"directives dir: {lines[3]!r}")
 
 
+def test_import_never_leaks_env():
+    # A mere module import must have ZERO environment side effects: CI runs
+    # every test in one process, and an import-time APHRODITE_HOME export
+    # made layout_check heal against the real runner home (Development Check
+    # failures). The export happens at register() only.
+    lines, _ = shim_probe({}, export=False)
+    ok(lines[2] == "", f"APHRODITE_HOME leaked at import: {lines[2]!r}")
+    ok(lines[3] == "", f"APHRODITE_DIRECTIVES_DIR leaked at import: {lines[3]!r}")
+    # The resolution itself is still computed at import (pure, no side
+    # effects) - the decision and paths are available to register().
+    ok(lines[0] == str(Path.home() / ".hermes" / "aphrodite"), f"home {lines[0]!r}")
+    ok(lines[1] == "default", f"decision {lines[1]!r}")
+
+
 def test_canonical_home_wins_when_it_already_holds_the_install():
     # When BOTH homes hold an install the canonical (HERMES_HOME-derived)
     # home wins - the user has already migrated; never roll back.
@@ -212,7 +235,9 @@ def test_canonical_home_wins_when_it_already_holds_the_install():
 
 
 def main():
-    tests = [fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)]
+    tests = [
+        fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)
+    ]
     failed = []
     for fn in tests:
         try:
