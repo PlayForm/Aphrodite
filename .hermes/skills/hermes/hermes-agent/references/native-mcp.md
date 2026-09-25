@@ -35,7 +35,7 @@ uv pip install mcp
 
 ## Quick Start
 
-Add MCP servers to `~/.hermes/config.yaml` under the `mcp_servers` key:
+MCP server configuration lives under the `mcp_servers` key in `~/.hermes/config.yaml`:
 
 ```yaml
 mcp_servers:
@@ -227,8 +227,7 @@ pip install mcp
 
 ### "No MCP servers configured"
 
-No `mcp_servers` key in `~/.hermes/config.yaml`, or it's empty. Add at least
-one server.
+No `mcp_servers` key in `~/.hermes/config.yaml`, or it's empty. At least one server entry is required.
 
 ### "Failed to connect to MCP server 'X'"
 

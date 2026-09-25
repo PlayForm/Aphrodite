@@ -84,6 +84,15 @@ A plugin detach or toolset cleanup never edits these files; it removes their
 registration from Hermes config (`plugins.*` entries, env var names,
 `platform_toolsets` / `known_plugin_toolsets` leftovers).
 
+## `aphrodite setup` flags vs the toml template
+
+`aphrodite setup` accepts `--api-key` / `--api-url` / `--model`, but the toml
+template substitutes ONLY the ports (cache 9797 / token 9798) - there are no
+placeholders for the other three, so they are parsed and ignored. Never claim
+the flags write into the toml. Upstream config is env-driven:
+`APHRODITE_API_URL` and `APHRODITE_MODEL`; the proxy's API key comes from the
+`APHRODITE_API_KEY` env var or a `[defaults] api_key` in the toml.
+
 ## Where configs live
 
 - Default: `~/.hermes/config.yaml`

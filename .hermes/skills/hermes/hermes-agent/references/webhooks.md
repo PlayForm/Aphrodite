@@ -27,7 +27,7 @@ secret.
 
 ### Option 2: Manual config
 
-Add to `~/.hermes/config.yaml`:
+Webhook platform settings live in `~/.hermes/config.yaml`:
 
 ```yaml
 platforms:

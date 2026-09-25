@@ -1,0 +1,3 @@
+# Env-var hermeticity
+
+- **Self-reports are not facts - a child's "3x green" suite is not green in YOUR env.** A child's subprocess may NOT inherit env vars the parent exported earlier in the session (a probe set `APHRODITE_PREVIEW_MAX_CHARS` in the parent terminal; the child's runs stayed green while the parent's identical command failed 21-25 tests every run). A child reporting a clean suite run is a FALSE NEGATIVE until the parent re-runs the exact command in its own environment - an exported env var, not a code race, was the whole cause. Conflicts between two children's reports about the same file resolve by reading the on-disk state.

@@ -45,7 +45,7 @@ In an Aphrodite-compressed session, tool output may come back as
 - **Round trip**: `aphrodite_test` smoke-tests compress + retrieve; run it
   before trusting a change.
 - **Auto-expand is NOT a fix** for raw markers: the only working path is
-  retrieval (see `aphrodite-auto-expand-testing`).
+  retrieval; see the `aphrodite-auto-expand-testing` skill.
 
 ## Changes not taking effect
 
