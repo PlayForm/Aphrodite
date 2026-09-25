@@ -241,6 +241,10 @@ jobs:
       - name: Generate in-tree SHA256SUMS.txt (child submodule)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fine-grained PAT (Release-environment secret) with contents:write
+          # on the CHILD repo only - GITHUB_TOKEN is scoped to this repo and
+          # cannot push to PlayForm/Aphrodite-Hermes (the 1.6.3 403).
+          PLAYFORM_RELEASE_PAT: ${{ secrets.PLAYFORM_RELEASE_PAT }}
         run: |
           set -euo pipefail
           V="${GITHUB_REF_NAME#Aphrodite/v}"
@@ -268,5 +272,18 @@ jobs:
             echo "SHA256SUMS.txt unchanged - nothing to commit"
           else
             git -C "${CHILD}" commit -m "chore: update in-tree SHA256SUMS.txt for v${V} (Build.yml)"
-            git -C "${CHILD}" push origin Current
+            # GITHUB_TOKEN is scoped to the parent repo and cannot push to the
+            # child (PlayForm/Aphrodite-Hermes - the 1.6.3 403); the
+            # Release-environment secret carries a fine-grained PAT with
+            # contents:write on the child only. Drop the parent token's
+            # extraheader globally (a child-local unset does not reach it) and
+            # override per-command as belt-and-braces, so the PAT below is
+            # actually used. Fail loudly when the secret is missing rather
+            # than pushing an unauth'd URL.
+            git -C "${CHILD}" config --global --unset-all http.https://github.com/.extraheader || true
+            if [ -z "${PLAYFORM_RELEASE_PAT:-}" ]; then
+              echo "::error::PLAYFORM_RELEASE_PAT (Release-environment secret) is not set - cannot push the in-tree SHA256SUMS.txt to the child repo" >&2
+              exit 1
+            fi
+            git -C "${CHILD}" -c http.https://github.com/.extraheader= push "https://x-access-token:${PLAYFORM_RELEASE_PAT}@github.com/PlayForm/Aphrodite-Hermes.git" Current
           fi
