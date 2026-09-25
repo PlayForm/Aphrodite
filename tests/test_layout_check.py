@@ -330,6 +330,45 @@ def test_binaries_excluded_from_plugin_scan():
         )
 
 
+def test_aphrodite_home_override_relocates_runtime_home():
+    # Issue 40 F3: layout_check must follow the SAME runtime-home decision as
+    # the shim. The shim exports its resolution through APHRODITE_HOME, so a
+    # user who works around the HERMES_HOME mismatch with APHRODITE_HOME must
+    # never get required dirs (re)created under a second, shadow home.
+    with tempfile.TemporaryDirectory() as td:
+        home, src = make_tree(Path(td))
+        runtime = Path(td) / "custom-runtime"
+        os.environ["APHRODITE_HOME"] = str(runtime)
+        try:
+            report = check_and_heal(
+                home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
+            )
+        finally:
+            os.environ.pop("APHRODITE_HOME", None)
+        # The required runtime home is created at the override, not under
+        # <hermes-home>/aphrodite.
+        ok(runtime.is_dir(), f"runtime home not created at APHRODITE_HOME: {runtime}")
+        ok(
+            not any("created directory" in a and str(home) in a for a in report["actions_taken"]),
+            f"shadow-home dirs were created: {report['actions_taken']}",
+        )
+        # Config presence is checked against the override (the heal operates
+        # on the home the plugin actually uses)...
+        ok(
+            any(str(runtime) in m for m in report["mismatches"]),
+            f"relocated home not referenced by mismatches: {report['mismatches']}",
+        )
+        ok(
+            any("aphrodite.toml missing" in m for m in report["mismatches"]),
+            f"config mismatch not reported for the relocated home: {report['mismatches']}",
+        )
+        # ...and the real ~/.hermes tree is never touched.
+        ok(
+            (home / ".hermes" / "aphrodite" / "aphrodite.toml").exists(),
+            "existing config was moved out of the legacy tree",
+        )
+
+
 def main():
     tests = [
         fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)
