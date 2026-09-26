@@ -84,13 +84,15 @@ commit):
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 ```
 
-Rule: **bump the fork crate version BEFORE dispatching.** The check reads
-`crates/headroom-core/Cargo.toml` at the parent-recorded gitlink; if that
-version is already in the index the publish step is skipped (`published ==
-'false'` is false). A stale fork version therefore publishes NOTHING - the
-job goes green and the release silently ships the old crate. Bump fork crate
-
-- parent pin together, float the gitlink, THEN dispatch.
+Rule: **bump the fork crate version BEFORE the release chain (before the
+parent tag push).** The check reads `crates/headroom-core/Cargo.toml` at the
+parent-recorded gitlink the tag pins; if that version is already in the
+index the publish step is skipped (`published == 'false'` is false) - and
+even if it is not, the publish step is unreachable (removed dispatch input).
+A stale fork version therefore publishes NOTHING - the job goes green and
+the release silently ships the old crate (or `Publish-Aphrodite` fails when
+the bumped version is not live). Bump fork crate + parent pin together,
+float the gitlink, THEN tag.
 
 The publish step is gated on
 `github.event_name == 'workflow_dispatch' && inputs.publish_crates &&
