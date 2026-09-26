@@ -2,7 +2,8 @@
 
 Owner: `aphrodite-release-workflow` (publishing gates; this file is the
 evidence for the owned headroom publish). The ceremony that executes the
-publish is `Publish.yml` via `gh workflow run Publish -f publish_crates=true`
+publish is `Publish.yml`, triggered via `workflow_run` on Build completion
+(tag `Aphrodite/v*` → Build success → Publish; no dispatch input exists)
 
 - never run `cargo publish` locally without `CARGO_REGISTRY_TOKEN`. The
   release ceremony (`aphrodite-release-flow` Step I5) carries the fork into
@@ -52,17 +53,18 @@ publish is `Publish.yml` via `gh workflow run Publish -f publish_crates=true`
   `vendor/headroom/RELEASE-CYCLE.md` - the fork's release record; update
   both per cycle.
 
-## Bump BEFORE dispatch (or CI skips you)
+## Bump BEFORE the release chain (or CI skips you)
 
 `Publish.yml` job `Publish-Headroom-Core` (`needs: [Test]`,
 `working-directory: vendor/headroom`, `environment: Release`) reads the fork
-crate version and checks it against the crates.io index; if that version is
-already live, the publish step is skipped (lines 143-161 - observational;
-read the `if:` conditions at the tag commit):
+crate version and checks it against the crates.io index; the publish step is
+gated on the REMOVED `workflow_dispatch publish_crates` input and never
+fires (lines 159-177 - observational; read the `if:` conditions at the tag
+commit):
 
 ```yaml
 - name: Check if aphrodite-headroom-core version is already published
-  if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish_crates) || startsWith(github.ref, 'refs/tags/Aphrodite/') }}
+  if: ${{ startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v') }}
   id: check
   working-directory: vendor/headroom
   run: |
@@ -91,31 +93,36 @@ job goes green and the release silently ships the old crate. Bump fork crate
 - parent pin together, float the gitlink, THEN dispatch.
 
 The publish step is gated on
-`workflow_dispatch && inputs.publish_crates && published == 'false'` - **a
-plain `Aphrodite/v*` tag push NEVER publishes headroom-core** (unlike
-`aphrodite`/`aphrodite-hermes`, whose publish steps carry
-`|| startsWith(github.ref, 'refs/tags/Aphrodite/')` - see the trigger table
-in the owning SKILL.md, Gate R7).
+`github.event_name == 'workflow_dispatch' && inputs.publish_crates &&
+published == 'false'` - and `Publish.yml` no longer declares
+`workflow_dispatch` (the input was removed at 677a7b3), so the condition is
+ALWAYS false: **the chain NEVER publishes headroom-core**.
+`aphrodite`/`aphrodite-hermes` publish steps are gated on
+`startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')` and DO
+run on the tag chain - see the trigger table in the owning SKILL.md, Gate
+R7.
 
 Trigger:
 
-```bash
-gh workflow run Publish -f publish_crates=true
-```
+NO dispatch exists. `Publish.yml` runs via `workflow_run` on Build
+completion, gated on `conclusion == 'success' && startsWith(head_branch,
+'Aphrodite/v')`, with checkouts pinned to the triggering tag. The
+headroom-core publish step never fires under this chain.
 
 Dependency order enforced by `needs:`: Test → Publish-Headroom-Core →
-Publish-Aphrodite → Publish-Hermes. If headroom-core is not published first,
-`Publish-Aphrodite` fails (its `path + version` dep strips the `path` key on
-publish, so the matching version must already exist on crates.io).
+Publish-Aphrodite → Publish-Hermes. If the fork version is bumped and is not
+live on crates.io, `Publish-Aphrodite` fails (its `path + version` dep
+strips the `path` key on publish, so the matching version must already exist
+on crates.io) - the chain cannot publish the fork itself.
 
-## Fork tag convention (create BEFORE dispatch)
+## Fork tag convention (create BEFORE the release chain)
 
 - Fork tags use `aphrodite-vX.Y.Z` in the fork repo (PlayForm/Headroom,
   branch `Current`) - NEVER the parent `Aphrodite/v*` scheme (last fork tag:
   `aphrodite-v0.9.4`; proposed next: `aphrodite-v0.10.0`).
-- Create the fork tag BEFORE dispatching `Publish.yml` - CI publishes the
-  parent-recorded gitlink tree, so the parent gitlink must float to the
-  tagged fork commit carrying the new version (see Gitlink trap below).
+- Create the fork tag BEFORE the release chain - the parent tag push freezes
+  the gitlink CI publishes, so the parent gitlink must float to the tagged
+  fork commit carrying the new version (see Gitlink trap below).
 
 ## 1.5.0 gap - canonical failure (the published-version trap)
 
@@ -161,7 +168,8 @@ git push Source Current
 
 If you skip this, `Publish.yml` publishes the previously-recorded commit's
 tree. This is the ceremony's submodule-first rule applied to the fork: bump +
-commit in the submodule, then float the parent gitlink before dispatching.
+commit in the submodule, then float the parent gitlink before the release
+chain (the parent tag push).
 
 ## Post-event consumer verification (publisher's claim is not proof)
 

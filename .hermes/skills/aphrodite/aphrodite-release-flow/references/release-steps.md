@@ -290,17 +290,17 @@ from the consumer's perspective, not the publisher's.
 **Do**
 
 ```sh
-# The tag push already ran cargo publish (per the accepted trigger audit) -
-# do NOT re-dispatch for aphrodite / aphrodite-hermes; verify instead:
+# The Build -> Publish chain already ran cargo publish for aphrodite /
+# aphrodite-hermes (per the accepted trigger audit) - verify, never re-run:
 curl -A < ua > https://crates.io/api/v1/crates/aphrodite | grep max_version
 curl -A < ua > https://crates.io/api/v1/crates/aphrodite-hermes | grep max_version
-# IF Step I5 carried a fork delta, dispatch the headroom publish now - the
-# fork leg (crate + parent pin bumped, fork tag + gitlink float) MUST have
-# run first, else the version check skips the stale version silently (the
-# 1.5.0 published-version trap); needs chain: Test -> Publish-Headroom-Core
-# -> Publish-Aphrodite -> Publish-Hermes (headroom publishes FIRST):
-gh workflow run Publish -f publish_crates=true
-# then verify the headroom publish landed (see references/headroom-publish.md):
+# Headroom-core's publish step is UNREACHABLE under the workflow_run chain:
+# Publish.yml no longer declares workflow_dispatch (input removed at
+# 677a7b3), so the step's `inputs.publish_crates` gate is always false. The
+# needs: chain still runs the headroom CHECK step; if Step I5 bumped the
+# fork version and it is NOT live, Publish-Aphrodite fails (its path+version
+# dep must already exist on crates.io) - see references/headroom-publish.md;
+# verify what the chain actually published:
 curl -A < ua > https://crates.io/api/v1/crates/aphrodite-headroom-core | grep max_version
 ```
 
@@ -313,14 +313,17 @@ curl -A < ua > https://crates.io/api/v1/crates/aphrodite-headroom-core | grep ma
 
 **Expected**
 
-- `max_version` == the released version for the published crates; the
-  headroom dispatch happens only when Step I5 carried a fork delta -
-  deliberate, never accidental.
+- `max_version` == the released version for `aphrodite` and
+  `aphrodite-hermes`; headroom-core is NOT published by the chain (its
+  publish step is unreachable) - a live fork publish is deliberate only via
+  a restored gate or an out-of-band publish.
 
 **Stop if**
 
 - A publish failed (re-publish errors red - no already-published check); an
-  UNACCEPTED crate was published; headroom-core published without dispatch.
+  UNACCEPTED crate was published; headroom-core was published at all (its
+  step is unreachable under the workflow_run chain - a live publish means
+  the gates changed since Gate R7).
 
 **Recovery**
 

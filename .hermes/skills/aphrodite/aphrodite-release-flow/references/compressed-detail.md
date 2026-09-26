@@ -36,11 +36,14 @@ I1.
 ## Headroom fork leg (expanded)
 
 Fork delta → fork crate + parent pin TOGETHER (cargo check fails otherwise),
-fork tag BEFORE dispatch (`aphrodite-vX.Y.Z`, never `Aphrodite/v*`), gitlink
-to the TAGGED fork commit (CI publishes the parent-recorded gitlink tree, not
-local submodule HEAD). A stale fork version makes CI skip the publish
-silently (1.5.0 trap). Tracking: `vendor/headroom/RELEASE-CYCLE.md` +
-`vendor/headroom/CHANGELOG.md`. Dispatch in R6 only after this leg.
+fork tag before the release chain (`aphrodite-vX.Y.Z`, never `Aphrodite/v*`),
+gitlink to the TAGGED fork commit (CI publishes the parent-recorded gitlink
+tree, not local submodule HEAD). A stale fork version makes CI skip the
+publish silently (1.5.0 trap). Tracking: `vendor/headroom/RELEASE-CYCLE.md` +
+`vendor/headroom/CHANGELOG.md`. No dispatch exists: Publish.yml is
+`workflow_run`-chained and headroom-core's publish step is unreachable
+(`inputs.publish_crates` gate, input removed at 677a7b3) -
+references/headroom-publish.md.
 
 ## Artifact matrix (expanded)
 
@@ -83,15 +86,15 @@ out during the compression pass.
 - **B4 branch-identity audit - MANDATORY before ANY sync or tag.** Scans workflow triggers + push targets, `.gitmodules` branch fields, gitlink resolution - zero hits required; ANY hit ABORTS (record in `.hermes/notes/release/CEREMONY-AUDIT.md`; never checkout the other branch). Commands: ceremony-steps.md Step I1.
 - **Submodule-first (bottom-up):** plugin FIRST, then parent; validate the plugin commit before the parent gitlink moves; never float the gitlink to a non-released plugin commit.
 - **Controlled restore is identity-only:** `git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite` - ceremony invariant, NOT repair; never blanket checkout/reset.
-- **Headroom fork leg (mandatory):** fork delta → fork crate + parent pin TOGETHER (cargo check fails otherwise), fork tag BEFORE dispatch (`aphrodite-vX.Y.Z`, never `Aphrodite/v*`), gitlink to the TAGGED fork commit (CI publishes the parent-recorded gitlink tree). Stale fork version → CI skips publish silently (1.5.0 trap). Tracking: compressed-detail.md.
+- **Headroom fork leg (mandatory):** fork delta → fork crate + parent pin TOGETHER (cargo check fails otherwise), fork tag before the release chain (the parent tag push freezes the gitlink CI publishes; `aphrodite-vX.Y.Z`, never `Aphrodite/v*`), gitlink to the TAGGED fork commit (CI publishes the parent-recorded gitlink tree). Stale fork version → CI skips publish silently (1.5.0 trap). Tracking: compressed-detail.md.
 
 ### Release
 
 - **4 irreversible events, never combined:** (1) release-sync commit (I4), (2) immutable tag (R4), (3) artifacts (R5, Build.yml attaches), (4) registry (R6, cargo publish). Each requires identity confirmation, version availability, intended list, Gate R7, human approval (`Ready for approval` pause), consumer verification.
-- **Gate R7 at the exact tag commit:** read the ACTUAL workflow files - never trust remembered behavior. Tag push publishes `aphrodite` + `aphrodite-hermes` (no already-published check); `aphrodite-headroom-core` is dispatch-gated, NOT tag-reachable. Unexpected tag-reachable publish → stop. Commands: release-steps.md Step R2.
+- **Gate R7 at the exact tag commit:** read the ACTUAL workflow files - never trust remembered behavior. Tag push publishes `aphrodite` + `aphrodite-hermes` (no already-published check); `aphrodite-headroom-core`'s publish step is unreachable - gated on the REMOVED `workflow_dispatch publish_crates` input, so the tag chain never publishes it. Unexpected tag-reachable publish → stop. Commands: release-steps.md Step R2.
 - **Never re-tag; never move the tag.** Immutable evidence on the exact release-sync commit; re-tagging re-fires Build/Publish.
 - **`BINARY_VERSION` bumps LAST (after assets exist):** a pre-asset bump 404s every download; `_check_version_published` warning = hard stop.
-- **Registry:** the tag push already ran `cargo publish` - never re-dispatch; verify via crates.io API `max_version` (commands: release-steps.md Step R6); failed publish → release a NEW version.
+- **Registry:** the tag → Build → Publish chain already ran `cargo publish` for `aphrodite`/`aphrodite-hermes` - verify via crates.io API `max_version`, never re-trigger (commands: release-steps.md Step R6; headroom-core's publish step is unreachable - headroom-publish.md); failed publish → release a NEW version.
 - **Artifacts:** Finalize fails loudly on missing assets; 12 = 4 targets × (`aphrodite-<t>` + `libaphrodite_hermes-<t>.{so,dylib,dll}` + `SHA256SUMS-<t>.txt`). BODY amendable, tag not; `--notes-file`, never inline backticks.
 
 ### Observe

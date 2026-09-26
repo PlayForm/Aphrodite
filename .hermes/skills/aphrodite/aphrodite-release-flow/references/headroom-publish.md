@@ -1,23 +1,28 @@
-# Headroom fork publish - dispatch and post-event verification
+# Headroom fork publish - chain behavior and post-event verification
 
-The `vendor/headroom` fork crate (`aphrodite-headroom-core`) is
-dispatch-gated, NOT tag-reachable: a tag push never publishes it. Publishing
-it is a separate, deliberate event that requires the fork leg (Step I5) to
-have run first.
+The `vendor/headroom` fork crate (`aphrodite-headroom-core`) is never
+published by the release chain: its publish step is gated on the REMOVED
+`workflow_dispatch publish_crates` input, so the `workflow_run`-chained
+`Publish.yml` never fires it. Publishing it is a separate, deliberate event
+(restored gate or out-of-band `cargo publish` with `CARGO_REGISTRY_TOKEN`)
+that requires the fork leg (Step I5) to have run first.
 
-## Dispatch conditions
+## When the fork crate can publish
 
-Dispatch `gh workflow run Publish -f publish_crates=true` ONLY when Step I5
-carried a fork delta (fork crate + parent pin bumped, fork tag + gitlink
-float done). If the fork leg did not run, the version check sees the old
-version live on crates.io and skips the stale version silently (the 1.5.0
-published-version trap) - never dispatch for `aphrodite` /
-`aphrodite-hermes`: the tag push already ran `cargo publish` for them per
-the accepted Gate R7 trigger audit.
+There is NO dispatch input: `Publish.yml` runs via `workflow_run` on Build
+completion, and its headroom-core publish step is unreachable (gated on the
+removed input). Step I5's fork leg (fork crate + parent pin bumped, fork tag
++ gitlink float done BEFORE the parent tag push) must still run - a stale
+fork version either ships silently (the 1.5.0 published-version trap) or
+fails `Publish-Aphrodite` (its `path + version` dep must already exist on
+crates.io). Never re-trigger for `aphrodite` / `aphrodite-hermes`: the tag →
+Build → Publish chain already ran `cargo publish` for them per the accepted
+Gate R7 trigger audit.
 
 Needs chain (Publish.yml): Test → Publish-Headroom-Core → Publish-Aphrodite
-→ Publish-Hermes - headroom publishes FIRST. `aphrodite-headroom-core` is
-index-checked and skipped if already live.
+→ Publish-Hermes. The headroom-core CHECK step still runs (index-checked),
+but the PUBLISH step's `if:` names the removed `workflow_dispatch
+publish_crates` input - it never fires under the `workflow_run`-only `on:`.
 
 ## Post-event consumer verification
 
@@ -26,7 +31,7 @@ curl -A < ua > https://crates.io/api/v1/crates/aphrodite-headroom-core | grep ma
 ```
 
 The index must serve the NEW fork version. Seeing only the old 0.1.2 means
-the skip fired again - the fork version was not published. Verify the fork
-tag exists before dispatch and the parent gitlink floats to the TAGGED fork
-commit (CI publishes the parent-recorded gitlink tree, not the local
-submodule HEAD).
+the fork version was not published - under the current chain it CANNOT be
+(the publish step is unreachable). Verify the fork tag exists before the
+release chain and the parent gitlink floats to the TAGGED fork commit (CI
+publishes the parent-recorded gitlink tree, not the local submodule HEAD).

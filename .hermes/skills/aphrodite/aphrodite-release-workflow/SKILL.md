@@ -97,18 +97,26 @@ never trust remembered or documented behavior. The `if:` conditions at the tag c
 
 Resolution of C-002: one release document claimed `Publish.yml` only publishes crates after
 a deliberate `workflow_dispatch` and that a plain tag push triggers only Build.yml's GitHub
-Release artifacts. **False at commit `a81acab6`**: a plain `Aphrodite/v*` tag push DOES
-reach `cargo publish` for `aphrodite` and `aphrodite-hermes` (publish steps carry
-`|| startsWith(github.ref, 'refs/tags/Aphrodite/')`); only `aphrodite-headroom-core` is truly
-dispatch-gated. A tag push is not a build-only event. Re-audit at the tag commit:
-`grep -A3 'Publish to crates.io' .github/workflows/Publish.yml`; worked trigger table +
+Release artifacts. That was **false at commit `a81acab6`**: a plain `Aphrodite/v*` tag push
+reached `cargo publish` for `aphrodite` and `aphrodite-hermes` directly (publish steps
+carried `|| startsWith(github.ref, 'refs/tags/Aphrodite/')`). **At `677a7b3` the chain was
+restructured**: the tag push now starts Build.yml only; Publish.yml follows via `workflow_run`
+on Build `completed` - every job gated `conclusion == 'success' && head_branch startsWith
+'Aphrodite/v'`, checkouts pinned to the tag - and `cargo publish` for `aphrodite` and
+`aphrodite-hermes` runs there (publish steps carry
+`startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')`). Only
+`aphrodite-headroom-core` is never CI-published: its step `if` names `workflow_dispatch &&
+inputs.publish_crates`, unreachable under the `workflow_run`-only `on:` (the dispatch input
+is gone). A tag push is still a publish event - never build-only, and publishing cannot race
+or precede the build. Re-audit at the tag commit:
+`grep -nE 'workflow_run|head_branch' .github/workflows/Publish.yml`; worked trigger table +
 environment/Finalize/Test-job notes: `references/gate-r7-trigger-audit.md` (evidence, not a
 substitute for the audit).
 
 ### Gate R7 template (the ceremony runs this; definitions owned here)
 
 **Read:** workflow files at the intended release commit (`.github/workflows/*.yml`); trigger
-clauses for tag push, push branch, `workflow_dispatch`, `workflow_call`.
+clauses for tag push, push branch, `workflow_dispatch`, `workflow_call`, `workflow_run` (Build -> Publish chaining).
 **Record:** workflows triggered by this tag; jobs publishing GitHub assets; jobs publishing
 crates/packages; required secrets and manual inputs.
 **Pass:** the release owner has explicitly accepted every triggered side effect.
@@ -116,8 +124,10 @@ crates/packages; required secrets and manual inputs.
 
 ### Notes that gate behavior
 
-- Secrets: `CARGO_REGISTRY_TOKEN` (crates.io) + default `GITHUB_TOKEN`; manual input
-  `publish_crates` (boolean). Named, never echoed.
+- Secrets: `CARGO_REGISTRY_TOKEN` (crates.io) + default `GITHUB_TOKEN`; no manual inputs - the
+  `publish_crates` dispatch input is gone (677a7b3); Publish is `workflow_run`-chained on Build
+  `completed` (jobs gated `conclusion == 'success' && head_branch startsWith 'Aphrodite/v'`).
+  Named, never echoed.
 - The tag push has no already-published version check: a re-publish errors red, a
   never-published version IS published by the tag push alone.
 
@@ -231,7 +241,7 @@ draft notes) passes this checklist before a release claim:
 The owned fork crate `aphrodite-headroom-core` is published from
 `vendor/headroom/crates/headroom-core/Cargo.toml`; parent pin `crates/aphrodite/Cargo.toml`
 line 55 (observational, re-derive live: `package = "aphrodite-headroom-core", version = "0.1.2"`;
-`0.1.3` planned next - CLAIM). Publish is dispatch-gated (never a tag push), versions
+`0.1.3` planned next - CLAIM). Publish is `workflow_run`-chained on Build (a tag push never starts it directly), versions
 immutable, CI publishes the **parent-recorded gitlink tree**, not the local submodule HEAD.
 Full evidence note + checklist: `references/headroom-publish.md`.
 
@@ -257,8 +267,8 @@ approval boundaries, failure policy), `aphrodite-orientation` (preflight).
 | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Ledger rows match their authority manifests                         | `crates/aphrodite/Cargo.toml`, `crates/aphrodite-hermes/Cargo.toml`, `plugins/aphrodite/plugin.yaml`, `plugins/aphrodite/BINARY_VERSION`, `package.json`, README badges | Read each authority path at release time                                                           | Each row equals its authority (1.4.6-vs-1.5.0 lag = known failure)                                        | Fix the manifest before claiming; report the drift                              |
 | Tag push side effects are exactly as audited                        | Workflow files at the exact tag commit                                                                                                                                  | Gate R7: build the trigger table from the actual files                                             | Only accepted jobs reachable from the tag                                                                 | Change the workflow or halt the tag                                             |
-| Tag push reaches `cargo publish` for `aphrodite`/`aphrodite-hermes` | Publish.yml publish-step `if:` conditions                                                                                                                               | `grep -A3 'Publish to crates.io' .github/workflows/Publish.yml` at the tag commit                  | Both publish steps carry `startsWith(github.ref, 'refs/tags/Aphrodite/')` - or audit table records change | Accept the side effect explicitly or halt the tag                               |
-| `aphrodite-headroom-core` is never published by a tag push          | Publish.yml Publish-Headroom-Core step                                                                                                                                  | Read the publish-step `if:` at the tag commit                                                      | `workflow_dispatch && inputs.publish_crates && published == 'false'` only                                 | Tag-reachable headroom publish = unexpected side effect - stop                  |
+| Tag push reaches `cargo publish` for `aphrodite`/`aphrodite-hermes` | Publish.yml publish-step `if:` conditions                                                                                                                               | `grep -nE 'workflow_run|head_branch' .github/workflows/Publish.yml` at the tag commit                  | Both publish steps carry `startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')` and `on:` is `workflow_run` on Build `completed` - or audit table records change | Accept the side effect explicitly or halt the tag                               |
+| `aphrodite-headroom-core` is never published by a tag push          | Publish.yml Publish-Headroom-Core step                                                                                                                                  | Read the publish-step `if:` at the tag commit                                                      | publish-step `if:` names `workflow_dispatch && inputs.publish_crates` - unreachable under the `workflow_run`-only `on:` (input gone at 677a7b3); headroom-core never CI-published                                 | Tag-reachable headroom publish = unexpected side effect - stop                  |
 | Consumer download names match release assets                        | Build.yml staging names + download.sh/download.ps1 asset names                                                                                                          | `gh release view "Aphrodite/v<ver>" --json assets` vs section 4                                    | Every required name present (12 assets)                                                                   | Do NOT bump `BINARY_VERSION`; fix artifact build/attach                         |
 | Missing optional asset degrades, never bricks setup                 | `download.sh` SUMS path, `setup/dylib.rs` optional arm                                                                                                                  | Simulate a missing `SHA256SUMS-<target>.txt` and a missing `libaphrodite.dylib` in a clean install | Warning + continue; setup completes                                                                       | Fix the consumer script; re-run the simulation                                  |
 | Proposed registry version is available                              | crates.io index/API                                                                                                                                                     | `curl -A <ua> https://crates.io/api/v1/crates/<crate>` / index URL                                 | `max_version` (or `vers`) does not contain the proposed number                                            | Claim the next number; never re-publish                                         |

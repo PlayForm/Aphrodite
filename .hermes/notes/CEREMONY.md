@@ -21,14 +21,27 @@ Development`, selective pick (keep version bump/docs/real changes; discard
    RESTORE branch-owned identity (`git checkout HEAD -- .gitmodules .github/
 workflows plugins/aphrodite .hermes bench`), float the plugin gitlink,
    verify (identity diffs EMPTY, no `+` in `git submodule status`), commit,
-   push Current, tag `Aphrodite/vX.Y.Z`, `gh release create --notes-file`.
+   push Current, tag `Aphrodite/vX.Y.Z`, `gh release create --notes-file`
+   (note staged at `.hermes/release-notes/release-notes-vX.Y.Z.md` - Dev-side,
+   never crosses; the Maintain/ staging pattern ended at v1.6.2).
 4. **A3 what ships vs never ships**: crates/, plugins (as gitlink), docs,
    README, CHANGELOG, Maintain/scripts (non-bench), formatter configs ship;
    `.hermes/` (incl. skills/), bench/, tests/, auto-release.sh never ship.
-5. Tag AFTER the final tip is settled (re-tagging re-fires Build/Publish).
+5. Tag AFTER the final tip is settled (re-tagging re-fires the chain).
    Build.yml fires on `refs/tags/Aphrodite/*` -> 12 artifacts (4 targets x
-   bin + dylib + SUMS). Publish.yml fires on tag too for aphrodite +
-   aphrodite-hermes (headroom-core is dispatch-only).
+   bin + dylib + SUMS); Finalize asserts the matrix, commits the in-tree
+   `plugins/aphrodite/SHA256SUMS.txt` INSIDE the child submodule and pushes
+   child Current with the fine-grained PAT `PLAYFORM_RELEASE_PAT`
+   (child-scoped; GITHUB_TOKEN cannot push the child - the 1.6.3 403), then
+   TAGS the plugin `v$(plugin.yaml version)` at the child tip (annotated,
+   UNSIGNED - re-sign manually if the signed-tag convention must hold;
+   idempotent). Publish.yml no longer fires on the tag: it chains off Build
+   via `workflow_run` (completed + success + `Aphrodite/v*` head_branch) and
+   publishes `aphrodite` + `aphrodite-hermes` (the headroom-core publish step
+   is unreachable - it must already be live on crates.io); Bump-Plugin-Gitlink
+   then floats the parent gitlink to the child Current tip and pushes Current
+    - branch-protected (GH006) degrades with a loud warning; the bump becomes
+      a manual admin push.
 
 ## Phase B - SYNC-BACK (Current -> Development)
 
@@ -57,6 +70,10 @@ Source`, then scan BOTH refs:
    the OTHER branch = **LEAK** (Auto.yml class). The sanctioned exception:
    Auto.yml's heartbeat pushes to Current on BOTH copies (touches only the
    CI-ignored `.github/Update.md` path).
+   Publish.yml has no `branch:`/`branches:` keys (workflow_run-chained): its
+   gitlink-bump push target is a runtime run-step push (`HEAD:${BRANCH}`, default
+   Current). The step-4 keyword scan must treat run-step branch strings
+   (`BRANCH=Current`, "Current is branch-protected") as content, not identity.
 2. `.gitmodules` branch fields match their branch (plugin -> Development on
    Development / Current on Current; vendors -> Current on both, by design).
 3. Gitlink targets resolve to their branch (`git -C plugins/aphrodite branch
@@ -76,7 +93,11 @@ detached-HEAD fallback to `Current` (latent risk, not active).
 
 ## Tagging + invariants (immutable)
 
-- Tags exist ONLY on Current; plugin tag first, then parent tag.
+- Tags exist ONLY on Current. The PARENT tag is cut first (it fires the
+  chain); the plugin tag is then created automatically by Build.yml Finalize
+  at the child tip (from `plugin.yaml` version), and the parent gitlink is
+  floated to that tagged child tip by Publish.yml's Bump-Plugin-Gitlink.
+  Bottom-up holds for SYNC order and the gitlink float, not for tag order.
 - The one rule: plugin moves first in both directions; identity files never
   cross; tests/bench/dev-scaffolding only exist on Development; tags only on
   Current; every transplant is a reviewable staged snapshot, never an
@@ -100,3 +121,10 @@ detached-HEAD fallback to `Current` (latent risk, not active).
 - **BINARY_VERSION** (`MC3-01 +tag+guard`) is bumped LAST - it is a live
   download pointer; bumping it before the release assets exist 404s every
   download (the exact 2026-09-17 failure mode).
+- **Release notes** are authored per `.hermes/release/RELEASE-TEMPLATE.md` and
+  finalized at `.hermes/release-notes/release-notes-vX.Y.Z.md` (Dev-side,
+  NEVER crosses - `gh release create --notes-file` consumes it from the
+  ceremony checkout). The Maintain/ staging (`D@R4-01..05`) ended at v1.6.2.
+- **Child pushes in CI** use the fine-grained PAT `PLAYFORM_RELEASE_PAT`
+  (Release-environment secret, contents:write on the child repo only);
+  GITHUB_TOKEN cannot push the child (the 1.6.3 403).

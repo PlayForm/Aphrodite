@@ -146,9 +146,13 @@ git push Source Current
 git tag Aphrodite/vX.Y.Z && git push Source Aphrodite/vX.Y.Z
 gh release create Aphrodite/vX.Y.Z --notes-file Maintain/release-notes-vX.Y.Z.md
    # NEVER inline backticks in --notes; always --notes-file
-   # Build.yml auto-fires on refs/tags/Aphrodite/* → 12 artifacts (4 targets × bin+dylib+SUMS)
-   # Publish.yml fires on tag push too: aphrodite + aphrodite-hermes publish steps run
-   # on refs/tags/Aphrodite/* (only headroom-core needs workflow_dispatch + publish_crates)
+   # Build.yml auto-fires on refs/tags/Aphrodite/* → 12 artifacts (4 targets × bin+dylib+SUMS);
+   # Finalize then commits the in-tree SHA256SUMS.txt inside the child submodule and tags
+   # the plugin at the child tip (annotated, unsigned, idempotent)
+   # Publish.yml does NOT fire on the tag push: it chains via workflow_run once Build
+   # completes successfully (gate: conclusion == 'success' && head_branch startsWith
+   # Aphrodite/v) - publishes aphrodite → aphrodite-hermes, floats the parent gitlink to
+   # the child Current tip (GH006/protected-branch → loud warning + exit 0 degrade)
 ```
 
 Action 14: return the working copy to Development
@@ -328,13 +332,14 @@ then proceed.
 | ------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | push to Development | Check.yml `[Development]` | full CI: fmt (nightly), check, clippy, deny, ruff, pyright, **tests**                                                                                                                                                                                                                                                                                                    |
 | push to Current     | Check.yml `[Current]`     | CI minus Test job (test-free line):<br>fmt, check, clippy, deny, ruff, pyright                                                                                                                                                                                                                                                                                           |
-| tag `Aphrodite/v*`  | Build.yml                 | **12 artifacts**: 4 targets × (binary + libaphrodite_hermes + SHA256SUMS) + source zips                                                                                                                                                                                                                                                                                  |
-| tag `Aphrodite/v*`  | Publish.yml               | fires and publishes to crates.io when `workflow_dispatch` + `publish_crates: true` (manual, deliberate)<br>OR on a plain tag push - the `aphrodite`/`aphrodite-hermes` publish steps carry the tag-push condition (→ B4) and DO fire on tag;<br>only `aphrodite-headroom-core` is truly dispatch-only<br>(order: aphrodite-headroom-core → aphrodite → aphrodite-hermes) |
+| tag `Aphrodite/v*`  | Build.yml                 | **12 artifacts**: 4 targets × (binary + libaphrodite_hermes + SHA256SUMS) + source zips;<br>Finalize commits the in-tree SHA256SUMS.txt inside the child submodule (plugins/aphrodite), pushes child Current (fine-grained PAT), and tags the plugin at the child tip (annotated, unsigned, idempotent)                                                                                                                                                                                                                                                                                  |
+| Build completes (workflow_run on Build) | Publish.yml               | does NOT trigger on the tag push - chains via `workflow_run` once the Build run for the same tag succeeds (gate: `conclusion == 'success'` && head_branch `startsWith Aphrodite/v`);<br>checkouts pinned to the tag; publishes aphrodite → aphrodite-hermes to crates.io (the `workflow_dispatch publish_crates` input is gone - no manual dispatch; headroom-core's dispatch-only step can no longer fire under workflow_run);<br>then floats the parent gitlink to the child Current tip (GH006/protected-branch → loud warning + exit 0 degrade) |
 | plugin tag `vX.Y.Z` | (Aphrodite-Hermes repo)   | plugin release marker; plugin has no CI                                                                                                                                                                                                                                                                                                                                  |
 
 ```text
-B4 · Publish.yml tag-push condition
-startsWith(github.ref, 'refs/tags/Aphrodite/')
+Publish.yml workflow_run gate (the tag push no longer triggers Publish)
+github.event.workflow_run.conclusion == 'success' &&
+startsWith(github.event.workflow_run.head_branch, 'Aphrodite/v')
 ```
 
 `download.sh` resolves the binary by `BINARY_VERSION` (arg → file → Cargo.toml →

@@ -42,7 +42,7 @@ Cut Aphrodite releases on a weekly/monthly cadence: version bump + CHANGELOG + G
 
 ## Prerequisites
 
-- Read `.github/` and the version manifests first to map the EXISTING chain: Dependabot open/auto-merge, conventional commits (`fix:`, `feat:`), publish trigger (`Aphrodite/v*` tag push → Build.yml; Publish.yml `workflow_dispatch publish_crates=true`; `on: release: created`).
+- Read `.github/` and the version manifests first to map the EXISTING chain: Dependabot open/auto-merge, conventional commits (`fix:`, `feat:`), publish trigger (`Aphrodite/v*` tag push → Build.yml; Publish.yml chained via `workflow_run` on a successful Build for the same tag - no `workflow_dispatch publish_crates=true` input anymore).
 - A workflow file that runs on tag push is not a release; it proves only that a pipeline is defined. Run the Gate R7 trigger audit from `aphrodite-release-workflow` at the commit to be tagged before relying on any trigger claim.
 - git-cliff (Rust crate `git-cliff-core` + npm wrapper) is the standard conventional-commit changelog tool.
 
@@ -70,7 +70,7 @@ Tool verdicts (semantic-release, release-please, changesets, standard-version, g
 
 1. Does Dependabot open AND auto-merge dep PRs? If yes, dep churn is free.
 2. Are commits conventional? Any standard tool classifies them automatically.
-3. For Aphrodite: `Aphrodite/v*` tag push reaches Build.yml (4-target matrix) and Publish.yml (`cargo publish` for `aphrodite` + `aphrodite-hermes`); `aphrodite-headroom-core` is dispatch-gated. Re-verify at the tag commit (Gate R7).
+3. For Aphrodite: `Aphrodite/v*` tag push starts Build.yml only (4-target matrix + release assets). Publish.yml does NOT trigger on the tag push - it chains via `workflow_run` once that Build run completes successfully (gate: `conclusion == 'success'` and `head_branch startsWith 'Aphrodite/v'`), then publishes `aphrodite` + `aphrodite-hermes` to crates.io and floats the parent gitlink to the child's Current tip. No `workflow_dispatch publish_crates` input anymore. Re-verify at the tag commit (Gate R7).
 4. The manual gap is usually: bump version + write CHANGELOG + create the GitHub Release. Close it with a scheduled "Release Manager" - do NOT replace the existing publisher.
 
 ### 2. Verify the chain actually delivers (ladder, cheapest → decisive)
@@ -95,7 +95,7 @@ Scheduled release + Dependabot auto-merge + manual dispatch are multiple concurr
 - **`gh workflow run W --ref <tag>` executes the workflow file AT the tag commit** - re-point the tag after any workflow change (delete remote ref, delete local, re-create at new HEAD, push).
 - **Prefer the separated release pattern**: the Release job creates the release once with no files; each matrix leg attaches ONLY its own artifacts (`fail_on_unmatched_files: true`) with its own `SHA256SUMS-<target>.txt`; a Finalize job asserts every target's assets. Layout: `references/release-readiness-verification.md`.
 - **Actions disabled**: if a tag exists and `gh run list` shows 0 runs ever, check `gh api repos/O/R/actions/permissions` → `{"enabled": false}`; add to the org selected list, then `gh api -X PUT repos/O/R/actions/permissions -F enabled=true` (`-F` = typed boolean; `-f` sends "true" → 422).
-- **Re-fire without re-pushing**: `gh workflow run Build.yml -R O/R --ref <tag>` (needs `workflow_dispatch`).
+- **Re-fire without re-pushing**: Build.yml is tag-push-only (no `workflow_dispatch` trigger) - re-fire by deleting + re-creating the tag (delete remote + local, re-push) so a fresh push event fires.
 
 ### 5. Rehearse destructive release steps before the real run
 
@@ -147,7 +147,7 @@ Steps are irreversible: dependency bumps, `git push --delete`, tag delete/recrea
 
 | Claim                                                                                                                                   | Test that would falsify it                                                                                                                                                                  | Status                                                 |
 | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| The tag-triggered chain fires (`Aphrodite/v*` → Build.yml; Publish.yml `workflow_dispatch publish_crates=true`; `on: release: created`) | Run the Gate R7 trigger audit from `aphrodite-release-workflow` at the commit to be tagged                                                                                                  | CLAIM - re-run Gate R7 at the tag commit               |
+| The tag-triggered chain fires (`Aphrodite/v*` → Build.yml; Publish.yml chained via `workflow_run` on Build completion - no `workflow_dispatch publish_crates` input) | Run the Gate R7 trigger audit from `aphrodite-release-workflow` at the commit to be tagged                                                                                                  | CLAIM - re-run Gate R7 at the tag commit               |
 | The crate is published                                                                                                                  | `curl -s https://crates.io/api/v1/crates/<name> -H "User-Agent: <ua>"                                                                                                                       | jq -r '.crate                                          | .max_version + " " + .created_at'` - per crate (`aphrodite`, `aphrodite-hermes`) | Probe in row               |
 | The release and the tag exist                                                                                                           | `gh api repos/PlayForm/Aphrodite/releases --paginate -q '.[].tag_name'` AND `git ls-remote --tags <remote>`; empty output = no release, no tag                                              | Probe in row                                           |
 | The installer can consume the release assets                                                                                            | `plugins/aphrodite/download.sh <version> <target>` against a temp `BINARY_DIR`; a 404 on the asset URL = assets never uploaded even when the installer resolved its pinned `BINARY_VERSION` | Probe in row                                           |

@@ -537,7 +537,7 @@ git -C vendor/headroom log <last-published-commit>..HEAD --oneline
 #    update vendor/headroom/RELEASE-CYCLE.md + CHANGELOG.md, commit + push
 #    the fork's Current branch:
 git -C vendor/headroom push Source Current
-# 3. Fork tag BEFORE dispatch (fork scheme aphrodite-vX.Y.Z, e.g.
+# 3. Fork tag BEFORE the release chain (fork scheme aphrodite-vX.Y.Z, e.g.
 #    aphrodite-v0.10.0 - NEVER the parent Aphrodite/v* scheme); pauses for
 #    human approval like Step R4:
 git -C vendor/headroom tag aphrodite-v<X.Y.Z> <fork-commit>
@@ -565,7 +565,8 @@ curl -A < ua > https://crates.io/api/v1/crates/aphrodite-headroom-core | grep ma
 **Expected**
 
 - Delta = 0, OR the fork crate + parent pin moved together, the fork tag
-  exists BEFORE dispatch, and the gitlink floats to the tagged fork commit.
+  exists before the release chain runs, and the gitlink floats to the tagged
+  fork commit.
 
 **Stop if**
 
@@ -573,19 +574,21 @@ curl -A < ua > https://crates.io/api/v1/crates/aphrodite-headroom-core | grep ma
   check sees the old version live on crates.io and skips silently (1.5.0
   trap: commits went unpublished, nothing failed, the old 0.1.2 kept
   shipping).
-- The fork tag would be created after dispatch; the parent pin moved without
-  the fork crate (or vice versa).
+- The fork tag would be created after the chain ran (the parent tag push
+  freezes the gitlink CI publishes); the parent pin moved without the fork
+  crate (or vice versa).
 
 **Recovery**
 
 - Permitted: bump to the next free number and re-verify (crates.io versions
   are immutable - never reuse a burned version).
-- Prohibited: dispatching with a stale fork version; re-tagging the fork.
+- Prohibited: proceeding with a stale fork version; re-tagging the fork.
 
 **Produces**
 
-- Fork tag + parent gitlink float + headroom-fork notes. Dispatch order
-  (Publish.yml `needs:` chain): Test → Publish-Headroom-Core →
-  Publish-Aphrodite → Publish-Hermes - headroom publishes FIRST; run
-  `gh workflow run Publish -f publish_crates=true` in Step R6, only after
-  this leg (phase exit).
+- Fork tag + parent gitlink float + headroom-fork notes. Publish.yml runs
+  via `workflow_run` on Build completion (no dispatch input exists); needs:
+  chain Test → Publish-Headroom-Core → Publish-Aphrodite → Publish-Hermes -
+  Publish-Headroom-Core's publish step is UNREACHABLE (gated on the removed
+  `workflow_dispatch publish_crates` input), so only aphrodite /
+  aphrodite-hermes publish; verify in Step R6 (phase exit).
