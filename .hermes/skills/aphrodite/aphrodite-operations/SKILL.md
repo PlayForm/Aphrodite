@@ -321,7 +321,7 @@ an upstream release change the compiled behavior without a recorded decision.
 The full decision tree (inventory, upgrade one compatibility cluster, compile
 minimal targets, classify failure, choose action, behavioral tests, record the
 decision) is owned by `aphrodite-cargo-upgrade`; its breakpoint records live
-in its `references/breakpoints.md`. Never pin "until it compiles" without
+in `aphrodite-cargo-upgrade`'s `references/breakpoints.md`. Never pin "until it compiles" without
 recording the removal condition, because a pin without an exit blocks the next
 upgrade.
 

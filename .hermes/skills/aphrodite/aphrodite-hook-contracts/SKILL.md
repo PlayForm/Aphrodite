@@ -70,7 +70,7 @@ The dylib list additionally registers `pre_tool_call`, the fail-closed directive
 grep -n 'VALID_HOOKS' $HOME/.hermes/hermes-agent/hermes_cli/plugins.py
 ```
 
-The installed loader (`~/.hermes/aphrodite/__init__.py`; repo source at `plugins/aphrodite/__init__.py`) registers hooks verbatim from the dylib list via `ctx.register_hook(hook_name, _dispatch)` with no filtering (CLAIM: read the loader to confirm); kwargs pass JSON-serialized to the Rust `aphrodite_hermes_call_hook` arm (CLAIM: read `crates/aphrodite-hermes/src/lib.rs`). `VALID_HOOKS` in `hermes_cli/plugins.py` is the registry of accepted names (`on_`-prefixed).
+The installed loader (`~/.hermes/plugins/aphrodite/__init__.py`; repo source at `plugins/aphrodite/__init__.py`) registers hooks verbatim from the dylib list via `ctx.register_hook(hook_name, _dispatch)` with no filtering (CLAIM: read the loader to confirm); kwargs pass JSON-serialized to the Rust `aphrodite_hermes_call_hook` arm (CLAIM: read `crates/aphrodite-hermes/src/lib.rs`). `VALID_HOOKS` in `hermes_cli/plugins.py` is the registry of accepted names (`on_`-prefixed).
 
 ## Global contract (all registered hooks)
 

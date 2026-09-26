@@ -350,7 +350,7 @@ aphrodite_rebuild
 **Recovery**
 
 - Permitted: restart Pane 1 (fresh process); re-check the symlink (Step 2).
-- Prohibited: declaring a plugin change verified without a fresh-process or
+- Prohibited: declaring a plugin change correct without a fresh-process or
   reload test - a stale process reports old behavior; only a fresh process
   shows the running binary is the one just built.
 

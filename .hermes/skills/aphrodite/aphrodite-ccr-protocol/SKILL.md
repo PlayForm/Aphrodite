@@ -177,7 +177,7 @@ A strict parser MUST reject, with a readable diagnostic:
 - Missing required fields (empty hash, missing type or size)
 - Invalid hash alphabet or length (non-hex, < 24 hex, malformed `i:` prefix)
 - Non-numeric or negative size
-- Unknown protocol version (once a version field exists)
+- Unknown protocol version (once a version field is present)
 - Illegal content type (not in the classifier's canonical set)
 - Unsafe preview encoding (control chars, raw bytes, over-long preview)
 - Excessively long marker lines (cap enforced at parse time)

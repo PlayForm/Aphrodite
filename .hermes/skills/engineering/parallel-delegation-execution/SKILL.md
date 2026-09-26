@@ -47,7 +47,7 @@ Run large multi-crate tasks on the Aphrodite monorepo (PlayForm/Aphrodite, Devel
 - **Pair-shaped waves are the standing default** - exactly two children with disjoint file ownership per phase; four is the runtime cap, not the default shape; 3-4 one-file-owner surfaces can be a legitimate three-way wave. Full: references/ownership-scope.md.
 - **Self-reports are not facts - a child's "3x green" suite is not green in YOUR env**; its subprocess may not inherit the parent's exported env vars, so re-run the exact command yourself; conflicting reports resolve by reading on-disk state. Full: references/env-var-hermeticity.md.
 - **Keep progress in the repo planning archive** (`.hermes/notes/`; confirm with `git check-ignore -v` first; may be gitignored by design - an empty diff is expected; never /tmp). A single long-running verification is a valid one-child delegation: dispatch it, do not await it; the child polls as a BOUNDED FOREGROUND command, never a background process (killed when the child exits). Full: references/completion-verification.md.
-- **Finish the sweep directly, never by more delegation** - once the parallel implementation waves land and are verified, the final pass is executed by the orchestrator itself in-session - no more workers/agents; children are for parallel implementation; finishing touches are single-threaded by preference. Full: references/ownership-scope.md.
+- **Finish the sweep directly, never by more delegation** - once the parallel implementation waves land and their deliverables pass the post-wave checks (git status + wc -c), the final pass is executed by the orchestrator itself in-session - no more workers/agents; children are for parallel implementation; finishing touches are single-threaded by preference. Full: references/ownership-scope.md.
 - **Relaunch a failed child - never hand-execute its scope mid-wave (standing orchestration preference)** - when a child dies (401/429/timeout), re-dispatch it instead of writing its files yourself; the parent organizes and verifies, children implement. Full: references/quota-death-recovery.md.
 - **Read the NEWEST planning/instruction file before executing a mass change** - later directives supersede earlier ones and can reverse a rename or brand decision; a scripted mass rewrite is costly to undo. Full: references/wave-dispatch.md.
 
@@ -109,7 +109,7 @@ Pitfall (reproduction masking): on macOS `/tmp` is a symlink to `/private/tmp` a
 
 - **Stop if** two children in the same batch share a write target. **Recovery:** re-split ownership before dispatching (wave gate: Dispatch).
 - **Stop if** a batch produces 429/401 deaths. **Recovery:** let survivors finish; re-dispatch dead units one at a time or 2-wide; after a mixed cluster, probe with ONE minimal task before re-fanning out. Signatures: references/quota-death-recovery.md.
-- **Stop if** on-disk evidence does not match a child's report. **Recovery:** re-dispatch only the undelivered items; a late death whose deliverable is verified on disk is not re-dispatched.
+- **Stop if** on-disk evidence does not match a child's report. **Recovery:** re-dispatch only the undelivered items; a late death whose deliverable is present on disk (wc -c matches the report) is not re-dispatched.
 - **Stop if** the user pauses the operation mid-wave. **Recovery:** `delegate_task action=stop` every live child, write a `## PAUSED <date>` resume checklist, fold late-arriving completions into it.
 
 ## Wave gates

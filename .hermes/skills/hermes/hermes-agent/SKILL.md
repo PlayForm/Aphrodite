@@ -106,8 +106,10 @@ Good verification targets, cheapest first:
 - Source tree: https://github.com/NousResearch/hermes-agent
 
 Never answer "Hermes can't do that" from memory. Hermes ships far more than
-this skill body describes, and the index exists so a negative answer is always
-checkable.
+this skill body describes, and the `llms.txt` index makes a negative answer
+checkable - fetch it with `web_extract`, or
+`curl -s https://hermes-agent.nousresearch.com/docs/llms.txt` when web tools
+are off.
 
 ## Quick Start
 
@@ -210,7 +212,7 @@ The Aphrodite proxy compresses large tool output, so a read may come back as a
   `pre_llm_call`, `transform_terminal_output`, `post_llm_call`.
 
 **Stop if** a marker is treated as opaque text, or a file is re-read while a
-live marker for it exists.
+live marker for it exists - resolve it with `aphrodite_retrieve(hash)`.
 
 **Recovery** - retrieve the marker (`aphrodite_retrieve(hash)`), then proceed
 with the expanded content.
