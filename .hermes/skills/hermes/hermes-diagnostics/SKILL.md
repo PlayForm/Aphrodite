@@ -56,7 +56,7 @@ the child's `os.getcwd()`.
   row is never consulted.
 - `~/` ALWAYS expands to home (`os.path.expanduser`) - by design, not a bug.
 - `terminal.cwd: .` / `auto` / `cwd` are PLACEHOLDERS (`_CWD_PLACEHOLDERS`)
-  - they never become the completion root.
+    - they never become the completion root.
 - Fix: relaunch `hermes` from the project dir
   (`cd <workspace>/PlayForm/Aphrodite && hermes --profile dev-aphrodite`);
   each TUI window pins its own cwd at launch; absolute paths
@@ -212,7 +212,7 @@ Evidence first, in order:
    `threshold=N` in the "Compression budget rearmed" lines.
 2. Active profile config: `~/.hermes/config.yaml` (default profile) or
    `~/.hermes/profiles/dev-aphrodite/config.yaml` (`hermes --profile
-   dev-aphrodite`) - check `compression:` and `model_overrides:`; then
+dev-aphrodite`) - check `compression:` and `model_overrides:`; then
    `~/.hermes/context_length_cache.yaml`.
 3. Confirm the math in source before explaining
    (`~/.hermes/hermes-agent/agent/context_compressor.py`,

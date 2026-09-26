@@ -106,11 +106,11 @@ The refusal text for those is `BLOCKED: write to protected agent-instruction fil
 
 A startup warning like `platform 'cli' references unknown toolset 'a2a'` comes **only** from `platform_toolsets`. Map the three relevant keys:
 
-| Key | Role | Action on dead toolset |
-| --- | --- | --- |
-| `platform_toolsets.<platform>: [list]` | Per-platform toolset allowlist - **the source of the warnings** | Remove the dead name; if a platform's list becomes empty, set it to `[]` |
-| `known_plugin_toolsets.<platform>` | Stale auto-discovery cache; _not_ the warning source but should also be cleaned | Remove dead names (leave real ones like `spotify`) |
-| `plugins.disabled` / `plugins.enabled` | Real plugin entries - `platforms/a2a`, `aphrodite`, etc. are legitimately listed here | **LEAVE ALONE** - these are plugins, not toolsets |
+| Key                                    | Role                                                                                  | Action on dead toolset                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `platform_toolsets.<platform>: [list]` | Per-platform toolset allowlist - **the source of the warnings**                       | Remove the dead name; if a platform's list becomes empty, set it to `[]` |
+| `known_plugin_toolsets.<platform>`     | Stale auto-discovery cache; _not_ the warning source but should also be cleaned       | Remove dead names (leave real ones like `spotify`)                       |
+| `plugins.disabled` / `plugins.enabled` | Real plugin entries - `platforms/a2a`, `aphrodite`, etc. are legitimately listed here | **LEAVE ALONE** - these are plugins, not toolsets                        |
 
 Block layout and platform names: `references/config-structure.md`.
 
@@ -198,11 +198,11 @@ After a config change, "agents take long even on simple tasks" is a defaults-dif
 
 ## Local claim-to-test matrix
 
-| Claim | Evidence source | Test | Pass condition | Failure response |
-| --- | --- | --- | --- | --- |
-| Guard refuses patch/write_file for the top-level config | This skill | Attempt `patch` on `~/.hermes/config.yaml` | Refusal message; file unchanged | Use the CLI route |
-| CLI route rewrites YAML itself | `hermes config set` | Set a key, `hermes config get` round-trip | Value matches; file still parses | Fall back to Python replace |
-| Cleaner touches only the two toolset keys | Script dry run | `python3 scripts/clean_unknown_toolsets.py` | `plugins.*` lines untouched; YAML parses | Fix line surgery in the script |
-| Profile configs are patch-editable | `patch` on dev-aphrodite | Apply a patch to `~/.hermes/profiles/dev-aphrodite/config.yaml` | Change lands; YAML parses | Use CLI / Python replace |
-| Dead toolset names gone everywhere | grep + yaml.safe_load | Post-edit sweep (above) | Zero hits in toolset keys; all configs parse | Restore from scratch backup |
-| Latency keys traced to consumers before asserting | Core checkout grep | Grep key, read consuming function | Function identified; claim matches code | Read the function before asserting |
+| Claim                                                   | Evidence source          | Test                                                            | Pass condition                               | Failure response                   |
+| ------------------------------------------------------- | ------------------------ | --------------------------------------------------------------- | -------------------------------------------- | ---------------------------------- |
+| Guard refuses patch/write_file for the top-level config | This skill               | Attempt `patch` on `~/.hermes/config.yaml`                      | Refusal message; file unchanged              | Use the CLI route                  |
+| CLI route rewrites YAML itself                          | `hermes config set`      | Set a key, `hermes config get` round-trip                       | Value matches; file still parses             | Fall back to Python replace        |
+| Cleaner touches only the two toolset keys               | Script dry run           | `python3 scripts/clean_unknown_toolsets.py`                     | `plugins.*` lines untouched; YAML parses     | Fix line surgery in the script     |
+| Profile configs are patch-editable                      | `patch` on dev-aphrodite | Apply a patch to `~/.hermes/profiles/dev-aphrodite/config.yaml` | Change lands; YAML parses                    | Use CLI / Python replace           |
+| Dead toolset names gone everywhere                      | grep + yaml.safe_load    | Post-edit sweep (above)                                         | Zero hits in toolset keys; all configs parse | Restore from scratch backup        |
+| Latency keys traced to consumers before asserting       | Core checkout grep       | Grep key, read consuming function                               | Function identified; claim matches code      | Read the function before asserting |

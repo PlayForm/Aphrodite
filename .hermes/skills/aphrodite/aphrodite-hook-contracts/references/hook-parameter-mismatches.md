@@ -82,10 +82,9 @@ grep -rn '"hook_name"' ~/.hermes/hermes-agent/ --include='*.py' | grep -v tests/
 
 Each row is a permanent negative test: the handler signature must accept the correct names, and a fixture invoking the hook with only the wrong names must NOT silently produce a destructive empty result.
 
-| Hook | Wrong Param | Correct Param | Effect |
-| --- | --- | --- | --- |
-| transform_terminal_output | stdout, stderr, exit_code | output, returncode | ALL terminal output empty |
-| pre_llm_call | api_messages, response | conversation_history, user_message | Hook returned early (None guard) |
-| post_llm_call | api_messages, response, turn_number | conversation_history, assistant_response, turn_id | Hook returned early |
-| on_session_start | session_start (hook name) | on_session_start | Proxy never auto-launched |
-
+| Hook                      | Wrong Param                         | Correct Param                                     | Effect                           |
+| ------------------------- | ----------------------------------- | ------------------------------------------------- | -------------------------------- |
+| transform_terminal_output | stdout, stderr, exit_code           | output, returncode                                | ALL terminal output empty        |
+| pre_llm_call              | api_messages, response              | conversation_history, user_message                | Hook returned early (None guard) |
+| post_llm_call             | api_messages, response, turn_number | conversation_history, assistant_response, turn_id | Hook returned early              |
+| on_session_start          | session_start (hook name)           | on_session_start                                  | Proxy never auto-launched        |

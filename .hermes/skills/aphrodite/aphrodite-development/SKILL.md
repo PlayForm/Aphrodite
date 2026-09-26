@@ -1,7 +1,7 @@
 ---
 name: aphrodite-development
 description: "Use when developing the aphrodite plugin. Mode-branched (source vs installed) session setup, verifiable dev-loop gates, inert auto-expand doctrine."
-version: 2.1.0
+version: 2.2.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -48,27 +48,20 @@ mutation_level: local
 # Aphrodite Development
 
 Local iteration and runtime readiness for the Aphrodite monorepo
-(`PlayForm/Aphrodite`, with the plugin submodule at `plugins/aphrodite` -
-remote `Source`). Supersedes the legacy lessons skill (v1.x). This
-skill drives the **Prepare** and **Validate** phases of the unified lifecycle
-(full table in `aphrodite-orientation`); it is `mutation_level: local` - it
-edits local source, config, and scratch, never Git history or releases.
-
-Every setup step begins by proving which runtime mode it is in. A step must
-never advise `cargo build` until it has proved source mode; conversely, an
-installed user is never told to repair a workspace that is not supposed to
-exist.
+(`PlayForm/Aphrodite`, plugin submodule at `plugins/aphrodite`, remote
+`Source`). Supersedes the legacy lessons skill (v1.x). It drives the
+**Prepare** and **Validate** phases of the unified lifecycle (full table in
+`aphrodite-orientation`); it is `mutation_level: local` - it edits local
+source, config, and scratch, never Git history or releases.
 
 ## Choose a mode before any build advice
 
-| Check           | Source development                          | Installed/user diagnosis                                                               |
-| --------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Workspace       | Parent Cargo workspace must exist           | Cargo workspace may legitimately be absent                                             |
-| Plugin source   | Loader source in `plugins/aphrodite/`       | Installed hooks-only loader (`~/.hermes/plugins/aphrodite`: plugin.yaml + **init**.py) |
-| Binary          | Build from source allowed                   | Release artifact download path used                                                    |
-| Code edits      | Local source reload/restart required        | Do not assume edits affect installed plugin                                            |
-| Version truth   | Workspace manifests plus submodule metadata | Installed binary plus `BINARY_VERSION` pairing                                         |
-| Primary failure | Stale process/loader                        | Missing, incompatible, or unavailable artifact                                         |
+Every setup step begins by proving which runtime mode it is in. A step never
+advises `cargo build` until it has proved source mode; an installed user is
+never told to repair a workspace that the mode gate proved absent. The full
+source/installed comparison matrix and the pinned versions are the worked
+matrix in `references/mode-decision.md`; Step 1 below is the probe that fills
+it in.
 
 Current pins (verify against the manifests, never memorize): binary **1.6.2**
 (`crates/aphrodite` + `crates/aphrodite-hermes`), plugin **2.2.2**
@@ -77,33 +70,25 @@ Current pins (verify against the manifests, never memorize): binary **1.6.2**
 
 ## C-001: auto-expand is configuration observability only
 
-> Auto-expand fields are **configuration observability only** until an active
-> consumer is verified in the running binary. Do not treat them as a debugging
-> guarantee. When a CCR marker appears, retrieve it through the canonical
-> retrieval route; validate any claimed auto-expansion behavior using an
-> explicit before/after test.
+Auto-expand fields are **configuration observability only** until an active
+consumer is shown in the running binary - never a debugging guarantee. When a
+CCR marker appears, retrieve it through the canonical retrieval route;
+validate any claimed auto-expansion behavior using an explicit before/after
+test.
 
 Contradiction C-001 ("enable auto-expand" vs "no active consumer") is
 resolved: auto-expand is **inert configuration** - parsed and echoed, no
-consumer. It is never a debugging guarantee and never a remediation for raw
-CCR markers. The canonical owner of C-001 and of the inert-configuration
-record is `aphrodite-auto-expand-testing` (v3.0.0); this skill only consumes
-the doctrine. Do not configure auto-expand as a fix for raw markers; the only
+consumer; never a debugging guarantee, never a remediation for raw CCR
+markers. The canonical owner of C-001 and of the inert-configuration record
+is `aphrodite-auto-expand-testing` (v3.0.0); this skill only consumes the
+doctrine. Do not configure auto-expand as a fix for raw markers; the only
 working path is retrieval.
 
-The verification for any auto-expansion claim is the fixture acceptance test:
-
-1. Create a known payload larger than the compression threshold.
-2. Read it once under the proposed auto-expand setting.
-3. Record whether the response is inline content, a valid marker, or a
-   malformed result.
-4. If it is a marker, resolve it once through the canonical retrieval tool.
-5. Compare bytes or normalized text with the source payload.
-6. Record the runtime binary version and configuration source.
-
-With the current source the expected observation is: a marker appears and
-requires canonical retrieval - proving the configuration is inert. If the test
-ever shows resolution without retrieval, a real consumer exists: run the
+The verification for any auto-expansion claim is the fixture acceptance test -
+the 6-step probe procedure in `references/auto-expand-fixture.md`. With the
+current source the expected observation is: a marker appears and requires
+canonical retrieval, which shows the configuration is inert. If the test ever
+shows resolution without retrieval, a real consumer is active: run the
 reactivation gate in `aphrodite-auto-expand-testing` and update the record
 from `inactive` to `active`.
 
@@ -142,10 +127,10 @@ cat ~/.hermes/aphrodite/BINARY_VERSION
 
 **Expected**
 
-- `WORKSPACE:0` at the repo root → **source mode**: cargo build is permitted,
-  edits require reinstall + restart.
-- `WORKSPACE` non-zero but `RUNTIME_HOME:0` → **installed mode**: never cargo
-  build; edits do not affect the installed plugin.
+- `WORKSPACE:0` at the repo root → **source mode**: `cargo build` is
+  permitted; edits require reinstall + restart.
+- `WORKSPACE` non-zero but `RUNTIME_HOME:0` → **installed mode**: never
+  `cargo build`; edits do not affect the installed plugin.
 - Both non-zero → **stop**: not an Aphrodite dev environment.
 - `LOADER:0` + `BINARY_VERSION` == the crate version (1.6.2) → the hooks-only
   loader layout is intact.
@@ -157,10 +142,11 @@ cat ~/.hermes/aphrodite/BINARY_VERSION
 
 **Recovery**
 
-- Permitted: re-run the orientation gate; `git submodule update --init` only
-  after the parent state is verified clean.
+- Permitted: re-run the orientation gate; run `git submodule update --init`
+  only after the orientation preflight reports the parent state clean.
 - Prohibited: switching branches or cleaning the working tree to "fix" the
-  gate.
+  gate - that rewrites Git state to mask a misdiagnosis; this skill never
+  edits Git history (`mutation_level: local`).
 
 **Produces**
 
@@ -205,20 +191,22 @@ echo "PIN:$?"
 **Stop if**
 
 - source mode and the installed loader is stale - background workers keep
-  running old code. Refresh it by re-running `aphrodite setup` from the freshly
-  built binary (setup removes stale plugin-dir symlinks, writes the loader,
-  writes the `BINARY_VERSION` pin, registers via `hermes plugins enable`, and
-  prints both locations - there is no `ln -s` step anymore).
+  running old code. Refresh it by re-running `aphrodite setup` from the
+  freshly built binary (setup removes stale plugin-dir symlinks, writes the
+  loader, writes the `BINARY_VERSION` pin, registers via
+  `hermes plugins enable`, and prints both locations - there is no `ln -s`
+  step anymore).
 
 **Recovery**
 
 - Permitted: re-run `aphrodite setup` after a build to refresh loader + pin.
 - Prohibited: editing the installed loader copy directly instead of repo
-  source.
+  source - the next `aphrodite setup` overwrites the loader, so the edit is
+  lost and the repo stays unchanged.
 
 **Produces**
 
-- Verified loader-to-source binding, or a declared installed layout.
+- A declared loader-to-source binding, or a declared installed layout.
 
 ### Step 3 - Start the dev loop (Pane 0 + Pane 1)
 
@@ -246,19 +234,20 @@ hermes --profile dev-aphrodite
 
 **Verify**
 
-- `cargo watch` compiles both packages on save.
-- `aphrodite_rebuild` / `aphrodite_stats` report the freshly built dylib
-  version and healthy proxy.
+- `cargo watch` compiles both packages on save (probe:
+  `aphrodite_rebuild` / `aphrodite_stats` report the freshly built dylib
+  version and a healthy proxy).
 
 **Expected**
 
-- A save in `crates/aphrodite-hermes/` rebuilds `libaphrodite_hermes.dylib`.
+- A save in `crates/aphrodite-hermes/` rebuilds `libaphrodite_hermes.dylib`
+  (probe: `aphrodite_rebuild` reports the fresh dylib version).
 - There is no mtime hot-reload dir in the runtime home - after a build, source
-  the environment file first (its `cargo()` wrapper syncs binary + dylib), then
-  run `aphrodite setup` from the fresh `target/release` binary to install
+  the environment file first (its `cargo()` wrapper syncs binary + dylib),
+  then run `aphrodite setup` from the fresh `target/release` binary to install
   binary + dylib into `~/.hermes/aphrodite/binaries/`, refresh the
-  `BINARY_VERSION` pin, and rewrite the loader; then restart Pane 1 for a fresh
-  process.
+  `BINARY_VERSION` pin, and rewrite the loader; then restart Pane 1 for a
+  fresh process.
 
 **Stop if**
 
@@ -268,7 +257,9 @@ hermes --profile dev-aphrodite
 **Recovery**
 
 - Permitted: re-run watch with both `-p` flags; restart Pane 1.
-- Prohibited: blaming the plugin for code the watch never rebuilt.
+- Prohibited: blaming the plugin for code the watch never rebuilt - a
+  single-package watch never built the dylib, so the behavior is not the
+  plugin's.
 
 **Produces**
 
@@ -318,7 +309,9 @@ api_key` in the TOML.
 
 - Permitted: set `env_passthrough` explicitly; export the key; restart the
   session.
-- Prohibited: hardcoding the key into source or fixtures.
+- Prohibited: hardcoding the key into source or fixtures - repo-tracked files
+  would leak it; the secrets model allows only presence checks and redacted
+  fingerprints.
 
 **Produces**
 
@@ -335,9 +328,9 @@ process or symlink target.
 
 **Do**
 
-- Reinstall the fresh build (`aphrodite setup` from `target/release` - see
-  Step 3) and restart the session for a fresh process; there is no mtime
-  hot-reload dir in the runtime home.
+- Reinstall the fresh build and restart the session for a fresh process - the
+  rebuild path is Step 3 (Expected); there is no mtime hot-reload dir in the
+  runtime home.
 
 **Verify**
 
@@ -358,7 +351,8 @@ aphrodite_rebuild
 
 - Permitted: restart Pane 1 (fresh process); re-check the symlink (Step 2).
 - Prohibited: declaring a plugin change verified without a fresh-process or
-  reload test.
+  reload test - a stale process reports old behavior; only a fresh process
+  shows the running binary is the one just built.
 
 **Produces**
 
@@ -394,8 +388,9 @@ test -d .hermes/tmp
 **Recovery**
 
 - Permitted: move artifacts to `.hermes/tmp/`.
-- Prohibited: `git reset`/checkout to erase probe artifacts
-  (`aphrodite-boundaries` git repair taxonomy).
+- Prohibited: `git reset`/checkout to erase probe artifacts - erasing via Git
+  rewrites the worktree instead of removing the artifact; the
+  `aphrodite-boundaries` git repair taxonomy forbids that path.
 
 **Produces**
 
@@ -413,31 +408,16 @@ may never be compressed, retrieval exemptions): `aphrodite-compression-safety`.
 
 A change is done only when its mode's acceptance list passes with recorded
 output - report what commands printed, never "should pass" (AGENTS.md quality
-gates).
-
-### Source-mode acceptance
-
-- Workspace discovered.
-- The intended crate builds from source.
-- Plugin points at the repository source.
-- Restart/reload has occurred.
-- Updated binary/version is observed.
-- Targeted contract test passes.
-
-### Installed-mode acceptance
-
-- No workspace is required.
-- Plugin layout validates.
-- Compatible release artifact resolves.
-- Download/checksum/version pairing succeeds.
-- Plugin starts against the installed binary.
-- Targeted contract test passes.
+gates). The per-mode lists are the worked criteria in
+`references/acceptance.md`.
 
 ## Validate-phase pitfalls
 
 - The repo's dev skills live in `.hermes/skills/` (Development branch only,
   never shipped with the plugin) - edit the files directly with
-  `write_file`/`patch`, never via `skill_manage`.
+  `write_file`/`patch`, never via `skill_manage`; `skill_manage` writes to the
+  profile skill store, not the repo tree, so the change would not land in
+  `.hermes/skills/`.
 - Never assume a new import is safe - a symbol the target module lacks
   silently kills the plugin at session start. After adding imports, test
   `python3 -c "import aphrodite"`.
@@ -479,12 +459,12 @@ uncertainty (Validate). On any stop, recover per `aphrodite-boundaries`
 
 ## Local claim-to-test matrix
 
-| Claim                             | Evidence source                 | Test                                 | Pass condition                                    | Failure response                     |
-| --------------------------------- | ------------------------------- | ------------------------------------ | ------------------------------------------------- | ------------------------------------ |
-| Mode gate precedes build advice   | This skill                      | Run Step 1 in an installed-only home | Mode declared `installed`; no cargo build advised | Fix the gate ordering                |
-| Watch rebuilds both packages      | `cargo watch` output            | Save in `crates/aphrodite-hermes/`   | dylib mtime/version changes                       | Re-add `-p aphrodite-hermes`         |
-| Plugin resolves to repo source    | `readlink`                      | Step 2 check                         | Symlink == `$PWD/plugins/aphrodite`               | Re-symlink; re-verify                |
-| Auto-expand is inert (C-001)      | `aphrodite-auto-expand-testing` | 6-step fixture test                  | Marker appears; retrieval required                | Reactivation gate in the owner skill |
-| env_passthrough reaches proxy     | `aphrodite_stats`               | Step 4                               | Proxy healthy, no key error                       | Set passthrough; restart session     |
-| Stale process does not mask edits | `aphrodite_rebuild`             | Step 5                               | Version matches fresh build                       | Fresh-process restart                |
-| Scratch stays hermetic            | `git status --short`            | Step 6                               | No probe artifacts outside `.hermes/tmp/`         | Move artifacts; edit directly        |
+| Claim                             | Evidence source                 | Test                                                | Pass condition                                    | Failure response                     |
+| --------------------------------- | ------------------------------- | --------------------------------------------------- | ------------------------------------------------- | ------------------------------------ |
+| Mode gate precedes build advice   | This skill                      | Run Step 1 in an installed-only home                | Mode declared `installed`; no cargo build advised | Fix the gate ordering                |
+| Watch rebuilds both packages      | `cargo watch` output            | Save in `crates/aphrodite-hermes/`                  | dylib mtime/version changes                       | Re-add `-p aphrodite-hermes`         |
+| Plugin resolves to repo source    | `readlink`                      | Step 2 check                                        | Symlink == `$PWD/plugins/aphrodite`               | Re-symlink; re-verify                |
+| Auto-expand is inert (C-001)      | `aphrodite-auto-expand-testing` | Fixture test in `references/auto-expand-fixture.md` | Marker appears; retrieval required                | Reactivation gate in the owner skill |
+| env_passthrough reaches proxy     | `aphrodite_stats`               | Step 4                                              | Proxy healthy, no key error                       | Set passthrough; restart session     |
+| Stale process does not mask edits | `aphrodite_rebuild`             | Step 5                                              | Version matches fresh build                       | Fresh-process restart                |
+| Scratch stays hermetic            | `git status --short`            | Step 6                                              | No probe artifacts outside `.hermes/tmp/`         | Move artifacts; edit directly        |

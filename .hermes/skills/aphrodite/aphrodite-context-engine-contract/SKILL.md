@@ -1,7 +1,7 @@
 ---
 name: aphrodite-context-engine-contract
 description: "Use when configuring, debugging, or verifying the Aphrodite context engine. Single-compression-owner activation contract: inheritance, registration, selection, configuration ownership."
-version: 1.1.0
+version: 1.2.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -51,20 +51,14 @@ mutation_level: read-only
 
 # Aphrodite Context Engine Contract
 
-The contract for activating Aphrodite's context engine as the **single
-compression owner** of a Hermes session, and the boundary between Hermes
-built-in compression and Aphrodite compression. **Source-derived facts, not
-prose:** every claim names the file to re-derive from; line numbers are
-observational snapshots, never durable coordinates.
+The contract for activating Aphrodite's context engine as the **single compression owner** of a Hermes session, and the boundary between Hermes built-in compression and Aphrodite compression. Source-derived facts, not prose: every claim names the file to re-derive from; line numbers are observational snapshots, never durable coordinates.
+
+**Stop if:** a claim below disagrees with the checked-out source named in `verification.source_of_truth`, or a line number is being treated as a durable coordinate.
+**Recovery:** re-derive the fact from the named source file, update the claim and its row in the claim-to-test matrix, then continue.
 
 ## The single-compression-owner principle
 
-Exactly **one** system may mutate conversation context per session. If
-Aphrodite is active, Hermes built-in compression must be disabled; otherwise
-two independently mutating systems exist and the resulting "Compacting
-context" behavior cannot be attributed reliably. This skill owns the
-activation checklist that makes the owner unambiguous. (State boundary owner:
-`aphrodite-boundaries`.)
+Exactly **one** system may mutate conversation context per session. If Aphrodite is active, Hermes built-in compression must be disabled; otherwise two independently mutating systems are present and the resulting "Compacting context" behavior cannot be attributed reliably. This skill owns the activation checklist that makes the owner unambiguous. (State boundary owner: `aphrodite-boundaries`.)
 
 ## Boundary: Hermes built-in compression vs Aphrodite compression
 
@@ -76,10 +70,7 @@ activation checklist that makes the owner unambiguous. (State boundary owner:
 | Activation model  | Preflight compaction near the token threshold                                                                                       | Per-tool-output marker compression, threshold-free                                   |
 | Failure behavior  | N/A (host-owned)                                                                                                                    | Fail-open transforms; engine itself never raises                                     |
 
-**Never leave `compression.enabled: true` when Aphrodite is active**: the
-built-in preflight/auto-compaction would run independently of the Aphrodite
-engine, producing constant `Compacting context` messages and two mutating
-systems. Verify with `hermes config get compression.enabled` and set it false.
+**Never leave `compression.enabled: true` when Aphrodite is active** because the built-in preflight/auto-compaction would then run independently of the Aphrodite engine, producing constant `Compacting context` messages and two mutating systems. Verify with `hermes config get compression.enabled` and set it false.
 
 ## ContextEngine ABC (the inheritance contract)
 
@@ -87,85 +78,28 @@ Base class: `agent/context_engine.py` (`ContextEngine(ABC)`).
 
 **Abstract (MUST implement):**
 
-- `name` - **`@property`**, short identifier string. A class attribute is NOT
-  accepted (it is an abstract property on the ABC; property lookup fails).
-- `update_from_response(usage: dict) -> None` - token tracking after each API
-  response.
-- `should_compress(prompt_tokens=None) -> bool` - return True to trigger
-  compaction.
-- `compress(messages, current_tokens=None, focus_topic=None, force=False, memory_context="") -> list`
-    - main compaction entry; returns the (possibly shortened) message list. The
-      host filters optional parameters by signature, so older engines may omit
-      them.
+- `name` - **`@property`**, short identifier string. A class attribute is NOT accepted because it is an abstract property on the ABC; property lookup fails.
+- `update_from_response(usage: dict) -> None` - token tracking after each API response.
+- `should_compress(prompt_tokens=None) -> bool` - return True to trigger compaction.
+- `compress(messages, current_tokens=None, focus_topic=None, force=False, memory_context="") -> list` - main compaction entry; returns the (possibly shortened) message list. The host filters optional parameters by signature, so older engines may omit them.
 
-**Optional / defaulted (safe to override or ignore):**
+**Optional / defaulted (safe to override or ignore):** full signatures, defaults, and selection order: `references/compressed-detail.md`, `references/context-engine-api.md`; silent-rejection pitfalls: `references/context-engine-pitfalls.md`.
 
-- `update_model(model, context_length, base_url="", api_key="", provider="", api_mode="")`
-    - model-switch handling (7 params, **no** `**kw` in the current ABC signature;
-      the historical reference note listed `**kw` - verify against
-      `agent/context_engine.py` before matching).
-- `select_context(request_messages, ...)` - request-only context replacement.
-- `on_session_start(session_id, **kwargs)`, `on_session_end(session_id, messages)`,
-  `on_session_reset()` - real session boundaries only, never per-turn.
-- `should_compress_preflight(messages)`, `has_content_to_compress(messages)`.
-- `get_tool_schemas()`, `handle_tool_call(name, args, **kwargs)`.
-- `get_status()`, `on_turn_complete(...)`.
-- Default attributes: `last_prompt_tokens`/`last_completion_tokens`/
-  `last_total_tokens`/`threshold_tokens`/`context_length`/`compression_count`
-  (0), `threshold_percent` (0.75), `protect_first_n` (3), `protect_last_n` (6),
-  `emit_automatic_compaction_status` (True).
-
-## Registration conditions (accepted, not silently ignored)
-
-`ctx.register_context_engine(engine)` (`hermes_cli/plugins.py:702`):
-
-- **isinstance gate:** `engine` must be a `ContextEngine` subclass. A plain
-  class is **silently rejected** with the warning "does not inherit from
-  ContextEngine. Ignoring." - registration continues, no engine is stored.
-- **One-engine rule:** only one context engine may be registered per plugin
-  manager; a second registration is rejected with "Only one context engine
-  plugin is allowed."
-- **name must be `@property`** and match the `context.engine` config value at
-  selection time.
+- **One-engine rule:** only one context engine may be registered per plugin manager; a second registration is rejected with "Only one context engine plugin is allowed."
+- **name must be `@property`** and match the `context.engine` config value at selection time.
 - Success logs: `Plugin 'aphrodite' registered context engine: aphrodite`.
 
-Plugin side (`plugins/aphrodite/__init__.py`, `_register_context_engine`):
-registration is **opt-in** - only when `APHRODITE_CONTEXT_ENGINE` is truthy
-(`1`/`true`, `_env_bool`). It imports `agent.context_engine.ContextEngine`
-dynamically (it only exists inside the Hermes runtime) and registers
-`AphroditeContextEngine` with `name == "aphrodite"`, `should_compress -> False`,
-and `compress -> messages` unchanged (non-destructive: the transform hooks and
-proxy do the actual shrinking, so the engine itself never forces a compaction).
-A registration failure logs a warning and falls back to hooks + proxy.
+Plugin side (`plugins/aphrodite/__init__.py`, `_register_context_engine`): registration is opt-in via `APHRODITE_CONTEXT_ENGINE` (truthy, `_env_bool`); failure logs a warning and falls back to hooks + proxy. Details: `references/compressed-detail.md`.
 
-**Installed layout is hooks-only:** `~/.hermes/plugins/aphrodite` holds ONLY
-`plugin.yaml` + `__init__.py` (the loader - there is no `_core/`, no `_hooks/`);
-everything else lives in `~/.hermes/aphrodite/` (`binaries/`, `aphrodite.toml`,
-the `BINARY_VERSION` pin, `ccr.db`, `directives/`). The repo-side
-`plugins/aphrodite/__init__.py` is the source of that loader.
+**Installed layout is hooks-only:** `~/.hermes/plugins/aphrodite` holds only the loader (`plugin.yaml` + `__init__.py`); runtime state lives in `~/.hermes/aphrodite/`. Full layout + CLAIM: `references/compressed-detail.md`.
 
-**The same env var name has two consumers** (`config_loader.rs:126`):
-`APHRODITE_CONTEXT_ENGINE` (or TOML `compression.context_engine`, **default
-true**) toggles the dylib's internal engine behavior, while the plugin's
-`_env_bool("APHRODITE_CONTEXT_ENGINE")` gates whether the engine is registered
-with Hermes at all. Do not assume one setting controls both.
+**`APHRODITE_CONTEXT_ENGINE` has two consumers** - dylib toggle (TOML `compression.context_engine`, `config_loader.rs:126`) and plugin registration gate (`_env_bool`); they gate different layers. Details: `references/compressed-detail.md`.
 
 ## Engine selection (configuration ownership)
 
 Selection runs per agent build (`agent/agent_init.py`, `_select_context_engine`):
 
-1. `context.engine` from the agent config; **default `"compressor"`** (built-in).
-2. `"compressor"` -> `None` (built-in `ContextCompressor`; plugin engines are
-   NOT auto-activated).
-3. Otherwise: `plugins/context_engine/<name>/` loader first, then
-   `get_plugin_context_engine()` (the general plugin system) - the candidate
-   must have `.name == engine_name`.
-4. The selected candidate is **deep-copied** (`copy.deepcopy`); an engine that
-   cannot be copied (locks, DB connections) falls back to the built-in
-   compressor with an accurate warning - the plugin engine should be
-   deepcopy-clean (AphroditeContextEngine holds no uncopyable state).
-5. Not found / name mismatch: warning "Context engine '<name>' not found -
-   falling back to built-in compressor", built-in wins.
+`context.engine` (default `"compressor"`) -> built-in `ContextCompressor` unless a registered engine with matching `.name` is found; candidates are deep-copied (`copy.deepcopy` - engine must be deepcopy-clean); copy failure or name mismatch falls back to built-in with a warning. Details: `references/compressed-detail.md`.
 
 Configuration ownership table:
 
@@ -176,75 +110,35 @@ Configuration ownership table:
 | `compression.context_engine`   | `~/.hermes/aphrodite/aphrodite.toml` | Aphrodite dylib; **default true**                       | leave true (or `APHRODITE_CONTEXT_ENGINE=1`) |
 | `APHRODITE_CONTEXT_ENGINE` env | environment                          | two consumers (plugin registration gate + dylib toggle) | truthy when the engine is wanted             |
 
-Config changes apply to **new sessions** - changing `context.engine`
-mid-session does not swap the running engine.
+Config changes apply to **new sessions** - changing `context.engine` mid-session does not swap the running engine.
 
-**Env-driven upstream config (setup does not write it):** `aphrodite setup`
-parses `--api-key`/`--api-url`/`--model`, but the TOML template substitutes
-ONLY the proxy ports (cache 9797 / token 9798) - there are no placeholders
-for key/url/model. `api_url` and `model` are env-driven
-(`APHRODITE_API_URL` / `APHRODITE_MODEL`); the proxy's API key comes from the
-`APHRODITE_API_KEY` env var or `[defaults] api_key` in the TOML. Never claim
-setup writes them into the TOML.
-
-**API key must be actually exported:** the proxy fails loudly with `no API
-key configured - set APHRODITE_API_KEY env var` when the variable is absent OR
-commented out in the environment file - a commented-out line behaves exactly
-like an absent var. Verify the var is exported (`env | grep APHRODITE_API_KEY`),
-never assume from the file's text.
+**Setup writes only proxy ports, never key/url/model:** `api_url`/`model` are env-driven (`APHRODITE_API_URL`/`APHRODITE_MODEL`); the proxy key comes from `APHRODITE_API_KEY` or TOML `[defaults] api_key` and must be actually exported - a commented-out line behaves like an absent var. Details: `references/compressed-detail.md`.
 
 ## Activation checklist (7 conditions - all must hold)
 
-Aphrodite's context engine is **active** only when every condition below is
-confirmed. If ANY condition fails, the state is **hooks-only** - never
-"partially active context engine". Hooks-only means: plugin loads, hooks and
-proxy run, but no engine owns compression (and if `compression.enabled` stays
-true, Hermes built-in compression is the owner - two systems if the engine is
-then enabled on top).
+Aphrodite's context engine is **active** only when every condition below is confirmed. If ANY condition fails, the state is **hooks-only** - never "partially active context engine". Hooks-only means: plugin loads, hooks and proxy run, but no engine owns compression; if `compression.enabled` stays true, Hermes built-in compression is the owner - two systems once the engine is enabled on top.
 
-1. **Plugin loads successfully** - `register()` completes; dylib loads; the
-   log shows the registered hook count (a missing/broken dylib disables the
-   plugin entirely).
-2. **Engine subclasses `ContextEngine`** - `AphroditeContextEngine` extends
-   the dynamically imported `agent.context_engine.ContextEngine`.
-3. **Registration accepted, not silently ignored** - the log shows "Plugin
-   'aphrodite' registered context engine: aphrodite"; no
-   "does not inherit from ContextEngine" or "already registered" warning.
-4. **Engine selected** - `context.engine: aphrodite` in Hermes config; no
-   "falling back to built-in compressor" warning at agent build.
-5. **Hermes built-in compression disabled** - `compression.enabled` is false
-   (default is true; verify live, never assume).
-6. **One controlled compress/retrieve round trip succeeds** - compress a known
-   payload and retrieve it once (e.g. `aphrodite_test`); normalized content
-   matches the source.
-7. **Exactly one active compression owner** - engine selected AND built-in
-   compression off AND no second engine registered by any plugin.
+1. **Plugin loads successfully** - `register()` completes; dylib loads; the log shows the registered hook count (a missing/broken dylib disables the plugin entirely).
+2. **Engine subclasses `ContextEngine`** - `AphroditeContextEngine` extends the dynamically imported `agent.context_engine.ContextEngine`.
+3. **Registration accepted, not silently ignored** - the log shows "Plugin 'aphrodite' registered context engine: aphrodite"; no "does not inherit from ContextEngine" or "already registered" warning.
+4. **Engine selected** - `context.engine: aphrodite` in Hermes config; no "falling back to built-in compressor" warning at agent build.
+5. **Hermes built-in compression disabled** - `compression.enabled` is false (default is true; verify live with `hermes config get compression.enabled`, never assume).
+6. **One controlled compress/retrieve round trip succeeds** - compress a known payload and retrieve it once (e.g. `aphrodite_test`); normalized content matches the source.
+7. **Exactly one active compression owner** - engine selected AND built-in compression off AND no second engine registered by any plugin.
 
-## Hook input structures (read-only, contract-level consequences)
+## Hook input structures
 
-- Hook input structures are read-only unless the framework documents
-  mutability; `pre_llm_call`'s `conversation_history` is a copy - in-place
-  edits are discarded, so message mutation belongs to the engine/transforms,
-  never to in-place hook edits.
-- A hook that replaces output must return the original output for
-  pass-through; an empty string is a destructive replacement, never "no
-  change". (Full rules: `aphrodite-boundaries`, context boundaries; per-hook
-  return contracts: `aphrodite-hook-contracts`.)
+Read-only unless documented mutable; `pre_llm_call`'s `conversation_history` is a copy - in-place edits are discarded (mutation belongs to engine/transforms). Output-replacing hooks must return the original output for pass-through; an empty string is a destructive replacement, never "no change". (Full rules: `aphrodite-boundaries`, `aphrodite-hook-contracts`; details: `references/compressed-detail.md`.)
 
 ## References
 
-Evidence notes moved here from `aphrodite-hook-reference` (keep as evidence;
-line numbers are v0.16.0-era snapshots that have drifted - the contract above
-re-derives from current source):
+Evidence notes moved here from `aphrodite-hook-reference` (keep as evidence; line numbers are v0.16.0-era snapshots that have drifted - the contract above re-derives from current source):
 
-- `references/context-engine-api.md` - ContextEngine API shape, abstract
-  methods, selection order
-- `references/context-engine-integration.md` - registration flow, required
-  interface, engine-to-plugin hooks
-- `references/context-engine-pitfalls.md` - silent rejection cases, name
-  @property, update_model signature
-- `references/session-discoveries-20260615.md` - session findings incl. the
-  isinstance bug, copy semantics, tool-chain boundary split
+- `references/context-engine-api.md` - ContextEngine API shape, abstract methods, selection order
+- `references/context-engine-integration.md` - registration flow, required interface, engine-to-plugin hooks
+- `references/context-engine-pitfalls.md` - silent rejection cases, name @property, update_model signature
+- `references/compressed-detail.md` - optional/defaulted signatures, installed-layout probe, env-mapping detail
+- `references/session-discoveries-20260615.md` - session findings incl. the isinstance bug, copy semantics, tool-chain boundary split
 
 ## Claim-to-test matrix
 

@@ -156,31 +156,31 @@ is active, resolve the real home from `$HERMES_HOME` - never hardcode
 
 ## Routing Table - load the reference for the task
 
-| User wants... | Load |
-| --- | --- |
-| **Anything not listed below - "can Hermes do X?", "how do I set up X?"** | **https://hermes-agent.nousresearch.com/docs/llms.txt** |
-| Bots that chat, run routines, or message each other; the Bots tab | docs: `/user-guide/bot-mode` |
-| CLI commands, subcommands, flags, "how do I run X" | `references/cli-reference.md` |
-| In-session slash commands | `references/slash-commands.md` |
-| Provider setup, API keys, OAuth | `references/providers-and-models.md` |
-| config.yaml sections, toolsets, voice/STT/TTS | `references/configuration.md` |
-| AGENTS.md / .hermes.md / CLAUDE.md project rules | `references/project-context-files.md` |
-| Secret redaction, PII, approval modes, "reset permissions" | `references/security-privacy.md` |
-| Delegation, cron, curator, kanban | `references/background-systems.md` |
-| MCP servers (add, catalog, `hermes mcp`) | `references/native-mcp.md` |
-| Webhook routes and event-driven runs | `references/webhooks.md` |
-| A custom theme/skin ("synthwave theme", "change the gold ●") | `references/themes.md` + `templates/skin.yaml` |
-| A desktop app UI element (pane, widget, ⌘K command, page) | `references/desktop-plugins.md` + `templates/plugin.js` |
-| A live TUI panel or modal widget (ticker, clock, dashboard) | `references/tui-widgets.md` + `templates/clock.mjs` |
-| Pet mascots - install, select, scale, diagnose | `references/petdex.md` |
-| Windows-specific issues (keybinds, WinError 10106, BOM) | `references/windows-quirks.md` |
-| Debugging: voice, tools missing, gateway, aux models | `references/troubleshooting.md` |
-| Contributing code: adding tools, slash commands, tests | `references/contributor-guide.md` |
-| delegate_task "capped at N" reports | `references/delegate-task-concurrency-diagnosis.md` |
-| "Can app X use my Nous Portal subscription/OAuth?" | `references/portal-auth-for-third-party-apps.md` |
-| Spawning extra Hermes instances (tmux/PTY, one-shot, resume, multi-agent) | `references/spawning-instances.md` |
-| Surface orientation (desktop, dashboard, TUI, proxy) | `references/surfaces.md` |
-| Connecting a messaging platform (Telegram, Discord, Slack, WhatsApp, …) | docs: `/user-guide/messaging` |
+| User wants...                                                             | Load                                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Anything not listed below - "can Hermes do X?", "how do I set up X?"**  | **https://hermes-agent.nousresearch.com/docs/llms.txt** |
+| Bots that chat, run routines, or message each other; the Bots tab         | docs: `/user-guide/bot-mode`                            |
+| CLI commands, subcommands, flags, "how do I run X"                        | `references/cli-reference.md`                           |
+| In-session slash commands                                                 | `references/slash-commands.md`                          |
+| Provider setup, API keys, OAuth                                           | `references/providers-and-models.md`                    |
+| config.yaml sections, toolsets, voice/STT/TTS                             | `references/configuration.md`                           |
+| AGENTS.md / .hermes.md / CLAUDE.md project rules                          | `references/project-context-files.md`                   |
+| Secret redaction, PII, approval modes, "reset permissions"                | `references/security-privacy.md`                        |
+| Delegation, cron, curator, kanban                                         | `references/background-systems.md`                      |
+| MCP servers (add, catalog, `hermes mcp`)                                  | `references/native-mcp.md`                              |
+| Webhook routes and event-driven runs                                      | `references/webhooks.md`                                |
+| A custom theme/skin ("synthwave theme", "change the gold ●")              | `references/themes.md` + `templates/skin.yaml`          |
+| A desktop app UI element (pane, widget, ⌘K command, page)                 | `references/desktop-plugins.md` + `templates/plugin.js` |
+| A live TUI panel or modal widget (ticker, clock, dashboard)               | `references/tui-widgets.md` + `templates/clock.mjs`     |
+| Pet mascots - install, select, scale, diagnose                            | `references/petdex.md`                                  |
+| Windows-specific issues (keybinds, WinError 10106, BOM)                   | `references/windows-quirks.md`                          |
+| Debugging: voice, tools missing, gateway, aux models                      | `references/troubleshooting.md`                         |
+| Contributing code: adding tools, slash commands, tests                    | `references/contributor-guide.md`                       |
+| delegate_task "capped at N" reports                                       | `references/delegate-task-concurrency-diagnosis.md`     |
+| "Can app X use my Nous Portal subscription/OAuth?"                        | `references/portal-auth-for-third-party-apps.md`        |
+| Spawning extra Hermes instances (tmux/PTY, one-shot, resume, multi-agent) | `references/spawning-instances.md`                      |
+| Surface orientation (desktop, dashboard, TUI, proxy)                      | `references/surfaces.md`                                |
+| Connecting a messaging platform (Telegram, Discord, Slack, WhatsApp, …)   | docs: `/user-guide/messaging`                           |
 
 The reference list above is not the feature list - it is the set of topics that
 need more than their docs page. For everything else Hermes ships, fetch

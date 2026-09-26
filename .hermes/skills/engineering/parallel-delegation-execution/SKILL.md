@@ -60,10 +60,12 @@ Run large multi-crate tasks on the Aphrodite monorepo (PlayForm/Aphrodite, Devel
 For "check if these issues are valid and fixable" runs, split into two phases per task, both pair-shaped:
 
 - **Parent establishes the repro baseline itself first** - verify each claim's DIRECTION, not just its existence; grep the test suite for tests that LOCK current behavior before any behavioral 'improvement'; when a fix names a dependency, grep the workspace Cargo.toml and lockfile first. Test cases: references/scar-catalog.md.
+
 2. **Validation pair (read-only).** Two children, each owning a DISJOINT slice of the issue's claims; verdict per claim (valid / invalid / partially-valid) with line-numbered evidence, root cause, and a fix proposal naming the exact file+function; return structured JSON (output_schema). Full: references/completion-verification.md.
 3. **Fix pair (write).** Dispatched per task in the same order, with file ownership lifted straight from the validation proposals, so the two fix children never collide.
 4. **Sequence tasks one pair at a time when the user lists them "in order"** - do not batch pairs across tasks even when the concurrency cap allows; the user's ordering is a dependency, not a suggestion.
 5. **"don't commit or release" is the standing gate for these runs:** state it verbatim in every child context alongside the auto-commit warning, and verify `git status` is clean of new commits after each wave.
+
 - **Fold tightly-coupled tasks into ONE pair instead of two** - when an issue and a PR (or two listed tasks) touch the SAME files and one claims to fix the other, run one pair with ownership split across the shared surface; two separate pairs would double-edit the same file sequentially. Full: references/ownership-scope.md.
 - **Reverify wave (standing default): a final READ-ONLY verification pair after all fix waves land** - agent A re-runs the test ladder + spot-checks fixes; agent B verifies git state, removals, archive verdicts; both read-only. Full: references/completion-verification.md.
 - **"Research more" = additional read-only pairs, not a fix wave** (history/audit, fix-design, empirical battery, system audit); the parent VERIFIES children's factual claims against the tree; do not implement in this mode. Full: references/completion-verification.md.

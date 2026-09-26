@@ -31,6 +31,7 @@ verification:
         - .github/workflows/Build.yml and .github/workflows/Publish.yml (publisher triggers)
 mutation_level: mutate
 ---
+
 # Automatic Release Pipeline
 
 Cut Aphrodite releases on a weekly/monthly cadence: version bump + CHANGELOG + GitHub Release, driven by a scheduled "Release Manager" that complements, never replaces, the existing publisher (Build.yml + Publish.yml).
@@ -62,6 +63,7 @@ Cut Aphrodite releases on a weekly/monthly cadence: version bump + CHANGELOG + G
 ## Tool Comparison
 
 Tool verdicts (semantic-release, release-please, changesets, standard-version, git-cliff) are finished observations; re-probe before relying (CLAIM). Recommendation: scheduled workflow + git-cliff for notes + existing publisher via `workflow_call` or plain tag push. Table: `references/research.md`.
+
 ## Procedure
 
 ### 1. Map the manual gap
@@ -98,6 +100,7 @@ Scheduled release + Dependabot auto-merge + manual dispatch are multiple concurr
 ### 5. Rehearse destructive release steps before the real run
 
 Steps are irreversible: dependency bumps, `git push --delete`, tag delete/recreate, `gh release delete`, `cargo publish`. Rehearse with a dry-run harness: clone into a throwaway sandbox (`git clone --local --no-hardlinks`), stub PATH with wrappers that log every mutating command as `[DRY]`. Stub taxonomy + Publish.yml pattern: `references/release-dry-run.md`.
+
 ## Pitfalls
 
 - **Never run `git tag <name>` bare in automation** - always `git tag -a <name> -m "<msg>"`, because `tag.gpgsign` / `tag.forcesignannotated` (or a `git tag` alias) turns a plain tag annotated+signed and opens `$EDITOR`, killing the script. Verify `git rev-parse <name>^{}`. Tag-shape/mis-tag/interrupted-session/remote-evidence rules: `references/pitfall-details.md`.
@@ -122,22 +125,23 @@ Steps are irreversible: dependency bumps, `git push --delete`, tag delete/recrea
 - **Release pipeline principle: Actions-driven only.** Tag push → build workflow (builds + release assets + in-tree checksums inside the submodule) + publish workflow (registry + parent→child gitlink bump); nothing local runs the release.
 - **A Publish job needs the repo's `Release` environment (and token secret when token-gated) before the first run** - `gh api repos/O/R/environments` shows `total_count: 0` on fresh repos.
 - **When automating a public repo, keep only the org author + public URLs in git identity** - do not re-introduce ssh/personal remotes; scaffold sets public `https://github.com/PlayForm/Aphrodite.git`; keep it.
+
 ## Claim-to-Test Matrix
 
-| Claim | Test that would falsify it | Status |
-| --- | --- | --- |
-| The tag-triggered chain fires (`Aphrodite/v*` → Build.yml; Publish.yml `workflow_dispatch publish_crates=true`; `on: release: created`) | Run the Gate R7 trigger audit from `aphrodite-release-workflow` at the commit to be tagged | CLAIM - re-run Gate R7 at the tag commit |
-| The crate is published | `curl -s https://crates.io/api/v1/crates/<name> -H "User-Agent: <ua>" | jq -r '.crate | .max_version + " " + .created_at'` - per crate (`aphrodite`, `aphrodite-hermes`) | Probe in row |
-| The release and the tag exist | `gh api repos/PlayForm/Aphrodite/releases --paginate -q '.[].tag_name'` AND `git ls-remote --tags <remote>`; empty output = no release, no tag | Probe in row |
-| The installer can consume the release assets | `plugins/aphrodite/download.sh <version> <target>` against a temp `BINARY_DIR`; a 404 on the asset URL = assets never uploaded even when the installer resolved its pinned `BINARY_VERSION` | Probe in row |
-| crates.io and GitHub assets are independent delivery paths | probe both paths: a crate can be published while every `download.sh`/badge URL is still 404 | Probe in row |
-| Every target's assets are attached (4 targets × binary + dylib + `SHA256SUMS-<target>.txt` = 12 assets) | assert the release asset list contains every target's set | Probe in row |
-| The workflow fired on the tag | `gh run list` shows the run | Probe in row |
-| The publish came from the expected commit | `gh run view <id> --json headSha` equals the expected commit; `https://crates.io/api/v1/crates/<name>/<version>/dependencies` is the authoritative nested-dep view | Probe in row |
-| A release created with the default `GITHUB_TOKEN` triggers another workflow's `on: release: created` | `gh run list` after the release shows the downstream workflow | CLAIM - fix is `workflow_call` or inlining the publish |
-| The research-only pass left the repo untouched | `git status --porcelain` and `git diff --stat` both empty | Probe in row |
-| The leak-scan is empty before commit/release | `git ls-files -z | xargs -0 grep -Il -E 'ssh://|<username>|<workspace>'` → no matches | Probe in row |
-| Tool verdicts match the current ecosystem (semantic-release, release-please, changesets, standard-version, git-cliff) | re-probe the tooling landscape before relying on a verdict | CLAIM - finished observation; re-verify |
+| Claim                                                                                                                                   | Test that would falsify it                                                                                                                                                                  | Status                                                 |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| The tag-triggered chain fires (`Aphrodite/v*` → Build.yml; Publish.yml `workflow_dispatch publish_crates=true`; `on: release: created`) | Run the Gate R7 trigger audit from `aphrodite-release-workflow` at the commit to be tagged                                                                                                  | CLAIM - re-run Gate R7 at the tag commit               |
+| The crate is published                                                                                                                  | `curl -s https://crates.io/api/v1/crates/<name> -H "User-Agent: <ua>"                                                                                                                       | jq -r '.crate                                          | .max_version + " " + .created_at'` - per crate (`aphrodite`, `aphrodite-hermes`) | Probe in row               |
+| The release and the tag exist                                                                                                           | `gh api repos/PlayForm/Aphrodite/releases --paginate -q '.[].tag_name'` AND `git ls-remote --tags <remote>`; empty output = no release, no tag                                              | Probe in row                                           |
+| The installer can consume the release assets                                                                                            | `plugins/aphrodite/download.sh <version> <target>` against a temp `BINARY_DIR`; a 404 on the asset URL = assets never uploaded even when the installer resolved its pinned `BINARY_VERSION` | Probe in row                                           |
+| crates.io and GitHub assets are independent delivery paths                                                                              | probe both paths: a crate can be published while every `download.sh`/badge URL is still 404                                                                                                 | Probe in row                                           |
+| Every target's assets are attached (4 targets × binary + dylib + `SHA256SUMS-<target>.txt` = 12 assets)                                 | assert the release asset list contains every target's set                                                                                                                                   | Probe in row                                           |
+| The workflow fired on the tag                                                                                                           | `gh run list` shows the run                                                                                                                                                                 | Probe in row                                           |
+| The publish came from the expected commit                                                                                               | `gh run view <id> --json headSha` equals the expected commit; `https://crates.io/api/v1/crates/<name>/<version>/dependencies` is the authoritative nested-dep view                          | Probe in row                                           |
+| A release created with the default `GITHUB_TOKEN` triggers another workflow's `on: release: created`                                    | `gh run list` after the release shows the downstream workflow                                                                                                                               | CLAIM - fix is `workflow_call` or inlining the publish |
+| The research-only pass left the repo untouched                                                                                          | `git status --porcelain` and `git diff --stat` both empty                                                                                                                                   | Probe in row                                           |
+| The leak-scan is empty before commit/release                                                                                            | `git ls-files -z                                                                                                                                                                            | xargs -0 grep -Il -E 'ssh://                           | <username>                                                                       | <workspace>'` → no matches | Probe in row |
+| Tool verdicts match the current ecosystem (semantic-release, release-please, changesets, standard-version, git-cliff)                   | re-probe the tooling landscape before relying on a verdict                                                                                                                                  | CLAIM - finished observation; re-verify                |
 
 ## References
 

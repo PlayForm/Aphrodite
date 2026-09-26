@@ -1,7 +1,7 @@
 ---
 name: aphrodite-cargo-upgrade
 description: "Use when upgrading cargo deps in PlayForm/Aphrodite (crates/aphrodite + vendor/headroom owned fork). Decision tree: inventory, one compatibility cluster at a time, minimal-target compile, failure classification, migrate/pin/revert/defer, runtime behavioral tests, pin lifecycle."
-version: 1.3.0
+version: 1.4.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -38,36 +38,42 @@ mutation_level: local
 
 # Aphrodite Cargo Upgrade (Decision Tree)
 
-Canonical procedure for dependency upgrades in PlayForm/Aphrodite: the parent
+Canonical procedure for dependency upgrades in PlayForm/Aphrodite: parent
 workspace (`crates/aphrodite`, `crates/aphrodite-hermes`) and the
-`vendor/headroom` OWNED fork (a submodule that may be modified freely,
-edition-2024 workspace). Entry point used historically:
-the house-style Cargo update wrapper script (environment-specific; its
-`ExpandVersions` helper hits the toml_edit breakpoint in
-`references/breakpoints.md`).
+`vendor/headroom` OWNED fork, a submodule that may be modified freely
+(edition-2024 workspace, declared in its `Cargo.toml`). Historical entry
+point: the house-style Cargo update wrapper script (environment-specific;
+CLAIM, not probed here). Its `ExpandVersions` helper hits the toml_edit
+breakpoint recorded in `references/breakpoints.md` (read that file to
+confirm).
 
-Anti-pattern this tree prevents: "pin everything until it compiles", which
-leaves a split dependency graph and untested runtime breakage.
+Anti-pattern this tree prevents: pin everything until it compiles. Pinning
+until it compiles is not an upgrade; the graph can compile with a split
+dependency set while a runtime break goes unseen. Probes: `cargo tree -p
+headroom-proxy` (split); Step 6 runtime list (breakage).
 
 ## Preflight (delegated - do not duplicate)
 
-Before Step 1, run the **aphrodite-orientation** gate (repository root,
-permitted branch `Development`, clean/known worktree, submodule status,
-auto-committer HEAD snapshot). Apply the **aphrodite-boundaries** stop and
-recovery rules at every step: never mutate before a precondition is verified,
-never continue after a failed verification, never use `git checkout`/`reset`
-to repair content. `mutation_level: local` - no commit/tag/push here; the
-auto-committer sweeps.
+Run the **aphrodite-orientation** gate first (repository root, permitted
+branch `Development`, clean/known worktree, submodule status, auto-committer
+HEAD snapshot), then apply **aphrodite-boundaries** stop/recovery rules at
+every step. `mutation_level: local`: no commit/tag/push here; the
+auto-committer sweeps (orientation's HEAD snapshot is the test).
+
+- Never mutate before a precondition is verified, because the failure
+  becomes unattributable to the change.
+- Never continue after a failed verification, because the baseline is then
+  stale and every later decision inherits it.
+- Never use `git checkout`/`reset` to repair content, because it discards
+  working-tree changes the Step 1 diff must record.
+- Never commit or push from this skill, because the auto-committer owns the
+  sweep and a manual commit races it.
 
 ## Step 1 - Inventory the upgrade surface
 
-**Purpose**: Capture the exact pre-upgrade state so every later decision has a
-baseline.
-
-**Preconditions**
-
-- Orientation gate passed (aphrodite-orientation).
-- No unrelated working-tree changes in manifests or Cargo.lock.
+Capture the exact pre-upgrade state; every later decision needs this
+baseline. Preconditions: orientation gate passed; no unrelated manifest or
+Cargo.lock changes.
 
 **Do**
 
@@ -86,34 +92,20 @@ git status --short -- Cargo.lock 'crates/*/Cargo.toml' 'vendor/headroom/**/Cargo
 echo "EXIT:$?"
 ```
 
-**Expected**
+Recorded: lockfile diff, package graph, toolchain version, full manifest
+list, no uncommitted manifest edits.
 
-- Lockfile diff, package graph, toolchain version, and the full manifest list
-  (parent crates + headroom workspace + headroom crates + vendor/rtk) are
-  recorded.
-- No uncommitted manifest edits from a previous session.
+**Stop if** the lockfile or a manifest differs from what the diff shows
+(auto-committer race). Re-capture; do not proceed on stale evidence.
 
-**Stop if**
-
-- The lockfile or a manifest differs from what the diff shows (auto-committer
-  race) - re-capture, do not proceed on stale evidence.
-
-**Recovery**
-
-- Permitted: re-run the inventory read-only commands; repair intended content
-  by editing the file directly.
-- Prohibited: `git checkout`/`git restore`/`git reset` to "clean" the diff.
-
-**Produces**: baseline evidence record for the upgrade session.
+**Recovery**: permitted - re-run the read-only inventory commands and edit
+files directly; prohibited - `git checkout`/`git restore`/`git reset` to
+"clean" the diff, because cleaning erases the baseline record the diff is.
 
 ## Step 2 - Upgrade one compatibility cluster at a time
 
-**Purpose**: Bound blast radius so a failure is attributable to one group of
-co-changing dependencies.
-
-**Preconditions**
-
-- Step 1 baseline recorded.
+Bound blast radius so a failure is attributable to one co-changing group.
+Precondition: Step 1 baseline recorded.
 
 **Do**
 
@@ -123,33 +115,22 @@ cargo upgrade --dry-run <cluster>   # e.g. axum, or tokio-tungstenite alone
 cargo update -p <cluster-member> --dry-run
 ```
 
-**Expected**
+The proposed change must touch ONE compatibility cluster: networking
+(reqwest/tokio-tungstenite), web routing (axum), Python FFI
+(pyo3/pyo3-log), crypto/hash (sha2), or an unrelated single crate.
 
-- The proposed change touches ONE compatibility cluster: networking
-  (reqwest/tokio-tungstenite), web routing (axum), Python FFI (pyo3/pyo3-log),
-  crypto/hash (sha2), or an unrelated single crate.
+**Stop if** the upgrade moves unrelated networking + FFI + crypto + web deps
+together. That requires an explicit compatibility matrix (each crate
+compiled AND runtime-tested at the proposed versions) before it is allowed.
 
-**Stop if**
-
-- The upgrade would move unrelated networking + FFI + crypto + web deps
-  together - that requires an explicit compatibility matrix (each crate
-  compiled AND runtime-tested at the proposed versions) before it is allowed.
-
-**Recovery**
-
-- Permitted: split the request into per-cluster `cargo upgrade` runs.
-- Prohibited: pinning the whole graph "until it compiles" as a substitute for
-  cluster isolation.
-
-**Produces**: one accepted cluster change (or a refused one, ending the run).
+**Recovery**: permitted - split into per-cluster `cargo upgrade` runs;
+prohibited - pinning the whole graph until it compiles, because that
+re-creates the split graph the anti-pattern names.
 
 ## Step 3 - Compile minimal targets independently
 
-**Purpose**: Prove each layer of the graph compiles before any runtime claim.
-
-**Preconditions**
-
-- Step 2 accepted exactly one cluster.
+Prove each layer compiles before any runtime claim. Precondition: Step
+2 accepted exactly one cluster.
 
 **Do**
 
@@ -172,73 +153,37 @@ for t in aphrodite aphrodite-hermes headroom-proxy headroom-py; do echo "$t: $(
 echo "EXIT:$?"
 ```
 
-**Expected**
+**Stop if** a failure's cause cannot be assigned to the Step 2 cluster.
 
-- Workspace package, affected crate, FFI boundary, and vendored submodule
-  each compile independently; the failing crate is isolated.
-
-**Stop if**
-
-- A failure's cause cannot be assigned to the cluster from Step 2.
-
-**Recovery**
-
-- Permitted: proceed to Step 4 classification with the isolated failure.
-- Prohibited: "fixing" a different cluster's manifest to make this one pass.
-
-**Produces**: per-target compile evidence and the failure surface for Step 4.
+**Recovery**: permitted - proceed to Step 4 with the isolated failure;
+prohibited - "fixing" a different cluster's manifest to make this one pass,
+because that moves the failure outside the blast radius.
 
 ## Step 4 - Classify the failure
 
-**Purpose**: Map the symptom to one failure class, because each class has one
-allowed action.
+Map the symptom to ONE failure class; each class has one allowed action.
+Precondition: Step 3 produced a compile error or a known runtime suspicion.
 
-**Preconditions**
+Classes (recognition strings and examples in
+`references/runtime-tests.md`; default actions): API rename → migrate
+source; trait-bound change → migrate source or pin locally; feature rename
+→ migrate feature string; semver incompatibility → pin locally or revert;
+runtime route behavior → pin + behavioral tests; ABI/FFI change → pin +
+FFI contract gates; security advisory → pin to patched minor or defer.
 
-- Step 3 produced a compile error or a known runtime suspicion.
+**Stop if** two classes both plausibly match. Resolve by compiling the crate
+at the old version to isolate the change.
 
-**Do** - classify against this table (examples in `references/breakpoints.md`):
-
-| Class                  | Recognition                                                                               | Default action                |
-| :--------------------- | :---------------------------------------------------------------------------------------- | :---------------------------- |
-| API rename             | symbol/type moved or renamed (e.g. `Message` variants, `DocumentMut`)                     | migrate source                |
-| Trait-bound change     | `trait bound ... not satisfied` (e.g. `LowerHex`, axum `Handler`, tracing `DisplayValue`) | migrate source or pin locally |
-| Feature rename         | `dep does not have that feature` (e.g. reqwest `rustls-tls` → `rustls`)                   | migrate feature string        |
-| Semver incompatibility | behavior/API removed across major bump without replacement                                | pin locally or revert         |
-| Runtime route behavior | starts but routes/fallback/WS misbehave                                                   | pin + behavioral tests        |
-| ABI/FFI change         | pyo3/FFI surface change (e.g. `allow_threads` removed)                                    | pin; FFI contract gates       |
-| Security advisory      | `cargo audit`/advisory for the target version                                             | pin to patched minor or defer |
-
-**Expected**
-
-- Exactly one class is chosen; the evidence (error text or failing probe) is
-  recorded next to the dependency.
-
-**Stop if**
-
-- Two classes both plausibly match - resolve by compiling the crate at the old
-  version to isolate the change.
-
-**Recovery**
-
-- Permitted: `cargo tree -p <dep>` and `cargo update --dry-run` to inspect.
-- Prohibited: guessing from stale skill prose; re-derive from the checked-out
-  manifest (fact class: source-derived).
-
-**Produces**: one classified failure with attached evidence.
+**Recovery**: permitted - `cargo tree -p <dep>` and `cargo update --dry-run`
+to inspect; prohibited - guessing from stale skill prose, because the
+checked-out manifest is the source-derived fact; re-derive from it.
 
 ## Step 5 - Choose the action
 
-**Purpose**: Select the single allowed response for the class, with a pin
-lifecycle when pinning.
-
-**Preconditions**
-
-- Step 4 classification recorded.
-
-**Do** - apply the default action from Step 4; when the action is a pin,
-create its ledger entry immediately (template below). Action precedence:
-migrate source > pin locally > pin workspace-wide > revert > defer.
+Apply the Step 4 default action; a pin gets its ledger entry immediately
+(template below). Precondition: Step 4 classification recorded. Action
+precedence: migrate source > pin locally > pin workspace-wide > revert >
+defer.
 
 **Verify**
 
@@ -247,22 +192,12 @@ grep -n '^<dep> *=' crates/*/Cargo.toml vendor/headroom/Cargo.toml vendor/headro
 echo "EXIT:$?"
 ```
 
-**Expected**
+**Stop if** a pin would be added without a ledger entry. Unexplained pins
+become permanent debt and hide split graphs.
 
-- The chosen action is applied in exactly the manifests it names; a pin has a
-  `### Compatibility pin` entry (below) with owner and removal condition.
-
-**Stop if**
-
-- A pin would be added without a ledger entry (unexplained pins become
-  permanent debt and hide split graphs).
-
-**Recovery**
-
-- Permitted: edit the manifest and ledger directly; rerun Step 3.
-- Prohibited: pinning "temporarily" without recording expiry/revisit.
-
-**Produces**: migrated source or a recorded pin/revert/defer decision.
+**Recovery**: permitted - edit the manifest and ledger directly, rerun Step
+3; prohibited - pinning "temporarily" without expiry/revisit, because a pin
+without a removal condition is ungoverned debt.
 
 ### Compatibility pin
 
@@ -275,47 +210,35 @@ echo "EXIT:$?"
 **Removal condition:** Replacement API implemented and behavioral tests pass.
 **Review deadline:** `<version/date milestone>`
 
-A crate-local pin overrides the workspace version and MUST be recorded - it
-can hide a split dependency graph (`cargo tree -p <crate>` disagrees with the
-rest of the workspace) and increases the behavioral-test obligation to both
-versions' runtime paths.
+A crate-local pin overrides the workspace version. It MUST be recorded,
+because it can hide a split dependency graph (`cargo tree -p <crate>`
+disagrees with the rest of the workspace) and it adds behavioral-test
+obligation for both versions' runtime paths.
 
 ## Step 6 - Run behavioral tests (compilation is not enough)
 
-**Purpose**: Prove runtime behavior, not just type-correctness. A clean compile
-misses route startup, message-type, FFI, and formatting failures.
+A clean compile is not a runtime pass; it proves only that the types line
+up. Route startup, message-type, FFI, and formatting failures show up only
+at runtime. Precondition: Step 3 compile passes (or the Step 5 pin is in
+force). Commands and assertions: `references/runtime-tests.md`.
 
-**Preconditions**
+**Do** - mandatory runtime list, all nine, after ANY dep upgrade:
 
-- Step 3 compile passes (or the pin from Step 5 is in force).
-
-**Do** - mandatory runtime list, all of it, after ANY dep upgrade:
-
-- `--version` path BEFORE config loading: run `aphrodite --version` with no
-  `aphrodite.toml` present, then with an existing config - both must print the
-  version and exit 0.
-- Startup with an existing configuration file (real `aphrodite.toml`); then
-  engine health (`aphrodite_stats` equivalent) and ONE compress/retrieve round
-  trip through the proxy.
-- HTTP route registration, including catch-all/fallback: start the proxy, hit
-  a real route and an unmatched path; catch-all must behave, no
-  "Path segments must not start with *" panic.
-- WebSocket ping/pong, text, and binary messages through the proxy
-  (tokio-tungstenite message types).
-- Python/FFI init and thread interaction: `test_finalize_bindings.py` and the
-  FFI contract checker (`test_check_ffi_contract.py`), plus a GIL-release/thread
-  probe when pyo3 changed.
-- Marker/hash formatting and checksums: byte-identical hex vs Python
-  `hashlib.sha256` (smart_crusher `_hash_field_name` parity).
-- Plugin import/load: fresh Hermes session with the plugin (never a stale
-  dylib/process), plus `diff -q plugins/aphrodite/__init__.py
-crates/aphrodite/templates/__init__.py` (drift guard).
-- Release builds for every supported target, where possible
-  (`cargo build --release -p aphrodite -p aphrodite-hermes`, plus per-platform
-  builds when available).
-- Reinstall after a rebuild: source the environment file first (its `cargo()`
-  wrapper syncs binary + dylib); a fresh release build lands in
-  `target/release`, and `aphrodite setup` run from that binary installs it.
+1. Version before config loading: `aphrodite --version` with no
+   `aphrodite.toml`, then with an existing config; both exit 0.
+2. Startup with an existing config; engine health; ONE compress/retrieve
+   round trip.
+3. Route registration incl. catch-all/fallback; no "Path segments must not
+   start with *" panic.
+4. WS ping/pong, text, binary through the proxy.
+5. FFI init + thread interaction; GIL-release probe when pyo3 changed.
+6. Marker/hash parity vs Python `hashlib.sha256`.
+7. Plugin import/load in a fresh session; never a stale dylib/process,
+   because a stale one loads the previous binary; drift guard `diff -q
+plugins/aphrodite/__init__.py crates/aphrodite/templates/__init__.py`.
+8. Release builds for every supported target, where possible.
+9. Reinstall after rebuild: source the environment file; fresh build lands
+   in `target/release`; `aphrodite setup` installs it.
 
 **Verify**
 
@@ -328,38 +251,26 @@ python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py
 echo "EXIT:$?"
 ```
 
-**Expected**
+**Stop if** any runtime item fails. Do NOT proceed to Step 7 with a known
+runtime break, because a decision recorded over a known break falsifies the
+record.
 
-- Every item above passes with recorded output; nothing is inferred from a
-  successful compile.
-
-**Stop if**
-
-- Any runtime item fails: do NOT proceed to Step 7 with a known runtime break.
-
-**Recovery**
-
-- Permitted: return to Step 4/5 with the runtime symptom as new evidence
-  (route behavior class).
-- Prohibited: marking the upgrade complete on compile evidence alone.
-
-**Produces**: runtime evidence set attached to the upgrade.
+**Recovery**: permitted - return to Step 4/5 with the runtime symptom as
+new evidence (route behavior class); prohibited - marking the upgrade
+complete on compile evidence alone, because the compile does not exercise
+the runtime paths the list probes.
 
 ## Step 7 - Record the compatibility decision
 
-**Purpose**: Leave a durable, reviewable decision so the next upgrade starts
-from evidence, not memory.
-
-**Preconditions**
-
-- Step 6 runtime suite passed (or a failure was deliberately converted into a
-  pin at Step 5).
+Leave a durable, reviewable decision; the next upgrade starts from
+evidence, not memory. Precondition: Step 6 passed (or the failure was
+converted into a pin at Step 5).
 
 **Do**
 
-- Record for every changed dependency: exact before/after versions, the
-  failure class, the action taken, and - for pins - the full `### Compatibility
-pin` entry (reason, affected surface, evidence, owner, removal condition,
+- Record for every changed dependency: exact before/after versions, failure
+  class, action taken, and - for pins - the full `### Compatibility pin`
+  entry (reason, affected surface, evidence, owner, removal condition,
   review deadline).
 - Update `references/breakpoints.md` when a new breakpoint or a changed live
   state (e.g. a pin that landed) is discovered - it is the
@@ -374,30 +285,27 @@ grep -rn 'tokio-tungstenite\|pyo3\|sha2\|reqwest\|axum' references/breakpoints.m
 echo "EXIT:$?"
 ```
 
-**Expected**
+**Stop if** a decision lacks an owner or expiry, because the pin is then
+ungoverned debt.
 
-- Every pinned dependency has a ledger entry with removal condition and review
-  deadline; every new/verified breakpoint is in `references/breakpoints.md`.
-
-**Stop if**
-
-- A decision lacks an owner or expiry - the pin is then ungoverned debt.
-
-**Recovery**
-
-- Permitted: write the missing ledger entry, then rerun the Verify command.
-- Prohibited: deferring the ledger "until the next upgrade".
-
-**Produces**: the compatibility-decision record for this upgrade.
+**Recovery**: permitted - write the missing ledger entry, then rerun the
+Verify command; prohibited - deferring the ledger until the next upgrade,
+because an unrecorded pin is indistinguishable from an accidental pin.
 
 ## CI parity gates
 
-- Build.yml: 4-target matrix producing 12 assets - the release build must pass
-  before any upgrade claim.
-- Publish.yml: publish chain headroom-core → aphrodite → aphrodite-hermes under
-  the `Aphrodite/v*` tag scheme; never publish a crate out of chain order.
-- Test-gate parity: `cargo test -p aphrodite --lib setup::tests` exercises the
-  setup path locally; run it after any upgrade that touches config/setup code.
+- Build.yml: 4-target matrix producing 12 assets - the release build must
+  pass before any upgrade claim.
+- Publish.yml: publish chain headroom-core → aphrodite → aphrodite-hermes
+  under the `Aphrodite/v*` tag scheme; never publish out of chain order,
+  because the chain is the dependency order and an out-of-order publish
+  ships against an unpublished dependency.
+- Test-gate parity: `cargo test -p aphrodite --lib setup::tests` exercises
+  the setup path locally; run it after any upgrade touching config/setup
+  code.
+
+Core rule: if a claim cannot be tested, do not write an operational
+instruction that relies on it.
 
 ## Test matrix (claim → test)
 
@@ -413,6 +321,3 @@ echo "EXIT:$?"
 | Compilation alone proves nothing at runtime                                | Step 6 runtime suite                                   | Run the full mandatory runtime list after every upgrade                    | All 9 runtime items pass with recorded output                           | Halt upgrade; revert or defer the cluster                                 |
 | Every pin has a lifecycle                                                  | Pin ledger (`### Compatibility pin` entries)           | Grep manifests for pinned versions; cross-check ledger                     | Every pin has owner + removal condition + review deadline               | Add the missing ledger entry before continuing                            |
 | `--version` works before config load                                       | main() arg scan                                        | `aphrodite --version` with and without `aphrodite.toml`                    | Both print version, exit 0                                              | Fix early arg check; treat as CLI-startup breakpoint                      |
-
-Core rule (rewrite.md): if a claim cannot be tested, do not write an
-operational instruction that relies on it.

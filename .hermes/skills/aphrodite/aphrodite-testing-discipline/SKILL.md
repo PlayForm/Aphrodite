@@ -118,13 +118,13 @@ Apply a compact label immediately after any claim that is likely to drift. Forma
 
 Labels:
 
-| Label | Meaning |
-| --- | --- |
-| **Invariant** | Expected to remain true unless architecture changes; state as a permanent safety rule |
-| **Source-derived** | Must be checked in the currently checked-out source before edits |
-| **Runtime-derived** | Must be read from the active process/configuration at probe time |
-| **Release-derived** | Must be checked at the exact proposed release commit |
-| **Historical** | Explanatory only; never copy into live implementation |
+| Label               | Meaning                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| **Invariant**       | Expected to remain true unless architecture changes; state as a permanent safety rule |
+| **Source-derived**  | Must be checked in the currently checked-out source before edits                      |
+| **Runtime-derived** | Must be read from the active process/configuration at probe time                      |
+| **Release-derived** | Must be checked at the exact proposed release commit                                  |
+| **Historical**      | Explanatory only; never copy into live implementation                                 |
 
 A live skill never presents an implementation property as an invariant. If the behavior differs from the documented contract, update the canonical contract and its test matrix - do not add an unstructured note to a random reference file (Step 6 of the investigation workflow).
 
@@ -136,13 +136,13 @@ Every known past failure becomes a permanent negative test or lint rule. The goa
 
 `aphrodite-boundaries` is the canonical owner of the policy definitions; this skill applies them to probes and test harnesses. Every harness path picks one policy explicitly:
 
-| Harness situation | Policy | Behavior in a harness |
-| --- | --- | --- |
-| Version handshake mismatch or FFI contract violation | **Fail closed** | Stop the harness with a readable diagnostic; never report results from a mismatched dylib |
-| Compression/preview transform bug | **Fail open** | Log structured error; return original content - a compression bug must never erase output |
-| Proxy/upstream unavailable | **Degrade** | Retain local/raw checks, expose degraded status, continue what is testable locally |
-| Transient socket/process start | **Retry boundedly** | Limited retries with backoff; then degrade |
-| SIGSEGV/crash dialog, invalid marker grammar, data loss | **Escalate** | Halt the workflow; require a human decision |
+| Harness situation                                       | Policy              | Behavior in a harness                                                                     |
+| ------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
+| Version handshake mismatch or FFI contract violation    | **Fail closed**     | Stop the harness with a readable diagnostic; never report results from a mismatched dylib |
+| Compression/preview transform bug                       | **Fail open**       | Log structured error; return original content - a compression bug must never erase output |
+| Proxy/upstream unavailable                              | **Degrade**         | Retain local/raw checks, expose degraded status, continue what is testable locally        |
+| Transient socket/process start                          | **Retry boundedly** | Limited retries with backoff; then degrade                                                |
+| SIGSEGV/crash dialog, invalid marker grammar, data loss | **Escalate**        | Halt the workflow; require a human decision                                               |
 
 ## Bounded investigation workflow
 
@@ -218,11 +218,11 @@ The finish gate is in references/verification-checklist.md; run it before closin
 
 ## Local test matrix
 
-| Claim | Evidence source | Test | Pass condition | Failure response |
-| --- | --- | --- | --- | --- |
-| Raw-ctypes probes SIGSEGV (historical) | Crash logs (historical) | Grep all probes for `ctypes.CDLL` | Zero raw CDLL in probes; plugin path used | Rewrite probe via `_load_dylib`/`_call_json` |
-| Version handshake catches stale dylib | `plugins/aphrodite/BINARY_VERSION` | Fresh-process version probe after rebuild | Reported version equals file value | Rebuild and re-run; do not trust old process |
-| Env leak breaks config tests | `cargo test -p aphrodite` | Export `APHRODITE_PREVIEW_MAX_CHARS`, run suite, then remove | Failures appear when leaked; green when hermetic | Add remove_var/restore guard to the test |
-| Negative tests prevent recurrence | references/negative-tests.md | For each row, confirm the corresponding prevention test is defined in references/negative-tests.md | Prevention red on the old bug, green on the fix | Add the missing test/lint before closing |
-| Investigation workflow bounds repair | This skill | Simulated failure: run Steps 1-6 | One bounded repair after smallest discriminating test | Re-run workflow with immutable evidence |
-| Thresholds are live-read, not remembered | Active config / proxy | Read threshold from config, test at T-1/T/T+1 | Observed transition matches read value | Update the skill's recorded threshold |
+| Claim                                    | Evidence source                    | Test                                                                                               | Pass condition                                        | Failure response                             |
+| ---------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------- |
+| Raw-ctypes probes SIGSEGV (historical)   | Crash logs (historical)            | Grep all probes for `ctypes.CDLL`                                                                  | Zero raw CDLL in probes; plugin path used             | Rewrite probe via `_load_dylib`/`_call_json` |
+| Version handshake catches stale dylib    | `plugins/aphrodite/BINARY_VERSION` | Fresh-process version probe after rebuild                                                          | Reported version equals file value                    | Rebuild and re-run; do not trust old process |
+| Env leak breaks config tests             | `cargo test -p aphrodite`          | Export `APHRODITE_PREVIEW_MAX_CHARS`, run suite, then remove                                       | Failures appear when leaked; green when hermetic      | Add remove_var/restore guard to the test     |
+| Negative tests prevent recurrence        | references/negative-tests.md       | For each row, confirm the corresponding prevention test is defined in references/negative-tests.md | Prevention red on the old bug, green on the fix       | Add the missing test/lint before closing     |
+| Investigation workflow bounds repair     | This skill                         | Simulated failure: run Steps 1-6                                                                   | One bounded repair after smallest discriminating test | Re-run workflow with immutable evidence      |
+| Thresholds are live-read, not remembered | Active config / proxy              | Read threshold from config, test at T-1/T/T+1                                                      | Observed transition matches read value                | Update the skill's recorded threshold        |

@@ -1,7 +1,7 @@
 ---
 name: aphrodite-ccr-protocol
 description: "Use when producing, parsing, resolving, or versioning CCR markers. Canonical marker grammar, typed parser contract, versioning and idempotence rules."
-version: 1.1.0
+version: 1.2.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -54,23 +54,40 @@ mutation_level: read-only
 
 # Aphrodite CCR Protocol
 
-Canonical owner of the CCR marker grammar: how markers are produced, parsed,
-resolved, versioned, and kept idempotent. Pair with
-`aphrodite-compression-safety`, which owns the transform-pipeline hard gates
-(what may be compressed, pairing, skip lists, recursion caps). This skill is
-read-only: it documents contracts and verification, it never mutates code or
-state.
+Canonical owner of the CCR marker grammar: production, parsing, resolution,
+versioning, idempotence. Pair with `aphrodite-compression-safety`
+(transform-pipeline hard gates: what may be compressed, pairing, skip lists,
+recursion caps). Read-only: documents contracts and verification, never
+mutates code or state.
 
-Every claim below is classified: **verified** (checked in the named source on
-the Development branch) or **normative** (the target contract from
-`.hermes/governance/` refactor policy; implement and test before relying on
-it). Never treat a normative item as if it were already enforced.
+Claims are classified. **verified** = checked in the named source on the
+Development branch; probe `grep -n <symbol> <path>` at the cited anchor.
+**normative** = target contract from the refactor policy in
+`.hermes/governance/`; implement and test before relying on it. Never treat a
+normative item as if it were already enforced, because the enforcement does
+not exist yet; treating it as enforced reports false success.
+
+## Stop if / Recovery
+
+- A marker does not match `<<<CCR:{hash}|{type}|{size}>>>`. Recovery: re-read
+  the source at its anchor (`verification.source_of_truth`); do not invent a
+  grammar, because a guessed grammar cannot parse against the real parser.
+- A grammar change alters a field before adding a version field. Recovery:
+  add the version field first (proposed `CCR:v1:...`), keeping old-form
+  parsing behind a compatibility table.
+- Resolution exceeds depth 5 or revisits a visited hash. Recovery: the depth
+  cap returns the raw un-expanded content (F9); the visited set returns the
+  cached resolved value.
+- A protocol claim has no source anchor and no test. Recovery: mark it CLAIM.
+- Disputes: re-read the anchor file in `verification.source_of_truth`
+  first.
 
 ## Verified marker grammar (current)
 
-**Verified** - the LLM-facing marker is a single ASCII line with three pipe-
-delimited fields, produced by `proxy_format_ccr_output`
-(`crates/aphrodite/src/proxy.rs:1966`):
+**Verified** at `crates/aphrodite/src/proxy.rs:1966`: the LLM-facing marker is
+a single ASCII line, three pipe-delimited fields, produced by
+`proxy_format_ccr_output`. Probe: `grep -n proxy_format_ccr_output
+crates/aphrodite/src/proxy.rs`.
 
 ```text
 <<<CCR:{hash}|{type}|{size}>>>
@@ -91,89 +108,50 @@ OUTSIDE the marker, on the lines before it:
 | type  | Content-type classifier output (`ct`)                  | `crates/aphrodite/src/preview/builders/`       |
 | size  | Original content byte length (`content.len()`)         | `proxy.rs` `smart_marker` / `cache_marker`     |
 
-Observed type values in source/tests: `text`, `code_rust`, `terminal`,
-`build`, `search`, `yaml`, `tool`. The canonical type set is the classifier
-in `crates/aphrodite/src/preview/builders/` - re-derive from there, never
-from a literal list in this skill.
-
-Hash algorithm facts (**verified**):
+Hash algorithm facts (**verified**; `grep -n compute_key
+vendor/headroom/crates/headroom-core/src/ccr/mod.rs`):
 
 - Key = BLAKE3 of the payload bytes, truncated to the first 40 hex chars
   (160 bits), lowercase; same bytes → same key (content-addressed).
 - Hash validation at resolution: `is_valid_ccr_hash` (`marker/parse.rs`)
   accepts >= 24 hex chars, or an `i:` prefix followed by >= 6 hex chars
   (inline-only hashes). `aphrodite_retrieve` resolves by exact hash match
-  only - truncated hashes do not resolve.
-- SHA-256 appears only as the download-checksum verifier, never as a content
-  key (C-003: the historical Python SHA-256 sample is retired; see
-  `aphrodite-hook-reference` v1 history).
+  only. A truncated hash does not resolve, because the store is keyed by the
+  full 40-hex key.
+- SHA-256 is only the download-checksum verifier, never a content key. It is
+  not a content key, because the content key is BLAKE3 40-hex; C-003 retired
+  the historical Python SHA-256 sample (see `aphrodite-hook-reference` v1
+  history).
 
-Consumers are intentionally tolerant (**verified**):
+The canonical type set is the classifier in
+`crates/aphrodite/src/preview/builders/`. Re-derive from that classifier,
+never from a literal list in this skill, because the classifier is the single
+writer and a literal list drifts out of sync (observed values:
+`references/grammar-diff.md`).
+
+Consumers are intentionally tolerant (**verified**; probe: `grep -n
+normalize_hash crates/aphrodite/src/marker/parse.rs`):
 
 - `normalize_hash` strips everything from the first `|` onward and trims
-  whitespace, so a caller that echoes the full `hash|type|size` body still
+  whitespace, so a caller echoing the full `hash|type|size` body still
   resolves (`marker/parse.rs:8`; `resolve/one.rs`).
-- The extraction regex `HASH_RE` also matches the legacy delimiter families
-  `[CCR:hash|type]` and Unicode `⫷CCR:...⫸` - accepted for historical
-  compatibility; the strict grammar is `<<<CCR:...>>>` only.
+- The extraction regex `HASH_RE` also matches legacy delimiter families
+  `[CCR:hash|type]` and Unicode `⫷CCR:...⫸`, accepted for historical
+  compatibility. The strict grammar is `<<<CCR:...>>>` only. A legacy-family
+  match is not a strict-grammar marker.
 
-## Diff: proposed v1 grammar vs actual current grammar
+## Internal block marker is not the LLM-facing marker
 
-The refactor policy (rewrite.md §CCR protocol needs versioning)
-proposes `CCR:v1:<hash>:<content-type>:<byte-size>:<mode>:<preview>`. That
-grammar is **NOT implemented**. The verified differences:
-
-| Aspect     | Proposed v1 (rewrite.md) | Actual current (verified)             |
-| ---------- | ------------------------ | ------------------------------------- |
-| Version    | explicit `v1` field      | No version field in the marker        |
-| Separators | colon `:`                | Pipe `\|`                             |
-| Wrappers   | none                     | ASCII `<<<` ... `>>>`                 |
-| Preview    | Inside the marker        | Outside, on preceding lines           |
-| Mode       | Explicit field           | No mode field (internal routing only) |
-
-Consequence: until a version field is added, every marker is implicitly
-version-0 of an unversioned protocol, and "unknown version" cannot be
-detected from the marker alone. The typed parser contract below defines the
-target; a version field is the first required change before any grammar
-revision ships.
-
-Do not confuse the LLM-facing marker with headroom's internal block marker
-`<<ccr:{hash}>>` (`headroom-core::ccr::marker_for`) - a different internal
-protocol with different delimiters and case. LLM-facing parsers must not
-resolve `<<ccr:...>>` blocks.
-
-## Producers and consumers
-
-| Role            | Component                                        | Verified location                                   |
-| --------------- | ------------------------------------------------ | --------------------------------------------------- |
-| Proxy producer  | `smart_marker` (token mode), `cache_marker`      | `crates/aphrodite/src/proxy.rs:1981-1989`           |
-| Hook producer   | Dylib transform path (segmented markers)         | `crates/aphrodite-hermes/src/lib.rs`                |
-| Parser          | `find_markers` / `parse_marker_hash`             | `crates/aphrodite/src/resolve/parse.rs`             |
-| Hash extraction | `extract_hashes` (HASH_RE, 3 delimiter families) | `crates/aphrodite/src/marker/parse.rs`              |
-| Resolver        | `resolve_one` + `resolve_recursive`              | `crates/aphrodite/src/resolve/{one,recursive}.rs`   |
-| Retrieve tool   | `aphrodite_retrieve` (exact hash match)          | `crates/aphrodite-hermes/src/lib.rs` tools dispatch |
-
-Hermes itself is protocol-agnostic: no `CCR:` reference exists in the Hermes
-agent codebase (verified). All marker logic lives in the Rust
-crates and the plugin shim.
-
-## Runtime layout (loader + runtime home)
-
-`~/.hermes/plugins/aphrodite` holds ONLY the loader (`plugin.yaml` +
-`__init__.py`) registering 5 hooks (on_session_start, transform_tool_result,
-pre_llm_call, transform_terminal_output, post_llm_call) and the 13 CCR tools
-(aphrodite_catalog, aphrodite_compress, aphrodite_diff, aphrodite_directive,
-aphrodite_files, aphrodite_prefetch, aphrodite_prefetch_status, aphrodite_rebuild,
-aphrodite_reclassify, aphrodite_retrieve, aphrodite_search, aphrodite_stats,
-aphrodite_test). Every runtime artifact (binaries, dylib, `aphrodite.toml`,
-`ccr.db`, logs) lives under `~/.hermes/aphrodite/`. Proxy listeners: token
-proxy `:9798`, cache proxy `:9797` - port values are config properties in
-`[ports]`; read them from the running proxy / live toml, never assume.
+The LLM-facing marker is not headroom's internal block marker. Headroom's is
+`<<ccr:{hash}>>` (`headroom-core::ccr::marker_for`); different delimiters and
+case, a different protocol. LLM-facing parsers must not resolve `<<ccr:...>>`
+blocks, because resolving them would address headroom-internal content
+through the wrong protocol.
 
 ## Typed parser contract (normative)
 
-The parser MUST return a typed result, never a bare regex match. Each result
-has defined handling:
+The parser MUST return a typed result, never a bare regex match. A bare regex
+match is not a result, because it carries no handling decision:
 
 | Parse result              | Handling                                                    | Current status        |
 | ------------------------- | ----------------------------------------------------------- | --------------------- |
@@ -183,14 +161,16 @@ has defined handling:
 | valid-but-missing-content | Report unresolved content key; leave marker text untouched  | Implemented (F1)      |
 | valid-and-resolvable      | Retrieve once, with loop protection (depth + visited set)   | Implemented           |
 
-Verified implementation anchors: `find_markers` skips unclosed markers and
-markers with empty hashes without a diagnostic (malformed = silent skip
-today - the diagnostic is the normative gap); `resolve_recursive` leaves an
-unresolved nested marker's original text untouched (F1) instead of
-substituting an error token; the depth limit returns the raw un-expanded
-content for that hash rather than `None` (F9).
+Implementation anchors (**verified**; probe: `grep -n "fn find_markers"
+crates/aphrodite/src/resolve/parse.rs`):
 
-## Parser rejection rules (normative)
+- `find_markers` skips unclosed markers and empty-hash markers without a
+  diagnostic. Malformed is a silent skip today; the diagnostic is the
+  normative gap.
+- `resolve_recursive` leaves an unresolved nested marker's original text
+  untouched (F1), not an error token.
+- The depth limit returns the raw un-expanded content for that hash. It does
+  not return `None` (F9).
 
 A strict parser MUST reject, with a readable diagnostic:
 
@@ -204,19 +184,24 @@ A strict parser MUST reject, with a readable diagnostic:
 - A marker inside an untrusted structure where only raw content is allowed
 
 **Verified today:** hash alphabet/length are gated at resolution
-(`is_valid_ccr_hash`); size is informational and not validated at parse
-time; the remaining rejections are the normative target.
+(`is_valid_ccr_hash`); size is informational, not validated at parse time;
+the rest are normative. Probe: `grep -n is_valid_ccr_hash
+crates/aphrodite/src/marker/parse.rs`.
 
 ## Versioning rules
 
 - A producer emits only the currently supported version. Today that is the
-  unversioned `<<<CCR:hash|type|size>>>` form; the first grammar change MUST
-  add a version field before altering any other field.
+  unversioned `<<<CCR:hash|type|size>>>` form. The first grammar change MUST
+  add a version field before altering any other field, because without it an
+  unknown version cannot be detected from the marker alone.
 - A consumer either fully validates and resolves a supported marker, or
-  leaves it untouched with a diagnostic reason.
-- A malformed marker is never interpreted as a valid retrieval key.
+  leaves it untouched with a diagnostic reason. Partial resolution is not an
+  option, because it would corrupt the marker's content.
+- A malformed marker is never interpreted as a valid retrieval key. Its hash
+  cannot match stored content, so resolution would fail; the text must
+  survive for the diagnostic.
 - A resolver has a maximum recursion/expansion depth and a visited-hash set
-  (both implemented: depth 5, `visited` Vec - see below).
+  (implemented: depth 5, `visited` Vec - Resolution rules).
 - A retrieval result is marked non-compressible for the remainder of that
   transformation pass (owner: `aphrodite-compression-safety`).
 - Any grammar change requires a compatibility table (old form → new form →
@@ -225,20 +210,21 @@ time; the remaining rejections are the normative target.
 
 ## Resolution rules (verified)
 
-`resolve_recursive` (`crates/aphrodite/src/resolve/recursive.rs`):
+`resolve_recursive` (`crates/aphrodite/src/resolve/recursive.rs`;
+`grep -n "RECURSIVE_DEPTH" crates/aphrodite/src/resolve/recursive.rs`):
 
 - **Max recursion depth = 5** (`const RECURSIVE_DEPTH: usize = 5`). At the
-  limit, returns the raw content for the current hash (F9) - a readable,
-  non-marker-cycling outcome.
+  limit, the resolver returns the raw content for the current hash (F9); it
+  is not `None`.
 - **Visited-hash set**: a `Vec<String>` pushed per hash; a hash already in
-  the set returns its cached resolved value, breaking cycles (verified test:
+  the set returns its cached resolved value, breaking cycles. Test fixture:
   a `hA ↔ hB` cycle resolves to `<<<CCR:hB|t|1>>>` - the marker is preserved,
-  no infinite loop).
+  no infinite loop.
 - **Persistent resolved cache**: a `HashMap<String, String>` shared across
   the whole resolution tree; nested references to an already-resolved hash
   reuse the cached content (F4).
 - **No write-back (F1)**: the expanded result is intentionally NOT stored
-  back over the original hash - this preserves the content-address invariant
+  back over the original hash. This preserves the content-address invariant
   and protects literal `<<<CCR:...>>>`-shaped text inside original content.
 - Single-hash resolve (`resolve_one`) checks the inline store first; `i:`
   prefixed hashes resolve inline-only. Unresolved keys return `None` (or
@@ -253,21 +239,28 @@ time; the remaining rejections are the normative target.
 | R twice      | R(R(M(x))) = x | Resolving resolved content (or the same marker again) is stable; no re-compression, no drift |
 
 The third property is enforced by the non-compressible classification of
-retrieval results (compression-safety) plus the content-address invariant
-(F1 no write-back).
+retrieval results (owner: `aphrodite-compression-safety`) plus
+content-address invariance (F1 no write-back).
 
 ## Grammar change procedure
 
 1. Add the version field first (proposed: `CCR:v1:...`), keeping old-form
-   parse support behind a compatibility table.
+   parsing behind a compatibility table.
 2. Update EVERY producer and consumer in one change - the sync list from
    `aphrodite-hook-reference` v1 history: Rust producers (`proxy.rs`,
    `aphrodite-hermes`), `resolve/parse.rs` + `marker/parse.rs` consumers,
    retrieve tool schema, tool-injection descriptions, docs, fixtures.
-3. Build the e2e matrix: each fixture payload compressed → parsed → resolved
-   → compared byte-for-byte; malformed/unknown-version/oversized inputs all
-   exercised; recursion depth and cycle fixtures included.
+3. Build the e2e matrix: every fixture payload compressed → parsed → resolved
+   → compared byte-for-byte, with malformed/unknown-version/oversized inputs
+   and recursion/cycle fixtures.
 4. Gate on `aphrodite-testing-discipline` probes before any release claim.
+
+## References
+
+`references/grammar-diff.md` (v1 diff; observed type values),
+`references/producers-consumers.md` (producer/consumer map; Hermes probe),
+`references/runtime-layout.md` (loader, hooks, 13 tools, runtime, ports),
+`references/ccr-marker-format.md` (STALE evidence, not current).
 
 ## Local test matrix
 

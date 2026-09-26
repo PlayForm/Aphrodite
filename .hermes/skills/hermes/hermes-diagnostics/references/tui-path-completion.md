@@ -117,11 +117,12 @@ Wait for the `gateway.ready` event frame before sending RPCs - requests
 written before boot are lost. Read stdout with `select` + timeout, never a
 blocking readline. Skip `session.create` (it can stall the entry). SIGTERM
 dumps from throwaway children land in `~/.hermes/logs/tui_gateway_crash.log`
+
 - respawn/SIGTERM entries there are normal lifecycle, not crashes. Set
-`PYTHONPATH` + `HERMES_PYTHON_SRC_ROOT` to the source root or the import
-guard may load a different package. Keep probe runs short - multiple gateway
-children contend for state.db. Spawn with the live env mirrored (cwd =
-HERMES_CWD = launch dir); match responses by request `id`; boot takes ~4s;
-stdio is BINARY pipes - encode the JSON-RPC frame (`frame.encode()`), or
-`stdin.write` raises `TypeError`. If the probe prints nothing, allow more
-boot time and confirm no leftover `tui_gateway.entry` from a previous run.
+  `PYTHONPATH` + `HERMES_PYTHON_SRC_ROOT` to the source root or the import
+  guard may load a different package. Keep probe runs short - multiple gateway
+  children contend for state.db. Spawn with the live env mirrored (cwd =
+  HERMES_CWD = launch dir); match responses by request `id`; boot takes ~4s;
+  stdio is BINARY pipes - encode the JSON-RPC frame (`frame.encode()`), or
+  `stdin.write` raises `TypeError`. If the probe prints nothing, allow more
+  boot time and confirm no leftover `tui_gateway.entry` from a previous run.

@@ -124,6 +124,7 @@ def pre_tool_hook(
 **Input invariants** - `args` is a dict (Hermes coerces non-dicts to `{}` before invoking); `middleware_trace` is a list, empty when absent; all id fields default to `""`.
 
 **Return contract** (directive dict; the first valid dict wins, non-dict returns are ignored):
+
 - `None` / non-dict: no directive; the tool proceeds normally
 - `{"action": "modify", "args": {...}}`: keys shallow-merge into the tool arguments before dispatch
 - `{"action": "block", "message": str}`: veto; the message becomes the tool result
@@ -279,12 +280,12 @@ Evidence notes moved here from `aphrodite-hook-reference` (keep as evidence; the
 
 ## Claim-to-test matrix
 
-| Claim | Evidence source | Test | Pass condition | Failure response |
-| --- | --- | --- | --- | --- |
-| Hook receives `output`, not `stdout` | `tools/terminal_tool_result.py:144` | Sentinel-output invocation | Handler observes original sentinel | Update handler parameters and this contract |
-| Hook registration uses `on_session_start` | `hermes_cli/plugins.py` VALID_HOOKS + `plugin.yaml` | Start session with registration log | One log entry appears | Inspect registration name/source |
-| pre_tool_call is fail-closed on timeout | `hermes_cli/plugins_dispatch.py` `_HOOK_TIMEOUT_FAIL_CLOSED_HOOKS` | Stall a handler past the timeout and dispatch a tool | Tool blocked with the timeout message | Fix handler boundedness; re-derive dispatch code |
-| `conversation_history` is a discardable copy | `agent/turn_context.py:702` | Mutate it in place; assert transcript unchanged | Live transcript unchanged | Move mutation to the context engine |
-| Empty string replaces, never passes through | Return contracts above | Invoke with `output="x"`, return `""` | Result is empty (documented destructive replacement) | Fix handler to return the original output |
-| pre_api_request now has a call site | `agent/turn_api_request.py:52-63` | Grep current Hermes source | Call site present (old "zero sites" claim is stale) | Update boundary notes; re-derive contract |
-| Registered-but-never-invoked detection | VALID_HOOKS vs production `invoke_hook` sites | Script: registered names minus non-test invocation names | Zero dead registrations | Fix registration name or remove dead hook |
+| Claim                                        | Evidence source                                                    | Test                                                     | Pass condition                                       | Failure response                                 |
+| -------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| Hook receives `output`, not `stdout`         | `tools/terminal_tool_result.py:144`                                | Sentinel-output invocation                               | Handler observes original sentinel                   | Update handler parameters and this contract      |
+| Hook registration uses `on_session_start`    | `hermes_cli/plugins.py` VALID_HOOKS + `plugin.yaml`                | Start session with registration log                      | One log entry appears                                | Inspect registration name/source                 |
+| pre_tool_call is fail-closed on timeout      | `hermes_cli/plugins_dispatch.py` `_HOOK_TIMEOUT_FAIL_CLOSED_HOOKS` | Stall a handler past the timeout and dispatch a tool     | Tool blocked with the timeout message                | Fix handler boundedness; re-derive dispatch code |
+| `conversation_history` is a discardable copy | `agent/turn_context.py:702`                                        | Mutate it in place; assert transcript unchanged          | Live transcript unchanged                            | Move mutation to the context engine              |
+| Empty string replaces, never passes through  | Return contracts above                                             | Invoke with `output="x"`, return `""`                    | Result is empty (documented destructive replacement) | Fix handler to return the original output        |
+| pre_api_request now has a call site          | `agent/turn_api_request.py:52-63`                                  | Grep current Hermes source                               | Call site present (old "zero sites" claim is stale)  | Update boundary notes; re-derive contract        |
+| Registered-but-never-invoked detection       | VALID_HOOKS vs production `invoke_hook` sites                      | Script: registered names minus non-test invocation names | Zero dead registrations                              | Fix registration name or remove dead hook        |

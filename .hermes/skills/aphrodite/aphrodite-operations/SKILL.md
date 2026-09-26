@@ -1,7 +1,7 @@
 ---
 name: aphrodite-operations
 description: "Use when operating inside an aphrodite-compressed session or the Aphrodite repo. Compressed-session marker discipline, source-vs-installed rebuild diagnosis, degraded modes."
-version: 2.1.0
+version: 2.2.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -49,22 +49,23 @@ mutation_level: local
 Day-to-day operation inside an aphrodite-compressed session and the Aphrodite
 repo. Supersedes the v1.1.0 operational prose; drives the **Observe** and
 **Recover** phases of the unified lifecycle (full table in
-`aphrodite-orientation`). It is `mutation_level: local` - it rebuilds local
-binaries and edits local config/scratch, never Git history or releases.
+`aphrodite-orientation`). `mutation_level: local` - rebuilds local binaries
+and edits local config/scratch, never Git history or releases.
 
 A step must never advise `cargo build` until it has proved it is in source
-mode. Conversely, an installed user should never be told to repair a missing
-workspace that is not supposed to exist.
+mode, because in installed mode there is no workspace to build. An installed
+user must never be told to repair a missing workspace that is not supposed to
+exist, because in installed mode the workspace may legitimately be absent.
 
 ## Diagnose the mode before any rebuild advice
 
-The same mode table is the setup branch in `aphrodite-development`; here it is
-the diagnosis applied to rebuild, repair, and version truth. Choose exactly
-one mode before any mutation.
+The mode table is the setup branch in `aphrodite-development`; here it is the
+diagnosis applied to rebuild, repair, and version truth. Choose exactly one
+mode before any mutation; the probe for each row is the Step 1 command block.
 
 | Check           | Source development                          | Installed/user diagnosis                       |
 | --------------- | ------------------------------------------- | ---------------------------------------------- |
-| Workspace       | Parent Cargo workspace must exist           | Cargo workspace may legitimately be absent     |
+| Workspace       | Parent Cargo workspace required             | Cargo workspace may legitimately be absent     |
 | Plugin source   | Direct repository symlink expected          | Installed package/layout expected              |
 | Binary          | Build from source allowed                   | Release artifact download path used            |
 | Code edits      | Local source reload/restart required        | Do not assume edits affect installed plugin    |
@@ -74,22 +75,25 @@ one mode before any mutation.
 ## Compressed-session workflow
 
 The engine compresses every read - never fight it by re-reading the same file
-with different offsets or tools. The full tool-API doctrine lives in
-`aphrodite-tool-testing`; the operational shape is:
+with different offsets or tools, because each repeated read becomes a fresh
+compressed marker. The full tool-API doctrine lives in
+`aphrodite-tool-testing`; the operational shape:
 
 1. **Plan reads ahead** - `aphrodite_prefetch(paths=[...])` reads and
    compresses files in the background; track progress with
    `aphrodite_prefetch_status`.
 2. **Retrieve, don't re-read** - on `<<<CCR:hash|type|size>>>`, call
-   `aphrodite_retrieve(hash)`. Never call `read_file` again on the same file.
+   `aphrodite_retrieve(hash)`. Never call `read_file` again on the same file,
+   because each call returns a fresh compressed marker.
 3. **Write terminal output to files** - `cmd > .hermes/tmp/out.txt 2>&1`,
-   then prefetch/retrieve the file instead of reading raw output (scratch
-   belongs in `.hermes/tmp/`, never `/tmp`).
+   then prefetch/retrieve the file instead of reading raw output. Scratch
+   belongs in `.hermes/tmp/`; never `/tmp`, because scratch must stay
+   reachable by the prefetch/retrieve workflow.
 4. **Do other work while waiting** - dispatch prefetches and independent
    tasks, then poll readiness.
 
-Anti-pattern: calling `read_file` 3+ times on the same file with different
-offsets - each call returns a fresh compressed marker.
+Anti-pattern: `read_file` 3+ times on the same file with different offsets -
+each call returns a fresh compressed marker.
 
 ### When NOT to compress
 
@@ -97,11 +101,13 @@ Compression-safety boundaries are owned by `aphrodite-compression-safety` and
 `aphrodite-boundaries` (context boundaries); the operating rules:
 
 - Never compress a retrieval response or an Aphrodite diagnostic response -
-  doing so can turn the retrieval path into a marker-resolution loop.
+  compressing one can turn the retrieval path into a marker-resolution loop.
 - Never split a tool call from its matching tool result when selecting a
-  context-compression boundary.
+  context-compression boundary. UNKNOWN - the boundary-selection rationale is
+  owned by `aphrodite-compression-safety`.
 - Never re-emit a CCR marker for a value that is already a resolved retrieval
-  payload.
+  payload - a resolved payload must stay raw, and re-emitting its marker
+  produces a nested marker.
 
 ## Rebuild and sync workflow
 
@@ -136,11 +142,11 @@ readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite 2> /dev/null
 
 **Expected**
 
-- `WORKSPACE:0` at the Aphrodite root → **source mode**: rebuild from source
+- `WORKSPACE:0` at the Aphrodite root -> **source mode**: rebuild from source
   is the correct path.
-- `WORKSPACE` non-zero, `RUNTIME_HOME:0`, `LAYOUT:0` → **installed mode**: no
-  workspace to repair; artifact download path is the correct path.
-- Neither → **stop**: not a runnable Aphrodite environment.
+- `WORKSPACE` non-zero, `RUNTIME_HOME:0`, `LAYOUT:0` -> **installed mode**: no
+  workspace to repair; the artifact download path is the correct path.
+- Neither -> **stop**: not a runnable Aphrodite environment.
 
 **Stop if**
 
@@ -150,9 +156,10 @@ readlink ~/.hermes/profiles/dev-aphrodite/plugins/aphrodite 2> /dev/null
 **Recovery**
 
 - Permitted: re-run orientation; `git submodule update --init` only after the
-  parent state is verified clean.
-- Prohibited: creating a Cargo workspace in an installed home; `git
-checkout`/`reset` to repair content.
+  orientation re-run shows the parent state clean.
+- Prohibited: creating a Cargo workspace in an installed home, because a Cargo
+  workspace may legitimately be absent there; `git checkout`/`reset` to repair
+  content, because both erase the state the diagnosis depends on.
 
 **Produces**
 
@@ -195,8 +202,9 @@ aphrodite_rebuild
 
 - Permitted: restart the session for a fresh process; re-check the plugin
   symlink (`aphrodite-development` Step 2).
-- Prohibited: `git reset`/checkout to erase the change; declaring success on a
-  banner alone.
+- Prohibited: `git reset`/checkout to erase the change, because erasing the
+  change removes the thing under diagnosis; declaring success on a banner
+  alone, because only `aphrodite_rebuild` provides version evidence.
 
 **Produces**
 
@@ -214,15 +222,16 @@ without touching a workspace.
 **Do**
 
 - Confirm the installed loader set: `~/.hermes/plugins/aphrodite/` holds ONLY
-  `plugin.yaml` + `__init__.py` (hooks-only layout; the repo-side
-  `plugins/aphrodite/` carries the full package: `__init__.py`, `_bindings.py`,
-  `BINARY_VERSION`, `download.sh` / `download.ps1`, `layout_check.py`,
-  `layout_schema.json`, `plugin.yaml`, `README.md`, `SHA256SUMS.txt`, `tests/`).
-- Confirm the binary + dylib exist under `~/.hermes/aphrodite/binaries/`
-  (`aphrodite` + `libaphrodite_hermes.dylib`, optional `libaphrodite.dylib`)
-  and the pin at `~/.hermes/aphrodite/BINARY_VERSION` matches (current: 1.6.2).
-  If missing, incompatible, or unavailable, reinstall via `aphrodite setup`
-  (the runtime home self-heals binaries/directives on start).
+  `plugin.yaml` + `__init__.py` (hooks-only layout; the full repo-side
+  package list is in `references/package-layout.md`).
+- Confirm the binary + dylib are present under
+  `~/.hermes/aphrodite/binaries/` (`aphrodite` + `libaphrodite_hermes.dylib`,
+  optional `libaphrodite.dylib`) and the pin at
+  `~/.hermes/aphrodite/BINARY_VERSION` matches (current: 1.6.2). If missing,
+  incompatible, or unavailable, reinstall via `aphrodite setup`. The runtime
+  home self-heals binaries/directives on start. CLAIM: no probe in this
+  paragraph; probe by running `aphrodite setup` and observing the runtime
+  home.
 
 **Verify**
 
@@ -245,17 +254,18 @@ cat ~/.hermes/aphrodite/aphrodite.toml | grep -iE "binary|version" | head -20
 
 - Permitted: re-download the artifact and verify checksum/version pairing;
   record degraded state if it fails.
-- Prohibited: `cargo build`; repairing a missing workspace that is not
-  supposed to exist.
+- Prohibited: `cargo build`, because in installed mode there is no workspace
+  to build; repairing a missing workspace that is not supposed to exist.
 
 **Produces**
 
-- A working installed plugin, or a recorded artifact-level failure.
+- An installed plugin whose dylib version pairs with `BINARY_VERSION` (probe:
+  the Verify commands above), or a recorded artifact-level failure.
 
 ## Setup flow (the reinstall path)
 
-`aphrodite setup` performs the whole install in one command: it removes stale
-plugin-dir symlinks, writes the loader (`plugin.yaml` + `__init__.py`) into
+`aphrodite setup` installs in one command: it removes stale plugin-dir
+symlinks, writes the loader (`plugin.yaml` + `__init__.py`) into
 `~/.hermes/plugins/aphrodite`, writes the `BINARY_VERSION` pin into the
 runtime home, registers the plugin via `hermes plugins enable`, and prints
 both locations - there is no `ln -s` step anymore. Its
@@ -264,64 +274,66 @@ substitutes ONLY the proxy ports (cache 9797 / token 9798) - `api_url`/`model`
 are env-driven (`APHRODITE_API_URL` / `APHRODITE_MODEL`); the proxy API key
 comes from `APHRODITE_API_KEY` or `[defaults] api_key` in the TOML. After a
 source rebuild, source the environment file first (its `cargo()` wrapper syncs
-binary + dylib), then run `aphrodite setup` from the fresh `target/release`
-binary to install it.
+binary + dylib; probe: `aphrodite_rebuild` after a build), then run
+`aphrodite setup` from the fresh `target/release` binary to install it.
 
 ## Degraded modes
 
 - **Inline-only when upstream unavailable**: when the upstream API is
   unreachable, the engine retains local/raw behavior and exposes a degraded
-  status - never assume an upstream-dependent recovery action. Local health
-  endpoints succeed without upstream access; upstream reachability is a
-  separate probe (Layer 4, `aphrodite-engine-observability`). Failure policy:
-  degrade, per `aphrodite-boundaries`.
+  status - never assume an upstream-dependent recovery action, because the
+  upstream is exactly what is unavailable. Local health endpoints succeed
+  without upstream access; upstream reachability is a separate probe (Layer 4,
+  `aphrodite-engine-observability`). Failure policy: degrade, per
+  `aphrodite-boundaries`.
 - **API key not actually exported**: the proxy fails loudly with `no API key
 configured - set APHRODITE_API_KEY env var` when `APHRODITE_API_KEY` is
-  absent OR commented out in the environment file - a commented-out line
-  behaves exactly like an absent var. Verify `env | grep APHRODITE_API_KEY`
-  shows it exported; never assume from the file's text.
+  absent OR commented out in the environment file. A commented-out line is
+  not an exported variable. It behaves exactly like an absent var. Verify
+  `env | grep APHRODITE_API_KEY` shows it exported; never assume from the
+  file's text, because a commented-out line reads like a value but exports
+  nothing.
 - **`--version` before config loading (source-derived)**: the Rust binary's
   `--version` is only parsed by clap when `Cli::parse()` runs - which never
-  happens when `aphrodite.toml` exists. If `[BINARY, "--version"]` hangs,
+  happens when `aphrodite.toml` is present. If `[BINARY, "--version"]` hangs,
   verify the current `main()` intercepts `--version`/`-V` before config
-  loading. **Confidence:** source-derived; re-check in the checked-out source
-  before relying on it.
+  loading. CLAIM: source-derived; re-check in the checked-out source before
+  relying on it.
 
 ## Plugin repo is the submodule (post-merge)
 
 `plugins/aphrodite` IS the standalone plugin repository, a git submodule with
 remote `Source` (`ssh://git@github.com/PlayForm/Aphrodite.git`) - there is no
-separate copy to sync. The three submodules are `plugins/aphrodite`,
-`vendor/headroom`, `vendor/rtk`. Work lands directly inside the submodule and
-is carried to Current by the release ceremony (submodule-first,
-`aphrodite-release-flow`). End users install via `aphrodite setup` (binary +
-dylib into `~/.hermes/aphrodite/binaries/`, loader into
-`~/.hermes/plugins/aphrodite`); the runtime home self-heals binaries/directives
-on start. The repo package is `__init__.py`, `_bindings.py`, `BINARY_VERSION`,
-`download.sh` / `download.ps1`, `layout_check.py`, `layout_schema.json`,
-`plugin.yaml`, `README.md`, `SHA256SUMS.txt`, `tests/` - no `_core/`, no
+separate copy to sync, because the submodule itself is the copy. The three
+submodules are `plugins/aphrodite`, `vendor/headroom`, `vendor/rtk`. Work
+lands directly inside the submodule and is carried to Current by the release
+ceremony (submodule-first, `aphrodite-release-flow`). End users install via
+`aphrodite setup` (binary + dylib into `~/.hermes/aphrodite/binaries/`, loader
+into `~/.hermes/plugins/aphrodite`). The repo package has no `_core/`, no
 `_hooks/`; the installed `~/.hermes/plugins/aphrodite` holds only `plugin.yaml`
 
-- `__init__.py`.
+- `__init__.py`. Byte-exact file sets: `references/package-layout.md`.
 
 ## Dep pins
 
-Pin dependencies to exact versions - never semver ranges. The full decision
-tree (inventory, upgrade one compatibility cluster, compile minimal targets,
-classify failure, choose action, behavioral tests, record the decision) is
-owned by `aphrodite-cargo-upgrade`; its breakpoint records live in its
-`references/breakpoints.md`. Never pin "until it compiles" without recording
-the removal condition.
+Pin dependencies to exact versions - never semver ranges, because a range lets
+an upstream release change the compiled behavior without a recorded decision.
+The full decision tree (inventory, upgrade one compatibility cluster, compile
+minimal targets, classify failure, choose action, behavioral tests, record the
+decision) is owned by `aphrodite-cargo-upgrade`; its breakpoint records live
+in its `references/breakpoints.md`. Never pin "until it compiles" without
+recording the removal condition, because a pin without an exit blocks the next
+upgrade.
 
 ## Lifecycle phases
 
 This skill drives **Observe** (health and round-trip checks after a runtime
 change; diagnostics must agree with the release/version claim) and **Recover**
-(only documented repair operations; root cause and clean state verified) from
-the unified lifecycle table in `aphrodite-orientation`. Hard stops:
-diagnostics disagree with the version claim (Observe); destructive shortcut or
-inferred recovery (Recover). Repair rules come from `aphrodite-boundaries`
-(git repair taxonomy, failure-behavior policy).
+(only documented repair operations; root cause established and clean state
+restored) from the unified lifecycle table in `aphrodite-orientation`. Hard
+stops: diagnostics disagree with the version claim (Observe); destructive
+shortcut or inferred recovery (Recover). Repair rules come from
+`aphrodite-boundaries` (git repair taxonomy, failure-behavior policy).
 
 ## Local claim-to-test matrix
 
@@ -332,5 +344,5 @@ inferred recovery (Recover). Repair rules come from `aphrodite-boundaries`
 | Retrieval/diagnostics never re-compressed    | Transform pipeline                     | Feed a retrieval response through the transform       | Payload stays raw; no nested marker      | Update skip classifier (compression-safety owner) |
 | Source rebuild updates the dylib             | `aphrodite_rebuild`                    | Step 2 with both `-p` flags                           | Version matches fresh build              | Rebuild both packages; fresh-process restart      |
 | Installed repair never advises `cargo build` | This skill                             | Step 3 in an installed-only home                      | No build advice; artifact path used      | Fix the step ordering                             |
-| Upstream down → inline-only degraded mode    | `aphrodite-engine-observability`       | Disable upstream, probe local health                  | Degraded status; inline content retained | Fix the degrade path (boundaries: degrade policy) |
+| Upstream down -> inline-only degraded mode   | `aphrodite-engine-observability`       | Disable upstream, probe local health                  | Degraded status; inline content retained | Fix the degrade path (boundaries: degrade policy) |
 | `BINARY_VERSION` pairing verified            | `aphrodite_rebuild` + `BINARY_VERSION` | Step 3 verify                                         | Pairing matches; plugin starts           | Stop release claims; fix artifact                 |

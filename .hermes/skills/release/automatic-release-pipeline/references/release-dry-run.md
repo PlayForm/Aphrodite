@@ -6,7 +6,7 @@ Local release helper scripts (repo-level `Release/NPM.sh` and `Release/Cargo.sh`
 conventions) follow the same flow:
 
 1. `Fn "$@"` - version from arg 1 (sources `Fn/Argument/Version.sh`, exports `Version`)
-2. source `~/.aliases` + `~/.functions` (real dotfiles; `bump_dependencies` runs
+2. source the user's shell rc files (real dotfiles; `bump_dependencies` runs
    `cargo upgrade` / `composer update` / `ncu -u` via `find_ignore`)
 3. `cargo build` / `cargo build --release` / `cargo install --force --path .`
 4. Workflow rewrite - rewrites `.github/workflows/*` (SHA-pinning action refs)

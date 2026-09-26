@@ -50,10 +50,10 @@ workers: `hermes-background-workers`; config hook removal:
 Two hook systems coexist in an Aphrodite session; a shell hook is not a CCR
 plugin hook.
 
-| System | Where declared | Events | Owner |
-| --- | --- | --- | --- |
-| Hermes shell hooks (this skill) | `~/.hermes/config.yaml` → `hooks:` | `pre_tool_call`, `post_tool_call`, `pre_llm_call`, `post_llm_call`, `on_session_start`, `on_session_end`, `subagent_stop` | Scripts in `~/.hermes/agent-hooks/` |
-| Aphrodite CCR plugin hooks | Loader at `~/.hermes/plugins/aphrodite/__init__.py` (plugin.yaml + loader only; engine in `crates/aphrodite`, runtime in `~/.hermes/aphrodite/`) | `on_session_start`, `transform_tool_result`, `pre_llm_call`, `transform_terminal_output`, `post_llm_call` | `aphrodite-hook-contracts`, `aphrodite-hook-reference` |
+| System                          | Where declared                                                                                                                                   | Events                                                                                                                    | Owner                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Hermes shell hooks (this skill) | `~/.hermes/config.yaml` → `hooks:`                                                                                                               | `pre_tool_call`, `post_tool_call`, `pre_llm_call`, `post_llm_call`, `on_session_start`, `on_session_end`, `subagent_stop` | Scripts in `~/.hermes/agent-hooks/`                    |
+| Aphrodite CCR plugin hooks      | Loader at `~/.hermes/plugins/aphrodite/__init__.py` (plugin.yaml + loader only; engine in `crates/aphrodite`, runtime in `~/.hermes/aphrodite/`) | `on_session_start`, `transform_tool_result`, `pre_llm_call`, `transform_terminal_output`, `post_llm_call`                 | `aphrodite-hook-contracts`, `aphrodite-hook-reference` |
 
 The CCR hooks are the compression pipeline (markers, retrieval,
 `aphrodite_retrieve`); the shell hooks here are plain scripts for
@@ -328,10 +328,10 @@ measurements; re-probe with a `time` wrapper).
 
 ## Local claim-to-test matrix
 
-| Claim | Evidence source | Test | Pass condition | Failure response |
-| --- | --- | --- | --- | --- |
-| post_tool_call hooks fire only in the tool loop | SKILL.md | `hermes hooks test post_tool_call --for-tool write_file` | Hook output appears | Check exec bit + allowlist (`hermes hooks doctor`) |
-| Hooks do not fire in TUI mode | This skill | Start TUI, run a write_file | No post-hook mtime warning appears | Expected - test in CLI mode instead |
-| Dash/tab normalization keeps files clean | `git status --short` | Write a file with an em dash under `~/.hermes/tmp/` | On-disk file contains ASCII hyphen only | Re-check registration/allowlist |
-| `cargo fmt` routing finds crate manifests | post-edit-format-qa.py | Edit a `.rs` file under `crates/` | Format result reports `cargo fmt` success | Check the nearest-Cargo.toml walk |
-| Hook tests never touch the repo tree | `git status --short` | Run the `~/.hermes/tmp/` test | No repo file modified | Move the test target under `~/.hermes/tmp/` |
+| Claim                                           | Evidence source        | Test                                                     | Pass condition                            | Failure response                                   |
+| ----------------------------------------------- | ---------------------- | -------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------- |
+| post_tool_call hooks fire only in the tool loop | SKILL.md               | `hermes hooks test post_tool_call --for-tool write_file` | Hook output appears                       | Check exec bit + allowlist (`hermes hooks doctor`) |
+| Hooks do not fire in TUI mode                   | This skill             | Start TUI, run a write_file                              | No post-hook mtime warning appears        | Expected - test in CLI mode instead                |
+| Dash/tab normalization keeps files clean        | `git status --short`   | Write a file with an em dash under `~/.hermes/tmp/`      | On-disk file contains ASCII hyphen only   | Re-check registration/allowlist                    |
+| `cargo fmt` routing finds crate manifests       | post-edit-format-qa.py | Edit a `.rs` file under `crates/`                        | Format result reports `cargo fmt` success | Check the nearest-Cargo.toml walk                  |
+| Hook tests never touch the repo tree            | `git status --short`   | Run the `~/.hermes/tmp/` test                            | No repo file modified                     | Move the test target under `~/.hermes/tmp/`        |

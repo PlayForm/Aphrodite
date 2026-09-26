@@ -1,7 +1,7 @@
 ---
 name: github-repo-management
 description: "Use when cloning, creating, or forking GitHub repos; manage remotes, releases, secrets, CI for the PlayForm org and public repos."
-version: 1.3.0
+version: 1.4.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -26,11 +26,14 @@ owns:
 depends_on:
     - github-auth
 supersedes: []
+verification:
+    source_of_truth: Live GitHub API responses (`gh api` / `curl https://api.github.com`) and `git ls-remote` output; this file is not ground truth.
+    mutation_level: high
 ---
 
 # GitHub Repository Management
 
-Create, clone, fork, configure, and manage GitHub repositories. Each section shows `gh` first, then the `git` + `curl` fallback.
+Create, clone, fork, configure, and manage GitHub repositories. Each section shows the `gh` command first. The `git` + `curl` fallback for each operation lives in `references/curl-fallbacks.md`; the full REST endpoint list lives in `references/github-api-cheatsheet.md`.
 
 ## When to Use
 
@@ -38,19 +41,15 @@ Create, clone, fork, configure, and manage GitHub repositories. Each section sho
 - User needs repo settings, branch protection, secrets, releases, or CI runs
 - User needs a `gh`-vs-`curl` fallback pattern for a repo-level GitHub API call
 
-Aphrodite context: the PlayForm org repos (`PlayForm/Aphrodite`) default to
-the `Development` branch; use it wherever examples below say `main`, and
-protect `Development` (and `Current`) rather than `main` when configuring
-branch protection. The Aphrodite repo's canonical remote is named `Source`
-(`ssh git@github.com/PlayForm/Aphrodite.git`) with three submodules
-(`plugins/aphrodite`, `vendor/headroom`, `vendor/rtk`) - where examples read
-`origin`, substitute the actual remote name (`Source` or the clone remote).
+Aphrodite context: the PlayForm org repos (`PlayForm/Aphrodite`) default to the `Development` branch; `gh repo view PlayForm/Aphrodite` shows the default branch. Use `Development` wherever examples below say `main`, and protect `Development` (and `Current`) rather than `main` when configuring branch protection. The Aphrodite repo's canonical remote is named `Source` (`ssh git@github.com/PlayForm/Aphrodite.git`) and holds three submodules (`plugins/aphrodite`, `vendor/headroom`, `vendor/rtk`). Where examples read `origin`, substitute the actual remote name (`Source` or the clone remote).
 
 ## Prerequisites
 
-- Authenticated with GitHub (see `github-auth` skill)
+- Authenticated with GitHub (see the `github-auth` skill)
 
 ### Setup
+
+The setup script picks the transport. `AUTH` becomes `gh` only when the `gh` binary is present and `gh auth status` succeeds; otherwise `AUTH` becomes `git` and the script reads `GITHUB_TOKEN` from `~/.hermes/.env`, then from `~/.git-credentials`.
 
 ```bash
 if command -v gh &> /dev/null && gh auth status &> /dev/null; then
@@ -74,7 +73,7 @@ else
 fi
 ```
 
-If you're inside a repo already:
+If you are inside a repo already:
 
 ```bash
 REMOTE_URL=$(git remote get-url origin)
@@ -83,17 +82,15 @@ OWNER=$(echo "$OWNER_REPO" | cut -d/ -f1)
 REPO=$(echo "$OWNER_REPO" | cut -d/ -f2)
 ```
 
-Alternatively source the shared auth helper from `github-auth` (sets
-`$GITHUB_TOKEN`, `$GH_OWNER`, `$GH_REPO`):
+Alternatively, source the shared auth helper from `github-auth`, which sets `$GITHUB_TOKEN`, `$GH_OWNER`, and `$GH_REPO`:
+
 `source "${HERMES_HOME:-$HOME/.hermes}/skills/github/github-auth/scripts/gh-env.sh"`
 
-- adapt `$OWNER`/`$REPO` to `$GH_OWNER`/`$GH_REPO` if you use it.
-
----
+Adapt `$OWNER`/`$REPO` to `$GH_OWNER`/`$GH_REPO` if you use it.
 
 ## 1. Cloning Repositories
 
-Cloning is pure `git` - works identically either way:
+Cloning is pure `git`; it behaves identically with or without `gh`.
 
 ```bash
 # Clone via HTTPS (works with credential helper or token-embedded URL)
@@ -112,7 +109,7 @@ git clone --branch develop https://github.com/owner/repo-name.git
 git clone git@github.com:owner/repo-name.git
 ```
 
-**With gh (shorthand):**
+With `gh` (shorthand):
 
 ```bash
 gh repo clone owner/repo-name
@@ -121,7 +118,7 @@ gh repo clone owner/repo-name -- --depth 1
 
 ## 2. Creating Repositories
 
-**With gh:**
+With `gh`:
 
 ```bash
 # Create a public repo and clone it
@@ -138,84 +135,27 @@ cd /path/to/existing/project
 gh repo create my-project --source . --public --push
 ```
 
-**With git + curl:**
-
-```bash
-# Create the remote repo via API
-curl -s -X POST \
-	-H "Authorization: token ***" \
-	https://api.github.com/user/repos \
-	-d '{
-    "name": "my-new-project",
-    "description": "A useful tool",
-    "private": false,
-    "auto_init": true,
-    "license_template": "mit"
-  }'
-
-# Clone it
-git clone https://github.com/$GH_USER/my-new-project.git
-cd my-new-project
-
-# -- OR -- push an existing local directory to the new repo
-cd /path/to/existing/project
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/$GH_USER/my-new-project.git
-git push -u origin main
-```
-
-To create under an organization:
-
-```bash
-curl -s -X POST \
-	-H "Authorization: token ***" \
-	https://api.github.com/orgs/my-org/repos \
-	-d '{"name": "my-new-project", "private": false}'
-```
+The `git` + `curl` fallback for user, org, and template creation is in `references/curl-fallbacks.md`.
 
 ### From a Template
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh repo create my-new-app --template owner/template-repo --public --clone
 ```
 
-**With curl:**
-
-```bash
-curl -s -X POST \
-	-H "Authorization: token ***" \
-	https://api.github.com/repos/owner/template-repo/generate \
-	-d '{"owner": "'"$GH_USER"'", "name": "my-new-app", "private": false}'
-```
+The curl `generate` flow is in `references/curl-fallbacks.md`.
 
 ## 3. Forking Repositories
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh repo fork owner/repo-name --clone
 ```
 
-**With git + curl:**
-
-```bash
-# Create the fork via API
-curl -s -X POST \
-	-H "Authorization: token ***" \
-	https://api.github.com/repos/owner/repo-name/forks
-
-# Wait a moment for GitHub to create it, then clone
-sleep 3
-git clone https://github.com/$GH_USER/repo-name.git
-cd repo-name
-
-# Add the original repo as "upstream" remote
-git remote add upstream https://github.com/owner/repo-name.git
-```
+The curl fork flow is in `references/curl-fallbacks.md`.
 
 ### Keeping a Fork in Sync
 
@@ -227,7 +167,7 @@ git merge upstream/Development
 git push origin Development
 ```
 
-**With gh (shortcut):**
+With `gh` (shortcut):
 
 ```bash
 gh repo sync $GH_USER/repo-name
@@ -235,7 +175,7 @@ gh repo sync $GH_USER/repo-name
 
 ## 4. Repository Information
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh repo view owner/repo-name
@@ -243,44 +183,11 @@ gh repo list --limit 20
 gh search repos "machine learning" --language python --sort stars
 ```
 
-**With curl:**
-
-```bash
-# View repo details
-curl -s \
-	-H "Authorization: token ***" \
-	https://api.github.com/repos/$OWNER/$REPO \
-	| python3 -c "
-import sys, json
-r = json.load(sys.stdin)
-print(f\"Name: {r['full_name']}\")
-print(f\"Description: {r['description']}\")
-print(f\"Stars: {r['stargazers_count']}  Forks: {r['forks_count']}\")
-print(f\"Default branch: {r['default_branch']}\")
-print(f\"Language: {r['language']}\")"
-
-# List your repos
-curl -s \
-	-H "Authorization: token ***" \
-	"https://api.github.com/user/repos?per_page=20&sort=updated" \
-	| python3 -c "
-import sys, json
-for r in json.load(sys.stdin):
-    vis = 'private' if r['private'] else 'public'
-    print(f\"  {r['full_name']:40}  {vis:8}  {r.get('language', ''):10}  ★{r['stargazers_count']}\")"
-
-# Search repos
-curl -s \
-	"https://api.github.com/search/repositories?q=machine+learning+language:python&sort=stars&per_page=10" \
-	| python3 -c "
-import sys, json
-for r in json.load(sys.stdin)['items']:
-    print(f\"  {r['full_name']:40}  ★{r['stargazers_count']:6}  {r['description'][:60] if r['description'] else ''}\")"
-```
+The curl + python3 formatting variants are in `references/curl-fallbacks.md`.
 
 ## 5. Repository Settings
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh repo edit --description "Updated description" --visibility public
@@ -290,28 +197,13 @@ gh repo edit --add-topic "machine-learning,python"
 gh repo edit --enable-auto-merge
 ```
 
-**With curl:**
-
-```bash
-curl -s -X PATCH \
-	-H "Authorization: token ***" \
-	https://api.github.com/repos/$OWNER/$REPO \
-	-d '{
-    "description": "Updated description",
-    "has_wiki": false,
-    "has_issues": true,
-    "allow_auto_merge": true
-  }'
-
-# Update topics
-curl -s -X PUT \
-	-H "Authorization: token ***" \
-	-H "Accept: application/vnd.github.mercy-preview+json" \
-	https://api.github.com/repos/$OWNER/$REPO/topics \
-	-d '{"names": ["machine-learning", "python", "automation"]}'
-```
+The curl PATCH and topics flows are in `references/curl-fallbacks.md`.
 
 ## 6. Branch Protection
+
+There is no `gh` subcommand for branch protection; the API is the only path.
+
+Never PUT branch protection without reading the current protection first, because the PUT replaces the whole config.
 
 ```bash
 # View current protection
@@ -336,12 +228,11 @@ curl -s -X PUT \
   }'
 ```
 
-For the Aphrodite repos, protect `Development` (and `Current` where a
-release line is protected); `Build.yml` provides the required check context.
+For the Aphrodite repos, protect `Development` (and `Current` where a release line is protected); `Build.yml` provides the required check context (`gh workflow list` shows the workflow name).
 
 ## 7. Secrets Management (GitHub Actions)
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh secret set API_KEY --body "your-secret-value"
@@ -350,56 +241,11 @@ gh secret list
 gh secret delete API_KEY
 ```
 
-**With curl:**
-
-Secrets require encryption with the repo's public key - more involved via API:
-
-```bash
-# Get the repo's public key for encrypting secrets
-curl -s \
-	-H "Authorization: token ***" \
-	https://api.github.com/repos/$OWNER/$REPO/actions/secrets/public-key
-
-# Encrypt and set (requires Python with PyNaCl)
-python3 -c "
-from base64 import b64encode
-from nacl import encoding, public
-import json, sys
-
-# Get the public key
-key_id = '<key_id_from_above>'
-public_key = '<base64_key_from_above>'
-
-# Encrypt
-sealed = public.SealedBox(
-    public.PublicKey(public_key.encode('utf-8'), encoding.Base64Encoder)
-).encrypt('your-secret-value'.encode('utf-8'))
-print(json.dumps({
-    'encrypted_value': b64encode(sealed).decode('utf-8'),
-    'key_id': key_id
-}))"
-
-# Then PUT the encrypted secret
-curl -s -X PUT \
-	-H "Authorization: token ***" \
-	https://api.github.com/repos/$OWNER/$REPO/actions/secrets/API_KEY \
-	-d '<output from python script above>'
-
-# List secrets (names only, values hidden)
-curl -s \
-	-H "Authorization: token ***" \
-	https://api.github.com/repos/$OWNER/$REPO/actions/secrets \
-	| python3 -c "
-import sys, json
-for s in json.load(sys.stdin)['secrets']:
-    print(f\"  {s['name']:30}  updated: {s['updated_at']}\")"
-```
-
-Note: For secrets, `gh secret set` is dramatically simpler. If setting secrets is needed and `gh` isn't available, recommend installing it for just that operation.
+Never set secrets through the REST path when `gh` is available, because the REST route requires PyNaCl encryption of the value and is easy to get wrong. If setting secrets is needed and `gh` is not available, install `gh` for just that operation. The encrypt-and-PUT curl flow is in `references/curl-fallbacks.md`.
 
 ## 8. Releases
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh release create v1.0.0 --title "v1.0.0" --generate-notes
@@ -409,50 +255,11 @@ gh release list
 gh release download v1.0.0 --dir ./downloads
 ```
 
-Aphrodite-specific releases (crate versions, the plugin binary, the
-`BINARY_VERSION` pairing, publish steps) are owned by
-`aphrodite-release-workflow` - use the generic `gh release` commands here
-only for other repos or ad-hoc operations, never to override the release
-ceremony for the Aphrodite crates.
-
-**With curl:**
-
-```bash
-# Create a release
-curl -s -X POST \
-  -H "Authorization: token ***" \
-  https://api.github.com/repos/$OWNER/$REPO/releases \
-  -d '{
-    "tag_name": "v1.0.0",
-    "name": "v1.0.0",
-    "body": "## Changelog\n- Feature A\n- Bug fix B",
-    "draft": false,
-    "prerelease": false,
-    "generate_release_notes": true
-  }'
-
-# List releases
-curl -s \
-  -H "Authorization: token ***" \
-  https://api.github.com/repos/$OWNER/$REPO/releases \
-  | python3 -c "
-import sys, json
-for r in json.load(sys.stdin):
-    tag = r.get('tag_name', 'no tag')
-    print(f\"  {tag:15}  {r['name']:30}  {'draft' if r['draft'] else 'published'}\")"
-
-# Upload a release asset (binary file)
-RELEASE_ID=<id_from_create_response>
-curl -s -X POST \
-  -H "Authorization: token ***" \
-  -H "Content-Type: application/octet-stream" \
-  "https://uploads.github.com/repos/$OWNER/$REPO/releases/$RELEASE_ID/assets?name=binary-amd64" \
-  --data-binary @./dist/binary-amd64
-```
+Aphrodite-specific releases (crate versions, the plugin binary, the `BINARY_VERSION` pairing, publish steps) are owned by `aphrodite-release-workflow`. Never use these generic `gh release` commands to override the release ceremony for the Aphrodite crates, because the ceremony enforces the crate/version pairing. Use the generic commands only for other repos or ad-hoc operations. The curl create/list/asset-upload flows are in `references/curl-fallbacks.md`.
 
 ## 9. GitHub Actions Workflows
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh workflow list
@@ -465,121 +272,57 @@ gh workflow run Build.yml --ref Development
 gh workflow run Publish.yml -f environment=staging
 ```
 
-**With curl:**
-
-```bash
-# List workflows
-curl -s \
-  -H "Authorization: token ***" \
-  https://api.github.com/repos/$OWNER/$REPO/actions/workflows \
-  | python3 -c "
-import sys, json
-for w in json.load(sys.stdin)['workflows']:
-    print(f\"  {w['id']:10}  {w['name']:30}  {w['state']}\")"
-
-# List recent runs
-curl -s \
-  -H "Authorization: token ***" \
-  "https://api.github.com/repos/$OWNER/$REPO/actions/runs?per_page=10" \
-  | python3 -c "
-import sys, json
-for r in json.load(sys.stdin)['workflow_runs']:
-    print(f\"  Run {r['id']}  {r['name']:30}  {r['conclusion'] or r['status']}\")"
-
-# Download failed run logs
-RUN_ID=<run_id>
-curl -s -L \
-  -H "Authorization: token ***" \
-  https://api.github.com/repos/$OWNER/$REPO/actions/runs/$RUN_ID/logs \
-  -o /tmp/ci-logs.zip
-cd /tmp && unzip -o ci-logs.zip -d ci-logs
-
-# Re-run a failed workflow
-curl -s -X POST \
-  -H "Authorization: token ***" \
-  https://api.github.com/repos/$OWNER/$REPO/actions/runs/$RUN_ID/rerun
-
-# Re-run only failed jobs
-curl -s -X POST \
-  -H "Authorization: token ***" \
-  https://api.github.com/repos/$OWNER/$REPO/actions/runs/$RUN_ID/rerun-failed-jobs
-
-# Trigger a workflow manually (workflow_dispatch)
-WORKFLOW_ID=<workflow_id_or_filename>
-curl -s -X POST \
-  -H "Authorization: token ***" \
-  https://api.github.com/repos/$OWNER/$REPO/actions/workflows/$WORKFLOW_ID/dispatches \
-  -d '{"ref": "Development", "inputs": {"environment": "staging"}}'
-```
+The curl list/logs/rerun/dispatch flows are in `references/curl-fallbacks.md`.
 
 ## 10. Gists
 
-**With gh:**
+With `gh`:
 
 ```bash
 gh gist create script.py --public --desc "Useful script"
 gh gist list
 ```
 
-**With curl:**
-
-```bash
-# Create a gist
-curl -s -X POST \
-	-H "Authorization: token ***" \
-	https://api.github.com/gists \
-	-d '{
-    "description": "Useful script",
-    "public": true,
-    "files": {
-      "script.py": {"content": "print(\"hello\")"}
-    }
-  }'
-
-# List your gists
-curl -s \
-	-H "Authorization: token ***" \
-	https://api.github.com/gists \
-	| python3 -c "
-import sys, json
-for g in json.load(sys.stdin):
-    files = ', '.join(g['files'].keys())
-    print(f\"  {g['id']}  {g['description'] or '(no desc)':40}  {files}\")"
-```
-
-## Quick Reference Table
-
-| Action         | gh                             | git + curl                                               |
-| -------------- | ------------------------------ | -------------------------------------------------------- |
-| Clone          | `gh repo clone o/r`            | `git clone https://github.com/o/r.git`                   |
-| Create repo    | `gh repo create name --public` | `curl POST /user/repos`                                  |
-| Fork           | `gh repo fork o/r --clone`     | `curl POST /repos/o/r/forks` + `git clone`               |
-| Repo info      | `gh repo view o/r`             | `curl GET /repos/o/r`                                    |
-| Edit settings  | `gh repo edit --...`           | `curl PATCH /repos/o/r`                                  |
-| Create release | `gh release create v1.0`       | `curl POST /repos/o/r/releases`                          |
-| List workflows | `gh workflow list`             | `curl GET /repos/o/r/actions/workflows`                  |
-| Rerun CI       | `gh run rerun ID`              | `curl POST /repos/o/r/actions/runs/ID/rerun`             |
-| Set secret     | `gh secret set KEY`            | `curl PUT /repos/o/r/actions/secrets/KEY` (+ encryption) |
-
-For the full REST endpoint list see `references/github-api-cheatsheet.md`.
+The curl create/list flows are in `references/curl-fallbacks.md`.
 
 ## Detaching Forks (making a fork standalone + private)
 
-GitHub has NO API to un-fork a repo. A public fork also CANNOT be made private directly (PATCH fails with "Public forks can't be made private"). The only automated path is delete+recreate:
+GitHub has no API to un-fork a repo. A public fork cannot be made private directly; the PATCH fails with "Public forks can't be made private". The only automated path is delete+recreate:
 
-1. **Export metadata first** (BEFORE deleting): `gh api --paginate repos/{o}/{r}/pulls?state=all` + issues/comments JSON. This is the ONLY copy of PR titles/bodies once the fork is gone.
-2. **Mirror clone** (full backup, incl. `refs/pull/*`): `git clone --mirror URL`. Keep it until verified.
-3. **Delete** the fork: `gh api -X DELETE repos/{o}/{r}` - requires the `delete_repo` OAuth scope (403 otherwise; add via `gh auth refresh -h github.com -s delete_repo` - device flow needs the user to enter the one-time code, and the flow only starts polling AFTER Enter is pressed).
-4. **Recreate** same name as private: `gh api -X POST orgs/{o}/repos -f name=... -f private=true -f description=... -f has_issues=... -f has_wiki=...` - OMIT `has_projects` (orgs with the Projects feature disabled reject the field even as false). Repo creation is secondary-rate-limited: space creations out (90s+) and retry with backoff.
-5. **Push**: `git --git-dir=mirror push URL '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'` - pushing branches containing `.github/workflows/*` requires the `workflow` OAuth scope (else "refusing to allow an OAuth App to create or update workflow"). Never `push --mirror` (GitHub rejects `refs/pull/*`).
-6. **Verify refs**: compare `git ls-remote` (filter out `^{}` peeled tag lines) vs `for-each-ref --format='%(refname) %(objectname)'` - diff must be empty.
-7. **Restore default branch** if non-main/master (PATCH `default_branch`). Recreate PRs from the export (same-repo PRs need their head branches pushed; merged/closed PRs with deleted branches are unrecreatable - their diff is in history).
+1. Export metadata first, before deleting: `gh api --paginate repos/{o}/{r}/pulls?state=all` plus the issues and comments JSON. This export is the only copy of the PR titles and bodies once the fork is gone.
+2. Mirror clone for a full backup, including `refs/pull/*`: `git clone --mirror URL`. Keep the mirror until step 6 passes.
+3. Delete the fork: `gh api -X DELETE repos/{o}/{r}`. This requires the `delete_repo` OAuth scope; without it the call returns 403. Add the scope with `gh auth refresh -h github.com -s delete_repo`. The device flow needs the user to enter the one-time code, and the flow does not start polling until Enter is pressed.
+4. Recreate the same name as private: `gh api -X POST orgs/{o}/repos -f name=... -f private=true -f description=... -f has_issues=... -f has_wiki=...`. Never include `has_projects`, because orgs with the Projects feature disabled reject the field even as false. Repo creation is secondary-rate-limited; space creations out (90s+) and retry with backoff.
+5. Push all refs: `git --git-dir=mirror push URL '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'`. Pushing branches that contain `.github/workflows/*` requires the `workflow` OAuth scope; without it the push fails with "refusing to allow an OAuth App to create or update workflow". Never use `push --mirror`, because GitHub rejects `refs/pull/*`.
+6. Verify refs: compare `git ls-remote` (filter out `^{}` peeled tag lines) against the mirror's `for-each-ref --format='%(refname) %(objectname)'`. The diff must be empty.
+7. Restore the default branch if it is not main/master (PATCH `default_branch`). Recreate PRs from the export; same-repo PRs need their head branches pushed. Merged or closed PRs with deleted branches are unrecreatable, and their diff lives only in history.
 
-Gotchas: re-running a detach script that re-exports AFTER deletion overwrites the good export with a 404 body (only export once, pre-delete); archived orgs cannot be unarchived via API (repos in them are stuck public); GitHub's Dependabot security-updates may auto-recreate equivalent dependency PRs on the fresh repos.
+Gotchas: never re-run a detach script that re-exports after deletion, because it overwrites the good export with a 404 body; export once, pre-delete. Archived orgs cannot be unarchived via API, and repos in them stay public. GitHub's Dependabot security-updates may auto-recreate equivalent dependency PRs on the fresh repos.
+
+## Stop if / Recovery
+
+Stop if the fork has not been exported (`gh api --paginate repos/{o}/{r}/pulls?state=all`) and mirror-cloned (`git clone --mirror URL`) before a delete; if a detach script would re-export after deletion; if you are about to `push --mirror`; or if the current branch protection has not been read (`curl -s -H "Authorization: token ***" https://api.github.com/repos/$OWNER/$REPO/branches/Development/protection`).
+
+Recovery: the only legal next act is to run the missing read first - export and mirror before any delete, GET protection before any PUT, and `'+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'` in place of `push --mirror`. If a 404 body already overwrote the export, the mirror is the only remaining backup.
 
 ## Pitfalls
 
-- Prefer `gh secret set` over the curl path - the REST route requires PyNaCl encryption of the value and is easy to get wrong.
-- Use `--depth 1` shallow clones for large repos; full history is rarely needed for inspection.
-- Branch protection PUT replaces the whole config - read the current protection first (`GET .../branches/Development/protection`) before changing it.
-- Keep the redacted `Authorization: token *** placeholder in every curl example - never paste a real token into a command.
+- Never set a secret through the REST path when `gh` is available, because the REST route requires PyNaCl encryption of the value and is easy to get wrong.
+- Never clone full history for inspection, because `--depth 1` shallow clones are faster for large repos and full history is rarely needed.
+- Never PUT branch protection without reading the current protection first (`curl -s -H "Authorization: token ***" https://api.github.com/repos/$OWNER/$REPO/branches/Development/protection`), because the PUT replaces the whole config.
+- Never paste a real token into a command, because it leaks into shell history and logs. Keep the redacted `Authorization: token ***` placeholder in every curl example.
+
+## Claim-to-test table
+
+| Claim                                                                                        | Test                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH` resolves to `gh` when the binary is present and authenticated                         | `gh auth status` exits 0                                                                                                                                            |
+| `gh repo create my-new-project --public --clone` creates and clones a repo                   | `gh repo view my-new-project` exits 0 and `test -d my-new-project` succeeds                                                                                         |
+| `gh repo create my-project --source . --public --push` publishes an existing local directory | `git ls-remote` on the new remote shows the pushed head                                                                                                             |
+| `gh repo sync $GH_USER/repo-name` brings a fork up to date                                   | `git fetch upstream` then `git log --oneline origin/Development..upstream/Development` returns empty output                                                         |
+| The branch protection PUT replaces the whole config                                          | `curl -s -H "Authorization: token ***" https://api.github.com/repos/$OWNER/$REPO/branches/Development/protection` shows only the fields from the last PUT           |
+| `gh secret set API_KEY --body "your-secret-value"` writes a secret                           | `gh secret list` shows `API_KEY`                                                                                                                                    |
+| `gh release create v1.0.0 --title "v1.0.0" --generate-notes` publishes a release             | `gh release list` shows `v1.0.0`                                                                                                                                    |
+| `gh workflow run Build.yml --ref Development` triggers the workflow                          | `gh run list --limit 10` shows a run for `Build.yml`                                                                                                                |
+| A public fork cannot be made private directly                                                | the PATCH to `/repos/{owner}/{repo}` with `"visibility": "private"` fails with "Public forks can't be made private"                                                 |
+| The detach-fork push restores all refs                                                       | `git ls-remote` on the recreated repo compared with the mirror's `for-each-ref --format='%(refname) %(objectname)'` shows an empty diff after filtering `^{}` lines |
