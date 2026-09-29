@@ -12,7 +12,7 @@ Fields are read from each SKILL.md frontmatter (`name`, `version`, `category`,
 `status`, `mutation_level`, `successor`). `mutation_level` defaults to `local`
 when a skill does not declare it; observed values: `read-only`, `local`,
 `publish`, `mutate`, `mutates`, `orchestration`. `successor` is set only for
-archived skills. 58 skills total: 57 active, 1 archived.
+archived skills. 59 skills total: 58 active, 1 archived.
 
 ## aphrodite (18)
 
@@ -88,10 +88,11 @@ archived skills. 58 skills total: 57 active, 1 archived.
 | github-readme-generation  | 1.2.0   | active | local          | docs     | Use when generating, editing, or restyling PlayForm/Aphrodite READMEs. |
 | markdown-readme-audit-fix | 1.2.0   | active | local          | docs     | Use when fixing README markdown formatting and links.                  |
 
-## engineering (11)
+## engineering (12)
 
 | Skill                         | Version | Status | Mutation level | Category    | Description                                                                                                                      |
 | ----------------------------- | ------- | ------ | -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| aphrodite-public-markdown-tools | 1.0.0 | active | local          | engineering | Use when running public-markdown link hygiene (inventory/rewrite/branch-flip), .vscode/settings.json parity utilities (ruff port, squash resolve, nightly-rustfmt override), or the crates/aphrodite dep-bump to Current's pins. |
 | code-quality-improvement      | 1.2.0   | active | local          | engineering | Use when improving code quality and docs across the Aphrodite monorepo (Rust crates, plugin Python, .hermes docs).               |
 | macos-binary-deployment       | 1.1.0   | active | mutates        | engineering | Use when deploying the freshly built Aphrodite binary and libaphrodite_hermes.dylib into ~/.hermes/aphrodite/binaries on macOS.  |
 | parallel-delegation-execution | 1.1.0   | active | orchestration  | engineering | Use when running large repo tasks as parallel delegate waves on the Aphrodite monorepo (PlayForm/Aphrodite, Development branch). |

@@ -129,3 +129,4 @@ placeholder/
 .hermes/examples/prompts/*.md
 .hermes/examples/proxies/*.md
 .hermes/examples/templates/*.md
+.hermes/skills/**/__pycache__/
