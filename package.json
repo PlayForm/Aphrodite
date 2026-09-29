@@ -7,11 +7,11 @@
   "repository": "PlayForm/Aphrodite",
   "scripts": {
     "Check:FFI": "python3 Maintain/check_ffi_contract.py",
-    "Format": "sh Maintain/Format.sh",
-    "Format:LineEndings": "sh Maintain/Format.sh dos2unix",
-    "Format:Shell": "sh Maintain/Format.sh shell",
-    "Format:Prettier": "sh Maintain/Format.sh prettier",
-    "Format:Rust": "sh Maintain/Format.sh rust",
+    "Format": "bash Maintain/Format.sh",
+    "Format:LineEndings": "bash Maintain/Format.sh dos2unix",
+    "Format:Shell": "bash Maintain/Format.sh shell",
+    "Format:Prettier": "bash Maintain/Format.sh prettier",
+    "Format:Rust": "bash Maintain/Format.sh rust",
     "FormatCheck": "prettier --check ."
   },
   "devDependencies": {
