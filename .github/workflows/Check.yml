@@ -65,7 +65,7 @@ jobs:
         # nightly. `toolchain: nightly` resolves to whatever the latest
         # nightly is on the day the workflow runs - deliberately never a
         # dated pin.
-        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
         with:
           toolchain: nightly
           components: rustfmt, clippy
@@ -102,7 +102,7 @@ jobs:
         # codebase (1235 diff hunks, verified locally) - a false-positive
         # gate, not a real regression. A pinned dated nightly is carried
         # solely for this one step; every other job uses stable.
-        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
         with:
           toolchain: nightly-2026-05-01
           components: rustfmt
