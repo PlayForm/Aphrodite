@@ -83,9 +83,15 @@ def test_plugin_dir_contents_never_touched():
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         # The plugin dir is Hermes-owned: the plugin never moves, removes, or
         # modifies ANYTHING inside it - report-only (catalog review, PR 118488).
-        ok((plugin / "aphrodite.toml").read_text() == "plugin-cfg\n", "config was moved out of plugin dir")
+        ok(
+            (plugin / "aphrodite.toml").read_text() == "plugin-cfg\n",
+            "config was moved out of plugin dir",
+        )
         ok((plugin / "ccr.db").read_text() == "db-bytes", "ccr.db was moved out of plugin dir")
-        ok((plugin / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01", "plugin-dir binaries were touched")
+        ok(
+            (plugin / "binaries" / "aphrodite").read_bytes() == b"BIN\x00\x01",
+            "plugin-dir binaries were touched",
+        )
         ok(
             not any("moved" in a or "copy" in a for a in report["actions_taken"]),
             f"plugin dir was modified: {report['actions_taken']}",
@@ -206,7 +212,10 @@ def test_env_config_override():
                 os.environ["APHRODITE_CONFIG_PATH"] = old
         # config inside the Hermes-owned plugin dir is never moved - not even
         # to an env override target (report-only; the plugin dir is untouchable).
-        ok((plugin / "aphrodite.toml").read_text() == "env-cfg\n", "config was moved out of plugin dir")
+        ok(
+            (plugin / "aphrodite.toml").read_text() == "env-cfg\n",
+            "config was moved out of plugin dir",
+        )
         ok(
             not any("moved" in a for a in report["actions_taken"]),
             f"plugin dir was modified: {report['actions_taken']}",
@@ -258,7 +267,10 @@ def test_destination_differs_skipped():
         report = check_and_heal(home_dir=home, dry_run=False, plugin_dir=plugin)
         # plugin-dir config is never moved, compared, or warned about - the
         # plugin dir is Hermes-owned and untouchable.
-        ok((plugin / "aphrodite.toml").read_text() == "plugin version\n", "plugin-dir config was modified")
+        ok(
+            (plugin / "aphrodite.toml").read_text() == "plugin version\n",
+            "plugin-dir config was modified",
+        )
         ok(
             (home / ".hermes" / "aphrodite" / "aphrodite.toml").read_text() == "runtime version\n",
             "runtime config was modified",
@@ -327,6 +339,45 @@ def test_binaries_excluded_from_plugin_scan():
         ok(
             not any("binaries" in w for w in report["warnings"]),
             f"unexpected binaries warnings: {report['warnings']}",
+        )
+
+
+def test_aphrodite_home_override_relocates_runtime_home():
+    # Issue 40 F3: layout_check must follow the SAME runtime-home decision as
+    # the shim. The shim exports its resolution through APHRODITE_HOME, so a
+    # user who works around the HERMES_HOME mismatch with APHRODITE_HOME must
+    # never get required dirs (re)created under a second, shadow home.
+    with tempfile.TemporaryDirectory() as td:
+        home, src = make_tree(Path(td))
+        runtime = Path(td) / "custom-runtime"
+        os.environ["APHRODITE_HOME"] = str(runtime)
+        try:
+            report = check_and_heal(
+                home_dir=home, dry_run=False, plugin_dir=src / "plugins" / "aphrodite"
+            )
+        finally:
+            os.environ.pop("APHRODITE_HOME", None)
+        # The required runtime home is created at the override, not under
+        # <hermes-home>/aphrodite.
+        ok(runtime.is_dir(), f"runtime home not created at APHRODITE_HOME: {runtime}")
+        ok(
+            not any("created directory" in a and str(home) in a for a in report["actions_taken"]),
+            f"shadow-home dirs were created: {report['actions_taken']}",
+        )
+        # Config presence is checked against the override (the heal operates
+        # on the home the plugin actually uses)...
+        ok(
+            any(str(runtime) in m for m in report["mismatches"]),
+            f"relocated home not referenced by mismatches: {report['mismatches']}",
+        )
+        ok(
+            any("aphrodite.toml missing" in m for m in report["mismatches"]),
+            f"config mismatch not reported for the relocated home: {report['mismatches']}",
+        )
+        # ...and the real ~/.hermes tree is never touched.
+        ok(
+            (home / ".hermes" / "aphrodite" / "aphrodite.toml").exists(),
+            "existing config was moved out of the legacy tree",
         )
 
 

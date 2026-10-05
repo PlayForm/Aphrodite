@@ -11,7 +11,6 @@ import logging
 import os
 import subprocess
 import sys
-import tempfile
 import threading
 import types
 from collections.abc import Callable
@@ -55,47 +54,6 @@ def _hermes_home() -> Path:
     return Path.home() / ".hermes"
 
 
-def _home_holds_install(home: Path) -> bool:
-    """True when ``home`` already carries a live Aphrodite install: a
-    ``binaries/`` directory, an ``aphrodite.toml``, or a ``ccr.db``.
-
-    Feeds the legacy-adoption rule (F2) so an upgrade never abandons the
-    home a previous version actually used - never migrate, adopt-and-warn.
-    """
-    try:
-        return (
-            (home / "binaries").is_dir()
-            or (home / "aphrodite.toml").is_file()
-            or (home / "ccr.db").is_file()
-        )
-    except OSError:
-        return False
-
-
-def _home_is_scratch(home: Path) -> bool:
-    """True when ``home`` is a throwaway/scratch Hermes home: under the OS
-    temp dir (the catalog-validate probe's ``tempfile.TemporaryDirectory``),
-    under ``/tmp`` (Linux containers, ``/tmp/hermes-*`` scratch homes), or
-    under the real home's ``.hermes/cache/scratch`` (Hermes' documented
-    scratch-home pattern). Legacy adoption must NEVER redirect a throwaway
-    home onto a real install: under the probe that would make the layout
-    heal and directives materialize write into the live
-    ``~/.hermes/aphrodite`` - the exact pollution PR 118488 removed.
-    """
-    try:
-        scratch_roots = [
-            Path(tempfile.gettempdir()).resolve(),
-            Path("/tmp").resolve(),
-            (Path.home() / ".hermes" / "cache" / "scratch").resolve(),
-        ]
-        resolved = home.resolve()
-        return any(resolved.is_relative_to(root) for root in scratch_roots)
-    except (OSError, ValueError, RuntimeError):
-        # A symlink loop or an unresolvable home must never crash the
-        # import - treat as "not scratch" and let the other guards decide.
-        return False
-
-
 def _runtime_home() -> tuple[Path, str]:
     """THE single runtime-home decision for the whole plugin process.
 
@@ -104,11 +62,10 @@ def _runtime_home() -> tuple[Path, str]:
       2. ``<hermes-home>/aphrodite`` - the canonical home, matching the
          shim's Hermes-home resolution and Hermes' per-Hermes-home plugin
          managers (profiles).
-      3. Legacy ``$HOME/.hermes/aphrodite`` - ADOPTED when it is the one
-         that actually holds an install and the canonical home does not
-         (issue 40 F2: never pick a home other than the one a previous
-         version used while that one still exists - adopt-and-warn instead
-         of migrating).
+      There is deliberately NO fallback to the legacy ``$HOME/.hermes/
+      aphrodite`` home (catalog review, PR 118488): a non-default
+      ``HERMES_HOME`` with no install must report "not installed", never
+      quietly share one runtime home across profiles.
 
     Returns ``(home, decision)`` where ``decision`` names the source for the
     startup log line (F5). The decision is exported to the Rust half via
@@ -121,19 +78,6 @@ def _runtime_home() -> tuple[Path, str]:
     if override:
         return Path(override).expanduser(), "APHRODITE_HOME override"
     canonical = _hermes_home() / "aphrodite"
-    legacy = Path.home() / ".hermes" / "aphrodite"
-    if (
-        not _home_holds_install(canonical)
-        and _home_holds_install(legacy)
-        and not _home_is_scratch(_hermes_home())
-    ):
-        _log.warning(
-            "adopting the pre-2.2 runtime home %s (no install under %s); "
-            "set APHRODITE_HOME to pin the location explicitly",
-            legacy,
-            canonical,
-        )
-        return legacy, "legacy ~/.hermes/aphrodite adoption"
     if os.environ.get("HERMES_HOME", "").strip():
         return canonical, "HERMES_HOME"
     return canonical, "default"

@@ -1,26 +1,26 @@
 {
-    "name": "@playform/aphrodite",
-    "version": "1.6.4",
-    "private": true,
-    "description": "CCR compression proxy + absorptive preview pipeline for Hermes Agent",
-    "license": "CC0-1.0",
-    "repository": "PlayForm/Aphrodite",
-    "scripts": {
-        "Check:FFI": "python3 Maintain/check_ffi_contract.py",
-        "Format": "bash Maintain/Format.sh",
-        "Format:LineEndings": "bash Maintain/Format.sh dos2unix",
-        "Format:Shell": "bash Maintain/Format.sh shell",
-        "Format:Prettier": "bash Maintain/Format.sh prettier",
-        "Format:Rust": "bash Maintain/Format.sh rust",
-        "FormatCheck": "prettier --check ."
-    },
-    "devDependencies": {
-        "prettier": "3.9.9",
-        "prettier-plugin-sh": "0.20.2"
-    },
-    "engines": {
-        "node": ">=20",
-        "pnpm": ">=9"
-    },
-    "packageManager": "pnpm@12.4.2"
+  "name": "@playform/aphrodite",
+  "version": "1.6.5",
+  "private": true,
+  "description": "CCR compression proxy + absorptive preview pipeline for Hermes Agent",
+  "license": "CC0-1.0",
+  "repository": "PlayForm/Aphrodite",
+  "scripts": {
+    "Check:FFI": "python3 Maintain/check_ffi_contract.py",
+    "Format": "bash Maintain/Format.sh",
+    "Format:LineEndings": "bash Maintain/Format.sh dos2unix",
+    "Format:Shell": "bash Maintain/Format.sh shell",
+    "Format:Prettier": "bash Maintain/Format.sh prettier",
+    "Format:Rust": "bash Maintain/Format.sh rust",
+    "FormatCheck": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "3.9.6",
+    "prettier-plugin-sh": "0.19.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@12.4.2"
 }
