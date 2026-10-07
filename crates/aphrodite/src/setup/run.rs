@@ -73,16 +73,48 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// lives in the runtime home. A stale symlink from older installs (plugin
 	// dir -> runtime home) is removed first so the loader files land as real
 	// files, never through the link into the runtime home.
-	if ctx
-		.plugin_dir
-		.symlink_metadata()
-		.map(|m| m.file_type().is_symlink())
-		.unwrap_or(false)
-	{
-		println!("removing stale plugin symlink -> {}", ctx.plugin_dir.display());
-		fs::remove_file(&ctx.plugin_dir)?;
+//
+	// Catalog-install guard (PR 118488 review, teknium1): when
+	// <hermes-home>/plugins/aphrodite is the plugin's OWN install dir - a
+	// real directory under the Hermes home placed there by a catalog install
+	// (download.sh/download.ps1) - `aphrodite setup` must never write into
+	// it or delete it: that path is Hermes-owned and REPORT-ONLY. The dev
+	// path (plugin dir absent, or a symlink resolving OUTSIDE the Hermes
+	// home - an old dev link into the source checkout) keeps the historical
+	// behavior below unchanged.
+	let plugin_is_catalog_install = match fs::canonicalize(&ctx.plugin_dir) {
+		Ok(resolved) => {
+			let home = fs::canonicalize(&hermes_home).unwrap_or_else(|_| hermes_home.clone());
+			resolved.starts_with(&home)
+		},
+		// Absent dir (fresh setup) or dangling symlink (stale dev link):
+		// nothing of a catalog install exists - dev path.
+		Err(_) => false,
+	};
+	if plugin_is_catalog_install {
+		// Report-only: never remove symlinks, never create or write the
+		// plugin dir. A catalog install must be updated via
+		// download.sh/download.ps1, not `aphrodite setup`, and setup never
+		// deletes the plugin dir.
+		println!(
+			"NOTE: {} is the plugin's own install dir under the Hermes home (catalog install) - report-only, left \
+			 untouched",
+			ctx.plugin_dir.display()
+		);
+		println!("  a catalog install must use `bash download.sh` / `pwsh download.ps1`, not `aphrodite setup`");
+		println!("  `aphrodite setup` will not remove, create, or overwrite files there");
+	} else {
+		if ctx
+			.plugin_dir
+			.symlink_metadata()
+			.map(|m| m.file_type().is_symlink())
+			.unwrap_or(false)
+		{
+			println!("removing stale plugin symlink -> {}", ctx.plugin_dir.display());
+			fs::remove_file(&ctx.plugin_dir)?;
+		}
+		fs::create_dir_all(&ctx.plugin_dir)?;
 	}
-	fs::create_dir_all(&ctx.plugin_dir)?;
 
 	// ── Step 3: Copy self to binaries dir (always overwrite - the binary
 	// is the install payload; config is preserved unless --force) ──
@@ -117,10 +149,17 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	}
 
 	// ── Step 7: Write plugin.yaml ──
-	write_plugin_yaml(&ctx, args)?;
-
 	// ── Step 8: Write __init__.py shim ──
-	write_init_py(&ctx)?;
+	// Both write the loader INTO the plugin dir - skipped in catalog-install
+	// mode (report-only, PR 118488); the Hermes-home plugin dir is the
+	// plugin's own install dir there and setup must not touch it.
+	if !plugin_is_catalog_install {
+		write_plugin_yaml(&ctx, args)?;
+		write_init_py(&ctx)?;
+	}
+
+	// ── Step 8b: Write the BINARY_VERSION pin into the runtime home ──
+	write_binary_version(&ctx)?;
 
 	// ── Step 8b: Write the BINARY_VERSION pin into the runtime home ──
 	write_binary_version(&ctx)?;
@@ -133,7 +172,15 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 		"  binaries, config, and state: {} (everything the plugin manages)",
 		ctx.aphrodite_dir.display()
 	);
-	println!("  hooks registered (loader only): {}", ctx.plugin_dir.display());
+if plugin_is_catalog_install {
+		println!(
+			"  plugin dir (catalog install, report-only): {} - loader NOT written by setup; use \
+			 download.sh/download.ps1",
+			ctx.plugin_dir.display()
+		);
+	} else {
+		println!("  hooks registered (loader only): {}", ctx.plugin_dir.display());
+	}
 
 	Ok(())
 }

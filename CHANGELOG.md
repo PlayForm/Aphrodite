@@ -1,5 +1,41 @@
 # Changelog
 
+## v1.6.6 - Catalog review: prefetch path guard, setup hardening, opt-in context engine (2026-10-07)
+
+The second `hermes-agent` catalog-review release (PR 118488, review
+5441199534): `aphrodite_prefetch` refuses sensitive paths outright,
+`aphrodite setup` never touches the Hermes plugin directory (report-only,
+points at the download scripts), the dylib arm refuses installs when the
+in-tree checksums are missing, and the context engine is re-described as
+opt-in with a `requires_hermes` floor. Config and docs are re-audited 1:1
+against the parsers. Binary `1.6.5 → 1.6.6`, plugin `2.2.5 → 2.2.6`.
+
+- **Fix (prefetch, path guard)**: `aphrodite_prefetch` refuses `.env`,
+  `auth.json`, `~/.ssh`, the Hermes home, and non-file paths with
+  `ReadOutcome::Refused` + `refuse_reason` instead of reading them.
+- **Fix (setup, plugin-dir guard)**: `aphrodite setup` treats the Hermes-home
+  plugin directory as report-only - no symlink removal/create, no writes, no
+  deletes; the notice points at `bash download.sh` / `pwsh download.ps1`.
+- **Fix (setup, dylib checksums)**: the dylib arm hard-refuses (`Err`) when
+  the in-tree `SHA256SUMS.txt` is missing or has no entry for the target.
+- **Fix (setup, hints)**: the shim carries the explicit download-script
+  hints; `plugins/aphrodite/__init__.py` and
+  `crates/aphrodite/templates/__init__.py` stay byte-identical (drift-guard).
+- **Feature (plugin, opt-in context engine)**: description corrected to
+  "opt-in context engine" - registration is `APHRODITE_CONTEXT_ENGINE=1`
+  (TOML `compression.context_engine` defaults true); `requires_hermes:
+">=0.20.2"` (first Hermes release with `pre_tool_call` `modify`).
+- **Feature (plugin, Disclosure)**: `plugin.yaml` and the parent `write.rs`
+  description disclose the `pre_tool_call` behavior (auto-backgrounds long
+  terminal/process commands, rewrites chained terminal commands when enabled).
+- **Chore (repo, config 1:1 audit)**: both TOMLs mutually consistent + 1:1
+  with the parsers; dead `[templates.*]` subtree and `compression.prefetch`
+  removed; `chain_split_min/max_segments` and `defaults.api_url/model` added;
+  unwired keys annotated.
+- **Docs**: 21 doc files fixed (thresholds, 13 tools, 30-type classifier, no
+  hot-reload claims, explicit `bash download.sh` install, endpoints table,
+  version stamps 1.6.5 → 1.6.6).
+
 ## v1.6.5 - Catalog review: mandatory in-tree checksums + no legacy home adoption (2026-10-05)
 
 A plugin-hardening release driven by the `hermes-agent` catalog review

@@ -1,6 +1,6 @@
 # Process Startup & Dual-Proxy Launch
 
-`aphrodite` startup splits into two halves. The binary half resolves configuration (env > TOML > default), binds every listener before spawning any server, builds one `AppState` per listener with a CCR store backend, and arms a config-file hot-reload watcher. The Hermes plugin half runs once per Hermes home inside `register()`: it loads and smoke-tests the dylib, checks the runtime layout (report-only), materializes the built-in directives, registers hooks and tools, and launches the proxy when it is not already healthy.
+`aphrodite` startup splits into two halves. The binary half resolves configuration (env > TOML > default), binds every listener before spawning any server, builds one `AppState` per listener with a CCR store backend, and arms a config-file reload watcher. The Hermes plugin half runs once per Hermes home inside `register()`: it loads and smoke-tests the dylib, checks the runtime layout (report-only), materializes the built-in directives, registers hooks and tools, and launches the proxy when it is not already healthy.
 
 ## Startup sequence
 
@@ -143,7 +143,7 @@ The layout check and the directives materialize are best-effort by design: eithe
 | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Runtime + subcommand dispatch                                         | `crates/aphrodite/src/main.rs`                                                |
 | Config path resolution + bind-before-spawn                            | `crates/aphrodite/src/main.rs`                                                |
-| Config hot-reload watcher                                             | `crates/aphrodite/src/main.rs`                                                |
+| Config reload watcher                                                 | `crates/aphrodite/src/main.rs`                                                |
 | Per-listener router + serve                                           | `crates/aphrodite/src/main.rs`                                                |
 | `MultiConfig::resolve` / `apply_port_override`                        | `crates/aphrodite/src/config/`                                                |
 | `proxy::build_state` (CCR backend selection)                          | `crates/aphrodite/src/proxy.rs`                                               |

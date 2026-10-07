@@ -21,7 +21,7 @@ sequenceDiagram
     participant RF as replacement_from
 
     H->>PY: transform_tool_result(tool_name, result, status, error_*, duration_ms)
-    PY->>DL: _load_dylib()  (smoke-tested fresh copy if mtime changed)
+    PY->>DL: _load_dylib()  (probe + load-once-per-process)
     DL->>DL: _probe_dylib in subprocess once per unique path -<br/>SIGSEGV stays in the child, never the gateway
     PY->>CJ: aphrodite_hermes_call_hook("transform_tool_result", args_json)
     CJ->>CJ: fn.restype = c_void_p (forced - default c_int truncates 64-bit ptr)

@@ -178,10 +178,10 @@ fn download_dylib(dest_name:&str, dest:&Path) -> Result<(), String> {
 	match status {
 		Ok(s) if s.success() => {
 			println!("  downloaded -> {}", dest.display());
-			// SHA256SUMS-verified (F3): a missing sums file (e.g. a release
-			// cut before this was added) degrades to a loud warning rather
-			// than a hard failure, matching download.sh's own tolerance for
-			// older tags - see verify_download_checksum.
+			// SHA256SUMS-verified (F3 + PR 118488 catalog review): the sums file is
+			// MANDATORY - a missing file, a missing asset entry, or a mismatch is a
+			// hard refusal (Err -> setup exits non-zero), never a skipped check,
+			// matching download.sh/download.ps1's in-tree sums doctrine.
 			if let Err(e) = verify_download_checksum(&release_dir, triple, &remote_name, dest) {
 				let _ = fs::remove_file(dest);
 				return Err(e);
@@ -220,8 +220,14 @@ pub(crate) fn verify_download_checksum(
 	let sums_text = match sums_text {
 		Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
 		_ => {
-			println!("  WARNING: {sums_url} not found - skipping checksum verification for this release");
-			return Ok(());
+			// PR 118488 catalog review: the sums file is mandatory - a
+			// missing file is a HARD REFUSAL, never a skipped check (a
+			// release without its sums cannot be validated, so the
+			// download must not proceed).
+			return Err(format!(
+				"SHA256SUMS-{triple}.txt not found at {sums_url} - refusing to install without the mandatory checksum \
+				 list"
+			));
 		},
 	};
 	let expected = sums_text.lines().find_map(|line| {
@@ -231,8 +237,12 @@ pub(crate) fn verify_download_checksum(
 		(name == asset_name).then(|| hash.to_lowercase())
 	});
 	let Some(expected) = expected else {
-		println!("  WARNING: {asset_name} has no entry in SHA256SUMS-{triple}.txt - skipping checksum check");
-		return Ok(());
+		// PR 118488 catalog review: an asset without a sums entry is a HARD
+		// REFUSAL, never a skipped check - an unverifiable asset must not
+		// be installed.
+		return Err(format!(
+			"{asset_name} has no entry in SHA256SUMS-{triple}.txt - refusing to install an unverifiable asset"
+		));
 	};
 
 	let hash_output = if cfg!(windows) {

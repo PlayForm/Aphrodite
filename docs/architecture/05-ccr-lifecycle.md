@@ -69,7 +69,7 @@ stateDiagram-v2
     note right of Update
       fill_pct = clamp(100 - ema/20, 1..99)*100
       exposed as X-Aphrodite-Fill-Pct + /metrics
-      Live-tunable atomics (config hot-reload):
+      Live-tunable atomics (config reload):
       cache/token/inline thresholds, code_multiplier
     end note
 ```

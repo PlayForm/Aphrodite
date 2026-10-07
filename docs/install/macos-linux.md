@@ -33,7 +33,7 @@ bash download.sh               # auto-detects version + platform
 `BINARY_VERSION` file, the monorepo's own Cargo.toml, or the latest
 published release) and detects your platform too - no Rust toolchain
 needed. You can pin both explicitly:
-`bash download.sh 1.5.1 x86_64-unknown-linux-gnu`. If the proxy never comes
+`bash download.sh 1.6.5 x86_64-unknown-linux-gnu`. If the proxy never comes
 up, see [Troubleshooting](troubleshooting.md#proxy-doesnt-auto-launch).
 
 ## Option 2: `cargo install` + `aphrodite setup`

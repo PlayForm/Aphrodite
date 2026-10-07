@@ -1,8 +1,8 @@
 # CCR Management Endpoints
 
 These loopback-only endpoints let external tools and scripts create, list, and
-delete compressed content entries in the CCR store directly, and hot-reload
-the compression configuration. The Hermes plugin itself compresses and
+delete compressed content entries in the CCR store directly, and re-apply
+the compression configuration live. The Hermes plugin itself compresses and
 retrieves in-process through its dylib bindings - these HTTP routes are for
 anything outside the plugin process.
 

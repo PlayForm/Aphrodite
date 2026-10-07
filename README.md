@@ -13,9 +13,9 @@
 > type-aware classifier, TOML-driven, opt-in config auto-reload.
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/static/v1?label=release&message=v1.6.5&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/static/v1?label=release&message=v1.6.6&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.2.5&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.2.6&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
 [![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE)
 
@@ -32,18 +32,27 @@ No Rust toolchain is required for the common path.
 
 ```sh
 git clone https://github.com/PlayForm/Aphrodite-Hermes.git
-ln -s "$(pwd)/Aphrodite-Hermes" ~/.hermes/plugins/aphrodite
+cd Aphrodite-Hermes
+ln -s "$(pwd)" ~/.hermes/plugins/aphrodite
+bash download.sh # explicit setup step: binary + dylib from GitHub Releases
+cd ..
 hermes plugins enable aphrodite
 hermes
 ```
 
-On first launch the plugin auto-downloads the `aphrodite` binary from
-[releases](https://github.com/PlayForm/Aphrodite/releases).
+Binaries are never shipped in the repository and `register()` never downloads:
+run the explicit setup step `bash download.sh` (or `pwsh ./download.ps1` on
+Windows) from the plugin clone, which fetches the `aphrodite` binary and the
+dylib from [releases](https://github.com/PlayForm/Aphrodite/releases) into
+`~/.hermes/aphrodite/binaries/` with SHA-256 verification. If the binaries are
+missing, the plugin logs the setup command and stays disabled until they are
+present.
 
 > [!IMPORTANT]
 >
-> Use the Hermes plugin method on Windows too - `download.ps1` is a native
-> PowerShell equivalent. See [docs/install/windows.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/windows.md).
+> Use the Hermes plugin method on Windows too - run `pwsh ./download.ps1`
+> (native PowerShell) as the explicit setup step instead of `download.sh`. See
+> [docs/install/windows.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/windows.md).
 
 ### Option B: cargo install (standalone binary)
 
@@ -128,8 +137,9 @@ Four fast layers (classification 40-123 ns; whole compress step sub-millisecond)
 3. **Store** - BLAKE3 → SQLite/in-memory → `<<<CCR:hash|type|size>>>` marker.
 4. **Decide** - agent reads preview, retrieves only when needed.
 
-The context engine auto-compresses middle turns to CCR as the session fills,
-so the agent never hits the context ceiling.
+The context engine's `pre_llm_call` hook auto-compresses overflowing middle
+turns to CCR as the session fills, so the agent never hits the context
+ceiling.
 
 ---
 
@@ -232,7 +242,7 @@ crates/aphrodite/          ← Core engine (binary + cdylib)
   marker.rs                ← Marker parsing, hash normalization, validity checks
   stage2.rs                ← Semantic reduction (JSON minify, build, diff, code)
   struct_extract.rs        ← Code structure extraction (Rust, Python, Go, JS/TS)
-  config.rs / config_loader.rs ← TOML schema, hot-reload, multi-proxy resolution
+  config_loader.rs / config/     ← TOML schema, config reload, multi-proxy resolution
   state.rs                 ← AppState: counters, caches, adaptive EMA state
   directives.rs            ← Behavioral directive registry
   session.rs               ← Session state, turn history
@@ -240,7 +250,7 @@ crates/aphrodite/          ← Core engine (binary + cdylib)
   prefetch.rs              ← Background file prefetch → CCR
   poll_worker.rs           ← Auto-backgrounding of slow tool calls
   flow.rs / setup.rs       ← Plugin bootstrap, `aphrodite setup` installer
-  builtin_directives/      ← Shipped directive markdown (focus, foresight, cleanup, explore, lazy, ccr-handling)
+  builtin_directives/      ← Shipped directive markdown (focus, foresight, cleanup, explore, lazy, lazy-eval, ccr-handling)
 
 crates/aphrodite-hermes/   ← Hermes bridge (cdylib)
   lib.rs                   ← FFI surface, hook dispatch
@@ -306,23 +316,27 @@ Six Hermes hooks drive the plugin (`provides_hooks` in `plugin.yaml`):
 The proxy exposes loopback-only management routes (auth via
 `APHRODITE_MGMT_TOKEN` when set; `/health` and `/metrics` are exempt):
 
-| Route         | Method | Role                                         |
-| :------------ | :----: | :------------------------------------------- |
-| `/health`     |  GET   | Liveness probe (public)                      |
-| `/stats`      |  GET   | JSON counters, EMA, per-type compression     |
-| `/metrics`    |  GET   | Prometheus text format (loopback only)       |
-| `/retrieve`   |  POST  | Resolve `<<<CCR:hash\|type\|size>>>` markers |
-| `/ccr/create` |  POST  | Programmatic CCR creation                    |
-| `/ccr/list`   |  GET   | Catalog listing                              |
-| `/ccr/{hash}` | DELETE | Evict an entry                               |
-| `/reload`     |  POST  | Hot-reload `aphrodite.toml`                  |
-| `/tool/relay` |  POST  | Bidirectional tool relay (token mode)        |
+| Route              | Method | Role                                                       |
+| :----------------- | :----: | :--------------------------------------------------------- |
+| `/health`          |  GET   | Liveness probe (public)                                    |
+| `/health/upstream` |  GET   | Upstream API probe (60s cache)                             |
+| `/version`         |  GET   | Binary version (`CARGO_PKG_VERSION`)                       |
+| `/stats`           |  GET   | JSON counters, EMA, per-type compression                   |
+| `/stats/db`        |  GET   | CCR store statistics                                       |
+| `/metrics`         |  GET   | Prometheus text format (loopback only)                     |
+| `/history`         |  GET   | Request history                                            |
+| `/retrieve`        |  POST  | Resolve `<<<CCR:hash\|type\|size>>>` markers               |
+| `/ccr/create`      |  POST  | Programmatic CCR creation                                  |
+| `/ccr/list`        |  GET   | Catalog listing                                            |
+| `/ccr/{hash}`      | DELETE | Evict an entry                                             |
+| `/reload`          |  POST  | Re-apply live `[compression]` fields from `aphrodite.toml` |
+| `/tool/relay`      |  POST  | Bidirectional tool relay (token mode)                      |
 
 > [!NOTE]
 >
 > All compression logic lives in the Rust dylib; Python is a thin FFI loader.
-> Hot-reload: rebuild the dylib → mtime change detected → next call picks up
-> new code automatically.
+> The dylib is loaded once per process - there is no live reload. A rebuilt
+> dylib takes effect only after the Hermes session is restarted.
 
 > [!NOTE]
 >
@@ -336,48 +350,94 @@ The proxy exposes loopback-only management routes (auth via
 
 Thirteen tools ship with the plugin:
 
-| Tool                        | Description                                              |
-| :-------------------------- | :------------------------------------------------------- |
-| `aphrodite_retrieve`        | Resolve `<<<CCR:hash\|type\|size>>>` markers             |
-| `aphrodite_compress`        | Compress content via CCR with type hint                  |
-| `aphrodite_stats`           | Proxy health, engine status, inline store size           |
-| `aphrodite_rebuild`         | Rebuild binary, kill proxies, restart                    |
-| `aphrodite_files`           | Tracked file references, grouped by tool                 |
-| `aphrodite_diff`            | Conversation turn history with summaries                 |
-| `aphrodite_search`          | Search CCR store by keyword or type                      |
-| `aphrodite_directive`       | List/swap/add/remove/reset behavioral directives         |
-| `aphrodite_test`            | Smoke test suite: quick (1 check), full (3 checks)       |
-| `aphrodite_catalog`         | Full CCR catalog with hashes, types, sizes, previews     |
-| `aphrodite_reclassify`      | Retroactive metadata enrichment for unclassified CCR     |
-| `aphrodite_prefetch`        | Read + compress files on demand; markers returned inline |
-| `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors           |
+| Tool                        | Description                                                          |
+| :-------------------------- | :------------------------------------------------------------------- |
+| `aphrodite_retrieve`        | Resolve `<<<CCR:hash\|type\|size>>>` markers                         |
+| `aphrodite_compress`        | Compress content via CCR with type hint                              |
+| `aphrodite_stats`           | Proxy health, engine status, inline store size                       |
+| `aphrodite_rebuild`         | Report binary/proxy version + a rebuild hint (never rebuilds itself) |
+| `aphrodite_files`           | Tracked file references, grouped by tool                             |
+| `aphrodite_diff`            | Conversation turn history with summaries                             |
+| `aphrodite_search`          | Search CCR store by keyword or type                                  |
+| `aphrodite_directive`       | List/swap/add/remove/reset behavioral directives                     |
+| `aphrodite_test`            | Smoke test suite: quick (1 sample), full (3 samples)                 |
+| `aphrodite_catalog`         | Full CCR catalog with hashes, types, sizes, previews                 |
+| `aphrodite_reclassify`      | Retroactive metadata enrichment for unclassified CCR                 |
+| `aphrodite_prefetch`        | Read + compress files on demand; markers returned inline             |
+| `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors                       |
 
 ---
 
 ## Configuration 🎛️
 
-Everything lives in `aphrodite.toml` - no recompile needed.
-Edit + save (or `POST /reload`) applies changes immediately.
+Configuration lives in `aphrodite.toml`. Two shipped files must stay in sync:
+`aphrodite.toml.example` (repo root - the copy-from example) and
+`crates/aphrodite/templates/aphrodite.toml` (embedded in the binary and
+written by `aphrodite setup`, which substitutes `{cache_port}`/`{token_port}`).
 
-**`aphrodite.toml`**
+Two independent parsers read the file:
+
+- the **Rust HTTP proxy** (`config/proxy.rs`, active when an `aphrodite.toml`
+  is found): `[[proxies]]`, `[defaults]`, and the four live-reload thresholds
+  `tool_threshold_token` / `tool_threshold_cache` / `inline_threshold` /
+  `code_multiplier`, plus `[previews] preview_max_chars`;
+- the **Hermes dylib session** (`config_loader.rs`): the `[compression]`
+  engine/chain-split/poll keys, `[defaults] model` / `api_url`, `[flow]
+budget_chars`, `[directives] active`, `[prompts] session_inject`, and
+  `[previews] preview_max_chars`.
+
+Edit + save (or `POST /reload`) re-applies the four proxy thresholds and the
+preview cap immediately; the dylib re-applies config fields on change only
+when `auto_reload = true`.
+
+**`aphrodite.toml` (key subset - the shipped files document every key)**
 
 ```toml
+[defaults]
+api_url = "https://api.openai.com"   # APHRODITE_API_URL > TOML > fallback
+model = "default-model"              # APHRODITE_MODEL > TOML > fallback
+ccr_ttl_seconds = 3600
+
 [compression]
-tool_threshold_token = 256   # token proxy threshold (bytes)
-tool_threshold_cache = 2048  # cache proxy threshold (bytes)
-terminal_threshold  = 512    # terminal output threshold (bytes)
-inline_threshold    = 1024   # inline-vs-durable CCR storage cutoff (bytes)
-code_multiplier     = 3.0    # multiply threshold for code_* content types
+engine_threshold_pct = 45    # dylib session state (stats/config_get); 100+ = engine-off escape hatch
+tool_threshold_token = 512   # token proxy threshold (bytes) - live-reloadable
+tool_threshold_cache = 4096  # cache proxy threshold (bytes) - live-reloadable
+terminal_threshold  = 1024   # dylib terminal output threshold (bytes)
+inline_threshold    = 2048   # inline-vs-durable CCR storage cutoff - live-reloadable
+code_multiplier     = 3.0    # multiply threshold for code_* content types - live-reloadable
+context_engine      = true   # dylib session status flag (default-on)
+poll_worker = true           # dylib: auto-background slow tool calls
+auto_reload = false          # dylib: watch aphrodite.toml, re-apply config fields
+chain_split = false          # dylib: opt-in fine-grained command splitting
+chain_split_min_segments = 2 # dylib: adaptive split floor (min 2)
+chain_split_max_segments = 6 # dylib: adaptive split cap
+
+[flow]
+budget_chars = 2600          # dylib: hard cap on per-turn injected context
+
+[directives]
+active = ["focus", "foresight"] # empty list seeds focus + foresight + lazy
 ```
 
-Each `[compression]` field is overridable via an `APHRODITE_*` env var
-(see [docs/config/env-vars.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md)).
+Wired `[compression]`/`[defaults]` fields are overridable via `APHRODITE_*`
+env vars (see
+[docs/config/env-vars.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md)).
+
+Reserved keys - parsed but **no consumer**, setting them is a silent no-op
+(kept, marked `DOCUMENTED BUT UNWIRED`): `auto_expand`, `auto_expand_limit`,
+`classifier_poll`, `catalog_mode`, `previews.model_family`,
+`previews.code_structure_map`, `prompts.retrieve_guidance`,
+`prompts.ccr_marker_hint`, `prompts.catalog_intent_hints`. Keys with no
+parser home at all - `compression.prefetch` and the old `[templates.*]`
+sections - were removed from the shipped files (marker/preview formats are
+compiled into the binary, not TOML-configurable).
 
 > [!TIP]
 >
 > **Directives** seed short behavioral instructions injected each turn,
 > swappable mid-conversation via `aphrodite_directive`.
-> Shipped set: `focus`, `foresight`, `cleanup`, `explore`, `lazy-eval`.
+> Built-in set (baked into the binary): `focus`, `foresight`,
+> `ccr-handling`, `cleanup`, `explore`, `lazy`, `lazy-eval`.
 
 ---
 

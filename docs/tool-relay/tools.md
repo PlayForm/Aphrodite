@@ -35,8 +35,9 @@ logic to know about.
 
 All handlers share one session store, so content compressed by a hook or by
 `aphrodite_compress` stays resolvable by `aphrodite_retrieve` for the life of
-the session. The one caveat: markers do not survive a dylib hot-reload, which
-starts a fresh session store. There is also an internal 14th registry entry,
+the session. The one caveat: markers do not survive a session restart - the
+dylib is loaded once per process, so a new session starts a fresh store.
+There is also an internal 14th registry entry,
 `context_engine_pre_llm` - the context engine's own pre-LLM hook, not a tool an
 agent calls directly.
 
@@ -45,7 +46,7 @@ agent calls directly.
 ```json
 {
 	"name": "aphrodite_compress",
-	"description": "Store content in CCR and get a marker back. Hashes the content, classifies it (or trusts the `type` hint), keeps it in the session store, and hands back a resolvable `<<<CCR:hash|type|size>>>` marker - park bulky text here instead of carrying it in context, then pull it back with aphrodite_retrieve when you actually need it. Storage is in-process and sub-millisecond; markers stay resolvable for the life of the session but do not survive a dylib hot-reload. Returns {hash, type, size, preview, marker}.",
+	"description": "Store content in CCR and get a marker back. Hashes the content, classifies it (or trusts the `type` hint), keeps it in the session store, and hands back a resolvable `<<<CCR:hash|type|size>>>` marker - park bulky text here instead of carrying it in context, then pull it back with aphrodite_retrieve when you actually need it. Storage is in-process and sub-millisecond; markers stay resolvable for the life of the session but do not survive a session restart. Returns {hash, type, size, preview, marker}.",
 	"parameters": {
 		"type": "object",
 		"properties": {
@@ -120,7 +121,7 @@ held by the dylib, and a live TCP poll of the two proxy ports.
 
 ```json
 {
-	"version": "1.4.6",
+	"version": "1.6.5",
 	"engine": "aphrodite-hermes",
 	"inline_entries": 0,
 	"markers": 0,
@@ -356,7 +357,7 @@ always empty. Returns
 Takes no arguments. Reports state rather than performing a rebuild - the dylib
 cannot safely rebuild itself mid-session. Returns
 `{status: "ok", version, proxies, hint: "rebuild via `cargo build --release -p
-aphrodite`; dylib hot-reloads on mtime change"}`.
+aphrodite`; restart the Hermes session to pick up the new dylib"}`.
 
 ## Content-type hints
 
