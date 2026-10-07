@@ -73,7 +73,7 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// lives in the runtime home. A stale symlink from older installs (plugin
 	// dir -> runtime home) is removed first so the loader files land as real
 	// files, never through the link into the runtime home.
-//
+	//
 	// Catalog-install guard (PR 118488 review, teknium1): when
 	// <hermes-home>/plugins/aphrodite is the plugin's OWN install dir - a
 	// real directory under the Hermes home placed there by a catalog install
@@ -172,7 +172,7 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 		"  binaries, config, and state: {} (everything the plugin manages)",
 		ctx.aphrodite_dir.display()
 	);
-if plugin_is_catalog_install {
+	if plugin_is_catalog_install {
 		println!(
 			"  plugin dir (catalog install, report-only): {} - loader NOT written by setup; use \
 			 download.sh/download.ps1",

@@ -92,6 +92,20 @@ pub fn runtime_home_opt() -> Option<PathBuf> {
 /// `aphrodite.toml` under the runtime home.
 pub fn config_path() -> PathBuf { runtime_home().join("aphrodite.toml") }
 
+/// Serializes tests that mutate process-global env vars (`HERMES_HOME`,
+/// `APHRODITE_HOME`, `HOME`). ONE shared mutex for the whole crate - a test
+/// in `prefetch.rs` must never observe a transient `HERMES_HOME` written by
+/// a concurrent `home.rs` test (separate per-module guards race: the refusal
+/// check compares against `hermes_home()`, so a stray override silently
+/// turns a refused path into `missing`).
+#[cfg(test)]
+pub(crate) fn env_guard() -> std::sync::MutexGuard<'static, ()> {
+	static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+	G.get_or_init(|| std::sync::Mutex::new(()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// `directives/` under the runtime home (the home-namespace directive store).
 pub fn directives_dir() -> PathBuf { runtime_home().join("directives") }
 
@@ -101,14 +115,6 @@ pub fn ccr_db_path() -> PathBuf { runtime_home().join("ccr.db") }
 #[cfg(test)]
 mod tests {
 	use super::*;
-
-	/// Serializes tests that mutate process-global env vars.
-	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
-		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-		G.get_or_init(|| std::sync::Mutex::new(()))
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner)
-	}
 
 	fn clear_all() {
 		unsafe {
