@@ -46,6 +46,16 @@ the plugin, auto-detect the version and your platform, and fetch the binary
 | **`cargo install aphrodite && aphrodite setup`** | Users with a Rust toolchain who want one command to bootstrap the binary, dylibs, and config (the plugin symlink is a manual follow-up) | [macOS/Linux](macos-linux.md#option-2-cargo-install--aphrodite-setup), [Windows](windows.md#option-2-cargo-install--aphrodite-setup)                                                                                                       |
 | **From source (monorepo)**                       | Working from a full checkout, building the Rust crates yourself                                                                         | Build with cargo, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at `target/{debug,release}/` or copy the build output into the runtime home's `binaries/` - the plugin never downloads and never self-heals the install |
 
+> [!IMPORTANT]
+>
+> **Plugin-catalog installs:** if you installed the plugin through Hermes'
+> plugin catalog, do **not** run `aphrodite setup` against the plugin
+> directory - setup rewrites `~/.hermes/plugins/aphrodite` (hooks-only loader
+>
+> - symlink), which the catalog manages. Fetch the binaries from the
+>   installed plugin directory with `bash download.sh` (or
+>   `pwsh ./download.ps1` on Windows) instead.
+
 ## Guides
 
 | Guide                                 | Covers                                                                                                 |

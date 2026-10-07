@@ -27,7 +27,7 @@ loopback by default.
 - Tool relay is an independent per-listener flag (`--tool-relay` or
   `tool_relay = true` in the TOML), not implied by the mode.
 - Compression thresholds are live values, resolved as env var > TOML
-  `[compression]` > compiled default, and hot-reloaded by `POST /reload` and
+  `[compression]` > compiled default, and re-applied live by `POST /reload` and
   the config-file watcher.
 
 ## Request Lifecycle
@@ -84,7 +84,7 @@ a token estimate; the name is kept for API compatibility.
 | `/ccr/create`      | POST   | `handle_ccr_create`         | Loopback + mgmt token                    |
 | `/ccr/list`        | GET    | `handle_ccr_list`           | Loopback + mgmt token                    |
 | `/ccr/{hash}`      | DELETE | `handle_ccr_delete`         | Loopback + mgmt token                    |
-| `/reload`          | POST   | config hot-reload           | Loopback + mgmt token                    |
+| `/reload`          | POST   | config reload               | Loopback + mgmt token                    |
 | `/favicon.ico`     | GET    | 404                         | Loopback + mgmt token                    |
 | `/robots.txt`      | GET    | `Disallow: /`               | Loopback + mgmt token                    |
 | `/`                | GET    | version JSON                | Loopback + mgmt token                    |

@@ -45,7 +45,7 @@ flowchart LR
 		L7["[directives] active (seeds active_directives)"]
 		L8["[previews] preview_max_chars → preview cap<br/>(env APHRODITE_PREVIEW_MAX_CHARS > TOML; shipped template default 120, key absent = no cap)"]
 	end
-	subgraph hot["HOT-RELOADABLE (config-file watcher, applies to live atomics)"]
+	subgraph hot["CONFIG-RELOADABLE (config-file watcher, applies to live atomics)"]
 		H1["the 4 threshold atomics only"]
 	end
 	subgraph inert["INERT / RESERVED (write-only, never read by the proxy)"]
@@ -63,4 +63,4 @@ Precedence subtleties:
 - `apply_compression` maps the FFI state's `tool_threshold` to the `tool_threshold_token` TOML key and the `APHRODITE_TOOL_THRESHOLD_TOKEN` env var. The old `tool_threshold` names shipped in no TOML, so wiring them as-is would have silently resolved to the default forever.
 - `env_bool` accepts `1`/`true` (case-insensitive) as truthy and everything else as false; `env_parse_warn` warns loudly on a present-but-malformed numeric override instead of silently defaulting.
 - `[previews] preview_max_chars` caps rendered previews (env `APHRODITE_PREVIEW_MAX_CHARS` wins over TOML). The shipped config template sets 120; when the key is absent the preview builder applies no cap. It is applied at proxy startup and whenever the FFI config is (re)loaded - a dylib reload re-applies it, but the config-file watcher does not.
-- The config-file watcher reacts to `Modify` events on `aphrodite.toml` (500 ms debounce), reloads the file, and stores the four resolved thresholds (`cache`, `token`, `inline`, `code_multiplier`) into every live `AppState`'s atomics. Nothing else is hot-updated.
+- The config-file watcher reacts to `Modify` events on `aphrodite.toml` (500 ms debounce), reloads the file, and stores the four resolved thresholds (`cache`, `token`, `inline`, `code_multiplier`) into every live `AppState`'s atomics. Nothing else is updated live.

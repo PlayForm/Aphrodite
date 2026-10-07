@@ -4,7 +4,7 @@ Aphrodite compresses context before it hits the LLM - through a reverse proxy
 for any OpenAI-compatible client, or as a native Hermes plugin with hook-level
 interception. CCR (Compress-Cache-Retrieve) storage, a 30-type classifier,
 context engine, and prefetch pipeline - all under 1ms. This tree documents
-the 1.5.1 binary and 2.1.5 plugin.
+the 1.6.5 binary and 2.2.5 plugin.
 
 ## Getting Started
 
@@ -21,7 +21,7 @@ the 1.5.1 binary and 2.1.5 plugin.
 
 - [Architecture Index](architecture/README.md) - all 11 flow traces: startup,
   chat compression, retrieve, hook/FFI, CCR lifecycle, SSE streaming, config
-  resolution, dylib hot-reload, release CI, components, data model
+  resolution, dylib loading, release CI, components, data model
 
 ## CCR (Compress-Cache-Retrieve)
 
@@ -46,7 +46,7 @@ the 1.5.1 binary and 2.1.5 plugin.
 
 - [aphrodite.toml](config/aphrodite-toml.md) - full schema: `[[proxies]]`,
   `[defaults]`, `[compression]`, `[previews]`, `[templates.*]`, `[flow]`,
-  precedence rules, hot-reload
+  precedence rules, config reload
 - [Environment Variables](config/env-vars.md) - the `APHRODITE_*` registry
   with the documented-but-unwired list
 

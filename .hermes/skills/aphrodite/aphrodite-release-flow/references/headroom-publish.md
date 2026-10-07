@@ -12,12 +12,13 @@ that requires the fork leg (Step I5) to have run first.
 There is NO dispatch input: `Publish.yml` runs via `workflow_run` on Build
 completion, and its headroom-core publish step is unreachable (gated on the
 removed input). Step I5's fork leg (fork crate + parent pin bumped, fork tag
-+ gitlink float done BEFORE the parent tag push) must still run - a stale
-fork version either ships silently (the 1.5.0 published-version trap) or
-fails `Publish-Aphrodite` (its `path + version` dep must already exist on
-crates.io). Never re-trigger for `aphrodite` / `aphrodite-hermes`: the tag →
-Build → Publish chain already ran `cargo publish` for them per the accepted
-Gate R7 trigger audit.
+
+- gitlink float done BEFORE the parent tag push) must still run - a stale
+  fork version either ships silently (the 1.5.0 published-version trap) or
+  fails `Publish-Aphrodite` (its `path + version` dep must already exist on
+  crates.io). Never re-trigger for `aphrodite` / `aphrodite-hermes`: the tag →
+  Build → Publish chain already ran `cargo publish` for them per the accepted
+  Gate R7 trigger audit.
 
 Needs chain (Publish.yml): Test → Publish-Headroom-Core → Publish-Aphrodite
 → Publish-Hermes. The headroom-core CHECK step still runs (index-checked),

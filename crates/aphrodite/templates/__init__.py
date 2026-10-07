@@ -716,7 +716,7 @@ def _ensure_binaries() -> None:
             )
         except Exception as e:
             _log.warning(
-                "failed to run %s (%s) - run `aphrodite setup` to install the aphrodite binaries",
+                "failed to run %s (%s) - install the aphrodite binaries with `bash download.sh` or `pwsh download.ps1`",
                 _download_script(),
                 e,
             )
@@ -724,8 +724,8 @@ def _ensure_binaries() -> None:
         if result.returncode != 0:
             tail = "\n".join(((result.stdout or "") + (result.stderr or "")).splitlines()[-15:])
             _log.warning(
-                "download.sh exited %d - run `aphrodite setup` to install the "
-                "aphrodite binaries; output tail:\n%s",
+                "download.sh exited %d - install the aphrodite binaries with "
+                "`bash download.sh` or `pwsh download.ps1`; output tail:\n%s",
                 result.returncode,
                 tail,
             )
@@ -741,10 +741,10 @@ def _ensure_binaries() -> None:
             missing.append(f"{label} ({p})")
     _log.warning(
         "aphrodite binaries missing (%s) - the plugin will not register. "
-        "Run `aphrodite setup` once to install them into the runtime home "
-        "(explicit setup step; register() never downloads, and the plugin "
-        "never writes into its own directory), or set "
-        "APHRODITE_AUTO_DOWNLOAD=1 for the legacy auto-fetch",
+        "Install them with `bash download.sh` or `pwsh download.ps1` (explicit "
+        "setup step; register() never downloads, and the plugin never writes "
+        "into its own directory), or set APHRODITE_AUTO_DOWNLOAD=1 for the "
+        "legacy auto-fetch",
         "; ".join(missing),
     )
 
@@ -991,8 +991,8 @@ def register(ctx: Any) -> None:
         # register, so we log and return.
         _log.error(
             "aphrodite-hermes dylib could not be loaded (%s) - plugin disabled; "
-            "run `aphrodite setup` to install the binaries into the runtime "
-            "home (explicit setup step), then restart Hermes",
+            "install the binaries with `bash download.sh` or `pwsh download.ps1` "
+            "(explicit setup step), then restart Hermes",
             e,
         )
         return

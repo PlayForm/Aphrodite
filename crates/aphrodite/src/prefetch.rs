@@ -4,7 +4,7 @@
 //! Agent-agnostic: any agent can preload files into the compression store
 //! before they're needed, avoiding round-trips during critical paths.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::state::{AphroditeState, MarkerEntry};
 
@@ -14,9 +14,19 @@ const MAX_PREFETCH_SIZE:u64 = 10 * 1024 * 1024;
 /// Outcome of reading one path, before any state mutation.
 pub enum ReadOutcome {
 	Missing,
+	/// Path refused by the prefetch guard (`.env` / `auth.json` / `~/.ssh` /
+	/// Hermes home / non-file) - never read, never stored.
+	Refused {
+		reason:String,
+	},
 	Error,
-	SkippedSize { size:u64 },
-	Loaded { content:String, size:u64 },
+	SkippedSize {
+		size:u64,
+	},
+	Loaded {
+		content:String,
+		size:u64,
+	},
 }
 
 /// Read every path from disk - no state access, so this never needs to hold
@@ -28,6 +38,9 @@ pub fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
 		.iter()
 		.map(|path_str| {
 			let path = Path::new(path_str);
+			if let Some(reason) = refuse_reason(path) {
+				return (path_str.clone(), ReadOutcome::Refused { reason });
+			}
 			if !path.is_file() {
 				return (path_str.clone(), ReadOutcome::Missing);
 			}
@@ -46,6 +59,70 @@ pub fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
 		.collect()
 }
 
+/// Refuse a path that must never be prefetched - the core-crate equivalent
+/// of the bridge crate's `read_path_guarded`
+/// (crates/aphrodite-hermes/src/tools.rs), same refusal intent, 1:1
+/// semantics, implemented here so the core crate needs no dependency on the
+/// bridge crate:
+///
+/// - `.env` / `auth.json` files, wherever they live (even inside the
+///   workspace - prefetch must never absorb credentials),
+/// - anything under `~/.ssh`,
+/// - anything under the Hermes home (`~/.hermes`, or `$HERMES_HOME` when
+///   set - resolved the same way the bridge does via `home::hermes_home`),
+/// - existing non-file paths (directories etc.).
+///
+/// Returns the refusal reason, or `None` when the path is allowed through
+/// to the size/read checks.
+fn refuse_reason(path:&Path) -> Option<String> {
+	// File-name denylist first - checked on the raw path so a relative
+	// `.env` in the cwd is caught without any resolution.
+	if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+		if name == ".env" || name == "auth.json" {
+			return Some(format!("refusing sensitive file name: {path:?}"));
+		}
+	}
+	let canon = guard_absolute(path);
+	if let Some(home) = dirs::home_dir()
+		&& canon.starts_with(home.join(".ssh"))
+	{
+		return Some(format!("refusing path under ~/.ssh: {path:?}"));
+	}
+	let hh = crate::home::hermes_home();
+	let hh = hh.canonicalize().unwrap_or(hh);
+	if canon.starts_with(&hh) {
+		return Some(format!("refusing path under Hermes home ({}): {path:?}", hh.display()));
+	}
+	if path.exists() && !path.is_file() {
+		return Some(format!("refusing non-file path: {path:?}"));
+	}
+	None
+}
+
+/// Absolute, `~`-expanded form of `path` for the guard's prefix checks:
+/// canonicalized when the path resolves (so `..`/symlinks can't dodge the
+/// checks), otherwise the cwd-joined absolute path (a refusal like
+/// `~/.ssh/id_rsa` must hold even before the file exists). Tilde expansion
+/// mirrors `home.rs`'s `expand_tilde`.
+fn guard_absolute(path:&Path) -> PathBuf {
+	let s = path.to_string_lossy();
+	let expanded:PathBuf = if s == "~" {
+		dirs::home_dir().unwrap_or_else(|| path.to_path_buf())
+	} else if let Some(rest) = s.strip_prefix("~/")
+		&& let Some(home) = dirs::home_dir()
+	{
+		home.join(rest)
+	} else {
+		path.to_path_buf()
+	};
+	let abs = if expanded.is_absolute() {
+		expanded
+	} else {
+		std::env::current_dir().map(|c| c.join(&expanded)).unwrap_or(expanded)
+	};
+	abs.canonicalize().unwrap_or(abs)
+}
+
 /// Classify and store already-read file contents into `state`. Pure state
 /// mutation + JSON assembly - no I/O, so this is the only part that needs
 /// the lock.
@@ -54,6 +131,7 @@ pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutc
 	let mut results = Vec::with_capacity(total);
 	let mut loaded = 0u32;
 	let mut skipped_size = 0u32;
+	let mut refused = 0u32;
 	let mut missing = 0u32;
 
 	for (path_str, outcome) in outcomes {
@@ -61,6 +139,14 @@ pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutc
 			ReadOutcome::Missing | ReadOutcome::Error => {
 				missing += 1;
 				results.push(serde_json::json!({"path": path_str, "status": "missing"}));
+			},
+			ReadOutcome::Refused { reason } => {
+				refused += 1;
+				results.push(serde_json::json!({
+					"path": path_str,
+					"status": "refused",
+					"reason": reason,
+				}));
 			},
 			ReadOutcome::SkippedSize { size } => {
 				skipped_size += 1;
@@ -116,6 +202,7 @@ pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutc
 		"total": total,
 		"loaded": loaded,
 		"skipped_size": skipped_size,
+		"refused": refused,
 		"missing": missing,
 		"results": results,
 		// Report 05 F11: prefetched content joins the same byte-budgeted
@@ -201,5 +288,111 @@ mod tests {
 		let r = prefetch_files(&mut s, &[src, "/nonexistent/abc".to_string()]);
 		assert_eq!(r["loaded"], 1);
 		assert_eq!(r["missing"], 1);
+	}
+
+	// ── Teknium1 review ask 1: prefetch applies the same guard as
+	// `aphrodite_retrieve` (`read_path_guarded` semantics, implemented here
+	// in the core crate): refuse `.env` / `auth.json` / `~/.ssh` /
+	// Hermes-home / non-file paths with a distinct `refused` outcome. ──
+
+	/// Serializes tests that mutate process-global env vars (`HERMES_HOME`),
+	/// same pattern as `home.rs`'s `env_guard`.
+	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
+		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+		G.get_or_init(|| std::sync::Mutex::new(()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner)
+	}
+
+	#[test]
+	fn test_prefetch_refuses_dot_env() {
+		// Exact file name `.env` is refused even though it exists and is
+		// small - prefetch must never absorb credentials.
+		let dir = std::env::temp_dir().join(format!("aphrodite_prefetch_dotenv_{}", std::process::id()));
+		std::fs::create_dir_all(&dir).unwrap();
+		let path = dir.join(".env");
+		std::fs::write(&path, "SECRET=value\n").unwrap();
+
+		let mut s = AphroditeState::default();
+		let r = prefetch_files(&mut s, &[path.to_string_lossy().to_string()]);
+		assert_eq!(r["refused"], 1, "dot-env must be refused: {r:?}");
+		assert_eq!(r["loaded"], 0);
+		assert_eq!(r["results"][0]["status"], "refused");
+		assert!(r["results"][0]["reason"].as_str().unwrap().contains(".env"));
+
+		let _ = std::fs::remove_dir_all(&dir);
+	}
+
+	#[test]
+	fn test_prefetch_refuses_auth_json() {
+		let dir = std::env::temp_dir().join(format!("aphrodite_prefetch_auth_{}", std::process::id()));
+		std::fs::create_dir_all(&dir).unwrap();
+		let path = dir.join("auth.json");
+		std::fs::write(&path, "{\"token\":\"x\"}\n").unwrap();
+
+		let mut s = AphroditeState::default();
+		let r = prefetch_files(&mut s, &[path.to_string_lossy().to_string()]);
+		assert_eq!(r["refused"], 1, "auth.json must be refused: {r:?}");
+		assert_eq!(r["loaded"], 0);
+		assert_eq!(r["results"][0]["status"], "refused");
+		assert!(r["results"][0]["reason"].as_str().unwrap().contains("auth.json"));
+
+		let _ = std::fs::remove_dir_all(&dir);
+	}
+
+	#[test]
+	fn test_prefetch_refuses_ssh() {
+		// Refusal is by `~/.ssh` prefix, so the file need not exist.
+		let home = dirs::home_dir().expect("test machine has a home");
+		let abs = home.join(".ssh").join("id_rsa");
+		let mut s = AphroditeState::default();
+		let r = prefetch_files(&mut s, &[abs.to_string_lossy().to_string()]);
+		assert_eq!(r["refused"], 1, "~/.ssh path must be refused: {r:?}");
+		assert_eq!(r["results"][0]["status"], "refused");
+
+		// The literal tilde form must be refused too.
+		let r2 = prefetch_files(&mut s, &["~/.ssh/id_rsa".to_string()]);
+		assert_eq!(r2["refused"], 1, "tilde ~/.ssh path must be refused: {r2:?}");
+	}
+
+	#[test]
+	fn test_prefetch_refuses_hermes_home() {
+		// Default Hermes home (`~/.hermes`): refusal is by prefix, no file
+		// needed on disk.
+		let home = dirs::home_dir().expect("test machine has a home");
+		let p = home.join(".hermes").join("aphrodite").join("tokens.json");
+		let mut s = AphroditeState::default();
+		let r = prefetch_files(&mut s, &[p.to_string_lossy().to_string()]);
+		assert_eq!(r["refused"], 1, "~/.hermes path must be refused: {r:?}");
+		assert_eq!(r["results"][0]["status"], "refused");
+
+		// `$HERMES_HOME` override must be honored.
+		let _g = env_guard();
+		let prior = std::env::var_os("HERMES_HOME");
+		let dir = std::env::temp_dir().join(format!("aphrodite_prefetch_hh_{}", std::process::id()));
+		std::fs::create_dir_all(&dir).unwrap();
+		std::fs::write(dir.join("secrets.toml"), "token = \"x\"\n").unwrap();
+		unsafe { std::env::set_var("HERMES_HOME", &dir) };
+		let r2 = prefetch_files(&mut s, &[dir.join("secrets.toml").to_string_lossy().to_string()]);
+		assert_eq!(r2["refused"], 1, "$HERMES_HOME path must be refused: {r2:?}");
+		match prior {
+			Some(v) => unsafe { std::env::set_var("HERMES_HOME", v) },
+			None => unsafe { std::env::remove_var("HERMES_HOME") },
+		}
+		let _ = std::fs::remove_dir_all(&dir);
+	}
+
+	#[test]
+	fn test_prefetch_refuses_non_file_directory() {
+		// An existing directory is a non-file path - refused, distinct from
+		// a missing file (which stays `missing`).
+		let dir = std::env::temp_dir().join(format!("aphrodite_prefetch_dir_{}", std::process::id()));
+		std::fs::create_dir_all(&dir).unwrap();
+
+		let mut s = AphroditeState::default();
+		let r = prefetch_files(&mut s, &[dir.to_string_lossy().to_string()]);
+		assert_eq!(r["refused"], 1, "directory must be refused: {r:?}");
+
+		let _ = std::fs::remove_dir_all(&dir);
 	}
 }

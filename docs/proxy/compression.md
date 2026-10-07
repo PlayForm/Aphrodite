@@ -242,7 +242,7 @@ from the classifier is always honored as-is.
 
 The rendered preview length is capped by `[previews] preview_max_chars`
 (`APHRODITE_PREVIEW_MAX_CHARS` env var, applied end-to-end including
-hot-reload). See also
+config reload). See also
 [CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/content-types.md) for the underlying type taxonomy.
 
 ## 6. EMA Update

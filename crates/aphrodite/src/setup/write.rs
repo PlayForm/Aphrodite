@@ -26,9 +26,9 @@ pub(crate) fn write_plugin_yaml(ctx:&SetupCtx, args:&SetupArgs) -> Result<(), Se
 	let yaml = format!(
 		r#"name: aphrodite
 version: {version}
-description: "CCR compression plugin - 13 tools, context engine, TOML-driven templates."
+description: "CCR compression plugin - 28-type classifier, 13 tools, context engine, TOML-driven templates. Disclosure - pre_tool_call auto-backgrounds long terminal/process commands (modify: background=true, notify_on_complete=true) and rewrites chained terminal commands when enabled."
 kind: standalone
-min_hermes_version: "0.16.0"
+requires_hermes: ">=0.20.2"
 requires_hooks: true
 provides_hooks:
   - on_session_start

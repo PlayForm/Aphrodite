@@ -29,7 +29,7 @@ Verification (retrospective), What Ships, and Links.
   "no Windows release" - the slow Windows leg is a timing race, and
   Build.yml's `Finalize` job fails the release if the matrix is incomplete.
 - **Contributor credit:** co-authored work carries `Co-authored-by: Name
-  <email>` trailers; issue-fixing changes reference `Fixes #N` in the change
+<email>` trailers; issue-fixing changes reference `Fixes #N` in the change
   bullet or commit so the note links back to the issue.
 - Never ship a bare compare link with zero description.
 - Never use backticks with `gh release create --notes` - the shell interprets

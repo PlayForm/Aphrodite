@@ -335,7 +335,7 @@ load-balancer probes work. Does not call the upstream - see
 	"status": "healthy",
 	"ccr": true,
 	"mode": "token",
-	"version": "1.4.6",
+	"version": "1.6.5",
 	"fill_pct": 90.0
 }
 ```
