@@ -77,10 +77,10 @@ pub fn read_paths(paths:&[String]) -> Vec<(String, ReadOutcome)> {
 fn refuse_reason(path:&Path) -> Option<String> {
 	// File-name denylist first - checked on the raw path so a relative
 	// `.env` in the cwd is caught without any resolution.
-	if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-		if name == ".env" || name == "auth.json" {
-			return Some(format!("refusing sensitive file name: {path:?}"));
-		}
+	if let Some(name) = path.file_name().and_then(|n| n.to_str())
+		&& (name == ".env" || name == "auth.json")
+	{
+		return Some(format!("refusing sensitive file name: {path:?}"));
 	}
 	let canon = guard_absolute(path);
 	if let Some(home) = dirs::home_dir()
