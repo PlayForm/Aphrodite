@@ -86,3 +86,38 @@ Per `aphrodite-release-flow` (read `.hermes/skills/aphrodite/aphrodite-release-f
 - `.hermes/release-notes/vNEXT-draft.md`
 - Ceremony: git refs only (Current sync commits, tag `Aphrodite/v1.6.6`, plugin tag `v2.2.6`), `BINARY_VERSION` LAST
 - Catalog PR: `~/Developer/Application/NikolaRHristov/hermes-agent/plugin-catalog/aphrodite.yaml`
+
+## 5. Session addendum (2026-10-07, pre-merge verification - committed on Development)
+
+Everything below was live-verified this session and is COMMITTED on Development
+(the auto-committer swept the bump); the merge ceremony was NOT started.
+
+- **Bump committed:** parent `2675ada6` (`1031f238` "Stage v1.6.6 bump, changelog,
+  and release handoff" + `2675ada6` gitlink bump) - crates 1.6.6, hermes pin 1.6.6,
+  package.json 1.6.6, README badges v1.6.6/v2.2.6, CHANGELOG v1.6.6 entry,
+  vNEXT-draft.md rewritten. Submodule `90b460f` on Development - plugin.yaml 2.2.6 +
+  install_message + plugin README badge v2.2.6. `BINARY_VERSION` still 1.6.4
+  (bump-LAST honored). Gitlink synced, no `+`.
+- **Gates run:** `cargo check -p aphrodite -p aphrodite-hermes` green (7.24s);
+  `cargo build --release` green (17.56s) -> `aphrodite v1.6.6`; stale-version sweep
+  clean; drift-guard byte-identical; prettier clean on CHANGELOG + vNEXT-draft.
+- **Local re-install done:** fresh binary + 2 dylibs in `~/.hermes/aphrodite/binaries/`
+  (atomic-rename trick needed - in-place `cp` over the RUNNING proxy's mapped file
+  triggers taskgated SIGKILL "Code Signature Invalid"; always `cp` to `.new` + `mv`).
+  `aphrodite setup` from fresh binary: catalog-install guard live (report-only, review
+  ask 2a), installed BINARY_VERSION pin 1.6.6, plugin registered, exit 1 only on the
+  expected 9797 port conflict. Installed loader plugin.yaml is OLD-format until the
+  catalog re-pin (step 6) - report-only by design, not a miss.
+- **B4 audit (I1): PASS** - zero identity hits; Current gitlink `387c6eb` = plugin
+  Current tip; Development gitlink `90b460f` = plugin Development tip.
+- **Gate R7 (R2) at Source/Current:** tag push -> Build.yml (release + 12 assets +
+  Finalize child push) -> Publish.yml `workflow_run` (cargo publish aphrodite +
+  aphrodite-hermes); headroom-core publish step unreachable; Auto.yml pushes Current.
+- **Fork (I5) recommendation:** `aphrodite-headroom-core` 0.1.3 live; fork delta = 2
+  dep-only commits (fastembed->5, crate refresh) past `aphrodite-v0.10.0`. NO fork bump
+  this cycle (matches 1.6.4 precedent; a pin to unpublished 0.1.4 would fail
+  Publish-Aphrodite). RELEASE-CYCLE.md §5 is stale (says 0.1.3 unpublished) - update at
+  ceremony time as doc-only reconciliation.
+- **Next agent starts at I2** (plugin sync `release: sync v2.2.6`) in the release
+  worktree on Current; pause at tag (R4) per the approval boundary. All 6 review asks
+  and 4 commitment points from the original handoff remain unchanged.
