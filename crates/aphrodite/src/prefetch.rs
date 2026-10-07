@@ -295,15 +295,6 @@ mod tests {
 	// in the core crate): refuse `.env` / `auth.json` / `~/.ssh` /
 	// Hermes-home / non-file paths with a distinct `refused` outcome. ──
 
-	/// Serializes tests that mutate process-global env vars (`HERMES_HOME`),
-	/// same pattern as `home.rs`'s `env_guard`.
-	fn env_guard() -> std::sync::MutexGuard<'static, ()> {
-		static G:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-		G.get_or_init(|| std::sync::Mutex::new(()))
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner)
-	}
-
 	#[test]
 	fn test_prefetch_refuses_dot_env() {
 		// Exact file name `.env` is refused even though it exists and is
@@ -357,8 +348,15 @@ mod tests {
 
 	#[test]
 	fn test_prefetch_refuses_hermes_home() {
-		// Default Hermes home (`~/.hermes`): refusal is by prefix, no file
-		// needed on disk.
+		// Hold the SHARED env guard (crate::home::env_guard - one mutex for
+		// every env-mutating test) for the WHOLE test, and clear HERMES_HOME
+		// first: the default-home refusal must never observe a concurrent
+		// test's transient override (that would silently turn `refused` into
+		// `missing`). Default Hermes home (`~/.hermes`): refusal is by
+		// prefix, no file needed on disk.
+		let _g = crate::home::env_guard();
+		let prior = std::env::var_os("HERMES_HOME");
+		unsafe { std::env::remove_var("HERMES_HOME") };
 		let home = dirs::home_dir().expect("test machine has a home");
 		let p = home.join(".hermes").join("aphrodite").join("tokens.json");
 		let mut s = AphroditeState::default();
@@ -367,8 +365,6 @@ mod tests {
 		assert_eq!(r["results"][0]["status"], "refused");
 
 		// `$HERMES_HOME` override must be honored.
-		let _g = env_guard();
-		let prior = std::env::var_os("HERMES_HOME");
 		let dir = std::env::temp_dir().join(format!("aphrodite_prefetch_hh_{}", std::process::id()));
 		std::fs::create_dir_all(&dir).unwrap();
 		std::fs::write(dir.join("secrets.toml"), "token = \"x\"\n").unwrap();
