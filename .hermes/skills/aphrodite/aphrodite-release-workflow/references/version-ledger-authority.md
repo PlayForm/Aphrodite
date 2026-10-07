@@ -53,6 +53,14 @@ the drift.
   README badges (they drift - the badge may lag two minors), then
   `BINARY_VERSION` LAST. The ceremony in `aphrodite-release-flow` executes
   this order; this ledger is the check it runs against.
+- **Sweep BOTH READMEs for badges - the plugin submodule's own badge is a
+  separate surface from the parent's.** The plugin track's "README badge"
+  row means TWO files: `README.md` (parent, release + plugin badges) AND
+  `plugins/aphrodite/README.md` (the plugin repo's own badge). The plugin
+  README badge is the one that silently lags - a bump commit that touches
+  only `plugin.yaml` leaves it at the previous minor. Grep both trees for
+  the old version string before claiming the bump done
+  (`grep -rn "<old-ver>" README.md plugins/aphrodite/README.md`).
 - **Never reuse a claimed version:** check the registry before claiming a
   number (Gate R7 / owning SKILL.md section 3); a burned crates.io version
   is gone forever.

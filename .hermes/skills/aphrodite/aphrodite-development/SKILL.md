@@ -413,11 +413,20 @@ gates). The per-mode lists are the worked criteria in
 
 ## Validate-phase pitfalls
 
-- The repo's dev skills live in `.hermes/skills/` (Development branch only,
+- **The repo's dev skills live in `.hermes/skills/` (Development branch only,
   never shipped with the plugin) - edit the files directly with
   `write_file`/`patch`, never via `skill_manage`; `skill_manage` writes to the
   profile skill store, not the repo tree, so the change would not land in
-  `.hermes/skills/`.
+  `.hermes/skills/`.\n- **The plugin submodule must ALWAYS sit on its branch**
+  (`plugins/aphrodite` on `Development`, remote `Source`; the parent gitlink
+  auto-updates on the next parent-side commit). A commit made while the
+  submodule is on a detached HEAD lands on no branch and blocks every push
+  (`git sync` fails: \"You are not currently on a branch\"). Before any
+  submodule work, verify `git -C plugins/aphrodite symbolic-ref -q HEAD`;
+  if a detached commit already happened, fast-forward the branch onto it
+  (`git merge-base --is-ancestor <tip> <sha>` first, then
+  `git branch -f Development <sha>` + `git checkout Development`) - never
+  rewrite history to \"fix\" it.
 - Never assume a new import is safe - a symbol the target module lacks
   silently kills the plugin at session start. After adding imports, test
   `python3 -c "import aphrodite"`.
