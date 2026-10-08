@@ -130,3 +130,5 @@ placeholder/
 .hermes/examples/proxies/*.md
 .hermes/examples/templates/*.md
 .hermes/skills/**/__pycache__/
+
+Site/
