@@ -1,6 +1,6 @@
 # Environment Variables
 
-Aphrodite reads a set of `APHRODITE_*` environment variables (plus a few non-prefixed ones) across three surfaces: the Rust proxy, the `aphrodite setup` subcommand, and the Hermes-plugin dylib session. This page lists every variable with a live reader, what precedence applies, and what it gates. Variables with no reader anywhere are listed at the bottom under "Documented but currently unwired" - setting those is a silent no-op.
+Aphrodite reads a set of `APHRODITE_*` environment variables (plus a few non-prefixed ones) across three surfaces: the Rust proxy, the `aphrodite setup` subcommand, and the Hermes-plugin dylib session. This page lists every variable with a live reader, what precedence applies, and what it gates. Variables with no reader anywhere are listed at the bottom under "Documented but currently unwired (WIP)" - setting those is a silent no-op.
 
 Precedence rule: where it says "env > TOML > default", the env var wins if set and parses; otherwise the matching `aphrodite.toml` key wins if present; otherwise the compiled-in default applies. A present-but-malformed value (e.g. `APHRODITE_CCR_TTL=abc`) is never silently treated as absent - it logs a warning and falls through to the next precedence level. Boolean env vars share one truthiness rule everywhere: `"1"` / `"true"` (case-insensitive) is true; anything else present, or absent, is false.
 
@@ -100,7 +100,7 @@ source (`runtime home: <path> (decided by ...)`); on an upgrade the pre-2.2
 `~/.hermes/aphrodite` home is adopted (with a warning) when it holds the
 existing install and the Hermes-home-derived one does not.
 
-## Documented but currently unwired
+## Documented but currently unwired (WIP)
 
 These names appear in older docs or scripts but have **no reader anywhere** in this codebase as of this writing - setting them is a silent no-op. Do not document them alongside the live vars above without this caveat; if one gets wired up, move its row into the tables above.
 
