@@ -224,3 +224,13 @@ test result: ok. 3 passed; 0 failed; 0 ignored
 
 → unwrapped to the message, type=`build_error` (contains `error: could not`),
 threshold BASE
+
+### Marker-shaped preview (the doubling regression, fixed in v1.3.4)
+
+```text
+[text:[text:53L 1913B]]
+```
+
+→ an already-self-describing preview re-wrapped in `render_marker`; the fix
+emits the preview exactly once (regression-tested). Shown here as the type
+catalog's known failure shape, sourced from CHANGELOG.md v1.3.4.
