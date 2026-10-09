@@ -140,6 +140,40 @@ A generic proxy compresses HTTP response bodies. That helps, but:
 | Works with              | Hermes only                                    | Any OpenAI-compatible client            |
 | Setup                   | `hermes plugins enable aphrodite`              | `OPENAI_BASE_URL=http://localhost:9798` |
 
+## What each configuration buys
+
+Three configurations, three trade-offs - each buys something the previous one
+does not have:
+
+**Hermes alone.** Nothing intercepts tool output. Every file read, build log,
+and JSON blob enters the message history raw, because nothing stands between
+the tool and the model - the agent spends its token budget reading noise
+instead of reasoning.
+
+**Hermes + Aphrodite.** The plugin lane intercepts output before it becomes
+message history: `transform_tool_result` classifies, stores, and replaces raw
+output with a type-aware marker (~15 tokens instead of hundreds), the agent
+retrieves the full content only when it actually needs it, and `pre_llm_call`
+injects directives, nudges, and the recall catalog under a hard byte budget.
+Measured over 200 real Hermes sessions: 26.9% of all context tokens
+deflected, a median session saved ratio of 22.9%, and ~22,921 tokens saved
+per API call. The trade-off is stated plainly: the hooks are Hermes'
+contract - no other client can register them, so this lane works with Hermes
+only.
+
+**Hermes + Aphrodite + the Aphrodite proxy.** The plugin already spawns both
+listeners, so the third configuration runs without extra setup: point
+`base_url` at `:9798` and any OpenAI-compatible client gets the same CCR
+compression over plain HTTP. That is the agent-to-agent path - a second
+agent, a script, or an external tool can converse through the same compressed
+channel, share the persistent SQLite store (which survives a restart; the
+plugin lane's inline store is session-scoped), and call the tool relay to
+retrieve or create CCR entries. The limit is real too: the proxy only sees
+HTTP traffic - no tool-output interception, no terminal compression, no
+directives, no context engine, and SSE streams pass through uncompressed. The
+proxy extends the stack to other callers; it does not replace the hooks
+inside Hermes.
+
 ## What the agent sees
 
 Without Aphrodite, the agent's context fills with raw tool output:
