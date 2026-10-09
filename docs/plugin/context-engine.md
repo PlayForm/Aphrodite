@@ -66,6 +66,12 @@ Threshold semantics (per the shipped manifest comment): `-1` always
 compresses, `0` disables, `>0` is the fill percentage. Environment overrides
 TOML, which overrides the default.
 
+**WIP**: `engine_protect_first`, `engine_protect_last`, and `engine_min_msgs`
+are write-only - parsed into the dylib session state and echoed for
+visibility, but never consulted by any compression decision (see
+[aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md),
+the `engine_*` family note).
+
 ## See also
 
 - [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md) - where the actual per-turn compression happens

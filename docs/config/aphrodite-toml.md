@@ -120,30 +120,30 @@ The compiled defaults apply when neither env nor TOML sets a value; the shipped 
 | `chain_split_max_segments` | Cap for the adaptive split threshold                                                                         | `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS` | `6`     |
 | `context_engine`           | Status flag exposed via `aphrodite_stats` / `aphrodite_config_get`; the standalone HTTP proxy never reads it | `APHRODITE_CONTEXT_ENGINE`           | `true`  |
 
-The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_protect_last`, `engine_min_msgs`) is parsed into the dylib session state and exposed the same way, but is **not consulted by any compression decision** - it is populated for visibility, not load-bearing. (`engine_threshold_pct` has no effect on the engine; the shipped example sets it to 45 as the documented value, with 100+ as the escape hatch to disable engine compression entirely.)
+The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_protect_last`, `engine_min_msgs`) is parsed into the dylib session state and exposed the same way, but is **not consulted by any compression decision (WIP)** - it is populated for visibility, not load-bearing. (`engine_threshold_pct` has no effect on the engine; the shipped example sets it to 45 as the documented value, with 100+ as the escape hatch to disable engine compression entirely.)
 
-**Not read by anything** (parsed for schema compatibility, echoed by `/reload` for visibility, no consumer): `auto_expand`, `auto_expand_limit`, `catalog_mode` (catalog mode is whatever the caller passes per-request), `classifier_poll`, `prefetch` (the `aphrodite_prefetch` tool exists regardless of this key).
+**Not read by anything (WIP)** (parsed for schema compatibility, echoed by `/reload` for visibility, no consumer): `auto_expand`, `auto_expand_limit`, `catalog_mode` (catalog mode is whatever the caller passes per-request), `classifier_poll`, `prefetch` (the `aphrodite_prefetch` tool exists regardless of this key).
 
 ## `[previews]` and `[prompts]`
 
 | Section      | Field                  | Meaning                                                                                        | Status                                                                              |
 | ------------ | ---------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `[previews]` | `preview_max_chars`    | Caps the rendered preview string, in chars; absent/0 = unlimited                               | Wired (env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > unlimited; shipped example `120`) |
-| `[previews]` | `model_family`         | `"compact"` \| `"code_first"` \| `"balance"` - preview template family                         | Reserved - no reader                                                                |
-| `[previews]` | `code_structure_map`   | Include function/struct/class signatures in code previews                                      | Reserved - no reader                                                                |
-| `[previews]` | `rust_preview_lines`   | Lines of Rust source to include in previews                                                    | Reserved - no reader                                                                |
+| `[previews]` | `model_family`         | `"compact"` \| `"code_first"` \| `"balance"` - preview template family                         | Reserved - no reader (WIP)                                                          |
+| `[previews]` | `code_structure_map`   | Include function/struct/class signatures in code previews                                      | Reserved - no reader (WIP)                                                          |
+| `[previews]` | `rust_preview_lines`   | Lines of Rust source to include in previews                                                    | Reserved - no reader (WIP)                                                          |
 | `[prompts]`  | `session_inject`       | First-turn orientation text injected by `pre_llm_call` on turn 0; `""` disables                | Wired (env `APHRODITE_SESSION_INJECT` > TOML > shipped builtin)                     |
-| `[prompts]`  | `retrieve_guidance`    | `"minimal"` \| `"standard"` \| `"verbose"` - how much the system prompt explains CCR retrieval | Reserved - no reader                                                                |
-| `[prompts]`  | `ccr_marker_hint`      | Append a retrieval hint after markers                                                          | Reserved - no reader                                                                |
-| `[prompts]`  | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output                                           | Reserved - no reader                                                                |
+| `[prompts]`  | `retrieve_guidance`    | `"minimal"` \| `"standard"` \| `"verbose"` - how much the system prompt explains CCR retrieval | Reserved - no reader (WIP)                                                          |
+| `[prompts]`  | `ccr_marker_hint`      | Append a retrieval hint after markers                                                          | Reserved - no reader (WIP)                                                          |
+| `[prompts]`  | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output                                           | Reserved - no reader (WIP)                                                          |
 
-"Reserved - no reader" means the values parse cleanly but nothing in the current codebase reads them back out; changing them does not change behavior, so treat them as reserved until that's confirmed. `[previews] preview_max_chars` and `[prompts] session_inject` are the two keys in these sections that do have live effects.
+"Reserved - no reader (WIP)" means the values parse cleanly but nothing in the current codebase reads them back out; changing them does not change behavior, so treat them as reserved until that's confirmed. `[previews] preview_max_chars` and `[prompts] session_inject` are the two keys in these sections that do have live effects.
 
 ## `[templates.*]`
 
 The shipped example config carries a large `[templates.preview.*]` / `[templates.marker]` / `[templates.prompts]` / `[templates.reverse]` block of per-content-type format strings, with a variable reference (`{type}`, `{ln}`, `{size}`, `{hash}`, `{fns}`, `{sigs}`, etc.) in its header comment.
 
-Nothing in the codebase renders previews from these templates - preview strings are generated internally. If you're editing `[templates.*]` expecting it to change preview output, verify against your running version first; treat the section as reserved/aspirational rather than functioning configuration.
+Nothing in the codebase renders previews from these templates - preview strings are generated internally. If you're editing `[templates.*]` expecting it to change preview output, verify against your running version first; treat the section as reserved/aspirational (WIP) rather than functioning configuration.
 
 ## `[directives]`
 
