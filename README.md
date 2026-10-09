@@ -192,7 +192,7 @@ the longer content stays visible in context before being compressed:
 | Tier           | Types                                                    |    Multiplier     |
 | :------------- | :------------------------------------------------------- | :---------------: |
 | Error          | `error`                                                  |        ×8         |
-| Code           | `code_rust`, `code_python`, `code_go`, `code_js`, `code` |        ×4         |
+| Code           | `code_rust`, `code_python`, `code_go`, `code_js`, `code` |       ×3.0        |
 | Diff / tracked | `diff`, `git`, `text`                                    |        ×2         |
 | Default        | `tool_output`, `json`, everything else                   |        ×1         |
 | Noisy (BASE)   | `linter`, `build_output`, `log`                          | ×1 (never halved) |
