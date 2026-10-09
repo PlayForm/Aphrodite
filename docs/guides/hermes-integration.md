@@ -1,9 +1,14 @@
 # Hermes Integration
 
 Aphrodite connects to Hermes Agent as a native plugin, not as a proxy you
-point a client at. The plugin is a thin Python loader: it registers six
-hooks, thirteen tools, and an optional context engine with Hermes, then
-forwards every call into a Rust dylib that holds all of the actual behavior.
+point a client at.
+
+It is the reason the interception lives inside the turn: tool output never
+hits a wire, so only hook-level registration can catch it before it becomes
+message history. The plugin is a thin Python loader: it registers six hooks,
+thirteen tools, and an optional context engine with Hermes, then forwards
+every call into a Rust dylib that holds all of the actual behavior.
+
 Two proxy processes - a cache proxy and a token proxy - run alongside as
 subprocesses, and a canonical runtime home under `~/.hermes/aphrodite/`
 holds the binaries, config, CCR database, directives, and logs.

@@ -6,9 +6,11 @@ dylib holds all of the actual behavior and replies with JSON that the Python
 module hands back to Hermes.
 
 Registration is driven by the dylib's hook list: on plugin load the shim asks
-the dylib for its hook names and registers one callback per name, so the six
-hooks below are always registered together. `plugin.yaml` declares the same
-set under `provides_hooks`.
+the dylib for its hook names and registers one callback per name.
+
+It is the reason the six hooks below are always registered together: the
+dispatch surface is the dylib's own contract, and `plugin.yaml` declares the
+same set under `provides_hooks`.
 
 | Hook                        | Purpose                                                    | When it fires                  |
 | --------------------------- | ---------------------------------------------------------- | ------------------------------ |
