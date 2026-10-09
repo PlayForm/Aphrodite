@@ -69,7 +69,7 @@ centers.
 
 ## What the LLM Sees
 
-```
+```rust
 use std::sync::Arc;
 use axum::{Router, extract::State};
 fn main() -> anyhow::Result<()> {
