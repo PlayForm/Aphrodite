@@ -174,7 +174,7 @@ log output stays fully visible because a coding session needs to read it.
 ### JSON envelope (proxy path)
 
 ```json
-{ "output": "Compiling aphrodite v1.6.5", "exit_code": 0 }
+{ "output": "Compiling aphrodite v1.6.6", "exit_code": 0 }
 ```
 
 → type=`tool_output` (contains `exit_code`), threshold ×1
@@ -192,7 +192,7 @@ pub fn main() -> Result<()> {
 ### Build output (proxy path)
 
 ```text
-   Compiling aphrodite v1.6.5
+   Compiling aphrodite v1.6.6
    Compiling headroom-core v1.0.0
     Finished release [optimized] target(s) in 12.34s
 ```

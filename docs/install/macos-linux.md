@@ -12,6 +12,15 @@ The plugin is a pure loader: it does **not** bundle the binary or the dylib.
 into the canonical runtime home `~/.hermes/aphrodite/binaries/` - never into
 the plugin directory.
 
+**Or skip the clone entirely:** the plugin is in the Hermes plugin catalog.
+`hermes plugins install aphrodite` checks out the catalog entry's reviewed,
+pinned commit (answer yes at the `Enable now?` prompt, or run
+`hermes plugins enable aphrodite`), then `bash download.sh` from
+`~/.hermes/plugins/aphrodite` fetches the binaries as below - the catalog
+manages the install directory, so never run `aphrodite setup` against it.
+The install mechanics are in
+[the Hermes plugin guide](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins/).
+
 ```bash
 git clone https://github.com/PlayForm/Aphrodite-Hermes.git
 ln -s "$(pwd)/Aphrodite-Hermes" ~/.hermes/plugins/aphrodite

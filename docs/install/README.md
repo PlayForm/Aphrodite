@@ -1,6 +1,6 @@
 # Installing Aphrodite
 
-"How do I install this" has three correct answers depending on your platform
+"How do I install this" has four correct answers depending on your platform
 and setup. This page picks the right one for you before you touch a terminal.
 
 ## Which artifact do you need?
@@ -29,7 +29,7 @@ Agent's own `config.yaml` (`providers.*`, `plugins.enabled`,
 processes, no shared keys. See
 [Troubleshooting: two config files](troubleshooting.md#two-separate-config-files).
 
-## Three ways to install
+## Four ways to install
 
 Only the plugin path ships native setup scripts: `download.sh` for
 macOS/Linux and `download.ps1` for native Windows PowerShell. Both live in
@@ -43,6 +43,7 @@ the plugin, auto-detect the version and your platform, and fetch the binary
 | Path                                             | Best for                                                                                                                                | How                                                                                                                                                                                                                                        |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Hermes plugin + explicit setup**               | Everyday users on any platform                                                                                                          | Symlink the plugin into `~/.hermes/plugins/aphrodite`, run `bash download.sh` (or `pwsh ./download.ps1`), then `hermes plugins enable aphrodite` - `register()` never downloads                                                            |
+| **Hermes plugin catalog (store)**                | The one-command install: a reviewed, pinned checkout of the catalog entry                                                                | `hermes plugins install aphrodite`, answer yes at the `Enable now?` prompt (or `hermes plugins enable aphrodite`), then `bash download.sh` from `~/.hermes/plugins/aphrodite` - see [Installing from the catalog](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugins/) |
 | **`cargo install aphrodite && aphrodite setup`** | Users with a Rust toolchain who want one command to bootstrap the binary, dylibs, and config (the plugin symlink is a manual follow-up) | [macOS/Linux](macos-linux.md#option-2-cargo-install--aphrodite-setup), [Windows](windows.md#option-2-cargo-install--aphrodite-setup)                                                                                                       |
 | **From source (monorepo)**                       | Working from a full checkout, building the Rust crates yourself                                                                         | Build with cargo, then point `APHRODITE_BINARY_PATH`/`APHRODITE_HERMES_DYLIB_PATH` at `target/{debug,release}/` or copy the build output into the runtime home's `binaries/` - the plugin never downloads and never self-heals the install |
 
