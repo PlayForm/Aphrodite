@@ -35,7 +35,7 @@ archived skills. 59 skills total: 58 active, 1 archived.
 | aphrodite-release-flow            | 2.2.0   | active | publish        | aphrodite | Use when releasing or hotfixing Aphrodite (parent + plugin submodule), or verifying the live CCR engine after a bump.                     |
 | aphrodite-release-workflow        | 2.2.0   | active | publish        | aphrodite | Use when releasing Aphrodite.                                                                                                             |
 | aphrodite-testing-discipline      | 2.1.0   | active | local          | aphrodite | Use when probing, testing, or verifying the Aphrodite plugin or dylib.                                                                    |
-| aphrodite-tool-testing            | 2.1.0   | active | read-only      | aphrodite | Use when teaching or verifying aphrodite CCR tool usage.                                                                                  |
+| aphrodite-tool-testing            | 2.3.0   | active | read-only      | aphrodite | Use when teaching or verifying aphrodite CCR tool usage.                                                                                  |
 
 ## git (7)
 

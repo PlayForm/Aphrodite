@@ -1,7 +1,7 @@
 ---
 name: aphrodite-tool-testing
 description: "Use when teaching or verifying aphrodite CCR tool usage: the 13 CCR tools, marker handling, the retrieve-first rule, read-only vs state-changing classification, and the tool test cases."
-version: 2.2.0
+version: 2.3.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -86,22 +86,29 @@ only). It is NOT registered in `plugin.yaml`. This note is runtime-derived:
 diff against the live tool catalog before relying on it. `aphrodite_debug` is
 not part of the registered 13.
 
-## Retrieve-first rule
+## Retrieve-first rule (priced)
 
-**A CCR marker in tool output is content. It is not a placeholder.** When a
-marker appears, resolve it with `aphrodite_retrieve(hash)` before any other
-action that consumes the content it stands for. This is the standing rule in
-every session. Auto-expand is inert configuration; it never resolves markers
-for you (see `aphrodite-auto-expand-testing`).
+**A CCR marker in tool output is content. It is not a placeholder.** A
+marker's `size` is its retrieval cost: resolving it re-adds that many bytes
+to context, undoing that item's compression. Resolve a marker when the next
+action consumes the content it stands for; defer the rest (markers persist in
+context and in CCR, so deferring is free - batch the ones you need into one
+turn). Auto-expand is inert configuration; it never resolves markers for you
+(see `aphrodite-auto-expand-testing`).
 
 - Never re-read the source file behind a marker with `read_file`, because the
   marker IS the content; re-reading just yields another marker.
-- Resolve EVERY marker the next action needs, in the same turn. Local tools
+- Judge from the preview + type + size whether the next action needs the
+  content. Previews render at full length and answer the structural question
+  for most types (succeeded? which files? how many? what shape?). A preview
+  that answers the question is a legitimate skip - do not retrieve "for
+  completeness".
+- Resolve the markers the next action needs, in the same turn. Local tools
   take one call per invocation: a `tool_call` with multiple local entries is
   rejected. Issue the retrieves one at a time and complete them all before
   acting. Connector tools may be batched.
 - Prefer a `query` filter over full content when only matching lines are
-  needed, because retrieval is cheap and filtering is cheaper.
+  needed, because filtering is cheaper than full expansion.
 - CLAIM: nested markers are expanded recursively by the resolver.
 - Never compress a retrieval response or an Aphrodite diagnostic response,
   because this is a context boundary (canonical owner:
@@ -114,8 +121,10 @@ Why agents fail:
 2. They re-read the source file with `read_file` instead of retrieving.
 3. They retrieve one marker at a time across turns instead of resolving all
    needed markers in the same turn.
-4. They rely on auto-expand or "the preview was fine" instead of the canonical
-   retrieval path.
+4. They retrieve every marker reflexively and refund the compression - each
+   retrieve re-adds the marker's full size to context.
+5. They hallucinate content they never retrieved (the one unforgivable
+   failure); fall back to `read_file`/`terminal` on `found: false` instead.
 
 ## Using `aphrodite_retrieve`
 
@@ -164,11 +173,13 @@ again.
 
 ## Checklist for Agents
 
-- [ ] See `<<<CCR:hash|type|size>>>` -> `aphrodite_retrieve(hash)` before any
-      other action; never re-read the source file behind the marker, because
-      the marker IS the content; re-reading yields another marker
-- [ ] Resolve all markers the next action needs in the same turn (local tools
-      one call per invocation; batch connector tools)
+- [ ] See `<<<CCR:hash|type|size>>>` -> judge from preview + type + size
+      whether the next action consumes the content; retrieve then (priced by
+      `size`); never re-read the source file behind the marker - the marker
+      IS the content
+- [ ] Defer markers the next action does not consume; batch the ones you need
+      into one turn (local tools one call per invocation; batch connector
+      tools)
 - [ ] Prefer a `query` filter over full content for large entries
 - [ ] Retrieval fails (`found: false`) -> fall back to `read_file` / `terminal`
 - [ ] Never compress retrieval or diagnostic responses, because a retrieval

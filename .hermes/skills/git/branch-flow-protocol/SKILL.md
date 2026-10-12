@@ -29,6 +29,7 @@ owns:
     - The two-line branch protocol (axioms, state machine, invariant set)
     - Submodule gitlink hygiene (float, bump, verify)
     - The release ritual on Current
+    - The non-release content sync (docs/workspace to Current, no tag)
 depends_on:
     - aphrodite-orientation (preflight gate before any ritual)
     - aphrodite-release-workflow (instance release gates, version-sync)
@@ -209,6 +210,62 @@ Run the full set after every ritual; any failure is a release blocker.
    `git ls-tree`.
 5. **Tag & publish**: tag on Current (`Aphrodite/vX.Y.Z`), push tag,
    create release; return the working copy to Development.
+
+## Non-release content sync (docs/workspace to Current, no tag)
+
+Use when recent Development work (docs, workspace config, deps) must
+reach Current WITHOUT a version bump, tag, or publish. The ritual's
+prepare/tag steps are skipped; the sync is curated cherry-picks, never a
+wholesale `git merge Development`.
+
+1. **Orient fresh**: `git fetch Source` in the parent AND the plugin,
+   then capture `HEAD` + remote tip. A stale `git status` "behind N" is
+   not reliable - heartbeats/dependabot advance the remote and the local
+   branch can already match it; re-fetch and re-measure immediately
+   before mutating. Note `Aphrodite-Release` is a LINKED WORKTREE of the
+   Aphrodite repo on `Current` (`+ Branch <sha> (/path)` in `git branch
+   -vv` = another worktree, not a separate clone) - merge inside it.
+2. **Measure the real delta**: `git log Current..Development` lists every
+   commit since the last common ancestor, but most are already
+   content-synced by squash `release: sync vX.Y.Z from Development`
+   transplants. The true outstanding delta = commits after the last sync
+   source; cross-check with the tip-to-tip `git diff Current..Development`
+   (a plain merge would re-import dev-only paths Current's tree
+   deliberately excludes - bench/, tests/, crates/.../tests/, `.hermes/`,
+   Maintain/ - tens of thousands of lines).
+3. **Curate the skip list**, per commit:
+   - gitlink-bump commits (`chore: bump submodule gitlinks: ...`) - SKIP;
+     Current's released gitlink stays.
+   - content already on Current via picks/dependabot - probe `git diff
+     Current..Development -- <file>` empty means already there, SKIP.
+   - `.hermes`-only commits (release notes, handoffs, skills) - Current
+     never carries `.hermes/`; SKIP.
+   - file-removal commits for files absent on Current - SKIP at first,
+     but RE-CHECK after cherry-picks that add those files: the removal
+     becomes applicable then (an add-then-remove asset lands add-only if
+     its removal was skipped as a no-op).
+   - version-doc-alignment commits (docs say X where X == Current's
+     manifest version) are SAFE to bring - they align, they do not bump;
+     a true version-bump commit is the one to exclude.
+4. **Cherry-pick oldest-first** the kept range, so each applies on the
+   state the previous commits produced (a big rewrite applies cleanly
+   only on top of the earlier doc commits it builds on). Hook silence is
+   expected: the post-commit gitlink bump stays quiet when the submodule
+   checkout equals the parent gitlink - verify `git log <base>..HEAD`
+   contains exactly your commits.
+5. **Verify**: `git diff Development -- <brought paths>` must be empty;
+   the residual `git diff Current..Development` must be ONLY dev-only
+   paths + branch-owned identity files (.github/workflows, .gitmodules -
+   these are SUPPOSED to differ, I5) + the gitlink + cosmetic whitespace.
+   Confirm versions via `git show HEAD:<manifest>`, the gitlink via
+   `git ls-tree HEAD plugins/aphrodite`, and `git submodule status` shows
+   no `+`.
+6. **Plugin side**: `git log Current..Development` empty in the submodule
+   means Development is fully contained - no content merge; just
+   fast-forward the local Current branch to the remote tip and attach the
+   detached checkout, so a later `checkout Current` cannot float the
+   parent gitlink DOWN to a stale tip.
+7. **Leave the push to the user** - commits stay local on Current.
 
 ## Adopting the protocol
 
