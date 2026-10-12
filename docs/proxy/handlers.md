@@ -378,8 +378,8 @@ POST /retrieve
 
 ### Retrieve Flow
 
-1. Validate hash (required - 400 if missing); the hash is normalized (a
-   `|type|size` marker-body suffix and surrounding whitespace are stripped).
+1. Validate hash (required - 400 if missing); the hash was normalized (a
+   `|type|size` marker-body suffix and surrounding whitespace were stripped).
 2. Check inline_ccr (LRU cache, lock dropped before any await).
 3. Fall back to the CCR backend (SQLite/In-memory via a blocking thread).
 4. Apply the query filter (case-insensitive substring, capped at 512 chars).

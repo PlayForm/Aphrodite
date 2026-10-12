@@ -16,7 +16,7 @@ The plugin manifest declares the capability:
 provides_context_engine: true
 ```
 
-The engine instance is registered only when explicitly requested:
+The plugin registers the engine instance only when explicitly requested:
 
 ```bash
 APHRODITE_CONTEXT_ENGINE=1
@@ -43,8 +43,8 @@ The registered engine is a small subclass of Hermes' `ContextEngine`:
 | `compress`             | Returns the transcript **unchanged** - non-destructive, because the transform hooks already shrink tool output |
 
 The engine never forces a compaction, never rewrites messages, and never
-touches the inline store. Compression of large tool and terminal output
-happens in `transform_tool_result` and `transform_terminal_output` - see
+touches the inline store. Aphrodite compresses large tool and terminal output in
+`transform_tool_result` and `transform_terminal_output` - see
 [Plugin Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md).
 
 ## Engine configuration

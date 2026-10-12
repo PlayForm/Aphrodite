@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="600" viewBox="0 0 1800 600" role="img" aria-label="Aphrodite - CCR compression proxy">
+  <!--
+    aphrodite-header.svg - the dark patterned full README header banner.
+
+    Zine grammar, bound to Site/Source/Stylesheet/Global.css:
+    - soot-black #09090b field (the body background token)
+    - photocopy-grit layer: newsprint tooth dots #dedbd2 at 0.08, 8px grid
+    - halftone-screen layer: red risograph dots #931128 at 0.28, 13px grid
+    - grunge-noise layer: SVG feTurbulence grain, the print-ink noise
+    - the mark: the kiss mark paths reused verbatim from
+      Site/Public/Brand/aphrodite-mark.svg (the recolored red mark, raw-blood
+      #931128 / oxblood #3d040d per the BRAND-RED pass, commit e51ab1f2)
+    - the wordmark: APHRODITE in the Space Grotesk stack (the site's display
+      face, self-hosted on the site; generic sans fallbacks elsewhere)
+
+    Self-contained: patterns, filter, mark and wordmark are all inline -
+    no external references. Wide 3:1 banner (1800x600), the README header shape.
+  -->
+  <defs>
+    <!-- Photocopy grit (newsprint tooth) - Global.css .photocopy-grit -->
+    <pattern id="photocopy-grit" width="8" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="4" cy="4" r="1" fill="#dedbd2" opacity="0.08"/>
+    </pattern>
+    <!-- Halftone red dot screen (risograph) - Global.css .halftone-screen -->
+    <pattern id="halftone-screen" width="13" height="13" patternUnits="userSpaceOnUse">
+      <circle cx="6.5" cy="6.5" r="1.5" fill="#931128" opacity="0.28"/>
+    </pattern>
+    <!-- Grunge noise - the SVG filter from Site/Source/Layout/Base.astro #grunge-noise -->
+    <filter id="grunge-noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" seed="7" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <!-- Risograph stipple over the upper lip (verbatim from aphrodite-mark.svg) -->
+    <pattern id="stipple" width="4" height="4" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="#520612"/>
+      <circle cx="3" cy="3" r="0.65" fill="#3d040d"/>
+    </pattern>
+  </defs>
+
+  <!-- Soot-black field -->
+  <rect width="1800" height="600" fill="#09090b"/>
+  <!-- Texture layers -->
+  <rect width="1800" height="600" fill="url(#photocopy-grit)"/>
+  <rect width="1800" height="600" fill="url(#halftone-screen)"/>
+  <rect width="1800" height="600" filter="url(#grunge-noise)" opacity="0.05"/>
+
+  <!-- Oxblood hairline frame, print misregistration -->
+  <rect x="14" y="14" width="1772" height="572" fill="none" stroke="#520612" stroke-width="2"/>
+  <rect x="20" y="20" width="1772" height="572" fill="none" stroke="#3d040d" stroke-width="2" transform="translate(6,6)"/>
+
+  <!-- The kiss mark, raw-blood red per the BRAND-RED pass -->
+  <g transform="translate(180,130) scale(1.9)">
+    <g transform="translate(12,12)">
+      <path d="M 8,62 C 30,32 66,16 100,40 C 134,16 170,32 192,62 C 158,54 126,56 100,66 C 74,56 42,54 8,62 Z" fill="#3d040d"/>
+      <path d="M 18,64 C 46,100 80,114 100,114 C 120,114 154,100 182,64 C 146,90 118,74 100,74 C 82,74 54,90 18,64 Z" fill="#3d040d"/>
+    </g>
+    <path d="M 8,62 C 30,32 66,16 100,40 C 134,16 170,32 192,62 C 158,54 126,56 100,66 C 74,56 42,54 8,62 Z" fill="#931128"/>
+    <path d="M 18,64 C 46,100 80,114 100,114 C 120,114 154,100 182,64 C 146,90 118,74 100,74 C 82,74 54,90 18,64 Z" fill="#931128"/>
+    <path d="M 8,62 C 30,32 66,16 100,40 C 134,16 170,32 192,62 C 158,54 126,56 100,66 C 74,56 42,54 8,62 Z" fill="url(#stipple)"/>
+    <path d="M 42,63 C 72,69 100,71 158,63 C 128,66 72,66 42,63 Z" fill="#ece9e0" opacity="0.9"/>
+    <circle cx="30" cy="6" fill="#20807b" r="5"/>
+    <circle cx="64" cy="10" fill="#e5a93b" r="3.5"/>
+    <circle cx="168" cy="8" fill="#e5a93b" r="4.5"/>
+    <circle cx="206" cy="30" fill="#20807b" r="3.5"/>
+    <circle cx="190" cy="140" fill="#dedbd2" opacity="0.6" r="3"/>
+    <circle cx="34" cy="144" fill="#dedbd2" opacity="0.6" r="3"/>
+  </g>
+
+  <!-- Wordmark: sized so the natural fallback-font width stays inside the
+       right frame edge (rsvg renders <text> without textLength support). -->
+  <text x="640" y="336" font-family="Space Grotesk, Arial, Helvetica, sans-serif" font-size="130" font-weight="700" letter-spacing="12" fill="#ece9e0">APHRODITE</text>
+  <rect x="646" y="366" width="960" height="6" fill="#931128"/>
+  <text x="650" y="432" font-family="Space Grotesk, Arial, Helvetica, sans-serif" font-size="32" font-weight="500" letter-spacing="4" fill="#82808a">CCR COMPRESSION PROXY FOR HERMES AGENT</text>
+</svg>

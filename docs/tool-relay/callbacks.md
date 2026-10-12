@@ -72,7 +72,7 @@ POST /tool/relay
 
 ### Callback delivery
 
-After tool execution, the result is POSTed to `callback_url`:
+After tool execution, the proxy POSTs the result to `callback_url`:
 
 ```json
 POST https://hermes.internal/callback
@@ -93,9 +93,9 @@ front with HTTP 400.
 
 ### SSRF protection
 
-Only `https://` URLs are accepted for `callback_url`. Anything else - `http://`
-including loopback, `file://`, and other schemes - is rejected with HTTP 400
-and `{"success": false, "error": "callback_url must use the https scheme"}`.
+The relay accepts only `https://` URLs for `callback_url` and rejects
+anything else - `http://` including loopback, `file://`, and other schemes -
+with HTTP 400 and `{"success": false, "error": "callback_url must use the https scheme"}`.
 Nothing is executed for a rejected request.
 
 ### Timeouts and delivery
@@ -132,13 +132,13 @@ Content-Type: application/json
 ```
 
 `ttl` defaults to 3600 seconds and `tags` to an empty list when the request
-omits them. Unlike the tool-relay callback, this notification is sent with
-`Authorization: Bearer {notify_key}` whenever a key is configured, and its
+omits them. Unlike the tool-relay callback, the proxy sends this notification
+with `Authorization: Bearer {notify_key}` whenever a key is configured, and its
 outcome is counted in the `notify` counters.
 
 ## Task tracker
 
-Both delivery paths are spawned onto the proxy's task tracker. On graceful
+The proxy spawns both delivery paths onto its task tracker. On graceful
 shutdown the tracker stops accepting new tasks and then waits for any in-flight
 callback or notification to finish, so none are lost mid-delivery (a second
 shutdown signal aborts remaining tasks).

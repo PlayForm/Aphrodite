@@ -1,6 +1,7 @@
 # SSE Streaming Passthrough
 
-Server-sent-event (`text/event-stream`) responses bypass compression and the response cache entirely, stream chunk-by-chunk with a timeout-free client, and account bytes and errors mid-stream. Detection happens twice: on the request (`"stream": true` selects the timeout-free client) and on the response (`Content-Type` selects the passthrough branch).
+Server-sent-event (`text/event-stream`) responses bypass compression and the response cache entirely, stream chunk-by-chunk with a timeout-free client, and account bytes and errors mid-stream.
+Detection happens twice: on the request (`"stream": true` selects the timeout-free client) and on the response (`Content-Type` selects the passthrough branch).
 
 ## SSE detection & passthrough
 
@@ -54,7 +55,8 @@ flowchart TD
     A --> G["mid-stream errors counted separately from<br/>upstream_connect_errors/upstream_timeouts (pre-header only)"]
 ```
 
-Byte accounting: only `response_body_bytes` accumulates during the stream (via the `.inspect` closure); `tokens_saved` is not touched because nothing was compressed. `sse_stream_errors` surfaces in `/stats` and `/metrics` (`aphrodite_sse_stream_errors_total`).
+Byte accounting: only `response_body_bytes` accumulates during the stream (via the `.inspect` closure); `tokens_saved` is not touched because nothing was compressed.
+`sse_stream_errors` surfaces in `/stats` and `/metrics` (`aphrodite_sse_stream_errors_total`).
 
 ## Call sites
 

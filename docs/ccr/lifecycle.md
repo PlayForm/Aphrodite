@@ -1,8 +1,9 @@
 # CCR Lifecycle
 
 CCR (Compress-Cache-Retrieve) is the lossless end-to-end compression path for
-LLM proxy traffic: content is hashed, stored, and replaced with a compact
-marker in the response, and the original is retrieved by hash on demand. This
+LLM proxy traffic: Aphrodite hashed the content, stored it, and replaced it
+with a compact marker in the response, and the agent retrieved the original
+by hash on demand. This
 document walks the six phases of that lifecycle, from compression to expiry.
 
 ## Phase 1: Compress
@@ -36,7 +37,7 @@ trigrams in the first 4096 bytes - as the effective compressed size).
 
 ## Phase 2: Cache
 
-Before storing, the hash is checked against the backend (`ccr_hits` /
+Before storing, Aphrodite checked the hash against the backend (`ccr_hits` /
 `ccr_misses` counters) and against the inline cache (`inline_ccr_hits` /
 `inline_ccr_misses`).
 
@@ -90,8 +91,8 @@ The HTTP `/retrieve` endpoint resolves a hash to its original content:
    capped at 512 chars) and optional pagination (`offset` + `limit`; an
    explicit `limit` is clamped to 10,000 lines, `limit: 0` returns the full
    document).
-5. Windowed results are prefixed with a `[lines a-b/total]` header and
-   flagged via the `truncated` field.
+5. The endpoint prefixed windowed results with a `[lines a-b/total]` header
+   and flagged them via the `truncated` field.
 
 Full-document retrieval is byte-identical - including a trailing newline -
 so the returned body hashes back to the marker's own hash.
@@ -168,7 +169,7 @@ budget_mult = clamp(0.50 + (budget% / 100) * 0.50, 0.50, 1.0)
 
 ## Session Catalog Emission
 
-Per-turn catalog summaries are emitted delta-only: the renderer remembers
+Per-turn catalog summaries were emitted delta-only: the renderer remembers
 `last_emitted_marker_count` and `last_emitted_file_count` and reports
 `+N new compressions this turn` / `+N new files` only when new items
 arrived, with a stable "no change" line otherwise. Counters reset on session

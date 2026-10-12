@@ -4,8 +4,8 @@ Every example on this page is a real tool result captured from a live session
 against the 1.4.6 binary. Marker strings are quoted verbatim; hashes are the
 BLAKE3 digests the proxy computed for the stored bytes. Because hashing is
 content-addressed, the same bytes always produce the same hash - which is why
-the same marker reappears across sessions whenever the same output is
-compressed.
+the same marker reappears across sessions whenever the proxy compressed
+the same output.
 
 The marker schema and the retrieval mechanics behind these examples are
 documented in [CCR: Marker Format](../ccr/marker-format.md), [CCR:
@@ -14,8 +14,8 @@ Lifecycle](../ccr/lifecycle.md), and the content taxonomy in
 
 ## The Shape of a Compressed Tool Result
 
-When a tool result crosses its compression threshold, the proxy replaces the
-raw output in the relayed result with a two-line block:
+When a tool result crossed its compression threshold, the proxy replaced
+the raw output in the relayed result with a two-line block:
 
 ```
 <<<CCR:hash|type|size>>>
@@ -76,7 +76,7 @@ the code threshold of 1,536 bytes (512 x 3.0), so the proxy compressed it.
 -> Arc<Self>`, and the file is 112 lines.
 - To see the actual code it calls `aphrodite_retrieve("f8d6c87de81a74c79a9af2909022ffec0534f49c")`.
 
-A shorter read stays under the threshold and is relayed raw - for example a
+A shorter read that stayed under the threshold was relayed raw - for example a
 50-line excerpt compressed at 2,370 bytes rendered as
 `[code:2fns fn detect_type(content:&str) -> String 50L]`.
 
@@ -99,7 +99,7 @@ directly and only retrieves the full trace when it needs the rest.
 ## Scenario 3: JSON Tool Output
 
 A 1,728-byte pretty-printed JSON document (nested dictionaries, list of
-records, 116 lines) crossed the tool threshold and was compressed.
+records, 116 lines) crossed the tool threshold, and the proxy compressed it.
 
 ### What the model sees
 
@@ -164,14 +164,15 @@ AphroditeRetrieve("e357cd16e409796079cf2db87f00ea1fc9c1cf69")
 Result: {"found": true, "source": "ccr", "hash": "e357cd16...", "content": "total 48\n..."}
 ```
 
-The full listing replaces the marker in context. The model pays the token cost
+The full listing replaced the marker in context. The model pays the token cost
 only when it actually needs the details.
 
 ## Scenario 6: Session Orientation with Directives
 
 Directives are the real session-mode mechanism: the `directives.active` list
 selects which directive files from the runtime home
-(`~/.hermes/aphrodite/directives/`) are loaded into the per-turn flow budget.
+(`~/.hermes/aphrodite/directives/`) the injection assembler loads into the
+per-turn flow budget.
 See [Directives](../plugin/directives.md) for the full story.
 
 | Active list             | Behavior captured                                                                |

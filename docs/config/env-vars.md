@@ -1,8 +1,12 @@
 # Environment Variables
 
-Aphrodite reads a set of `APHRODITE_*` environment variables (plus a few non-prefixed ones) across three surfaces: the Rust proxy, the `aphrodite setup` subcommand, and the Hermes-plugin dylib session. This page lists every variable with a live reader, what precedence applies, and what it gates. Variables with no reader anywhere are listed at the bottom under "Documented but currently unwired (WIP)" - setting those is a silent no-op.
+Aphrodite reads a set of `APHRODITE_*` environment variables (plus a few non-prefixed ones) across three surfaces: the Rust proxy, the `aphrodite setup` subcommand, and the Hermes-plugin dylib session.
+This page lists every variable with a live reader, what precedence applies, and what it gates.
+Variables with no reader anywhere are listed at the bottom under "Documented but currently unwired (WIP)" - setting those is a silent no-op.
 
-Precedence rule: where it says "env > TOML > default", the env var wins if set and parses; otherwise the matching `aphrodite.toml` key wins if present; otherwise the compiled-in default applies. A present-but-malformed value (e.g. `APHRODITE_CCR_TTL=abc`) is never silently treated as absent - it logs a warning and falls through to the next precedence level. Boolean env vars share one truthiness rule everywhere: `"1"` / `"true"` (case-insensitive) is true; anything else present, or absent, is false.
+Precedence rule: where it says "env > TOML > default", the env var wins if set and parses; otherwise the matching `aphrodite.toml` key wins if present; otherwise the compiled-in default applies.
+A present-but-malformed value (e.g. `APHRODITE_CCR_TTL=abc`) is never silently treated as absent - it logs a warning and falls through to the next precedence level.
+Boolean env vars share one truthiness rule everywhere: `"1"` / `"true"` (case-insensitive) is true; anything else present, or absent, is false.
 
 ## Rust proxy - multi-proxy mode (aphrodite.toml present)
 
@@ -63,7 +67,8 @@ The setup subcommand accepts these as flags or env vars (clap `env` attributes):
 
 ## Hermes plugin / aphrodite-hermes dylib
 
-The dylib initializes its session state from `aphrodite.toml` (searching `./aphrodite.toml` then `~/.hermes/aphrodite/aphrodite.toml`), with env vars on top - a **separate** resolution path from the Rust proxy above, feeding the Hermes hook/tool-dispatch session rather than the HTTP proxy. The Python plugin reads a few vars of its own at registration time.
+The dylib initializes its session state from `aphrodite.toml` (searching `./aphrodite.toml` then `~/.hermes/aphrodite/aphrodite.toml`), with env vars on top - a **separate** resolution path from the Rust proxy above, feeding the Hermes hook/tool-dispatch session rather than the HTTP proxy.
+The Python plugin reads a few vars of its own at registration time.
 
 | Variable                                        | Precedence                         | Default                                               | Effect                                                                                                                                                                                                                                                                  |
 | ----------------------------------------------- | ---------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -102,7 +107,8 @@ existing install and the Hermes-home-derived one does not.
 
 ## Documented but currently unwired (WIP)
 
-These names appear in older docs or scripts but have **no reader anywhere** in this codebase as of this writing - setting them is a silent no-op. Do not document them alongside the live vars above without this caveat; if one gets wired up, move its row into the tables above.
+These names appear in older docs or scripts but have **no reader anywhere** in this codebase as of this writing - setting them is a silent no-op.
+Do not document them alongside the live vars above without this caveat; if one gets wired up, move its row into the tables above.
 
 `APHRODITE_DEBUG`, `APHRODITE_PASSTHROUGH`, `HERMES_DEV`, `APHRODITE_AUTO_EXPAND`, `APHRODITE_AUTO_EXPAND_LIMIT`, `APHRODITE_LIVE_CONTAINER`, `APHRODITE_RECURSIVE_DEPTH`, `APHRODITE_MAX_REQUEST_BODY_SIZE`, `APHRODITE_RECENT_MARKERS_MAX`, `APHRODITE_CATALOG` (catalog mode is TOML-only, `compression.catalog_mode`, with no env override), `APHRODITE_TOOL_THRESHOLD` (no `_TOKEN` / `_CACHE` suffix - superseded by the two suffixed vars above), `HEADROOM_SSE_BUFFER_MAX_BYTES` (read only by the vendored `headroom` Python package this repo's binaries don't run).
 

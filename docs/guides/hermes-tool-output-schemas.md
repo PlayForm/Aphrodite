@@ -4,8 +4,8 @@ Every Hermes tool returns output with its own shape: unified diffs, JSON
 envelopes, grep listings, markdown, console logs. Aphrodite classifies each
 result into a content type, builds a compact preview, and - when the result
 is above the compression threshold and eligible - replaces it with a CCR
-marker. This page maps the tool surface: what each tool returns, how that
-output is classified, and how much compression typically helps.
+marker. This page maps the tool surface: what each tool returns, how Aphrodite
+classifies that output, and how much compression typically helps.
 
 The catalog below covers 43 tool-output shapes: 31 Hermes tools, 10 Aphrodite
 meta-tools, and two special entries. The classification pipeline and its 30
@@ -91,8 +91,8 @@ full registry.
 ### Aphrodite meta-tools
 
 The plugin ships thirteen `aphrodite_*` tools; the ten below are the ones the
-output catalog tracks. Meta-tool output is auto-expanded inline - never
-compressed - so the agent always sees it (the remaining three, `directive`,
+output catalog tracks. `auto_expand` expands meta-tool output inline - the
+tools are never compressed - so the agent always sees it (the remaining three, `directive`,
 `prefetch`, and `prefetch_status`, return short status text classified as
 `json`/`text`).
 
@@ -118,8 +118,8 @@ compressed - so the agent always sees it (the remaining three, `directive`,
 
 ## Skip Gates
 
-Compression only happens when the result is eligible. A result is left
-untouched when it is empty; when the tool is in the essential set - the
+Compression only happens when the result is eligible. Aphrodite leaves a
+result untouched when it is empty; when the tool is in the essential set - the
 agent needs raw output; when the tool is one of Aphrodite's own or a
 headroom helper; or when the result is below the threshold.
 
@@ -152,7 +152,7 @@ examples from the enriched catalog:
 
 When the classifier only reaches a generic bucket (`text`/`terminal`/`log`/
 empty), a semantic detector upgrades the arm to a high-signal shape (git
-status, git log, grep, ls, test) before the preview is built. The rendered
+status, git log, grep, ls, test) before Aphrodite builds the preview. The rendered
 preview length is capped by `preview_max_chars` (default 120;
 `APHRODITE_PREVIEW_MAX_CHARS` overrides it, and environment beats TOML).
 The [Enriched Preview

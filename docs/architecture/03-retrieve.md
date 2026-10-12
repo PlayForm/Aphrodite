@@ -43,7 +43,9 @@ sequenceDiagram
     HR-->>C: 200 {found:true, content, source:"ccr", truncated}
 ```
 
-Pagination facts: an explicit nonzero `limit` clamps to a 10,000-line server cap; `limit == 0` is not capped and returns the full document. An empty stored document (`content: ""`) is a valid zero-line result, not an out-of-range offset. A full-window retrieval skips the lossy `lines()/join()` round-trip entirely, so the returned bytes hash back to the marker's own hash.
+Pagination facts: an explicit nonzero `limit` clamps to a 10,000-line server cap; `limit == 0` is not capped and returns the full document.
+An empty stored document (`content: ""`) is a valid zero-line result, not an out-of-range offset.
+A full-window retrieval skips the lossy `lines()/join()` round-trip entirely, so the returned bytes hash back to the marker's own hash.
 
 ## Recursive resolution (resolve::expand)
 

@@ -52,16 +52,16 @@ interventions are possible, both driven by the poll worker and chain-split
 features:
 
 - **Auto-backgrounding.** When the poll worker is enabled
-  (`APHRODITE_POLL_WORKER`, default on), a `terminal` or `process` call whose
-  command matches the long-running patterns is rewritten to run in the
-  background: the hook returns a modify action with `background: true` and
+  (`APHRODITE_POLL_WORKER`, default on), the hook rewrites a `terminal` or
+  `process` call whose command matches the long-running patterns to run in the
+  background: it returns a modify action with `background: true` and
   `notify_on_complete: true`, and Hermes runs the tool asynchronously. The
   agent observes completion through its normal poll flow. `process` calls
   with `action: poll` are never backgrounded - they are checks, not work.
 - **Chain splitting.** When chain splitting is enabled
   (`APHRODITE_CHAIN_SPLIT=1` or `[compression] chain_split = true`, default
-  off), a chained terminal command (`cd x && cargo build && cargo test`) is
-  rewritten with invisible segment markers, provided it has at least
+  off), the hook rewrites a chained terminal command (`cd x && cargo build &&
+  cargo test`) with invisible segment markers, provided it has at least
   `chain_split_min_segments` segments. The marker-splitting lets
   `transform_terminal_output` compress each segment into its own CCR marker,
   so the model sees several compact previews instead of one large blob.
@@ -72,10 +72,10 @@ If neither intervention applies, the call passes through unchanged.
 
 Fires after every tool call with the tool's result. The pipeline:
 
-1. **Telemetry.** The call's status, error type/message, arguments, and
-   duration are recorded into the tool-event ring, which feeds the
-   error-loop and phase detectors. Empty results are skipped here.
-2. **Skip gates.** A result is left untouched when it is empty; when the tool
+1. **Telemetry.** The hook records the call's status, error type/message,
+   arguments, and duration into the tool-event ring, which feeds the
+   error-loop and phase detectors, and skips empty results here.
+2. **Skip gates.** Aphrodite leaves a result untouched when it is empty; when the tool
    is in the essential set (`skill_view`, `skills_list`, `skill_manage`,
    `memory`, `session_search`, `read_file`, `read_terminal` - the agent needs
    raw output); when it is one of Aphrodite's own tools or a headroom helper
@@ -83,35 +83,35 @@ Fires after every tool call with the tool's result. The pipeline:
    replace resolved content with another marker); or when it is below the
    tool threshold (default 4,096 characters; `0` disables the gate and always
    compresses).
-3. **Classify.** The content-type detector assigns a type; generic
-   text/log/plain results get a semantic upgrade (git status, ls, test, grep)
-   so the preview carries high-signal shape.
-4. **Store.** The content is hashed (BLAKE3), stored in the inline store, and
-   replaced by a marker of the form `<<<CCR:hash|type|size>>>` with a preview.
-   Hermes swaps the tool output for the marker; retrieval returns the exact
-   original bytes.
+3. **Classify.** The content-type detector assigns a type and upgrades
+   generic text/log/plain results (git status, ls, test, grep) so the
+   preview carries high-signal shape.
+4. **Store.** The hook hashes the content (BLAKE3), stores it in the inline
+   store, and replaces it with a marker of the form `<<<CCR:hash|type|size>>>`
+   with a preview. Hermes swaps the tool output for the marker; retrieval
+   returns the exact original bytes.
 
-File references are tracked before the skip gates, so `read_file` and
-`search_files` results are recorded for `aphrodite_files` and the catalog
-even when they are never compressed.
+The hook tracks file references before the skip gates, so it records
+`read_file` and `search_files` results for `aphrodite_files` and the catalog
+even when it never compresses them.
 
 ## transform_terminal_output
 
 Fires after every terminal execution. The pipeline mirrors tool results:
 
-1. **Telemetry.** The command and return code are recorded; a non-zero exit
-   code marks the event as a failure and feeds the error-loop detector.
+1. **Telemetry.** The hook records the command and return code; a non-zero
+   exit code marks the event as a failure and feeds the error-loop detector.
 2. **Chain split.** When chain splitting is enabled and the output carries
-   the segment markers injected by `pre_tool_call`, each segment is
-   compressed into its own marker (unconditional, before the threshold gate,
-   so marked output never leaks raw). Per-segment error hints are merged into
+   the segment markers injected by `pre_tool_call`, the hook compresses each
+   segment into its own marker (unconditional, before the threshold gate, so
+   marked output never leaks raw) and merges per-segment error hints into
    previews.
 3. **Threshold gate.** Unmarked output below the terminal threshold (default
    1,024 characters; `0` disables the gate) passes through untouched.
-4. **Classify and store.** Output containing `exit code:` or `Error:` is
-   typed `terminal`; other output gets the normal content-type detection with
-   the same semantic upgrade as tool results. Above-threshold content is
-   hashed, stored, and replaced by a marker.
+4. **Classify and store.** The hook types output containing `exit code:` or
+   `Error:` as `terminal` and runs other output through the normal
+   content-type detection with the same semantic upgrade as tool results. It
+   hashes, stores, and replaces above-threshold content with a marker.
 
 ## pre_llm_call
 
@@ -129,13 +129,13 @@ over budget:
 5. `[recall]` catalog summary - the first section dropped under budget
    pressure
 
-The first-turn orientation is built from the `[prompts] session_inject`
-template (default compiled into the binary, `{VERSION}` interpolated to the
-plugin version). It is injected once on turn 0, then never again; an empty
-string disables it entirely.
+The assembler builds the first-turn orientation from the `[prompts]
+session_inject` template (default compiled into the binary, `{VERSION}`
+interpolated to the plugin version). The hook injects it once on turn 0, then
+never again; an empty string disables it entirely.
 
 The hook returns `{"context": ...}`, which Hermes injects into the model's
-turn. When the assembled context is empty, nothing is injected.
+turn. When the assembled context is empty, the hook injects nothing.
 
 ## post_llm_call
 

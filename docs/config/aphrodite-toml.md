@@ -1,8 +1,10 @@
 # aphrodite.toml
 
-Aphrodite's proxy listeners and compression engine are configured through a single TOML file. This page documents every section, field, precedence rule, and validation check; the companion page [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md) lists every env var that overrides a value here.
+Aphrodite's proxy listeners and compression engine are configured through a single TOML file.
+This page documents every section, field, precedence rule, and validation check; the companion page [Environment Variables](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md) lists every env var that overrides a value here.
 
-This file is Aphrodite's own proxy/engine config - a **different file** from Hermes Agent's `config.yaml`. See [Troubleshooting: two separate config files](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#two-separate-config-files) if you came here looking for Hermes-side keys like `plugins.enabled` or `context.engine`.
+This file is Aphrodite's own proxy/engine config - a **different file** from Hermes Agent's `config.yaml`.
+See [Troubleshooting: two separate config files](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#two-separate-config-files) if you came here looking for Hermes-side keys like `plugins.enabled` or `context.engine`.
 
 ## File location
 
@@ -13,11 +15,13 @@ This file is Aphrodite's own proxy/engine config - a **different file** from Her
 | Override                     | `APHRODITE_CONFIG_PATH` environment variable                                               |
 | If missing                   | Falls back to CLI-flag mode (single proxy, see [CLI equivalents](#cli-equivalents))        |
 
-The `~/.hermes/aphrodite/aphrodite.toml` fallback only applies when `APHRODITE_CONFIG_PATH` was **not** explicitly set - an explicit override that points at a nonexistent file still falls through to CLI-flag mode rather than silently redirecting elsewhere. `aphrodite setup` writes its generated config (with `{cache_port}` / `{token_port}` placeholders substituted) from the same embedded template that ships as `aphrodite.toml.example` in the repo root.
+The `~/.hermes/aphrodite/aphrodite.toml` fallback only applies when `APHRODITE_CONFIG_PATH` was **not** explicitly set - an explicit override that points at a nonexistent file still falls through to CLI-flag mode rather than silently redirecting elsewhere.
+`aphrodite setup` writes its generated config (with `{cache_port}` / `{token_port}` placeholders substituted) from the same embedded template that ships as `aphrodite.toml.example` in the repo root.
 
 ## Precedence
 
-For every field except the two noted below, the resolution order is **env var → TOML (proxy entry → `[defaults]`) → compiled-in default**: an env var wins if set and parses; otherwise the proxy entry's value wins; otherwise `[defaults]`; otherwise the default compiled into the binary. A present-but-malformed env value (e.g. `APHRODITE_CCR_TTL=abc`) is never treated as absent - it logs a warning and falls through to the next level.
+For every field except the two noted below, the resolution order is **env var → TOML (proxy entry → `[defaults]`) → compiled-in default**: an env var wins if set and parses; otherwise the proxy entry's value wins; otherwise `[defaults]`; otherwise the default compiled into the binary.
+A present-but-malformed env value (e.g. `APHRODITE_CCR_TTL=abc`) is never treated as absent - it logs a warning and falls through to the next level.
 
 Two exceptions:
 
@@ -92,7 +96,8 @@ The root `aphrodite.toml.example` ships the full annotated version, including th
 
 `[defaults]` accepts `api_url`, `model`, `ccr_ttl_seconds`, and `api_key`; each applies to every proxy that doesn't set its own value. No provider-specific defaults are baked in - `api_url` / `model` resolve from env or config, and fall back to `https://api.openai.com` / `default-model` only when neither is set.
 
-All listeners bind loopback by default, and the proxy rejects non-loopback peers (and non-loopback `Host` headers) on every route except `/health`. Binding `0.0.0.0` is possible but exposes unauthenticated management routes (`/retrieve`, `/history`, `/ccr/*`) to your network - see the shipped example's comments on the `0.0.0.0` lines.
+All listeners bind loopback by default, and the proxy rejects non-loopback peers (and non-loopback `Host` headers) on every route except `/health`.
+Binding `0.0.0.0` is possible but exposes unauthenticated management routes (`/retrieve`, `/history`, `/ccr/*`) to your network - see the shipped example's comments on the `0.0.0.0` lines.
 
 ## `[compression]`
 
@@ -120,7 +125,8 @@ The compiled defaults apply when neither env nor TOML sets a value; the shipped 
 | `chain_split_max_segments` | Cap for the adaptive split threshold                                                                         | `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS` | `6`     |
 | `context_engine`           | Status flag exposed via `aphrodite_stats` / `aphrodite_config_get`; the standalone HTTP proxy never reads it | `APHRODITE_CONTEXT_ENGINE`           | `true`  |
 
-The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_protect_last`, `engine_min_msgs`) is parsed into the dylib session state and exposed the same way, but is **not consulted by any compression decision (WIP)** - it is populated for visibility, not load-bearing. (`engine_threshold_pct` has no effect on the engine; the shipped example sets it to 45 as the documented value, with 100+ as the escape hatch to disable engine compression entirely.)
+The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_protect_last`, `engine_min_msgs`) is parsed into the dylib session state and exposed the same way, but is **not consulted by any compression decision (WIP)** - it is populated for visibility, not load-bearing.
+(`engine_threshold_pct` has no effect on the engine; the shipped example sets it to 45 as the documented value, with 100+ as the escape hatch to disable engine compression entirely.)
 
 **Not read by anything (WIP)** (parsed for schema compatibility, echoed by `/reload` for visibility, no consumer): `auto_expand`, `auto_expand_limit`, `catalog_mode` (catalog mode is whatever the caller passes per-request), `classifier_poll`, `prefetch` (the `aphrodite_prefetch` tool exists regardless of this key).
 
@@ -137,13 +143,15 @@ The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_p
 | `[prompts]`  | `ccr_marker_hint`      | Append a retrieval hint after markers                                                          | Reserved - no reader (WIP)                                                          |
 | `[prompts]`  | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output                                           | Reserved - no reader (WIP)                                                          |
 
-"Reserved - no reader (WIP)" means the values parse cleanly but nothing in the current codebase reads them back out; changing them does not change behavior, so treat them as reserved until that's confirmed. `[previews] preview_max_chars` and `[prompts] session_inject` are the two keys in these sections that do have live effects.
+"Reserved - no reader (WIP)" means the values parse cleanly but nothing in the current codebase reads them back out; changing them does not change behavior, so treat them as reserved until that's confirmed.
+`[previews] preview_max_chars` and `[prompts] session_inject` are the two keys in these sections that do have live effects.
 
 ## `[templates.*]`
 
 The shipped example config carries a large `[templates.preview.*]` / `[templates.marker]` / `[templates.prompts]` / `[templates.reverse]` block of per-content-type format strings, with a variable reference (`{type}`, `{ln}`, `{size}`, `{hash}`, `{fns}`, `{sigs}`, etc.) in its header comment.
 
-Nothing in the codebase renders previews from these templates - preview strings are generated internally. If you're editing `[templates.*]` expecting it to change preview output, verify against your running version first; treat the section as reserved/aspirational (WIP) rather than functioning configuration.
+Nothing in the codebase renders previews from these templates - preview strings are generated internally.
+If you're editing `[templates.*]` expecting it to change preview output, verify against your running version first; treat the section as reserved/aspirational (WIP) rather than functioning configuration.
 
 ## `[directives]`
 
@@ -156,7 +164,8 @@ active = ["focus", "foresight"]  # e.g. ["focus", "foresight"]
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `active` | Which loaded directives start active. Directive `.md` files are discovered from `APHRODITE_DIRECTIVES_DIR` (if set) → `./directives/` → `~/.hermes/aphrodite/directives/` → binary-relative - the **first directory that exists** wins, and an existing-but-empty directives dir is intentional (no custom directives). If no directory exists, built-in directives are used. Names in `active` that aren't in the loaded set are silently filtered out; if `active` resolves empty while directives ARE loaded, the session seeds `focus` / `foresight` / `lazy` from the loaded set instead. Loading is never gated on this list being non-empty. |
 
-Read by the Hermes-plugin dylib session, not the Rust proxy. The active set is fully runtime-mutable via the `aphrodite_directive` tool - see [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md) for the complete feature reference.
+Read by the Hermes-plugin dylib session, not the Rust proxy.
+The active set is fully runtime-mutable via the `aphrodite_directive` tool - see [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md) for the complete feature reference.
 
 ## `[flow]`
 
@@ -175,7 +184,9 @@ proxy.api_key
       → error: no API key configured
 ```
 
-Stops at the first non-empty value. This chain is TOML-first by design; the two legacy provider-specific fallbacks (`DEEPSEEK_API_KEY`, `HEADROOM_DEEPSEEK_KEY`) no longer exist in the codebase. The proxy refuses to start if the chain resolves empty.
+Stops at the first non-empty value.
+This chain is TOML-first by design; the two legacy provider-specific fallbacks (`DEEPSEEK_API_KEY`, `HEADROOM_DEEPSEEK_KEY`) no longer exist in the codebase.
+The proxy refuses to start if the chain resolves empty.
 
 ## Default value chain
 
@@ -215,11 +226,13 @@ Stops at the first non-empty value. This chain is TOML-first by design; the two 
 | `"token"` | SQLite    | >1 KB (`1024`)        | Durable CCR storage; supports tool relay (per-proxy flag, default `false`)   |
 | `"cache"` | In-memory | >8 KB (`8192`)        | Lightweight caching; `tool_relay` is independent of mode, not disabled by it |
 
-Thresholds are the compiled defaults; the shipped example config lowers them (see `[compression]` above). The token proxy's SQLite path comes from `ccr_db_path` (or the default below) and its TTL from `ccr_ttl_seconds`; the cache proxy's in-memory store uses the same TTL.
+Thresholds are the compiled defaults; the shipped example config lowers them (see `[compression]` above).
+The token proxy's SQLite path comes from `ccr_db_path` (or the default below) and its TTL from `ccr_ttl_seconds`; the cache proxy's in-memory store uses the same TTL.
 
 ## Database path resolution
 
-A relative `ccr_db_path` is resolved against the binary's own directory, not the current working directory - so a relative path behaves consistently regardless of where the proxy is launched from. Parent directories are created automatically if missing.
+A relative `ccr_db_path` is resolved against the binary's own directory, not the current working directory - so a relative path behaves consistently regardless of where the proxy is launched from.
+Parent directories are created automatically if missing.
 
 ## CLI equivalents
 

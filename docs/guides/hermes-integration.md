@@ -59,9 +59,10 @@ forwards its arguments to the dylib and hands the JSON reply back to Hermes.
 | `pre_llm_call`              | Before each LLM request        | Inject directives, nudges, and the recall catalog under a hard byte budget  |
 | `post_llm_call`             | After each LLM response        | Archive the turn, advance the counter, expire nudges and stale tasks        |
 
-`transform_tool_result` is where tool output becomes a marker: the result is
-classified into a content type, hashed (BLAKE3), stored, and replaced by a
-marker of the form `<<<CCR:hash|type|size>>>` with a compact preview. The
+`transform_tool_result` is where tool output becomes a marker: the hook
+classified the result into a content type, hashed it (BLAKE3), stored it, and
+replaced it with a marker of the form `<<<CCR:hash|type|size>>>` with a compact
+preview. The
 agent can recover the exact original bytes with `aphrodite_retrieve`. See
 [Plugin Hooks](../plugin/hooks.md) for the full per-hook reference.
 
@@ -72,15 +73,15 @@ The plugin registers thirteen `aphrodite_*` tools from the dylib's schemas:
 `directive`, `test`, `catalog`, `reclassify`, `prefetch`, and
 `prefetch_status`. They teach the agent how to interact with the CCR engine -
 retrieving stored content, inspecting the catalog, adjusting directives -
-and are auto-expanded inline rather than compressed. See
+and `auto_expand` expands them inline rather than compressing them. See
 [Tool Relay: Tools](../tool-relay/tools.md) for the reference.
 
 ## Context engine
 
 The plugin declares context-engine support and can register a Hermes context
 engine when opted in with `APHRODITE_CONTEXT_ENGINE=1`. By default no engine
-is registered: the per-turn catalog summary is injected through the
-`pre_llm_call` hook instead, so the context assembler remains the single
+is registered: the `pre_llm_call` hook injects the per-turn catalog summary
+instead, so the context assembler remains the single
 source of what the model sees. See
 [Context Engine](../plugin/context-engine.md) for details.
 
@@ -102,7 +103,7 @@ $HERMES_HOME/ (default ~/.hermes/)
 ```
 
 On plugin startup `layout_check.py` checks toward this schema but is
-**report-only**: deviations are logged, never moved - and the
+**report-only**: it logs deviations and never moves them - and the
 `plugins/aphrodite` install path is Hermes-owned (the plugin never creates
 or recreates it). The plugin directory stays a pure loader.
 
@@ -110,9 +111,8 @@ or recreates it). The plugin directory stays a pure loader.
 
 Two proxies launch when the plugin loads: a cache proxy on `:9797`
 (in-memory backend, compresses payloads above 8 KB) and a token proxy on
-`:9798` (SQLite backend, compresses above 1 KB). Launch is guarded - the
-plugin probes both health endpoints first and skips launching when a healthy
-proxy already owns the ports, and `APHRODITE_NO_AUTO_LAUNCH` disables
+`:9798` (SQLite backend, compresses above 1 KB). The plugin guards the launch - it probes both health endpoints first and skips
+launching when a healthy proxy already owns the ports, and `APHRODITE_NO_AUTO_LAUNCH` disables
 auto-launch entirely. Each proxy compresses HTTP response bodies for
 OpenAI-compatible clients; the Hermes plugin path compresses locally through
 the hooks and does not depend on the proxies for its own compression.

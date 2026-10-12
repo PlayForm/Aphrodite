@@ -229,8 +229,8 @@ Matches case-insensitively against each entry's preview line and CCR type only
 | `remove` | Drop one directive from the active set                                       | `{active}`                       |
 | `reset`  | Clear actives, ephemerals, and the manual latch; back to automatic selection | `{active}`                       |
 
-An unknown directive name returns `{error}` and changes nothing. Active
-directive bodies are injected into every turn through the `pre_llm_call` hook -
+An unknown directive name returns `{error}` and changes nothing. The
+`pre_llm_call` hook injects active directive bodies into every turn -
 see [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md)
 for the full mechanism.
 
@@ -336,11 +336,12 @@ reclassify every entry in the session. Returns `{status: "ok", reclassified:
 }
 ```
 
-Despite the name this is synchronous: every path is read and compressed before
-the call returns, so each returned hash is immediately resolvable through
+Despite the name this is synchronous: the tool reads and compresses every path
+before the call returns, so each returned hash is immediately resolvable through
 `aphrodite_retrieve`. One marker per file, no file bodies in context.
-Oversized files are skipped rather than truncated, and a batch larger than the
-inline-store budget evicts older entries (including ones from the same batch).
+The tool skips oversized files rather than truncating them, and a batch larger
+than the inline-store budget evicts older entries (including ones from the
+same batch).
 Returns `{total, loaded, skipped_size, missing, inline_store_bytes,
 inline_store_byte_budget, results: [{path, status: "loaded"|"skipped"|"missing",
 hash, type, size, preview, reason}]}`.

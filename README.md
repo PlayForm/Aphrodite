@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/aphrodite.png" alt="Aphrodite" width="120">
+  <img src="assets/aphrodite.svg" alt="Aphrodite - CCR compression proxy for Hermes Agent" width="480">
 </p>
 
 ---

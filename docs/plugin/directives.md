@@ -1,11 +1,12 @@
 # Conversational Directives
 
 Directives are short behavioral instruction files - one `.md` file each -
-injected inline into the LLM's context on every `pre_llm_call`. Unlike file
-content (which gets compressed into CCR markers), directives are always
-injected verbatim: they are compact enough to never need compression, and the
-active set can be listed, swapped, and stacked mid-conversation via the
-`aphrodite_directive` tool without touching any config file.
+that `pre_llm_call` injects inline into the LLM's context on every call.
+Unlike file content (which the transform hooks compress into CCR markers),
+directives travel verbatim: they are compact enough to never need
+compression, and the active set can be listed, swapped, and stacked
+mid-conversation via the `aphrodite_directive` tool without touching any
+config file.
 
 ## Design principle: usage, not mechanism
 
