@@ -1,9 +1,9 @@
 # Content Type Taxonomy
 
-Every payload that enters the compression pipeline is labeled with a content
-type so thresholds and previews can adapt per type - errors stay visible in
-context while verbose build and log output is compressed at the base
-threshold. Classification is layered: a vendored base classifier assigns one
+The classifier labeled every payload that enters the compression pipeline
+with a content type so thresholds and previews can adapt per type - errors
+stay visible in context while Aphrodite compressed verbose build and log
+output at the base threshold. Classification is layered: a vendored base classifier assigns one
 of seven coarse types, an Aphrodite-side semantic detector refines common
 tool-output shapes, the Hermes bridge unwraps wrapper envelopes before either
 runs, and an explicit caller-supplied type hint always wins. Across all
@@ -24,8 +24,8 @@ The preview each type produces is documented in the
 The proxy path classifies raw pushed content; the Hermes plugin path
 unwraps envelopes first, then runs the same base classifier and semantic
 detector on the extracted payload. Both paths share the semantic detector, so
-a `git status` or `ls -l` result is tagged the same way whether it arrives
-through the proxy or through a Hermes tool call.
+the semantic detector tagged a `git status` or `ls -l` result the same way
+whether it arrived through the proxy or through a Hermes tool call.
 
 ## Base Classifier (7 Types)
 

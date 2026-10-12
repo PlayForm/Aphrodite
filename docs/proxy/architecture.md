@@ -153,7 +153,7 @@ a caller is stripped rather than forwarded.
 
 ## Response Cache
 
-Chat Completions requests are cached so an identical request is served
+Aphrodite cached Chat Completions requests so it served an identical request
 without a second upstream round-trip.
 
 | Property  | Behavior                                                                                                        |

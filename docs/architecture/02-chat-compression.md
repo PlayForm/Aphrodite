@@ -2,7 +2,8 @@
 
 The token and cache proxies' central flow: a `/v1/chat/completions` response comes back from upstream, and `compress_chat_completion` classifies each `message.content`, applies an EMA-tuned per-type threshold (scaled by the `x-headroom-budget` header), BLAKE3-hashes over-threshold content, stores it, and replaces the text with a self-describing preview plus a `<<<CCR:hash|type|size>>>` marker. `tool_calls[].function.arguments` is a sibling field the loop never visits, so it always passes through untouched.
 
-The HTTP proxy path is a separate pipeline from the Hermes FFI hook path: it classifies via `proxy_detect_content_type` and builds previews via `proxy_build_preview`, and never calls the staged transform pipeline (`transforms::detect`, `stage2::compress_stage2`, `struct_extract::extract_code_structure`) - those run only on the Hermes hook path (see [04-hook-ffi.md](04-hook-ffi.md)). The two pipelines share the BLAKE3 `compute_key` and the marker wire format, but nothing else.
+The HTTP proxy path is a separate pipeline from the Hermes FFI hook path: it classifies via `proxy_detect_content_type` and builds previews via `proxy_build_preview`, and never calls the staged transform pipeline (`transforms::detect`, `stage2::compress_stage2`, `struct_extract::extract_code_structure`) - those run only on the Hermes hook path (see [04-hook-ffi.md](04-hook-ffi.md)).
+The two pipelines share the BLAKE3 `compute_key` and the marker wire format, but nothing else.
 
 ## Response compression sequence
 

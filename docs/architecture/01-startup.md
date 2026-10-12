@@ -135,7 +135,8 @@ sequenceDiagram
     end
 ```
 
-The layout check and the directives materialize are best-effort by design: either failing degrades to a warning and the plugin still registers (never a raise). The dylib load itself is the one hard gate - if the smoke test or the FFI assertion fails, `register()` logs "plugin disabled" and returns.
+The layout check and the directives materialize are best-effort by design: either failing degrades to a warning and the plugin still registers (never a raise).
+The dylib load itself is the one hard gate - if the smoke test or the FFI assertion fails, `register()` logs "plugin disabled" and returns.
 
 ## Call sites
 

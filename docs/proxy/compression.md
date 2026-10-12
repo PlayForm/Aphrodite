@@ -7,8 +7,8 @@ CCR marker, and tracks token savings. "Compression" here means the marker
 substitution in the model-facing response - the stored bytes are kept verbatim,
 not codec-compressed.
 
-The compression-ratio EMA is updated from two sources: the Chat Completions
-path (using the rendered marker length) and the direct `/ccr/create` endpoint
+Two sources update the compression-ratio EMA: the Chat Completions path
+(using the rendered marker length) and the direct `/ccr/create` endpoint
 (using a trigram-uniqueness heuristic for the compressed-size estimate), so
 `/stats` reflects the compressibility of everything flowing through the proxy.
 
@@ -219,9 +219,9 @@ and the Hermes hook/FFI path (both funnel through the same `build_preview`
 function).
 
 When the classifier only reaches a generic bucket (`text`/`terminal`/`log`/
-empty), a semantic detector (`detect_semantic_type`) upgrades the arm to a
-high-signal shape (git status, git log, grep, ls, test) before the preview is
-built. Detection is conservative (line-prefix / marker patterns, majority
+empty), a semantic detector (`detect_semantic_type`) upgraded the arm to a
+high-signal shape (git status, git log, grep, ls, test) before the preview
+was built. Detection is conservative (line-prefix / marker patterns, majority
 votes) so ordinary prose is never mis-tagged. An explicit non-generic type
 from the classifier is always honored as-is.
 
@@ -367,7 +367,7 @@ Initial values at startup:
 Chain-split is a Hermes plugin-side feature, not a proxy one: `pre_tool_call`
 rewrites chained shell commands (`cd x && cargo build && cargo test`) by
 echoing segment markers to stderr, and `transform_tool_result` splits the
-produced output into per-segment pieces so each segment is compressed
+produced output into per-segment pieces so each segment was compressed
 independently (`[chain:3 | build ...]` previews). It is opt-in
 (`chain_split = false` by default), and constructs that would corrupt control
 flow (heredocs, loops spanning segments) are left untouched. The proxy itself
