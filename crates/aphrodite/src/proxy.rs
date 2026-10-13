@@ -2561,6 +2561,11 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 			// Issue #11 WS4: keep the preview cap in sync on hot-reload
 			// (`[previews] preview_max_chars`).
 			crate::preview::set_preview_max_chars(config.previews.as_ref().and_then(|p| p.preview_max_chars));
+			// Pre-Rust port: keep `[templates]` preview families + the
+			// `[previews] model_family` selector in sync on hot-reload, the
+			// same way the cap is re-applied here.
+			crate::templates::set_preview_family(config.previews.as_ref().and_then(|p| p.model_family.clone()));
+			crate::templates::set_templates(config.templates.clone());
 			let comp = config.compression.as_ref();
 			let thresholds = resolve_thresholds(comp);
 			state.cache_compress_threshold.store(thresholds.cache, Ordering::Relaxed);

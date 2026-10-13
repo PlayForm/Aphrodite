@@ -75,6 +75,10 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 			// $APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120; an absent
 			// key means unlimited.
 			cfg.apply_previews();
+			// Pre-Rust port: register `[templates]` + `[previews]
+			// model_family` so the dylib path renders TOML preview
+			// templates exactly like the engine/proxy paths.
+			cfg.apply_templates(&s);
 			// Opt-in config auto-reload (`[compression] auto_reload = true`,
 			// default off): watch aphrodite.toml and re-apply config fields
 			// on change. Only config fields are mutated - session CCR state,
@@ -119,6 +123,7 @@ fn apply_config_reload(cfg:&aphrodite::config_loader::Config, state:&mut Aphrodi
 	state.directives = saved_directives;
 	state.active_directives = saved_active;
 	cfg.apply_previews();
+	cfg.apply_templates(state);
 }
 
 /// Spawn the opt-in config auto-reload watcher. Mirrors the engine binary's

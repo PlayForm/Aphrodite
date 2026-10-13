@@ -388,6 +388,25 @@ impl Config {
 		let max = self.get_u64("APHRODITE_PREVIEW_MAX_CHARS", "previews", "preview_max_chars", 0);
 		crate::preview::set_preview_max_chars(if max == 0 { None } else { Some(max.min(u32::MAX as u64) as u32) });
 	}
+
+	/// Register `[templates]` + `[previews] model_family` into the
+	/// process-global template renderer (pre-Rust port of
+	/// `_core/template.py::_render_template`): the consumer of
+	/// `[templates.preview.<family>.<ctype>]` format strings. Called wherever
+	/// `apply_previews` is (dylib init + config auto-reload) so the dylib
+	/// path renders TOML preview templates exactly like the engine binary and
+	/// proxy `/reload` do. Absent `[templates]` = `None` = hardcoded builders
+	/// remain the default; absent `model_family` = `render_preview` defaults
+	/// to `"code_first"`.
+	pub fn apply_templates(&self, state:&crate::state::AphroditeState) {
+		let family = self
+			.section("previews")
+			.and_then(|s| s.get("model_family"))
+			.and_then(|v| v.as_str())
+			.map(|s| s.to_string());
+		crate::templates::set_preview_family(family);
+		crate::templates::set_templates(state.templates.clone());
+	}
 }
 
 #[cfg(test)]
@@ -620,6 +639,38 @@ mod tests {
 		if let Some(v) = env_backup {
 			unsafe { std::env::set_var("APHRODITE_PREVIEW_MAX_CHARS", v) };
 		}
+	}
+
+	// ── Pre-Rust port: `apply_templates` registers `[templates]` +
+	// `[previews] model_family` into the process-global renderer so the
+	// dylib path renders `[templates.preview.<family>.<ctype>]` format
+	// strings. ──
+	#[test]
+	fn test_apply_templates_registers_templates_and_family() {
+		let _g = crate::templates::templates_test_guard();
+		let cfg = Config {
+			raw:"[templates.preview.code_first]\ndiff = \"{type} {ln}L\"\n[previews]\nmodel_family = \"code_first\"\n"
+				.parse()
+				.unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		cfg.apply_templates(&state);
+		assert_eq!(
+			crate::templates::get_preview_family().as_deref(),
+			Some("code_first"),
+			"model_family must register from [previews]"
+		);
+		assert_eq!(
+			crate::templates::render_preview("diff", "a\nb\nc\n").as_deref(),
+			Some("diff 3L"),
+			"registered [templates.preview.code_first.diff] must render"
+		);
+		// Restore globals for later tests.
+		crate::templates::set_templates(None);
+		crate::templates::set_preview_family(None);
 	}
 
 	// ── Fix 21 (inspection): `get_bool` must accept uppercase/mixed-case

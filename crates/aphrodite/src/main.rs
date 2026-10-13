@@ -146,6 +146,12 @@ async fn run() -> anyhow::Result<()> {
 		// config structs but never read anywhere, so every preview knob
 		// was a no-op. Absent -> unlimited (legacy behavior).
 		aphrodite::preview::set_preview_max_chars(config.previews.as_ref().and_then(|p| p.preview_max_chars));
+		// ── Pre-Rust port: register `[templates]` + `[previews]
+		// model_family` into the process-global template renderer so
+		// `[templates.preview.<family>.<ctype>]` format strings render
+		// instead of the hardcoded per-arm builders. Absent -> hardcoded.
+		aphrodite::templates::set_preview_family(config.previews.as_ref().and_then(|p| p.model_family.clone()));
+		aphrodite::templates::set_templates(config.templates.clone());
 		let log_compact = aphrodite::config::env_bool("APHRODITE_LOG_COMPACT");
 		(Some(config), None, log_compact)
 	} else {
