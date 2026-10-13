@@ -189,9 +189,9 @@ Deletes a specific CCR entry by hash.
 
 Hot-reloads `aphrodite.toml` (or `APHRODITE_CONFIG_PATH`) and applies the
 `[compression]` thresholds to the live proxy state - cache/token/inline
-thresholds and the code multiplier. The `[previews] preview_max_chars` cap is
-kept in sync too. Other `[compression]` keys are echoed for visibility but not
-applied by the proxy.
+thresholds, the code multiplier, and the auto-expand knobs. The
+`[previews] preview_max_chars` cap is kept in sync too. Other `[compression]`
+keys are echoed for visibility but not applied by the proxy.
 
 ### Response (200 OK)
 
@@ -204,11 +204,11 @@ applied by the proxy.
 		"tool_threshold_cache": 2000,
 		"tool_threshold_token": 3000,
 		"inline_threshold": 500,
-		"code_multiplier": 2.0
+		"code_multiplier": 2.0,
+		"auto_expand": true,
+		"auto_expand_limit": 102400
 	},
 	"parsed_only": {
-		"auto_expand": null,
-		"auto_expand_limit": null,
 		"terminal_threshold": null,
 		"engine_threshold_pct": null,
 		"catalog_mode": null

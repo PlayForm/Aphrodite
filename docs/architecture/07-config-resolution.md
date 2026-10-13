@@ -1,6 +1,6 @@
 # Config Resolution Precedence
 
-Two independent resolution stacks share the same **env > TOML > default** precedence but live in different modules: the proxy's `MultiConfig::resolve`, which produces one `Cli` per listener, and the Hermes/FFI `Config` loader, whose `apply_compression` writes straight into `AphroditeState`. Both read the same `aphrodite.toml`, and only a small set of keys is actually consumed at runtime - most of the schema is inert or reserved.
+Two independent resolution stacks share the same **env > TOML > default** precedence but live in different modules: the proxy's `MultiConfig::resolve`, which produces one `Cli` per listener, and the Hermes/FFI `Config` loader, whose `apply_compression` writes straight into `AphroditeState`. Both read the same `aphrodite.toml`; nearly the whole schema is consumed at runtime, with a small residual set that stays parsed-but-inert (`catalog_mode`, `code_structure_map`, `rust_preview_lines`, `classifier_poll`).
 
 ## Precedence flowchart
 
@@ -42,18 +42,21 @@ flowchart LR
 		L4["defaults.api_url/model, ccr_ttl_seconds, timeout"]
 		L5["[flow] budget_chars → flow_budget_chars"]
 		L6["[compression] context_engine, tool_threshold_token, terminal_threshold (FFI state)"]
-		L7["[directives] active (seeds active_directives)"]
-		L8["[previews] preview_max_chars → preview cap<br/>(env APHRODITE_PREVIEW_MAX_CHARS > TOML; shipped template default 120, key absent = no cap)"]
+		L7["[compression] engine_threshold_pct / engine_protect_first/last / engine_min_msgs (FFI state, load-bearing middle-turn archiving)"]
+		L8["[compression] auto_expand / auto_expand_limit (inline marker resolution; /reload-applied)"]
+		L9["[previews] model_family → preview template family selector<br/>[templates.preview.*] / [templates.marker] / [templates.prompts] / [templates.reverse] → format strings + ctype→key remap"]
+		L10["[prompts] retrieve_guidance / ccr_marker_hint / catalog_intent_hints (FFI state)"]
+		L11["[directives] active (seeds active_directives)"]
+		L12["[previews] preview_max_chars → preview cap<br/>(env APHRODITE_PREVIEW_MAX_CHARS > TOML; shipped template default 0 = no cap)"]
 	end
 	subgraph hot["CONFIG-RELOADABLE (config-file watcher, applies to live atomics)"]
 		H1["the 4 threshold atomics only"]
 	end
-	subgraph inert["INERT / RESERVED (write-only, never read by the proxy)"]
-		I1["engine_min_msgs, engine_protect_first/last (write-only, never read)"]
-		I2["catalog_mode (RESERVED)"]
-		I3["previews.* remaining inert (model_family / code_structure_map / rust_preview_lines) · prompts.* (never read by the proxy)"]
-		I4["auto_expand / auto_expand_limit / classifier_poll (CompressionConfig fields, unused)"]
-		I5["mode/listen: not env-overridable in resolve (would break dual-proxy)"]
+	subgraph inert["INERT / RESERVED (parsed for schema compatibility, no consumer)"]
+		I1["catalog_mode (RESERVED)"]
+		I2["previews.* inert remainder (code_structure_map / rust_preview_lines)"]
+		I3["classifier_poll (CompressionConfig field, unused)"]
+		I4["mode/listen: not env-overridable in resolve (would break dual-proxy)"]
 	end
 ```
 
@@ -62,5 +65,5 @@ Precedence subtleties:
 - The proxy's `resolve` deliberately gives `mode`/`listen` no blanket env override - a process-wide `APHRODITE_MODE`/`APHRODITE_LISTEN` would clobber every `[[proxies]]` entry and break the cache/token split. Port overrides stay per-mode (`APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT`).
 - `apply_compression` maps the FFI state's `tool_threshold` to the `tool_threshold_token` TOML key and the `APHRODITE_TOOL_THRESHOLD_TOKEN` env var. The old `tool_threshold` names shipped in no TOML, so wiring them as-is would have silently resolved to the default forever.
 - `env_bool` accepts `1`/`true` (case-insensitive) as truthy and everything else as false; `env_parse_warn` warns loudly on a present-but-malformed numeric override instead of silently defaulting.
-- `[previews] preview_max_chars` caps rendered previews (env `APHRODITE_PREVIEW_MAX_CHARS` wins over TOML). The shipped config template sets 120; when the key is absent the preview builder applies no cap. It is applied at proxy startup and whenever the FFI config is (re)loaded - a dylib reload re-applies it, but the config-file watcher does not.
+- `[previews] preview_max_chars` caps rendered previews (env `APHRODITE_PREVIEW_MAX_CHARS` wins over TOML; shipped default `0` = no cap). It is applied at proxy startup and whenever the FFI config is (re)loaded - a dylib reload re-applies it, and `POST /reload` re-applies it to the proxy, but the config-file watcher does not.
 - The config-file watcher reacts to `Modify` events on `aphrodite.toml` (500 ms debounce), reloads the file, and stores the four resolved thresholds (`cache`, `token`, `inline`, `code_multiplier`) into every live `AppState`'s atomics. Nothing else is updated live.

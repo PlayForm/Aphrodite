@@ -282,8 +282,8 @@ DELETE /ccr/{hash}
 ## handle_ccr_reload
 
 Hot-reloads `aphrodite.toml` and applies the `[compression]` thresholds
-(cache, token, inline, code multiplier) plus the preview cap to the live
-`AppState`.
+(cache, token, inline, code multiplier), the auto-expand knobs, and the
+preview cap to the live `AppState`.
 
 ### Endpoint
 
