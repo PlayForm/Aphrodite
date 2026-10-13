@@ -115,7 +115,7 @@ impl Config {
 
 	/// Parse the `[templates]` section (pre-Rust port) into typed structs.
 	/// Absent section = None (hardcoded builders remain the default).
-	pub fn get_templates(&self) -> Option<crate::config::TemplatesConfig> {
+	pub fn get_templates(&self) -> Option<crate::state::TemplatesConfig> {
 		self.section("templates").and_then(|t| t.clone().try_into().ok())
 	}
 

@@ -225,7 +225,7 @@ mod tests {
 	#[test]
 	fn test_toc_hint_uses_configured_search_hint_template() {
 		let mut s = AphroditeState::default();
-		s.templates = Some(crate::config::TemplatesConfig::default());
+		s.templates = Some(crate::state::TemplatesConfig::default());
 		s.templates
 			.as_mut()
 			.unwrap()

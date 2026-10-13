@@ -20,5 +20,5 @@ pub use proxy::{
 	PromptsConfig,
 	ProxyConfig,
 	ProxyMode,
-	TemplatesConfig,
 };
+pub use crate::state::TemplatesConfig;

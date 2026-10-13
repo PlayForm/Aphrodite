@@ -625,7 +625,7 @@ mod tests {
 
 	fn state_with_prompt(name:&str, tmpl:&str) -> AphroditeState {
 		let mut s = AphroditeState::default();
-		s.templates = Some(crate::config::TemplatesConfig::default());
+		s.templates = Some(crate::state::TemplatesConfig::default());
 		s.templates.as_mut().unwrap().prompts.insert(name.into(), tmpl.into());
 		s
 	}
@@ -642,7 +642,7 @@ mod tests {
 	#[test]
 	fn test_render_prompt_configured_template_wins_over_fallback() {
 		let mut s = AphroditeState::default();
-		s.templates = Some(crate::config::TemplatesConfig::default());
+		s.templates = Some(crate::state::TemplatesConfig::default());
 		s.templates
 			.as_mut()
 			.unwrap()

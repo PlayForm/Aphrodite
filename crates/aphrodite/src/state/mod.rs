@@ -26,6 +26,25 @@ pub use directives::ActiveDirective;
 pub use events::ToolEvent;
 pub use markers::MarkerEntry;
 
+/// TOML template strings (pre-Rust port): preview families, marker block,
+/// prompt templates, reverse key map. Each preview family maps content types
+/// to `{variable}` format strings; resolution order is
+/// family[ctype] -> reverse[ctype] -> family[_default] -> hardcoded builder.
+/// Defined here (not in the feature-gated `config` module) so the dylib
+/// path (`state`, `config_loader`, `templates`) can reference it without the
+/// `proxy` feature.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct TemplatesConfig {
+	#[serde(default)]
+	pub preview:HashMap<String, HashMap<String, String>>,
+	#[serde(default)]
+	pub marker:HashMap<String, String>,
+	#[serde(default)]
+	pub prompts:HashMap<String, String>,
+	#[serde(default)]
+	pub reverse:HashMap<String, String>,
+}
+
 /// Maximum inline store entries before LRU eviction.
 const INLINE_MAX:usize = 500;
 
@@ -140,7 +159,7 @@ pub struct AphroditeState {
 	pub session_inject:String,
 	/// `[templates]` section (pre-Rust port) - preview families, marker block,
 	/// prompt templates, reverse key map. None = hardcoded builders/defaults.
-	pub templates:Option<crate::config::TemplatesConfig>,
+	pub templates:Option<TemplatesConfig>,
 	/// `[prompts] retrieve_guidance` (minimal|standard|verbose) - how much CCR
 	/// retrieval explanation `flow::build_turn_context` injects per turn.
 	/// Default "minimal" = current behavior (no extra guidance).

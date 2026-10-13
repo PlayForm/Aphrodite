@@ -18,7 +18,7 @@ use std::{
 	sync::{OnceLock, RwLock},
 };
 
-use crate::config::TemplatesConfig;
+use crate::state::TemplatesConfig;
 
 /// Process-global template registry: the parsed `[templates]` section plus
 /// the `[previews] model_family` selector (default `"code_first"` when
