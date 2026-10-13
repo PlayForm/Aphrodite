@@ -123,8 +123,11 @@ fn current_hint() -> String {
 /// Dispatch marker rendering: configured `[templates.marker] format` wins,
 /// the canonical three-part grammar is the fallback.
 fn render_marker_block(preview:&str, ccr_type:&str, meta:&str, center:Option<&str>, hash:&str, size:usize) -> String {
+	// DEV-ONLY debug instrumentation (crate::debug): marker-render counter +
+	// verbose line at APHRODITE_DEBUG=2 (captured only when verbose).
+	let t0 = (crate::debug::level() >= 2).then(std::time::Instant::now);
 	let hint = current_hint();
-	match registered_marker_format() {
+	let out = match registered_marker_format() {
 		Some(fmt) => {
 			let size_s = size.to_string();
 			let center_seg = center.map(|c| format!(";center={c}")).unwrap_or_default();
@@ -141,7 +144,20 @@ fn render_marker_block(preview:&str, ccr_type:&str, meta:&str, center:Option<&st
 			substitute_vars(&fmt, &vars)
 		},
 		None => render_marker_fallback(preview, ccr_type, meta, center, hash, size, &hint),
+	};
+	crate::debug::bump(crate::debug::Counter::TemplateRenders);
+	if let Some(t0) = t0 {
+		crate::debug::log_verbose(
+			"marker_render",
+			&[
+				("hash", hash.to_string()),
+				("type", ccr_type.to_string()),
+				("size", size.to_string()),
+				("elapsed_us", t0.elapsed().as_micros().to_string()),
+			],
+		);
 	}
+	out
 }
 
 /// Render the canonical marker grammar (fallback when `[templates.marker]

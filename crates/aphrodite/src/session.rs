@@ -211,15 +211,19 @@ pub fn engine_maybe_archive(state:&mut AphroditeState) -> Option<String> {
 	// Engine off (config), or threshold 0 (never) / 100+ (documented
 	// engine-off escape hatch). All gates run before any mutation.
 	if !state.context_engine_enabled || state.engine_threshold_pct == 0 || state.engine_threshold_pct >= 100 {
+		// DEV-ONLY debug instrumentation (crate::debug): engine decision.
+		crate::debug::engine_skip(state, "engine_off_or_threshold_gate");
 		return None;
 	}
 	let total = state.conv_index.len();
 	if total < state.engine_min_msgs {
+		crate::debug::engine_skip(state, "below_min_msgs");
 		return None;
 	}
 	// Fill ratio: archived-turn count against the index's own cap.
 	let fill_pct = ((total as u64 * 100) / CONV_INDEX_CAP as u64).min(100);
 	if fill_pct < state.engine_threshold_pct {
+		crate::debug::engine_skip(state, "fill_below_threshold");
 		return None;
 	}
 	// Middle slice: exactly protect_first from the start, protect_last from
@@ -228,6 +232,7 @@ pub fn engine_maybe_archive(state:&mut AphroditeState) -> Option<String> {
 	let tail_n = state.engine_protect_last;
 	let middle_n = total.saturating_sub(head_n).saturating_sub(tail_n);
 	if middle_n < 3 {
+		crate::debug::engine_skip(state, "middle_too_small");
 		return None;
 	}
 	// Sorted turns, oldest first (same ordering as `get_conv_index`).
@@ -277,6 +282,19 @@ pub fn engine_maybe_archive(state:&mut AphroditeState) -> Option<String> {
 		center:None,
 		meta:None,
 	});
+	// DEV-ONLY debug instrumentation (crate::debug): archive outcome.
+	crate::debug::bump(crate::debug::Counter::EngineArchives);
+	crate::debug::log_at(
+		state.debug_level,
+		"engine_archive",
+		&[
+			("hash", hash.clone()),
+			("middle", middle_n.to_string()),
+			("head", head_n.to_string()),
+			("tail", tail_n.to_string()),
+			("size", packed.len().to_string()),
+		],
+	);
 	tracing::info!(
 		hash,
 		middle = middle_n,

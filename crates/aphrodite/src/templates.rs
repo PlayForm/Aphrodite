@@ -75,6 +75,9 @@ pub fn get_preview_family() -> Option<String> {
 /// fallback). Substitution is defensive: unknown `{variable}`s render as
 /// empty strings and a malformed template never panics.
 pub fn render_preview(type_str:&str, content:&str) -> Option<String> {
+	// DEV-ONLY debug instrumentation (crate::debug): template-render counter
+	// + verbose line at APHRODITE_DEBUG=2 (captured only when verbose).
+	let t0 = (crate::debug::level() >= 2).then(std::time::Instant::now);
 	let st = state().read().unwrap_or_else(std::sync::PoisonError::into_inner);
 	let templates = st.templates.as_ref()?;
 	let family = st.family.clone().unwrap_or_else(|| "code_first".to_string());
@@ -87,7 +90,19 @@ pub fn render_preview(type_str:&str, content:&str) -> Option<String> {
 		return None;
 	}
 	let vars = build_vars(type_str, content);
-	Some(substitute(tmpl, &vars))
+	let out = substitute(tmpl, &vars);
+	crate::debug::bump(crate::debug::Counter::TemplateRenders);
+	if let Some(t0) = t0 {
+		crate::debug::log_verbose(
+			"render_preview",
+			&[
+				("type", type_str.to_string()),
+				("bytes", content.len().to_string()),
+				("elapsed_us", t0.elapsed().as_micros().to_string()),
+			],
+		);
+	}
+	Some(out)
 }
 
 /// Build the template variable set from content, mirroring the pre-Rust

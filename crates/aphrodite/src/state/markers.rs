@@ -16,6 +16,9 @@ pub struct MarkerEntry {
 impl AphroditeState {
 	/// Record a compression marker.
 	pub fn record_marker(&mut self, entry:MarkerEntry) {
+		// DEV-ONLY debug metrics (crate::debug): one atomic add when the
+		// logger is on; a no-op single load when off.
+		crate::debug::bump(crate::debug::Counter::MarkersCreated);
 		self.recent_markers.push_back(entry);
 		// Keep the last RECENT_MARKERS_CAP markers; front eviction (fix 6)
 		// keeps index 0 as the oldest survivor.

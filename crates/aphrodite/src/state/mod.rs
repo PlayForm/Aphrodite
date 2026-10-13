@@ -136,6 +136,10 @@ pub struct AphroditeState {
 	/// fields on change (default off). Only config fields are mutated -
 	/// session CCR state, directive selection, and telemetry are preserved.
 	pub auto_reload:bool,
+	/// DEV-ONLY debug logger level (0 = off, 1 = on, 2 = verbose), read from
+	/// `APHRODITE_DEBUG` at config load (temporary development
+	/// instrumentation - see `crate::debug`; never a release path).
+	pub debug_level:u8,
 	// RESERVED: same as engine_min_msgs above (01-F9).
 	pub catalog_mode:String,
 	pub expand_guidance:bool,
@@ -272,7 +276,8 @@ impl Default for AphroditeState {
 			tool_threshold:512,
 			terminal_threshold:256,
 			config_error:None,
-			auto_reload:false,
+					auto_reload:false,
+					debug_level:0,
 			catalog_mode:"tool".into(),
 			expand_guidance:false,
 			dev_mode:false,

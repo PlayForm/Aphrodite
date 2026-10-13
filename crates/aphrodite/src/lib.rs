@@ -22,6 +22,9 @@
 pub mod catalog;
 pub mod chain_split;
 pub mod config_loader;
+/// DEV-ONLY env-gated debug logger (temporary development instrumentation,
+/// gated behind `APHRODITE_DEBUG` - never a release path).
+pub mod debug;
 pub mod directives;
 pub mod home;
 pub mod flow;

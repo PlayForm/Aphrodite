@@ -201,6 +201,9 @@ pub fn build_first_turn_injection(state:&AphroditeState) -> String {
 /// itself does not render a telemetry line.
 pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<usize>) -> String {
 	let _ = est_request_bytes; // reserved for P9/T27 telemetry line
+	// DEV-ONLY debug instrumentation (crate::debug): pre-turn timing
+	// (captured only when the logger is on - one atomic load when off).
+	let t0 = crate::debug::enabled().then(std::time::Instant::now);
 
 	let budget = state.flow_budget_chars;
 
@@ -280,7 +283,55 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 		sections.pop();
 	}
 
-	join_sections(&sections)
+	let joined = join_sections(&sections);
+	// DEV-ONLY debug instrumentation (crate::debug): pre-turn line with the
+	// injected sections (label + byte size each), the flow budget, and the
+	// cumulative metrics snapshot - emitted on every turn while the logger
+	// is on.
+	if let Some(t0) = t0 {
+		let us = t0.elapsed().as_micros() as u64;
+		crate::debug::add_timing(crate::debug::TimingCat::PreTurn, us);
+		let secs:Vec<serde_json::Value> = sections
+			.iter()
+			.map(|s| serde_json::json!({"label": section_label(s), "bytes": s.len()}))
+			.collect();
+		crate::debug::log_at(
+			state.debug_level,
+			"pre_turn_sections",
+			&[
+				("turn", state.turn_counter.to_string()),
+				("budget", budget.to_string()),
+				("always_survive", always_survive.to_string()),
+				("sections", serde_json::to_string(&secs).unwrap_or_default()),
+				("pending_markers", state.recent_markers.len().to_string()),
+				("metrics", crate::debug::metrics_json().to_string()),
+				("elapsed_us", us.to_string()),
+			],
+		);
+	}
+	joined
+}
+
+/// DEV-ONLY: short label for an injected section, derived from its first
+/// line (the section order is fixed by [`build_turn_context`]).
+fn section_label(s:&str) -> &'static str {
+	if s.starts_with("[directives") {
+		"directives"
+	} else if s.starts_with("[nudge") {
+		"nudges"
+	} else if s.starts_with("[engine-offload") {
+		"engine_offload"
+	} else if s.starts_with("[retrieval") {
+		"retrieval"
+	} else if s.starts_with("[auto-expand") {
+		"auto_expand"
+	} else if s.starts_with("[recall]") {
+		"recall"
+	} else if s.starts_with("[aphrodite: first-turn") {
+		"session_inject"
+	} else {
+		"other"
+	}
 }
 
 /// Number of leading "never-drop" sections currently present (directives +

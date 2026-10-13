@@ -374,6 +374,10 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 				"chain_split_events": state.split_events.len(),
 				"chain_split_produced": state.split_events.iter().map(|e| e.produced).sum::<usize>(),
 				"chain_split_retrieved": state.split_events.iter().map(|e| e.retrieved).sum::<usize>(),
+				// DEV-ONLY debug logger (temporary instrumentation): the
+				// env-gated level + cumulative metrics snapshot.
+				"debug_level": state.debug_level,
+				"debug_metrics": aphrodite::debug::metrics_json(),
 			})
 		});
 		stats["proxies"] = proxy_health();

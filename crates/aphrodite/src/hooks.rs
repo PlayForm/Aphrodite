@@ -168,6 +168,8 @@ fn transform_live_container(state:&mut AphroditeState, content:&str, type_str:&s
 		meta:None,
 	});
 
+	// DEV-ONLY debug metrics (crate::debug): count the live-container wrap.
+	crate::debug::bump(crate::debug::Counter::LiveContainers);
 	serde_json::json!({
 		"status": "ok",
 		"compressed": true,
@@ -233,6 +235,10 @@ pub fn transform_tool_result_with_meta(
 /// inferred from the args of `write_file`/`patch`-style tools.
 fn record_tool_event_from_meta(state:&mut AphroditeState, tool_name:&str, content:&str, meta:&ToolCallMeta) {
 	let ok = meta.status.map(|s| s != "error").unwrap_or(true);
+	// DEV-ONLY debug metrics (crate::debug): count tool-reported errors.
+	if !ok {
+		crate::debug::bump(crate::debug::Counter::ToolErrors);
+	}
 	let error_sig = if ok {
 		None
 	} else {
@@ -400,6 +406,8 @@ fn transform_tool_result_inner(
 	} else {
 		None
 	};
+	// DEV-ONLY debug metrics (crate::debug): count the compress decision.
+	crate::debug::bump(crate::debug::Counter::Compressions);
 	let mut payload = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
@@ -412,6 +420,7 @@ fn transform_tool_result_inner(
 	if let Some(expanded) = expanded {
 		payload["auto_expanded"] = serde_json::Value::Bool(true);
 		payload["expanded"] = serde_json::Value::String(expanded);
+		crate::debug::bump(crate::debug::Counter::AutoExpansions);
 	}
 	payload
 }
@@ -564,10 +573,14 @@ fn transform_terminal_output_inner(
 				total_orig,
 				total_marker
 			);
-			return serde_json::json!({
-				"status": "ok",
-				"compressed": true,
-				"chain_split": true,
+			// DEV-ONLY debug metrics (crate::debug): count the chain-split
+					// compress decision (per-segment markers are counted individually
+					// by `record_marker`).
+					crate::debug::bump(crate::debug::Counter::Compressions);
+					return serde_json::json!({
+						"status": "ok",
+						"compressed": true,
+						"chain_split": true,
 				"segments": segments.len(),
 				"summary": summary,
 				"markers": segments,
@@ -619,6 +632,8 @@ fn transform_terminal_output_inner(
 	} else {
 		None
 	};
+	// DEV-ONLY debug metrics (crate::debug): count the compress decision.
+	crate::debug::bump(crate::debug::Counter::Compressions);
 	let mut payload = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
@@ -631,6 +646,7 @@ fn transform_terminal_output_inner(
 	if let Some(expanded) = expanded {
 		payload["auto_expanded"] = serde_json::Value::Bool(true);
 		payload["expanded"] = serde_json::Value::String(expanded);
+		crate::debug::bump(crate::debug::Counter::AutoExpansions);
 	}
 	payload
 }

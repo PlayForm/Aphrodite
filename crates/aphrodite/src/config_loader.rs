@@ -248,6 +248,18 @@ impl Config {
 		// wiped it; fa85dfa). Env: `APHRODITE_AUTO_RELOAD`.
 		state.auto_reload = self.get_bool("APHRODITE_AUTO_RELOAD", "compression", "auto_reload", false);
 
+		// ── DEV-ONLY debug logger (temporary development instrumentation) ──
+		// `APHRODITE_DEBUG=1|2` exported at Hermes launch turns the
+		// per-session debug file logger on from turn 0 (see `crate::debug`;
+		// the runtime `aphrodite_debug` tool stays for toggling). 0 = off
+		// (default), 1 = on, 2 = verbose. Read here (like
+		// `APHRODITE_AUTO_EXPAND` etc.) so the env var is captured into
+		// state at session start; the process-global level mirror lets
+		// stateless render points gate on the same flag. This is temporary
+		// dev-only compute - never a release path.
+		state.debug_level = self.get_u64("APHRODITE_DEBUG", "compression", "debug_level", 0).min(2) as u8;
+		crate::debug::set_level(state.debug_level);
+
 		// ── Fine-grained chain splitting ──
 		// Default OFF for release: the segment markers (`echo __APHRODITE_SEG__`)
 		// pollute captured stdout when commands are redirected to files, and
@@ -807,6 +819,37 @@ mod tests {
 		if let Some(v) = backup {
 			unsafe { std::env::set_var(KEY, v) };
 		}
+	}
+
+	// ── DEV-ONLY debug logger (crate::debug, temporary instrumentation):
+	// `APHRODITE_DEBUG` must be captured into `state.debug_level` at config
+	// load (0 = off default, 1 = on, 2 = verbose, >2 clamps to 2). ──
+	#[test]
+	fn test_aphrodite_debug_env_sets_state_level() {
+		let _g = CWD_GUARD.get_or_init(|| std::sync::Mutex::new(())).lock().unwrap();
+		const KEY:&str = "APHRODITE_DEBUG";
+		let backup = std::env::var(KEY).ok();
+		unsafe { std::env::remove_var(KEY) };
+
+		// Absent => 0 (off - byte-identical behavior when unset).
+		let mut state = crate::state::AphroditeState::default();
+		guarded_apply_compression(&Config::default(), &mut state);
+		assert_eq!(state.debug_level, 0, "absent APHRODITE_DEBUG must leave debug off");
+		assert!(!crate::debug::enabled(), "process-global level must mirror 0");
+
+		for (value, expected) in [("1", 1u8), ("2", 2u8), ("3", 2u8)] {
+			unsafe { std::env::set_var(KEY, value) };
+			let mut state = crate::state::AphroditeState::default();
+			guarded_apply_compression(&Config::default(), &mut state);
+			assert_eq!(state.debug_level, expected, "APHRODITE_DEBUG={value:?}");
+		}
+
+		unsafe { std::env::remove_var(KEY) };
+		if let Some(v) = backup {
+			unsafe { std::env::set_var(KEY, v) };
+		}
+		// Leave the process-global logger off for the rest of the suite.
+		crate::debug::set_level(0);
 	}
 
 	// ── Fix 22 (inspection): a found-but-broken TOML file must emit a

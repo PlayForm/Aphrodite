@@ -51,7 +51,20 @@ fn runtime_home() -> PathBuf {
 	// $HERMES_HOME -> $HOME -> platform default. Under a non-default Hermes
 	// home (Docker, profiles) the debug flags land in that home, not in a
 	// shadow $HOME/.hermes/aphrodite.
-	aphrodite::home::runtime_home_opt().unwrap_or_else(|| std::env::temp_dir().join(".hermes").join("aphrodite"))
+	#[cfg(test)]
+	{
+		// Hermetic tests: route debug flags / session persistence away from
+		// the real runtime home so the live session's toggle and
+		// `session.current` can never leak into (or be polluted by) the
+		// test process.
+		let scratch = std::env::temp_dir().join("aphrodite-hermes-test-home");
+		let _ = std::fs::create_dir_all(&scratch);
+		scratch
+	}
+	#[cfg(not(test))]
+	{
+		aphrodite::home::runtime_home_opt().unwrap_or_else(|| std::env::temp_dir().join(".hermes").join("aphrodite"))
+	}
 }
 
 /// Record session -> parent from a `pre_llm_call` invocation. Empty or
@@ -74,6 +87,9 @@ pub(crate) fn record_session(session:&str, parent:&str) {
 	// write degrades to "no persistence", never an error.
 	let _ = std::fs::write(runtime_home().join("session.current"), session);
 	if parent.is_empty() || session == parent {
+		// Root session (no parent): publish it directly so the env-gated
+		// logger targets `debug.<root>` (crate::debug).
+		aphrodite::debug::note_root_session(session);
 		return;
 	}
 	let mut map = SESSION_PARENTS
@@ -81,6 +97,10 @@ pub(crate) fn record_session(session:&str, parent:&str) {
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	map.entry(session.to_string()).or_insert_with(|| parent.to_string());
+	// Publish the ROOT of this session tree (root-most ancestor) so the
+	// env-gated logger targets `debug.<root>` for the whole tree.
+	let root = session_chain(session).last().cloned().unwrap_or_else(|| session.to_string());
+	aphrodite::debug::note_root_session(&root);
 }
 
 /// Walk session -> parent -> ... -> root, root first. Depth-capped at 16 so
@@ -124,7 +144,13 @@ fn flag_enabled(path:&Path) -> bool {
 		return *cached_on;
 	}
 	let on = std::fs::read_to_string(path)
-		.map(|s| s.trim().to_lowercase())
+		.ok()
+		// FIRST line only: the env-gated logger (`aphrodite::debug`)
+		// APPENDS timestamped lines to this same `debug.<root>` file, so
+		// the flag value stays readable on line 1 while the log history
+		// grows below it. A toggle write ("on"/"off", whole-file
+		// overwrite) still reads back identically.
+		.and_then(|s| s.lines().next().map(|l| l.trim().to_lowercase()))
 		.map(|s| matches!(s.as_str(), "1" | "on" | "true" | "debug"))
 		.unwrap_or(false);
 	guard.insert(key, (mtime, on));
@@ -247,4 +273,42 @@ pub(crate) fn debug_line(r:&serde_json::Value, session:&str) -> Option<String> {
 		"[aphrodite-debug: session={} status={} compressed={} type={} size={} hash={} reason={}]",
 		session, status, compressed, ccr_type, size, hash, reason
 	))
+}
+
+// ── DEV-ONLY env-gated logger bridge (temporary instrumentation) ─────────
+//
+// The core crate's logger (`aphrodite::debug`) gates on `APHRODITE_DEBUG`
+// captured at launch (`state.debug_level`). These helpers OR in the session
+// flag toggle so the `aphrodite_debug` tool still turns logging on/off for a
+// session tree even when the env var was not exported.
+
+/// Effective debug level for a session: the env-gated level (captured at
+/// launch) wins; otherwise the session flag-file toggle applies (level 1).
+pub(crate) fn effective_level(state:&aphrodite::state::AphroditeState, session:&str) -> u8 {
+	if state.debug_level > 0 {
+		state.debug_level
+	} else if enabled_for(session) {
+		1
+	} else {
+		0
+	}
+}
+
+/// True when any debug channel is on for `session` (cheap pre-check for
+/// callers that must capture timing before logging).
+pub(crate) fn any_enabled(state:&aphrodite::state::AphroditeState, session:&str) -> bool {
+	effective_level(state, session) != 0
+}
+
+/// Bridge-side log line: env level OR the session flag toggle.
+pub(crate) fn log_bridge(
+	state:&aphrodite::state::AphroditeState,
+	session:&str,
+	event:&str,
+	kv:&[(&str, String)],
+) {
+	let lvl = effective_level(state, session);
+	if lvl > 0 {
+		aphrodite::debug::log_at(lvl, event, kv);
+	}
 }
