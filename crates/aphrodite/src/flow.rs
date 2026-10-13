@@ -110,6 +110,45 @@ fn auto_expand_guidance_block(state:&AphroditeState) -> String {
 	format!("[auto-expand: {}]", text)
 }
 
+/// Context-engine trigger + offload section (pre-Rust port of `_engine.py`
+/// `compress`): while the context engine is enabled
+/// (`state.context_engine_enabled`), ask it whether it archived middle
+/// messages this turn ([`crate::session::engine_maybe_archive`]); when it
+/// returns the rendered `engine_offload` prompt (marker + guidance), inject
+/// it so the model sees the compacted history. Disabled, or enabled with the
+/// engine returning `None` (nothing archived), = no injection, byte-identical
+/// current behavior.
+///
+/// Mirrors `auto_expand_guidance_block` (gate on the state flag, section
+/// injection through [`build_turn_context`]). Unlike the auto-expand line it
+/// is counted in the always-survive tier when present: the archive already
+/// mutated the conversation (session.rs owns that), so the explanation must
+/// not be the first section dropped under budget pressure.
+fn engine_offload_block(state:&mut AphroditeState) -> String {
+	engine_offload_section_from(engine_archive_prompt(state))
+}
+
+/// Gate + trigger: call [`crate::session::engine_maybe_archive`] only while
+/// the context engine is enabled. Disabled => the engine is never consulted
+/// (this is the trigger's only call site) and nothing is injected.
+fn engine_archive_prompt(state:&mut AphroditeState) -> Option<String> {
+	if !state.context_engine_enabled {
+		return None;
+	}
+	crate::session::engine_maybe_archive(state)
+}
+
+/// Wrap the engine's offload prompt into the injected section text; `None`
+/// or an empty prompt injects nothing. Split out so the Some/None injection
+/// semantics stay testable while `session::engine_maybe_archive` is still the
+/// pre-landed stub (Task 3 implements the body).
+fn engine_offload_section_from(prompt:Option<String>) -> String {
+	match prompt {
+		Some(text) if !text.is_empty() => format!("[engine-offload: {text}]"),
+		_ => String::new(),
+	}
+}
+
 /// Default first-turn session injection. Loaded from `[prompts] session_inject`
 /// in aphrodite.toml; this constant is the fallback when the key is absent.
 /// Rendered once (turn_counter == 0) by `build_first_turn_injection`, then
@@ -145,11 +184,13 @@ pub fn build_first_turn_injection(state:&AphroditeState) -> String {
 ///
 /// Section order (top = highest survival priority; drop order is bottom-up:
 /// the recall catalog goes first under budget pressure, directives + nudges
-/// never drop):
+/// + the engine-offload prompt never drop):
 ///
 /// ```text
 /// [directives: focus] ...        (build_directive_context - never dropped)
 /// [nudge: ...]                   (ephemeral one-shots, at most 2 - never dropped)
+/// [engine-offload: ...]          (context-engine archive prompt - present only
+///                                 when the engine archived this turn; never dropped)
 /// [retrieval: ...]               (opt-in retrieve_guidance line - droppable)
 /// [auto-expand: ...]             (opt-in auto_expand_guidance line - droppable)
 /// [recall] <catalog summary>     (dropped first under budget pressure)
@@ -169,6 +210,12 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	// ── Always-survive sections (top priority) ──
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
 	let nudges = render_nudges(state);
+
+	// ── Context-engine trigger + offload prompt (fires only when the engine
+	// archived messages this turn; runs before the recall summary so any
+	// engine state mutation lands before the catalog reads the markers) ──
+	let engine_offload = engine_offload_block(state);
+	let engine_offload_present = !engine_offload.is_empty();
 
 	// ── Retrieval guidance (opt-in via [prompts] retrieve_guidance; drops
 	// before bg status / recall under budget pressure) ──
@@ -199,6 +246,9 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	if !nudges.is_empty() {
 		sections.push(nudges);
 	}
+	if engine_offload_present {
+		sections.push(engine_offload);
+	}
 	if !retrieve.is_empty() {
 		sections.push(retrieve);
 	}
@@ -219,10 +269,12 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	// sections, so a turn with an inject + directive + nudge present could
 	// compute always_survive == 1 and drop directives/nudges under budget
 	// pressure). Session inject non-empty, directives non-empty, nudges
-	// present; keep the min with the section count so an empty turn never
-	// underflows the floor.
-	let always_survive =
-		(!session_inject.is_empty()) as usize + (!directives.is_empty()) as usize + nudges_present(state) as usize;
+	// present, engine-offload present; keep the min with the section count
+	// so an empty turn never underflows the floor.
+	let always_survive = (!session_inject.is_empty()) as usize
+		+ (!directives.is_empty()) as usize
+		+ nudges_present(state) as usize
+		+ engine_offload_present as usize;
 	let always_survive = always_survive.min(sections.len());
 	while join_sections(&sections).len() > budget && sections.len() > always_survive {
 		sections.pop();
@@ -812,5 +864,62 @@ mod tests {
 			ctx.contains("[auto-expand: inline {limit} limit]"),
 			"configured template must win over the fallback: {ctx}"
 		);
+	}
+
+	// ── Context-engine trigger + offload injection (pre-Rust port): while
+	// `state.context_engine_enabled` is set, `engine_archive_prompt` consults
+	// `session::engine_maybe_archive` (the trigger's single call site) and the
+	// returned prompt is injected as a `[engine-offload: ...]` section; disabled
+	// or engine returning None = nothing, byte-identical current behavior. The
+	// engine body is still the pre-landed stub (always None), so the Some-path
+	// injection semantics are exercised on `engine_offload_section_from`. ──
+
+	#[test]
+	fn test_engine_offload_disabled_no_call_no_injection() {
+		// Disabled: the gate short-circuits inside `engine_archive_prompt`
+		// BEFORE `session::engine_maybe_archive` (its only call site), so the
+		// engine is never consulted and no section can appear.
+		let mut s = AphroditeState::default();
+		s.context_engine_enabled = false;
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(!ctx.contains("[engine-offload"), "disabled engine must inject nothing: {ctx}");
+		assert_eq!(engine_archive_prompt(&mut s), None, "gate must yield None while disabled");
+	}
+
+	#[test]
+	fn test_engine_offload_prompt_injected_when_engine_returns_some() {
+		// Engine returned a prompt => the wrapped section is what the model sees.
+		// The full build_turn_context path cannot produce Some yet: the
+		// `session::engine_maybe_archive` stub returns None until Task 3 lands.
+		let section = engine_offload_section_from(Some("offloaded abc123 keep 5".to_string()));
+		assert_eq!(section, "[engine-offload: offloaded abc123 keep 5]");
+		// An empty prompt degrades to no injection, never a bare section.
+		assert_eq!(engine_offload_section_from(Some(String::new())), "");
+	}
+
+	#[test]
+	fn test_engine_offload_nothing_injected_when_engine_returns_none() {
+		// Engine enabled (default) + stub returning None => no injection.
+		let mut s = AphroditeState::default();
+		assert_eq!(engine_offload_section_from(engine_archive_prompt(&mut s)), "");
+		assert_eq!(engine_offload_section_from(None), "");
+	}
+
+	#[test]
+	fn test_engine_offload_default_state_unchanged() {
+		// Default state: engine enabled (default) but the pre-landed
+		// `engine_maybe_archive` stub returns None => no archive, no injection -
+		// byte-identical current behavior (and the context stays empty).
+		let mut s = AphroditeState::default();
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[engine-offload"),
+			"stub engine (None) must inject nothing: {ctx}"
+		);
+		assert_eq!(ctx, "", "default state must produce the same empty context as before");
 	}
 }

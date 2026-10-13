@@ -38,11 +38,18 @@ pub fn next_turn(state:&mut AphroditeState) -> usize {
 	state.turn_counter
 }
 
+/// Cap on `conv_index` entries - the eviction bound enforced by
+/// [`archive_turn`]. Doubles as the capacity reference for the context
+/// engine's fill ratio: the dylib has no token counts and no context
+/// length, so the conversation index's own cap is the closest available
+/// "full" reference (the index holds at most `CONV_INDEX_CAP` turns).
+const CONV_INDEX_CAP:usize = 50;
+
 /// Archive a compression at end of turn into the conversation index.
 pub fn archive_turn(state:&mut AphroditeState, hash:&str, summary:&str, size:usize) {
 	let turn = state.turn_counter;
 	state.conv_index.insert(turn, (hash.to_string(), summary.to_string(), size));
-	if state.conv_index.len() > 50 {
+	if state.conv_index.len() > CONV_INDEX_CAP {
 		let oldest = state.conv_index.keys().min().copied();
 		if let Some(key) = oldest {
 			state.conv_index.remove(&key);
@@ -173,16 +180,113 @@ pub fn catalog_summary(state:&mut AphroditeState) -> String {
 }
 
 /// Context-engine archiving entry (pre-Rust port of `_engine.py`
-/// `AphroditeContextEngine`). When the engine is enabled and the session
-/// crosses `engine_threshold_pct` with at least `engine_min_msgs` messages,
-/// archive the middle messages (keeping `engine_protect_first` at the start
-/// and `engine_protect_last` at the end) into CCR and return the rendered
-/// `engine_offload` prompt (marker + guidance) to inject; `None` = nothing
-/// archived (below threshold / engine off). Task 3 (pre-Rust port) implements
-/// the body; the signature is the stable contract the trigger consumes.
+/// `AphroditeContextEngine`).
+///
+/// Metric (documented per the pre-Rust-port brief): the dylib never receives
+/// the raw conversation message list (Hermes holds it) and has no token
+/// counts or context length, so the closest available message-count proxy is
+/// the conversation index itself - `conv_index.len()` is the number of
+/// archived turns (each turn contributes at least one user + one assistant
+/// message in the real conversation). The "message-count fill ratio" is
+/// `conv_index.len() * 100 / CONV_INDEX_CAP`: the index's own eviction cap is
+/// the only "full" reference the dylib has.
+///
+/// When the engine is enabled and the session crosses `engine_threshold_pct`
+/// (fill ratio at or above the percent; 100+ = engine off, 0 = never, both
+/// pre-Rust `should_compress` semantics) with at least `engine_min_msgs`
+/// entries, the middle turns of the index - keeping exactly
+/// `engine_protect_first` at the start and `engine_protect_last` at the end,
+/// with the pre-Rust middle-size floor of ≥ 3 - are packed as one JSON
+/// payload, stored in the inline/CCR store under a BLAKE3 key
+/// (`headroom_core::ccr::compute_key`), and the middle is REPLACED in
+/// `conv_index` by a single marker entry recorded via `archive_turn` so the
+/// model sees a compact history (head + marker + tail). The returned string
+/// is the CCR marker plus the rendered `engine_offload` prompt (hash + tail)
+/// for the caller to inject into the live conversation.
+///
+/// `None` = nothing archived (engine off / below threshold / below min_msgs /
+/// middle too small) with zero mutation - byte-identical behavior when
+/// disabled.
 pub fn engine_maybe_archive(state:&mut AphroditeState) -> Option<String> {
-	let _ = state;
-	None
+	// Engine off (config), or threshold 0 (never) / 100+ (documented
+	// engine-off escape hatch). All gates run before any mutation.
+	if !state.context_engine_enabled || state.engine_threshold_pct == 0 || state.engine_threshold_pct >= 100 {
+		return None;
+	}
+	let total = state.conv_index.len();
+	if total < state.engine_min_msgs {
+		return None;
+	}
+	// Fill ratio: archived-turn count against the index's own cap.
+	let fill_pct = ((total as u64 * 100) / CONV_INDEX_CAP as u64).min(100);
+	if fill_pct < state.engine_threshold_pct {
+		return None;
+	}
+	// Middle slice: exactly protect_first from the start, protect_last from
+	// the end; pre-Rust `compress()` refuses a middle shorter than 3.
+	let head_n = state.engine_protect_first;
+	let tail_n = state.engine_protect_last;
+	let middle_n = total.saturating_sub(head_n).saturating_sub(tail_n);
+	if middle_n < 3 {
+		return None;
+	}
+	// Sorted turns, oldest first (same ordering as `get_conv_index`).
+	let mut turns:Vec<usize> = state.conv_index.keys().copied().collect();
+	turns.sort_unstable();
+	let end = total.saturating_sub(tail_n);
+	let middle_keys:Vec<usize> = turns[head_n..end].to_vec();
+
+	// Pack the REAL middle entries (recorded turn → hash/summary/size) as one
+	// compact JSON payload - never fabricated message content.
+	let packed_entries:Vec<serde_json::Value> = middle_keys
+		.iter()
+		.filter_map(|t| {
+			state.conv_index.get(t).map(
+				|(hash, summary, size)| serde_json::json!({"turn": t, "hash": hash, "summary": summary, "size": size}),
+			)
+		})
+		.collect();
+	let packed = match serde_json::to_string(&packed_entries) {
+		Ok(p) => p,
+		Err(e) => {
+			tracing::warn!(error = %e, "engine_maybe_archive: packing middle turns failed; skipping");
+			return None;
+		},
+	};
+	let hash = headroom_core::ccr::compute_key(packed.as_bytes());
+	state.inline_store_put(hash.clone(), packed.clone());
+	let preview = packed.chars().take(120).collect::<String>();
+	let marker = crate::marker::ccr_marker(&hash, "context", packed.len(), &preview, None, None, None);
+	let rendered =
+		crate::flow::render_prompt(state, "engine_offload", &[("hash", &hash), ("tail", &tail_n.to_string())]);
+	let prompt = format!("{marker}\n{rendered}");
+
+	// Replace the archived middle with the marker entry: drop the middle
+	// turns from the index, then record the new archive at the current turn.
+	for t in &middle_keys {
+		state.conv_index.remove(t);
+	}
+	let summary = format!("engine offload: {middle_n} middle turns archived (keep {head_n}/{tail_n})");
+	archive_turn(state, &hash, &summary, packed.len());
+	state.record_marker(crate::state::MarkerEntry {
+		hash:hash.clone(),
+		ccr_type:"context".into(),
+		size:packed.len(),
+		preview,
+		turn:state.turn_counter,
+		center:None,
+		meta:None,
+	});
+	tracing::info!(
+		hash,
+		middle = middle_n,
+		size = packed.len(),
+		"context_engine: archived {} middle turns to CCR:{} ({} bytes)",
+		middle_n,
+		hash,
+		packed.len()
+	);
+	Some(prompt)
 }
 
 #[cfg(test)]
@@ -340,5 +444,177 @@ mod tests {
 			r.contains("intent=read | recent CCRs: bbbbbbbbbbbb cccccccccccc dddddddddddd"),
 			"last 3 hashes in insertion order, 12 chars each: {r}"
 		);
+	}
+
+	// ── Context-engine archiving (pre-Rust port of _engine.py) ──
+
+	/// Build a state with `entries` archived turns (keys 1..=entries) and
+	/// default engine config (enabled, threshold 45, min 8, protect 2/5).
+	fn engine_state(entries:usize) -> AphroditeState {
+		let mut s = AphroditeState::default();
+		for i in 1..=entries {
+			s.conv_index.insert(i, (format!("h{i:02}"), format!("summary {i}"), i * 10));
+		}
+		s
+	}
+
+	/// Assert the engine left the state completely untouched: same
+	/// conversation index, empty inline store, no recorded markers.
+	fn assert_zero_mutation(s:&AphroditeState) {
+		assert!(s.inline_store.is_empty(), "no archive may hit the inline store");
+		assert!(s.recent_markers.is_empty(), "no marker may be recorded");
+	}
+
+	#[test]
+	fn test_engine_archive_below_threshold_none_no_mutation() {
+		// 10 archived turns = 20% fill; threshold 80 not crossed.
+		let mut s = engine_state(10);
+		s.engine_threshold_pct = 80;
+		let before = s.conv_index.clone();
+		assert!(engine_maybe_archive(&mut s).is_none());
+		assert_eq!(s.conv_index, before, "below threshold must not touch conv_index");
+		assert_zero_mutation(&s);
+	}
+
+	#[test]
+	fn test_engine_archive_disabled_none_no_mutation() {
+		let mut s = engine_state(12);
+		s.engine_threshold_pct = 20; // well over threshold if enabled
+		s.context_engine_enabled = false;
+		let before = s.conv_index.clone();
+		assert!(engine_maybe_archive(&mut s).is_none());
+		assert_eq!(s.conv_index, before, "disabled engine must be byte-identical no-op");
+		assert_zero_mutation(&s);
+	}
+
+	#[test]
+	fn test_engine_archive_over_threshold_archives_middle_and_returns_prompt() {
+		let mut s = engine_state(12);
+		s.engine_threshold_pct = 20; // 12 entries = 24% fill
+		s.engine_min_msgs = 8;
+		s.engine_protect_first = 2;
+		s.engine_protect_last = 5;
+		let prompt = engine_maybe_archive(&mut s).expect("over threshold must archive");
+		// Returned prompt carries the marker line AND the rendered guidance
+		// (fallback references the hash for aphrodite_retrieve).
+		let hash = headroom_core::ccr::compute_key(
+			serde_json::json!([
+				{"turn": 3, "hash": "h03", "summary": "summary 3", "size": 30},
+				{"turn": 4, "hash": "h04", "summary": "summary 4", "size": 40},
+				{"turn": 5, "hash": "h05", "summary": "summary 5", "size": 50},
+				{"turn": 6, "hash": "h06", "summary": "summary 6", "size": 60},
+				{"turn": 7, "hash": "h07", "summary": "summary 7", "size": 70},
+			])
+			.to_string()
+			.as_bytes(),
+		);
+		assert!(prompt.contains(&hash), "prompt must contain the archive hash: {prompt}");
+		assert!(prompt.contains("<<<CCR:"), "prompt must carry the CCR marker line");
+		assert!(
+			prompt.contains("Use aphrodite_retrieve"),
+			"prompt must carry retrieval guidance"
+		);
+		// Middle replaced by the marker entry: keys 3..=7 gone, head (1,2)
+		// and tail (8..=12) kept, marker entry recorded at the current turn.
+		for t in 3..=7 {
+			assert!(!s.conv_index.contains_key(&t), "middle turn {t} must be replaced");
+		}
+		for t in [1, 2, 8, 9, 10, 11, 12] {
+			assert!(s.conv_index.contains_key(&t), "protected turn {t} must survive");
+		}
+		assert_eq!(s.conv_index.len(), 8, "12 - 5 middle + 1 marker entry");
+		let (m_hash, m_summary, m_size) = s.conv_index.get(&0).expect("marker entry recorded");
+		assert_eq!(m_hash, &hash);
+		assert!(m_summary.starts_with("engine offload: 5 middle turns archived"));
+		assert!(*m_size > 0);
+		// Archived middle must be retrievable from the inline store.
+		assert!(s.inline_store.contains_key(&hash), "archive payload must be stored inline");
+	}
+
+	#[test]
+	fn test_engine_archive_protect_bounds_respected() {
+		// protect_first=2 / protect_last=5 on 12 turns: exactly keys 3..=7
+		// (5 entries) are the middle; head/tail survive verbatim.
+		let mut s = engine_state(12);
+		s.engine_threshold_pct = 20;
+		s.engine_min_msgs = 8;
+		s.engine_protect_first = 2;
+		s.engine_protect_last = 5;
+		let _ = engine_maybe_archive(&mut s).expect("must archive");
+		assert!(s.conv_index.contains_key(&1) && s.conv_index.contains_key(&2));
+		assert!(s.conv_index.contains_key(&8) && s.conv_index.contains_key(&12));
+		assert!(!s.conv_index.contains_key(&3) && !s.conv_index.contains_key(&7));
+		assert_eq!(s.conv_index.len(), 8);
+		// protect_first=0 keeps nothing at the start: middle starts at key 1.
+		let mut s0 = engine_state(12);
+		s0.engine_threshold_pct = 20;
+		s0.engine_min_msgs = 8;
+		s0.engine_protect_first = 0;
+		s0.engine_protect_last = 5;
+		let _ = engine_maybe_archive(&mut s0).expect("must archive");
+		assert!(!s0.conv_index.contains_key(&1), "protect_first=0 keeps no head");
+		assert!(s0.conv_index.contains_key(&8) && s0.conv_index.contains_key(&12));
+	}
+
+	#[test]
+	fn test_engine_archive_min_msgs_respected() {
+		// 5 entries = 10% fill >= threshold 10, but 5 < min_msgs 8.
+		let mut s = engine_state(5);
+		s.engine_threshold_pct = 10;
+		s.engine_min_msgs = 8;
+		let before = s.conv_index.clone();
+		assert!(engine_maybe_archive(&mut s).is_none());
+		assert_eq!(s.conv_index, before);
+		assert_zero_mutation(&s);
+	}
+
+	#[test]
+	fn test_engine_archive_threshold_100_off() {
+		// 100+ = documented engine-off escape hatch; also 0 = never.
+		for pct in [0u64, 100, 200] {
+			let mut s = engine_state(12);
+			s.engine_threshold_pct = pct;
+			let before = s.conv_index.clone();
+			assert!(
+				engine_maybe_archive(&mut s).is_none(),
+				"threshold {pct} must leave the engine off"
+			);
+			assert_eq!(s.conv_index, before);
+			assert_zero_mutation(&s);
+		}
+	}
+
+	#[test]
+	fn test_engine_archive_middle_too_small_none() {
+		// protect 2/9 on 12 turns leaves a 1-entry middle (< pre-Rust floor 3).
+		let mut s = engine_state(12);
+		s.engine_threshold_pct = 20;
+		s.engine_min_msgs = 8;
+		s.engine_protect_first = 2;
+		s.engine_protect_last = 9;
+		let before = s.conv_index.clone();
+		assert!(engine_maybe_archive(&mut s).is_none());
+		assert_eq!(s.conv_index, before);
+		assert_zero_mutation(&s);
+	}
+
+	#[test]
+	fn test_engine_archive_payload_round_trips_inline() {
+		let mut s = engine_state(12);
+		s.engine_threshold_pct = 20;
+		s.engine_min_msgs = 8;
+		s.engine_protect_first = 2;
+		s.engine_protect_last = 5;
+		let prompt = engine_maybe_archive(&mut s).expect("must archive");
+		// Extract the hash from the marker line and resolve it back.
+		let hash = crate::marker::extract_hashes(&prompt)
+			.into_iter()
+			.next()
+			.expect("marker hash must be extractable");
+		let resolved = s.inline_store_get(&hash).expect("archive must resolve from inline store");
+		let parsed:serde_json::Value = serde_json::from_str(&resolved).expect("packed payload must be JSON");
+		assert_eq!(parsed.as_array().map(Vec::len), Some(5), "middle of 5 turns packed");
+		assert_eq!(parsed[0]["turn"], 3);
+		assert_eq!(parsed[4]["turn"], 7);
 	}
 }
