@@ -224,6 +224,8 @@ impl Config {
 		state.auto_expand = self.get_bool("APHRODITE_AUTO_EXPAND", "compression", "auto_expand", false);
 		state.auto_expand_limit =
 			self.get_usize("APHRODITE_AUTO_EXPAND_LIMIT", "compression", "auto_expand_limit", 102400);
+		// ── Live containers (pre-Rust port): streaming tool-output mode ──
+		state.live_container = self.get_bool("APHRODITE_LIVE_CONTAINER", "compression", "live_container", false);
 		// Opt-in config auto-reload (default OFF): when true, the dylib
 		// watches aphrodite.toml and re-applies config fields on change -
 		// never session CCR state (the dropped dylib-binary hot-reload

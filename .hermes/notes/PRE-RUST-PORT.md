@@ -38,14 +38,20 @@ edit it.
    487 total green; rustfmt clean. Parent integration gate pending re-run.
 4. **Task 3 - context engine pair:** session/state archiving wired to
    `engine_*` keys (middle-message compression, head/tail protection).
-4. **Task 3 - context engine pair:** session/state archiving wired to
-   `engine_*` keys (middle-message compression, head/tail protection).
+4. **Task 3 - context engine pair: DONE (2026-10-13).**
+   A = session.rs engine_maybe_archive (threshold gates, protect 2/5, middle JSON
+   packed, BLAKE3 hash, inline store, engine_offload prompt) - 8 tests;
+   B = flow.rs trigger + engine_offload injection - 4 tests. NOTE: engine now
+   LIVE - with shipped defaults (threshold 30, enabled) it archives at 30% fill.
 5. **Task 4 - live containers pair:** streaming read_file/terminal via CCR
-   (`APHRODITE_LIVE_CONTAINER`) in prefetch/retrieve/hooks.
+   (`APHRODITE_LIVE_CONTAINER`) in prefetch/poll_worker + hooks/retrieve.
+   NOTE: prefetch.rs/poll_worker.rs already cover much (v0.5.127-134 machinery
+   survived); port the missing streaming/container bits from _hooks/live.py.
 6. **Task 5 - scripting + caps pair:** Rhai `scripting.rs` + Cargo feature;
-   recursion depth/body-size config consumers.
-7. **Task 6 - prompt knobs pair:** flow rendering of `retrieve_guidance`,
-   `ccr_marker_hint`, `catalog_intent_hints`.
+   recursion depth/body-size config consumers. (center.rs NOT restored -
+   deliberately dead per lib.rs report 01-T6.)
+7. **Task 6 - prompt knobs: DONE (absorbed by Task 1 sa-1):** retrieve_guidance,
+   ccr_marker_hint, catalog_intent_hints wired with tests.
 
 ## Standing brief rules (verbatim in every child context)
 

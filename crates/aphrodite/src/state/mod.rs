@@ -166,6 +166,10 @@ pub struct AphroditeState {
 	pub auto_expand:bool,
 	/// `[compression] auto_expand_limit` - byte cap for auto-expanded content.
 	pub auto_expand_limit:usize,
+	/// `APHRODITE_LIVE_CONTAINER` (pre-Rust port): streaming live-container
+	/// mode for tool outputs (chunked arrival + instant markers + progress).
+	/// Default false = current behavior.
+	pub live_container:bool,
 	/// `[prompts] retrieve_guidance` (minimal|standard|verbose) - how much CCR
 	/// retrieval explanation `flow::build_turn_context` injects per turn.
 	/// Default "minimal" = current behavior (no extra guidance).
@@ -274,6 +278,7 @@ impl Default for AphroditeState {
 			templates:None,
 			auto_expand:false,
 			auto_expand_limit:102400,
+			live_container:false,
 			retrieve_guidance:"minimal".into(),
 			catalog_intent_hints:false,
 			manual_directive_turn:None,
