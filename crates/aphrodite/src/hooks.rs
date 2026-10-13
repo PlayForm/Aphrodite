@@ -117,19 +117,11 @@ pub(crate) fn chunk_on_char_boundaries(content:&str, chunk_size:usize) -> Vec<&s
 /// way `ccr_marker` does (newlines → spaces).
 fn live_marker(hash:&str, total:usize, chunks:usize, preview:&str) -> String {
 	let safe = preview.replace(['\n', '\r'], " ").trim().to_string();
-	let chunk_note = if chunks == 1 {
-		"1 chunk".to_string()
-	} else {
-		format!("{chunks} chunks")
-	};
+	let chunk_note = if chunks == 1 { "1 chunk".to_string() } else { format!("{chunks} chunks") };
 	format!(
-		"<<<CCR:{}|live|{}>>>\nLive container: {} · {} · {} bytes · 0 bytes arrived. Use aphrodite_retrieve({}) to fetch when needed. Continue reasoning without waiting.",
-		hash,
-		total,
-		safe,
-		chunk_note,
-		total,
-		hash
+		"<<<CCR:{}|live|{}>>>\nLive container: {} · {} · {} bytes · 0 bytes arrived. Use aphrodite_retrieve({}) to \
+		 fetch when needed. Continue reasoning without waiting.",
+		hash, total, safe, chunk_note, total, hash
 	)
 }
 
@@ -1143,6 +1135,171 @@ mod tests {
 			r["auto_expanded"], true,
 			"auto-expand must store+expand below-threshold content so no marker leaks"
 		);
+		assert_eq!(r["expanded"], content);
+	}
+
+	// ── Live containers (pre-Rust port of _hooks/live.py): enabled AND
+	// above the compress threshold → chunked container store + INSTANT
+	// marker with a progress annotation; off / below threshold → today's
+	// behavior byte-identical. ──
+
+	// Contract 1: `live_container` off (the default) must keep the payload
+	// byte-identical to the pre-live shape - same field set, same marker
+	// grammar, no container fields, no container store keys.
+	#[test]
+	fn test_live_container_off_payload_is_byte_identical() {
+		let mut s = AphroditeState::default(); // live_container = false
+		s.tool_threshold = 0;
+		let content = "fn main() {\n    println!(\"hello\");\n}\n";
+		let r = transform_tool_result(&mut s, content, "terminal");
+		assert_eq!(r["status"], "ok");
+		assert_eq!(r["compressed"], true);
+		assert!(r.get("live").is_none(), "off must not emit container fields");
+		let hash = r["hash"].as_str().unwrap();
+		let expect_marker = format!(
+			"<<<CCR:{}|{}|{}>>>\n{}",
+			hash,
+			r["type"].as_str().unwrap(),
+			content.len(),
+			r["preview"].as_str().unwrap()
+		);
+		assert_eq!(r["marker"], expect_marker, "off must keep the exact marker grammar");
+		assert!(
+			!s.inline_store.contains_key(&live_meta_key(hash)),
+			"off must not store a container envelope"
+		);
+		assert!(
+			!s.inline_store.contains_key(&live_chunk_key(hash, 0)),
+			"off must not store container chunks"
+		);
+		assert_eq!(crate::resolve::expand(&mut s, hash), Some(content.to_string()));
+	}
+
+	// Contract 2: enabled but below the compress threshold → unchanged
+	// (no container) on BOTH the tool and terminal paths.
+	#[test]
+	fn test_live_container_below_threshold_unchanged() {
+		let mut s = AphroditeState::default();
+		s.live_container = true;
+		s.tool_threshold = 10_000;
+		let r = transform_tool_result(&mut s, "short output", "terminal");
+		assert_eq!(r["compressed"], false);
+		assert_eq!(r["reason"], "below_threshold");
+		assert!(r.get("live").is_none(), "below-threshold must not emit a container");
+
+		let mut s2 = AphroditeState::default();
+		s2.live_container = true;
+		s2.terminal_threshold = 10_000;
+		let r2 = transform_terminal_output(&mut s2, "tiny terminal output");
+		assert_eq!(r2["compressed"], false);
+		assert_eq!(r2["reason"], "below_threshold");
+		assert!(r2.get("live").is_none());
+	}
+
+	// Contract 3: enabled + over the threshold → INSTANT marker with a
+	// progress annotation; the store carries the container (meta envelope +
+	// per-chunk entries) AND the round-trip hash; the marker's hash still
+	// resolves to the exact original.
+	#[test]
+	fn test_live_container_tool_over_threshold_instant_marker_with_progress() {
+		let mut s = AphroditeState::default();
+		s.live_container = true;
+		s.tool_threshold = 0; // always compress
+		let content = (0..40)
+			.map(|i| format!("tool payload line {i:02} with some text\n"))
+			.collect::<String>();
+		let chunks = chunk_on_char_boundaries(&content, LIVE_CHUNK_SIZE);
+		assert!(chunks.len() >= 2, "test content must span multiple chunks");
+		let r = transform_tool_result(&mut s, &content, "terminal");
+		assert_eq!(r["status"], "ok");
+		assert_eq!(r["compressed"], true);
+		assert_eq!(r["live"], true);
+		assert_eq!(r["type"], "live", "the marker type must be `live`");
+		assert_eq!(r["size"].as_u64().unwrap() as usize, content.len());
+		assert_eq!(r["chunks"].as_u64().unwrap() as usize, chunks.len());
+		assert_eq!(r["bytes_arrived"], 0, "the instant marker reports zero bytes arrived");
+		let hash = r["hash"].as_str().unwrap();
+		let marker = r["marker"].as_str().unwrap();
+		assert!(
+			marker.starts_with(&format!("<<<CCR:{}|live|{}>>>", hash, content.len())),
+			"marker must use the live grammar: {marker}"
+		);
+		assert!(marker.contains("Live container"), "marker must carry the annotation: {marker}");
+		assert!(
+			marker.contains(&format!("{} chunks", chunks.len())),
+			"marker must carry the chunk count: {marker}"
+		);
+		assert!(
+			marker.contains("0 bytes arrived"),
+			"marker must carry the progress annotation: {marker}"
+		);
+		// Container store: meta envelope + per-chunk entries + round-trip hash.
+		assert!(
+			s.inline_store.contains_key(&live_meta_key(hash)),
+			"meta envelope must be stored"
+		);
+		for i in 0..chunks.len() {
+			assert!(
+				s.inline_store.contains_key(&live_chunk_key(hash, i)),
+				"chunk {i} must be stored"
+			);
+		}
+		assert_eq!(crate::resolve::expand(&mut s, hash), Some(content.clone()));
+		assert!(
+			s.recent_markers.iter().any(|m| m.hash == hash && m.ccr_type == "live"),
+			"the live entry must be recorded in the catalog"
+		);
+	}
+
+	// Contract 3 (terminal path): same instant-marker contract through
+	// `transform_terminal_output`.
+	#[test]
+	fn test_live_container_terminal_over_threshold_instant_marker() {
+		let mut s = AphroditeState::default();
+		s.live_container = true;
+		s.terminal_threshold = 0;
+		let content = (0..40)
+			.map(|i| format!("cargo step {i:02} done - line content\n"))
+			.collect::<String>();
+		let r = transform_terminal_output(&mut s, &content);
+		assert_eq!(r["live"], true);
+		assert_eq!(r["type"], "live");
+		assert_eq!(
+			r["chunks"].as_u64().unwrap() as usize,
+			chunk_on_char_boundaries(&content, LIVE_CHUNK_SIZE).len()
+		);
+		let hash = r["hash"].as_str().unwrap();
+		assert!(
+			r["marker"]
+				.as_str()
+				.unwrap()
+				.starts_with(&format!("<<<CCR:{}|live|{}>>>", hash, content.len()))
+		);
+		assert_eq!(crate::resolve::expand(&mut s, hash), Some(content));
+	}
+
+	// Contract 4: the default state keeps `live_container` off - no config
+	// change, no behavioral drift.
+	#[test]
+	fn test_live_container_default_state_unchanged() {
+		let s = AphroditeState::default();
+		assert_eq!(s.live_container, false, "default state must keep live_container off");
+	}
+
+	// Auto-expand wins over the container path: under auto-expand (within
+	// the limit) the hook returns the expanded content inline even when
+	// live_container is on - no container marker may leak.
+	#[test]
+	fn test_live_container_defers_to_auto_expand_within_limit() {
+		let mut s = AphroditeState::default();
+		s.live_container = true;
+		s.auto_expand = true;
+		s.auto_expand_limit = 102400;
+		s.tool_threshold = 0;
+		let content = "some content that would otherwise become a live container\n";
+		let r = transform_tool_result(&mut s, content, "terminal");
+		assert_eq!(r["auto_expanded"], true, "auto-expand must win over the container path");
+		assert!(r.get("live").is_none());
 		assert_eq!(r["expanded"], content);
 	}
 }
