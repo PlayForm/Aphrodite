@@ -27,8 +27,8 @@ use std::{
 };
 
 use axum::{
-	body::Body,
-	extract::State,
+	body::{Body, to_bytes},
+	extract::{FromRequest, Request, State},
 	http::{Method, StatusCode},
 	response::{IntoResponse, Json, Response},
 };
@@ -146,6 +146,13 @@ pub struct ResolvedThresholds {
 	/// content. Env `APHRODITE_AUTO_EXPAND_LIMIT` > TOML
 	/// `auto_expand_limit` > `AUTO_EXPAND_LIMIT_DEFAULT`.
 	pub auto_expand_limit:usize,
+	/// `APHRODITE_MAX_REQUEST_BODY_SIZE` (pre-Rust port): proxy request-body
+	/// cap in bytes - requests with bodies over this size are rejected with
+	/// 413 while the body is being read (never fully buffered). Env >
+	/// TOML `[compression] max_request_body_size` > None (no cap = current
+	/// behavior). Resolved at startup only; write-once like the other
+	/// non-atomic config (a `/reload` echoes it but cannot change a live cap).
+	pub max_request_body_size:Option<usize>,
 }
 
 /// Resolve the compression thresholds and auto-expand knobs from env vars,
@@ -183,6 +190,11 @@ pub fn resolve_thresholds(compression:Option<&CompressionConfig>) -> ResolvedThr
 		auto_expand_limit:env_parse_warn::<usize>("APHRODITE_AUTO_EXPAND_LIMIT")
 			.or_else(|| compression.and_then(|c| c.auto_expand_limit).map(|v| v as usize))
 			.unwrap_or(AUTO_EXPAND_LIMIT_DEFAULT),
+		// Presence-aware: `APHRODITE_MAX_REQUEST_BODY_SIZE=0` is a legitimate
+		// "reject every non-empty body" configuration, so absent-env must
+		// fall through to TOML then to None (no cap) rather than parse 0.
+		max_request_body_size:env_parse_warn::<usize>("APHRODITE_MAX_REQUEST_BODY_SIZE")
+			.or_else(|| compression.and_then(|c| c.max_request_body_size)),
 	}
 }
 
@@ -426,6 +438,14 @@ pub struct AppState {
 	/// content (see `auto_expand`). Default `AUTO_EXPAND_LIMIT_DEFAULT`
 	/// (matches the Hermes-side `AphroditeState` default).
 	pub auto_expand_limit:AtomicUsize,
+	/// `APHRODITE_MAX_REQUEST_BODY_SIZE` (pre-Rust port): request-body cap
+	/// in bytes enforced by the [`CappedBody`] extractor while the body is
+	/// read - `Some(n)` rejects over-`n` bodies with 413, `None` (the
+	/// default) = no cap, byte-identical current behavior. Matches the
+	/// Hermes-side `AphroditeState::max_request_body_size` (same env/TOML
+	/// key, resolved by `resolve_thresholds`). Write-once: set in
+	/// `build_state`, never mutated after startup.
+	pub max_request_body_size:Option<usize>,
 }
 
 /// Estimate the effective compressed byte-size of `content` for EMA
@@ -891,6 +911,7 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		code_multiplier_x100:AtomicU64::new((thresholds.code_multiplier * 100.0) as u64),
 		auto_expand:AtomicBool::new(thresholds.auto_expand),
 		auto_expand_limit:AtomicUsize::new(thresholds.auto_expand_limit),
+		max_request_body_size:thresholds.max_request_body_size,
 	})
 }
 
@@ -1081,6 +1102,53 @@ fn truncate_char_safe(s:&str, max:usize) -> &str {
 	&s[..end]
 }
 
+/// Request-body extractor enforcing [`AppState::max_request_body_size`].
+///
+/// Wraps the `Bytes` extractor but reads the body through
+/// `axum::body::to_bytes` with the configured cap, so an over-limit body
+/// is rejected with 413 WHILE it is being read - never fully buffered into
+/// memory. `None` (the default) reads the whole body with a `usize::MAX`
+/// cap: byte-identical current behavior. Complements the router's
+/// `DefaultBodyLimit` (a fixed 64 MB on the catch-all route): this is the
+/// config-driven, per-`max_request_body_size` cap.
+#[derive(Debug)]
+pub struct CappedBody(pub Bytes);
+
+/// Rejection for [`CappedBody`] - 413 with the crate's standard
+/// `{"error": ...}` JSON shape (the same status `DefaultBodyLimit` uses).
+#[derive(Debug)]
+pub struct BodyTooLarge;
+
+impl IntoResponse for BodyTooLarge {
+	fn into_response(self) -> Response {
+		(
+			StatusCode::PAYLOAD_TOO_LARGE,
+			Json(serde_json::json!({"error": "request body exceeds configured max_request_body_size limit"})),
+		)
+			.into_response()
+	}
+}
+
+impl FromRequest<Arc<AppState>> for CappedBody {
+	type Rejection = BodyTooLarge;
+
+	async fn from_request(req:Request, state:&Arc<AppState>) -> Result<Self, Self::Rejection> {
+		// Only the body stream is needed; the (already-extracted) parts are
+		// dropped, exactly as the `Bytes` extractor does.
+		let (_parts, body) = req.into_parts();
+		let cap = state.max_request_body_size.unwrap_or(usize::MAX);
+		// `to_bytes` stops reading at `cap` and errors on overflow, so the
+		// cap is enforced during the read, never after a full buffering.
+		match to_bytes(body, cap).await {
+			Ok(bytes) => Ok(CappedBody(bytes)),
+			// Over-limit OR a body read failure - both degrade to the same
+			// 413: a client that sent too much gets the same answer whether
+			// the stream errored or was merely too long.
+			Err(_) => Err(BodyTooLarge),
+		}
+	}
+}
+
 /// Catch-all proxy handler - forwards any request to DeepSeek.
 /// Specifically handles Chat Completions API at /v1/chat/completions.
 pub async fn proxy_handler(
@@ -1088,7 +1156,7 @@ pub async fn proxy_handler(
 	method:Method,
 	path:axum::extract::OriginalUri,
 	headers:axum::http::HeaderMap,
-	body:Bytes,
+	CappedBody(body):CappedBody,
 ) -> impl IntoResponse {
 	state.requests_total.fetch_add(1, Ordering::Relaxed);
 	state.request_body_bytes.fetch_add(body.len() as u64, Ordering::Relaxed);
@@ -2661,6 +2729,9 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 					"code_multiplier": thresholds.code_multiplier,
 					"auto_expand": thresholds.auto_expand,
 					"auto_expand_limit": thresholds.auto_expand_limit,
+					// Echoed for visibility; the live cap is write-once
+					// (resolved at startup) - a reload cannot change it.
+					"max_request_body_size": thresholds.max_request_body_size,
 				},
 				// Parsed and visible, but not applied by this proxy (see doc
 				// comment above).
@@ -2678,6 +2749,7 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 				code_multiplier = thresholds.code_multiplier,
 				auto_expand = thresholds.auto_expand,
 				auto_expand_limit = thresholds.auto_expand_limit,
+				max_request_body_size = ?thresholds.max_request_body_size,
 				"config reloaded - compression thresholds applied"
 			);
 			(StatusCode::OK, Json(body)).into_response()
@@ -2797,6 +2869,7 @@ pub(crate) mod tests {
 			code_multiplier_x100:AtomicU64::new(300),
 			auto_expand:AtomicBool::new(false),
 			auto_expand_limit:AtomicUsize::new(AUTO_EXPAND_LIMIT_DEFAULT),
+			max_request_body_size:None,
 		};
 		assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
 	}
@@ -2822,6 +2895,7 @@ pub(crate) mod tests {
 			inline_threshold:Some(2048),
 			auto_expand:None,
 			auto_expand_limit:None,
+			max_request_body_size:None,
 			catalog_mode:None,
 			classifier_poll:None,
 			code_multiplier:Some(5.0),
@@ -2864,6 +2938,7 @@ pub(crate) mod tests {
 			inline_threshold:None,
 			auto_expand:Some(true),
 			auto_expand_limit:Some(4096),
+			max_request_body_size:None,
 			catalog_mode:None,
 			classifier_poll:None,
 			code_multiplier:None,
@@ -3445,6 +3520,7 @@ auto_expand_limit = 2048
 			code_multiplier_x100:AtomicU64::new(300),
 			auto_expand:AtomicBool::new(false),
 			auto_expand_limit:AtomicUsize::new(AUTO_EXPAND_LIMIT_DEFAULT),
+			max_request_body_size:None,
 		}
 	}
 
@@ -4006,14 +4082,14 @@ auto_expand_limit = 2048
 		Method,
 		axum::extract::OriginalUri,
 		axum::http::HeaderMap,
-		Bytes,
+		CappedBody,
 	) {
 		(
 			axum::extract::State(state),
 			Method::POST,
 			axum::extract::OriginalUri(format!("http://x{path}").parse().unwrap()),
 			axum::http::HeaderMap::new(),
-			Bytes::from_static(body.as_bytes()),
+			CappedBody(Bytes::from_static(body.as_bytes())),
 		)
 	}
 
@@ -4097,5 +4173,51 @@ auto_expand_limit = 2048
 		// Short input and pure-ASCII input pass through unchanged.
 		assert_eq!(truncate_char_safe("abc", 80), "abc");
 		assert_eq!(truncate_char_safe(&"x".repeat(100), 80).len(), 80);
+	}
+
+	// ── Pre-Rust port: `APHRODITE_MAX_REQUEST_BODY_SIZE` - the CappedBody
+	// extractor must reject over-limit bodies with 413 while reading, and
+	// `None` must keep today's no-cap behavior byte-identical. ──
+	fn test_state_with_max_body(n:usize) -> AppState { AppState { max_request_body_size:Some(n), ..test_state() } }
+
+	#[tokio::test]
+	async fn test_body_cap_rejects_over_limit_with_413() {
+		let state = Arc::new(test_state_with_max_body(16));
+		let req = axum::extract::Request::builder()
+			.method("POST")
+			.uri(format!("http://x{CHAT_COMPLETIONS_PATH}"))
+			.body(Body::from(vec![b'x'; 32]))
+			.unwrap();
+		let rejection = CappedBody::from_request(req, &state).await.unwrap_err();
+		let response = rejection.into_response();
+		assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+	}
+
+	#[tokio::test]
+	async fn test_body_cap_accepts_body_at_or_under_limit() {
+		let state = Arc::new(test_state_with_max_body(16));
+		let body = vec![b'x'; 16];
+		let req = axum::extract::Request::builder()
+			.method("POST")
+			.uri(format!("http://x{CHAT_COMPLETIONS_PATH}"))
+			.body(Body::from(body.clone()))
+			.unwrap();
+		let extracted = CappedBody::from_request(req, &state).await.unwrap();
+		assert_eq!(extracted.0.as_ref(), body.as_slice());
+	}
+
+	#[tokio::test]
+	async fn test_body_cap_none_is_no_cap() {
+		// `max_request_body_size: None` (the default) must read the whole
+		// body - byte-identical current behavior.
+		let state = Arc::new(test_state());
+		let body = vec![b'x'; 8192];
+		let req = axum::extract::Request::builder()
+			.method("POST")
+			.uri(format!("http://x{CHAT_COMPLETIONS_PATH}"))
+			.body(Body::from(body.clone()))
+			.unwrap();
+		let extracted = CappedBody::from_request(req, &state).await.unwrap();
+		assert_eq!(extracted.0.as_ref(), body.as_slice());
 	}
 }

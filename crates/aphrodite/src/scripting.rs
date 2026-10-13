@@ -25,27 +25,27 @@ use rhai::{Engine, Scope};
 /// identically.
 #[derive(Debug, Clone, Default)]
 pub struct HookPayload {
-	pub content: Option<String>,
-	pub content_type: Option<String>,
-	pub size: Option<usize>,
-	pub hash: Option<String>,
-	pub metadata: Option<String>,
-	pub preview: Option<String>,
+	pub content:Option<String>,
+	pub content_type:Option<String>,
+	pub size:Option<usize>,
+	pub hash:Option<String>,
+	pub metadata:Option<String>,
+	pub preview:Option<String>,
 }
 
 /// A single loaded script file.
 struct Script {
-	path: PathBuf,
-	mtime: SystemTime,
-	source: String,
+	path:PathBuf,
+	mtime:SystemTime,
+	source:String,
 }
 
 /// Rhai micro-script engine: loads `.rhai` files from the script dirs,
 /// evaluates their hook functions against a [`HookPayload`], and degrades
 /// (warn + pass-through) on any script error - never panics.
 pub struct ScriptEngine {
-	scripts: Mutex<Vec<Script>>,
-	dirs: Vec<PathBuf>,
+	scripts:Mutex<Vec<Script>>,
+	dirs:Vec<PathBuf>,
 }
 
 impl ScriptEngine {
@@ -55,8 +55,8 @@ impl ScriptEngine {
 	pub fn new() -> Self {
 		let home = dirs::home_dir().unwrap_or_default();
 		let engine = ScriptEngine {
-			scripts: Mutex::new(Vec::new()),
-			dirs: vec![
+			scripts:Mutex::new(Vec::new()),
+			dirs:vec![
 				home.join(".hermes").join("aphrodite").join("scripts"),
 				PathBuf::from("scripts/aphrodite"),
 			],
@@ -97,18 +97,13 @@ impl ScriptEngine {
 
 	/// Hot-reload when any loaded script's mtime changed on disk.
 	fn check_reload(&self) {
-		let needs = self
-			.scripts
-			.lock()
-			.unwrap_or_else(|e| e.into_inner())
-			.iter()
-			.any(|s| {
-				std::fs::metadata(&s.path)
-					.ok()
-					.and_then(|m| m.modified().ok())
-					.map(|t| t > s.mtime)
-					.unwrap_or(false)
-			});
+		let needs = self.scripts.lock().unwrap_or_else(|e| e.into_inner()).iter().any(|s| {
+			std::fs::metadata(&s.path)
+				.ok()
+				.and_then(|m| m.modified().ok())
+				.map(|t| t > s.mtime)
+				.unwrap_or(false)
+		});
 		if needs {
 			self.reload();
 		}
@@ -123,7 +118,7 @@ impl ScriptEngine {
 	/// passes through unchanged; a script that does not define the hook
 	/// function is skipped silently (missing function is not an error). All
 	/// lock/compile/call sites degrade; this method never panics.
-	pub fn run(&self, hook: &str, payload: &HookPayload) -> Option<String> {
+	pub fn run(&self, hook:&str, payload:&HookPayload) -> Option<String> {
 		self.check_reload();
 		let scripts = self.scripts.lock().unwrap_or_else(|e| e.into_inner());
 		let mut current = payload.content.clone().unwrap_or_default();
@@ -172,11 +167,11 @@ impl ScriptEngine {
 	/// Pre-Rust compatibility surface: run the `on_compress` hook over
 	/// content. Returns the transformed content, or the input unchanged when
 	/// no script modified it.
-	pub fn on_compress(&self, content: &str, ct: &str, size: usize) -> String {
+	pub fn on_compress(&self, content:&str, ct:&str, size:usize) -> String {
 		let payload = HookPayload {
-			content: Some(content.to_string()),
-			content_type: Some(ct.to_string()),
-			size: Some(size),
+			content:Some(content.to_string()),
+			content_type:Some(ct.to_string()),
+			size:Some(size),
 			..Default::default()
 		};
 		self.run("on_compress", &payload).unwrap_or_else(|| content.to_string())
@@ -185,13 +180,13 @@ impl ScriptEngine {
 	/// Pre-Rust compatibility surface: run the `on_marker` hook over the
 	/// preview. Returns the transformed preview, or the input unchanged when
 	/// no script modified it.
-	pub fn on_marker(&self, hash: &str, ct: &str, meta: &str, preview: &str) -> String {
+	pub fn on_marker(&self, hash:&str, ct:&str, meta:&str, preview:&str) -> String {
 		let payload = HookPayload {
-			content: Some(preview.to_string()),
-			content_type: Some(ct.to_string()),
-			hash: Some(hash.to_string()),
-			metadata: Some(meta.to_string()),
-			preview: Some(preview.to_string()),
+			content:Some(preview.to_string()),
+			content_type:Some(ct.to_string()),
+			hash:Some(hash.to_string()),
+			metadata:Some(meta.to_string()),
+			preview:Some(preview.to_string()),
 			..Default::default()
 		};
 		self.run("on_marker", &payload).unwrap_or_else(|| preview.to_string())
@@ -200,11 +195,11 @@ impl ScriptEngine {
 	/// Pre-Rust compatibility surface: run the `on_retrieve` hook over
 	/// content. Returns the transformed content, or the input unchanged when
 	/// no script modified it.
-	pub fn on_retrieve(&self, hash: &str, content: &str, ct: &str) -> String {
+	pub fn on_retrieve(&self, hash:&str, content:&str, ct:&str) -> String {
 		let payload = HookPayload {
-			content: Some(content.to_string()),
-			content_type: Some(ct.to_string()),
-			hash: Some(hash.to_string()),
+			content:Some(content.to_string()),
+			content_type:Some(ct.to_string()),
+			hash:Some(hash.to_string()),
 			..Default::default()
 		};
 		self.run("on_retrieve", &payload).unwrap_or_else(|| content.to_string())
@@ -215,17 +210,15 @@ impl ScriptEngine {
 mod tests {
 	use super::*;
 
-	fn script(source: &str) -> Script {
+	fn script(source:&str) -> Script {
 		Script {
-			path: PathBuf::from("test.rhai"),
-			mtime: SystemTime::UNIX_EPOCH,
-			source: source.to_string(),
+			path:PathBuf::from("test.rhai"),
+			mtime:SystemTime::UNIX_EPOCH,
+			source:source.to_string(),
 		}
 	}
 
-	fn engine(scripts: Vec<Script>) -> ScriptEngine {
-		ScriptEngine { scripts: Mutex::new(scripts), dirs: Vec::new() }
-	}
+	fn engine(scripts:Vec<Script>) -> ScriptEngine { ScriptEngine { scripts:Mutex::new(scripts), dirs:Vec::new() } }
 
 	// ── Contract: a script evaluates against a hook payload and returns the
 	// modified payload (Some) ──
@@ -237,9 +230,9 @@ mod tests {
 			}"#,
 		)]);
 		let payload = HookPayload {
-			content: Some("hello".to_string()),
-			content_type: Some("text".to_string()),
-			size: Some(5),
+			content:Some("hello".to_string()),
+			content_type:Some("text".to_string()),
+			size:Some(5),
 			..Default::default()
 		};
 		let out = engine.run("on_compress", &payload);
@@ -254,7 +247,7 @@ mod tests {
 			script("fn on_compress() { content + \"A\" }"),
 			script("fn on_compress() { content + \"B\" }"),
 		]);
-		let payload = HookPayload { content: Some("x".to_string()), ..Default::default() };
+		let payload = HookPayload { content:Some("x".to_string()), ..Default::default() };
 		assert_eq!(engine.run("on_compress", &payload).as_deref(), Some("xAB"));
 	}
 
@@ -267,7 +260,7 @@ mod tests {
 			script("fn on_compress() { 42 }"),
 			script("fn on_compress() { content + \"!\" }"),
 		]);
-		let payload = HookPayload { content: Some("x".to_string()), ..Default::default() };
+		let payload = HookPayload { content:Some("x".to_string()), ..Default::default() };
 		let out = engine.run("on_compress", &payload);
 		assert_eq!(out.as_deref(), Some("x!"), "bad scripts skipped, good script applied");
 	}
@@ -277,7 +270,7 @@ mod tests {
 	#[test]
 	fn missing_hook_fn_is_skipped_silently() {
 		let engine = engine(vec![script("fn unrelated() { 1 }")]);
-		let payload = HookPayload { content: Some("x".to_string()), ..Default::default() };
+		let payload = HookPayload { content:Some("x".to_string()), ..Default::default() };
 		assert_eq!(engine.run("on_compress", &payload), None);
 	}
 
@@ -301,17 +294,14 @@ mod tests {
 	// reload - the engine degrades to no-op rather than crashing ──
 	#[test]
 	fn broken_script_is_dropped_at_reload() {
-		let dir = std::env::temp_dir().join(format!(
-			"aphrodite-scripting-reload-{}",
-			std::process::id()
-		));
+		let dir = std::env::temp_dir().join(format!("aphrodite-scripting-reload-{}", std::process::id()));
 		let _ = std::fs::create_dir_all(&dir);
 		std::fs::write(dir.join("broken.rhai"), "fn on_compress() { this is not valid rhai !!").unwrap();
-		let engine = ScriptEngine { scripts: Mutex::new(Vec::new()), dirs: vec![dir.clone()] };
+		let engine = ScriptEngine { scripts:Mutex::new(Vec::new()), dirs:vec![dir.clone()] };
 		engine.reload();
 		let _ = std::fs::remove_dir_all(&dir);
 		assert!(engine.scripts.lock().unwrap_or_else(|e| e.into_inner()).is_empty());
-		let payload = HookPayload { content: Some("x".to_string()), ..Default::default() };
+		let payload = HookPayload { content:Some("x".to_string()), ..Default::default() };
 		assert_eq!(engine.run("on_compress", &payload), None);
 	}
 

@@ -103,8 +103,7 @@ fn build_vars(type_str:&str, content:&str) -> HashMap<String, String> {
 		.chars()
 		.take(110)
 		.collect::<String>()
-		.replace('\n', " ")
-		.replace('\r', " ")
+		.replace(['\n', '\r'], " ")
 		.trim()
 		.to_string();
 	let err_count = lower.iter().filter(|l| l.contains("error")).count();

@@ -240,8 +240,8 @@ impl Config {
 		state.live_container = self.get_bool("APHRODITE_LIVE_CONTAINER", "compression", "live_container", false);
 		// ── Caps (pre-Rust port): recursion depth + request-body limit ──
 		state.recursive_depth = self.get_usize("APHRODITE_RECURSIVE_DEPTH", "compression", "recursive_depth", 5);
-		state.max_request_body_size = self
-			.get_opt_usize("APHRODITE_MAX_REQUEST_BODY_SIZE", "compression", "max_request_body_size");
+		state.max_request_body_size =
+			self.get_opt_usize("APHRODITE_MAX_REQUEST_BODY_SIZE", "compression", "max_request_body_size");
 		// Opt-in config auto-reload (default OFF): when true, the dylib
 		// watches aphrodite.toml and re-applies config fields on change -
 		// never session CCR state (the dropped dylib-binary hot-reload

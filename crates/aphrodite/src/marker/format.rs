@@ -233,7 +233,8 @@ pub(crate) fn substitute_vars(tmpl:&str, vars:&[(&str, &str)]) -> String {
 				j += 1;
 			}
 			if !name.is_empty() && j < chars.len() && chars[j] == '}' {
-				if let Some((_, v)) = vars.iter().find(|(k, _)| *k == name.as_str()) {
+				let found = vars.iter().find(|(k, _)| *k == name.as_str());
+				if let Some((_, v)) = found {
 					out.push_str(v);
 					i = j + 1;
 					continue;
