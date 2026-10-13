@@ -2561,6 +2561,18 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 			// Issue #11 WS4: keep the preview cap in sync on hot-reload
 			// (`[previews] preview_max_chars`).
 			crate::preview::set_preview_max_chars(config.previews.as_ref().and_then(|p| p.preview_max_chars));
+			// ── TOML-driven marker block templates (pre-Rust port): keep the
+			// process-global marker format/hint + `ccr_marker_hint` knob in
+			// sync on hot-reload, same as the preview cap above.
+			crate::marker::set_marker_templates(
+				config
+					.templates
+					.as_ref()
+					.and_then(|t| t.marker.get("format"))
+					.map(String::as_str),
+				config.templates.as_ref().and_then(|t| t.marker.get("hint")).map(String::as_str),
+				config.prompts.as_ref().and_then(|p| p.ccr_marker_hint).unwrap_or(false),
+			);
 			// Pre-Rust port: keep `[templates]` preview families + the
 			// `[previews] model_family` selector in sync on hot-reload, the
 			// same way the cap is re-applied here.

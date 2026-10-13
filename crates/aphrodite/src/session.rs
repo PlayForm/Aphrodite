@@ -152,6 +152,15 @@ pub fn catalog_summary(state:&mut AphroditeState) -> String {
 		}
 	}
 
+	// ── Intent hints (prompt knob `[prompts] catalog_intent_hints`, opt-in) ──
+	// Pre-Rust port: `intent=read | recent CCRs: <last 3 hashes, 12 chars>`.
+	// Default off = current behavior.
+	if state.catalog_intent_hints && current_markers > 0 {
+		let last3:Vec<_> = state.recent_markers.iter().rev().take(3).collect();
+		let hashes:Vec<String> = last3.iter().rev().map(|m| m.hash.chars().take(12).collect()).collect();
+		parts.push(format!("intent=read | recent CCRs: {}", hashes.join(" ")));
+	}
+
 	let summary = parts.join(" ");
 
 	// Commit both watermarks only now, after the string is fully assembled:
@@ -274,5 +283,49 @@ mod tests {
 		on_session_start(&mut s);
 		assert_eq!(s.last_emitted_marker_count, 0);
 		assert_eq!(s.last_emitted_file_count, 0);
+	}
+
+	// ── catalog_intent_hints knob (prompt knob, default off) ──
+	#[test]
+	fn test_catalog_summary_intent_hints_off_by_default() {
+		let mut s = AphroditeState::default();
+		s.record_marker(crate::state::MarkerEntry {
+			hash:"aaaaaaaaaaaa111111111111".into(),
+			ccr_type:"text".into(),
+			size:100,
+			preview:"[text] p".into(),
+			turn:1,
+			center:None,
+			meta:None,
+		});
+		let r = catalog_summary(&mut s);
+		assert!(!r.contains("intent=read"), "intent hints must be off by default: {r}");
+	}
+
+	#[test]
+	fn test_catalog_summary_intent_hints_on_lists_recent_hashes() {
+		let mut s = AphroditeState::default();
+		s.catalog_intent_hints = true;
+		for h in [
+			"aaaaaaaaaaaa111111111111",
+			"bbbbbbbbbbbb222222222222",
+			"cccccccccccc333333333333",
+			"dddddddddddd444444444444",
+		] {
+			s.record_marker(crate::state::MarkerEntry {
+				hash:h.into(),
+				ccr_type:"text".into(),
+				size:100,
+				preview:"[text] p".into(),
+				turn:1,
+				center:None,
+				meta:None,
+			});
+		}
+		let r = catalog_summary(&mut s);
+		assert!(
+			r.contains("intent=read | recent CCRs: bbbbbbbbbbbb cccccccccccc dddddddddddd"),
+			"last 3 hashes in insertion order, 12 chars each: {r}"
+		);
 	}
 }

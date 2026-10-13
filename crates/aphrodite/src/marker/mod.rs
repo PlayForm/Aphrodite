@@ -13,5 +13,8 @@ mod parse;
 #[cfg(test)]
 mod tests;
 
-pub use format::ccr_marker;
+pub use format::{ccr_marker, set_marker_templates};
 pub use parse::{extract_hashes, is_valid_ccr_hash, normalize_hash, parse_preview};
+pub(crate) use format::{marker_hint_enabled, registered_marker_format, substitute_vars};
+#[cfg(test)]
+pub(crate) use format::marker_templates_test_guard;

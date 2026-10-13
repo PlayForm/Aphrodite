@@ -13,8 +13,10 @@
 //! (dylib path), `main.rs` (engine binary), and the proxy `/reload` handler
 //! (hot-reload).
 
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock, RwLock};
+use std::{
+	collections::HashMap,
+	sync::{OnceLock, RwLock},
+};
 
 use crate::config::TemplatesConfig;
 
@@ -37,26 +39,24 @@ fn state() -> &'static RwLock<TemplatesState> {
 /// default). Returns the previous value so callers (tests, hot-reload) can
 /// restore it - same pattern as `set_preview_max_chars`.
 pub fn set_templates(templates:Option<TemplatesConfig>) -> Option<TemplatesConfig> {
-	state()
-		.write()
-		.unwrap_or_else(std::sync::PoisonError::into_inner)
-		.templates
-		.replace(templates)
+	let mut st = state().write().unwrap_or_else(std::sync::PoisonError::into_inner);
+	std::mem::replace(&mut st.templates, templates)
 }
 
 /// Currently registered `[templates]` config (None = hardcoded builders).
 pub fn get_templates() -> Option<TemplatesConfig> {
-	state().read().unwrap_or_else(std::sync::PoisonError::into_inner).templates.clone()
+	state()
+		.read()
+		.unwrap_or_else(std::sync::PoisonError::into_inner)
+		.templates
+		.clone()
 }
 
 /// Register the `[previews] model_family` selector; None = default
 /// (`"code_first"`). Returns the previous value (restore-friendly).
 pub fn set_preview_family(family:Option<String>) -> Option<String> {
-	state()
-		.write()
-		.unwrap_or_else(std::sync::PoisonError::into_inner)
-		.family
-		.replace(family)
+	let mut st = state().write().unwrap_or_else(std::sync::PoisonError::into_inner);
+	std::mem::replace(&mut st.family, family)
 }
 
 /// Currently registered `[previews] model_family` selector.
@@ -169,11 +169,26 @@ fn build_vars(type_str:&str, content:&str) -> HashMap<String, String> {
 			_ => "",
 		};
 		let st = crate::struct_extract::extract_code_structure(content, lang);
-		let sigs = st.get("fns").map(|v| v.iter().take(2).cloned().collect::<Vec<_>>().join("; ")).unwrap_or_default();
-		vars.insert("fns".into(), st.get("fns").map(|v| v.len().to_string()).unwrap_or_else(|| "?".into()));
-		vars.insert("structs".into(), st.get("structs").map(|v| v.len().to_string()).unwrap_or_else(|| "0".into()));
-		vars.insert("impls".into(), st.get("impls").map(|v| v.len().to_string()).unwrap_or_else(|| "0".into()));
-		vars.insert("classes".into(), st.get("classes").map(|v| v.len().to_string()).unwrap_or_else(|| "0".into()));
+		let sigs = st
+			.get("fns")
+			.map(|v| v.iter().take(2).cloned().collect::<Vec<_>>().join("; "))
+			.unwrap_or_default();
+		vars.insert(
+			"fns".into(),
+			st.get("fns").map(|v| v.len().to_string()).unwrap_or_else(|| "?".into()),
+		);
+		vars.insert(
+			"structs".into(),
+			st.get("structs").map(|v| v.len().to_string()).unwrap_or_else(|| "0".into()),
+		);
+		vars.insert(
+			"impls".into(),
+			st.get("impls").map(|v| v.len().to_string()).unwrap_or_else(|| "0".into()),
+		);
+		vars.insert(
+			"classes".into(),
+			st.get("classes").map(|v| v.len().to_string()).unwrap_or_else(|| "0".into()),
+		);
 		vars.insert("sigs".into(), sigs.clone());
 		// Computed `sig1` = first signature (pre-Rust).
 		vars.insert(
@@ -199,7 +214,7 @@ fn build_vars(type_str:&str, content:&str) -> HashMap<String, String> {
 /// convention `echo "EXIT:$?"`); `"?"` when absent.
 fn extract_exit(lines:&[&str]) -> String {
 	for l in lines {
-		if let Some(rest) = l.split_once("EXIT:") {
+		if let Some((_, rest)) = l.split_once("EXIT:") {
 			let code:String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
 			if !code.is_empty() {
 				return code;
@@ -286,8 +301,8 @@ fn substitute(tmpl:&str, vars:&HashMap<String, String>) -> String {
 /// module's tests must not interleave).
 #[cfg(test)]
 pub(crate) fn templates_test_guard() -> std::sync::MutexGuard<'static, ()> {
-	static G:OnceLock<Mutex<()>> = OnceLock::new();
-	G.get_or_init(|| Mutex::new(()))
+	static G:OnceLock<std::sync::Mutex<()>> = OnceLock::new();
+	G.get_or_init(|| std::sync::Mutex::new(()))
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner)
 }
@@ -317,7 +332,12 @@ mod tests {
 		);
 		let mut reverse = HashMap::new();
 		reverse.insert("build_output".to_string(), "build".to_string());
-		set_templates(Some(TemplatesConfig { preview, marker:HashMap::new(), prompts:HashMap::new(), reverse }));
+		set_templates(Some(TemplatesConfig {
+			preview,
+			marker:HashMap::new(),
+			prompts:HashMap::new(),
+			reverse,
+		}));
 		set_preview_family(Some("code_first".to_string()));
 
 		// family[ctype] direct hit, with an unknown {zzz} degrading to "".
@@ -340,9 +360,10 @@ mod tests {
 		set_preview_family(Some("nonexistent".to_string()));
 		assert!(render_preview("diff", "x").is_none());
 
-		// Family unset -> default "code_first" (the registered family).
+		// Family unset -> default "code_first" (the registered family). No
+		// +/- lines => pre-Rust defaults "?"/"?".
 		set_preview_family(None);
-		assert_eq!(render_preview("diff", "a\nb\nc\n").as_deref(), Some("diff:+0/-0 3L []"));
+		assert_eq!(render_preview("diff", "a\nb\nc\n").as_deref(), Some("diff:+?/-? 3L []"));
 
 		// No templates registered -> None.
 		set_templates(None);
@@ -367,6 +388,42 @@ mod tests {
 		assert_eq!(set_preview_family(Some("balance".to_string())), None);
 		assert_eq!(get_preview_family().as_deref(), Some("balance"));
 		set_templates(None);
+		set_preview_family(None);
+	}
+
+	/// End-to-end (task deliverable 2): `build_preview` consults the
+	/// registered templates FIRST, applies the `preview_max_chars` cap to the
+	/// rendered result, and falls back to the hardcoded per-arm dispatch when
+	/// nothing is registered.
+	#[test]
+	fn test_build_preview_consults_registered_templates() {
+		let _g = templates_test_guard();
+		let _cap = crate::preview::preview_cap_test_guard();
+		let mut fam_map = HashMap::new();
+		fam_map.insert("diff".to_string(), "[tpl {type} {ln}L]".to_string());
+		let mut preview = HashMap::new();
+		preview.insert("code_first".to_string(), fam_map);
+		set_templates(Some(TemplatesConfig {
+			preview,
+			marker:HashMap::new(),
+			prompts:HashMap::new(),
+			reverse:HashMap::new(),
+		}));
+		set_preview_family(Some("code_first".to_string()));
+
+		// Template renders first; the cap (8 chars) truncates it on a char
+		// boundary, preserving the closing `]`.
+		crate::preview::set_preview_max_chars(Some(8));
+		let out = crate::preview::build_preview("diff", "a\nb\n");
+		assert_eq!(out, "[tpl d…]");
+
+		// Unregistered -> hardcoded diff arm, unchanged.
+		set_templates(None);
+		let out = crate::preview::build_preview("diff", "a\nb\n");
+		assert!(out.starts_with("[diff"), "hardcoded fallback expected, got {out:?}");
+
+		// Restore globals for later tests.
+		crate::preview::set_preview_max_chars(None);
 		set_preview_family(None);
 	}
 }

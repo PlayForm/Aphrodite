@@ -42,7 +42,10 @@ pub fn build_preview(type_str:&str, content:&str) -> String {
 	if let Some(rendered) = crate::templates::render_preview(type_str, content)
 		&& !rendered.is_empty()
 	{
-		return cap::apply_preview_cap(&rendered, PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed) as usize);
+		return cap::apply_preview_cap(
+			&rendered,
+			PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed) as usize,
+		);
 	}
 	let inp = Input::new(content).unwrap_or_else(|| Input::empty(content));
 	let effective = resolve_effective_type(type_str, &inp);

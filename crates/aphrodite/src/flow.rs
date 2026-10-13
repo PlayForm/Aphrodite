@@ -13,7 +13,84 @@
 //! it, so the "bridge reimplements the hook body and forks" failure mode is
 //! unrepresentable.
 
-use crate::state::{ActiveDirective, AphroditeState};
+use crate::{
+	marker::substitute_vars,
+	state::{ActiveDirective, AphroditeState},
+};
+
+/// Compiled-in fallback prompt templates - the `[templates.prompts]` keys
+/// (pre-Rust port of `_core/template.py` `_render_prompt_tmpl` fallbacks),
+/// with the Rust-side current strings where those already ship compiled in
+/// (`session_inject`, `search_hint`). A key absent from the TOML map falls
+/// back to its entry here; an unknown key renders as "" (never panics).
+pub const FALLBACK_PROMPTS:&[(&str, &str)] = &[
+	("session_inject", SHIPPED_SESSION_INJECT),
+	(
+		"engine_offload",
+		"These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} \
+		 messages below are your active context.",
+	),
+	(
+		"auto_expand_guidance",
+		"Tool outputs are auto-expanded - you see full content inline. If you see a CCR marker, retrieve only if the \
+		 preview hints at useful content.",
+	),
+	(
+		"catalog_context_warn",
+		"context={ctx} msgs - prefer catalog over scanning history",
+	),
+	("search_hint", "Use aphrodite_retrieve(hash) to expand any entry."),
+];
+
+/// Render a `[templates.prompts]` template (pre-Rust port of
+/// `_core/template.py` `_render_prompt_tmpl`).
+///
+/// Resolution: `templates.prompts[name]` → compiled-in fallback (see
+/// [`FALLBACK_PROMPTS`]). `{var}` substitution applies to whichever string
+/// won, with the same degrade-don't-panic semantics as the marker templates
+/// (unknown placeholders stay verbatim). Consumers: `search_hint` feeds the
+/// catalog hint; `session_inject` is resolved at config load;
+/// `engine_offload` / `auto_expand_guidance` / `catalog_context_warn` are
+/// available for the engine-offload / auto-expand / context-count sites.
+pub fn render_prompt(state:&AphroditeState, name:&str, vars:&[(&str, &str)]) -> String {
+	let tmpl = state
+		.templates
+		.as_ref()
+		.and_then(|t| t.prompts.get(name))
+		.map(String::as_str)
+		.unwrap_or_else(|| fallback_prompt(name));
+	substitute_vars(tmpl, vars)
+}
+
+fn fallback_prompt(name:&str) -> &'static str {
+	FALLBACK_PROMPTS.iter().find(|(k, _)| *k == name).map(|(_, v)| *v).unwrap_or("")
+}
+
+/// Retrieval-guidance text for `retrieve_guidance = "standard"`.
+const RETRIEVAL_GUIDANCE_STANDARD:&str = "CCR markers compress large tool output. Use aphrodite_retrieve(hash) when \
+                                          the preview doesn't tell you enough; batch pending markers into one turn.";
+
+/// Retrieval-guidance text for `retrieve_guidance = "verbose"`.
+const RETRIEVAL_GUIDANCE_VERBOSE:&str = "CCR markers compress large tool output. Use aphrodite_retrieve(hash) when \
+                                         the preview doesn't tell you enough; batch pending markers into one turn. \
+                                         Prefer granular retrieval - pull the exact piece you need. Never re-read a \
+                                         file you hold a marker for; never invent content you did not retrieve.";
+
+/// Retrieval-guidance section (prompt knob `[prompts] retrieve_guidance`):
+/// minimal (default) = current behavior, nothing extra; standard = one line;
+/// verbose = extended. An unrecognized value warns and degrades to standard
+/// rather than injecting nothing (warn + degrade house style; never panics).
+fn retrieval_guidance_block(state:&AphroditeState) -> String {
+	let text = match state.retrieve_guidance.as_str() {
+		"minimal" | "" => return String::new(),
+		"verbose" => RETRIEVAL_GUIDANCE_VERBOSE,
+		other => {
+			tracing::warn!(value = %other, "unknown retrieve_guidance value; degrading to standard");
+			RETRIEVAL_GUIDANCE_STANDARD
+		},
+	};
+	format!("[retrieval: {}]", text)
+}
 
 /// Default first-turn session injection. Loaded from `[prompts] session_inject`
 /// in aphrodite.toml; this constant is the fallback when the key is absent.
@@ -73,6 +150,10 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
 	let nudges = render_nudges(state);
 
+	// ── Retrieval guidance (opt-in via [prompts] retrieve_guidance; drops
+	// before bg status / recall under budget pressure) ──
+	let retrieve = retrieval_guidance_block(state);
+
 	// ── Droppable section: recall catalog, delta-only (04-F1) ──
 	let recall = crate::session::catalog_summary(state);
 
@@ -93,6 +174,9 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	}
 	if !nudges.is_empty() {
 		sections.push(nudges);
+	}
+	if !retrieve.is_empty() {
+		sections.push(retrieve);
 	}
 	if !bg_status.is_empty() {
 		sections.push(bg_status);
@@ -534,5 +618,130 @@ mod tests {
 			"{{VERSION}} must be replaced: {ctx}"
 		);
 		assert!(!ctx.contains("{VERSION}"), "unreplaced {{VERSION}} placeholder: {ctx}");
+	}
+
+	// ── [templates.prompts] rendering (pre-Rust port of
+	// `_core/template.py` `_render_prompt_tmpl`) ──
+
+	fn state_with_prompt(name:&str, tmpl:&str) -> AphroditeState {
+		let mut s = AphroditeState::default();
+		s.templates = Some(crate::config::TemplatesConfig::default());
+		s.templates.as_mut().unwrap().prompts.insert(name.into(), tmpl.into());
+		s
+	}
+
+	#[test]
+	fn test_render_prompt_from_templates_map() {
+		let s = state_with_prompt("engine_offload", "offloaded {hash} keep {tail}");
+		assert_eq!(
+			render_prompt(&s, "engine_offload", &[("hash", "abc123"), ("tail", "5")]),
+			"offloaded abc123 keep 5"
+		);
+	}
+
+	#[test]
+	fn test_render_prompt_configured_template_wins_over_fallback() {
+		let mut s = AphroditeState::default();
+		s.templates = Some(crate::config::TemplatesConfig::default());
+		s.templates
+			.as_mut()
+			.unwrap()
+			.prompts
+			.insert("search_hint".into(), "custom {hash} hint".into());
+		assert_eq!(render_prompt(&s, "search_hint", &[("hash", "xyz")]), "custom xyz hint");
+	}
+
+	#[test]
+	fn test_render_prompt_fallback_when_key_absent() {
+		let s = AphroditeState::default(); // templates = None
+		assert_eq!(
+			render_prompt(&s, "engine_offload", &[("hash", "h1"), ("tail", "3")]),
+			"These messages were offloaded to reduce context. Use aphrodite_retrieve(h1) if needed. The 3 messages \
+			 below are your active context."
+		);
+		assert_eq!(
+			render_prompt(&s, "catalog_context_warn", &[("ctx", "120")]),
+			"context=120 msgs - prefer catalog over scanning history"
+		);
+		assert_eq!(
+			render_prompt(&s, "search_hint", &[]),
+			"Use aphrodite_retrieve(hash) to expand any entry."
+		);
+		assert_eq!(
+			render_prompt(&s, "auto_expand_guidance", &[]),
+			"Tool outputs are auto-expanded - you see full content inline. If you see a CCR marker, retrieve only if \
+			 the preview hints at useful content."
+		);
+		// The session_inject fallback is the shipped constant; {VERSION} is
+		// an unknown var here and stays verbatim, so the output is identical.
+		assert_eq!(render_prompt(&s, "session_inject", &[]), SHIPPED_SESSION_INJECT);
+		// Unknown key => empty string, no panic.
+		assert_eq!(render_prompt(&s, "no_such_key", &[]), "");
+	}
+
+	#[test]
+	fn test_render_prompt_unknown_var_left_verbatim() {
+		let s = state_with_prompt("catalog_context_warn", "ctx={ctx} typo={typo}");
+		assert_eq!(render_prompt(&s, "catalog_context_warn", &[("ctx", "9")]), "ctx=9 typo={typo}");
+	}
+
+	// ── retrieve_guidance knob: minimal (default) injects nothing, standard
+	// and verbose inject progressively more into the per-turn flow ──
+
+	#[test]
+	fn test_retrieve_guidance_minimal_injects_nothing() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "minimal".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[retrieval:"),
+			"minimal must not inject retrieval guidance: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_retrieve_guidance_default_injects_nothing() {
+		let mut s = AphroditeState::default();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(!ctx.contains("[retrieval:"), "absent knob (default) must not inject: {ctx}");
+	}
+
+	#[test]
+	fn test_retrieve_guidance_standard_injects_line() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "standard".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[retrieval: CCR markers compress large tool output."),
+			"standard must inject one guidance line: {ctx}"
+		);
+		assert!(!ctx.contains("Never re-read"), "standard must stay single-line: {ctx}");
+	}
+
+	#[test]
+	fn test_retrieve_guidance_verbose_injects_extended() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "verbose".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[retrieval:") && ctx.contains("Never re-read a file"),
+			"verbose must inject the extended guidance: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_retrieve_guidance_unknown_value_degrades_to_standard() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "bogus".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[retrieval: CCR markers compress large tool output."),
+			"unknown value must warn + degrade to standard: {ctx}"
+		);
 	}
 }

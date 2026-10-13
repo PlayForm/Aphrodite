@@ -93,7 +93,9 @@ pub fn build_catalog(state:&AphroditeState, mode:&str) -> serde_json::Value {
 			.map(|m| format!("{} ({}B) - {}", m.ccr_type, m.size, floor_boundary(&m.preview, 60)))
 			.collect();
 		result["recommendations"] = serde_json::json!(recommendations);
-		result["hint"] = serde_json::json!("Use aphrodite_retrieve(hash) to expand any entry.");
+		// `[templates.prompts] search_hint` (pre-Rust port); falls back to
+		// the compiled-in string when the key is absent.
+		result["hint"] = serde_json::json!(crate::flow::render_prompt(state, "search_hint", &[]));
 	}
 
 	result
@@ -216,6 +218,31 @@ mod tests {
 
 		let cat = build_catalog(&s, "toc");
 		assert!(cat["hint"].as_str().unwrap().contains("retrieve"));
+	}
+
+	// ── [templates.prompts] search_hint (pre-Rust port): a configured
+	// template wins over the compiled-in fallback hint. ──
+	#[test]
+	fn test_toc_hint_uses_configured_search_hint_template() {
+		let mut s = AphroditeState::default();
+		s.templates = Some(crate::config::TemplatesConfig::default());
+		s.templates
+			.as_mut()
+			.unwrap()
+			.prompts
+			.insert("search_hint".into(), "custom search hint".into());
+		s.record_marker(crate::state::MarkerEntry {
+			hash:"abc".into(),
+			ccr_type:"text".into(),
+			size:100,
+			preview:"[text]".into(),
+			turn:1,
+			center:None,
+			meta:None,
+		});
+
+		let cat = build_catalog(&s, "toc");
+		assert_eq!(cat["hint"].as_str().unwrap(), "custom search hint");
 	}
 
 	#[test]

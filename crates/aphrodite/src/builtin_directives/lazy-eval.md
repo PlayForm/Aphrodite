@@ -22,20 +22,20 @@ exercise it now, later, batched, or never.
 - Judge from the preview + type + size whether the marker's content is needed
   for the NEXT action. Previews render at full length; for most types they
   answer the structural question:
-  - ls/dir: counts + extensions → sufficient for inventory; retrieve only for
-    exact names.
-  - search/grep: file paths + hit counts → sufficient for "which files / how
-    many"; retrieve (or query-filter) only for matched content.
-  - terminal: first meaningful line + exit code → sufficient for "did it
-    succeed"; retrieve only to read or parse the exact output.
-  - diff: files, +/- and line counts → sufficient for "how big a change";
-    retrieve to see the change itself.
-  - json/table: keys / item counts → sufficient for structure; retrieve for
-    values.
-  - code: structure map (fns/structs/impls) + first signature → sufficient for
-    "what is in this file"; retrieve when editing or reading specific bodies.
-  - error/build/log: counts + first error line → sufficient for triage;
-    retrieve for the full trace.
+    - ls/dir: counts + extensions → sufficient for inventory; retrieve only for
+      exact names.
+    - search/grep: file paths + hit counts → sufficient for "which files / how
+      many"; retrieve (or query-filter) only for matched content.
+    - terminal: first meaningful line + exit code → sufficient for "did it
+      succeed"; retrieve only to read or parse the exact output.
+    - diff: files, +/- and line counts → sufficient for "how big a change";
+      retrieve to see the change itself.
+    - json/table: keys / item counts → sufficient for structure; retrieve for
+      values.
+    - code: structure map (fns/structs/impls) + first signature → sufficient for
+      "what is in this file"; retrieve when editing or reading specific bodies.
+    - error/build/log: counts + first error line → sufficient for triage;
+      retrieve for the full trace.
 - Deferral is safe and free: a marker stays in context and in the CCR store;
   you can resolve it in any later turn. Not retrieving now costs nothing. The
   only failure is hallucinating content you did not retrieve - never do that.

@@ -141,6 +141,13 @@ pub struct AphroditeState {
 	/// `[templates]` section (pre-Rust port) - preview families, marker block,
 	/// prompt templates, reverse key map. None = hardcoded builders/defaults.
 	pub templates:Option<crate::config::TemplatesConfig>,
+	/// `[prompts] retrieve_guidance` (minimal|standard|verbose) - how much CCR
+	/// retrieval explanation `flow::build_turn_context` injects per turn.
+	/// Default "minimal" = current behavior (no extra guidance).
+	pub retrieve_guidance:String,
+	/// `[prompts] catalog_intent_hints` - show `intent=read` alongside the
+	/// recent CCR hashes in the recall catalog output (default off = current).
+	pub catalog_intent_hints:bool,
 	/// Turn number of the most recent MANUAL `aphrodite_directive` mutation
 	/// (swap/add/remove/reset). Latches phase-aware auto-swaps out (P6); set by
 	/// `directives::handle_action` on any successful mutation.
@@ -240,6 +247,8 @@ impl Default for AphroditeState {
 			flow_budget_chars:4000,
 			session_inject:String::new(),
 			templates:None,
+			retrieve_guidance:"minimal".into(),
+			catalog_intent_hints:false,
 			manual_directive_turn:None,
 			tool_events:VecDeque::new(),
 			bg_tasks:VecDeque::new(),

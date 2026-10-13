@@ -146,6 +146,19 @@ async fn run() -> anyhow::Result<()> {
 		// config structs but never read anywhere, so every preview knob
 		// was a no-op. Absent -> unlimited (legacy behavior).
 		aphrodite::preview::set_preview_max_chars(config.previews.as_ref().and_then(|p| p.preview_max_chars));
+		// ── TOML-driven marker block templates (pre-Rust port): register the
+		// `[templates.marker]` format/hint strings and the `[prompts]
+		// ccr_marker_hint` knob process-globally, mirroring the preview-cap
+		// registration above (the marker builder has no AphroditeState).
+		aphrodite::marker::set_marker_templates(
+			config
+				.templates
+				.as_ref()
+				.and_then(|t| t.marker.get("format"))
+				.map(String::as_str),
+			config.templates.as_ref().and_then(|t| t.marker.get("hint")).map(String::as_str),
+			config.prompts.as_ref().and_then(|p| p.ccr_marker_hint).unwrap_or(false),
+		);
 		// ── Pre-Rust port: register `[templates]` + `[previews]
 		// model_family` into the process-global template renderer so
 		// `[templates.preview.<family>.<ctype>]` format strings render

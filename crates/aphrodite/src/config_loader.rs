@@ -362,18 +362,58 @@ impl Config {
 			}
 		}
 
-		// ── First-turn session injection (templates.prompts.session_inject) ──
-		// Loaded from the TOML's [prompts] section; defaults to the compiled-in
-		// SHIPPED_SESSION_INJECT constant when the key is absent so a bare/minimal
-		// config still gets a first-turn orientation. Empty string disables it.
-		state.session_inject = self.get_string(
-			"APHRODITE_SESSION_INJECT",
-			"prompts",
-			"session_inject",
-			crate::flow::SHIPPED_SESSION_INJECT,
+		// ── [templates] section (pre-Rust port): preview families, marker
+		// block, prompt templates, reverse key map ──
+		let templates = self.get_templates();
+		state.templates = templates.clone();
+
+		// ── TOML-driven marker block templates (pre-Rust port) ──
+		// Register the `[templates.marker]` format/hint strings and the
+		// `[prompts] ccr_marker_hint` knob process-globally (mirroring
+		// `set_preview_max_chars`): the marker builder runs on paths without an
+		// `AphroditeState` (hooks, dylib, poll worker), so the config must reach
+		// it through the global. An absent `[templates]` section resets to the
+		// canonical fallback grammar so a hot-reload that removes the templates
+		// never leaves a stale format in force.
+		let ccr_marker_hint = self.get_bool("APHRODITE_CCR_MARKER_HINT", "prompts", "ccr_marker_hint", false);
+		crate::marker::set_marker_templates(
+			templates.as_ref().and_then(|t| t.marker.get("format")).map(String::as_str),
+			templates.as_ref().and_then(|t| t.marker.get("hint")).map(String::as_str),
+			ccr_marker_hint,
 		);
-		// ── [templates] section (pre-Rust port): preview/marker/prompt/reverse ──
-		state.templates = self.get_templates();
+
+		// ── First-turn session injection (templates.prompts.session_inject) ──
+		// Priority (pre-Rust port): override/env → `[templates.prompts]
+		// session_inject` (canonical location) → `[prompts] session_inject`
+		// (legacy location) → compiled-in SHIPPED_SESSION_INJECT (so a
+		// bare/minimal config still gets a first-turn orientation). Empty string
+		// disables it entirely.
+		state.session_inject = if let Some(v) = self.overrides.get("APHRODITE_SESSION_INJECT") {
+			v.clone()
+		} else if let Ok(v) = std::env::var("APHRODITE_SESSION_INJECT") {
+			v
+		} else if let Some(t) = templates.as_ref().and_then(|t| t.prompts.get("session_inject")) {
+			t.clone()
+		} else {
+			self.get_string(
+				"APHRODITE_SESSION_INJECT",
+				"prompts",
+				"session_inject",
+				crate::flow::SHIPPED_SESSION_INJECT,
+			)
+		};
+
+		// ── Prompt knobs (pre-Rust port; previously parsed with no consumer) ──
+		// `retrieve_guidance` (minimal|standard|verbose): how much CCR retrieval
+		// explanation `flow::build_turn_context` injects per turn. Default
+		// minimal = current behavior.
+		state.retrieve_guidance =
+			self.get_string("APHRODITE_RETRIEVE_GUIDANCE", "prompts", "retrieve_guidance", "minimal");
+		// `catalog_intent_hints`: show `intent=read` alongside the recent CCR
+		// hashes in the recall catalog output (`session::catalog_summary`).
+		// Default off = current behavior.
+		state.catalog_intent_hints =
+			self.get_bool("APHRODITE_CATALOG_INTENT_HINTS", "prompts", "catalog_intent_hints", false);
 	}
 
 	/// Load preview settings into the process-global preview builder.
@@ -418,6 +458,16 @@ mod tests {
 	// such tests running in parallel could observe each other's state.
 	static CWD_GUARD:std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
 
+	// Serialize `apply_compression` against the marker-template tests:
+	// `apply_compression` registers the process-global marker templates
+	// (`[templates.marker]` + `ccr_marker_hint`), which the marker module's
+	// tests mutate under `marker_templates_test_guard()` - both sides must
+	// hold the same mutex or `cargo test`'s concurrent module bodies race.
+	fn guarded_apply_compression(cfg:&Config, state:&mut crate::state::AphroditeState) {
+		let _g = crate::marker::marker_templates_test_guard();
+		cfg.apply_compression(state);
+	}
+
 	#[test]
 	fn test_defaults() {
 		let cfg = Config::default();
@@ -446,7 +496,7 @@ mod tests {
 		let mut cfg = Config::default();
 		cfg.set_override("APHRODITE_TOOL_THRESHOLD_TOKEN", "777");
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert_eq!(state.tool_threshold, 777);
 	}
 
@@ -458,7 +508,7 @@ mod tests {
 			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert_eq!(state.tool_threshold, 321);
 	}
 
@@ -472,19 +522,19 @@ mod tests {
 			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert_eq!(state.flow_budget_chars, 1234);
 
 		// Env override wins over TOML.
 		let mut cfg2 = Config::default();
 		cfg2.set_override("APHRODITE_FLOW_BUDGET_CHARS", "555");
 		let mut state2 = crate::state::AphroditeState::default();
-		cfg2.apply_compression(&mut state2);
+		guarded_apply_compression(&cfg2, &mut state2);
 		assert_eq!(state2.flow_budget_chars, 555);
 
 		// Absent everywhere => default 4000.
 		let mut state3 = crate::state::AphroditeState::default();
-		Config::default().apply_compression(&mut state3);
+		guarded_apply_compression(&Config::default(), &mut state3);
 		assert_eq!(state3.flow_budget_chars, 4000);
 	}
 
@@ -517,7 +567,7 @@ mod tests {
 			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 
 		std::env::set_current_dir(&original).unwrap();
 		let _ = std::fs::remove_dir_all(&tmp);
@@ -559,7 +609,7 @@ mod tests {
 		unsafe { std::env::set_var("APHRODITE_DIRECTIVES_DIR", &env_dir) };
 
 		let mut state = crate::state::AphroditeState::default();
-		Config::default().apply_compression(&mut state);
+		guarded_apply_compression(&Config::default(), &mut state);
 
 		unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };
 		std::env::set_current_dir(&original).unwrap();
@@ -582,7 +632,7 @@ mod tests {
 	fn test_poll_worker_enabled_default_true() {
 		let cfg = Config::default();
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert!(state.poll_worker_enabled, "poll_worker must default to true");
 	}
 
@@ -591,7 +641,7 @@ mod tests {
 		let mut cfg = Config::default();
 		cfg.set_override("APHRODITE_POLL_WORKER", "false");
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert!(!state.poll_worker_enabled);
 	}
 
@@ -603,7 +653,7 @@ mod tests {
 			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert!(!state.poll_worker_enabled);
 	}
 
@@ -656,7 +706,7 @@ mod tests {
 			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		cfg.apply_templates(&state);
 		assert_eq!(
 			crate::templates::get_preview_family().as_deref(),
@@ -846,7 +896,7 @@ mod tests {
 
 		// `aphrodite_stats` self-diagnosis surface.
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		let ce = state.config_error.as_deref().expect("config_error must be set on the state");
 		assert!(
 			ce.contains(broken.to_str().unwrap()),
@@ -878,7 +928,7 @@ mod tests {
 			cfg.parse_failure
 		);
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert_eq!(state.terminal_threshold, 16384);
 		assert!(state.config_error.is_none());
 	}
@@ -895,19 +945,104 @@ mod tests {
 			parse_failure:None,
 		};
 		let mut state = crate::state::AphroditeState::default();
-		cfg.apply_compression(&mut state);
+		guarded_apply_compression(&cfg, &mut state);
 		assert!(state.auto_reload, "auto_reload must resolve from TOML");
 
 		// Default off.
 		let mut state2 = crate::state::AphroditeState::default();
-		Config::default().apply_compression(&mut state2);
+		guarded_apply_compression(&Config::default(), &mut state2);
 		assert!(!state2.auto_reload, "auto_reload must default to off");
 
-		// Env override wins.
+		// ── Env override wins.
 		let mut cfg3 = Config::default();
 		cfg3.set_override("APHRODITE_AUTO_RELOAD", "1");
 		let mut state3 = crate::state::AphroditeState::default();
-		cfg3.apply_compression(&mut state3);
+		guarded_apply_compression(&cfg3, &mut state3);
 		assert!(state3.auto_reload, "env override must enable auto_reload");
+	}
+
+	// ── Prompt knobs (pre-Rust port): retrieve_guidance / ccr_marker_hint /
+	// catalog_intent_hints previously parsed with no consumer. ──
+	#[test]
+	fn test_prompt_knobs_resolve_from_toml_and_default() {
+		let _g = crate::marker::marker_templates_test_guard();
+		let cfg = Config {
+			raw:"[prompts]\nretrieve_guidance = \"verbose\"\ncatalog_intent_hints = true\nccr_marker_hint = \
+			     true\n\n[templates.marker]\nformat = \"{preview}\"\nhint = \"H\"\n"
+				.parse()
+				.unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.retrieve_guidance, "verbose");
+		assert!(state.catalog_intent_hints);
+		// Marker registration reached the process-global the builder reads.
+		assert!(crate::marker::marker_hint_enabled());
+		assert_eq!(crate::marker::registered_marker_format().as_deref(), Some("{preview}"));
+
+		// Absent everywhere => defaults (minimal / off / off / fallback grammar).
+		let mut state2 = crate::state::AphroditeState::default();
+		Config::default().apply_compression(&mut state2);
+		assert_eq!(state2.retrieve_guidance, "minimal");
+		assert!(!state2.catalog_intent_hints);
+		assert!(!crate::marker::marker_hint_enabled());
+		assert!(crate::marker::registered_marker_format().is_none());
+	}
+
+	#[test]
+	fn test_prompt_knobs_resolve_from_env_override() {
+		let _g = crate::marker::marker_templates_test_guard();
+		let mut cfg = Config::default();
+		cfg.set_override("APHRODITE_RETRIEVE_GUIDANCE", "standard");
+		cfg.set_override("APHRODITE_CATALOG_INTENT_HINTS", "1");
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.retrieve_guidance, "standard");
+		assert!(state.catalog_intent_hints);
+	}
+
+	#[test]
+	fn test_session_inject_prefers_templates_prompts_over_prompts() {
+		let _g = crate::marker::marker_templates_test_guard();
+		// [templates.prompts] session_inject (canonical pre-Rust location) wins
+		// over the legacy [prompts] session_inject.
+		let cfg = Config {
+			raw:"[prompts]\nsession_inject = \"legacy [prompts] text\"\n\n[templates.prompts]\nsession_inject = \
+			     \"templates text\"\n"
+				.parse()
+				.unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.session_inject, "templates text");
+
+		// No [templates.prompts] => the legacy [prompts] location still works.
+		let cfg2 = Config {
+			raw:"[prompts]\nsession_inject = \"legacy text\"\n".parse().unwrap(),
+			overrides:HashMap::new(),
+			parse_failure:None,
+		};
+		let mut state2 = crate::state::AphroditeState::default();
+		cfg2.apply_compression(&mut state2);
+		assert_eq!(state2.session_inject, "legacy text");
+
+		// Neither => shipped constant.
+		let mut state3 = crate::state::AphroditeState::default();
+		Config::default().apply_compression(&mut state3);
+		assert_eq!(state3.session_inject, crate::flow::SHIPPED_SESSION_INJECT);
+	}
+
+	#[test]
+	fn test_session_inject_env_override_beats_templates_prompts() {
+		let _g = crate::marker::marker_templates_test_guard();
+		let mut cfg = Config::default();
+		cfg.set_override("APHRODITE_SESSION_INJECT", "env wins");
+		let mut state = crate::state::AphroditeState::default();
+		cfg.apply_compression(&mut state);
+		assert_eq!(state.session_inject, "env wins");
 	}
 }
