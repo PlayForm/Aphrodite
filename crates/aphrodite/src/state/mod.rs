@@ -138,6 +138,9 @@ pub struct AphroditeState {
 	/// in aphrodite.toml - rendered once via `build_first_turn_injection`,
 	/// then dropped (turn_counter > 0). Empty = no injection (default).
 	pub session_inject:String,
+	/// `[templates]` section (pre-Rust port) - preview families, marker block,
+	/// prompt templates, reverse key map. None = hardcoded builders/defaults.
+	pub templates:Option<crate::config::TemplatesConfig>,
 	/// Turn number of the most recent MANUAL `aphrodite_directive` mutation
 	/// (swap/add/remove/reset). Latches phase-aware auto-swaps out (P6); set by
 	/// `directives::handle_action` on any successful mutation.
@@ -236,6 +239,7 @@ impl Default for AphroditeState {
 			ephemeral_directives:Vec::new(),
 			flow_budget_chars:4000,
 			session_inject:String::new(),
+			templates:None,
 			manual_directive_turn:None,
 			tool_events:VecDeque::new(),
 			bg_tasks:VecDeque::new(),

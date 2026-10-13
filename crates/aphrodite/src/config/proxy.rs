@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 
 use clap::ValueEnum;
@@ -28,6 +29,7 @@ pub struct MultiConfig {
 	pub compression:Option<CompressionConfig>,
 	pub previews:Option<PreviewsConfig>,
 	pub prompts:Option<PromptsConfig>,
+	pub templates:Option<TemplatesConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -71,6 +73,22 @@ pub struct PromptsConfig {
 	pub retrieve_guidance:Option<String>,
 	pub ccr_marker_hint:Option<bool>,
 	pub catalog_intent_hints:Option<bool>,
+}
+
+/// TOML template strings (pre-Rust port): preview families, marker block,
+/// prompt templates, reverse key map. Each preview family maps content types
+/// to `{variable}` format strings; resolution order is
+/// family[ctype] -> reverse[ctype] -> family[_default] -> hardcoded builder.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct TemplatesConfig {
+	#[serde(default)]
+	pub preview:HashMap<String, HashMap<String, String>>,
+	#[serde(default)]
+	pub marker:HashMap<String, String>,
+	#[serde(default)]
+	pub prompts:HashMap<String, String>,
+	#[serde(default)]
+	pub reverse:HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

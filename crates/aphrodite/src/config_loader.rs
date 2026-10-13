@@ -113,6 +113,12 @@ impl Config {
 	/// Get a TOML section as a table, or empty if missing
 	fn section(&self, name:&str) -> Option<&toml::Table> { self.raw.get(name).and_then(|v| v.as_table()) }
 
+	/// Parse the `[templates]` section (pre-Rust port) into typed structs.
+	/// Absent section = None (hardcoded builders remain the default).
+	pub fn get_templates(&self) -> Option<crate::config::TemplatesConfig> {
+		self.section("templates").and_then(|t| t.clone().try_into().ok())
+	}
+
 	/// Resolve bool: override → env → toml[section][key] → default
 	pub fn get_bool(&self, env_key:&str, section:&str, key:&str, default:bool) -> bool {
 		// Fix 21 (inspection): values are matched case-insensitively -
@@ -366,6 +372,8 @@ impl Config {
 			"session_inject",
 			crate::flow::SHIPPED_SESSION_INJECT,
 		);
+		// ── [templates] section (pre-Rust port): preview/marker/prompt/reverse ──
+		state.templates = self.get_templates();
 	}
 
 	/// Load preview settings into the process-global preview builder.

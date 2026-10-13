@@ -148,15 +148,29 @@ OPERATING RULES (token-efficiency):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  TEMPLATE FORMATS  -  compiled-in, not TOML-configurable
+#  TEMPLATES  -  customizable format strings (pre-Rust port, re-wired)
 # ══════════════════════════════════════════════════════════════════════════════
-# The [templates.preview.*], [templates.marker], [templates.prompts] and
-# [templates.reverse] sections shipped in older versions were never parsed by
-# any reader (config_loader.rs and config/proxy.rs read no "templates"
-# section) - the marker and preview format strings are hardcoded in
-# crates/aphrodite/src/marker/format.rs and preview.rs. Removed as dead
-# config. The marker grammar is fixed:
-#   <<<CCR:{hash}|{type}|{size}>>>
+# Optional `[templates]` section: preview families, the marker block, prompt
+# templates, and the reverse key map. Absent = hardcoded builders/defaults.
+# Resolution order per preview: family[ctype] -> reverse[ctype] ->
+# family[_default] -> hardcoded builder. Variables: {type} {ln} {size} {hash}
+# {err} {warn} {exit} {cmd} {files} {fn} {plus} {minus} {keys} {items} {msg}
+# {commit} {subject} {pid} {uptime} {fns} {structs} {impls} {classes} {sigs}
+# {first}. See the pre-Rust reference at _core/template.py in the
+# Aphrodite-Pre-Rust worktree for the full variable set.
+[templates]
+# preview.<family>.<ctype> = "format string"
+# [templates.preview.compact]
+# diff = "[diff:{files}f +{plus}/-{minus} {ln}L{fx}{fn}]"
+# [templates.preview.code_first]
+# code = "[{type}:{fns}fns|{structs}structs {sigs} {ln}L]"
+# [templates.marker]
+# format = "{preview}\n[{type}: {meta}{center_seg}]\n<<<CCR:{hash}|{type}|{size}>>>"
+# hint = "…(use aphrodite_retrieve)"
+# [templates.prompts]
+# session_inject = "CCR markers (<<<CCR:hash|type|size>>>) are compressed content…"
+# [templates.reverse]
+# build_output = "build_output"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

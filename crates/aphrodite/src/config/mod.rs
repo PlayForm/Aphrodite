@@ -12,4 +12,4 @@ mod tests;
 
 pub use cli::{Cli, Command, SetupArgs};
 pub use env::{env_bool, env_parse_warn};
-pub use proxy::{CompressionConfig, Defaults, MultiConfig, PreviewsConfig, PromptsConfig, ProxyConfig, ProxyMode};
+pub use proxy::{CompressionConfig, Defaults, MultiConfig, PreviewsConfig, PromptsConfig, ProxyConfig, ProxyMode, TemplatesConfig};
