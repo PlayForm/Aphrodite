@@ -91,6 +91,10 @@ notify = { version = "8.2.0", optional = true }
 regex = "1.13.1"
 blake3 = "1.8.7"
 lru = "0.18.4"
+# Rhai micro-script engine (scripting.rs port). Exact-pinned, optional, and
+# only linked when the `scripting` feature is on - the default build (and the
+# cdylib consumed by aphrodite-hermes) must never pull rhai in.
+rhai = { version = "=1.25.1", optional = true }
 
 [features]
 default = ["proxy"]
@@ -109,6 +113,9 @@ proxy = [
 	"uuid",
 	"notify",
 ]
+# Rhai scripting engine: enables the `scripting` module (scripting.rs) and
+# links the exact-pinned rhai dependency.
+scripting = ["rhai"]
 
 [dev-dependencies]
 proptest = "1.11.0"

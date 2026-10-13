@@ -159,6 +159,18 @@ impl Config {
 		self.get_u64(env_key, section, key, default as u64) as usize
 	}
 
+	/// Resolve an optional usize: override → env → toml[section][key]; absent = None.
+	/// Used for caps that default to "no limit" (current behavior).
+	pub fn get_opt_usize(&self, env_key:&str, section:&str, key:&str) -> Option<usize> {
+		if let Some(v) = self.overrides.get(env_key) {
+			return v.parse().ok();
+		}
+		self.section(section)
+			.and_then(|s| s.get(key))
+			.and_then(|v| v.as_integer())
+			.map(|v| v as usize)
+	}
+
 	/// Resolve String
 	pub fn get_string(&self, env_key:&str, section:&str, key:&str, default:&str) -> String {
 		if let Some(v) = self.overrides.get(env_key) {
@@ -226,6 +238,10 @@ impl Config {
 			self.get_usize("APHRODITE_AUTO_EXPAND_LIMIT", "compression", "auto_expand_limit", 102400);
 		// ── Live containers (pre-Rust port): streaming tool-output mode ──
 		state.live_container = self.get_bool("APHRODITE_LIVE_CONTAINER", "compression", "live_container", false);
+		// ── Caps (pre-Rust port): recursion depth + request-body limit ──
+		state.recursive_depth = self.get_usize("APHRODITE_RECURSIVE_DEPTH", "compression", "recursive_depth", 5);
+		state.max_request_body_size = self
+			.get_opt_usize("APHRODITE_MAX_REQUEST_BODY_SIZE", "compression", "max_request_body_size");
 		// Opt-in config auto-reload (default OFF): when true, the dylib
 		// watches aphrodite.toml and re-applies config fields on change -
 		// never session CCR state (the dropped dylib-binary hot-reload

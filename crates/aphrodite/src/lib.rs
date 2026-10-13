@@ -50,6 +50,12 @@ pub mod retrieve;
 #[cfg(feature = "proxy")]
 pub mod setup;
 
+// Rhai scripting engine (pre-Rust scripting.rs port): user-defined
+// micro-scripts that transform hook payloads. Feature-gated so the default
+// cdylib build doesn't link rhai.
+#[cfg(feature = "scripting")]
+pub mod scripting;
+
 use std::{
 	collections::HashMap,
 	ffi::{CStr, CString},
@@ -1068,5 +1074,16 @@ mod ffi_tests {
 			"stats must surface the reload parse failure: {stats}"
 		);
 		aphrodite_destroy(handle.as_ptr());
+	}
+
+	// ── Scripting gate (pre-Rust scripting.rs port): the module must not
+	// exist in a feature-off build. This test compiles and passes ONLY when
+	// the `scripting` feature is off - `pub mod scripting` in lib.rs is
+	// declared behind `#[cfg(feature = "scripting")]`, so the default build
+	// has no scripting module at all. ──
+	#[cfg(not(feature = "scripting"))]
+	#[test]
+	fn scripting_module_absent_without_feature() {
+		assert!(!cfg!(feature = "scripting"));
 	}
 }

@@ -170,6 +170,12 @@ pub struct AphroditeState {
 	/// mode for tool outputs (chunked arrival + instant markers + progress).
 	/// Default false = current behavior.
 	pub live_container:bool,
+	/// `APHRODITE_RECURSIVE_DEPTH` (pre-Rust port): max marker recursion depth.
+	/// Default 5 = current hardcoded RECURSIVE_DEPTH.
+	pub recursive_depth:usize,
+	/// `APHRODITE_MAX_REQUEST_BODY_SIZE` (pre-Rust port): proxy request-body
+	/// cap in bytes. None = no cap (current behavior).
+	pub max_request_body_size:Option<usize>,
 	/// `[prompts] retrieve_guidance` (minimal|standard|verbose) - how much CCR
 	/// retrieval explanation `flow::build_turn_context` injects per turn.
 	/// Default "minimal" = current behavior (no extra guidance).
@@ -279,6 +285,8 @@ impl Default for AphroditeState {
 			auto_expand:false,
 			auto_expand_limit:102400,
 			live_container:false,
+			recursive_depth:5,
+			max_request_body_size:None,
 			retrieve_guidance:"minimal".into(),
 			catalog_intent_hints:false,
 			manual_directive_turn:None,
