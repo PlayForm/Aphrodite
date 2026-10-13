@@ -10,12 +10,12 @@
 >
 > CCR compression proxy + absorptive preview pipeline for Hermes Agent.
 > Up to 610× compression on the standard corpus (132× overall), ~10 ms end-to-end,
-> type-aware classifier, TOML-driven, opt-in config auto-reload.
+> type-aware classifier, TOML-driven templates, config auto-reload (default on).
 > _One binary. Zero dependencies. Millions of tokens saved._
 
-[![release](https://img.shields.io/static/v1?label=release&message=v1.6.6&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
+[![release](https://img.shields.io/static/v1?label=release&message=v1.7.0&color=blue)](https://github.com/PlayForm/Aphrodite/releases)
 [![crates.io](https://img.shields.io/static/v1?label=crates.io&message=aphrodite&color=orange)](https://crates.io/crates/aphrodite)
-[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.2.6&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
+[![plugin](https://img.shields.io/static/v1?label=plugin&message=v2.3.0&color=purple)](https://github.com/PlayForm/Aphrodite-Hermes/blob/Current/plugin.yaml)
 [![rust](https://img.shields.io/static/v1?label=rust&message=1.88%2B&color=orange)](https://www.rust-lang.org)
 [![license](https://img.shields.io/static/v1?label=license&message=CC0-1.0&color=lightgrey)](https://github.com/PlayForm/Aphrodite/tree/Development/LICENSE)
 
@@ -143,6 +143,32 @@ ceiling.
 
 ---
 
+## Features ⭐
+
+- **TOML templates** - `[templates.preview.<family>.<ctype>]` format strings,
+  `[templates.marker]` format + hint, `[templates.prompts]` prompt templates,
+  and `[templates.reverse]` ctype→key remap. Per preview the resolution is
+  `family[ctype]` → `reverse[ctype]` → `family[_default]` → the hardcoded
+  builder; `[previews] model_family` selects the family (default `code_first`).
+- **Auto-expand** - `[compression] auto_expand` / `auto_expand_limit`
+  (default limit 102400; the shipped example enables it) resolve markers
+  inline in the proxy and on the hook side as the session fills.
+- **Context engine** - `engine_threshold_pct` / `engine_protect_first` /
+  `engine_protect_last` / `engine_min_msgs` drive middle-turn archiving to
+  CCR plus the `engine_offload` prompt injection, so sessions never hit the
+  context ceiling (defaults: threshold 30, protect 2+5, min 8).
+- **Live containers** - `APHRODITE_LIVE_CONTAINER` env or
+  `[compression] live_container = true` emits instant CCR markers with the
+  `live` type and progressive chunked retrieval with ETA.
+- **Rhai scripting** - optional `scripting` Cargo feature (rhai pinned
+  1.25.1) for scripted pipeline extensions.
+- **Prompt knobs** - `retrieve_guidance`, `ccr_marker_hint`,
+  `catalog_intent_hints` are wired; caps via `APHRODITE_RECURSIVE_DEPTH` /
+  `recursive_depth` (default 5) and `APHRODITE_MAX_REQUEST_BODY_SIZE` /
+  `max_request_body_size`.
+
+---
+
 ## What Gets Compressed 📦
 
 Aphrodite classifies every blob of tool output before compressing it - errors
@@ -189,13 +215,13 @@ first match wins, and each type carries its own compression threshold tier.
 Each type maps to a compression threshold group - the higher the multiplier,
 the longer content stays visible in context before being compressed:
 
-| Tier           | Types                                                    |    Multiplier     |
-| :------------- | :------------------------------------------------------- | :---------------: |
-| Error          | `error`                                                  |        ×8         |
-| Code           | `code_rust`, `code_python`, `code_go`, `code_js`, `code` |       ×3.0        |
-| Diff / tracked | `diff`, `git`, `text`                                    |        ×2         |
-| Default        | `tool_output`, `json`, everything else                   |        ×1         |
-| Noisy (BASE)   | `linter`, `build_output`, `log`                          | ×1 (never halved) |
+| Tier           | Types                                                    |             Multiplier             |
+| :------------- | :------------------------------------------------------- | :--------------------------------: |
+| Error          | `error`                                                  |                 ×8                 |
+| Code           | `code_rust`, `code_python`, `code_go`, `code_js`, `code` | ×1.0 (scaled by `code_multiplier`) |
+| Diff / tracked | `diff`, `git`, `text`                                    |                 ×2                 |
+| Default        | `tool_output`, `json`, everything else                   |                 ×1                 |
+| Noisy (BASE)   | `linter`, `build_output`, `log`                          |         ×1 (never halved)          |
 
 ### Marker Format
 
@@ -239,6 +265,7 @@ crates/aphrodite/          ← Core engine (binary + cdylib)
   preview.rs               ← Type detection + enriched preview builder (all types)
   resolve.rs               ← CCR marker resolution (recursive, nested markers)
   retrieve.rs              ← /retrieve endpoint + retrieval plumbing
+  templates.rs            ← TOML template resolution (preview/marker/prompts/reverse)
   marker.rs                ← Marker parsing, hash normalization, validity checks
   stage2.rs                ← Semantic reduction (JSON minify, build, diff, code)
   struct_extract.rs        ← Code structure extraction (Rust, Python, Go, JS/TS)
@@ -378,17 +405,21 @@ written by `aphrodite setup`, which substitutes `{cache_port}`/`{token_port}`).
 Two independent parsers read the file:
 
 - the **Rust HTTP proxy** (`config/proxy.rs`, active when an `aphrodite.toml`
-  is found): `[[proxies]]`, `[defaults]`, and the four live-reload thresholds
+  is found): `[[proxies]]`, `[defaults]`, the four live-reload thresholds
   `tool_threshold_token` / `tool_threshold_cache` / `inline_threshold` /
-  `code_multiplier`, plus `[previews] preview_max_chars`;
+  `code_multiplier`, `[compression] auto_expand` / `auto_expand_limit`,
+  `[previews] preview_max_chars` (default `0` = unlimited previews), and the
+  `[templates.*]` sections via the `/reload` handler;
 - the **Hermes dylib session** (`config_loader.rs`): the `[compression]`
-  engine/chain-split/poll keys, `[defaults] model` / `api_url`, `[flow]
-budget_chars`, `[directives] active`, `[prompts] session_inject`, and
-  `[previews] preview_max_chars`.
+  engine/auto-expand/live-container/chain-split/poll keys, `[defaults] model`
+  / `api_url`, `[flow] budget_chars`, `[directives] active`, `[prompts]
+session_inject` plus the prompt knobs (`retrieve_guidance`,
+  `ccr_marker_hint`, `catalog_intent_hints`), `[templates.*]` (preview /
+  marker / prompts / reverse), and `[previews] preview_max_chars`.
 
-Edit + save (or `POST /reload`) re-applies the four proxy thresholds and the
-preview cap immediately; the dylib re-applies config fields on change only
-when `auto_reload = true`.
+Edit + save (or `POST /reload`) re-applies the four proxy thresholds, the
+preview cap, and the template registrations immediately; the dylib re-applies
+config fields on change when `auto_reload = true` (the shipped default).
 
 **`aphrodite.toml` (key subset - the shipped files document every key)**
 
@@ -399,15 +430,23 @@ model = "default-model"              # APHRODITE_MODEL > TOML > fallback
 ccr_ttl_seconds = 3600
 
 [compression]
-engine_threshold_pct = 45    # dylib session state (stats/config_get); 100+ = engine-off escape hatch
-tool_threshold_token = 512   # token proxy threshold (bytes) - live-reloadable
-tool_threshold_cache = 4096  # cache proxy threshold (bytes) - live-reloadable
-terminal_threshold  = 1024   # dylib terminal output threshold (bytes)
-inline_threshold    = 2048   # inline-vs-durable CCR storage cutoff - live-reloadable
-code_multiplier     = 3.0    # multiply threshold for code_* content types - live-reloadable
+engine_threshold_pct = 30    # dylib: fill% that triggers middle-turn archiving (compiled-in fallback 45); 0 = never, 100+ = engine-off escape hatch
+engine_protect_first = 2     # dylib: head turns always kept visible
+engine_protect_last = 5      # dylib: tail turns always kept visible
+engine_min_msgs = 8          # dylib: minimum conversation turns before archiving engages
+tool_threshold_token = 256   # token proxy threshold (bytes) - live-reloadable
+tool_threshold_cache = 2048  # cache proxy threshold (bytes) - live-reloadable
+terminal_threshold  = 256    # dylib terminal output threshold (bytes)
+inline_threshold    = 1024   # inline-vs-durable CCR storage cutoff - live-reloadable
+code_multiplier     = 1.0    # multiply threshold for code_* content types - live-reloadable
+auto_expand = true           # proxy+dylib: resolve markers inline as the session fills (compiled-in default: false)
+auto_expand_limit = 102400   # proxy+dylib: cap on auto-expanded bytes
+live_container = false       # dylib: instant CCR 'live'-type markers with chunked retrieval (env APHRODITE_LIVE_CONTAINER)
+recursive_depth = 5          # proxy+dylib: nested marker expansion cap (env APHRODITE_RECURSIVE_DEPTH)
+# max_request_body_size      # proxy: optional request-body cap (env APHRODITE_MAX_REQUEST_BODY_SIZE)
 context_engine      = true   # dylib session status flag (default-on)
 poll_worker = true           # dylib: auto-background slow tool calls
-auto_reload = false          # dylib: watch aphrodite.toml, re-apply config fields
+auto_reload = true           # dylib: watch aphrodite.toml, re-apply config fields
 chain_split = false          # dylib: opt-in fine-grained command splitting
 chain_split_min_segments = 2 # dylib: adaptive split floor (min 2)
 chain_split_max_segments = 6 # dylib: adaptive split cap
@@ -416,7 +455,7 @@ chain_split_max_segments = 6 # dylib: adaptive split cap
 budget_chars = 2600          # dylib: hard cap on per-turn injected context
 
 [directives]
-active = ["focus", "foresight"] # empty list seeds focus + foresight + lazy
+active = ["lazy", "lazy-eval", "foresight"] # empty list seeds focus + foresight + lazy
 ```
 
 Wired `[compression]`/`[defaults]` fields are overridable via `APHRODITE_*`
@@ -424,13 +463,56 @@ env vars (see
 [docs/config/env-vars.md](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/env-vars.md)).
 
 Reserved keys - parsed but **no consumer**, setting them is a silent no-op
-(kept, marked `DOCUMENTED BUT UNWIRED`): `auto_expand`, `auto_expand_limit`,
-`classifier_poll`, `catalog_mode`, `previews.model_family`,
-`previews.code_structure_map`, `prompts.retrieve_guidance`,
-`prompts.ccr_marker_hint`, `prompts.catalog_intent_hints`. Keys with no
-parser home at all - `compression.prefetch` and the old `[templates.*]`
-sections - were removed from the shipped files (marker/preview formats are
-compiled into the binary, not TOML-configurable).
+(kept, marked `DOCUMENTED BUT UNWIRED`): `classifier_poll`, `catalog_mode`,
+`previews.code_structure_map`, `previews.rust_preview_lines`. The
+`[templates.*]` sections are live and TOML-configurable - see
+[Templates (TOML)](#templates-toml) below.
+
+### Templates (TOML)
+
+Preview and marker format strings are TOML-configurable via `[templates.*]`.
+When a section is absent, the compiled-in builders and marker grammar stay
+the default. Per preview the resolution order is: `family[ctype]` →
+`reverse[ctype]` (a key in the same family) → `family[_default]` → the
+hardcoded builder. `[previews] model_family` selects the active family
+(default `code_first` when unset); it only matters when templates are
+configured. Unknown families and unknown variables degrade gracefully - the
+hardcoded builder / empty string, never a panic.
+
+**`aphrodite.toml` (template example)**
+
+```toml
+[templates.preview.code_first]
+diff = "[diff:{files}f +{plus}/-{minus} {ln}L{fx}{fn}]"
+code = "[{type}:{fns}fns|{structs}structs {sigs} {ln}L]"
+_default = "[{type}:{ln}L | {first}]"
+
+[templates.marker]
+format = "{preview}\n[{type}: {meta}{center_seg}]\n<<<CCR:{hash}|{type}|{size}>>>"
+hint = "…(use aphrodite_retrieve)"
+
+[templates.prompts]
+session_inject = "CCR markers (<<<CCR:hash|type|size>>>) are compressed content…"
+
+[templates.reverse]
+build_output = "build" # remap a content type to a key in the active family
+```
+
+**Preview template variables** - each substituted as a brace-wrapped name in
+the format string; unknown variables degrade to empty string, never panic:
+
+`type`, `ln`, `size`, `first`, `err`, `warn`, `msg`, `exit`, `cmd`, `files`,
+`fn`, `plus`, `minus`, `keys`, `items`, `commit`, `hash`, `subject`, `pid`,
+`uptime`, `fns`, `structs`, `impls`, `classes`, `sigs`, `code`, `loc`,
+`errors`, `total`, `sig1`, `fx`, `cmx`
+
+**Marker template variables** - `preview`, `type`, `meta`, `center`,
+`center_seg`, `hash`, `size`, `hint`. The `{hint}` variable renders only
+when the `[prompts] ccr_marker_hint` knob is enabled.
+
+**Prompt templates** - `session_inject` (user-facing, injected each session),
+`engine_offload` (rendered when the context engine archives middle turns;
+variables `hash` and `tail`), and `auto_expand_guidance` (internal).
 
 > [!TIP]
 >

@@ -52,22 +52,35 @@ tool_relay = true
 timeout = 300
 
 [compression]
-engine_threshold_pct = 45        # engine status flag (dylib session only)
-tool_threshold_token = 512       # token-proxy compression threshold, bytes
-tool_threshold_cache = 4096      # cache-proxy compression threshold, bytes
-terminal_threshold = 1024        # terminal-output threshold, bytes (dylib)
-inline_threshold = 2048          # inline-vs-durable CCR cutoff, bytes
-code_multiplier = 3.0            # multiplies threshold for code_* types
+engine_threshold_pct = 30        # context-engine fill-% gate (dylib session); 0 = never, 100+ = off
+engine_protect_first = 2         # context engine: turns kept at the start of the index
+engine_protect_last = 5          # context engine: turns kept at the end of the index
+engine_min_msgs = 8              # context engine: minimum archived turns before archiving
+tool_threshold_token = 256       # token-proxy compression threshold, bytes
+tool_threshold_cache = 2048      # cache-proxy compression threshold, bytes
+terminal_threshold = 256         # terminal-output threshold, bytes (dylib)
+inline_threshold = 1024          # inline-vs-durable CCR cutoff, bytes
+code_multiplier = 1.0            # multiplies threshold for code_* types
+auto_expand = true               # resolve stored content inline instead of a marker (byte-capped)
+auto_expand_limit = 102400       # byte cap for auto-expanded content
+live_container = false           # instant CCR markers with the 'live' type (dylib)
+recursive_depth = 5              # nested marker expansion cap (dylib)
+# max_request_body_size = 100000 # optional proxy request-body cap, bytes; absent = no cap
+auto_reload = true               # watch aphrodite.toml and re-apply config on change (dylib)
 chain_split = false              # opt-in fine-grained command splitting
 
 [previews]
-preview_max_chars = 120          # cap on rendered preview strings; absent = unlimited
+preview_max_chars = 0            # cap on rendered preview strings; 0 = unlimited
+model_family = "code_first"      # selects the [templates.preview.<family>.*] family
 
 [prompts]
 session_inject = "..."           # first-turn orientation text; "" disables
+retrieve_guidance = "minimal"    # "minimal" | "standard" | "verbose" - retrieval guidance line
+ccr_marker_hint = false          # append a retrieval hint after markers
+catalog_intent_hints = false     # intent hints in catalog output
 
 [directives]
-active = ["focus", "foresight"]
+active = ["lazy", "lazy-eval", "foresight"]
 
 [flow]
 budget_chars = 2600              # hard cap on per-turn injected context (dylib)
@@ -105,59 +118,80 @@ One shared table feeds two independent consumers:
 
 **Drives the Rust proxy** (env var wins over these if set; editing and saving, or `POST /reload`, applies immediately with no restart):
 
-| Field                  | Meaning                                                                 | Env override                     | Compiled default | Shipped example |
-| ---------------------- | ----------------------------------------------------------------------- | -------------------------------- | ---------------- | --------------- |
-| `tool_threshold_token` | Token-proxy compression threshold, bytes                                | `APHRODITE_TOOL_THRESHOLD_TOKEN` | `1024`           | `512`           |
-| `tool_threshold_cache` | Cache-proxy compression threshold, bytes                                | `APHRODITE_TOOL_THRESHOLD_CACHE` | `8192`           | `4096`          |
-| `inline_threshold`     | Inline-vs-durable CCR storage cutoff, bytes                             | `APHRODITE_INLINE_THRESHOLD`     | `256`            | `2048`          |
-| `code_multiplier`      | Multiplies the threshold for `code_*` content types (keeps code inline) | `APHRODITE_CODE_MULTIPLIER`      | `3.0`            | `3.0`           |
+| Field                   | Meaning                                                                                                | Env override                      | Compiled default | Shipped example |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------- | ---------------- | --------------- |
+| `tool_threshold_token`  | Token-proxy compression threshold, bytes                                                               | `APHRODITE_TOOL_THRESHOLD_TOKEN`  | `1024`           | `256`           |
+| `tool_threshold_cache`  | Cache-proxy compression threshold, bytes                                                               | `APHRODITE_TOOL_THRESHOLD_CACHE`  | `8192`           | `2048`          |
+| `inline_threshold`      | Inline-vs-durable CCR storage cutoff, bytes                                                            | `APHRODITE_INLINE_THRESHOLD`      | `256`            | `1024`          |
+| `code_multiplier`       | Multiplies the threshold for `code_*` content types (keeps code inline)                                | `APHRODITE_CODE_MULTIPLIER`       | `3.0`            | `1.0`           |
+| `auto_expand`           | Resolve the just-stored content inline instead of emitting a CCR marker, capped at `auto_expand_limit` | `APHRODITE_AUTO_EXPAND`           | `false`          | `true`          |
+| `auto_expand_limit`     | Byte cap for auto-expanded content                                                                     | `APHRODITE_AUTO_EXPAND_LIMIT`     | `102400`         | `102400`        |
+| `max_request_body_size` | Proxy request-body cap, bytes; over-size bodies rejected with 413 while being read                     | `APHRODITE_MAX_REQUEST_BODY_SIZE` | none (no cap)    | -               |
 
 The compiled defaults apply when neither env nor TOML sets a value; the shipped example config sets the values in the last column, so installations using it see those instead.
 
 **Drives the Hermes-plugin dylib session** (a separate process/codepath from the Rust proxy, read once at dylib load):
 
-| Field                      | Meaning                                                                                                      | Env override                         | Default |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------- |
-| `terminal_threshold`       | Terminal-output compression threshold, bytes - gates `transform_terminal_output`                             | `APHRODITE_TERMINAL_THRESHOLD`       | `1024`  |
-| `poll_worker`              | Auto-backgrounding of slow `terminal` / `process` calls (pre-tool-call rewrite)                              | `APHRODITE_POLL_WORKER`              | `true`  |
-| `chain_split`              | Opt-in fine-grained command splitting (`SEG_MARKER` segments); off by default                                | `APHRODITE_CHAIN_SPLIT`              | `false` |
-| `chain_split_min_segments` | Floor for the adaptive split threshold                                                                       | `APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS` | `2`     |
-| `chain_split_max_segments` | Cap for the adaptive split threshold                                                                         | `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS` | `6`     |
-| `context_engine`           | Status flag exposed via `aphrodite_stats` / `aphrodite_config_get`; the standalone HTTP proxy never reads it | `APHRODITE_CONTEXT_ENGINE`           | `true`  |
+| Field                      | Meaning                                                                                                                                | Env override                         | Default                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------- |
+| `terminal_threshold`       | Terminal-output compression threshold, bytes - gates `transform_terminal_output`                                                       | `APHRODITE_TERMINAL_THRESHOLD`       | `1024` (shipped example: `256`)   |
+| `poll_worker`              | Auto-backgrounding of slow `terminal` / `process` calls (pre-tool-call rewrite)                                                        | `APHRODITE_POLL_WORKER`              | `true`                            |
+| `chain_split`              | Opt-in fine-grained command splitting (`SEG_MARKER` segments); off by default                                                          | `APHRODITE_CHAIN_SPLIT`              | `false`                           |
+| `chain_split_min_segments` | Floor for the adaptive split threshold                                                                                                 | `APHRODITE_CHAIN_SPLIT_MIN_SEGMENTS` | `2`                               |
+| `chain_split_max_segments` | Cap for the adaptive split threshold                                                                                                   | `APHRODITE_CHAIN_SPLIT_MAX_SEGMENTS` | `6`                               |
+| `context_engine`           | Enables the context engine (dylib session only; the standalone HTTP proxy never reads it)                                              | `APHRODITE_CONTEXT_ENGINE`           | `true`                            |
+| `engine_threshold_pct`     | Context-engine fill-% gate: archives middle turns when the conversation index is at/above this fill percent; `0` = never, `100+` = off | `APHRODITE_ENGINE_THRESHOLD_PCT`     | `45` (shipped example: `30`)      |
+| `engine_protect_first`     | Turns kept at the start of the index when the engine archives middle turns                                                             | `APHRODITE_ENGINE_PROTECT_FIRST`     | `2`                               |
+| `engine_protect_last`      | Turns kept at the end of the index when the engine archives middle turns                                                               | `APHRODITE_ENGINE_PROTECT_LAST`      | `5`                               |
+| `engine_min_msgs`          | Minimum archived turns before the engine may archive                                                                                   | `APHRODITE_ENGINE_MIN_MSGS`          | `8`                               |
+| `live_container`           | Emit instant CCR markers with the `live` type (progressive retrieval + ETA)                                                            | `APHRODITE_LIVE_CONTAINER`           | `false`                           |
+| `auto_expand`              | Same inline-resolution knob as the proxy path, read into the session (also renders the `[auto-expand: ...]` guidance)                  | `APHRODITE_AUTO_EXPAND`              | `false` (shipped example: `true`) |
+| `auto_expand_limit`        | Byte cap for auto-expanded content                                                                                                     | `APHRODITE_AUTO_EXPAND_LIMIT`        | `102400`                          |
+| `recursive_depth`          | Nested marker expansion cap                                                                                                            | `APHRODITE_RECURSIVE_DEPTH`          | `5`                               |
+| `auto_reload`              | Watch `aphrodite.toml` and re-apply config fields on change (session CCR state is never touched)                                       | `APHRODITE_AUTO_RELOAD`              | `false` (shipped example: `true`) |
 
-The `engine_*` family (`engine_threshold_pct`, `engine_protect_first`, `engine_protect_last`, `engine_min_msgs`) is parsed into the dylib session state and exposed the same way, but is **not consulted by any compression decision (WIP)** - it is populated for visibility, not load-bearing.
-(`engine_threshold_pct` has no effect on the engine; the shipped example sets it to 45 as the documented value, with 100+ as the escape hatch to disable engine compression entirely.)
+The `engine_*` family is **load-bearing** in the dylib session: `engine_threshold_pct` gates the context engine's middle-turn archiving, and `engine_protect_first` / `engine_protect_last` / `engine_min_msgs` shape the slice it archives - see [Context Engine](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/context-engine.md) for the full behavior.
 
-**Not read by anything (WIP)** (parsed for schema compatibility, echoed by `/reload` for visibility, no consumer): `auto_expand`, `auto_expand_limit`, `catalog_mode` (catalog mode is whatever the caller passes per-request), `classifier_poll`, `prefetch` (the `aphrodite_prefetch` tool exists regardless of this key).
+**Parsed for schema compatibility, echoed by `/reload` for visibility** (no live effect): `catalog_mode` (catalog layout is compiled-in), `classifier_poll`, `prefetch` (the `aphrodite_prefetch` tool exists regardless of this key).
 
 ## `[previews]` and `[prompts]`
 
-| Section      | Field                  | Meaning                                                                                        | Status                                                                              |
-| ------------ | ---------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `[previews]` | `preview_max_chars`    | Caps the rendered preview string, in chars; absent/0 = unlimited                               | Wired (env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > unlimited; shipped example `120`) |
-| `[previews]` | `model_family`         | `"compact"` \| `"code_first"` \| `"balance"` - preview template family                         | Reserved - no reader (WIP)                                                          |
-| `[previews]` | `code_structure_map`   | Include function/struct/class signatures in code previews                                      | Reserved - no reader (WIP)                                                          |
-| `[previews]` | `rust_preview_lines`   | Lines of Rust source to include in previews                                                    | Reserved - no reader (WIP)                                                          |
-| `[prompts]`  | `session_inject`       | First-turn orientation text injected by `pre_llm_call` on turn 0; `""` disables                | Wired (env `APHRODITE_SESSION_INJECT` > TOML > shipped builtin)                     |
-| `[prompts]`  | `retrieve_guidance`    | `"minimal"` \| `"standard"` \| `"verbose"` - how much the system prompt explains CCR retrieval | Reserved - no reader (WIP)                                                          |
-| `[prompts]`  | `ccr_marker_hint`      | Append a retrieval hint after markers                                                          | Reserved - no reader (WIP)                                                          |
-| `[prompts]`  | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output                                           | Reserved - no reader (WIP)                                                          |
+| Section      | Field                  | Meaning                                                                                                           | Status                                                                                                     |
+| ------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `[previews]` | `preview_max_chars`    | Caps the rendered preview string, in chars; absent/0 = unlimited                                                  | Wired (env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > unlimited; shipped example `0`)                          |
+| `[previews]` | `model_family`         | `"compact"` \| `"code_first"` \| `"balance"` - selects the `[templates.preview.<family>.*]` family                | Wired as the template-family selector (default `"code_first"`; only matters when templates are configured) |
+| `[previews]` | `code_structure_map`   | Include function/struct/class signatures in code previews                                                         | Reserved - no reader (WIP)                                                                                 |
+| `[previews]` | `rust_preview_lines`   | Lines of Rust source to include in previews                                                                       | Reserved - no reader (WIP)                                                                                 |
+| `[prompts]`  | `session_inject`       | First-turn orientation text injected by `pre_llm_call` on turn 0; `""` disables                                   | Wired (env `APHRODITE_SESSION_INJECT` > TOML > shipped builtin)                                            |
+| `[prompts]`  | `retrieve_guidance`    | `"minimal"` \| `"standard"` \| `"verbose"` - how much guidance the per-turn assembler renders about CCR retrieval | Wired - rendered as the `[retrieval: ...]` line (env `APHRODITE_RETRIEVE_GUIDANCE` > TOML > `"minimal"`)   |
+| `[prompts]`  | `ccr_marker_hint`      | Append a retrieval hint after markers                                                                             | Wired - fills the marker template's `{hint}` (env `APHRODITE_CCR_MARKER_HINT` > TOML > `false`)            |
+| `[prompts]`  | `catalog_intent_hints` | Show intent hints alongside hashes in catalog output                                                              | Wired (env `APHRODITE_CATALOG_INTENT_HINTS` > TOML > `false`)                                              |
 
-"Reserved - no reader (WIP)" means the values parse cleanly but nothing in the current codebase reads them back out; changing them does not change behavior, so treat them as reserved until that's confirmed.
-`[previews] preview_max_chars` and `[prompts] session_inject` are the two keys in these sections that do have live effects.
+"Reserved" means the value parses cleanly but nothing in the current codebase reads it back out; changing it does not change behavior, so treat it as reserved until that's confirmed. The remaining reserved keys are `code_structure_map` and `rust_preview_lines`.
+`preview_max_chars`, `session_inject`, `retrieve_guidance`, `ccr_marker_hint`, `catalog_intent_hints`, and `model_family` all have live effects.
 
 ## `[templates.*]`
 
-The shipped example config carries a large `[templates.preview.*]` / `[templates.marker]` / `[templates.prompts]` / `[templates.reverse]` block of per-content-type format strings, with a variable reference (`{type}`, `{ln}`, `{size}`, `{hash}`, `{fns}`, `{sigs}`, etc.) in its header comment.
+The `[templates]` section customizes how previews, markers, and prompts render. Every block is optional; when a block (or the whole section) is absent, the hardcoded builders and shipped defaults apply.
 
-Nothing in the codebase renders previews from these templates - preview strings are generated internally.
-If you're editing `[templates.*]` expecting it to change preview output, verify against your running version first; treat the section as reserved/aspirational (WIP) rather than functioning configuration.
+| Block                                  | Purpose                                                                                                                                                    |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[templates.preview.<family>.<ctype>]` | Format string for the preview of content type `<ctype>` in family `<family>` (e.g. `[templates.preview.code_first] code = "..."`)                          |
+| `[templates.marker]`                   | `format` = marker block layout; `hint` = retrieval hint appended after markers                                                                             |
+| `[templates.prompts]`                  | Named prompt templates rendered into the per-turn context (`session_inject`, `engine_offload`, `auto_expand_guidance`, `catalog_context_warn`, and others) |
+| `[templates.reverse]`                  | `ctype -> key` remap: lets a content type borrow another type's format string                                                                              |
+
+Resolution per content type: `family[ctype]` → `reverse[ctype]` mapped key → `family[_default]` → the hardcoded builder. The family is selected by `[previews] model_family` (default `"code_first"` when unset); an unknown family or type falls through to the hardcoded builder. Substitution is defensive: unknown `{variable}`s render as empty.
+
+**Preview variables** (brace-wrapped in format strings, e.g. `{type}`, `{ln}`, `{size}`): `type`, `ln`, `size`, `first`, `err`, `warn`, `msg`, `exit`, `cmd`, `files`, `fn`, `plus`, `minus`, `keys`, `items`, `commit`, `hash`, `subject`, `pid`, `uptime`, `fns`, `structs`, `impls`, `classes`, `sigs`, `code`, `loc`, `errors`, `total`, `sig1`, `fx`, `cmx`.
+
+**Marker variables** (used in `[templates.marker] format`): `preview`, `type`, `meta`, `center`, `center_seg`, `hash`, `size`, `hint`.
 
 ## `[directives]`
 
 ```toml
 [directives]
-active = ["focus", "foresight"]  # e.g. ["focus", "foresight"]
+active = ["lazy", "lazy-eval", "foresight"]  # e.g. ["focus", "foresight"]
 ```
 
 | Field    | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -207,7 +241,7 @@ The proxy refuses to start if the chain resolves empty.
 
 ## Hot-reload
 
-`POST /reload` (per-listener) and the `aphrodite.toml` file watcher (all listeners at once) re-resolve the four live `[compression]` fields and write them into the running proxy's state immediately - no restart needed. `/reload` also re-applies `[previews] preview_max_chars`. `/reload`'s JSON response has `"applied": true`, echoes the values that took effect, and carries a `"parsed_only"` object for the fields that don't (see the `[compression]` breakdown above). The file watcher applies only the four thresholds. Everything else about a proxy (`listen`, `api_url`, `model`, `mode`, ...) is fixed at startup; changing those requires a restart.
+`POST /reload` (per-listener) and the `aphrodite.toml` file watcher (all listeners at once) re-resolve the live `[compression]` fields (the four thresholds plus `auto_expand` / `auto_expand_limit`) and write them into the running proxy's state immediately - no restart needed. `/reload` also re-applies `[previews] preview_max_chars` and the process-global marker format/hint + `ccr_marker_hint` knob. `/reload`'s JSON response has `"applied": true`, echoes the values that took effect, and carries a `"parsed_only"` object for the fields that don't (see the `[compression]` breakdown above). `max_request_body_size` is startup-only: a `/reload` echoes it but cannot change a live cap. The file watcher applies the same hot-reloadable set. Everything else about a proxy (`listen`, `api_url`, `model`, `mode`, ...) is fixed at startup; changing those requires a restart.
 
 ## Validation
 
@@ -266,19 +300,21 @@ In CLI mode, `max_context` / `max_output` / `tool_relay` / `dev` / `timeout` / `
 ccr_ttl_seconds = 7200
 
 [compression]
-tool_threshold_token = 512
-tool_threshold_cache = 4096
-inline_threshold = 2048
-code_multiplier = 3.0
+tool_threshold_token = 256
+tool_threshold_cache = 2048
+inline_threshold = 1024
+code_multiplier = 1.0
+auto_expand = true
+auto_expand_limit = 102400
 
 [previews]
-preview_max_chars = 120
+preview_max_chars = 0
 
 [prompts]
 session_inject = ""
 
 [directives]
-active = ["focus", "foresight"]
+active = ["lazy", "lazy-eval", "foresight"]
 
 [[proxies]]
 name = "cache"

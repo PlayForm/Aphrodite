@@ -12,14 +12,14 @@ It is the reason the six hooks below are always registered together: the
 dispatch surface is the dylib's own contract, and `plugin.yaml` declares the
 same set under `provides_hooks`.
 
-| Hook                        | Purpose                                                    | When it fires                  |
-| --------------------------- | ---------------------------------------------------------- | ------------------------------ |
-| `on_session_start`          | Reset all per-session state to a clean baseline            | A Hermes session starts        |
-| `pre_tool_call`             | Auto-background long-running calls; split chained commands | Before a tool executes         |
-| `transform_tool_result`     | Compress large tool results into CCR markers               | After every tool call          |
-| `transform_terminal_output` | Compress large terminal output into CCR markers            | After every terminal execution |
-| `pre_llm_call`              | Inject directives, nudges, and the recall catalog          | Before each LLM request        |
-| `post_llm_call`             | Archive the turn, advance the counter, expire stale state  | After each LLM response        |
+| Hook                        | Purpose                                                           | When it fires                  |
+| --------------------------- | ----------------------------------------------------------------- | ------------------------------ |
+| `on_session_start`          | Reset all per-session state to a clean baseline                   | A Hermes session starts        |
+| `pre_tool_call`             | Auto-background long-running calls; split chained commands        | Before a tool executes         |
+| `transform_tool_result`     | Compress large tool results into CCR markers                      | After every tool call          |
+| `transform_terminal_output` | Compress large terminal output into CCR markers                   | After every terminal execution |
+| `pre_llm_call`              | Inject directives, nudges, engine-offload, and the recall catalog | Before each LLM request        |
+| `post_llm_call`             | Archive the turn, advance the counter, expire stale state         | After each LLM response        |
 
 ```mermaid
 flowchart TD
@@ -61,7 +61,7 @@ features:
 - **Chain splitting.** When chain splitting is enabled
   (`APHRODITE_CHAIN_SPLIT=1` or `[compression] chain_split = true`, default
   off), the hook rewrites a chained terminal command (`cd x && cargo build &&
-  cargo test`) with invisible segment markers, provided it has at least
+cargo test`) with invisible segment markers, provided it has at least
   `chain_split_min_segments` segments. The marker-splitting lets
   `transform_terminal_output` compress each segment into its own CCR marker,
   so the model sees several compact previews instead of one large blob.
@@ -81,8 +81,8 @@ Fires after every tool call with the tool's result. The pipeline:
    raw output); when it is one of Aphrodite's own tools or a headroom helper
    (already compact metadata, and compressing `aphrodite_retrieve` would
    replace resolved content with another marker); or when it is below the
-   tool threshold (default 4,096 characters; `0` disables the gate and always
-   compresses).
+   tool threshold (default 4,096 characters, shipped example 256; `0`
+   disables the gate and always compresses).
 3. **Classify.** The content-type detector assigns a type and upgrades
    generic text/log/plain results (git status, ls, test, grep) so the
    preview carries high-signal shape.
@@ -107,7 +107,8 @@ Fires after every terminal execution. The pipeline mirrors tool results:
    marked output never leaks raw) and merges per-segment error hints into
    previews.
 3. **Threshold gate.** Unmarked output below the terminal threshold (default
-   1,024 characters; `0` disables the gate) passes through untouched.
+   1,024 characters, shipped example 256; `0` disables the gate) passes
+   through untouched.
 4. **Classify and store.** The hook types output containing `exit code:` or
    `Error:` as `terminal` and runs other output through the normal
    content-type detection with the same semantic upgrade as tool results. It
@@ -125,8 +126,15 @@ over budget:
 1. First-turn orientation (`[aphrodite: first-turn orientation]`, turn 0 only)
 2. `[directives: ...]` block - never dropped
 3. `[nudge: ...]` one-shots, at most two - never dropped
-4. Background-task status
-5. `[recall]` catalog summary - the first section dropped under budget
+4. `[engine-offload: ...]` - present only when the context engine archived
+   middle turns this turn; never dropped, because the archive already
+   mutated the conversation index
+5. `[retrieval: ...]` - opt-in guidance line rendered from
+   `[prompts] retrieve_guidance`
+6. Background-task status
+7. `[auto-expand: ...]` - opt-in guidance line rendered when `auto_expand`
+   is on
+8. `[recall]` catalog summary - the first section dropped under budget
    pressure
 
 The assembler builds the first-turn orientation from the `[prompts]
@@ -147,17 +155,21 @@ stale poll-worker tasks.
 
 ## Thresholds
 
-| Hook                          | Setting                                  | Default | Bypass                                                                     |
-| ----------------------------- | ---------------------------------------- | ------- | -------------------------------------------------------------------------- |
-| `transform_tool_result`       | `[compression] tool_threshold_token`     | 4,096   | empty, essential tools, self tools, below threshold; `0` = always compress |
-| `transform_terminal_output`   | `[compression] terminal_threshold`       | 1,024   | empty, below threshold; `0` = always compress                              |
-| `pre_llm_call`                | `[flow] budget_chars`                    | 4,000   | recall catalog dropped first; directives and nudges never drop             |
-| `pre_tool_call` (chain split) | `[compression] chain_split_min_segments` | -       | feature off by default (`chain_split = false`)                             |
+| Hook                            | Setting                                  | Default                     | Bypass                                                                                                        |
+| ------------------------------- | ---------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `transform_tool_result`         | `[compression] tool_threshold_token`     | 4,096 (shipped example 256) | empty, essential tools, self tools, below threshold; `0` = always compress                                    |
+| `transform_terminal_output`     | `[compression] terminal_threshold`       | 1,024 (shipped example 256) | empty, below threshold; `0` = always compress                                                                 |
+| `pre_llm_call`                  | `[flow] budget_chars`                    | 4,000                       | recall catalog dropped first; directives, nudges, and engine-offload never drop                               |
+| `pre_llm_call` (context engine) | `[compression] engine_threshold_pct`     | 45 (shipped example 30)     | engine disabled, `0` = never, `100+` = off, below `engine_min_msgs`, fill % below threshold, middle < 3 turns |
+| `pre_tool_call` (chain split)   | `[compression] chain_split_min_segments` | -                           | feature off by default (`chain_split = false`)                                                                |
 
 Each setting has an environment-variable equivalent (`APHRODITE_TOOL_THRESHOLD_TOKEN`,
 `APHRODITE_TERMINAL_THRESHOLD`, `APHRODITE_FLOW_BUDGET_CHARS`,
-`APHRODITE_CHAIN_SPLIT`); environment overrides TOML, which overrides the
-default. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md)
+`APHRODITE_CHAIN_SPLIT`, `APHRODITE_ENGINE_THRESHOLD_PCT`); environment
+overrides TOML, which overrides the
+default. The context-engine row is the `pre_llm_call` trigger for
+[Context Engine](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/context-engine.md).
+See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md)
 for the full schema.
 
 ## See also
