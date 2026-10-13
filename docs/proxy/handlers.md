@@ -302,16 +302,18 @@ POST /reload
 		"tool_threshold_cache": 8192,
 		"tool_threshold_token": 1024,
 		"inline_threshold": 256,
-		"code_multiplier": 3.0
+		"code_multiplier": 3.0,
+		"auto_expand": true,
+		"auto_expand_limit": 102400
 	},
 	"parsed_only": { ... }
 }
 ```
 
 `parsed_only` echoes `[compression]` keys that have no consumer in the proxy
-path (auto-expand, terminal threshold, engine threshold, catalog mode) - they
-are reported for visibility but not applied. A parse failure returns 500 with
-the error message.
+path (terminal threshold, engine threshold, catalog mode) - they are reported
+for visibility but not applied. A parse failure returns 500 with the error
+message.
 
 ## health_check
 

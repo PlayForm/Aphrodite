@@ -1,68 +1,74 @@
-> **Draft** - planned 1.6.6 binary release note. Finalized copy staged as
-> `release-notes-v1.6.6.md` in this directory at tag time; this draft tracks
-> the same content for the next release cycle.
+> **Draft** - planned {VERSION} binary release note; `{VERSION}` / `{PLUGIN_VERSION}`
+> stay as placeholders until the version sibling cuts the bump. Finalized copy
+> staged as `release-notes-v{VERSION}.md` in this directory at tag time; this
+> draft tracks the same content for the next release cycle.
 
-**[Compare Aphrodite/v1.6.5...Aphrodite/v1.6.6](https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.6.5...Aphrodite/v1.6.6)**
+**[Compare Aphrodite/v1.6.6...Aphrodite/{VERSION}](https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.6.6...Aphrodite/{VERSION})**
 
-## Aphrodite 1.6.6 💋 Plugin v2.2.6
+## Aphrodite {VERSION} 💋 Plugin v{PLUGIN_VERSION}
 
 ### Summary
 
-1.6.6 is the second `hermes-agent` catalog-review release (PR 118488, review
-5441199534), hardening the two paths the reviewer flagged: `aphrodite_prefetch`
-now refuses sensitive paths outright (`.env`, `auth.json`, `~/.ssh`, Hermes
-home, non-file paths) and `aphrodite setup` never touches the Hermes plugin
-directory - it is report-only and points at the download scripts. The dylib
-arm joins the strict in-tree-checksum policy (missing sums = hard refusal),
-the context engine is re-described as opt-in with a `requires_hermes` floor,
-and config + docs are re-audited 1:1 against the parsers. Binary
-`1.6.5 → 1.6.6`, plugin `2.2.5 → 2.2.6`.
+{VERSION} completes the pre-Rust feature port: every feature that lived only
+in the pre-Rust prototype now runs in the Rust engine - TOML templates,
+auto-expand, the load-bearing context engine, live containers, the Rhai
+scripting engine, and the prompt knobs, plus the recursion-depth and
+request-body caps. The shipped config moves to the priced-retrieval posture
+(lower thresholds, `preview_max_chars 0`, `[lazy, lazy-eval, foresight]`
+directives) so the defaults match the doctrine the docs teach.
 
 ### Changes
 
-- **Fix (prefetch, path guard)**: `ReadOutcome::Refused` + `refuse_reason`
-  on `.env`, `auth.json`, `~/.ssh`, Hermes-home paths, and non-file paths -
-  `aphrodite_prefetch` never reads what the reviewer flagged. 10/10 tests.
-- **Fix (setup, plugin-dir guard)**: the catalog-install guard makes the
-  Hermes-home plugin directory report-only - no symlink removal/create, no
-  writes, no deletes; the notice points at `bash download.sh` /
-  `pwsh download.ps1`.
-- **Fix (setup, dylib checksums)**: the dylib arm hard-refuses (`Err`) when
-  `SHA256SUMS.txt` is missing, lacks a target block, or lacks an asset entry -
-  the mandatory-sums policy now covers both binaries.
-- **Fix (setup, hints)**: the shim carries the explicit download-script
-  hints; `plugins/aphrodite/__init__.py` and
-  `crates/aphrodite/templates/__init__.py` stay byte-identical (drift-guard).
-- **Feature (plugin, opt-in context engine)**: description corrected to
-  "opt-in context engine" - registration is `APHRODITE_CONTEXT_ENGINE=1`
-  (TOML `compression.context_engine` defaults true), and `requires_hermes:
-">=0.20.2"` (the first Hermes release with `pre_tool_call` `modify`).
-- **Feature (plugin, Disclosure)**: `plugin.yaml` and the parent `write.rs`
-  description disclose the `pre_tool_call` behavior (auto-backgrounds long
-  terminal/process commands, rewrites chained terminal commands when enabled).
-- **Chore (repo, config 1:1 audit)**: both TOMLs mutually consistent and 1:1
-  with the parsers; dead `[templates.*]` subtree and `compression.prefetch`
-  removed; `chain_split_min/max_segments` and `defaults.api_url/model` added;
-  unwired keys annotated.
-- **Docs**: 21 doc files fixed (thresholds, 13 tools, 30-type classifier, no
-  hot-reload claims, explicit `bash download.sh` install, endpoints table,
-  version stamps 1.6.5 → 1.6.6).
+- **Feature (TOML templates)**: `[templates.preview.*]` / `[templates.marker]` /
+  `[templates.prompts]` / `[templates.reverse]` are now real configuration -
+  per-content-type format strings with a documented variable set (`{type}`,
+  `{ln}`, `{size}`, `{fns}`, `{sigs}`, ...), resolved per type as
+  `family[ctype] → reverse[ctype] → family[_default] → hardcoded builder`; the
+  family is selected by `[previews] model_family` (default `"code_first"`).
+  Unknown variables degrade to empty; absent blocks fall back to the
+  hardcoded builders.
+- **Feature (auto-expand)**: `[compression] auto_expand` / `auto_expand_limit`
+  are wired - just-stored tool output resolves inline (byte-capped, `0` =
+  unlimited) instead of emitting a CCR marker; the knob is hot-reloadable
+  with the threshold set.
+- **Feature (context engine)**: `engine_threshold_pct` /
+  `engine_protect_first` / `engine_protect_last` / `engine_min_msgs` are
+  load-bearing - the engine archives the middle turns into one compact CCR
+  entry and replaces them with a single marker (head + marker + tail), then
+  injects the rendered `engine_offload` prompt; the archive is in-place but
+  recoverable via `aphrodite_retrieve`. `0` = never, `100+` = off.
+- **Feature (live containers)**: `APHRODITE_LIVE_CONTAINER` streaming mode -
+  large tool results get instant CCR markers with the `live` type and
+  progressive chunked retrieval with bytes-so-far / ETA progress.
+- **Feature (scripting)**: the `scripting` Cargo feature ports the pre-Rust
+  Rhai micro-script engine.
+- **Feature (prompt knobs)**: `retrieve_guidance` / `ccr_marker_hint` /
+  `catalog_intent_hints` are wired - the per-turn `[retrieval: ...]` guidance
+  line, the marker template's `{hint}`, and catalog intent hints; the marker
+  format/hint re-applies on `/reload`.
+- **Feature (caps)**: `APHRODITE_RECURSIVE_DEPTH` (nested marker expansion
+  cap, default 5) and `APHRODITE_MAX_REQUEST_BODY_SIZE` (optional request-body
+  cap; over-size bodies rejected with 413) are wired through resolve and the
+  proxy.
+- **Chore (new shipped defaults)**: `tool_threshold_token` 256,
+  `tool_threshold_cache` 2048, `terminal_threshold` 256, `inline_threshold`
+  1024, `code_multiplier` 1.0, `engine_threshold_pct` 30, `preview_max_chars`
+  0 (unlimited), `auto_reload` true, and `[directives] active =
+["lazy", "lazy-eval", "foresight"]` - the priced-retrieval doctrine as the
+  shipped posture.
+- **Docs**: config, context-engine, and architecture docs refreshed for the
+  ported keys; the site config surface updated to the new defaults.
 
 ### Infrastructure
 
-- Build: `cargo build --release -p aphrodite -p aphrodite-hermes` ✅ (fresh
-  binaries at `target/release/`, `--version` reports v1.6.6)
-- Check: `cargo check -p aphrodite -p aphrodite-hermes` ✅ (0 errors,
-  proves crates + dep pin moved together)
-- Tests (recorded at release commit `946d22ab` by the review wave):
-  `cargo test -p aphrodite --lib` ✅ 410 passed / 0 failed / 1 ignored
-  (network-gated); config 16/16, setup 6/6, prefetch 10/10
-- Lint/format: `cargo +nightly-2026-05-01 fmt --all -- --check` ✅; drift-guard
-  byte-identical ✅; `ruff check plugins/aphrodite/` ✅; `npx prettier --check`
-  on owned docs ✅
-- Version track: crates + pin + `package.json` 1.6.6; `plugin.yaml` 2.2.6;
-  `BINARY_VERSION` stays 1.6.4 until the release assets exist (bump-LAST);
-  README badges v1.6.6 / v2.2.6
+- Build: `cargo build --release -p aphrodite -p aphrodite-hermes` ✅ ({PENDING})
+- Check: `cargo check -p aphrodite -p aphrodite-hermes` ✅ ({PENDING} errors)
+- Tests: `cargo test -p aphrodite --lib` ✅ ({PENDING} passed / 0 failed)
+- Lint/format: `cargo +nightly-2026-05-01 fmt --all -- --check` ✅ ({PENDING});
+  `npx prettier --check` on owned docs ✅ ({PENDING})
+- Version track: crates + pin + `package.json` {VERSION}; `plugin.yaml`
+  {PLUGIN_VERSION}; `BINARY_VERSION` bumped LAST, after the release assets
+  exist; README badges v{VERSION} / v{PLUGIN_VERSION}
 
 ### What Ships
 
@@ -75,16 +81,15 @@ Build.yml's 4-target matrix (`aarch64-apple-darwin`, `x86_64-apple-darwin`,
 | -------------------------------------------------------------------- | ---------------------------------------- |
 | `aphrodite-<target>` / `libaphrodite_hermes-<target>.{so,dylib,dll}` | per matrix target                        |
 | `SHA256SUMS-<target>.txt`                                            | checksums for that target's two binaries |
-| Plugin v2.2.6                                                        | Hermes (standalone repo)                 |
+| Plugin v{PLUGIN_VERSION}                                             | Hermes (standalone repo)                 |
 
-`aphrodite-headroom-core` stays at 0.1.3 (live since 2026-09-20); the fork
-holds 2 dependency-update commits post-0.1.3 (fastembed→5, crate version
-refresh) - dep-only delta, no fork version bump in this release per the 1.6.4
-precedent (the fork publish gate is unreachable under the workflow_run chain).
+`aphrodite-headroom-core` stays at 0.1.3; the fork holds 2 dependency-update
+commits post-tag (fastembed→5, crate version refresh) - dep-only delta, no
+fork version bump per the 1.6.4 precedent.
 
 ### Links
 
-- **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.6.5...Aphrodite/v1.6.6
+- **Full Changelog**: https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.6.6...Aphrodite/{VERSION}
 - **CHANGELOG.md**: [CHANGELOG.md](CHANGELOG.md)
 - **Plugin**: https://github.com/PlayForm/Aphrodite-Hermes
 - **Headroom Fork**: https://github.com/PlayForm/Headroom

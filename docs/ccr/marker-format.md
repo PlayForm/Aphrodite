@@ -143,11 +143,11 @@ pass/fail/ignored tallies, and JSON previews show item or key counts.
 
 The rendered preview is capped in characters when configured:
 
-| Source                              | Behavior                    |
-| ----------------------------------- | --------------------------- |
-| `APHRODITE_PREVIEW_MAX_CHARS` env   | Highest precedence          |
-| TOML `[previews] preview_max_chars` | Shipped default 120         |
-| Key absent                          | Unlimited (legacy behavior) |
+| Source                              | Behavior                      |
+| ----------------------------------- | ----------------------------- |
+| `APHRODITE_PREVIEW_MAX_CHARS` env   | Highest precedence            |
+| TOML `[previews] preview_max_chars` | Shipped default 0 (unlimited) |
+| Key absent                          | Unlimited (legacy behavior)   |
 
 Truncation is char-safe and preserves the closing `]` of a self-describing
 preview so downstream parsing keeps working.

@@ -51,7 +51,7 @@ This tree documents the 1.6.6 binary and 2.2.6 plugin.
   `[defaults]`, `[compression]`, `[previews]`, `[templates.*]`, `[flow]`,
   precedence rules, config reload
 - [Environment Variables](config/env-vars.md) - the `APHRODITE_*` registry
-  with the documented-but-unwired list
+  with the documented-but-inactive list
 
 ## Proxy
 

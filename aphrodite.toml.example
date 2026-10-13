@@ -25,7 +25,7 @@
 #
 # Keys marked "DOCUMENTED BUT UNWIRED" are parsed but have no consumer -
 # setting them is a silent no-op (kept for forward compatibility; see
-# docs/config/env-vars.md "Documented but currently unwired").
+# docs/config/env-vars.md "Documented but currently inactive").
 
 # ── Proxies ─────────────────────────────────────────────────────────────────
 # `listen` binds loopback-only by default (report 12 F2) - the router already
