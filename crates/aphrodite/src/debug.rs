@@ -193,10 +193,24 @@ pub fn log_at(level:u8, event:&str, kv:&[(&str, String)]) {
 		line.push_str(&format!(" {key}={}", sanitize_kv(value)));
 	}
 	line.push('\n');
-	if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
-		use std::io::Write;
-		let _ = f.write_all(line.as_bytes());
+	// Fresh-line guarantee: a legacy flag file may lack a trailing newline
+	// (the toggle writes "on"/"off" with no terminator), so a raw append
+	// would merge the first log line into the flag value and flip the flag
+	// off. Prefix a newline when the file does not already end with one.
+	let mut f = match std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+		Ok(f) => f,
+		// Best-effort: any failure (missing dir, permissions) degrades to
+		// silence - a debug-logging failure must never break a turn.
+		Err(_) => return,
+	};
+	use std::io::{Read, Seek, SeekFrom, Write};
+	if f.seek(SeekFrom::End(-1)).is_ok() {
+		let mut last = [0u8; 1];
+		if f.read_exact(&mut last).is_ok() && last[0] != b'\n' {
+			let _ = f.write_all(b"\n");
+		}
 	}
+	let _ = f.write_all(line.as_bytes());
 }
 
 /// Log at the process-global level (stateless call sites).

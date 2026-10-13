@@ -573,12 +573,15 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 				"on_session_start" | "session_start" => {
 					let r = aphrodite::session::on_session_start(state);
 					// DEV-ONLY debug logger (crate::debug): session-init /
-					// config-summary line, emitted once per process. Hermes does
-					// not always thread session_id here - fall back to the
-					// current turn's session.
-					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-					let sid = if sid.is_empty() { crate::debug::last_session() } else { sid.to_string() };
-					log_session_init(state, &sid);
+					// config-summary line, emitted once per process. Only when
+					// Hermes actually threads a session_id here - the
+					// last_session() fallback would target a STALE persisted
+					// root from another process (e.g. the live parent session)
+					// and append the init line to the WRONG debug file. The
+					// pre_llm_call arm emits the init for the real session.
+					if let Some(sid) = parsed.get("session_id").and_then(|v| v.as_str()) {
+						log_session_init(state, sid);
+					}
 					r
 				},
 				"pre_tool_call" => {
@@ -941,9 +944,18 @@ mod tests {
 		);
 		assert!(content.starts_with('['), "line must be timestamped: {content:?}");
 		// Toggle written to the same file (whole-file overwrite) must still
-		// resolve as a flag: first-line semantics.
+		// resolve as a flag: first-line/prefix semantics.
 		std::fs::write(&path, "on\n").unwrap();
 		assert!(crate::debug::enabled_for(root), "toggle must stay readable on line 1");
+		// Regression: a legacy flag file may have NO trailing newline
+		// ("on" bare), so a subsequent logger append merges into line 1
+		// ("on[2026-...") - the flag must still read ON (prefix match).
+		std::fs::write(&path, "on").unwrap();
+		aphrodite::debug::log_at(1, "merged", &[]);
+		assert!(
+			crate::debug::enabled_for(root),
+			"flag must survive an appended line merged into line 1"
+		);
 		let _ = std::fs::remove_file(&path);
 		aphrodite::debug::set_level(0);
 		unsafe { std::env::remove_var(HOME_KEY) };

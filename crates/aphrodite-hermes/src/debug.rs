@@ -152,13 +152,19 @@ fn flag_enabled(path:&Path) -> bool {
 	}
 	let on = std::fs::read_to_string(path)
 		.ok()
-		// FIRST line only: the env-gated logger (`aphrodite::debug`)
-		// APPENDS timestamped lines to this same `debug.<root>` file, so
-		// the flag value stays readable on line 1 while the log history
-		// grows below it. A toggle write ("on"/"off", whole-file
-		// overwrite) still reads back identically.
-		.and_then(|s| s.lines().next().map(|l| l.trim().to_lowercase()))
-		.map(|s| matches!(s.as_str(), "1" | "on" | "true" | "debug"))
+		// PREFIX match on the first token, NOT a whole-line match: the
+		// env-gated logger (`aphrodite::debug`) APPENDS timestamped lines
+		// to this same `debug.<root>` file, and a legacy flag file may have
+		// no trailing newline (the toggle writes "on"/"off" bare), so the
+		// first log line can merge into the flag value (e.g. "on[2026-...]").
+		// A value-prefix check keeps the toggle readable in every case.
+		.map(|s| s.trim_start().to_lowercase())
+		.map(|s| {
+			s.starts_with("1")
+				|| s.starts_with("on")
+				|| s.starts_with("true")
+				|| s.starts_with("debug")
+		})
 		.unwrap_or(false);
 	guard.insert(key, (mtime, on));
 	on
