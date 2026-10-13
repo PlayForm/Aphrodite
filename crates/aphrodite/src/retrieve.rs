@@ -23,6 +23,22 @@ pub struct RetrieveRequest {
 	pub limit:usize,
 }
 
+/// Progress status of a live container (pre-Rust port of `_hooks/live.py`),
+/// surfaced on every retrieve of a container entry. `chunks`/`chunk_size`
+/// describe the stored container; `bytes_arrived` counts bytes served so
+/// far through partial retrieves (an approximation - it advances by the
+/// bytes returned in each windowed response, including its `[lines ...]`
+/// header) and `complete` flips once the full content has been delivered
+/// (final resolve, `limit: 0`).
+#[derive(Debug, Clone, Serialize)]
+pub struct LiveProgress {
+	pub chunks:usize,
+	pub chunk_size:usize,
+	pub bytes_total:usize,
+	pub bytes_arrived:usize,
+	pub complete:bool,
+}
+
 /// Response body for `/retrieve`. `source` reports which backend served the
 /// content (e.g. `"inline_ccr"`, `"ccr"`, `"none"`) for observability.
 #[derive(Debug, Serialize)]
@@ -39,6 +55,28 @@ pub struct RetrieveResponse {
 	/// header is also prepended to `content` in that case; this field lets a
 	/// caller detect truncation without parsing it.
 	pub truncated:bool,
+	/// Live-container progress; present only when the resolved entry is a
+	/// live container. Skipped when absent so non-container responses stay
+	/// byte-identical to the pre-live shape.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub live:Option<LiveProgress>,
+}
+
+/// Parsed live-container metadata envelope (the `{hash}:live:meta` inline
+/// store entry written by `hooks::transform_live_container`). Unknown
+/// envelope fields (e.g. the stored content `type`) are ignored on parse.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct LiveContainerMeta {
+	#[serde(default)]
+	live:bool,
+	#[serde(default)]
+	size:usize,
+	#[serde(default)]
+	chunks:usize,
+	#[serde(default)]
+	chunk_size:usize,
+	#[serde(default)]
+	bytes_arrived:usize,
 }
 
 /// Resolve a CCR marker hash back to its original content, optionally
@@ -60,6 +98,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 					source:"none".into(),
 					error:Some("`hash` required".into()),
 					truncated:false,
+					live:None,
 				}),
 			)
 				.into_response();
@@ -87,6 +126,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 						source:"none".into(),
 						error:Some("inline_ccr lock poisoned; cannot serve /retrieve".into()),
 						truncated:false,
+						live:None,
 					}),
 				)
 					.into_response();
@@ -103,23 +143,24 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 				Some(ccr) => {
 					match ccr_get(ccr, &hash).await {
 						Some(c) => {
-							state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-							c
-						},
-						None => {
-							state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-							return (
-								StatusCode::NOT_FOUND,
-								Json(RetrieveResponse {
-									found:false,
-									content:None,
-									source:"none".into(),
-									error:Some(format!("CCR entry not found: {}", hash)),
-									truncated:false,
-								}),
-							)
-								.into_response();
-						},
+												state.ccr_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+												c
+											},
+											None => {
+												state.ccr_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+												return (
+													StatusCode::NOT_FOUND,
+													Json(RetrieveResponse {
+														found:false,
+														content:None,
+														source:"none".into(),
+														error:Some(format!("CCR entry not found: {}", hash)),
+														truncated:false,
+														live:None,
+													}),
+												)
+													.into_response();
+											},
 					}
 				},
 				None => {
@@ -132,6 +173,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 							source:"none".into(),
 							error:Some(format!("CCR entry not found: {}", hash)),
 							truncated:false,
+							live:None,
 						}),
 					)
 						.into_response();
@@ -156,18 +198,19 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 	let (content, truncated) = match paginate(&content, req.offset, req.limit) {
 		Ok(paged) => paged,
 		Err(err) => {
-			return (
-				StatusCode::BAD_REQUEST,
-				Json(RetrieveResponse {
-					found:false,
-					content:Some(err),
-					source:"ccr".into(),
-					error:None,
-					truncated:false,
-				}),
-			)
-				.into_response();
-		},
+					return (
+						StatusCode::BAD_REQUEST,
+						Json(RetrieveResponse {
+							found:false,
+							content:Some(err),
+							source:"ccr".into(),
+							error:None,
+							truncated:false,
+							live:None,
+						}),
+					)
+					.into_response();
+				},
 	};
 
 	Json(RetrieveResponse { found:true, content:Some(content), source:"ccr".into(), error:None, truncated })

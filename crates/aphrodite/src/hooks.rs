@@ -64,6 +64,132 @@ fn auto_expand_content(state:&mut AphroditeState, hash:&str, content:&str) -> St
 	}
 }
 
+// ── Live containers (pre-Rust port of _hooks/live.py) ─────────────────
+//
+// When `state.live_container` is on AND content clears the compress
+// threshold, the transform hooks store the content as a live container -
+// per-chunk entries + a metadata envelope - and emit the INSTANT marker
+// with a progress annotation. The retrieve path then serves the chunks
+// progressively (chunk count / bytes arrived via the container status);
+// a final resolve returns the full content. The content is ALSO stored
+// under the plain hash so `resolve::expand` keeps the lossless
+// round-trip contract. Off (the default) = byte-identical current
+// behavior.
+
+/// Target byte size of one live-container chunk. Chunking cuts on UTF-8
+/// char boundaries, so a chunk may be a few bytes under this when a
+/// multi-byte character straddles the boundary.
+pub(crate) const LIVE_CHUNK_SIZE:usize = 1024;
+/// Inline-store key suffix of the container metadata envelope.
+pub(crate) const LIVE_META_SUFFIX:&str = ":live:meta";
+/// Inline-store key segment prefix of the per-chunk entries.
+pub(crate) const LIVE_CHUNK_SUFFIX:&str = ":live:chunk:";
+
+/// Inline-store key of a live container's metadata envelope.
+pub(crate) fn live_meta_key(hash:&str) -> String { format!("{hash}{LIVE_META_SUFFIX}") }
+
+/// Inline-store key of a live container's `index`-th chunk.
+pub(crate) fn live_chunk_key(hash:&str, index:usize) -> String { format!("{hash}{LIVE_CHUNK_SUFFIX}{index}") }
+
+/// Split `content` into chunks of at most `chunk_size` BYTES, cutting only
+/// on UTF-8 char boundaries so reassembly is lossless - a raw byte slice
+/// can split a multi-byte char, and lossy re-encoding would corrupt the
+/// content and break the round-trip contract.
+pub(crate) fn chunk_on_char_boundaries(content:&str, chunk_size:usize) -> Vec<&str> {
+	let mut chunks = Vec::new();
+	let mut start = 0usize;
+	for (idx, _ch) in content.char_indices() {
+		if idx >= start + chunk_size {
+			chunks.push(&content[start..idx]);
+			start = idx;
+		}
+	}
+	if start < content.len() {
+		chunks.push(&content[start..]);
+	}
+	chunks
+}
+
+/// Render the instant live-container marker: the standard CCR header with
+/// the `live` type, then a single annotation line carrying the progress
+/// handle - chunk count, total size, and bytes arrived so far (0 at emit
+/// time; the retrieve path advances it). Sanitizes the preview the same
+/// way `ccr_marker` does (newlines → spaces).
+fn live_marker(hash:&str, total:usize, chunks:usize, preview:&str) -> String {
+	let safe = preview.replace(['\n', '\r'], " ").trim().to_string();
+	let chunk_note = if chunks == 1 {
+		"1 chunk".to_string()
+	} else {
+		format!("{chunks} chunks")
+	};
+	format!(
+		"<<<CCR:{}|live|{}>>>\nLive container: {} · {} · {} bytes · 0 bytes arrived. Use aphrodite_retrieve({}) to fetch when needed. Continue reasoning without waiting.",
+		hash,
+		total,
+		safe,
+		chunk_note,
+		total,
+		hash
+	)
+}
+
+/// Live-container transform (pre-Rust port of `_wrap_as_live_container`):
+/// store the content chunked with a metadata envelope, record a `live`
+/// marker entry, and return the INSTANT marker payload with a progress
+/// annotation. Call only when `state.live_container` is on and the content
+/// cleared the compress threshold (and auto-expand is not taking over).
+fn transform_live_container(state:&mut AphroditeState, content:&str, type_str:&str) -> serde_json::Value {
+	let hash = headroom_core::ccr::compute_key(content.as_bytes());
+	let total = content.len();
+	let chunks = chunk_on_char_boundaries(content, LIVE_CHUNK_SIZE);
+	let n = chunks.len();
+
+	// Round-trip entry: the plain hash resolves to the exact original via
+	// `resolve::expand` (and is what a final full retrieve serves).
+	state.inline_store_put(hash.clone(), content.to_string());
+	// Container entries: per-chunk content + the metadata envelope.
+	// `bytes_arrived` starts at 0 - the marker is instant, delivery happens
+	// through the retrieve path, which advances the counter.
+	for (i, chunk) in chunks.iter().enumerate() {
+		state.inline_store_put(live_chunk_key(&hash, i), (*chunk).to_string());
+	}
+	let meta = serde_json::json!({
+		"live": true,
+		"type": type_str,
+		"size": total,
+		"chunks": n,
+		"chunk_size": LIVE_CHUNK_SIZE,
+		"bytes_arrived": 0,
+	});
+	state.inline_store_put(live_meta_key(&hash), meta.to_string());
+
+	let preview = crate::build_preview(type_str, content);
+	let marker = live_marker(&hash, total, n, &preview);
+
+	state.record_marker(MarkerEntry {
+		hash:hash.clone(),
+		ccr_type:"live".to_string(),
+		size:total,
+		preview:preview.clone(),
+		turn:state.turn_counter,
+		center:None,
+		meta:None,
+	});
+
+	serde_json::json!({
+		"status": "ok",
+		"compressed": true,
+		"live": true,
+		"hash": hash,
+		"type": "live",
+		"size": total,
+		"chunks": n,
+		"bytes_arrived": 0,
+		"preview": preview,
+		"marker": marker,
+	})
+}
+
 /// Essential tools that must NOT be compressed - agent needs raw output.
 const ESSENTIAL_TOOLS:&[&str] = &[
 	"skill_view",
@@ -241,6 +367,18 @@ fn transform_tool_result_inner(
 	// limit goes through the store+expand path so no marker can leak.
 	if !auto_expand_applies(state, content) && state.tool_threshold > 0 && content.len() < state.tool_threshold {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
+	}
+
+	// ── Live container (pre-Rust port of _hooks/live.py) ──
+	// Enabled AND above the compress threshold → store the content chunked
+	// with a metadata envelope and emit the INSTANT marker with a progress
+	// annotation; the retrieve path serves the chunks progressively. When
+	// auto-expand applies it wins (it guarantees no marker reaches the
+	// model, so the container path is skipped and the expanded content is
+	// returned inline exactly as today).
+	if state.live_container && !auto_expand_applies(state, content) {
+		let (type_str, _classify_content) = resolve_type_and_classify_content(content, classify, false);
+		return transform_live_container(state, content, &type_str);
 	}
 
 	let (type_str, classify_content) = resolve_type_and_classify_content(content, classify, false);
@@ -450,6 +588,16 @@ fn transform_terminal_output_inner(
 	// splitting). Auto-expand bypasses the gate (store+expand path).
 	if !do_auto_expand && state.terminal_threshold > 0 && content.len() < state.terminal_threshold {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
+	}
+
+	// ── Live container (pre-Rust port of _hooks/live.py) ──
+	// Same contract as the tool path: enabled AND above the compress
+	// threshold → chunked container store + INSTANT marker with a progress
+	// annotation. Chain-split (above) already handled marked output, and
+	// auto-expand wins when it applies.
+	if state.live_container && !do_auto_expand {
+		let (type_str, _classify_content) = resolve_type_and_classify_content(content, classify, true);
+		return transform_live_container(state, content, &type_str);
 	}
 
 	let (type_str, classify_content) = resolve_type_and_classify_content(content, classify, true);

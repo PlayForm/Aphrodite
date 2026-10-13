@@ -11,6 +11,53 @@ use crate::state::{AphroditeState, MarkerEntry};
 /// Maximum file size for prefetch (10MB).
 const MAX_PREFETCH_SIZE:u64 = 10 * 1024 * 1024;
 
+/// Live-container arrival record (pre-Rust `_hooks/live.py` container
+/// semantics): one per prefetched entry, only surfaced when
+/// `state.live_container` is on. `bytes_arrived == size` with `eta_s == 0.0`
+/// means fully arrived; a partial record models chunked arrival (the
+/// async-loading case the pre-Rust `_prefetch_registry` tracked per path).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LiveArrival {
+	/// Unix-seconds timestamp of first arrival.
+	pub arrived_at_unix:u64,
+	/// Bytes of container content arrived so far.
+	pub bytes_arrived:u64,
+	/// Total container size in bytes.
+	pub size:u64,
+	/// Estimated seconds until fully arrived (0.0 = fully arrived).
+	pub eta_s:f32,
+}
+
+impl LiveArrival {
+	/// Fully-arrived record for content that landed synchronously (the
+	/// Rust port's prefetch read is synchronous, so every loaded entry
+	/// arrives in one chunk at insert time).
+	pub fn arrived(size:u64) -> LiveArrival {
+		LiveArrival { arrived_at_unix:unix_now(), bytes_arrived:size, size, eta_s:0.0 }
+	}
+
+	/// Chunked-arrival ETA estimate for a partial record: scale the elapsed
+	/// time by the bytes still outstanding relative to what already arrived
+	/// (linear arrival-rate model). Zero when nothing has arrived (no rate
+	/// to extrapolate) or everything has.
+	pub fn eta_estimate(bytes_arrived:u64, size:u64, elapsed_s:f32) -> f32 {
+		if bytes_arrived == 0 || bytes_arrived >= size {
+			return 0.0;
+		}
+		let outstanding_ratio = (size - bytes_arrived) as f32 / bytes_arrived as f32;
+		elapsed_s * outstanding_ratio
+	}
+}
+
+/// Unix-seconds now - single source of truth for live-container arrival
+/// timestamps so the prefetch and poll-worker surfaces share one clock.
+pub fn unix_now() -> u64 {
+	std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.map(|d| d.as_secs())
+		.unwrap_or(0)
+}
+
 /// Outcome of reading one path, before any state mutation.
 pub enum ReadOutcome {
 	Missing,
@@ -177,6 +224,19 @@ pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutc
 					meta:Some({
 						let mut m = std::collections::HashMap::new();
 						m.insert("path".to_string(), path_str.clone());
+						// Live-container mode (pre-Rust `_hooks/live.py`):
+						// the schedule entry carries container semantics -
+						// arrival timestamp, byte progress, ETA - so the
+						// prefetch_status surface can expose them. Off by
+						// default: meta keeps only `path` (byte-identical
+						// current behavior).
+						if state.live_container {
+							let arrival = LiveArrival::arrived(size);
+							m.insert("live".to_string(), "1".to_string());
+							m.insert("live_arrived_at".to_string(), arrival.arrived_at_unix.to_string());
+							m.insert("live_bytes_arrived".to_string(), arrival.bytes_arrived.to_string());
+							m.insert("live_eta_s".to_string(), arrival.eta_s.to_string());
+						}
 						m
 					}),
 				});
@@ -214,6 +274,57 @@ pub fn insert_outcomes(state:&mut AphroditeState, outcomes:Vec<(String, ReadOutc
 		"inline_store_bytes": state.inline_store_bytes(),
 		"inline_store_byte_budget": state.inline_store_byte_budget(),
 	})
+}
+
+/// Live prefetch schedule - the extended status struct behind the
+/// `aphrodite_prefetch_status` tool (pre-Rust `_hooks/prefetch.py`
+/// `_prefetch_status_handler` port).
+///
+/// When `state.live_container` is off the output is byte-identical to the
+/// pre-port bridge renderer (aphrodite-hermes `tools.rs`): `loading` /
+/// `ready` / `errors` arrays plus `total_ready`, ready entries carrying
+/// exactly `path` / `hash` / `type` / `size`. When on, each ready entry
+/// additionally carries the live-container arrival surface (`live`,
+/// `arrived_at`, `bytes_arrived`, `eta_s`) and the top level gains
+/// `live_container: true`; the base fields are untouched.
+pub fn prefetch_status(state:&AphroditeState) -> serde_json::Value {
+	let live = state.live_container;
+	let mut ready:Vec<serde_json::Value> = Vec::new();
+
+	for mk in state.recent_markers.iter() {
+		let Some(meta) = mk.meta.as_ref() else { continue };
+		let Some(path) = meta.get("path") else { continue };
+		let mut entry = serde_json::json!({
+			"path": path,
+			"hash": &mk.hash,
+			"type": mk.ccr_type,
+			"size": mk.size,
+		});
+		if live {
+			// Defensive parse (meta values are strings): a malformed or
+			// legacy entry degrades to "0 bytes arrived, 0s ETA" instead of
+			// failing the whole schedule surface.
+			let arrived_at = meta.get("live_arrived_at").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+			let bytes_arrived = meta.get("live_bytes_arrived").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+			let eta_s = meta.get("live_eta_s").and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.0);
+			entry["live"] = serde_json::json!(meta.get("live").map(|v| v == "1").unwrap_or(false));
+			entry["arrived_at"] = serde_json::json!(arrived_at);
+			entry["bytes_arrived"] = serde_json::json!(bytes_arrived);
+			entry["eta_s"] = serde_json::json!(eta_s);
+		}
+		ready.push(entry);
+	}
+
+	let mut out = serde_json::json!({
+		"loading": [],
+		"ready": ready,
+		"errors": [],
+		"total_ready": ready.len(),
+	});
+	if live {
+		out["live_container"] = serde_json::json!(true);
+	}
+	out
 }
 
 /// Prefetch a list of file paths into the inline store.
@@ -390,5 +501,119 @@ mod tests {
 		assert_eq!(r["refused"], 1, "directory must be refused: {r:?}");
 
 		let _ = std::fs::remove_dir_all(&dir);
+	}
+
+	// ── Live containers (pre-Rust `_hooks/live.py` port): prefetch status
+	// surfaces container semantics (arrival timestamp, byte progress, ETA)
+	// when `state.live_container` is on, and is byte-identical to the
+	// pre-port renderer when off. ──
+
+	#[test]
+	fn test_prefetch_status_live_off_byte_identical() {
+		let mut s = AphroditeState::default();
+		assert!(!s.live_container, "default state must have live_container off");
+		let src = env!("CARGO_MANIFEST_DIR").to_string() + "/src/prefetch.rs";
+		let r = prefetch_files(&mut s, std::slice::from_ref(&src));
+		assert_eq!(r["loaded"], 1, "prefetch failed: {r:?}");
+
+		// Reference renderer: the exact algorithm the pre-port bridge
+		// handler (aphrodite-hermes tools.rs `aphrodite_prefetch_status`)
+		// used - ready entries are `{path, hash, type, size}` from marker
+		// meta, plus empty loading/errors arrays and total_ready.
+		let expected_ready:Vec<serde_json::Value> = s
+			.recent_markers
+			.iter()
+			.filter_map(|mk| {
+				mk.meta.as_ref().and_then(|meta| meta.get("path")).map(
+					|path| serde_json::json!({"path": path, "hash": &mk.hash, "type": mk.ccr_type, "size": mk.size}),
+				)
+			})
+			.collect();
+		let expected = serde_json::json!({
+			"loading": [],
+			"ready": expected_ready,
+			"errors": [],
+			"total_ready": expected_ready.len(),
+		});
+
+		let status = prefetch_status(&s);
+		assert_eq!(
+			status, expected,
+			"live_container off must be byte-identical to the pre-port renderer"
+		);
+		// No live-container keys anywhere on the surface.
+		assert!(status.get("live_container").is_none());
+		for entry in status["ready"].as_array().unwrap() {
+			assert!(entry.get("live").is_none());
+			assert!(entry.get("arrived_at").is_none());
+			assert!(entry.get("bytes_arrived").is_none());
+			assert!(entry.get("eta_s").is_none());
+		}
+	}
+
+	#[test]
+	fn test_prefetch_status_live_on_surfaces_progress_eta() {
+		let mut s = AphroditeState::default();
+		s.live_container = true;
+		let src = env!("CARGO_MANIFEST_DIR").to_string() + "/src/prefetch.rs";
+		let r = prefetch_files(&mut s, std::slice::from_ref(&src));
+		assert_eq!(r["loaded"], 1, "prefetch failed: {r:?}");
+
+		let status = prefetch_status(&s);
+		assert_eq!(status["live_container"], true);
+		let ready = status["ready"].as_array().unwrap();
+		assert_eq!(ready.len(), 1, "one loaded entry: {status}");
+		let entry = &ready[0];
+		// Base fields must survive intact.
+		assert!(entry.get("path").is_some());
+		assert!(entry.get("hash").is_some());
+		assert!(entry.get("type").is_some());
+		// Container semantics: arrival timestamp, byte progress, ETA.
+		assert_eq!(entry["live"], true);
+		assert_eq!(entry["bytes_arrived"], entry["size"], "sync prefetch arrives fully");
+		assert_eq!(entry["eta_s"], 0.0, "fully arrived -> zero ETA");
+		assert!(entry["arrived_at"].as_u64().unwrap() > 0, "arrival timestamp must be set");
+		// The status surface carries the same full 40-char hash the
+		// prefetch response returned (instant-marker contract).
+		assert_eq!(entry["hash"].as_str().unwrap().len(), 40);
+		assert_eq!(entry["hash"].as_str().unwrap(), r["results"][0]["hash"].as_str().unwrap());
+	}
+
+	#[test]
+	fn test_prefetch_instant_marker_contract() {
+		let mut s = AphroditeState::default();
+		s.live_container = true;
+		let src = env!("CARGO_MANIFEST_DIR").to_string() + "/src/prefetch.rs";
+		let file_text = std::fs::read_to_string(&src).unwrap();
+		let r = prefetch_files(&mut s, std::slice::from_ref(&src));
+		assert_eq!(r["loaded"], 1);
+
+		// Instant marker: the task hash is available immediately in the
+		// prefetch response and on the status surface.
+		let hash = r["results"][0]["hash"].as_str().unwrap().to_string();
+		assert_eq!(hash.len(), 40, "instant hash must be the full 40-char CCR hash");
+		assert_eq!(prefetch_status(&s)["ready"][0]["hash"].as_str().unwrap(), hash);
+
+		// Full content arrives later: stored in the inline store and
+		// retrievable by the instant hash.
+		let stored = s.inline_store_get(&hash);
+		assert_eq!(
+			stored.as_deref(),
+			Some(file_text.as_str()),
+			"full content must be retrievable via the instant hash"
+		);
+	}
+
+	#[test]
+	fn test_live_eta_estimate_scales_with_outstanding_bytes() {
+		// Half arrived after 10s -> ~10s more at the observed rate.
+		let eta = LiveArrival::eta_estimate(50, 100, 10.0);
+		assert!((eta - 10.0).abs() < 0.001, "half arrived -> eta ~ elapsed, got {eta}");
+		// 90% arrived -> 10x less outstanding.
+		let eta2 = LiveArrival::eta_estimate(90, 100, 10.0);
+		assert!((eta2 - 10.0 / 9.0).abs() < 0.001, "90% arrived -> ~1.11s, got {eta2}");
+		// Nothing arrived / fully arrived -> no ETA to extrapolate.
+		assert_eq!(LiveArrival::eta_estimate(0, 100, 10.0), 0.0);
+		assert_eq!(LiveArrival::eta_estimate(100, 100, 10.0), 0.0);
 	}
 }

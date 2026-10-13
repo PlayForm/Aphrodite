@@ -489,23 +489,13 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 
 	// ── prefetch_status: which prefetched files are resolvable ──
 	// Prefetch is synchronous here, so anything loaded is already "ready".
+	// Rendered by the core crate's `prefetch::prefetch_status`: when
+	// `[compression] live_container` is off the output is byte-identical to
+	// the original inline renderer; when on, ready entries additionally
+	// carry the live-container arrival surface (arrived_at / bytes_arrived /
+	// eta_s).
 	m.insert("aphrodite_prefetch_status", |_args| {
-		with_shared(|state| {
-			let ready:Vec<serde_json::Value> = state
-				.recent_markers
-				.iter()
-				.filter_map(|mk| {
-					mk.meta.as_ref().and_then(|meta| meta.get("path")).map(|path| {
-						serde_json::json!({
-							"path": path,
-							"hash": &mk.hash,
-							"type": mk.ccr_type, "size": mk.size,
-						})
-					})
-				})
-				.collect();
-			serde_json::json!({"loading": [], "ready": ready, "errors": [], "total_ready": ready.len()})
-		})
+		with_shared(|state| aphrodite::prefetch::prefetch_status(state))
 	});
 
 	// ── reclassify: re-detect type/preview for stored markers ──
