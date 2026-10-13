@@ -81,26 +81,26 @@ ccr_ttl_seconds = 3600
 # Everything else in this section is parsed-but-unwired (see the per-key
 # annotations below).
 [compression]
-engine_threshold_pct = 45   # dylib session state (surfaced via aphrodite_stats/config_get); 100+ = documented engine-off escape hatch; proxy path parses-only (no consumer)
+engine_threshold_pct = 30   # dylib session state (surfaced via aphrodite_stats/config_get); 100+ = documented engine-off escape hatch; proxy path parses-only (no consumer)
 engine_protect_first = 2    # dylib session state (status only) - messages to keep at start
 engine_protect_last = 5     # dylib session state (status only) - messages to keep at end
 engine_min_msgs = 8         # dylib session state (status only) - minimum messages before activating
-tool_threshold_token = 512  # token proxy threshold (bytes) - lower = compress more (hot-reloads)
-tool_threshold_cache = 4096 # cache proxy threshold (bytes) - lower = compress more (hot-reloads)
-terminal_threshold = 1024   # dylib terminal-output threshold (bytes); proxy path parses-only
-inline_threshold = 2048     # inline zlib fallback threshold (bytes) (hot-reloads)
+tool_threshold_token = 256  # token proxy threshold (bytes) - lower = compress more (hot-reloads)
+tool_threshold_cache = 2048 # cache proxy threshold (bytes) - lower = compress more (hot-reloads)
+terminal_threshold = 256    # dylib terminal-output threshold (bytes); proxy path parses-only
+inline_threshold = 1024     # inline zlib fallback threshold (bytes) (hot-reloads)
 auto_expand = true          # DOCUMENTED BUT UNWIRED: parsed, no reader - auto-expand is not keyed on this flag
 auto_expand_limit = 102400  # DOCUMENTED BUT UNWIRED: parsed, no reader (0=unlimited is not enforced from this key)
 catalog_mode = "tool"       # DOCUMENTED BUT UNWIRED: parsed (echoed by POST /reload), no consumer - catalog layout is compiled-in
 classifier_poll = true      # DOCUMENTED BUT UNWIRED: parsed, no reader (CCR skipping is not keyed on this flag)
-code_multiplier = 3.0       # multiply threshold for code types (hot-reloads)
+code_multiplier = 1.0       # multiply threshold for code types (hot-reloads); 1.0 = code at base threshold (max compression)
 context_engine = true       # dylib-path only (aphrodite_stats/config_get/set,
 # aphrodite_dispatch) - a status flag exposed by
 # the C-ABI/Hermes bridge; the standalone HTTP
 # proxy (main.rs/proxy.rs) never reads it and has
 # no gated behavior tied to this key
 poll_worker = true          # dylib-path: enable auto-backgrounding of slow tool calls
-auto_reload = false         # dylib-path: watch aphrodite.toml and re-apply config fields on change (default off; session CCR state is never touched - only config fields)
+auto_reload = true          # dylib-path: watch aphrodite.toml and re-apply config fields on change (session CCR state is never touched - only config fields)
 chain_split = false         # dylib-path: opt-in fine-grained command splitting (SEG_MARKER segments); OFF by default (markers pollute redirected stdout)
 chain_split_min_segments = 2 # dylib-path: floor for the adaptive chain-split threshold (min 2)
 chain_split_max_segments = 6 # dylib-path: cap for the adaptive chain-split threshold
@@ -112,7 +112,7 @@ chain_split_max_segments = 6 # dylib-path: cap for the adaptive chain-split thre
 [previews]
 model_family = "code_first" # DOCUMENTED BUT UNWIRED: parsed, no consumer - preview families are compiled-in
 code_structure_map = true   # DOCUMENTED BUT UNWIRED: parsed, no consumer
-preview_max_chars = 120     # caps the whole rendered preview STRING, not per line; 0 = unlimited (env APHRODITE_PREVIEW_MAX_CHARS > TOML > default)
+preview_max_chars = 0       # caps the whole rendered preview STRING, not per line; 0 = unlimited - previews render at full natural length (env APHRODITE_PREVIEW_MAX_CHARS > TOML > default)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -127,8 +127,14 @@ catalog_intent_hints = false  # DOCUMENTED BUT UNWIRED: parsed, no consumer
 # crates/aphrodite/src/flow.rs). Set to "" to disable entirely.
 session_inject = """
 [APHRODITE] CCR active. Tool output > threshold → <<<CCR:hash|type|size>>>.
-Marker = stored content. If a marker appears, retrieve it (aphrodite_retrieve)
-before any other action. Never re-read a file you hold a marker for.
+Markers ARE the content, compressed. A marker's `size` is its retrieval cost:
+resolving it re-adds that many bytes to context. Price each retrieval against
+the next action - retrieve only markers whose content you will actually
+consume; defer the rest (markers persist and stay retrievable; batch the ones
+you need into one turn). Judge from the preview + type + size: for most types
+the preview answers the structural question (succeeded? which files? how
+many? what shape?). Never re-read a file you hold a marker for; never invent
+content you did not retrieve.
 OPERATING RULES (token-efficiency):
 - Branch on STRUCTURED exit signals only: tool `exit_code`, `error` fields,
   and command `EXIT:$?` prints. Never infer success/failure by scanning
@@ -137,7 +143,7 @@ OPERATING RULES (token-efficiency):
   use `test -f`/`grep -q` so the exit code is the source of truth.
 - Keep prose minimal. No declarative status paragraphs. Act, then report
   the single decisive fact (exit code / hash / file path).
-- Batch independent reads; retrieve all CCR markers in one turn before acting.
+- Batch independent reads; retrieve the CCR markers you need in one turn.
 """
 
 
@@ -162,7 +168,7 @@ OPERATING RULES (token-efficiency):
 # cleanup, explore, lazy, lazy-eval.
 # Swap mid-conversation via aphrodite_directive("swap", "explore").
 # An empty list seeds focus + foresight + lazy from the loaded set.
-active = ["focus", "foresight"]
+active = ["lazy", "lazy-eval", "foresight"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

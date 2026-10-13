@@ -8,23 +8,21 @@ of the token cost. Read this file first - it is the map.
 ## Current state (verified 2026-09-20)
 
 - **Binary 1.5.0** - `crates/aphrodite` (plus `crates/aphrodite-hermes`,
-  `package.json`, `plugins/aphrodite/BINARY_VERSION`). For live values ask
-  `aphrodite --version` / `aphrodite_stats`, never trust a hardcoded doc
-  number.
+  `package.json`, `plugins/aphrodite/BINARY_VERSION`). Live values:
+  `aphrodite --version` / `aphrodite_stats` (hardcoded doc numbers drift).
 - **Plugin 2.2.0** - `plugins/aphrodite` is a git submodule
   (PlayForm/Aphrodite-Hermes, remote `Source`). It is a **pure loader**: all
   compression/engine logic lives in the Rust dylib
   (`libaphrodite_hermes.dylib`); the FFI bindings are **generated**
-  (`_bindings.py` via cbindgen → ctypesgen → finalize). Never hand-edit
-  them - regenerate through the codegen pipeline and keep
-  `test_finalize_bindings.py` green.
+  (`_bindings.py` via cbindgen → ctypesgen → finalize) and guarded by
+  `test_finalize_bindings.py`.
 - **Runtime home `~/.hermes/aphrodite/`** - `aphrodite.toml`, `binaries/`
   (binary + dylib, auto-downloaded/auto-updated), `directives/`,
   `hotreload/` (dylib hot-reloads on mtime), `ccr.db`. The layout
   self-heals on start (re-copies binaries/directives/hotreload).
 - **Skills live dev-side** in `.hermes/skills/` (58 skills) and auto-load
   because the repo is listed in `skills.trusted_project_dirs`
-  (`~/.hermes/config.yaml`) - never ship them with the plugin, never re-trust.
+  (`~/.hermes/config.yaml`).
 - **Issue #11 preview machinery (landed in 1.4.6)** - honest previews: the
   `ok`-collapse is gone, the caller's type hint wins, build/error/linter/log
   arms surface real lines, `total_count` is real. `preview_max_chars` is
@@ -39,7 +37,7 @@ of the token cost. Read this file first - it is the map.
   so pointers are never orphaned; they run only in the main parent
   (superproject guard) and only touch real mode-160000 gitlinks.
 - **Two version tracks, never conflated**: binary 1.4.x vs plugin 2.1.x.
-  `BINARY_VERSION` is a live distribution pointer - bump it LAST at tag time.
+  `BINARY_VERSION` is a live distribution pointer - bumped LAST at tag time.
 
 ## Key paths
 
@@ -55,7 +53,7 @@ of the token cost. Read this file first - it is the map.
 | Dev archive     | `.hermes/` - skills/, tmp/ (scratch), scripts/, classification/, notes/, uml/   |
 | Maintenance     | `Maintain/` (scripts/, tests/, CHANGELOG.md)                                    |
 
-## Dev flow - the joyful loop
+## Dev loop
 
 - **Pane 0**: `cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x
 'run -p aphrodite'` - instant feedback on every save. Watch BOTH
@@ -64,13 +62,11 @@ of the token cost. Read this file first - it is the map.
   to touch it) and the plugin keeps running old code while the proxy looks
   alive.
 - **Pane 1**: `hermes --profile dev-aphrodite` - test in production.
-- Auto-expand is **inert configuration** (parsed, no active consumer) - never
-  enable it to debug markers; when you see a `<<<CCR:...>>>` marker,
-  `aphrodite_retrieve(hash)` it - never re-read the source file behind it.
-- Scratch belongs in `.hermes/tmp/` (gitignored contents, tracked
-  `.gitkeep`), NEVER `/tmp`; gzip/tar.gz bulky fixtures in place.
+- Auto-expand is **inert configuration** (parsed, no active consumer).
+- Scratch lives in `.hermes/tmp/` (gitignored contents, tracked
+  `.gitkeep`); bulky fixtures are gzip/tar.gz'd in place.
 
-## Quality gates - zero tolerance, record ACTUAL numbers (2026-09-18)
+## Quality gates - verified results (2026-09-18)
 
 | Gate                                                                                        | Result                                                |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -85,8 +81,7 @@ of the token cost. Read this file first - it is the map.
 | `cargo clippy -p aphrodite -- -D warnings`; `npx pyright plugins/aphrodite/`                | clean                                                 |
 | `npx prettier --check .hermes/**/*.md`                                                      | clean (tabs, width 100, proseWrap preserve)           |
 
-Run all gates before any release claim; report what commands printed, never
-"should pass".
+Release claims are backed by the gate output recorded above.
 
 ## Skills
 
