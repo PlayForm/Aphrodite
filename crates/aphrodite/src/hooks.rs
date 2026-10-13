@@ -574,10 +574,10 @@ fn transform_terminal_output_inner(
 				total_marker
 			);
 			// DEV-ONLY debug metrics (crate::debug): count the chain-split
-					// compress decision (per-segment markers are counted individually
-					// by `record_marker`).
-					crate::debug::bump(crate::debug::Counter::Compressions);
-					return serde_json::json!({
+			// compress decision (per-segment markers are counted individually
+			// by `record_marker`).
+			crate::debug::bump(crate::debug::Counter::Compressions);
+			return serde_json::json!({
 						"status": "ok",
 						"compressed": true,
 						"chain_split": true,

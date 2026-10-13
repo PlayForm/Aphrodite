@@ -30,8 +30,9 @@
 use std::{
 	path::PathBuf,
 	sync::{
-		Mutex, OnceLock,
-		atomic::{AtomicU64, AtomicU8, Ordering},
+		Mutex,
+		OnceLock,
+		atomic::{AtomicU8, AtomicU64, Ordering},
 	},
 };
 
@@ -138,11 +139,18 @@ pub fn current_root_session() -> String {
 		.unwrap_or_default()
 }
 
-/// The debug runtime home: the real runtime home in production, a scratch
-/// dir under the OS temp in tests so the live session's flag files and
-/// `session.current` can never leak into (or be polluted by) the test
-/// process.
+/// The debug runtime home: $APHRODITE_DEBUG_HOME (dev-only override, used
+/// by tests to keep probe files out of the real runtime home) -> the real
+/// runtime home in production -> a scratch dir under the OS temp in tests.
+/// The scratch fallback matters only when this crate is the test crate
+/// itself; as a dependency it compiles WITHOUT cfg(test), so test isolation
+/// relies on the env override (set by the hermes test suite).
 fn debug_runtime_home() -> PathBuf {
+	if let Ok(home) = std::env::var("APHRODITE_DEBUG_HOME")
+		&& !home.is_empty()
+	{
+		return PathBuf::from(home);
+	}
 	#[cfg(test)]
 	{
 		let scratch = std::env::temp_dir().join("aphrodite-test-debug-home");
@@ -276,7 +284,11 @@ pub fn config_summary(state:&AphroditeState) -> Vec<(&'static str, String)> {
 		("directives", state.active_directives.join(",")),
 		(
 			"templates",
-			if state.templates.is_some() { "registered".to_string() } else { "builtin".to_string() },
+			if state.templates.is_some() {
+				"registered".to_string()
+			} else {
+				"builtin".to_string()
+			},
 		),
 		("debug_level", state.debug_level.to_string()),
 	]

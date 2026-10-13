@@ -31,7 +31,8 @@ use std::{
 	ffi::{CStr, CString},
 	os::raw::c_char,
 	sync::{
-		Mutex, OnceLock,
+		Mutex,
+		OnceLock,
 		atomic::{AtomicBool, Ordering},
 	},
 };
@@ -299,13 +300,7 @@ fn log_session_init(state:&AphroditeState, session:&str) {
 /// (marker emitted with hash+type+size, auto-expanded bytes, live container
 /// chunks, chain-split segments, or a passthrough reason) + result size +
 /// elapsed microseconds.
-fn post_tool_log(
-	state:&AphroditeState,
-	session:&str,
-	r:&serde_json::Value,
-	result_bytes:usize,
-	elapsed_us:u64,
-) {
+fn post_tool_log(state:&AphroditeState, session:&str, r:&serde_json::Value, result_bytes:usize, elapsed_us:u64) {
 	let mut kv = vec![
 		("result_bytes", result_bytes.to_string()),
 		("elapsed_us", elapsed_us.to_string()),
@@ -368,10 +363,7 @@ fn expected_path(state:&AphroditeState, tool:&str, parsed:&serde_json::Value) ->
 		return "auto_expand".into();
 	}
 	if tool == "terminal" && state.chain_split_enabled {
-		let command = parsed
-			.get("args")
-			.and_then(|a| a.get("command"))
-			.and_then(|v| v.as_str());
+		let command = parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str());
 		if command.is_some_and(|c| c.contains("&&")) {
 			return "chain_split".into();
 		}
@@ -579,33 +571,38 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 			match name.as_str() {
 				// Accept both the canonical Hermes name and the legacy alias.
 				"on_session_start" | "session_start" => {
-				let r = aphrodite::session::on_session_start(state);
-				// DEV-ONLY debug logger (crate::debug): session-init /
-				// config-summary line, emitted once per process. Hermes does
-				// not always thread session_id here - fall back to the
-				// current turn's session.
-				let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-				let sid = if sid.is_empty() { crate::debug::last_session() } else { sid.to_string() };
-				log_session_init(state, &sid);
-				r
-			},
+					let r = aphrodite::session::on_session_start(state);
+					// DEV-ONLY debug logger (crate::debug): session-init /
+					// config-summary line, emitted once per process. Hermes does
+					// not always thread session_id here - fall back to the
+					// current turn's session.
+					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+					let sid = if sid.is_empty() { crate::debug::last_session() } else { sid.to_string() };
+					log_session_init(state, &sid);
+					r
+				},
 				"pre_tool_call" => {
-								// DEV-ONLY debug logger (crate::debug): pre-tool line with
-								// the tool name, args byte size, effective thresholds, and
-								// the expected compression path (the transform arms log
-								// the actual outcome).
-								let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
-								let args_bytes = parsed.get("args").map(|a| a.to_string().len()).unwrap_or(0);
-								let expected = expected_path(state, call_tool, &parsed);
-								crate::debug::log_bridge(state, &crate::debug::last_session(), "pre_tool", &[
-									("tool", call_tool.to_string()),
-									("args_bytes", args_bytes.to_string()),
-									("tool_threshold", state.tool_threshold.to_string()),
-									("terminal_threshold", state.terminal_threshold.to_string()),
-									("auto_expand_limit", state.auto_expand_limit.to_string()),
-									("expected", expected),
-								]);
-								// ── Auto-backgrounding: intercept BEFORE execution ──
+					// DEV-ONLY debug logger (crate::debug): pre-tool line with
+					// the tool name, args byte size, effective thresholds, and
+					// the expected compression path (the transform arms log
+					// the actual outcome).
+					let call_tool = parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
+					let args_bytes = parsed.get("args").map(|a| a.to_string().len()).unwrap_or(0);
+					let expected = expected_path(state, call_tool, &parsed);
+					crate::debug::log_bridge(
+						state,
+						&crate::debug::last_session(),
+						"pre_tool",
+						&[
+							("tool", call_tool.to_string()),
+							("args_bytes", args_bytes.to_string()),
+							("tool_threshold", state.tool_threshold.to_string()),
+							("terminal_threshold", state.terminal_threshold.to_string()),
+							("auto_expand_limit", state.auto_expand_limit.to_string()),
+							("expected", expected),
+						],
+					);
+					// ── Auto-backgrounding: intercept BEFORE execution ──
 					// Returns {"action":"modify","args":{"background":true,"notify_on_complete":true}}
 					// so Hermes runs the tool in background instead of blocking.
 					if state.poll_worker_enabled {
@@ -690,33 +687,33 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					// on every call (previously dropped on the floor) and route
 					// them into the telemetry ring via `_with_meta`.
 					let meta = aphrodite::hooks::ToolCallMeta {
-										args_json:parsed.get("args"),
-										status:parsed.get("status").and_then(|v| v.as_str()),
-										error_type:parsed.get("error_type").and_then(|v| v.as_str()),
-										error_message:parsed.get("error_message").and_then(|v| v.as_str()),
-										duration_ms:parsed.get("duration_ms").and_then(|v| v.as_u64()),
-									};
-									let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-									// DEV-ONLY debug logger (crate::debug): post-tool outcome +
-									// elapsed microseconds. Timing is captured only when a debug
-									// channel is on for this session (quiet path: one load).
-									let t0 = crate::debug::any_enabled(state, &sid).then(std::time::Instant::now);
-									let r = aphrodite::hooks::transform_tool_result_with_meta(
-										state,
-										tool_content,
-										tool,
-										classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
-										&meta,
-									);
-									if let Some(t0) = t0 {
-										let us = t0.elapsed().as_micros() as u64;
-										aphrodite::debug::add_timing(aphrodite::debug::TimingCat::ToolTransform, us);
-										post_tool_log(state, &sid, &r, tool_content.len(), us);
-									}
-									// Per-session debug: the caller's session_id rides in the
-									// hook kwargs - thread it so the flag resolves against the
-									// session tree (root scoped flag wins, global fallback).
-									replacement_from(&r, sid)
+						args_json:parsed.get("args"),
+						status:parsed.get("status").and_then(|v| v.as_str()),
+						error_type:parsed.get("error_type").and_then(|v| v.as_str()),
+						error_message:parsed.get("error_message").and_then(|v| v.as_str()),
+						duration_ms:parsed.get("duration_ms").and_then(|v| v.as_u64()),
+					};
+					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+					// DEV-ONLY debug logger (crate::debug): post-tool outcome +
+					// elapsed microseconds. Timing is captured only when a debug
+					// channel is on for this session (quiet path: one load).
+					let t0 = crate::debug::any_enabled(state, sid).then(std::time::Instant::now);
+					let r = aphrodite::hooks::transform_tool_result_with_meta(
+						state,
+						tool_content,
+						tool,
+						classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
+						&meta,
+					);
+					if let Some(t0) = t0 {
+						let us = t0.elapsed().as_micros() as u64;
+						aphrodite::debug::add_timing(aphrodite::debug::TimingCat::ToolTransform, us);
+						post_tool_log(state, sid, &r, tool_content.len(), us);
+					}
+					// Per-session debug: the caller's session_id rides in the
+					// hook kwargs - thread it so the flag resolves against the
+					// session tree (root scoped flag wins, global fallback).
+					replacement_from(&r, sid)
 				},
 				"transform_terminal_output" => {
 					let classify = crate::tools::unwrap_hermes_result(term_content);
@@ -726,28 +723,28 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					let command = parsed.get("command").and_then(|v| v.as_str());
 					let returncode = parsed.get("returncode").and_then(|v| v.as_i64());
 					let r = aphrodite::hooks::transform_terminal_output_with_meta(
-										state,
-										term_content,
-										classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
-										command,
-										returncode,
-									);
-									// Hermes does NOT thread session_id through
-									// transform_terminal_output (terminal_tool_result.py:144
-									// passes only command/output/returncode/task_id/env_type) -
-									// fall back to the current turn's session so terminal
-									// output keeps the same session scope as tool results.
-									let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-									let sid = if sid.is_empty() { crate::debug::last_session() } else { sid.to_string() };
-									// DEV-ONLY debug logger (crate::debug): post-tool outcome +
-									// elapsed microseconds for the terminal path.
-									let t0 = crate::debug::any_enabled(state, &sid).then(std::time::Instant::now);
-									if let Some(t0) = t0 {
-										let us = t0.elapsed().as_micros() as u64;
-										aphrodite::debug::add_timing(aphrodite::debug::TimingCat::ToolTransform, us);
-										post_tool_log(state, &sid, &r, term_content.len(), us);
-									}
-									replacement_from(&r, &sid)
+						state,
+						term_content,
+						classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
+						command,
+						returncode,
+					);
+					// Hermes does NOT thread session_id through
+					// transform_terminal_output (terminal_tool_result.py:144
+					// passes only command/output/returncode/task_id/env_type) -
+					// fall back to the current turn's session so terminal
+					// output keeps the same session scope as tool results.
+					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+					let sid = if sid.is_empty() { crate::debug::last_session() } else { sid.to_string() };
+					// DEV-ONLY debug logger (crate::debug): post-tool outcome +
+					// elapsed microseconds for the terminal path.
+					let t0 = crate::debug::any_enabled(state, &sid).then(std::time::Instant::now);
+					if let Some(t0) = t0 {
+						let us = t0.elapsed().as_micros() as u64;
+						aphrodite::debug::add_timing(aphrodite::debug::TimingCat::ToolTransform, us);
+						post_tool_log(state, &sid, &r, term_content.len(), us);
+					}
+					replacement_from(&r, &sid)
 				},
 				"pre_llm_call" => {
 					// 05-P1/T1: route this - the ONLY pre_llm_call arm Hermes
@@ -766,25 +763,30 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 					// 698-706), so record session -> parent here to build the
 					// tree the debug flag resolves against.
 					if let (Some(sid), Some(pid)) = (
-										parsed.get("session_id").and_then(|v| v.as_str()),
-										parsed.get("parent_session_id").and_then(|v| v.as_str()),
-									) {
-										debug::record_session(sid, pid);
-									}
-									// DEV-ONLY debug logger (crate::debug): pre-turn bridge line
-									// (turn/session/request-size); the per-section sizes and the
-									// cumulative metrics are logged inside build_turn_context.
-									let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-									if !sid.is_empty() {
-										crate::debug::log_bridge(state, sid, "pre_turn", &[
-											("turn", state.turn_counter.to_string()),
-											("session", sid.to_string()),
-											("est_request_bytes", args.len().to_string()),
-											("pending_markers", state.recent_markers.len().to_string()),
-										]);
-										log_session_init(state, sid);
-									}
-									let context = aphrodite::flow::build_turn_context(state, Some(args.len()));
+						parsed.get("session_id").and_then(|v| v.as_str()),
+						parsed.get("parent_session_id").and_then(|v| v.as_str()),
+					) {
+						debug::record_session(sid, pid);
+					}
+					// DEV-ONLY debug logger (crate::debug): pre-turn bridge line
+					// (turn/session/request-size); the per-section sizes and the
+					// cumulative metrics are logged inside build_turn_context.
+					let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
+					if !sid.is_empty() {
+						crate::debug::log_bridge(
+							state,
+							sid,
+							"pre_turn",
+							&[
+								("turn", state.turn_counter.to_string()),
+								("session", sid.to_string()),
+								("est_request_bytes", args.len().to_string()),
+								("pending_markers", state.recent_markers.len().to_string()),
+							],
+						);
+						log_session_init(state, sid);
+					}
+					let context = aphrodite::flow::build_turn_context(state, Some(args.len()));
 					if context.is_empty() {
 						serde_json::Value::Null
 					} else {
@@ -917,6 +919,15 @@ mod tests {
 	#[test]
 	fn test_debug_file_write_smoke() {
 		let _g = test_guard();
+		// Pin BOTH the core logger and the flag reader to the same scratch
+		// home (the core crate compiles without cfg(test) as a dependency,
+		// so isolation relies on the dev-only $APHRODITE_DEBUG_HOME
+		// override, not on cfg(test)).
+		const HOME_KEY:&str = "APHRODITE_DEBUG_HOME";
+		let scratch = std::env::temp_dir().join("aphrodite-debug-smoke-home");
+		let _ = std::fs::create_dir_all(&scratch);
+		let backup = std::env::var(HOME_KEY).ok();
+		unsafe { std::env::set_var(HOME_KEY, &scratch) };
 		let root = "debug-smoke";
 		let path = aphrodite::debug::log_path_for_root(root);
 		aphrodite::debug::set_level(1);
@@ -935,6 +946,10 @@ mod tests {
 		assert!(crate::debug::enabled_for(root), "toggle must stay readable on line 1");
 		let _ = std::fs::remove_file(&path);
 		aphrodite::debug::set_level(0);
+		unsafe { std::env::remove_var(HOME_KEY) };
+		if let Some(v) = backup {
+			unsafe { std::env::set_var(HOME_KEY, v) };
+		}
 	}
 
 	// ── Chain-split invisibility contract: the LLM sees the natural

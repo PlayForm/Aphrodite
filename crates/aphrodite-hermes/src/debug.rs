@@ -47,10 +47,17 @@ static FLAG_CACHE:OnceLock<Mutex<HashMap<String, (f64, bool)>>> = OnceLock::new(
 const FLAG_PREFIX:&str = "debug";
 
 fn runtime_home() -> PathBuf {
-	// One shared runtime-home decision (issue 40): $APHRODITE_HOME ->
+	// $APHRODITE_DEBUG_HOME (dev-only override, set by tests so the flag
+	// reader agrees with the core logger's scratch home) wins; otherwise
+	// the shared runtime-home decision (issue 40): $APHRODITE_HOME ->
 	// $HERMES_HOME -> $HOME -> platform default. Under a non-default Hermes
 	// home (Docker, profiles) the debug flags land in that home, not in a
 	// shadow $HOME/.hermes/aphrodite.
+	if let Ok(home) = std::env::var("APHRODITE_DEBUG_HOME")
+		&& !home.is_empty()
+	{
+		return PathBuf::from(home);
+	}
 	#[cfg(test)]
 	{
 		// Hermetic tests: route debug flags / session persistence away from
@@ -301,12 +308,7 @@ pub(crate) fn any_enabled(state:&aphrodite::state::AphroditeState, session:&str)
 }
 
 /// Bridge-side log line: env level OR the session flag toggle.
-pub(crate) fn log_bridge(
-	state:&aphrodite::state::AphroditeState,
-	session:&str,
-	event:&str,
-	kv:&[(&str, String)],
-) {
+pub(crate) fn log_bridge(state:&aphrodite::state::AphroditeState, session:&str, event:&str, kv:&[(&str, String)]) {
 	let lvl = effective_level(state, session);
 	if lvl > 0 {
 		aphrodite::debug::log_at(lvl, event, kv);
