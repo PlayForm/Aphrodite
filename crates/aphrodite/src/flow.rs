@@ -92,6 +92,24 @@ fn retrieval_guidance_block(state:&AphroditeState) -> String {
 	format!("[retrieval: {}]", text)
 }
 
+/// Auto-expand guidance section (prompt template `auto_expand_guidance`,
+/// pre-Rust port): while `state.auto_expand` is enabled, inject the rendered
+/// guidance so the model knows tool outputs arrive expanded inline (and that
+/// a CCR marker appearing anyway is worth retrieving). Rendered through
+/// [`render_prompt`] - a configured `[templates.prompts] auto_expand_guidance`
+/// wins, the compiled-in fallback otherwise. Disabled (default) = no
+/// guidance, current behavior; an unknown/empty template renders nothing.
+fn auto_expand_guidance_block(state:&AphroditeState) -> String {
+	if !state.auto_expand {
+		return String::new();
+	}
+	let text = render_prompt(state, "auto_expand_guidance", &[]);
+	if text.is_empty() {
+		return String::new();
+	}
+	format!("[auto-expand: {}]", text)
+}
+
 /// Default first-turn session injection. Loaded from `[prompts] session_inject`
 /// in aphrodite.toml; this constant is the fallback when the key is absent.
 /// Rendered once (turn_counter == 0) by `build_first_turn_injection`, then
@@ -132,6 +150,8 @@ pub fn build_first_turn_injection(state:&AphroditeState) -> String {
 /// ```text
 /// [directives: focus] ...        (build_directive_context - never dropped)
 /// [nudge: ...]                   (ephemeral one-shots, at most 2 - never dropped)
+/// [retrieval: ...]               (opt-in retrieve_guidance line - droppable)
+/// [auto-expand: ...]             (opt-in auto_expand_guidance line - droppable)
 /// [recall] <catalog summary>     (dropped first under budget pressure)
 /// ```
 ///
@@ -153,6 +173,10 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	// ── Retrieval guidance (opt-in via [prompts] retrieve_guidance; drops
 	// before bg status / recall under budget pressure) ──
 	let retrieve = retrieval_guidance_block(state);
+
+	// ── Auto-expand guidance (opt-in via state.auto_expand; drops before
+	// bg status / recall under budget pressure) ──
+	let auto_expand = auto_expand_guidance_block(state);
 
 	// ── Droppable section: recall catalog, delta-only (04-F1) ──
 	let recall = crate::session::catalog_summary(state);
@@ -180,6 +204,9 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	}
 	if !bg_status.is_empty() {
 		sections.push(bg_status);
+	}
+	if !auto_expand.is_empty() {
+		sections.push(auto_expand);
 	}
 	// The recall block - RETRIEVE_HINT removed per 04-F2 (tool schemas
 	// in the system prompt already teach retrieval; repeating it every
@@ -742,6 +769,48 @@ mod tests {
 		assert!(
 			ctx.contains("[retrieval: CCR markers compress large tool output."),
 			"unknown value must warn + degrade to standard: {ctx}"
+		);
+	}
+
+	// ── Auto-expand guidance: injected only while state.auto_expand is on
+	// (rendered via render_prompt with the compiled-in fallback); absent by
+	// default (current behavior). ──
+
+	#[test]
+	fn test_auto_expand_guidance_injected_when_enabled() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[auto-expand:") && ctx.contains("Tool outputs are auto-expanded"),
+			"auto-expand guidance must be injected when enabled: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_auto_expand_guidance_absent_when_disabled() {
+		let mut s = AphroditeState::default(); // auto_expand = false
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[auto-expand:") && !ctx.contains("auto-expanded"),
+			"absent auto-expand must inject no guidance: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_auto_expand_guidance_uses_configured_template() {
+		let mut s = state_with_prompt("auto_expand_guidance", "inline {limit} limit");
+		s.auto_expand = true;
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[auto-expand: inline {limit} limit]"),
+			"configured template must win over the fallback: {ctx}"
 		);
 	}
 }

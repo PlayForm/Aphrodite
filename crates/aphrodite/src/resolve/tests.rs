@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::*;
 
 #[test]
@@ -281,4 +283,56 @@ fn test_expand_diamond_nesting_fully_expands() {
 	let result = expand(&mut s, "outer").unwrap();
 	assert!(!result.contains("<<<CCR:"), "no raw marker should remain: {result}");
 	assert_eq!(result, "A and wraps A");
+}
+
+// ── Auto-expand (pre-Rust port): `resolve_inline` returns the fully
+// resolved content only when it fits within the limit; over-limit results
+// (and unresolvable hashes) return `None` so the caller keeps the marker. ──
+#[test]
+fn test_resolve_inline_returns_content_within_limit() {
+	let mut s = AphroditeState::default();
+	s.inline_store_put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
+	s.inline_store_put("inner123".into(), "RESOLVED".into());
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	let result = resolve_inline(&mut s, "outer", 1000, &mut resolved, &mut visited);
+	assert_eq!(result, Some("before RESOLVED after".into()));
+	assert!(
+		!result.unwrap().contains("<<<CCR:"),
+		"auto-expand must return the resolved content, not a marker"
+	);
+}
+
+#[test]
+fn test_resolve_inline_over_limit_returns_none() {
+	let mut s = AphroditeState::default();
+	s.inline_store_put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
+	s.inline_store_put("inner123".into(), "RESOLVED".into());
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	// Resolved content is 24 bytes ("before RESOLVED after") - a 10-byte
+	// limit must refuse it, leaving the caller's marker in place.
+	let result = resolve_inline(&mut s, "outer", 10, &mut resolved, &mut visited);
+	assert_eq!(result, None);
+}
+
+#[test]
+fn test_resolve_inline_missing_hash_returns_none() {
+	let mut s = AphroditeState::default();
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	assert_eq!(resolve_inline(&mut s, "nope", 1000, &mut resolved, &mut visited), None);
+}
+
+#[test]
+fn test_resolve_inline_honors_visited_set() {
+	// Cycle-safe: a self-referential pair must terminate and must not
+	// surface a raw marker as if it were resolved content.
+	let mut s = AphroditeState::default();
+	s.inline_store_put("hA".into(), "<<<CCR:hB|t|1>>>".into());
+	s.inline_store_put("hB".into(), "<<<CCR:hA|t|1>>>".into());
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	let result = resolve_inline(&mut s, "hA", 1000, &mut resolved, &mut visited);
+	assert_eq!(result, Some("<<<CCR:hB|t|1>>>".to_string()));
 }

@@ -17,4 +17,4 @@ pub use format::{ccr_marker, set_marker_templates};
 pub use parse::{extract_hashes, is_valid_ccr_hash, normalize_hash, parse_preview};
 pub(crate) use format::substitute_vars;
 #[cfg(test)]
-pub(crate) use format::{marker_hint_enabled, registered_marker_format, marker_templates_test_guard};
+pub(crate) use format::{marker_hint_enabled, marker_templates_test_guard, registered_marker_format};

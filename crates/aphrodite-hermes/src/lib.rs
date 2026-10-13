@@ -209,7 +209,11 @@ pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
 /// Hermes only honors a *string* return from `transform_tool_result` /
 /// `transform_terminal_output` (first non-None string wins; non-strings pass
 /// through). So return the CCR marker string when compression happened, and
-/// `null` otherwise to leave the original output untouched.
+/// `null` otherwise to leave the original output untouched. When the hook
+/// auto-expanded (`state.auto_expand` on, content within the limit), the
+/// resolved `expanded` string is returned instead of the marker - the
+/// marker itself stays in the payload and the store, still resolvable via
+/// `aphrodite_retrieve`.
 pub(crate) fn replacement_from(r:&serde_json::Value, session:&str) -> serde_json::Value {
 	if r.get("chain_split").and_then(|v| v.as_bool()).unwrap_or(false) {
 		// Fine-grained chain split, invisibility contract: the LLM must see
@@ -227,6 +231,16 @@ pub(crate) fn replacement_from(r:&serde_json::Value, session:&str) -> serde_json
 				return serde_json::Value::String(joined.join("\n"));
 			}
 		}
+	}
+	// Auto-expand (dylib-side consumer): the hook stored the content and
+	// resolved it inline, carrying the full text back in `expanded` - return
+	// that so no `<<<CCR:...>>>` marker reaches the model. A payload that
+	// flags `auto_expanded` without a usable `expanded` string falls through
+	// to the marker path below (degrade, never null-replace the output).
+	if r.get("auto_expanded").and_then(|v| v.as_bool()).unwrap_or(false)
+		&& let Some(expanded) = r.get("expanded").and_then(|v| v.as_str())
+	{
+		return serde_json::Value::String(expanded.to_string());
 	}
 	if r.get("compressed").and_then(|v| v.as_bool()).unwrap_or(false)
 		&& let Some(marker) = r.get("marker").and_then(|v| v.as_str())
@@ -774,6 +788,48 @@ mod tests {
 		});
 		let s = replacement_from(&r, "test-session");
 		assert_eq!(s.as_str().unwrap(), "<<<CCR:cccc|text|42>>>\n[text:42B] hi");
+	}
+
+	// ── Auto-expand: the hook resolved the stored content inline; the LLM
+	// must receive the expanded string, never the marker. ──
+	#[test]
+	fn test_replacement_from_auto_expanded_returns_expanded() {
+		let r = serde_json::json!({
+			"status": "ok",
+			"compressed": true,
+			"auto_expanded": true,
+			"hash": "dddd",
+			"type": "terminal",
+			"size": 11,
+			"preview": "[terminal:11B] hi",
+			"marker": "<<<CCR:dddd|terminal|11>>>",
+			"expanded": "hello world"
+		});
+		let s = replacement_from(&r, "test-session");
+		assert_eq!(
+			s.as_str().unwrap(),
+			"hello world",
+			"auto-expanded payload must return the resolved content"
+		);
+	}
+
+	#[test]
+	fn test_replacement_from_auto_expanded_without_expanded_falls_back_to_marker() {
+		// A payload flagging auto_expanded but carrying no usable `expanded`
+		// string must fall through to the normal marker path, never produce
+		// a null replacement that would erase the output.
+		let r = serde_json::json!({
+			"status": "ok",
+			"compressed": true,
+			"auto_expanded": true,
+			"hash": "dddd",
+			"type": "terminal",
+			"size": 11,
+			"preview": "[terminal:11B] hi",
+			"marker": "<<<CCR:dddd|terminal|11>>>"
+		});
+		let s = replacement_from(&r, "test-session");
+		assert_eq!(s.as_str().unwrap(), "<<<CCR:dddd|terminal|11>>>");
 	}
 
 	#[test]

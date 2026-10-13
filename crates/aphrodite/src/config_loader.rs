@@ -220,6 +220,10 @@ impl Config {
 
 		// ── Poll-worker auto-backgrounding ──
 		state.poll_worker_enabled = self.get_bool("APHRODITE_POLL_WORKER", "compression", "poll_worker", true);
+		// ── Auto-expand (pre-Rust port): resolve markers inline when enabled ──
+		state.auto_expand = self.get_bool("APHRODITE_AUTO_EXPAND", "compression", "auto_expand", false);
+		state.auto_expand_limit =
+			self.get_usize("APHRODITE_AUTO_EXPAND_LIMIT", "compression", "auto_expand_limit", 102400);
 		// Opt-in config auto-reload (default OFF): when true, the dylib
 		// watches aphrodite.toml and re-applies config fields on change -
 		// never session CCR state (the dropped dylib-binary hot-reload

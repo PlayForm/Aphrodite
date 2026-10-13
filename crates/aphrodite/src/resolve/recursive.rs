@@ -82,3 +82,28 @@ pub fn resolve_recursive(
 	// output), which got silently corrupted on every retrieval.
 	Some(result)
 }
+
+/// Auto-expand variant of [`resolve_recursive`]: resolves `hash_val` and
+/// all nested markers with the same cycle-safe `visited` set and
+/// `RECURSIVE_DEPTH` limit, but returns the resolved content ONLY when it
+/// fits within `limit` bytes - the "resolve inline instead of emitting a
+/// marker" contract for auto-expand (pre-Rust `_resolve.py` +
+/// `_core/config.py` AUTO_EXPAND_LIMIT).
+///
+/// No marker is re-emitted: when the content fits, the returned string IS
+/// the fully-resolved content. Over-limit results return `None` so the
+/// caller keeps the original marker (the stored bytes remain retrievable
+/// for a later, explicit resolve). A `None` is also returned when the
+/// top-level hash cannot be resolved at all, indistinguishable from an
+/// over-limit result by design - the caller's marker fallback is correct
+/// for both.
+pub fn resolve_inline(
+	state:&mut AphroditeState,
+	hash_val:&str,
+	limit:usize,
+	resolved:&mut HashMap<String, String>,
+	visited:&mut Vec<String>,
+) -> Option<String> {
+	let content = resolve_recursive(state, hash_val, 0, resolved, visited)?;
+	if content.len() <= limit { Some(content) } else { None }
+}

@@ -21,7 +21,7 @@ use std::{
 	sync::{
 		Arc,
 		Mutex,
-		atomic::{AtomicU64, AtomicUsize, Ordering},
+		atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 	},
 	time::Duration,
 };
@@ -76,6 +76,11 @@ use crate::config::{Cli, CompressionConfig, ProxyMode, env_parse_warn};
 const CACHE_COMPRESS_THRESHOLD:usize = 8192;
 /// Content size threshold for aphrodite mode compression (1KB).
 const TOKEN_COMPRESS_THRESHOLD:usize = 1024;
+/// Default `[compression] auto_expand_limit` byte cap - content at or
+/// below this size is resolved inline instead of marker-emitted when
+/// auto-expand is enabled. Matches the Hermes-side `AphroditeState`
+/// default in `state/mod.rs` so the two consumers agree out of the box.
+const AUTO_EXPAND_LIMIT_DEFAULT:usize = 102400;
 /// Inline CCR threshold - content below this size is stored in the inline
 /// HashMap instead of SQLite/in-memory CCR backends, avoiding round-trip
 /// overhead.
@@ -131,11 +136,21 @@ pub struct ResolvedThresholds {
 	pub token:usize,
 	pub inline:usize,
 	pub code_multiplier:f64,
+	/// `[compression] auto_expand` (pre-Rust port): resolve the just-stored
+	/// content inline instead of emitting a `<<<CCR:...>>>` marker, capped
+	/// at `auto_expand_limit` bytes. Env `APHRODITE_AUTO_EXPAND`
+	/// (`1`/`true`) > TOML `auto_expand` > default false - the same
+	/// env > TOML > default precedence as the thresholds.
+	pub auto_expand:bool,
+	/// `[compression] auto_expand_limit` - byte cap for auto-expanded
+	/// content. Env `APHRODITE_AUTO_EXPAND_LIMIT` > TOML
+	/// `auto_expand_limit` > `AUTO_EXPAND_LIMIT_DEFAULT`.
+	pub auto_expand_limit:usize,
 }
 
-/// Resolve the four compression thresholds from env vars, the TOML
-/// `[compression]` table (if any), and the compiled-in defaults, in that
-/// precedence order.
+/// Resolve the compression thresholds and auto-expand knobs from env vars,
+/// the TOML `[compression]` table (if any), and the compiled-in defaults,
+/// in that precedence order.
 ///
 /// `code_multiplier` defaults to `3.0`, not the old free-function's `2`: the
 /// prior default only existed because `APHRODITE_CODE_MULTIPLIER=3.0`
@@ -157,6 +172,17 @@ pub fn resolve_thresholds(compression:Option<&CompressionConfig>) -> ResolvedThr
 		code_multiplier:env_parse_warn::<f64>("APHRODITE_CODE_MULTIPLIER")
 			.or_else(|| compression.and_then(|c| c.code_multiplier))
 			.unwrap_or(3.0),
+		// Presence-aware env read: `APHRODITE_AUTO_EXPAND=0`/`false` must
+		// override a TOML `auto_expand = true`, so a bare `env_bool`
+		// (absent => false) would be wrong here - absent must fall through
+		// to the TOML value.
+		auto_expand:match std::env::var("APHRODITE_AUTO_EXPAND") {
+			Ok(v) => matches!(v.to_lowercase().as_str(), "1" | "true"),
+			Err(_) => compression.and_then(|c| c.auto_expand).unwrap_or(false),
+		},
+		auto_expand_limit:env_parse_warn::<usize>("APHRODITE_AUTO_EXPAND_LIMIT")
+			.or_else(|| compression.and_then(|c| c.auto_expand_limit).map(|v| v as usize))
+			.unwrap_or(AUTO_EXPAND_LIMIT_DEFAULT),
 	}
 }
 
@@ -211,7 +237,8 @@ async fn ccr_len(ccr:&Arc<dyn CcrStore>) -> usize {
 ///   (hot-reload re-writes the atomic threshold fields below, not these).
 /// - **Live-tunable atomics**: `cache_compress_threshold`,
 ///   `token_compress_threshold`, `inline_ccr_threshold`,
-///   `code_multiplier_x100` (re-written by config reload), plus
+///   `code_multiplier_x100`, `auto_expand`, `auto_expand_limit`
+///   (re-written by config reload), plus
 ///   `compression_ratio_ema` and `fill_pct` (re-written by the compression
 ///   feedback loop). These are the only fields that change in place after
 ///   startup.
@@ -386,6 +413,19 @@ pub struct AppState {
 	/// `code_multiplier`, ×100 for integer atomic storage (matches the
 	/// existing `compression_ratio_ema` ×100 convention above).
 	pub code_multiplier_x100:AtomicU64,
+	/// `[compression] auto_expand` (pre-Rust port): when true, the cache and
+	/// token compress paths resolve the just-stored content inline instead
+	/// of emitting a `<<<CCR:...>>>` marker, capped at `auto_expand_limit`
+	/// bytes (content larger than the limit still emits the marker). Same
+	/// live-tunable discipline as the thresholds above - resolved at startup
+	/// (env > TOML > false, see `resolve_thresholds`) and re-applied by
+	/// `POST /reload`. Default false = byte-identical current behavior
+	/// (markers appear).
+	pub auto_expand:AtomicBool,
+	/// `[compression] auto_expand_limit` - byte cap for auto-expanded
+	/// content (see `auto_expand`). Default `AUTO_EXPAND_LIMIT_DEFAULT`
+	/// (matches the Hermes-side `AphroditeState` default).
+	pub auto_expand_limit:AtomicUsize,
 }
 
 /// Estimate the effective compressed byte-size of `content` for EMA
@@ -849,6 +889,8 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		token_compress_threshold:AtomicUsize::new(thresholds.token),
 		inline_ccr_threshold:AtomicUsize::new(thresholds.inline),
 		code_multiplier_x100:AtomicU64::new((thresholds.code_multiplier * 100.0) as u64),
+		auto_expand:AtomicBool::new(thresholds.auto_expand),
+		auto_expand_limit:AtomicUsize::new(thresholds.auto_expand_limit),
 	})
 }
 
@@ -2052,6 +2094,21 @@ async fn compress_chat_completion(
 						ok
 					};
 					if stored {
+						// Auto-expand (pre-Rust port): when enabled and the
+						// just-stored content fits within `auto_expand_limit`,
+						// return it INLINE instead of emitting a marker - the
+						// response carries the original bytes (still stored
+						// under `hash`, so later retrievals keep working), and
+						// nothing is counted as compressed because nothing was
+						// removed from the wire. Over-limit content falls
+						// through to the marker path below. Default (flag
+						// false) is byte-identical current behavior.
+						if state.auto_expand.load(Ordering::Relaxed)
+							&& content.len() <= state.auto_expand_limit.load(Ordering::Relaxed)
+						{
+							*content_val = serde_json::Value::String(content.to_string());
+							continue;
+						}
 						let (compressed, orig_len) = {
 							let compressed = match state.mode {
 								ProxyMode::Cache => cache_marker(&hash, content, ct, None),
@@ -2551,9 +2608,10 @@ pub async fn handle_ccr_delete(
 /// previously this endpoint parsed the file, echoed the values back, and
 /// discarded them; a 200 response with `"reloaded": true` asserted a state
 /// change that never happened. Other `[compression]` keys
-/// (`engine_threshold_pct`, `catalog_mode`, `auto_expand*`) have no consumer
-/// in this crate's proxy path (they're echoed for visibility, not applied -
-/// see report 07 F8/F9 for their fate).
+/// (`engine_threshold_pct`, `catalog_mode`, `terminal_threshold`) have no
+/// consumer in this crate's proxy path (they're echoed for visibility, not
+/// applied - see report 07 F8/F9 for their fate). `auto_expand` /
+/// `auto_expand_limit` ARE applied here, mirroring the thresholds.
 pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoResponse {
 	let config_path = std::env::var("APHRODITE_CONFIG_PATH").unwrap_or_else(|_| "aphrodite.toml".to_string());
 	match crate::config::MultiConfig::load(&config_path) {
@@ -2586,6 +2644,12 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 			state
 				.code_multiplier_x100
 				.store((thresholds.code_multiplier * 100.0) as u64, Ordering::Relaxed);
+			// Pre-Rust port: auto-expand knobs are live-tunable exactly like
+			// the thresholds above - a `/reload` with `auto_expand = true`
+			// switches the compress paths to inline resolution immediately,
+			// and a `false` (or absent) value switches them back to markers.
+			state.auto_expand.store(thresholds.auto_expand, Ordering::Relaxed);
+			state.auto_expand_limit.store(thresholds.auto_expand_limit, Ordering::Relaxed);
 			let body = serde_json::json!({
 				"reloaded": true,
 				"applied": true,
@@ -2595,12 +2659,12 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 					"tool_threshold_token": thresholds.token,
 					"inline_threshold": thresholds.inline,
 					"code_multiplier": thresholds.code_multiplier,
+					"auto_expand": thresholds.auto_expand,
+					"auto_expand_limit": thresholds.auto_expand_limit,
 				},
 				// Parsed and visible, but not applied by this proxy (see doc
 				// comment above).
 				"parsed_only": {
-					"auto_expand": comp.and_then(|c| c.auto_expand),
-					"auto_expand_limit": comp.and_then(|c| c.auto_expand_limit),
 					"terminal_threshold": comp.and_then(|c| c.terminal_threshold),
 					"engine_threshold_pct": comp.and_then(|c| c.engine_threshold_pct),
 					"catalog_mode": comp.and_then(|c| c.catalog_mode.clone()),
@@ -2612,6 +2676,8 @@ pub async fn handle_ccr_reload(State(state):State<Arc<AppState>>) -> impl IntoRe
 				token_threshold = thresholds.token,
 				inline_threshold = thresholds.inline,
 				code_multiplier = thresholds.code_multiplier,
+				auto_expand = thresholds.auto_expand,
+				auto_expand_limit = thresholds.auto_expand_limit,
 				"config reloaded - compression thresholds applied"
 			);
 			(StatusCode::OK, Json(body)).into_response()
@@ -2659,6 +2725,12 @@ pub async fn health_check(State(state):State<Arc<AppState>>) -> impl IntoRespons
 #[cfg(test)]
 pub(crate) mod tests {
 	use super::*;
+
+	/// Serializes the `/reload` tests: they share the process-global
+	/// `APHRODITE_CONFIG_PATH` env var, so concurrent runs race on it (one
+	/// test's path can clobber the other's between `set_var` and the reload
+	/// call, making the reload read the wrong TOML).
+	static RELOAD_TEST_LOCK:std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 	#[test]
 	fn test_compress_threshold_cache() {
@@ -2723,6 +2795,8 @@ pub(crate) mod tests {
 			token_compress_threshold:AtomicUsize::new(TOKEN_COMPRESS_THRESHOLD),
 			inline_ccr_threshold:AtomicUsize::new(INLINE_CCR_THRESHOLD),
 			code_multiplier_x100:AtomicU64::new(300),
+			auto_expand:AtomicBool::new(false),
+			auto_expand_limit:AtomicUsize::new(AUTO_EXPAND_LIMIT_DEFAULT),
 		};
 		assert_eq!(state.compress_threshold(), CACHE_COMPRESS_THRESHOLD);
 	}
@@ -2768,12 +2842,42 @@ pub(crate) mod tests {
 		// F10: the corrected default - 2 only ever existed because
 		// "3.0".parse::<usize>() silently failed.
 		assert_eq!(t.code_multiplier, 3.0);
+		// Pre-Rust port: auto-expand is off by default; the limit default
+		// matches the Hermes-side `AphroditeState` default.
+		assert_eq!(t.auto_expand, false);
+		assert_eq!(t.auto_expand_limit, AUTO_EXPAND_LIMIT_DEFAULT);
+	}
+
+	// ── Pre-Rust port: `[compression] auto_expand` / `auto_expand_limit`
+	// must resolve from the TOML table into `ResolvedThresholds`, ready for
+	// `build_state` and `/reload` to apply. ──
+	#[test]
+	fn test_resolve_thresholds_auto_expand_toml_enabled() {
+		let comp = CompressionConfig {
+			engine_threshold_pct:None,
+			engine_protect_first:None,
+			engine_protect_last:None,
+			engine_min_msgs:None,
+			tool_threshold_token:None,
+			tool_threshold_cache:None,
+			terminal_threshold:None,
+			inline_threshold:None,
+			auto_expand:Some(true),
+			auto_expand_limit:Some(4096),
+			catalog_mode:None,
+			classifier_poll:None,
+			code_multiplier:None,
+		};
+		let t = resolve_thresholds(Some(&comp));
+		assert_eq!(t.auto_expand, true);
+		assert_eq!(t.auto_expand_limit, 4096);
 	}
 
 	// ── T15 (F4): `/reload` must actually apply the new thresholds to the
 	// live `AppState`, not just re-parse and echo the file. ──
 	#[test]
 	fn test_handle_ccr_reload_applies_thresholds_to_state() {
+		let _guard = RELOAD_TEST_LOCK.lock().unwrap();
 		let dir = std::env::temp_dir();
 		let path = dir.join(format!(
 			"aphrodite_reload_test_{}_{}.toml",
@@ -2809,6 +2913,46 @@ code_multiplier = 6.5
 		assert_eq!(state.cache_compress_threshold.load(Ordering::Relaxed), 1234);
 		assert_eq!(state.inline_ccr_threshold.load(Ordering::Relaxed), 77);
 		assert_eq!(state.code_multiplier_x100.load(Ordering::Relaxed), 650);
+	}
+
+	// ── Pre-Rust port: `/reload` must also re-apply `auto_expand` /
+	// `auto_expand_limit` into the live `AppState`, exactly like the
+	// thresholds above - the compress paths consult these atomics on every
+	// response, so a hot-reload toggle must take effect immediately. ──
+	#[test]
+	fn test_handle_ccr_reload_applies_auto_expand_to_state() {
+		let _guard = RELOAD_TEST_LOCK.lock().unwrap();
+		let dir = std::env::temp_dir();
+		let path = dir.join(format!(
+			"aphrodite_reload_auto_expand_test_{}_{}.toml",
+			std::process::id(),
+			fnv1a_64(b"auto-expand-reload-salt")
+		));
+		std::fs::write(
+			&path,
+			r#"
+[[proxies]]
+name = "token"
+mode = "token"
+
+[compression]
+auto_expand = true
+auto_expand_limit = 2048
+"#,
+		)
+		.unwrap();
+
+		// No other test in this crate reads/writes APHRODITE_CONFIG_PATH.
+		unsafe { std::env::set_var("APHRODITE_CONFIG_PATH", &path) };
+		let state = std::sync::Arc::new(test_state());
+		let rt = tokio::runtime::Runtime::new().unwrap();
+		let resp = rt.block_on(handle_ccr_reload(State(state.clone()))).into_response();
+		unsafe { std::env::remove_var("APHRODITE_CONFIG_PATH") };
+		let _ = std::fs::remove_file(&path);
+
+		assert_eq!(resp.status(), axum::http::StatusCode::OK);
+		assert_eq!(state.auto_expand.load(Ordering::Relaxed), true);
+		assert_eq!(state.auto_expand_limit.load(Ordering::Relaxed), 2048);
 	}
 
 	#[test]
@@ -3299,6 +3443,8 @@ code_multiplier = 6.5
 			token_compress_threshold:AtomicUsize::new(TOKEN_COMPRESS_THRESHOLD),
 			inline_ccr_threshold:AtomicUsize::new(INLINE_CCR_THRESHOLD),
 			code_multiplier_x100:AtomicU64::new(300),
+			auto_expand:AtomicBool::new(false),
+			auto_expand_limit:AtomicUsize::new(AUTO_EXPAND_LIMIT_DEFAULT),
 		}
 	}
 
@@ -3417,6 +3563,97 @@ code_multiplier = 6.5
 		let hash = compute_key(content.as_bytes());
 		let stored = tokio::runtime::Runtime::new().unwrap().block_on(ccr_get(&ccr, &hash));
 		assert_eq!(stored.as_deref(), Some(content.as_str()));
+	}
+
+	// ── Auto-expand (pre-Rust port): `[compression] auto_expand` resolves
+	// the just-stored content inline instead of emitting a marker, capped at
+	// `auto_expand_limit`; over-limit falls back to the marker; disabled
+	// (default) emits markers byte-identically. ──
+	#[test]
+	fn test_compress_chat_completion_auto_expand_returns_inline_content() {
+		let state = test_state_with_ccr();
+		state.auto_expand.store(true, Ordering::Relaxed);
+		state.auto_expand_limit.store(1_000_000, Ordering::Relaxed);
+		let content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
+		let body = chat_completion_body(&content);
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+
+		// Nothing was removed from the wire, so the function correctly
+		// reports "no compression" (None = pass-through) - the client
+		// receives the ORIGINAL content, not a marker.
+		assert!(
+			result.is_none(),
+			"auto-expand must pass content through uncompressed: {result:?}"
+		);
+		// The content is still stored under its hash, so later retrievals work.
+		let ccr = state.ccr.as_ref().unwrap().clone();
+		let hash = compute_key(content.as_bytes());
+		let stored = tokio::runtime::Runtime::new().unwrap().block_on(ccr_get(&ccr, &hash));
+		assert_eq!(stored.as_deref(), Some(content.as_str()));
+		// And no marker may appear anywhere in the response body.
+		assert!(!String::from_utf8_lossy(&body).contains("<<<CCR:"));
+	}
+
+	#[test]
+	fn test_compress_chat_completion_auto_expand_returns_inline_content_cache_mode() {
+		// Same inline contract on the cache-mode compress path (the branch
+		// sits before the mode-dependent marker renderer, so both
+		// `cache_marker` and `smart_marker` paths must honor it).
+		let mut state = test_state_with_ccr();
+		state.mode = ProxyMode::Cache;
+		state.auto_expand.store(true, Ordering::Relaxed);
+		state.auto_expand_limit.store(1_000_000, Ordering::Relaxed);
+		let content = "the quick brown fox jumps over the lazy dog. ".repeat(300); // > 8KB cache threshold
+		let body = chat_completion_body(&content);
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+
+		assert!(
+			result.is_none(),
+			"auto-expand must pass content through uncompressed: {result:?}"
+		);
+		assert!(!String::from_utf8_lossy(&body).contains("<<<CCR:"));
+	}
+
+	#[test]
+	fn test_compress_chat_completion_auto_expand_over_limit_falls_back_to_marker() {
+		let state = test_state_with_ccr();
+		state.auto_expand.store(true, Ordering::Relaxed);
+		state.auto_expand_limit.store(100, Ordering::Relaxed); // far below content
+		let content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
+		let body = chat_completion_body(&content);
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+
+		let response = result.expect("over-limit content must fall back to the marker path");
+		let new_content = response["choices"][0]["message"]["content"].as_str().unwrap();
+		assert!(
+			new_content.contains("<<<CCR:"),
+			"over-limit content must still emit a marker: {new_content}"
+		);
+	}
+
+	#[test]
+	fn test_compress_chat_completion_auto_expand_disabled_emits_marker() {
+		// Default (flag false) is byte-identical current behavior: markers.
+		let state = test_state_with_ccr(); // auto_expand defaults to false
+		let content = "the quick brown fox jumps over the lazy dog. ".repeat(200);
+		let body = chat_completion_body(&content);
+
+		let result = tokio::runtime::Runtime::new()
+			.unwrap()
+			.block_on(compress_chat_completion(&state, &body, None));
+
+		let response = result.expect("content above threshold must be compressed");
+		let new_content = response["choices"][0]["message"]["content"].as_str().unwrap();
+		assert!(new_content.contains("<<<CCR:"), "expected a CCR marker, got: {new_content}");
 	}
 
 	#[test]

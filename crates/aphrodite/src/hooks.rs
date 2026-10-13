@@ -4,6 +4,12 @@
 //!   file reference tracking, threshold gating, preview generation.
 //! transform_terminal_output: terminal-specific compression with exit code
 //!   detection, threshold gating, streaming support.
+//! auto-expand: when `state.auto_expand` is on and content fits the limit,
+//!   both hooks store + record the compression exactly as today but return
+//!   the RESOLVED content inline instead of the CCR marker, so no
+//!   `<<<CCR:...>>>` marker reaches the model (dylib-side consumer of
+//!   `[compression] auto_expand`; the bridge keys on the `auto_expanded`
+//!   flag / `expanded` string added to the payload).
 
 use headroom_core::transforms;
 
@@ -27,6 +33,36 @@ pub struct ToolCallMeta<'a> {
 
 /// Compute a CCR hash for content using BLAKE3 (40 hex chars).
 pub fn compute_hash(content:&str) -> String { headroom_core::ccr::compute_key(content.as_bytes()) }
+
+/// Auto-expand gate (dylib-side consumer of `[compression] auto_expand`):
+/// when enabled AND the content fits `auto_expand_limit` bytes, the
+/// transform hooks return the resolved content inline instead of the CCR
+/// marker, so no `<<<CCR:...>>>` marker reaches the model. Over the cap (or
+/// disabled) the caller keeps today's marker behavior unchanged.
+/// `limit == 0` is effectively off (no non-empty content fits), matching the
+/// pre-Rust `AUTO_EXPAND_LIMIT = 0` = OFF semantics.
+fn auto_expand_applies(state:&AphroditeState, content:&str) -> bool {
+	state.auto_expand && content.len() <= state.auto_expand_limit
+}
+
+/// Resolve a freshly stored hash through the crate's recursive resolution
+/// entry point (port of the pre-Rust `_resolve_recursive` auto-expand path).
+/// Call only when [`auto_expand_applies`] is true. Resolution failure
+/// degrades to the original content (warn + degrade house style, never
+/// panic) - the payload still carries a valid marker for manual retrieval
+/// either way.
+fn auto_expand_content(state:&mut AphroditeState, hash:&str, content:&str) -> String {
+	match crate::resolve::expand(state, hash) {
+		Some(expanded) => expanded,
+		None => {
+			tracing::warn!(
+				hash,
+				"auto-expand: inline resolve failed for freshly stored hash; returning original content"
+			);
+			content.to_string()
+		},
+	}
+}
 
 /// Essential tools that must NOT be compressed - agent needs raw output.
 const ESSENTIAL_TOOLS:&[&str] = &[
@@ -200,8 +236,10 @@ fn transform_tool_result_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "self_tool"});
 	}
 
-	// Skip below threshold (0 = always compress)
-	if state.tool_threshold > 0 && content.len() < state.tool_threshold {
+	// Skip below threshold (0 = always compress). Auto-expand bypasses this
+	// gate: under auto-expand every non-essential tool result within the
+	// limit goes through the store+expand path so no marker can leak.
+	if !auto_expand_applies(state, content) && state.tool_threshold > 0 && content.len() < state.tool_threshold {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
@@ -223,7 +261,16 @@ fn transform_tool_result_inner(
 		meta:None,
 	});
 
-	serde_json::json!({
+	// Auto-expand (pre-Rust port): store + record exactly as above, but
+	// return the RESOLVED content inline instead of the marker so no
+	// `<<<CCR:...>>>` reaches the model. Over the limit or disabled, the
+	// payload below is byte-identical to the pre-auto-expand shape.
+	let expanded = if auto_expand_applies(state, content) {
+		Some(auto_expand_content(state, &hash, content))
+	} else {
+		None
+	};
+	let mut payload = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
 		"hash": hash,
@@ -231,7 +278,12 @@ fn transform_tool_result_inner(
 		"size": content.len(),
 		"preview": preview,
 		"marker": marker,
-	})
+	});
+	if let Some(expanded) = expanded {
+		payload["auto_expanded"] = serde_json::Value::Bool(true);
+		payload["expanded"] = serde_json::Value::String(expanded);
+	}
+	payload
 }
 
 /// Transform terminal output - exit code aware.
@@ -300,11 +352,22 @@ fn transform_terminal_output_inner(
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
 	}
 
+	// ── Auto-expand gate (pre-Rust port) ──
+	// Computed once, BEFORE the chain-split / threshold gates: when enabled
+	// and the content fits the limit, no marker-emitting path may run at
+	// all - the content goes straight to the store+expand single path so
+	// no `<<<CCR:...>>>` (and no chain-split segment marker) reaches the
+	// model. Over the limit or disabled, every gate below behaves exactly
+	// as before.
+	let do_auto_expand = auto_expand_applies(state, content);
+
 	// ── Fine-grained chain splitting ──
 	// Runs BEFORE the threshold gate: marked output must never leak raw
 	// (below-threshold chained output would otherwise pass through with the
 	// segment markers still in it, polluting what the LLM sees). Splitting
-	// marked content is unconditional when the feature is enabled.
+	// marked content is unconditional when the feature is enabled - except
+	// under auto-expand (within the limit), where the whole content is
+	// returned expanded instead.
 	//
 	// Invisibility contract: the JSON payload carries the per-segment
 	// markers array (`markers`) - the Hermes bridge (replacement_from in
@@ -313,7 +376,7 @@ fn transform_terminal_output_inner(
 	// markers, each retrievable by its own hash). The `summary` string is
 	// telemetry/metrics ONLY and must never be returned to the LLM - it
 	// announces the mechanism.
-	if state.chain_split_enabled && content.contains(crate::chain_split::SEG_MARKER) {
+	if state.chain_split_enabled && !do_auto_expand && content.contains(crate::chain_split::SEG_MARKER) {
 		let parts = crate::chain_split::split_marked_output(content);
 		if parts.len() >= 2 {
 			let mut segments = Vec::with_capacity(parts.len());
@@ -383,8 +446,9 @@ fn transform_terminal_output_inner(
 	}
 
 	// Threshold gate for UNMARKED output only: below-threshold content
-	// passes through untouched (no markers to leak, nothing worth splitting).
-	if state.terminal_threshold > 0 && content.len() < state.terminal_threshold {
+	// passes through untouched (no markers to leak, nothing worth
+	// splitting). Auto-expand bypasses the gate (store+expand path).
+	if !do_auto_expand && state.terminal_threshold > 0 && content.len() < state.terminal_threshold {
 		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
 	}
 
@@ -406,7 +470,16 @@ fn transform_terminal_output_inner(
 		meta:None,
 	});
 
-	serde_json::json!({
+	// Auto-expand (pre-Rust port): store + record exactly as above, but
+	// return the RESOLVED content inline instead of the marker so no
+	// `<<<CCR:...>>>` reaches the model. Over the limit or disabled, the
+	// payload below is byte-identical to the pre-auto-expand shape.
+	let expanded = if do_auto_expand {
+		Some(auto_expand_content(state, &hash, content))
+	} else {
+		None
+	};
+	let mut payload = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
 		"hash": hash,
@@ -414,7 +487,12 @@ fn transform_terminal_output_inner(
 		"size": content.len(),
 		"preview": preview,
 		"marker": marker,
-	})
+	});
+	if let Some(expanded) = expanded {
+		payload["auto_expanded"] = serde_json::Value::Bool(true);
+		payload["expanded"] = serde_json::Value::String(expanded);
+	}
+	payload
 }
 
 /// Session start hook - full reset.
@@ -719,5 +797,204 @@ mod tests {
 			crate::poll_worker::BgStatus::Stale,
 			"expire_stale_tasks must still run when disabled (cleanup)"
 		);
+	}
+
+	// ── Auto-expand (dylib-side consumer of `[compression] auto_expand`):
+	// when enabled and content fits `auto_expand_limit`, the hook returns
+	// the RESOLVED content inline (no `<<<CCR:...>>>` marker reaches the
+	// model); over the limit or disabled, today's marker payload is
+	// byte-identical. ──
+
+	fn store_nested(state:&mut AphroditeState, text:&str) -> String {
+		let h = compute_hash(text);
+		state.inline_store_put(h.clone(), text.to_string());
+		h
+	}
+
+	#[test]
+	fn test_auto_expand_returns_expanded_content() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.auto_expand_limit = 102400;
+		s.tool_threshold = 0;
+		// A nested entry whose marker text is embedded in the tool output:
+		// the resolved content must differ from the raw marker text, proving
+		// the hook actually resolves instead of just passing through.
+		let nested = "nested payload\nsecond line\n";
+		let nested_hash = store_nested(&mut s, nested);
+		let content = format!("<<<CCR:{nested_hash}|text|{}>>>", nested.len());
+		let r = transform_tool_result(&mut s, &content, "terminal");
+		assert_eq!(r["compressed"], true);
+		assert_eq!(r["auto_expanded"], true, "auto-expand must flag the payload");
+		assert_eq!(r["expanded"], nested, "expanded must be the resolved nested content");
+		// The marker is still recorded and resolvable (retrieval stays
+		// lossless). The stored content was a single wrapper marker, so
+		// recursive expansion lands on the nested text itself.
+		let content_hash = r["hash"].as_str().unwrap().to_string();
+		assert!(r["marker"].as_str().unwrap().starts_with("<<<CCR:"));
+		assert_eq!(crate::resolve::expand(&mut s, &content_hash), Some(nested.to_string()));
+		assert_eq!(crate::resolve::expand(&mut s, &nested_hash), Some(nested.to_string()));
+	}
+
+	#[test]
+	fn test_auto_expand_terminal_returns_expanded_content() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.auto_expand_limit = 102400;
+		s.terminal_threshold = 0;
+		let nested = "terminal nested content";
+		let nested_hash = store_nested(&mut s, nested);
+		let content = format!("line 1\n<<<CCR:{nested_hash}|text|{}>>>\nline 3", nested.len());
+		let r = transform_terminal_output(&mut s, &content);
+		assert_eq!(r["compressed"], true);
+		assert_eq!(r["auto_expanded"], true);
+		assert_eq!(
+			r["expanded"],
+			format!("line 1\n{nested}\nline 3"),
+			"expanded must resolve the nested marker inline"
+		);
+	}
+
+	#[test]
+	fn test_auto_expand_over_limit_emits_marker() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.auto_expand_limit = 8;
+		s.tool_threshold = 0;
+		let content = "this content is far longer than eight bytes";
+		let r = transform_tool_result(&mut s, content, "terminal");
+		assert_eq!(r["compressed"], true);
+		assert!(
+			r.get("auto_expanded").is_none(),
+			"over-limit content must keep today's marker payload (no auto-expand fields)"
+		);
+		assert!(r.get("expanded").is_none());
+		assert!(r["marker"].as_str().unwrap().starts_with("<<<CCR:"));
+		// The stored entry must still resolve to the exact original.
+		let hash = r["hash"].as_str().unwrap();
+		assert_eq!(crate::resolve::expand(&mut s, hash), Some(content.to_string()));
+	}
+
+	#[test]
+	fn test_auto_expand_terminal_over_limit_emits_marker() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.auto_expand_limit = 4;
+		s.terminal_threshold = 0;
+		let content = "way over the four byte limit";
+		let r = transform_terminal_output(&mut s, content);
+		assert_eq!(r["compressed"], true);
+		assert!(r.get("auto_expanded").is_none(), "over-limit must emit the marker as today");
+		assert!(r["marker"].as_str().unwrap().starts_with("<<<CCR:"));
+		let hash = r["hash"].as_str().unwrap();
+		assert_eq!(crate::resolve::expand(&mut s, hash), Some(content.to_string()));
+	}
+
+	// Default (auto_expand = false): the payload must be byte-identical to
+	// the pre-auto-expand shape - same field set, same marker grammar.
+	#[test]
+	fn test_auto_expand_disabled_payload_is_byte_identical() {
+		let mut s = AphroditeState::default(); // auto_expand = false
+		s.tool_threshold = 0;
+		let content = "fn main() {\n    println!(\"hello\");\n}\n";
+		let r = transform_tool_result(&mut s, content, "terminal");
+		assert_eq!(r["status"], "ok");
+		assert_eq!(r["compressed"], true);
+		assert!(r.get("auto_expanded").is_none());
+		assert!(r.get("expanded").is_none());
+		let hash = r["hash"].as_str().unwrap();
+		assert_eq!(hash, &compute_hash(content));
+		assert_eq!(r["size"], content.len() as u64);
+		let mut keys:Vec<&str> = r.as_object().unwrap().keys().map(|k| k.as_str()).collect();
+		let mut expected = vec!["status", "compressed", "hash", "type", "size", "preview", "marker"];
+		keys.sort();
+		expected.sort();
+		assert_eq!(keys, expected, "default path must keep the exact pre-auto-expand field set");
+		let expect_marker = format!(
+			"<<<CCR:{}|{}|{}>>>\n{}",
+			hash,
+			r["type"].as_str().unwrap(),
+			content.len(),
+			r["preview"].as_str().unwrap()
+		);
+		assert_eq!(r["marker"], expect_marker, "default path must render the exact marker grammar");
+		assert_eq!(crate::resolve::expand(&mut s, hash), Some(content.to_string()));
+	}
+
+	#[test]
+	fn test_auto_expand_disabled_terminal_payload_is_byte_identical() {
+		let mut s = AphroditeState::default();
+		s.terminal_threshold = 0;
+		let content = "cargo build\n   Compiling aphrodite v0.1.0\nexit code: 0\n";
+		let r = transform_terminal_output(&mut s, content);
+		assert_eq!(r["compressed"], true);
+		assert!(r.get("auto_expanded").is_none());
+		assert!(r.get("expanded").is_none());
+		let hash = r["hash"].as_str().unwrap();
+		let expect_marker = format!(
+			"<<<CCR:{}|{}|{}>>>\n{}",
+			hash,
+			r["type"].as_str().unwrap(),
+			content.len(),
+			r["preview"].as_str().unwrap()
+		);
+		assert_eq!(r["marker"], expect_marker);
+		assert_eq!(crate::resolve::expand(&mut s, hash), Some(content.to_string()));
+	}
+
+	// ── Gate interplay: auto-expand within the limit wins over chain-split
+	// and the below-threshold pass-through, so no marker can leak. ──
+
+	#[test]
+	fn test_auto_expand_bypasses_chain_split_and_threshold() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.auto_expand_limit = 102400;
+		s.chain_split_enabled = true;
+		s.terminal_threshold = 100000; // content below the threshold
+		let content = format!(
+			"seg a output\n{}\nseg b output\n{}\nseg c output\n",
+			crate::chain_split::SEG_MARKER,
+			crate::chain_split::SEG_MARKER
+		);
+		let r = transform_terminal_output(&mut s, &content);
+		assert_eq!(
+			r["auto_expanded"], true,
+			"auto-expand must win over chain-split within the limit"
+		);
+		assert!(r.get("chain_split").is_none(), "no chain-split payload under auto-expand");
+		assert_eq!(
+			r["expanded"], content,
+			"expanded content must match the original (no nested markers)"
+		);
+	}
+
+	#[test]
+	fn test_chain_split_unaffected_when_auto_expand_off() {
+		let mut s = AphroditeState::default(); // auto_expand = false
+		s.chain_split_enabled = true;
+		s.terminal_threshold = 0;
+		let content = format!(
+			"seg a output\n{}\nseg b output\n{}\nseg c output\n",
+			crate::chain_split::SEG_MARKER,
+			crate::chain_split::SEG_MARKER
+		);
+		let r = transform_terminal_output(&mut s, &content);
+		assert_eq!(r["chain_split"], true, "chain-split must keep working when auto-expand is off");
+	}
+
+	#[test]
+	fn test_auto_expand_bypasses_tool_threshold_gate() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.auto_expand_limit = 102400;
+		s.tool_threshold = 10000; // content below the threshold
+		let content = "tiny tool output";
+		let r = transform_tool_result(&mut s, content, "terminal");
+		assert_eq!(
+			r["auto_expanded"], true,
+			"auto-expand must store+expand below-threshold content so no marker leaks"
+		);
+		assert_eq!(r["expanded"], content);
 	}
 }

@@ -27,11 +27,17 @@ edit it.
 
 1. **Foundation (parent):** `TemplatesConfig` structs (preview/marker/prompts/
    reverse) in `config/proxy.rs` + `config_loader.rs` parse + example keys.
-2. **Task 1 - templates pair:** A = preview template rendering (templates.rs
-   NEW + preview/builders consumption); B = marker format + prompt templates
-   (marker/format.rs + flow.rs). Consumes the foundation structs.
-3. **Task 2 - auto-expand pair:** resolve/proxy consumer for `auto_expand` +
-   `auto_expand_limit`.
+2. **Task 1 - templates pair: DONE (auto-committed c4f7079c + 1016fe6c, 2026-10-13).**
+   A = preview template rendering (templates.rs NEW + preview/builders consumption) - 4 tests;
+   B = marker block + prompt templates (marker/format.rs + flow.rs) - 22 tests, 465 total green.
+   Parent integration: moved TemplatesConfig to state/mod.rs (ungated; the config module is
+   feature-gated and broke the no-proxy aphrodite-hermes build); re-export kept at config.
+3. **Task 2 - auto-expand pair: DONE (2026-10-13).**
+   A = proxy-side inline resolution (proxy.rs + resolve/recursive.rs resolve_inline) - 10 tests;
+   B = dylib/hook-side (hooks.rs + flow.rs auto_expand_guidance + hermes bridge auto_expanded arm) - 14 tests.
+   487 total green; rustfmt clean. Parent integration gate pending re-run.
+4. **Task 3 - context engine pair:** session/state archiving wired to
+   `engine_*` keys (middle-message compression, head/tail protection).
 4. **Task 3 - context engine pair:** session/state archiving wired to
    `engine_*` keys (middle-message compression, head/tail protection).
 5. **Task 4 - live containers pair:** streaming read_file/terminal via CCR

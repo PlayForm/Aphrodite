@@ -18,7 +18,7 @@ mod tests;
 pub use expand::expand;
 pub use filter::filter_lines;
 pub use one::resolve_one;
-pub use recursive::resolve_recursive;
+pub use recursive::{resolve_inline, resolve_recursive};
 // Re-exported (crate-wide, test target only) so `use super::*` in `tests`
 // and the recursive resolver can reach these marker-parsing helpers.
 #[cfg(test)]

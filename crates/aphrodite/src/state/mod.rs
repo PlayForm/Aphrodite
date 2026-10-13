@@ -160,6 +160,12 @@ pub struct AphroditeState {
 	/// `[templates]` section (pre-Rust port) - preview families, marker block,
 	/// prompt templates, reverse key map. None = hardcoded builders/defaults.
 	pub templates:Option<TemplatesConfig>,
+	/// `[compression] auto_expand` (pre-Rust port): when true, compressed
+	/// tool outputs are resolved inline instead of emitting markers (capped
+	/// by `auto_expand_limit` bytes). Default false = markers appear.
+	pub auto_expand:bool,
+	/// `[compression] auto_expand_limit` - byte cap for auto-expanded content.
+	pub auto_expand_limit:usize,
 	/// `[prompts] retrieve_guidance` (minimal|standard|verbose) - how much CCR
 	/// retrieval explanation `flow::build_turn_context` injects per turn.
 	/// Default "minimal" = current behavior (no extra guidance).
@@ -266,6 +272,8 @@ impl Default for AphroditeState {
 			flow_budget_chars:4000,
 			session_inject:String::new(),
 			templates:None,
+			auto_expand:false,
+			auto_expand_limit:102400,
 			retrieve_guidance:"minimal".into(),
 			catalog_intent_hints:false,
 			manual_directive_turn:None,

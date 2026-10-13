@@ -172,6 +172,19 @@ pub fn catalog_summary(state:&mut AphroditeState) -> String {
 	summary
 }
 
+/// Context-engine archiving entry (pre-Rust port of `_engine.py`
+/// `AphroditeContextEngine`). When the engine is enabled and the session
+/// crosses `engine_threshold_pct` with at least `engine_min_msgs` messages,
+/// archive the middle messages (keeping `engine_protect_first` at the start
+/// and `engine_protect_last` at the end) into CCR and return the rendered
+/// `engine_offload` prompt (marker + guidance) to inject; `None` = nothing
+/// archived (below threshold / engine off). Task 3 (pre-Rust port) implements
+/// the body; the signature is the stable contract the trigger consumes.
+pub fn engine_maybe_archive(state:&mut AphroditeState) -> Option<String> {
+	let _ = state;
+	None
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
