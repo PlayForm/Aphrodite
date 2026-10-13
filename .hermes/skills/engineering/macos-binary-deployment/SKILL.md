@@ -104,6 +104,15 @@ CODESIGNING, Code 2, Invalid Page` at `dlopen`, even when `codesign
   launch usually means the quarantine xattr survived or the ad hoc
   signature is stale. Strip the attribute and re-sign, then re-run
   `spctl`.
+- **Release artifacts fetched by the plugin's own download.sh are ad-hoc
+  signed and NOT notarized**: `spctl --assess` reports `rejected` even when
+  `codesign --verify --deep --strict` passes and no `com.apple.quarantine`
+  xattr is present (only the benign `com.apple.provenance` marker). That is
+  the expected resting state and does not block local launch - Gatekeeper
+  only intervenes on quarantined files. Do NOT re-sign them (replacing the
+  release signature gains nothing); the dlopen/exec load probe is the gate.
+  The strip-quarantine + re-sign ritual applies to DEV-BUILT cargo
+  artifacts only.
 - **Don't leave the runtime dir half-updated** - a mismatch between
   binary and dylib versions is worse than neither updated.
 
