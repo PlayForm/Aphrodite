@@ -81,8 +81,29 @@ submodule, remote). No deploy begins from an unverified or dirty state.
 8. **On crash: restore the backup**, then confirm the same bytes load
    from another path before blaming the build.
 
+## Setup CLI does the whole deploy (verify before hand-copying)
+
+`aphrodite setup` run from the freshly built `target/release/aphrodite`
+performs every install step: copies binary + dylibs into
+`~/.hermes/aphrodite/binaries` via `install_macos_artifact` (ditto →
+`install_name_tool -id @rpath/...` → ad-hoc `codesign` for the dylib),
+writes the hooks-only loader (`plugin.yaml` + `__init__.py`), writes the
+`BINARY_VERSION` pin, runs `hermes plugins enable`, then starts the proxy.
+Setup does NOT re-sign the binary itself (only the dylib whose signature
+`install_name_tool` invalidated) - run `codesign --force --sign -` on the
+binary after setup and `codesign --verify --deep --strict` on both. The
+`aphrodite.toml` is written only when absent or `--force`, so restore a
+tuned config from backup before/after setup rather than passing `--force`.
+
 ## Pitfalls
 
+- **The gateway's plugin supervisor respawns the proxy from
+  `binaries/` after the old proxy is killed** (disable + kill + rebuild +
+  setup sequence): the respawned process is already the NEW binary and may
+  hold the ports, so setup's trailing "starting proxy" fails with
+  `Address already in use` (os error 48) - NON-fatal, every install step
+  completed (verify via the respawned proxy's `/health` version field).
+  Kill it, re-sign, and start a fresh proxy to complete verification.
 - **Dev-built dylibs copied into a runtime dir can SIGKILL the host at
   load**: `EXC_BAD_ACCESS (SIGKILL)` / `Termination Reason: Namespace
 CODESIGNING, Code 2, Invalid Page` at `dlopen`, even when `codesign
