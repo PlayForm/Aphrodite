@@ -41,22 +41,21 @@ pub fn detect_type(content:&str) -> String {
 /// reordering a priority = moving one line.
 pub fn detect_semantic_type(content:&str) -> Option<&'static str> {
 	let inp = Input::new(content)?;
-	None
-		.or_else(|| detectors::json::detect(&inp).then_some("json"))
+	None.or_else(|| detectors::json::detect(&inp).then_some("json"))
 		.or_else(|| detectors::test::detect(&inp).then_some("test"))
 		.or_else(|| detectors::diff::detect(&inp).then_some("diff"))
 		.or_else(|| detectors::code::detect(&inp).then_some("code"))
 		.or_else(|| detectors::table::detect(&inp).then_some("table"))
 		.or_else(|| detectors::markdown::detect(&inp).then_some("markdown"))
 		.or_else(|| detectors::yaml::detect(&inp).then_some("yaml"))
-		.or_else(|| detectors::xml::detect(&inp))                       // "html"/"xml"/None
+		.or_else(|| detectors::xml::detect(&inp)) // "html"/"xml"/None
 		.or_else(|| detectors::csv::detect(&inp).then_some("csv"))
 		.or_else(|| detectors::build::detect(&inp).then_some("build"))
 		.or_else(|| detectors::git::detect(&inp).then_some("git"))
 		.or_else(|| detectors::gitlog::detect(&inp).then_some("gitlog"))
 		.or_else(|| detectors::grep::detect(&inp).then_some("grep"))
 		.or_else(|| detectors::ls::detect(&inp).then_some("ls"))
-		.or_else(|| detectors::search::detect(&inp).then_some("search"))   // Phase 6
-		.or_else(|| detectors::log::detect(&inp).then_some("log"))         // Phase 6
+		.or_else(|| detectors::search::detect(&inp).then_some("search")) // Phase 6
+		.or_else(|| detectors::log::detect(&inp).then_some("log")) // Phase 6
 		.or_else(|| detectors::terminal::detect(&inp).then_some("terminal")) // Phase 6
 }

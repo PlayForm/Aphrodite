@@ -26,9 +26,9 @@ fn bin_path() -> std::path::PathBuf {
 	let exe = std::env::current_exe().expect("current_exe");
 	let bin_name = if cfg!(windows) { "aphrodite.exe" } else { "aphrodite" };
 	exe.parent() // target/<profile>/examples/
-        .and_then(|p| p.parent()) // target/<profile>/
-        .map(|p| p.join(bin_name))
-        .unwrap_or_else(|| bin_name.into())
+		.and_then(|p| p.parent()) // target/<profile>/
+		.map(|p| p.join(bin_name))
+		.unwrap_or_else(|| bin_name.into())
 }
 const CACHE_PORT:u16 = 49797;
 const TOKEN_PORT:u16 = 49798;
@@ -58,28 +58,28 @@ fn spawn(mode:&'static str, port:u16) -> Proxy {
 	// this run's retrieve checks with stale entries.
 	let _ = std::fs::remove_file(&db_path);
 	let child = Command::new(bin_path())
-        .args([
-            "--mode",
-            mode,
-            "--listen",
-            &listen,
-            "--api-url",
-            "http://127.0.0.1:1",
-            "--api-key",
-            "bench",
-            "--ccr-db-path",
-        ])
-        .arg(&db_path)
-        // The binary prefers a repo-root `aphrodite.toml` over these CLI
-        // flags whenever one exists relative to its cwd (main.rs `run()`),
-        // which would silently ignore --mode/--listen/--ccr-db-path here.
-        // Point it at a path that never exists so the single-proxy CLI path
-        // is always used, regardless of the directory this bench is run from.
-        .env("APHRODITE_CONFIG_PATH", "/nonexistent/aphrodite-bench.toml")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap_or_else(|_| panic!("spawn failed - run `cargo build --release` first"));
+		.args([
+			"--mode",
+			mode,
+			"--listen",
+			&listen,
+			"--api-url",
+			"http://127.0.0.1:1",
+			"--api-key",
+			"bench",
+			"--ccr-db-path",
+		])
+		.arg(&db_path)
+		// The binary prefers a repo-root `aphrodite.toml` over these CLI
+		// flags whenever one exists relative to its cwd (main.rs `run()`),
+		// which would silently ignore --mode/--listen/--ccr-db-path here.
+		// Point it at a path that never exists so the single-proxy CLI path
+		// is always used, regardless of the directory this bench is run from.
+		.env("APHRODITE_CONFIG_PATH", "/nonexistent/aphrodite-bench.toml")
+		.stdout(Stdio::null())
+		.stderr(Stdio::null())
+		.spawn()
+		.unwrap_or_else(|_| panic!("spawn failed - run `cargo build --release` first"));
 	let dl = Instant::now() + Duration::from_secs(5);
 	loop {
 		if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
