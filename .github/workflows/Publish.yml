@@ -17,7 +17,15 @@ permissions:
 # the child SHA256SUMS commit. Every job is gated on the triggering run's
 # conclusion + tag shape, and every checkout is pinned to that tag so the
 # published code is exactly the code Build tested.
+#
+# workflow_dispatch is a deliberate NO-OP (manual runs do nothing): every
+# job below is gated on github.event.workflow_run, which never exists for a
+# dispatch event, so a manual run skips all jobs. It must NEVER gain an
+# `inputs.publish_crates` declaration - that input is what makes
+# Publish-Headroom-Core's publish step reachable, and it was removed at
+# 677a7b3 precisely so headroom-core can never be CI-published.
 on:
+  workflow_dispatch:
   workflow_run:
     # The `workflows:` list matches the referenced workflow's `name:`
     # metadata (Build.yml declares `name: Build`), NOT the file name - a

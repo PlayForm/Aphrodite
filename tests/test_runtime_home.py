@@ -4,8 +4,10 @@ The shim used to resolve the runtime home from $HERMES_HOME while the Rust
 half resolved it from $HOME, so whenever HERMES_HOME != $HOME/.hermes the
 plugin disabled itself. The fix makes ONE decision (`_runtime_home`),
 exports it to the Rust half via `os.environ.setdefault("APHRODITE_HOME", ...)`
-(F1), adopts the legacy ~/.hermes/aphrodite home when it holds the existing
-install (F2, adopt-and-warn), and logs the decision (F5).
+(F1), and logs the decision (F5). The pre-2.2 legacy home is
+deliberately NEVER adopted (commit 26bfbab): the canonical
+<hermes-home>/aphrodite always wins, even when the legacy home holds an
+install.
 
 Each case imports the real plugin shim in a SUBPROCESS with a controlled
 environment, so env mutations and the module-level import side effects
@@ -32,6 +34,22 @@ def ok(condition, message=""):
     _ASSERTS += 1
     if not condition:
         raise AssertionError(message or "assertion failed")
+
+
+def _sandbox_base() -> Path:
+    """Writable base OUTSIDE the OS temp dir for sandboxed installs.
+
+    The OS temp dir's parent is `/` on Linux CI runners (unwritable), so a
+    base derived from `Path(tempfile.gettempdir()).parent` fails with
+    PermissionError there. The repo's own scratch dir (.hermes/tmp, tracked
+    .gitkeep) is writable on every checkout and outside the OS temp dir - a
+    HERMES_HOME under the temp dir is a throwaway/scratch home
+    (catalog-validate probe), so real-install cases must never sit there.
+    """
+
+    base = REPO_ROOT / ".hermes" / "tmp"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
 
 
 def shim_probe(extra_env, export=True):
@@ -113,15 +131,17 @@ def test_aphrodite_home_override_wins():
         ok(lines[3] == str(override / "directives"), f"directives dir: {lines[3]!r}")
 
 
-def test_legacy_home_adopted_when_it_holds_the_install():
-    # F2: upgrading an install whose runtime home lives at the pre-2.2
-    # location (~/.hermes/aphrodite) while the HERMES_HOME-derived home is
-    # empty must ADOPT the legacy home (never migrate), so binaries/ and
-    # aphrodite.toml keep resolving. The sandbox is placed OUTSIDE the OS
-    # temp dir: a HERMES_HOME under the temp dir is a throwaway/scratch home
-    # (catalog-validate probe) and adoption must never fire there.
-    sandbox_base = Path(tempfile.gettempdir()).parent
-    with tempfile.TemporaryDirectory(dir=str(sandbox_base)) as td:
+def test_legacy_home_never_adopted_even_when_it_holds_the_install():
+    # The pre-2.2 location (~/.hermes/aphrodite) is deliberately NEVER
+    # adopted (commit 26bfbab "drop legacy runtime-home adoption"): the
+    # canonical HERMES_HOME-derived home always wins, even when the legacy
+    # home holds a full install (binaries + aphrodite.toml). A non-default
+    # HERMES_HOME with no install must report "not installed", never
+    # quietly share one runtime home across profiles. The sandbox is placed
+    # OUTSIDE the OS temp dir (via _sandbox_base) so the scratch-home
+    # classification never fires and this case exercises the real
+    # no-adoption decision.
+    with tempfile.TemporaryDirectory(dir=str(_sandbox_base())) as td:
         base = Path(td)
         legacy = base / "home" / ".hermes" / "aphrodite"
         (legacy / "binaries").mkdir(parents=True)
@@ -130,14 +150,21 @@ def test_legacy_home_adopted_when_it_holds_the_install():
         lines, stderr = shim_probe(
             {"HERMES_HOME": str(base / "hermes"), "HOME": str(base / "home")}
         )
-        ok(lines[0] == str(legacy), f"runtime home {lines[0]!r} != adopted legacy {legacy!r}")
-        ok(lines[1] == "legacy ~/.hermes/aphrodite adoption", f"decision {lines[1]!r}")
-        ok(lines[2] == str(legacy), f"APHRODITE_HOME not exported to the legacy home: {lines[2]!r}")
+        canonical = base / "hermes" / "aphrodite"
         ok(
-            "adopting the pre-2.2 runtime home" in stderr,
-            f"adoption must warn, got stderr: {stderr!r}",
+            lines[0] == str(canonical),
+            f"runtime home {lines[0]!r} != canonical {canonical!r} (legacy must NOT be adopted)",
         )
-        ok(lines[4] == str(legacy / "binaries"), f"binaries dir: {lines[4]!r}")
+        ok(lines[1] == "HERMES_HOME", f"decision {lines[1]!r} != 'HERMES_HOME'")
+        ok(
+            lines[2] == str(canonical),
+            f"APHRODITE_HOME not exported to the canonical home: {lines[2]!r}",
+        )
+        ok(
+            "adopting the pre-2.2 runtime home" not in stderr,
+            f"adoption must NOT fire, got stderr: {stderr!r}",
+        )
+        ok(lines[4] == str(canonical / "binaries"), f"binaries dir: {lines[4]!r}")
 
 
 def test_scratch_home_never_adopts_legacy():
@@ -168,10 +195,10 @@ def test_scratch_home_never_adopts_legacy():
 def test_hermes_scratch_cache_home_never_adopts_legacy():
     # Hermes' documented scratch-home pattern ($HOME/.hermes/cache/scratch,
     # used by plugin tests and throwaway runs) must also never adopt the
-    # real install. Sandbox placed OUTSIDE the OS temp dir so this case
-    # exercises the cache/scratch check specifically.
-    sandbox_base = Path(tempfile.gettempdir()).parent
-    with tempfile.TemporaryDirectory(dir=str(sandbox_base)) as td:
+    # real install. Sandbox placed OUTSIDE the OS temp dir (via
+    # _sandbox_base) so this case exercises the cache/scratch check
+    # specifically.
+    with tempfile.TemporaryDirectory(dir=str(_sandbox_base())) as td:
         base = Path(td)
         home = base / "home"
         scratch = home / ".hermes" / "cache" / "scratch" / "hermes-plugin-test"
