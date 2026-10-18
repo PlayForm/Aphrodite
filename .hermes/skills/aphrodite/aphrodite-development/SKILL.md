@@ -252,7 +252,7 @@ hermes --profile dev-aphrodite
   linker-signed adhoc signature on a fresh dylib fails dyld page validation -
   Python's `ctypes` dlopen of `libaphrodite_hermes.dylib` is SIGKILLed with
   `EXC_BAD_ACCESS / Termination Reason: Namespace CODESIGNING, Code 2, Invalid
-  Page` (crash at `mach_o::Universal::isUniversal`). After copying the binary +
+Page` (crash at `mach_o::Universal::isUniversal`). After copying the binary +
   dylib into `~/.hermes/aphrodite/binaries/` (or syncing via the `cargo()`
   wrapper), run `codesign --force --sign -` on both, then
   `codesign --verify --deep --strict` - never re-copy a linker-signed blob

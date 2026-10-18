@@ -43,8 +43,7 @@ pub(crate) fn build_ls_preview(inp:&Input<'_>) -> String {
 			// File extension: text after the last `.` in the basename.
 			let base = name.rsplit('/').next().unwrap_or(name);
 			if let Some(dot) = base.rfind('.')
-				&& dot > 0
-				&& dot < base.len() - 1
+				&& dot > 0 && dot < base.len() - 1
 			{
 				let e:String = base[dot..].chars().take(8).collect();
 				*ext.entry(e).or_insert(0) += 1;

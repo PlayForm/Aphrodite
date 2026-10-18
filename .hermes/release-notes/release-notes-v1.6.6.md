@@ -32,7 +32,7 @@ and config + docs are re-audited 1:1 against the parsers. Binary
 - **Feature (plugin, opt-in context engine)**: description corrected to
   "opt-in context engine" - registration is `APHRODITE_CONTEXT_ENGINE=1`
   (TOML `compression.context_engine` defaults true), and `requires_hermes:
-  ">=0.20.2"` (the first Hermes release with `pre_tool_call` `modify`).
+">=0.20.2"` (the first Hermes release with `pre_tool_call` `modify`).
 - **Feature (plugin, Disclosure)**: `plugin.yaml` and the parent `write.rs`
   description disclose the `pre_tool_call` behavior (auto-backgrounds long
   terminal/process commands, rewrites chained terminal commands when enabled).

@@ -37,8 +37,7 @@ pub(crate) fn build_build_preview(inp:&Input<'_>) -> String {
 			// a failing test run used to preview as
 			// `[build:0E 0W 3L]` (ISSUE-11-PREVIEW-BATTERY #2).
 			if e == 0
-				&& w == 0
-				&& let Some(fail) = inp.raw.lines().map(|l| l.trim()).find(|l| is_failure_line(l))
+				&& w == 0 && let Some(fail) = inp.raw.lines().map(|l| l.trim()).find(|l| is_failure_line(l))
 			{
 				return format!(
 					"[build:{}E {}W {}L | {}]",

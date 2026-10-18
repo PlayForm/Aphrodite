@@ -224,7 +224,7 @@ wholesale `git merge Development`.
    branch can already match it; re-fetch and re-measure immediately
    before mutating. Note `Aphrodite-Release` is a LINKED WORKTREE of the
    Aphrodite repo on `Current` (`+ Branch <sha> (/path)` in `git branch
-   -vv` = another worktree, not a separate clone) - merge inside it.
+-vv` = another worktree, not a separate clone) - merge inside it.
 2. **Measure the real delta**: `git log Current..Development` lists every
    commit since the last common ancestor, but most are already
    content-synced by squash `release: sync vX.Y.Z from Development`
@@ -234,19 +234,19 @@ wholesale `git merge Development`.
    deliberately excludes - bench/, tests/, crates/.../tests/, `.hermes/`,
    Maintain/ - tens of thousands of lines).
 3. **Curate the skip list**, per commit:
-   - gitlink-bump commits (`chore: bump submodule gitlinks: ...`) - SKIP;
-     Current's released gitlink stays.
-   - content already on Current via picks/dependabot - probe `git diff
-     Current..Development -- <file>` empty means already there, SKIP.
-   - `.hermes`-only commits (release notes, handoffs, skills) - Current
-     never carries `.hermes/`; SKIP.
-   - file-removal commits for files absent on Current - SKIP at first,
-     but RE-CHECK after cherry-picks that add those files: the removal
-     becomes applicable then (an add-then-remove asset lands add-only if
-     its removal was skipped as a no-op).
-   - version-doc-alignment commits (docs say X where X == Current's
-     manifest version) are SAFE to bring - they align, they do not bump;
-     a true version-bump commit is the one to exclude.
+    - gitlink-bump commits (`chore: bump submodule gitlinks: ...`) - SKIP;
+      Current's released gitlink stays.
+    - content already on Current via picks/dependabot - probe `git diff
+Current..Development -- <file>` empty means already there, SKIP.
+    - `.hermes`-only commits (release notes, handoffs, skills) - Current
+      never carries `.hermes/`; SKIP.
+    - file-removal commits for files absent on Current - SKIP at first,
+      but RE-CHECK after cherry-picks that add those files: the removal
+      becomes applicable then (an add-then-remove asset lands add-only if
+      its removal was skipped as a no-op).
+    - version-doc-alignment commits (docs say X where X == Current's
+      manifest version) are SAFE to bring - they align, they do not bump;
+      a true version-bump commit is the one to exclude.
 4. **Cherry-pick oldest-first** the kept range, so each applies on the
    state the previous commits produced (a big rewrite applies cleanly
    only on top of the earlier doc commits it builds on). Hook silence is
