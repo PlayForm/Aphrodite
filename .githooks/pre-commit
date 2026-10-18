@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# pre-commit - refuse to commit on a detached HEAD.
+#
+# The user's invariant: every repository and submodule must ALWAYS sit on its
+# own branch (Development/Current for Aphrodite's trees). A commit made while
+# HEAD is detached lands on no branch, becomes dangling once the worktree
+# moves, and forces a manual re-attach later. Prevent it at the gate instead.
+#
+# Scope: applies to the main parent worktree AND every submodule that points
+# its core.hooksPath at this .githooks dir. The superproject guard in
+# lib/bump-submodule-gitlinks.sh keeps the gitlink-bump logic parent-only;
+# this guard is intentionally repo-agnostic - it must fire wherever a commit
+# is attempted on a detached HEAD.
+set -euo pipefail
+
+# Detect detachment: `git symbolic-ref -q HEAD` fails when HEAD is detached.
+if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
+	# Resolve the branch(es) that contain this commit so the message can name
+	# the exact re-attach command instead of a generic hint.
+	HEAD_SHA="$(git rev-parse HEAD)"
+	BRANCH_HITS="$(git branch --contains "$HEAD_SHA" 2>/dev/null | sed 's/^[*+] //' | grep -v '^$' || true)"
+	SUGGEST=""
+	if [ -n "$BRANCH_HITS" ]; then
+		# Pick the first local branch that contains the commit as the suggested
+		# re-attach target (Current preferred when both Development/Current).
+		if echo "$BRANCH_HITS" | grep -q '^Current$'; then
+			SUGGEST="Current"
+		elif echo "$BRANCH_HITS" | grep -q '^Development$'; then
+			SUGGEST="Development"
+		else
+			SUGGEST="$(echo "$BRANCH_HITS" | head -1)"
+		fi
+		REATTACH="git checkout $SUGGEST   # or: git branch -f $SUGGEST $HEAD_SHA && git checkout $SUGGEST"
+	else
+		REATTACH="git branch <name> $HEAD_SHA && git checkout <name>   # commit is not on any branch"
+	fi
+	echo ""
+	echo "REFUSED: commit on a detached HEAD ($HEAD_SHA)."
+	echo "Every repo must stay on its branch - this commit would be dangling."
+	echo "Re-attach first:"
+	echo "  $REATTACH"
+	echo ""
+	exit 1
+fi
+exit 0
