@@ -182,7 +182,7 @@ aphrodite]'` (see Uninstall below).
 
 1. Preserve anything valuable FIRST (skills, logs) to the personal scratch dir.
 2. `rm ~/.hermes/plugins/aphrodite` (the symlink only - never the checkout),
-   `rm -rf ~/.hermes/aphrodite` (data dir).
+   then remove the data dir (`~/.hermes/aphrodite`) with `rm -rf`.
 3. Sweep for LEGACY symlinks, not just the current paths: an old setup may
    have left bare `~/.hermes/directives` → repo `directives/` links
    predating the relocation (directives now live in
@@ -214,14 +214,14 @@ aphrodite]'` (see Uninstall below).
 
 - The proxy processes die at spawn with `no API key configured` when no key
   is set - Hermes' own provider config is NOT reused by the plugin. Sources:
-  `APHRODITE_API_KEY` env (set in `~/.hermes/.env`, loaded at Hermes start)
+  `APHRODITE_API_KEY` env (set in `.env` under `~/.hermes`, loaded at Hermes start)
   or `api_key` in the toml.
 - The key chain is provider-agnostic: config → `APHRODITE_API_KEY` only
   (DeepSeek-specific fallbacks were removed deliberately - no provider
   defaults, no provider-named key vars).
 - `~/.hermes/config.yaml` may hold the working key as `${SOME_ENV_VAR}`
   interpolation; resolve the referenced var (it may already live in
-  `~/.hermes/.env`) before writing it anywhere. Never print the value.
+  `.env` under `~/.hermes`) before writing it anywhere. Never print the value.
 
 ## Version tracks (three, never conflated)
 
