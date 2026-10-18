@@ -28,9 +28,11 @@ mod schemas;
 mod tools;
 
 use std::{
+	collections::HashMap,
 	ffi::{CStr, CString},
 	os::raw::c_char,
 	sync::{
+		Arc,
 		Mutex,
 		OnceLock,
 		atomic::{AtomicBool, Ordering},
@@ -40,23 +42,38 @@ use std::{
 // Re-export core aphrodite types for convenience
 pub use aphrodite::state::AphroditeState;
 
-// ── Process-global session state ───────────────────────────
+// ── Process-global session-state registry ──────────────────
 //
-// The Hermes plugin loads this dylib once per process and drives a single
-// agent session, so one shared `AphroditeState` is the correct model (it
-// mirrors the proxy's per-session store and the core crate's handle map).
-// Every hook and tool call operates on this shared state, so compressions
-// stored by `transform_tool_result` survive long enough for
-// `aphrodite_retrieve` to resolve them. The lock is poison-tolerant: a panic in
-// one call must not wedge every later call.
+// Hermes runs a SHARED-GATEWAY plugin model: ONE dylib instance serves ALL
+// sessions (parent + subagents) in the gateway process. A single
+// process-global `AphroditeState` (the pre-fix model) meant a heavy hook in
+// ONE session (subagent `pre_llm_call` -> `build_turn_context`) held the
+// only lock; when Hermes' `plugins.hook_callback_timeout` abandoned that
+// worker thread the mutex stayed locked forever, and every later hook in
+// EVERY session blocked on it (gateway log: "3 abandoned workers", permanent
+// skip until restart). State is therefore keyed by session_id: each session
+// owns an `Arc<Mutex<AphroditeState>>` cloned from a config-seeded template,
+// and hooks/tools lock ONLY their own session's mutex with a BOUNDED
+// try_lock (a wedged session degrades fail-open, never blocks the gateway).
+//
+// The registry mutex itself is held only for the HashMap get-or-create -
+// never while running hook work - so it cannot be wedged by an abandoned
+// worker; it blocks with poison recovery like any plain static mutex.
 
-/// Access the process-global session state.
+/// Key for calls with no session context (tools, tests, empty session_id).
+const DEFAULT_SESSION:&str = "default";
+
+/// Config-seeded template state, built once per process.
 ///
 /// Initializes from `aphrodite.toml` (report 07 F3/T16) via
 /// `config_loader::Config` - previously this crate always ran on hardcoded
 /// `AphroditeState::default()` values; `Config::load()`/`apply_compression`
 /// were the only implementation of the advertised env>TOML>default
 /// resolution for this path but had zero call sites anywhere in the repo.
+/// Every new session state is a clone of this template, so a subagent spawn
+/// inherits the same thresholds/directives/templates as the parent (the
+/// single-session behavior is unchanged: the first session IS a clone of
+/// the template, so one session behaves exactly as before).
 ///
 /// Test builds skip the TOML load and use plain defaults: `Config::load()`
 /// searches `./aphrodite.toml` first, and this crate's own tests run with
@@ -64,9 +81,9 @@ pub use aphrodite::state::AphroditeState;
 /// directory - without this split, unit tests would non-hermetically pick
 /// up whatever the repo's live config happens to contain instead of the
 /// documented defaults they assert against.
-pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
-	static STATE:OnceLock<Mutex<AphroditeState>> = OnceLock::new();
-	STATE.get_or_init(|| {
+fn config_template() -> &'static AphroditeState {
+	static TEMPLATE:OnceLock<AphroditeState> = OnceLock::new();
+	TEMPLATE.get_or_init(|| {
 		#[cfg(not(test))]
 		let state = {
 			let mut s = AphroditeState::default();
@@ -95,11 +112,79 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 		};
 		#[cfg(test)]
 		let state = AphroditeState::default();
-		Mutex::new(state)
+		state
 	})
 }
 
-/// Run `f` against the shared session state under the global lock.
+/// Per-session state registry: session_id -> Arc<Mutex<AphroditeState>>.
+///
+/// Gets-or-creates: a new session's state is a clone of [`config_template`]
+/// (config-seeded in production, plain defaults in test builds), so every
+/// session starts from the same config without re-reading aphrodite.toml.
+/// Returns an owned `Arc` clone so the registry lock is dropped before the
+/// caller contends on the session's state mutex.
+fn session_state(sid:&str) -> Arc<Mutex<AphroditeState>> {
+	let key = if sid.is_empty() { DEFAULT_SESSION } else { sid };
+	let mut map = SESSIONS
+		.get_or_init(|| Mutex::new(HashMap::new()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	map.entry(key.to_string())
+		.or_insert_with(|| Arc::new(Mutex::new(config_template().clone())))
+		.clone()
+}
+
+static SESSIONS:OnceLock<Mutex<HashMap<String, Arc<Mutex<AphroditeState>>>>> = OnceLock::new();
+
+/// Bounded lock acquisition: try_lock in a loop bounded by a ~100ms
+/// wall-clock deadline (the spec's "about 50 x 2ms" budget; a wall-clock
+/// deadline keeps the bound precise despite platform sleep-granularity
+/// overshoot - macOS sleeps ~6ms for a 2ms request).
+///
+/// Returns `None` when the mutex is wedged by an abandoned worker thread
+/// (the gateway-hang root cause: Hermes' `plugins.hook_callback_timeout`
+/// abandoned a worker that still held the old single global lock), so the
+/// caller degrades fail-open instead of blocking past the hook timeout.
+/// Poison is recovered like the old `.lock()` path: a panic in one call
+/// must not wedge every later call.
+fn lock_bounded(state:&Arc<Mutex<AphroditeState>>) -> Option<std::sync::MutexGuard<'_, AphroditeState>> {
+	let deadline = std::time::Instant::now() + std::time::Duration::from_millis(100);
+	loop {
+		match state.try_lock() {
+			Ok(guard) => return Some(guard),
+			// Poisoned: recover the guard (same contract as the pre-fix
+			// `.unwrap_or_else(PoisonError::into_inner)` path).
+			Err(std::sync::TryLockError::Poisoned(p)) => return Some(p.into_inner()),
+			Err(std::sync::TryLockError::WouldBlock) => {
+				if std::time::Instant::now() >= deadline {
+					return None;
+				}
+				std::thread::sleep(std::time::Duration::from_millis(2));
+			},
+		}
+	}
+}
+
+/// Run `f` against the given session's state under a BOUNDED lock.
+///
+/// Resolves the per-session state for `sid` (gets-or-creates) and locks ONLY
+/// that session's mutex - a heavy hook in one session can never block
+/// another session's hooks. `None` means the session's lock is wedged by an
+/// abandoned worker; the caller MUST degrade fail-open (never block).
+pub(crate) fn with_session<T>(sid:&str, f:impl FnOnce(&mut AphroditeState) -> T) -> Option<T> {
+	let state = session_state(sid);
+	lock_bounded(&state).map(|mut guard| f(&mut guard))
+}
+
+/// Run `f` against the session state under a bounded lock.
+///
+/// Compatibility shim for tools and tests that lack a `session_id`: resolves
+/// `crate::debug::last_session()` (fallback to the [`DEFAULT_SESSION`] key
+/// when empty) and locks ONLY that session with the bounded lock. On `None`
+/// (wedged lock) it runs `f` against a THROWAWAY clone of the config
+/// template so the call still returns quickly - fail-open, never block; the
+/// mutation is discarded (the template itself is never mutated, so future
+/// session seeds stay pristine).
 ///
 /// Torn-state contract (report 06 F12): `with_shared` itself does not
 /// `catch_unwind` - the panic guard lives one layer up, in `guarded()` at
@@ -110,8 +195,15 @@ pub(crate) fn shared() -> &'static Mutex<AphroditeState> {
 /// (e.g. `retain` then `push_front` in `inline_store_put`) ordered so an
 /// interruption degrades to "entry missing" rather than "duplicate entry".
 pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
-	let mut guard = shared().lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-	f(&mut guard)
+	let sid = crate::debug::last_session();
+	let sid = if sid.is_empty() { DEFAULT_SESSION.to_string() } else { sid };
+	let state = session_state(&sid);
+	if let Some(mut guard) = lock_bounded(&state) {
+		return f(&mut guard);
+	}
+	// Wedged session lock: degrade on a throwaway clone rather than block.
+	let mut scratch = config_template().clone();
+	f(&mut scratch)
 }
 
 /// Re-apply a freshly loaded config to the session state, preserving the
@@ -130,10 +222,42 @@ fn apply_config_reload(cfg:&aphrodite::config_loader::Config, state:&mut Aphrodi
 	cfg.apply_templates(state);
 }
 
+/// Apply `f` to EVERY registered session under a BOUNDED lock, skipping
+/// wedged sessions (an abandoned worker holds their mutex - a config reload
+/// must never block the watcher; the reload reaches them on a later pass).
+///
+/// Returns true when any session still has `auto_reload` on after the pass
+/// (the watcher keeps running only while at least one session wants it).
+fn for_each_session(f:impl Fn(&mut AphroditeState)) -> bool {
+	let map = SESSIONS
+		.get_or_init(|| Mutex::new(HashMap::new()))
+		.lock()
+		.unwrap_or_else(std::sync::PoisonError::into_inner);
+	// Clone the Arcs so the registry lock is released before contending on
+	// any session state mutex.
+	let sessions:Vec<Arc<Mutex<AphroditeState>>> = map.values().cloned().collect();
+	drop(map);
+	let mut any_reload = false;
+	for state in sessions {
+		if let Some(mut guard) = lock_bounded(&state) {
+			f(&mut guard);
+			if guard.auto_reload {
+				any_reload = true;
+			}
+		}
+		// Wedged session: skip (fail-open - it stays degraded, never blocks).
+	}
+	any_reload
+}
+
 /// Spawn the opt-in config auto-reload watcher. Mirrors the engine binary's
 /// watcher (`main.rs`): watch the config search dirs (cwd, then the user
 /// runtime home - the same precedence as `Config::load()`) non-recursively,
 /// debounce 500ms on a modify of `aphrodite.toml`, then reload.
+///
+/// A reload reaches EVERY registered session (each under its own bounded
+/// lock, wedged ones skipped), so a config change applies to the parent and
+/// all subagent sessions alike.
 ///
 /// Failure policy (fail-open, `aphrodite-boundaries`): a broken file keeps
 /// the previous values (like the engine watcher) and records the failure on
@@ -181,14 +305,12 @@ fn spawn_config_watcher() {
 				let cfg = aphrodite::config_loader::Config::load();
 				if cfg.parse_failure.is_some() {
 					// Broken file: keep the previous values, surface the
-					// failure (the loader's warn already fired).
-					with_shared(|s| s.config_error = cfg.parse_failure.clone());
+					// failure on EVERY session (the loader's warn already
+					// fired); wedged sessions are skipped.
+					for_each_session(|s| s.config_error = cfg.parse_failure.clone());
 					continue;
 				}
-				let keep_watching = with_shared(|s| {
-					apply_config_reload(&cfg, s);
-					s.auto_reload
-				});
+				let keep_watching = for_each_session(|s| apply_config_reload(&cfg, s));
 				if !keep_watching {
 					// `auto_reload` turned off in the file - stop watching
 					// (takes effect on the next successful reload).
@@ -530,6 +652,22 @@ pub extern "C" fn aphrodite_hermes_version() -> *mut c_char {
 
 // ── Hook dispatch C ABI ────────────────────────────────────
 
+/// Fail-open degrade value for a hook whose session lock is wedged by an
+/// abandoned worker (the bounded lock returned None). Never blocks and never
+/// erases output: `pre_tool_call` -> null (no directive; the tool proceeds
+/// normally), `transform_tool_result` / `transform_terminal_output` -> the
+/// ORIGINAL content string (Hermes honors a string return as the
+/// replacement; returning the identical content is a visible no-op),
+/// `pre_llm_call` -> null (no context injection), lifecycle hooks -> null
+/// (return ignored).
+fn fail_open_hook(name:&str, tool_content:&str, term_content:&str) -> serde_json::Value {
+	match name {
+		"transform_tool_result" => serde_json::Value::String(tool_content.to_string()),
+		"transform_terminal_output" => serde_json::Value::String(term_content.to_string()),
+		_ => serde_json::Value::Null,
+	}
+}
+
 /// Call a Hermes hook by name with JSON args.
 ///
 /// Operates on the process-global session state and honors the exact Hermes
@@ -567,7 +705,27 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 			.and_then(|v| v.as_str())
 			.unwrap_or("");
 
-		let result:serde_json::Value = with_shared(|state| {
+		// Resolve the session id BEFORE entering any lock: hooks carry
+		// `session_id` in their parsed args (pre_tool_call,
+		// transform_tool_result, pre_llm_call, post_llm_call,
+		// on_session_start); `transform_terminal_output` does NOT, so it
+		// falls back to `debug::last_session()` like before. Empty ->
+		// the default session key. Each hook then locks ONLY its own
+		// session's state (per-session registry) with a bounded lock.
+		let sid = parsed
+			.get("session_id")
+			.and_then(|v| v.as_str())
+			.filter(|s| !s.is_empty())
+			.map(str::to_string)
+			.unwrap_or_else(|| {
+				let last = crate::debug::last_session();
+				if last.is_empty() { DEFAULT_SESSION.to_string() } else { last }
+			});
+
+		// `with_session` returns None when THIS session's lock is wedged by
+		// an abandoned worker - fail open with the per-arm degrade value
+		// (fail_open_hook) instead of blocking the gateway.
+		let result:serde_json::Value = match with_session(&sid, |state| {
 			match name.as_str() {
 				// Accept both the canonical Hermes name and the legacy alias.
 				"on_session_start" | "session_start" => {
@@ -808,7 +966,10 @@ pub extern "C" fn aphrodite_hermes_call_hook(hook_name:*const c_char, args_json:
 				},
 				_ => serde_json::json!({ "error": format!("unknown hook: {}", name) }),
 			}
-		});
+		}) {
+			Some(v) => v,
+			None => fail_open_hook(&name, tool_content, term_content),
+		};
 
 		to_c_string(&serde_json::to_string(&result).unwrap_or_default())
 	}))
@@ -1550,6 +1711,129 @@ mod tests {
 			state.active_directives,
 			vec!["focus".to_string()],
 			"reload must preserve active directives"
+		);
+	}
+
+	// ── Per-session state registry probe (gateway shared-plugin fix): two
+	// different session_ids must resolve to DIFFERENT AphroditeState
+	// instances. A compression stored under session A (via the production
+	// transform_tool_result hook path) must NOT appear in session B's
+	// catalog, nor in the default (tool) session - the pre-fix single global
+	// state made every session see everything. ──
+	#[test]
+	fn probe_per_session_state_isolation() {
+		let _g = crate::test_guard();
+		// Reset the default (tool) session so its catalog count is
+		// deterministic (other tests leave markers behind).
+		with_shared(aphrodite::session::on_session_start);
+		// DIRECT read (bypasses with_shared): the reset must have cleared the
+		// real default state, not a throwaway fallback clone.
+		let post_reset = {
+			let s = session_state(DEFAULT_SESSION);
+			let g = s.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+			g.recent_markers.len()
+		};
+		assert_eq!(post_reset, 0, "reset must clear the real default session state (not a fallback clone)");
+
+		// Compress under session "probe-a" through the hook path Hermes
+		// actually fires (transform_tool_result with session_id in kwargs).
+		let content = "probe-isolation-payload-xyz\n".repeat(400);
+		let args = serde_json::json!({
+			"tool_name": "terminal",
+			"result": content,
+			"session_id": "probe-a",
+		})
+		.to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("transform_tool_result").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		let hook_result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+		// Compression happened: the hook returns the marker string.
+		let marker:String = serde_json::from_str(&hook_result).expect("session A compress must return a marker");
+		assert!(marker.starts_with("<<<CCR:"), "marker shape: {marker}");
+
+		// Session B sees none of A's entries.
+		let cat_b = with_session("probe-b", |s| serde_json::json!({"total": s.recent_markers.len()}))
+			.expect("session B lock must be free");
+		assert_eq!(cat_b["total"], 0, "session B must NOT see session A's compression");
+
+		// Session A sees exactly its own entry.
+		let cat_a = with_session("probe-a", |s| serde_json::json!({"total": s.recent_markers.len()}))
+			.expect("session A lock must be free");
+		assert_eq!(cat_a["total"], 1, "session A must see its own compression");
+
+		// The default (tool) session - the with_shared resolution target in
+		// tests, where last_session() is empty - must NOT see it either.
+		let cat_def = with_shared(|s| serde_json::json!({"total": s.recent_markers.len()}));
+		assert_eq!(
+			cat_def["total"], 0,
+			"default session must NOT see session A's compression: last_session={:?}",
+			crate::debug::last_session()
+		);
+	}
+
+	// ── Wedged-lock degrade probe (gateway shared-plugin fix): simulate an
+	// abandoned worker by HOLDING a session's state mutex, then call the
+	// hook for THAT session. It must return the fail-open value within the
+	// bounded-lock window (~100ms), never block toward Hermes' 50s hook
+	// timeout (the pre-fix behavior that hung the gateway). ──
+	#[test]
+	fn probe_wedged_session_lock_degrades_fail_open() {
+		let _g = crate::test_guard();
+		// Simulate the abandoned worker: hold this session's lock.
+		let state = session_state("probe-wedged");
+		let _wedged_guard = state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+
+		// pre_tool_call for the wedged session -> null (no directive; the
+		// tool proceeds normally).
+		let t0 = std::time::Instant::now();
+		let args = serde_json::json!({
+			"tool_name": "terminal",
+			"args": {"command": "cargo build"},
+			"session_id": "probe-wedged",
+		})
+		.to_string();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("pre_tool_call").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+		let elapsed_ms = t0.elapsed().as_millis();
+		assert_eq!(result, "null", "wedged pre_tool_call must fail open to null, got: {result}");
+		assert!(
+			elapsed_ms < 500,
+			"wedged hook must return within ~200ms (bounded lock), took {elapsed_ms}ms"
+		);
+
+		// transform_tool_result for the wedged session -> the ORIGINAL
+		// content string (never erase output).
+		let content = "wedged-original-output-line\n".repeat(50);
+		let args = serde_json::json!({
+			"tool_name": "terminal",
+			"result": content,
+			"session_id": "probe-wedged",
+		})
+		.to_string();
+		let t0 = std::time::Instant::now();
+		let ptr = aphrodite_hermes_call_hook(
+			CString::new("transform_tool_result").unwrap().as_ptr(),
+			CString::new(args).unwrap().as_ptr(),
+		);
+		let hook_result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+		aphrodite_hermes_free_string(ptr);
+		let elapsed_ms = t0.elapsed().as_millis();
+		let returned:String =
+			serde_json::from_str(&hook_result).expect("wedged transform must return the original content string");
+		assert_eq!(
+			returned, content,
+			"wedged transform_tool_result must return the ORIGINAL content, never erase it"
+		);
+		assert!(
+			elapsed_ms < 500,
+			"wedged transform must return within ~200ms (bounded lock), took {elapsed_ms}ms"
 		);
 	}
 }
