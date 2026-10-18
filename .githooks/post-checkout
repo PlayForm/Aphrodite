@@ -1,11 +1,52 @@
 #!/usr/bin/env bash
-# post-checkout - on a branch checkout in the parent, auto-commit any
-# updated submodule gitlinks. Args: $1 old HEAD, $2 new HEAD,
-# $3 flag (1 = branch checkout, 0 = file checkout).
+# post-checkout - two responsibilities:
+#
+#  1. On a branch checkout in the parent, auto-commit any updated submodule
+#     gitlinks (delegated to lib/bump-submodule-gitlinks.sh).
+#  2. NEVER leave any repo/worktree/submodule on a detached HEAD: if this
+#     checkout left HEAD detached but the commit is contained in a branch,
+#     re-attach to that branch immediately (the user's standing invariant:
+#     every repo stays on its branch - no dangling commits).
+#
+# Args: $1 old HEAD, $2 new HEAD, $3 flag (1 = branch checkout, 0 = file checkout).
 set -euo pipefail
-
-[ "${3:-0}" = "1" ] || exit 0
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-exec "$DIR/lib/bump-submodule-gitlinks.sh"
+# ── Responsibility 1: gitlink auto-bump (parent only, guarded in the lib) ──
+if [ "${3:-0}" = "1" ]; then
+	exec "$DIR/lib/bump-submodule-gitlinks.sh"
+fi
+
+# ── Responsibility 2: detached-HEAD re-attach (file checkout path) ──
+# A raw-SHA checkout (`git checkout <sha>`) reaches here with $3=0 and HEAD
+# detached. Re-attach when the commit is on exactly one branch; if it is on
+# multiple, prefer Current (release line), then Development. If it is on no
+# branch the commit is genuinely dangling - leave it alone and warn (a commit
+# on no branch must be attached manually; forcing a new branch here could
+# surprise). Recursion guard: our own `git checkout` below fires this hook
+# again - short-circuit via env.
+if [[ -n "${DETACH_REATTACH_ACTIVE:-}" ]]; then
+	exit 0
+fi
+
+if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
+	HEAD_SHA="$(git rev-parse HEAD)"
+	HITS="$(git branch --contains "$HEAD_SHA" 2>/dev/null | sed 's/^[*+] //' | grep -v '^$' || true)"
+	if [ -z "$HITS" ]; then
+		# Commit on no branch - genuinely dangling, cannot auto-pick a target.
+		echo "post-checkout: WARNING HEAD is detached at $HEAD_SHA and the commit is on NO branch - attach manually" >&2
+		exit 0
+	fi
+	# Choose: Current > Development > first hit (stable ordering).
+	TARGET="$(echo "$HITS" | grep -x 'Current' || true)"
+	if [ -z "$TARGET" ]; then
+		TARGET="$(echo "$HITS" | grep -x 'Development' || true)"
+	fi
+	if [ -z "$TARGET" ]; then
+		TARGET="$(echo "$HITS" | head -1)"
+	fi
+	echo "post-checkout: re-attaching detached HEAD ($HEAD_SHA) to branch '$TARGET'"
+	DETACH_REATTACH_ACTIVE=1 git checkout "$TARGET" >/dev/null 2>&1 || true
+fi
+exit 0
