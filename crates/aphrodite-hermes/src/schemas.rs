@@ -489,8 +489,13 @@ mod tests {
 
 	/// The schema list and the dispatch registry must not drift apart: a
 	/// schema with no handler is an advertised tool that always errors.
+	/// Takes the crate test guard: `aphrodite_test` with `{}` args runs its
+	/// QUICK mode and records a marker in the shared session state, so this
+	/// test is a state writer like any other - unguarded it raced
+	/// concurrently running tests (e.g. exact-count catalog assertions).
 	#[test]
 	fn test_every_schema_has_a_handler() {
+		let _g = crate::test_guard();
 		for s in all_schemas() {
 			let name = s["name"].as_str().unwrap();
 			let result = crate::tools::dispatch(name, "{}");

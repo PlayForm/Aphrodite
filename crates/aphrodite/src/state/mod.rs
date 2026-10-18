@@ -73,6 +73,12 @@ const REFERENCED_FILES_CAP:usize = 100;
 const SPLIT_ADAPT_MIN_EVENTS:usize = 4;
 
 /// Session state - one per loaded dylib instance.
+///
+/// `Clone` enables the hermes bridge's per-session registry: each new
+/// session's state is a clone of a config-seeded template, so subagent
+/// spawns inherit the same thresholds/directives without re-reading config.
+/// Cloning is a deep copy of the (empty at seed time) CCR stores.
+#[derive(Clone)]
 pub struct AphroditeState {
 	/// Inline content store: {hash: content}. The `HashMap` gives O(1)
 	/// get/put/contains (was an O(n) `VecDeque` linear scan per op - bug
