@@ -30,3 +30,9 @@ pub use detect::{detect_semantic_type, detect_type};
 pub use state::{preview_max_chars, set_preview_max_chars};
 #[cfg(test)]
 pub(crate) use state::preview_cap_test_guard;
+
+// TOML-driven preview template rendering (pre-Rust port): re-exported here
+// so engine/proxy/hermes call sites keep one `aphrodite::preview::` prefix
+// for every preview knob (the `[templates.preview]` registry is consumed by
+// `build_preview` above).
+pub use crate::templates::{get_preview_family, get_templates, render_preview, set_preview_family, set_templates};

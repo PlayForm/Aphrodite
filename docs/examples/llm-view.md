@@ -200,11 +200,11 @@ different preview text:
 
 Two more preview knobs from the captures:
 
-- `preview_max_chars` (120 default) caps each rendered preview line; longer
-  signatures truncate with an ellipsis.
-- `code_structure_map` (true default) controls whether function/type structure
-  extraction feeds the code preview; disabled, the preview falls back to
-  line-count-only metadata.
+- `preview_max_chars` (shipped default 0 = unlimited) caps the rendered
+  preview string; longer signatures truncate with an ellipsis.
+- `code_structure_map` stays unwired: it is parsed for schema compatibility
+  but not consulted, so function/type structure extraction always feeds the
+  code preview.
 
 ## Token Economics
 

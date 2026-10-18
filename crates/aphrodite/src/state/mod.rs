@@ -26,6 +26,25 @@ pub use directives::ActiveDirective;
 pub use events::ToolEvent;
 pub use markers::MarkerEntry;
 
+/// TOML template strings (pre-Rust port): preview families, marker block,
+/// prompt templates, reverse key map. Each preview family maps content types
+/// to `{variable}` format strings; resolution order is
+/// family[ctype] -> reverse[ctype] -> family[_default] -> hardcoded builder.
+/// Defined here (not in the feature-gated `config` module) so the dylib
+/// path (`state`, `config_loader`, `templates`) can reference it without the
+/// `proxy` feature.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct TemplatesConfig {
+	#[serde(default)]
+	pub preview:HashMap<String, HashMap<String, String>>,
+	#[serde(default)]
+	pub marker:HashMap<String, String>,
+	#[serde(default)]
+	pub prompts:HashMap<String, String>,
+	#[serde(default)]
+	pub reverse:HashMap<String, String>,
+}
+
 /// Maximum inline store entries before LRU eviction.
 const INLINE_MAX:usize = 500;
 
@@ -117,6 +136,10 @@ pub struct AphroditeState {
 	/// fields on change (default off). Only config fields are mutated -
 	/// session CCR state, directive selection, and telemetry are preserved.
 	pub auto_reload:bool,
+	/// DEV-ONLY debug logger level (0 = off, 1 = on, 2 = verbose), read from
+	/// `APHRODITE_DEBUG` at config load (temporary development
+	/// instrumentation - see `crate::debug`; never a release path).
+	pub debug_level:u8,
 	// RESERVED: same as engine_min_msgs above (01-F9).
 	pub catalog_mode:String,
 	pub expand_guidance:bool,
@@ -138,6 +161,32 @@ pub struct AphroditeState {
 	/// in aphrodite.toml - rendered once via `build_first_turn_injection`,
 	/// then dropped (turn_counter > 0). Empty = no injection (default).
 	pub session_inject:String,
+	/// `[templates]` section (pre-Rust port) - preview families, marker block,
+	/// prompt templates, reverse key map. None = hardcoded builders/defaults.
+	pub templates:Option<TemplatesConfig>,
+	/// `[compression] auto_expand` (pre-Rust port): when true, compressed
+	/// tool outputs are resolved inline instead of emitting markers (capped
+	/// by `auto_expand_limit` bytes). Default false = markers appear.
+	pub auto_expand:bool,
+	/// `[compression] auto_expand_limit` - byte cap for auto-expanded content.
+	pub auto_expand_limit:usize,
+	/// `APHRODITE_LIVE_CONTAINER` (pre-Rust port): streaming live-container
+	/// mode for tool outputs (chunked arrival + instant markers + progress).
+	/// Default false = current behavior.
+	pub live_container:bool,
+	/// `APHRODITE_RECURSIVE_DEPTH` (pre-Rust port): max marker recursion depth.
+	/// Default 5 = current hardcoded RECURSIVE_DEPTH.
+	pub recursive_depth:usize,
+	/// `APHRODITE_MAX_REQUEST_BODY_SIZE` (pre-Rust port): proxy request-body
+	/// cap in bytes. None = no cap (current behavior).
+	pub max_request_body_size:Option<usize>,
+	/// `[prompts] retrieve_guidance` (minimal|standard|verbose) - how much CCR
+	/// retrieval explanation `flow::build_turn_context` injects per turn.
+	/// Default "minimal" = current behavior (no extra guidance).
+	pub retrieve_guidance:String,
+	/// `[prompts] catalog_intent_hints` - show `intent=read` alongside the
+	/// recent CCR hashes in the recall catalog output (default off = current).
+	pub catalog_intent_hints:bool,
 	/// Turn number of the most recent MANUAL `aphrodite_directive` mutation
 	/// (swap/add/remove/reset). Latches phase-aware auto-swaps out (P6); set by
 	/// `directives::handle_action` on any successful mutation.
@@ -228,6 +277,7 @@ impl Default for AphroditeState {
 			terminal_threshold:256,
 			config_error:None,
 			auto_reload:false,
+			debug_level:0,
 			catalog_mode:"tool".into(),
 			expand_guidance:false,
 			dev_mode:false,
@@ -236,6 +286,14 @@ impl Default for AphroditeState {
 			ephemeral_directives:Vec::new(),
 			flow_budget_chars:4000,
 			session_inject:String::new(),
+			templates:None,
+			auto_expand:false,
+			auto_expand_limit:102400,
+			live_container:false,
+			recursive_depth:5,
+			max_request_body_size:None,
+			retrieve_guidance:"minimal".into(),
+			catalog_intent_hints:false,
 			manual_directive_turn:None,
 			tool_events:VecDeque::new(),
 			bg_tasks:VecDeque::new(),

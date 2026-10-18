@@ -22,6 +22,9 @@
 pub mod catalog;
 pub mod chain_split;
 pub mod config_loader;
+/// DEV-ONLY env-gated debug logger (temporary development instrumentation,
+/// gated behind `APHRODITE_DEBUG` - never a release path).
+pub mod debug;
 pub mod directives;
 pub mod home;
 pub mod flow;
@@ -34,6 +37,7 @@ pub mod session;
 pub mod stage2;
 pub mod state;
 pub mod struct_extract;
+pub mod templates;
 
 // Proxy modules (used by main.rs binary) - gated behind the `proxy`
 // feature (report 01-T2) so the cdylib built by `aphrodite-hermes` with
@@ -48,6 +52,12 @@ pub mod proxy;
 pub mod retrieve;
 #[cfg(feature = "proxy")]
 pub mod setup;
+
+// Rhai scripting engine (pre-Rust scripting.rs port): user-defined
+// micro-scripts that transform hook payloads. Feature-gated so the default
+// cdylib build doesn't link rhai.
+#[cfg(feature = "scripting")]
+pub mod scripting;
 
 use std::{
 	collections::HashMap,
@@ -1067,5 +1077,16 @@ mod ffi_tests {
 			"stats must surface the reload parse failure: {stats}"
 		);
 		aphrodite_destroy(handle.as_ptr());
+	}
+
+	// ── Scripting gate (pre-Rust scripting.rs port): the module must not
+	// exist in a feature-off build. This test compiles and passes ONLY when
+	// the `scripting` feature is off - `pub mod scripting` in lib.rs is
+	// declared behind `#[cfg(feature = "scripting")]`, so the default build
+	// has no scripting module at all. ──
+	#[cfg(not(feature = "scripting"))]
+	#[test]
+	fn scripting_module_absent_without_feature() {
+		assert!(!cfg!(feature = "scripting"));
 	}
 }

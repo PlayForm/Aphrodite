@@ -44,10 +44,12 @@ Markers are content. A <<<CCR:hash|type|size>>> marker in tool output stands in 
 - You waste turns re-reading files you already hold as markers
 - The user gets low-quality responses based on missing data
 
-## Retrieve now, think later
+## Price retrieval against the action
 
-- When the next action needs a marker's content, retrieve it BEFORE acting:
-  a marker you don't retrieve leaves you operating blind. This is the #1 cause
-  of poor agent performance in compressed sessions.
-- Always retrieve first, then decide what to do with the content - deciding
-  what to do with bare markers is deciding without the content.
+- A marker's `size` is its retrieval cost: resolving it re-adds that many
+  bytes to context, refunding that item's compression. Retrieve a marker only
+  when the next action consumes its content - a marker you don't retrieve
+  costs nothing and stays retrievable later. Deferring is not skipping.
+- When the next action does need the content, retrieve BEFORE acting: a marker
+  you leave unresolved leaves you operating blind. Batch the needed markers
+  into one turn.

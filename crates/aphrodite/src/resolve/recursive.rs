@@ -3,8 +3,11 @@ use std::collections::HashMap;
 use crate::state::AphroditeState;
 use super::{one::resolve_one, parse::find_markers};
 
-/// Maximum recursion depth for nested marker resolution.
-const RECURSIVE_DEPTH:usize = 5;
+// Depth limit is `AphroditeState::recursive_depth` - config-driven via
+// `APHRODITE_RECURSIVE_DEPTH`, default 5 in `AphroditeState::default()` and
+// the config loader, so the pre-port hardcoded constant's value is
+// byte-identical when unset. Every entry point in this module takes the
+// state, so there is no state-less path needing its own fallback.
 
 /// Recursively resolve a hash and all nested CCR markers.
 ///
@@ -27,11 +30,14 @@ pub fn resolve_recursive(
 	}
 	visited.push(hash_val.to_string());
 
-	// Depth limit: return the raw (un-further-expanded) content for this
-	// hash rather than falling back to the resolved cache (F9) - a hash
-	// that legitimately exists but simply hasn't been visited yet at this
-	// depth would otherwise incorrectly resolve to `None`.
-	if depth >= RECURSIVE_DEPTH {
+	// Depth limit (config-driven via `state.recursive_depth`,
+	// `APHRODITE_RECURSIVE_DEPTH`, default 5 - byte-identical to the
+	// pre-port hardcoded constant when unset): return the raw
+	// (un-further-expanded) content for this hash rather than falling
+	// back to the resolved cache (F9) - a hash that legitimately exists
+	// but simply hasn't been visited yet at this depth would otherwise
+	// incorrectly resolve to `None`.
+	if depth >= state.recursive_depth {
 		return resolve_one(state, hash_val);
 	}
 	if let Some(cached) = resolved.get(hash_val) {
@@ -81,4 +87,29 @@ pub fn resolve_recursive(
 	// *contained* (this crate's own test fixtures, docs, echoed tool
 	// output), which got silently corrupted on every retrieval.
 	Some(result)
+}
+
+/// Auto-expand variant of [`resolve_recursive`]: resolves `hash_val` and
+/// all nested markers with the same cycle-safe `visited` set and
+/// `state.recursive_depth` limit, but returns the resolved content ONLY
+/// when it fits within `limit` bytes - the "resolve inline instead of
+/// emitting a marker" contract for auto-expand (pre-Rust `_resolve.py` +
+/// `_core/config.py` AUTO_EXPAND_LIMIT).
+///
+/// No marker is re-emitted: when the content fits, the returned string IS
+/// the fully-resolved content. Over-limit results return `None` so the
+/// caller keeps the original marker (the stored bytes remain retrievable
+/// for a later, explicit resolve). A `None` is also returned when the
+/// top-level hash cannot be resolved at all, indistinguishable from an
+/// over-limit result by design - the caller's marker fallback is correct
+/// for both.
+pub fn resolve_inline(
+	state:&mut AphroditeState,
+	hash_val:&str,
+	limit:usize,
+	resolved:&mut HashMap<String, String>,
+	visited:&mut Vec<String>,
+) -> Option<String> {
+	let content = resolve_recursive(state, hash_val, 0, resolved, visited)?;
+	if content.len() <= limit { Some(content) } else { None }
 }

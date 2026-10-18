@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::*;
 
 #[test]
@@ -281,4 +283,113 @@ fn test_expand_diamond_nesting_fully_expands() {
 	let result = expand(&mut s, "outer").unwrap();
 	assert!(!result.contains("<<<CCR:"), "no raw marker should remain: {result}");
 	assert_eq!(result, "A and wraps A");
+}
+
+// ── Auto-expand (pre-Rust port): `resolve_inline` returns the fully
+// resolved content only when it fits within the limit; over-limit results
+// (and unresolvable hashes) return `None` so the caller keeps the marker. ──
+#[test]
+fn test_resolve_inline_returns_content_within_limit() {
+	let mut s = AphroditeState::default();
+	s.inline_store_put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
+	s.inline_store_put("inner123".into(), "RESOLVED".into());
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	let result = resolve_inline(&mut s, "outer", 1000, &mut resolved, &mut visited);
+	assert_eq!(result, Some("before RESOLVED after".into()));
+	assert!(
+		!result.unwrap().contains("<<<CCR:"),
+		"auto-expand must return the resolved content, not a marker"
+	);
+}
+
+#[test]
+fn test_resolve_inline_over_limit_returns_none() {
+	let mut s = AphroditeState::default();
+	s.inline_store_put("outer".into(), "before <<<CCR:inner123|text|10>>> after".into());
+	s.inline_store_put("inner123".into(), "RESOLVED".into());
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	// Resolved content is 24 bytes ("before RESOLVED after") - a 10-byte
+	// limit must refuse it, leaving the caller's marker in place.
+	let result = resolve_inline(&mut s, "outer", 10, &mut resolved, &mut visited);
+	assert_eq!(result, None);
+}
+
+#[test]
+fn test_resolve_inline_missing_hash_returns_none() {
+	let mut s = AphroditeState::default();
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	assert_eq!(resolve_inline(&mut s, "nope", 1000, &mut resolved, &mut visited), None);
+}
+
+#[test]
+fn test_resolve_inline_honors_visited_set() {
+	// Cycle-safe: a self-referential pair must terminate and must not
+	// surface a raw marker as if it were resolved content.
+	let mut s = AphroditeState::default();
+	s.inline_store_put("hA".into(), "<<<CCR:hB|t|1>>>".into());
+	s.inline_store_put("hB".into(), "<<<CCR:hA|t|1>>>".into());
+	let mut resolved = HashMap::new();
+	let mut visited = Vec::new();
+	let result = resolve_inline(&mut s, "hA", 1000, &mut resolved, &mut visited);
+	assert_eq!(result, Some("<<<CCR:hB|t|1>>>".to_string()));
+}
+
+// ── Pre-Rust port: `APHRODITE_RECURSIVE_DEPTH` - the depth limit is
+// config-driven via `state.recursive_depth` (default 5, byte-identical to
+// the pre-port hardcoded constant), not a fixed constant. ──
+#[test]
+fn test_expand_honors_configured_recursive_depth() {
+	// A chain deeper than the configured depth must stop expanding at the
+	// limit and return the readable raw content of the deepest-visited leaf
+	// hash (F9) - never None and never an unresolved placeholder.
+	let mut s = AphroditeState::default();
+	s.recursive_depth = 2;
+	s.inline_store_put("h0".into(), "<<<CCR:h1|t|1>>>".into());
+	s.inline_store_put("h1".into(), "<<<CCR:h2|t|1>>>".into());
+	s.inline_store_put("h2".into(), "<<<CCR:h3|t|1>>>".into());
+	s.inline_store_put("h3".into(), "DEEP".into());
+	let result = expand(&mut s, "h0");
+	assert_eq!(result, Some("<<<CCR:h3|t|1>>>".to_string()));
+}
+
+#[test]
+fn test_expand_recursive_depth_higher_than_default_expands_further() {
+	// A 6-deep chain exceeds the old hardcoded 5 but must fully expand when
+	// recursive_depth is raised to 8 - proves the limit is the configured
+	// value, not a min() with the old constant.
+	let mut s = AphroditeState::default();
+	s.recursive_depth = 8;
+	// h7 -> DEEP; h6 -> marker(h7); ...; h0 -> marker(h1): an 8-deep chain.
+	s.inline_store_put("h7".into(), "DEEP".into());
+	for i in (0..7).rev() {
+		s.inline_store_put(format!("h{i}").into(), format!("<<<CCR:h{}|t|1>>>", i + 1).into());
+	}
+	assert_eq!(expand(&mut s, "h0"), Some("DEEP".to_string()));
+}
+
+#[test]
+fn test_expand_recursive_depth_five_is_byte_identical_to_default() {
+	// The state default is 5 (the pre-port hardcoded constant): a default
+	// state and an explicitly-configured 5 must produce identical output on
+	// the same chain, and the default must be exactly 5.
+	assert_eq!(AphroditeState::default().recursive_depth, 5);
+	let mut s_default = AphroditeState::default();
+	let mut s_five = AphroditeState::default();
+	s_five.recursive_depth = 5;
+	for (k, v) in [
+		("h0", "<<<CCR:h1|t|1>>>"),
+		("h1", "<<<CCR:h2|t|1>>>"),
+		("h2", "<<<CCR:h3|t|1>>>"),
+		("h3", "<<<CCR:h4|t|1>>>"),
+		("h4", "<<<CCR:h5|t|1>>>"),
+		("h5", "DEEP"),
+	] {
+		s_default.inline_store_put(k.into(), v.into());
+		s_five.inline_store_put(k.into(), v.into());
+	}
+	assert_eq!(expand(&mut s_default, "h0"), expand(&mut s_five, "h0"));
+	assert_eq!(expand(&mut s_default, "h0"), Some("DEEP".to_string()));
 }

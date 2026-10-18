@@ -28,6 +28,7 @@ pub struct MultiConfig {
 	pub compression:Option<CompressionConfig>,
 	pub previews:Option<PreviewsConfig>,
 	pub prompts:Option<PromptsConfig>,
+	pub templates:Option<crate::state::TemplatesConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -51,6 +52,12 @@ pub struct CompressionConfig {
 	pub inline_threshold:Option<u32>,
 	pub auto_expand:Option<bool>,
 	pub auto_expand_limit:Option<u32>,
+	/// `[compression] max_request_body_size` (pre-Rust port): proxy
+	/// request-body cap in bytes - `Some(n)` rejects over-`n` bodies with
+	/// 413 while they're being read; None (absent) = no cap (current
+	/// behavior). Mirrors `AphroditeState::max_request_body_size`, which
+	/// the Hermes-side config loader resolves from the same env/TOML key.
+	pub max_request_body_size:Option<usize>,
 	pub catalog_mode:Option<String>,
 	pub classifier_poll:Option<bool>,
 	pub code_multiplier:Option<f64>,

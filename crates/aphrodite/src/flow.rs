@@ -13,7 +13,141 @@
 //! it, so the "bridge reimplements the hook body and forks" failure mode is
 //! unrepresentable.
 
-use crate::state::{ActiveDirective, AphroditeState};
+use crate::{
+	marker::substitute_vars,
+	state::{ActiveDirective, AphroditeState},
+};
+
+/// Compiled-in fallback prompt templates - the `[templates.prompts]` keys
+/// (pre-Rust port of `_core/template.py` `_render_prompt_tmpl` fallbacks),
+/// with the Rust-side current strings where those already ship compiled in
+/// (`session_inject`, `search_hint`). A key absent from the TOML map falls
+/// back to its entry here; an unknown key renders as "" (never panics).
+pub const FALLBACK_PROMPTS:&[(&str, &str)] = &[
+	("session_inject", SHIPPED_SESSION_INJECT),
+	(
+		"engine_offload",
+		"These messages were offloaded to reduce context. Use aphrodite_retrieve({hash}) if needed. The {tail} \
+		 messages below are your active context.",
+	),
+	(
+		"auto_expand_guidance",
+		"Tool outputs are auto-expanded - you see full content inline. If you see a CCR marker, retrieve only if the \
+		 preview hints at useful content.",
+	),
+	(
+		"catalog_context_warn",
+		"context={ctx} msgs - prefer catalog over scanning history",
+	),
+	("search_hint", "Use aphrodite_retrieve(hash) to expand any entry."),
+];
+
+/// Render a `[templates.prompts]` template (pre-Rust port of
+/// `_core/template.py` `_render_prompt_tmpl`).
+///
+/// Resolution: `templates.prompts[name]` → compiled-in fallback (see
+/// [`FALLBACK_PROMPTS`]). `{var}` substitution applies to whichever string
+/// won, with the same degrade-don't-panic semantics as the marker templates
+/// (unknown placeholders stay verbatim). Consumers: `search_hint` feeds the
+/// catalog hint; `session_inject` is resolved at config load;
+/// `engine_offload` / `auto_expand_guidance` / `catalog_context_warn` are
+/// available for the engine-offload / auto-expand / context-count sites.
+pub fn render_prompt(state:&AphroditeState, name:&str, vars:&[(&str, &str)]) -> String {
+	let tmpl = state
+		.templates
+		.as_ref()
+		.and_then(|t| t.prompts.get(name))
+		.map(String::as_str)
+		.unwrap_or_else(|| fallback_prompt(name));
+	substitute_vars(tmpl, vars)
+}
+
+fn fallback_prompt(name:&str) -> &'static str {
+	FALLBACK_PROMPTS.iter().find(|(k, _)| *k == name).map(|(_, v)| *v).unwrap_or("")
+}
+
+/// Retrieval-guidance text for `retrieve_guidance = "standard"`.
+const RETRIEVAL_GUIDANCE_STANDARD:&str = "CCR markers compress large tool output. Use aphrodite_retrieve(hash) when \
+                                          the preview doesn't tell you enough; batch pending markers into one turn.";
+
+/// Retrieval-guidance text for `retrieve_guidance = "verbose"`.
+const RETRIEVAL_GUIDANCE_VERBOSE:&str = "CCR markers compress large tool output. Use aphrodite_retrieve(hash) when \
+                                         the preview doesn't tell you enough; batch pending markers into one turn. \
+                                         Prefer granular retrieval - pull the exact piece you need. Never re-read a \
+                                         file you hold a marker for; never invent content you did not retrieve.";
+
+/// Retrieval-guidance section (prompt knob `[prompts] retrieve_guidance`):
+/// minimal (default) = current behavior, nothing extra; standard = one line;
+/// verbose = extended. An unrecognized value warns and degrades to standard
+/// rather than injecting nothing (warn + degrade house style; never panics).
+fn retrieval_guidance_block(state:&AphroditeState) -> String {
+	let text = match state.retrieve_guidance.as_str() {
+		"minimal" | "" => return String::new(),
+		"verbose" => RETRIEVAL_GUIDANCE_VERBOSE,
+		other => {
+			tracing::warn!(value = %other, "unknown retrieve_guidance value; degrading to standard");
+			RETRIEVAL_GUIDANCE_STANDARD
+		},
+	};
+	format!("[retrieval: {}]", text)
+}
+
+/// Auto-expand guidance section (prompt template `auto_expand_guidance`,
+/// pre-Rust port): while `state.auto_expand` is enabled, inject the rendered
+/// guidance so the model knows tool outputs arrive expanded inline (and that
+/// a CCR marker appearing anyway is worth retrieving). Rendered through
+/// [`render_prompt`] - a configured `[templates.prompts] auto_expand_guidance`
+/// wins, the compiled-in fallback otherwise. Disabled (default) = no
+/// guidance, current behavior; an unknown/empty template renders nothing.
+fn auto_expand_guidance_block(state:&AphroditeState) -> String {
+	if !state.auto_expand {
+		return String::new();
+	}
+	let text = render_prompt(state, "auto_expand_guidance", &[]);
+	if text.is_empty() {
+		return String::new();
+	}
+	format!("[auto-expand: {}]", text)
+}
+
+/// Context-engine trigger + offload section (pre-Rust port of `_engine.py`
+/// `compress`): while the context engine is enabled
+/// (`state.context_engine_enabled`), ask it whether it archived middle
+/// messages this turn ([`crate::session::engine_maybe_archive`]); when it
+/// returns the rendered `engine_offload` prompt (marker + guidance), inject
+/// it so the model sees the compacted history. Disabled, or enabled with the
+/// engine returning `None` (nothing archived), = no injection, byte-identical
+/// current behavior.
+///
+/// Mirrors `auto_expand_guidance_block` (gate on the state flag, section
+/// injection through [`build_turn_context`]). Unlike the auto-expand line it
+/// is counted in the always-survive tier when present: the archive already
+/// mutated the conversation (session.rs owns that), so the explanation must
+/// not be the first section dropped under budget pressure.
+fn engine_offload_block(state:&mut AphroditeState) -> String {
+	engine_offload_section_from(engine_archive_prompt(state))
+}
+
+/// Gate + trigger: call [`crate::session::engine_maybe_archive`] only while
+/// the context engine is enabled. Disabled => the engine is never consulted
+/// (this is the trigger's only call site) and nothing is injected.
+fn engine_archive_prompt(state:&mut AphroditeState) -> Option<String> {
+	if !state.context_engine_enabled {
+		return None;
+	}
+	crate::session::engine_maybe_archive(state)
+}
+
+/// Wrap the engine's offload prompt into the injected section text; `None`
+/// or an empty prompt injects nothing. Split out so the Some/None injection
+/// semantics stay testable while `session::engine_maybe_archive` is still the
+/// pre-landed stub (Task 3 implements the body).
+fn engine_offload_section_from(prompt:Option<String>) -> String {
+	match prompt {
+		Some(text) if !text.is_empty() => format!("[engine-offload: {text}]"),
+		_ => String::new(),
+	}
+}
 
 /// Default first-turn session injection. Loaded from `[prompts] session_inject`
 /// in aphrodite.toml; this constant is the fallback when the key is absent.
@@ -50,11 +184,15 @@ pub fn build_first_turn_injection(state:&AphroditeState) -> String {
 ///
 /// Section order (top = highest survival priority; drop order is bottom-up:
 /// the recall catalog goes first under budget pressure, directives + nudges
-/// never drop):
+/// + the engine-offload prompt never drop):
 ///
 /// ```text
 /// [directives: focus] ...        (build_directive_context - never dropped)
 /// [nudge: ...]                   (ephemeral one-shots, at most 2 - never dropped)
+/// [engine-offload: ...]          (context-engine archive prompt - present only
+///                                 when the engine archived this turn; never dropped)
+/// [retrieval: ...]               (opt-in retrieve_guidance line - droppable)
+/// [auto-expand: ...]             (opt-in auto_expand_guidance line - droppable)
 /// [recall] <catalog summary>     (dropped first under budget pressure)
 /// ```
 ///
@@ -63,6 +201,9 @@ pub fn build_first_turn_injection(state:&AphroditeState) -> String {
 /// itself does not render a telemetry line.
 pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<usize>) -> String {
 	let _ = est_request_bytes; // reserved for P9/T27 telemetry line
+	// DEV-ONLY debug instrumentation (crate::debug): pre-turn timing
+	// (captured only when the logger is on - one atomic load when off).
+	let t0 = crate::debug::enabled().then(std::time::Instant::now);
 
 	let budget = state.flow_budget_chars;
 
@@ -72,6 +213,20 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	// ── Always-survive sections (top priority) ──
 	let directives = crate::directives::build_directive_context(&state.directives, &state.active_directives);
 	let nudges = render_nudges(state);
+
+	// ── Context-engine trigger + offload prompt (fires only when the engine
+	// archived messages this turn; runs before the recall summary so any
+	// engine state mutation lands before the catalog reads the markers) ──
+	let engine_offload = engine_offload_block(state);
+	let engine_offload_present = !engine_offload.is_empty();
+
+	// ── Retrieval guidance (opt-in via [prompts] retrieve_guidance; drops
+	// before bg status / recall under budget pressure) ──
+	let retrieve = retrieval_guidance_block(state);
+
+	// ── Auto-expand guidance (opt-in via state.auto_expand; drops before
+	// bg status / recall under budget pressure) ──
+	let auto_expand = auto_expand_guidance_block(state);
 
 	// ── Droppable section: recall catalog, delta-only (04-F1) ──
 	let recall = crate::session::catalog_summary(state);
@@ -94,8 +249,17 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	if !nudges.is_empty() {
 		sections.push(nudges);
 	}
+	if engine_offload_present {
+		sections.push(engine_offload);
+	}
+	if !retrieve.is_empty() {
+		sections.push(retrieve);
+	}
 	if !bg_status.is_empty() {
 		sections.push(bg_status);
+	}
+	if !auto_expand.is_empty() {
+		sections.push(auto_expand);
 	}
 	// The recall block - RETRIEVE_HINT removed per 04-F2 (tool schemas
 	// in the system prompt already teach retrieval; repeating it every
@@ -108,16 +272,66 @@ pub fn build_turn_context(state:&mut AphroditeState, est_request_bytes:Option<us
 	// sections, so a turn with an inject + directive + nudge present could
 	// compute always_survive == 1 and drop directives/nudges under budget
 	// pressure). Session inject non-empty, directives non-empty, nudges
-	// present; keep the min with the section count so an empty turn never
-	// underflows the floor.
-	let always_survive =
-		(!session_inject.is_empty()) as usize + (!directives.is_empty()) as usize + nudges_present(state) as usize;
+	// present, engine-offload present; keep the min with the section count
+	// so an empty turn never underflows the floor.
+	let always_survive = (!session_inject.is_empty()) as usize
+		+ (!directives.is_empty()) as usize
+		+ nudges_present(state) as usize
+		+ engine_offload_present as usize;
 	let always_survive = always_survive.min(sections.len());
 	while join_sections(&sections).len() > budget && sections.len() > always_survive {
 		sections.pop();
 	}
 
-	join_sections(&sections)
+	let joined = join_sections(&sections);
+	// DEV-ONLY debug instrumentation (crate::debug): pre-turn line with the
+	// injected sections (label + byte size each), the flow budget, and the
+	// cumulative metrics snapshot - emitted on every turn while the logger
+	// is on.
+	if let Some(t0) = t0 {
+		let us = t0.elapsed().as_micros() as u64;
+		crate::debug::add_timing(crate::debug::TimingCat::PreTurn, us);
+		let secs:Vec<serde_json::Value> = sections
+			.iter()
+			.map(|s| serde_json::json!({"label": section_label(s), "bytes": s.len()}))
+			.collect();
+		crate::debug::log_at(
+			state.debug_level,
+			"pre_turn_sections",
+			&[
+				("turn", state.turn_counter.to_string()),
+				("budget", budget.to_string()),
+				("always_survive", always_survive.to_string()),
+				("sections", serde_json::to_string(&secs).unwrap_or_default()),
+				("pending_markers", state.recent_markers.len().to_string()),
+				("metrics", crate::debug::metrics_json().to_string()),
+				("elapsed_us", us.to_string()),
+			],
+		);
+	}
+	joined
+}
+
+/// DEV-ONLY: short label for an injected section, derived from its first
+/// line (the section order is fixed by [`build_turn_context`]).
+fn section_label(s:&str) -> &'static str {
+	if s.starts_with("[directives") {
+		"directives"
+	} else if s.starts_with("[nudge") {
+		"nudges"
+	} else if s.starts_with("[engine-offload") {
+		"engine_offload"
+	} else if s.starts_with("[retrieval") {
+		"retrieval"
+	} else if s.starts_with("[auto-expand") {
+		"auto_expand"
+	} else if s.starts_with("[recall]") {
+		"recall"
+	} else if s.starts_with("[aphrodite: first-turn") {
+		"session_inject"
+	} else {
+		"other"
+	}
 }
 
 /// Number of leading "never-drop" sections currently present (directives +
@@ -534,5 +748,229 @@ mod tests {
 			"{{VERSION}} must be replaced: {ctx}"
 		);
 		assert!(!ctx.contains("{VERSION}"), "unreplaced {{VERSION}} placeholder: {ctx}");
+	}
+
+	// ── [templates.prompts] rendering (pre-Rust port of
+	// `_core/template.py` `_render_prompt_tmpl`) ──
+
+	fn state_with_prompt(name:&str, tmpl:&str) -> AphroditeState {
+		let mut s = AphroditeState::default();
+		s.templates = Some(crate::state::TemplatesConfig::default());
+		s.templates.as_mut().unwrap().prompts.insert(name.into(), tmpl.into());
+		s
+	}
+
+	#[test]
+	fn test_render_prompt_from_templates_map() {
+		let s = state_with_prompt("engine_offload", "offloaded {hash} keep {tail}");
+		assert_eq!(
+			render_prompt(&s, "engine_offload", &[("hash", "abc123"), ("tail", "5")]),
+			"offloaded abc123 keep 5"
+		);
+	}
+
+	#[test]
+	fn test_render_prompt_configured_template_wins_over_fallback() {
+		let mut s = AphroditeState::default();
+		s.templates = Some(crate::state::TemplatesConfig::default());
+		s.templates
+			.as_mut()
+			.unwrap()
+			.prompts
+			.insert("search_hint".into(), "custom {hash} hint".into());
+		assert_eq!(render_prompt(&s, "search_hint", &[("hash", "xyz")]), "custom xyz hint");
+	}
+
+	#[test]
+	fn test_render_prompt_fallback_when_key_absent() {
+		let s = AphroditeState::default(); // templates = None
+		assert_eq!(
+			render_prompt(&s, "engine_offload", &[("hash", "h1"), ("tail", "3")]),
+			"These messages were offloaded to reduce context. Use aphrodite_retrieve(h1) if needed. The 3 messages \
+			 below are your active context."
+		);
+		assert_eq!(
+			render_prompt(&s, "catalog_context_warn", &[("ctx", "120")]),
+			"context=120 msgs - prefer catalog over scanning history"
+		);
+		assert_eq!(
+			render_prompt(&s, "search_hint", &[]),
+			"Use aphrodite_retrieve(hash) to expand any entry."
+		);
+		assert_eq!(
+			render_prompt(&s, "auto_expand_guidance", &[]),
+			"Tool outputs are auto-expanded - you see full content inline. If you see a CCR marker, retrieve only if \
+			 the preview hints at useful content."
+		);
+		// The session_inject fallback is the shipped constant; {VERSION} is
+		// an unknown var here and stays verbatim, so the output is identical.
+		assert_eq!(render_prompt(&s, "session_inject", &[]), SHIPPED_SESSION_INJECT);
+		// Unknown key => empty string, no panic.
+		assert_eq!(render_prompt(&s, "no_such_key", &[]), "");
+	}
+
+	#[test]
+	fn test_render_prompt_unknown_var_left_verbatim() {
+		let s = state_with_prompt("catalog_context_warn", "ctx={ctx} typo={typo}");
+		assert_eq!(render_prompt(&s, "catalog_context_warn", &[("ctx", "9")]), "ctx=9 typo={typo}");
+	}
+
+	// ── retrieve_guidance knob: minimal (default) injects nothing, standard
+	// and verbose inject progressively more into the per-turn flow ──
+
+	#[test]
+	fn test_retrieve_guidance_minimal_injects_nothing() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "minimal".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[retrieval:"),
+			"minimal must not inject retrieval guidance: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_retrieve_guidance_default_injects_nothing() {
+		let mut s = AphroditeState::default();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(!ctx.contains("[retrieval:"), "absent knob (default) must not inject: {ctx}");
+	}
+
+	#[test]
+	fn test_retrieve_guidance_standard_injects_line() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "standard".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[retrieval: CCR markers compress large tool output."),
+			"standard must inject one guidance line: {ctx}"
+		);
+		assert!(!ctx.contains("Never re-read"), "standard must stay single-line: {ctx}");
+	}
+
+	#[test]
+	fn test_retrieve_guidance_verbose_injects_extended() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "verbose".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[retrieval:") && ctx.contains("Never re-read a file"),
+			"verbose must inject the extended guidance: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_retrieve_guidance_unknown_value_degrades_to_standard() {
+		let mut s = AphroditeState::default();
+		s.retrieve_guidance = "bogus".into();
+		s.turn_counter = 5;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[retrieval: CCR markers compress large tool output."),
+			"unknown value must warn + degrade to standard: {ctx}"
+		);
+	}
+
+	// ── Auto-expand guidance: injected only while state.auto_expand is on
+	// (rendered via render_prompt with the compiled-in fallback); absent by
+	// default (current behavior). ──
+
+	#[test]
+	fn test_auto_expand_guidance_injected_when_enabled() {
+		let mut s = AphroditeState::default();
+		s.auto_expand = true;
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[auto-expand:") && ctx.contains("Tool outputs are auto-expanded"),
+			"auto-expand guidance must be injected when enabled: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_auto_expand_guidance_absent_when_disabled() {
+		let mut s = AphroditeState::default(); // auto_expand = false
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[auto-expand:") && !ctx.contains("auto-expanded"),
+			"absent auto-expand must inject no guidance: {ctx}"
+		);
+	}
+
+	#[test]
+	fn test_auto_expand_guidance_uses_configured_template() {
+		let mut s = state_with_prompt("auto_expand_guidance", "inline {limit} limit");
+		s.auto_expand = true;
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			ctx.contains("[auto-expand: inline {limit} limit]"),
+			"configured template must win over the fallback: {ctx}"
+		);
+	}
+
+	// ── Context-engine trigger + offload injection (pre-Rust port): while
+	// `state.context_engine_enabled` is set, `engine_archive_prompt` consults
+	// `session::engine_maybe_archive` (the trigger's single call site) and the
+	// returned prompt is injected as a `[engine-offload: ...]` section; disabled
+	// or engine returning None = nothing, byte-identical current behavior. The
+	// engine body is still the pre-landed stub (always None), so the Some-path
+	// injection semantics are exercised on `engine_offload_section_from`. ──
+
+	#[test]
+	fn test_engine_offload_disabled_no_call_no_injection() {
+		// Disabled: the gate short-circuits inside `engine_archive_prompt`
+		// BEFORE `session::engine_maybe_archive` (its only call site), so the
+		// engine is never consulted and no section can appear.
+		let mut s = AphroditeState::default();
+		s.context_engine_enabled = false;
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(!ctx.contains("[engine-offload"), "disabled engine must inject nothing: {ctx}");
+		assert_eq!(engine_archive_prompt(&mut s), None, "gate must yield None while disabled");
+	}
+
+	#[test]
+	fn test_engine_offload_prompt_injected_when_engine_returns_some() {
+		// Engine returned a prompt => the wrapped section is what the model sees.
+		// The full build_turn_context path cannot produce Some yet: the
+		// `session::engine_maybe_archive` stub returns None until Task 3 lands.
+		let section = engine_offload_section_from(Some("offloaded abc123 keep 5".to_string()));
+		assert_eq!(section, "[engine-offload: offloaded abc123 keep 5]");
+		// An empty prompt degrades to no injection, never a bare section.
+		assert_eq!(engine_offload_section_from(Some(String::new())), "");
+	}
+
+	#[test]
+	fn test_engine_offload_nothing_injected_when_engine_returns_none() {
+		// Engine enabled (default) + stub returning None => no injection.
+		let mut s = AphroditeState::default();
+		assert_eq!(engine_offload_section_from(engine_archive_prompt(&mut s)), "");
+		assert_eq!(engine_offload_section_from(None), "");
+	}
+
+	#[test]
+	fn test_engine_offload_default_state_unchanged() {
+		// Default state: engine enabled (default) but the pre-landed
+		// `engine_maybe_archive` stub returns None => no archive, no injection -
+		// byte-identical current behavior (and the context stays empty).
+		let mut s = AphroditeState::default();
+		s.turn_counter = 5;
+		s.flow_budget_chars = 4000;
+		let ctx = build_turn_context(&mut s, None);
+		assert!(
+			!ctx.contains("[engine-offload"),
+			"stub engine (None) must inject nothing: {ctx}"
+		);
+		assert_eq!(ctx, "", "default state must produce the same empty context as before");
 	}
 }

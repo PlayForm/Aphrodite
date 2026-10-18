@@ -17,7 +17,10 @@ Think one turn ahead. Prefetch loads files you WILL need next turn; retrieval re
 ## Markers
 
 - If a prefetch resolves to a <<<CCR:hash|type|size>>> marker, treat it like
-  any other marker: retrieve it when its content is needed.
+  any other marker: retrieve it when its content is needed. A marker's size is
+  its retrieval cost - resolving re-adds that many bytes to context - so
+  retrieve only the ones the next step depends on, and batch them in one turn.
+  The rest stay on deck for later; deferring costs nothing.
 - After a terminal command with large output: check for markers before reading
   the next file, and retrieve the ones the next step depends on.
 - Keep aphrodite_catalog handy - it lists what's already available this

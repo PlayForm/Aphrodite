@@ -108,12 +108,12 @@ sequenceDiagram
 
     H->>R: register(ctx)
     R->>DL: _load_dylib()
-    DL->>DL: _ensure_binaries(): presence check - NEVER downloads<br/>missing → log explicit setup command (download.sh / aphrodite setup);<br/>legacy APHRODITE_AUTO_DOWNLOAD=1 opt-in runs download.sh
+    DL->>DL: _ensure_binaries(): presence check - NEVER downloads<br/>missing → log explicit setup command (download.sh / aphrodite setup)<br/>legacy APHRODITE_AUTO_DOWNLOAD=1 opt-in runs download.sh
     DL->>PR: subprocess smoke-test (once per unique path)
     PR-->>DL: rc==0 → CDLL on the resolved canonical path (once per process, no hot-reload)
     DL->>DL: _configure_ffi: _bindings.py bind_to → manual fallback →<br/>_REQUIRED_VOID_P assertion
     R->>LH: check_and_heal() (best-effort, never raises)
-    Note over LH: canonical layout per layout_schema.json v2 (report-only):<br/>detect + log deviations, quarantine stale plugin-source copies;<br/>never moves in a git checkout, never touches plugins/aphrodite (Hermes-owned)
+    Note over LH: canonical layout per layout_schema.json v2 (report-only):<br/>detect + log deviations, quarantine stale plugin-source copies<br/>never moves in a git checkout, never touches plugins/aphrodite (Hermes-owned)
     R->>MD: materialize_directives(home_dir=b"")
     MD-->>R: {"status":"ok","written":[...],"skipped":[...],"warnings":[...]}
     Note over MD: embeds the built-in directives from the binary<br/>(include_str!) → writes ~/.hermes/aphrodite/directives/<br/>idempotent, never overwrites user-modified files

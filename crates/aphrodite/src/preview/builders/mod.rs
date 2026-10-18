@@ -32,7 +32,21 @@ use crate::preview::{input::Input, state::PREVIEW_MAX_CHARS, r#type::resolve_eff
 /// +/- line counts for diffs, fn/struct counts for source code) so the LLM
 /// gets a useful summary instead of a generic byte/line count wherever a
 /// richer signal is available.
+///
+/// TOML-driven override (pre-Rust port): a registered
+/// `[templates.preview.<family>.<ctype>]` format string renders first; the
+/// result takes the same `preview_max_chars` cap as every other path. When
+/// nothing is configured for this type (`render_preview` returns `None`) the
+/// per-arm dispatch below runs unchanged.
 pub fn build_preview(type_str:&str, content:&str) -> String {
+	if let Some(rendered) = crate::templates::render_preview(type_str, content)
+		&& !rendered.is_empty()
+	{
+		return cap::apply_preview_cap(
+			&rendered,
+			PREVIEW_MAX_CHARS.load(std::sync::atomic::Ordering::Relaxed) as usize,
+		);
+	}
 	let inp = Input::new(content).unwrap_or_else(|| Input::empty(content));
 	let effective = resolve_effective_type(type_str, &inp);
 	dispatch(effective.as_ref(), &inp)

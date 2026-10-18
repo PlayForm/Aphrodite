@@ -374,6 +374,10 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 				"chain_split_events": state.split_events.len(),
 				"chain_split_produced": state.split_events.iter().map(|e| e.produced).sum::<usize>(),
 				"chain_split_retrieved": state.split_events.iter().map(|e| e.retrieved).sum::<usize>(),
+				// DEV-ONLY debug logger (temporary instrumentation): the
+				// env-gated level + cumulative metrics snapshot.
+				"debug_level": state.debug_level,
+				"debug_metrics": aphrodite::debug::metrics_json(),
 			})
 		});
 		stats["proxies"] = proxy_health();
@@ -489,23 +493,13 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 
 	// ── prefetch_status: which prefetched files are resolvable ──
 	// Prefetch is synchronous here, so anything loaded is already "ready".
+	// Rendered by the core crate's `prefetch::prefetch_status`: when
+	// `[compression] live_container` is off the output is byte-identical to
+	// the original inline renderer; when on, ready entries additionally
+	// carry the live-container arrival surface (arrived_at / bytes_arrived /
+	// eta_s).
 	m.insert("aphrodite_prefetch_status", |_args| {
-		with_shared(|state| {
-			let ready:Vec<serde_json::Value> = state
-				.recent_markers
-				.iter()
-				.filter_map(|mk| {
-					mk.meta.as_ref().and_then(|meta| meta.get("path")).map(|path| {
-						serde_json::json!({
-							"path": path,
-							"hash": &mk.hash,
-							"type": mk.ccr_type, "size": mk.size,
-						})
-					})
-				})
-				.collect();
-			serde_json::json!({"loading": [], "ready": ready, "errors": [], "total_ready": ready.len()})
-		})
+		with_shared(|state| aphrodite::prefetch::prefetch_status(state))
 	});
 
 	// ── reclassify: re-detect type/preview for stored markers ──
@@ -590,34 +584,6 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 			"proxies": proxy_health(),
 			"hint": "rebuild via `cargo build --release -p aphrodite`; restart the session to pick up the new dylib",
 		})
-	});
-
-	// ── debug: per-session debug toggle (Rust-side only) ──
-	// Dev-only: gated behind debug_assertions so release dylibs register
-	// exactly the 13 production tools (catalog validate rule 6 - the
-	// manifest declares 13; a release dylib registering aphrodite_debug
-	// fails `hermes plugins validate` as an undeclared tool). Dev builds
-	// (cargo watch / debug profile) keep it; `cargo build --release` drops
-	// it. The debug-prefix/session-record machinery in debug.rs remains
-	// live in both profiles (it only activates on a flag file).
-	// Flips the session-scoped flag file in the runtime home. Resolution is
-	// root-session based (see debug.rs): the CURRENT session's root id keys the
-	// flag, so subagents inherit it and other sessions stay quiet. Pure Rust -
-	// the customer-facing Python shim is untouched.
-	#[cfg(debug_assertions)]
-	m.insert("aphrodite_debug", |args| {
-		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
-		match crate::debug::set_enabled_current(on) {
-			Ok((session, flag)) => {
-				serde_json::json!({
-					"status": "ok",
-					"debug": on,
-					"session": session,
-					"flag": flag,
-				})
-			},
-			Err(e) => serde_json::json!({"error": e}),
-		}
 	});
 
 	// ── context engine pre-LLM hook (registered via ctx.register_context_engine) ──

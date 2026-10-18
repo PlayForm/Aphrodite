@@ -161,9 +161,6 @@ pub fn run(args:&SetupArgs) -> Result<(), SetupError> {
 	// ── Step 8b: Write the BINARY_VERSION pin into the runtime home ──
 	write_binary_version(&ctx)?;
 
-	// ── Step 8b: Write the BINARY_VERSION pin into the runtime home ──
-	write_binary_version(&ctx)?;
-
 	// ── Step 9: Register with hermes ──
 	register_plugin(&ctx)?;
 

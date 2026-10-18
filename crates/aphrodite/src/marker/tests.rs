@@ -38,6 +38,12 @@ fn test_marker_format() {
 	// self-describing `[ct:...]` preview; `render_marker` must emit it
 	// verbatim (report 09 §5 doubling-bug fix) rather than re-wrapping it
 	// into `[ct:[ct:...]]`.
+	//
+	// All tests in this module that build markers hold
+	// `marker_templates_test_guard()`: the registered templates are
+	// process-global and config_loader's `apply_compression` tests mutate
+	// them concurrently under `cargo test`.
+	let _g = marker_templates_test_guard();
 	let m = ccr_marker(
 		"abc123def456abc123def456abc123def456",
 		"code_rust",
@@ -67,6 +73,7 @@ fn test_marker_format() {
 #[test]
 fn test_marker_preview_never_doubles_bracket_prefix() {
 	let _g = crate::preview::preview_cap_test_guard();
+	let _g2 = marker_templates_test_guard();
 	let re = regex::Regex::new(r"\[\w+:\[").unwrap();
 	for ty in [
 		"text",
@@ -91,6 +98,7 @@ fn test_marker_preview_never_doubles_bracket_prefix() {
 
 #[test]
 fn test_render_marker_wraps_bare_preview_but_not_bracketed() {
+	let _g = marker_templates_test_guard();
 	// A bare (cache-mode) excerpt is wrapped once with the center label...
 	let bare = ccr_marker(
 		"abc123def456abc123def456abc123def456",
@@ -118,6 +126,7 @@ fn test_render_marker_wraps_bare_preview_but_not_bracketed() {
 
 #[test]
 fn test_marker_with_budget() {
+	let _g = marker_templates_test_guard();
 	let preview = "a very long preview string that should be truncated under tight budget constraints";
 	let m = ccr_marker(
 		"abc123def456abc123def456abc123def456",
@@ -218,6 +227,7 @@ fn test_parse_preview_on_garbage() {
 
 #[test]
 fn test_ccr_marker_strips_interior_nul_bytes() {
+	let _g = marker_templates_test_guard();
 	// The control-char filter (`*c >= ' '`) excludes NUL (0x00) along with
 	// every other C0 control code - a literal embedded NUL in tool output
 	// must not survive into the rendered marker.
@@ -229,6 +239,7 @@ fn test_ccr_marker_strips_interior_nul_bytes() {
 
 #[test]
 fn test_ccr_marker_truncates_multibyte_preview_on_char_boundary() {
+	let _g = marker_templates_test_guard();
 	// budget < 25 truncates to 30 *chars* via `.chars().take(n)`, not a
 	// byte slice - a preview packed with multi-byte UTF-8 (each 'é' is 2
 	// bytes) must not panic or produce a str that isn't valid UTF-8 when
@@ -250,6 +261,7 @@ fn test_ccr_marker_truncates_multibyte_preview_on_char_boundary() {
 
 #[test]
 fn test_ccr_marker_preview_containing_literal_marker_syntax_does_not_confuse_extraction() {
+	let _g = marker_templates_test_guard();
 	// Literal marker-shaped text in the preview: `extract_hashes` scans the
 	// FULL output (including the preview line below the marker). Without `|`
 	// sanitization, a literal `<<<CCR:hex|type|size>>>` in content will
@@ -280,4 +292,105 @@ fn test_ccr_marker_preview_containing_literal_marker_syntax_does_not_confuse_ext
 	);
 	let hashes = extract_hashes(&m);
 	assert_eq!(hashes, vec!["abc123def456abc123def456abc123def456"]);
+}
+
+// ── TOML-driven marker block templates (pre-Rust port of
+// `_core/template.py` `_render_marker_tmpl`) ────────────────────────
+
+#[test]
+fn test_marker_format_configured_renders_toml_template() {
+	let _g = marker_templates_test_guard();
+	// Shipped-TOML-shaped template ({center_seg} for Python parity, {hint}
+	// populated only when the ccr_marker_hint knob is enabled - the template
+	// decides where it lands; a format without {hint} never emits it).
+	let fmt = "{preview}{hint}\n[{type}: {meta}{center_seg}]\n<<<CCR:{hash}|{type}|{size}>>>";
+	set_marker_templates(Some(fmt), Some("…(use aphrodite_retrieve)"), true);
+	let m = ccr_marker(
+		"abc123def456abc123def456abc123def456",
+		"code_rust",
+		1234,
+		"[code_rust:3fns 42L]",
+		None,
+		Some(&std::collections::HashMap::from([("err".to_string(), "2".to_string())])),
+		Some("mid"),
+	);
+	assert_eq!(
+		m,
+		"[code_rust:3fns 42L]…(use aphrodite_retrieve)\n[code_rust: \
+		 err=2;center=mid]\n<<<CCR:abc123def456abc123def456abc123def456|code_rust|1234>>>",
+		"configured format must win over the fallback grammar"
+	);
+	set_marker_templates(None, None, false);
+}
+
+#[test]
+fn test_marker_hint_var_empty_when_knob_disabled() {
+	let _g = marker_templates_test_guard();
+	// {hint} resolves to "" when ccr_marker_hint is off (default) - the
+	// hint text is registered but must not leak into the block.
+	set_marker_templates(Some("{preview}{hint}"), Some("HINT-TEXT"), false);
+	let m = ccr_marker("abc123def456abc123def456abc123def456", "text", 5, "hello", None, None, None);
+	assert_eq!(m, "hello");
+	set_marker_templates(None, None, false);
+}
+
+#[test]
+fn test_marker_fallback_byte_identical_when_unconfigured() {
+	let _g = marker_templates_test_guard();
+	// Unconfigured => the fixed grammar, byte-identical to the pre-port
+	// output (marker line + verbatim self-bracketed preview line).
+	set_marker_templates(None, None, false);
+	let m = ccr_marker(
+		"abc123def456abc123def456abc123def456",
+		"text",
+		12,
+		"[text:53L 1913B]",
+		None,
+		None,
+		None,
+	);
+	assert_eq!(m, "<<<CCR:abc123def456abc123def456abc123def456|text|12>>>\n[text:53L 1913B]");
+}
+
+#[test]
+fn test_marker_fallback_appends_hint_only_when_knob_enabled() {
+	let _g = marker_templates_test_guard();
+	set_marker_templates(None, Some("…(use aphrodite_retrieve)"), true);
+	let m = ccr_marker(
+		"abc123def456abc123def456abc123def456",
+		"text",
+		12,
+		"[text:53L 1913B]",
+		None,
+		None,
+		None,
+	);
+	assert_eq!(
+		m, "<<<CCR:abc123def456abc123def456abc123def456|text|12>>>\n[text:53L 1913B]…(use aphrodite_retrieve)",
+		"opt-in knob appends the hint after the preview text"
+	);
+	set_marker_templates(None, None, false);
+}
+
+#[test]
+fn test_marker_template_unknown_var_left_verbatim() {
+	let _g = marker_templates_test_guard();
+	// Unknown/malformed placeholders degrade to literal text (never panic,
+	// never a raw-template bailout) - the known vars still substitute.
+	set_marker_templates(Some("{preview} {typo} {size}"), None, false);
+	let m = ccr_marker("abc123def456abc123def456abc123def456", "text", 7, "p", None, None, None);
+	assert_eq!(m, "p {typo} 7");
+	set_marker_templates(None, None, false);
+}
+
+#[test]
+fn test_substitute_vars_known_unknown_and_escapes() {
+	let vars = [("hash", "abc"), ("size", "42")];
+	assert_eq!(substitute_vars("<<<CCR:{hash}|text|{size}>>>", &vars), "<<<CCR:abc|text|42>>>");
+	assert_eq!(substitute_vars("{typo} {hash}", &vars), "{typo} abc");
+	assert_eq!(substitute_vars("a{{b}}c", &vars), "a{b}c");
+	assert_eq!(substitute_vars("{{{hash}}}", &vars), "{abc}");
+	assert_eq!(substitute_vars("no placeholders", &vars), "no placeholders");
+	assert_eq!(substitute_vars("{hash!r}", &vars), "{hash!r}");
+	assert_eq!(substitute_vars("", &vars), "");
 }

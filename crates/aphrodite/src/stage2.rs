@@ -388,7 +388,7 @@ mod tests {
 
 	#[test]
 	fn test_integration_build_stage2() {
-		let content = "   Compiling foo v0.1.0\n   error: something broke\n   ".to_string() + &"x".repeat(80);
+		let content = format!("   Compiling foo v0.1.0\n   error: something broke\n   {}", "x".repeat(80));
 		let result = compress_stage2(&content, "build_error");
 		assert!(result.is_some());
 		assert!(result.unwrap().len() < content.len());

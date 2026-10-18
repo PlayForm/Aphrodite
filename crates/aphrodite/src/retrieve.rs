@@ -23,6 +23,22 @@ pub struct RetrieveRequest {
 	pub limit:usize,
 }
 
+/// Progress status of a live container (pre-Rust port of `_hooks/live.py`),
+/// surfaced on every retrieve of a container entry. `chunks`/`chunk_size`
+/// describe the stored container; `bytes_arrived` counts bytes served so
+/// far through partial retrieves (an approximation - it advances by the
+/// bytes returned in each windowed response, including its `[lines ...]`
+/// header) and `complete` flips once the full content has been delivered
+/// (final resolve, `limit: 0`).
+#[derive(Debug, Clone, Serialize)]
+pub struct LiveProgress {
+	pub chunks:usize,
+	pub chunk_size:usize,
+	pub bytes_total:usize,
+	pub bytes_arrived:usize,
+	pub complete:bool,
+}
+
 /// Response body for `/retrieve`. `source` reports which backend served the
 /// content (e.g. `"inline_ccr"`, `"ccr"`, `"none"`) for observability.
 #[derive(Debug, Serialize)]
@@ -39,6 +55,28 @@ pub struct RetrieveResponse {
 	/// header is also prepended to `content` in that case; this field lets a
 	/// caller detect truncation without parsing it.
 	pub truncated:bool,
+	/// Live-container progress; present only when the resolved entry is a
+	/// live container. Skipped when absent so non-container responses stay
+	/// byte-identical to the pre-live shape.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub live:Option<LiveProgress>,
+}
+
+/// Parsed live-container metadata envelope (the `{hash}:live:meta` inline
+/// store entry written by `hooks::transform_live_container`). Unknown
+/// envelope fields (e.g. the stored content `type`) are ignored on parse.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct LiveContainerMeta {
+	#[serde(default)]
+	live:bool,
+	#[serde(default)]
+	size:usize,
+	#[serde(default)]
+	chunks:usize,
+	#[serde(default)]
+	chunk_size:usize,
+	#[serde(default)]
+	bytes_arrived:usize,
 }
 
 /// Resolve a CCR marker hash back to its original content, optionally
@@ -60,6 +98,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 					source:"none".into(),
 					error:Some("`hash` required".into()),
 					truncated:false,
+					live:None,
 				}),
 			)
 				.into_response();
@@ -68,7 +107,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 
 	// Check inline_ccr first (lock dropped before any .await to avoid !Send
 	// MutexGuard)
-	let mut content = {
+	let content = {
 		// Fix 20 (inspection): the old `.lock().ok().and_then(...)` silently
 		// converted a poisoned mutex into a cache miss, so every request fell
 		// through to the CCR backend and callers saw confusing 404s. A
@@ -87,6 +126,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 						source:"none".into(),
 						error:Some("inline_ccr lock poisoned; cannot serve /retrieve".into()),
 						truncated:false,
+						live:None,
 					}),
 				)
 					.into_response();
@@ -116,6 +156,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 									source:"none".into(),
 									error:Some(format!("CCR entry not found: {}", hash)),
 									truncated:false,
+									live:None,
 								}),
 							)
 								.into_response();
@@ -132,6 +173,7 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 							source:"none".into(),
 							error:Some(format!("CCR entry not found: {}", hash)),
 							truncated:false,
+							live:None,
 						}),
 					)
 						.into_response();
@@ -151,6 +193,19 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 	// for. Removed rather than "fixed" - see `.plans/05-compression-pipeline.md`
 	// T12 and `docs/ccr/lifecycle.md`'s retrieve-flow section.
 
+	// ── Live container progression (pre-Rust port of _hooks/live.py) ──
+	// When the resolved entry is a live container (its metadata envelope
+	// sits in the inline store), serve the content from the container's own
+	// chunks and surface progress: chunk count / bytes arrived on partial
+	// retrieves, full content + complete status on the final resolve
+	// (limit: 0). A missing or malformed envelope degrades to the plain
+	// entry (warn + degrade, never panic).
+	let live_container = lookup_live_container(&state, &hash, &content);
+	let mut content = live_container
+		.as_ref()
+		.map(|(_meta, assembled)| assembled.clone())
+		.unwrap_or(content);
+
 	// Apply query filter, then pagination
 	content = filter_content(&content, req.query.as_deref());
 	let (content, truncated) = match paginate(&content, req.offset, req.limit) {
@@ -164,14 +219,104 @@ pub async fn handle_retrieve(State(state):State<Arc<AppState>>, Json(req):Json<R
 					source:"ccr".into(),
 					error:None,
 					truncated:false,
+					live:None,
 				}),
 			)
 				.into_response();
 		},
 	};
 
-	Json(RetrieveResponse { found:true, content:Some(content), source:"ccr".into(), error:None, truncated })
-		.into_response()
+	// Advance + surface the container progress after pagination, so the
+	// served window's byte count is known. A final resolve (limit: 0)
+	// marks the container complete; a partial window advances
+	// `bytes_arrived` by the bytes served in this response. The envelope is
+	// written back so later retrieves observe the accumulated progress.
+	let live = match live_container {
+		Some((meta, _)) => {
+			let final_resolve = req.limit == 0;
+			let served = if final_resolve { meta.size } else { content.len().min(meta.size) };
+			let bytes_arrived = meta.bytes_arrived.saturating_add(served).min(meta.size);
+			let complete = final_resolve || bytes_arrived >= meta.size;
+			let progress = LiveProgress {
+				chunks:meta.chunks,
+				chunk_size:meta.chunk_size,
+				bytes_total:meta.size,
+				bytes_arrived,
+				complete,
+			};
+			// Best-effort write-back: a poisoned lock or serialization
+			// hiccup degrades to no-writeback (progress stays as-is).
+			if let Ok(mut map) = state.inline_ccr.lock() {
+				let mut updated = meta;
+				updated.bytes_arrived = bytes_arrived;
+				if let Ok(encoded) = serde_json::to_string(&updated) {
+					map.put(crate::hooks::live_meta_key(&hash), encoded);
+				}
+			}
+			Some(progress)
+		},
+		None => None,
+	};
+
+	Json(RetrieveResponse {
+		found:true,
+		content:Some(content),
+		source:"ccr".into(),
+		error:None,
+		truncated,
+		live,
+	})
+	.into_response()
+}
+
+/// Look up a live container's metadata envelope and reassemble its content.
+///
+/// Returns `None` (the caller then serves the plain resolved content) when
+/// the entry is not a live container or its envelope is missing/malformed -
+/// warn + degrade, never panic. When the entry IS a live container, the
+/// content is reassembled from the container's own chunks (its
+/// authoritative store); a missing chunk degrades to the assembled prefix
+/// so far.
+fn lookup_live_container(state:&AppState, hash:&str, resolved:&str) -> Option<(LiveContainerMeta, String)> {
+	let meta_key = crate::hooks::live_meta_key(hash);
+	// `get` is `&mut self` on LruCache (get promotes recency) - the same
+	// reason the handler's inline_ccr lookup binds `mut map`.
+	let mut map = match state.inline_ccr.lock() {
+		Ok(m) => m,
+		Err(poisoned) => poisoned.into_inner(),
+	};
+	let meta_json = map.get(&meta_key)?.clone();
+	let meta:LiveContainerMeta = match serde_json::from_str(&meta_json) {
+		Ok(meta) => meta,
+		Err(err) => {
+			tracing::warn!(
+				hash,
+				error = %err,
+				"retrieve: live container envelope unparseable; serving as plain entry"
+			);
+			return None;
+		},
+	};
+	if !meta.live || meta.chunks == 0 {
+		// Not a live container (or a degenerate envelope) - serve plainly.
+		return None;
+	}
+	let mut assembled = String::new();
+	for i in 0..meta.chunks {
+		match map.get(&crate::hooks::live_chunk_key(hash, i)) {
+			Some(chunk) => assembled.push_str(chunk),
+			None => {
+				tracing::warn!(
+					hash,
+					chunk = i,
+					"retrieve: live container chunk missing; serving assembled prefix"
+				);
+				break;
+			},
+		}
+	}
+	let content = if assembled.is_empty() { resolved.to_string() } else { assembled };
+	Some((meta, content))
 }
 
 /// Keep only lines of `content` matching `query` (case-insensitive substring),
@@ -479,5 +624,178 @@ mod tests {
 		// Must not panic on a query longer than the content; truncates to 512 chars.
 		let result = filter_content(content, Some(&long_query));
 		assert!(result.contains("no lines matching"));
+	}
+
+	// ── Live containers (pre-Rust port of _hooks/live.py): the retrieve
+	// path serves container content progressively - chunk count /
+	// bytes-arrived surfaced on partial retrieves, full content + complete
+	// status on the final resolve (limit: 0). Non-container entries keep
+	// the pre-live response shape (no `live` field). ──
+
+	// Seed an AppState inline store exactly as `hooks::transform_live_container`
+	// stores one: round-trip hash + meta envelope + per-chunk entries.
+	fn seed_live_container(state:&AppState, hash:&str, content:&str) -> usize {
+		let chunks = crate::hooks::chunk_on_char_boundaries(content, crate::hooks::LIVE_CHUNK_SIZE);
+		{
+			let mut map = state.inline_ccr.lock().unwrap();
+			map.put(hash.to_string(), content.to_string());
+			let meta = serde_json::json!({
+				"live": true,
+				"type": "terminal",
+				"size": content.len(),
+				"chunks": chunks.len(),
+				"chunk_size": crate::hooks::LIVE_CHUNK_SIZE,
+				"bytes_arrived": 0,
+			});
+			map.put(crate::hooks::live_meta_key(hash), meta.to_string());
+			for (i, c) in chunks.iter().enumerate() {
+				map.put(crate::hooks::live_chunk_key(hash, i), (*c).to_string());
+			}
+		}
+		chunks.len()
+	}
+
+	// Contract: a partial retrieve of a live container returns a chunked
+	// window with progress surfaced (chunk count, bytes arrived, not
+	// complete); the final resolve (limit: 0) returns the exact original
+	// content and marks the container complete.
+	#[test]
+	fn test_retrieve_live_container_chunked_progress_then_full_content() {
+		let state = crate::proxy::tests::test_state_with_ccr();
+		let hash = "livehash_abc123";
+		let content = (0..40)
+			.map(|i| format!("container line {i:02} - payload content\n"))
+			.collect::<String>();
+		let chunk_count = seed_live_container(&state, hash, &content);
+		assert!(chunk_count >= 2, "test content must span multiple chunks");
+		let state = Arc::new(state);
+
+		async fn body_of(resp:axum::response::Response) -> serde_json::Value {
+			let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+			serde_json::from_slice(&bytes).unwrap()
+		}
+
+		tokio::runtime::Runtime::new().unwrap().block_on(async {
+			// 1. Partial retrieve → chunked progress, not complete.
+			let resp = handle_retrieve(
+				State(state.clone()),
+				Json(RetrieveRequest { hash:Some(hash.to_string()), query:None, offset:0, limit:2 }),
+			)
+			.await
+			.into_response();
+			let body = body_of(resp).await;
+			assert_eq!(body["found"], true);
+			assert_eq!(body["truncated"], true, "a windowed live retrieve must be flagged truncated");
+			let live = &body["live"];
+			assert_eq!(live["chunks"].as_u64().unwrap() as usize, chunk_count);
+			assert_eq!(live["bytes_total"].as_u64().unwrap() as usize, content.len());
+			assert_eq!(live["complete"], false, "a partial retrieve must not report completion");
+			let arrived = live["bytes_arrived"].as_u64().unwrap() as usize;
+			assert!(
+				arrived > 0 && arrived < content.len(),
+				"partial retrieve must advance bytes arrived: {arrived}"
+			);
+
+			// 2. Final resolve (limit: 0) → full content, complete.
+			let resp = handle_retrieve(
+				State(state.clone()),
+				Json(RetrieveRequest { hash:Some(hash.to_string()), query:None, offset:0, limit:0 }),
+			)
+			.await
+			.into_response();
+			let body = body_of(resp).await;
+			assert_eq!(body["found"], true);
+			assert_eq!(body["content"], content, "final resolve must return the exact original content");
+			assert_eq!(body["truncated"], false);
+			let live = &body["live"];
+			assert_eq!(live["complete"], true, "final resolve must mark the container complete");
+			assert_eq!(live["bytes_arrived"].as_u64().unwrap() as usize, content.len());
+
+			// The envelope's progress was written back for later retrieves.
+			let stored = state
+				.inline_ccr
+				.lock()
+				.unwrap()
+				.get(&crate::hooks::live_meta_key(hash))
+				.cloned()
+				.unwrap();
+			assert!(
+				stored.contains(&format!("\"bytes_arrived\":{}", content.len())),
+				"meta write-back must persist the accumulated progress: {stored}"
+			);
+		});
+	}
+
+	// Contract: a plain (non-container) entry resolves exactly as before -
+	// no `live` field appears in the response (byte-identical shape).
+	#[test]
+	fn test_retrieve_plain_entry_has_no_live_field() {
+		let state = crate::proxy::tests::test_state_with_ccr();
+		{
+			let mut map = state.inline_ccr.lock().unwrap();
+			map.put("plain1".to_string(), "plain content".to_string());
+		}
+		let state = Arc::new(state);
+
+		async fn body_of(resp:axum::response::Response) -> serde_json::Value {
+			let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+			serde_json::from_slice(&bytes).unwrap()
+		}
+
+		tokio::runtime::Runtime::new().unwrap().block_on(async {
+			let resp = handle_retrieve(
+				State(state.clone()),
+				Json(RetrieveRequest { hash:Some("plain1".into()), query:None, offset:0, limit:0 }),
+			)
+			.await
+			.into_response();
+			let body = body_of(resp).await;
+			assert_eq!(body["content"], "plain content");
+			assert_eq!(body["truncated"], false);
+			assert!(
+				body.get("live").is_none(),
+				"non-container responses must not carry a live field"
+			);
+		});
+	}
+
+	// Contract: a stale/malformed envelope degrades to the plain entry
+	// (warn + degrade) instead of panicking or 500ing.
+	#[test]
+	fn test_retrieve_live_container_malformed_envelope_degrades_to_plain() {
+		let state = crate::proxy::tests::test_state_with_ccr();
+		{
+			let mut map = state.inline_ccr.lock().unwrap();
+			map.put("livehash_malformed".to_string(), "the plain content".to_string());
+			map.put(
+				crate::hooks::live_meta_key("livehash_malformed"),
+				"this is not valid json {".to_string(),
+			);
+		}
+		let state = Arc::new(state);
+
+		async fn body_of(resp:axum::response::Response) -> serde_json::Value {
+			let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+			serde_json::from_slice(&bytes).unwrap()
+		}
+
+		tokio::runtime::Runtime::new().unwrap().block_on(async {
+			let resp = handle_retrieve(
+				State(state.clone()),
+				Json(RetrieveRequest { hash:Some("livehash_malformed".into()), query:None, offset:0, limit:0 }),
+			)
+			.await
+			.into_response();
+			let body = body_of(resp).await;
+			assert_eq!(body["found"], true);
+			assert_eq!(
+				body["content"], "the plain content",
+				"malformed envelope must degrade to the plain entry"
+			);
+			assert!(
+				body.get("live").is_none(),
+				"degraded entries must not surface container progress"
+			);
+		});
 	}
 }

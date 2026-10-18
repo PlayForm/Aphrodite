@@ -170,18 +170,20 @@ fn corpus() -> Vec<Sample> {
 		Sample {
 			label: "ls",
 			content: "total 128\ndrwxr-xr-x  11 user  staff   352 Sep 15 04:10 .\ndrwxr-xr-x   7 user  staff   224 Sep 15 04:11 ..\n".to_string()
-				+ &(0..70)
-					.map(|i| format!("-rw-r--r--   1 user  staff  {:>5} Sep 15 04:12 file_{:03}.rs", 100 + i * 25, i))
-					.collect::<Vec<_>>()
-					.join("\n"),
+						+ (0..70)
+							.map(|i| format!("-rw-r--r--   1 user  staff  {:>5} Sep 15 04:12 file_{:03}.rs", 100 + i * 25, i))
+							.collect::<Vec<_>>()
+							.join("\n")
+							.as_str(),
 		}, // ~4.6 KB ls -l
 		Sample {
 			label: "test",
 			content: "running 330 tests\n".to_string()
-				+ &(0..40)
-					.map(|i| format!("test module_{}::tests::test_case_{} ... ok\n", i % 8, i))
-					.collect::<String>()
-				+ "test result: ok. 329 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s\n",
+						+ (0..40)
+							.map(|i| format!("test module_{}::tests::test_case_{} ... ok\n", i % 8, i))
+							.collect::<String>()
+							.as_str()
+						+ "test result: ok. 329 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s\n",
 		}, // ~2.9 KB cargo test
 		Sample {
 			label: "grep",

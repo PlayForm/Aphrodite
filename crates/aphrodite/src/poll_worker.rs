@@ -104,6 +104,19 @@ pub struct BgTask {
 	/// The uncompressed output content (accumulated from polls).
 	/// Capped to avoid memory blow-up from long builds.
 	pub accumulated_output:String,
+	/// Live-container progress (pre-Rust `_hooks/live.py` container
+	/// semantics): bytes of output arrived so far. Tracked on every task
+	/// (cheap, real data) but only *surfaced* by the status renderer when
+	/// `state.live_container` is on.
+	pub live_bytes_arrived:usize,
+	/// Estimated seconds until the task completes - while running, the
+	/// elapsed-so-far heuristic (assume as long again as it has already
+	/// taken; no output total is known for a backgrounded command); 0.0
+	/// once done/failed.
+	pub live_eta_s:f32,
+	/// Unix-seconds timestamp of first arrival (task creation) - the
+	/// poll-surface clock, shared with `crate::prefetch::unix_now`.
+	pub live_arrived_at_unix:u64,
 }
 
 /// Heuristic: should this tool call's output be replaced with a poll-worker
@@ -278,6 +291,14 @@ pub fn update_from_poll(state:&mut AphroditeState, tool_name:&str, content:&str)
 			task.accumulated_output.push_str(output);
 		}
 
+		// Live-container progress (pre-Rust `_hooks/live.py` container
+		// semantics): bytes-so-far is the accumulated output; while still
+		// running, the ETA is the elapsed-so-far heuristic (no output
+		// total is known for a backgrounded command).
+		task.live_bytes_arrived = task.accumulated_output.len();
+		let elapsed = crate::prefetch::unix_now().saturating_sub(task.live_arrived_at_unix) as f32;
+		task.live_eta_s = elapsed;
+
 		matched = true;
 	}
 
@@ -310,6 +331,10 @@ pub fn update_from_poll(state:&mut AphroditeState, tool_name:&str, content:&str)
 			task.output_hash = Some(hash.clone());
 			task.output_preview = Some(preview.clone());
 			let sz = task.accumulated_output.len();
+			// Live-container progress: the full content has arrived, so
+			// bytes-so-far is final and the ETA is zero.
+			task.live_bytes_arrived = sz;
+			task.live_eta_s = 0.0;
 			task.accumulated_output.clear();
 			let cmd = task.command.clone();
 			match exit_code_val {
@@ -390,6 +415,9 @@ pub fn insert_bg_task(state:&mut AphroditeState, task_id:String, tool:String, co
 		output_preview:None,
 		poll_count:0,
 		accumulated_output:String::new(),
+		live_bytes_arrived:0,
+		live_eta_s:0.0,
+		live_arrived_at_unix:crate::prefetch::unix_now(),
 	});
 }
 
@@ -413,6 +441,16 @@ pub fn render_bg_task_status(state:&AphroditeState) -> String {
 			"  · `{}` - running since turn {} ({})",
 			task.command, task.started_turn, poll_info
 		));
+		// Live-container progress line (pre-Rust `_hooks/live.py` port):
+		// only rendered when the feature is enabled, so the off-path stays
+		// byte-identical. ETA is the elapsed-so-far heuristic (0.0 on a
+		// just-created task = no time elapsed yet, not "arrived").
+		if state.live_container {
+			lines.push(format!(
+				"    · [live container] {} bytes arrived so far, ETA ~{:.1}s",
+				task.live_bytes_arrived, task.live_eta_s
+			));
+		}
 	}
 	lines.join("\n")
 }
@@ -875,5 +913,105 @@ mod tests {
 		assert!(rendered.contains("2 active task(s)"), "only running tasks count: {}", rendered);
 		// r3 is running, r1 is running = 2 active.
 		// r2 is done - not counted.
+	}
+
+	// ── Live containers (pre-Rust `_hooks/live.py` port): polled tasks
+	// expose progress state (bytes-so-far / ETA) when `state.live_container`
+	// is on, and the status renderer's live-container line appears only when
+	// enabled (off-path byte-identical). ──
+
+	#[test]
+	fn test_render_live_container_line_only_when_enabled() {
+		// Off (default): byte-identical to the pre-port renderer.
+		let mut state = AphroditeState::default();
+		assert!(!state.live_container, "default state must have live_container off");
+		insert_bg_task(&mut state, "t1".into(), "terminal".into(), "cargo build".into(), 1);
+		let expected = "[poll workers] 1 active task(s):\n  · `cargo build` - running since turn 1 (not polled yet)";
+		assert_eq!(
+			render_bg_task_status(&state),
+			expected,
+			"off-path render must be byte-identical"
+		);
+
+		// On: a live-container line with byte progress appears.
+		state.live_container = true;
+		let rendered = render_bg_task_status(&state);
+		assert!(
+			rendered.contains("[live container]"),
+			"live mode must add a container line: {rendered}"
+		);
+		assert!(
+			rendered.contains("bytes arrived so far"),
+			"progress must be surfaced: {rendered}"
+		);
+	}
+
+	#[test]
+	fn test_poll_live_progress_bytes_so_far_and_eta() {
+		let mut state = AphroditeState::default();
+		state.live_container = true;
+		state.turn_counter = 5;
+		insert_bg_task(&mut state, "t1".into(), "terminal".into(), "make build".into(), 1);
+
+		let poll1 = serde_json::json!({"output": "x".repeat(500), "exit_code": serde_json::Value::Null}).to_string();
+		let consumed = update_from_poll(&mut state, "process", &poll1);
+		assert!(consumed);
+		assert_eq!(
+			state.bg_tasks[0].live_bytes_arrived, 500,
+			"bytes-so-far must track accumulated output"
+		);
+		assert!(
+			state.bg_tasks[0].live_eta_s >= 0.0 && state.bg_tasks[0].live_eta_s.is_finite(),
+			"running ETA must be a finite non-negative estimate"
+		);
+
+		let poll2 = serde_json::json!({"output": "y".repeat(1000), "exit_code": serde_json::Value::Null}).to_string();
+		update_from_poll(&mut state, "process", &poll2);
+		// Accumulated output joins polls with '\n': 500 + 1 + 1000.
+		assert_eq!(state.bg_tasks[0].live_bytes_arrived, 1501, "progress must grow across polls");
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Running);
+
+		// Completion zeroes the ETA; the full-content hash arrives later.
+		let done = serde_json::json!({"output": "done", "exit_code": 0}).to_string();
+		update_from_poll(&mut state, "process", &done);
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Done { exit_code:0 });
+		assert_eq!(state.bg_tasks[0].live_eta_s, 0.0, "completed task -> zero ETA");
+		assert!(
+			state.bg_tasks[0].output_hash.is_some(),
+			"full content hash must exist at completion"
+		);
+	}
+
+	#[test]
+	fn test_poll_instant_marker_hash_available_before_content() {
+		let mut state = AphroditeState::default();
+		state.live_container = true;
+		state.turn_counter = 3;
+		let task_id = headroom_core::ccr::compute_key(b"cargo build");
+		insert_bg_task(&mut state, task_id.clone(), "terminal".into(), "cargo build".into(), 1);
+
+		// Instant marker: the task hash is available immediately, typed poll.
+		let marker = create_poll_marker(&task_id, "cargo build", 3);
+		assert!(marker.contains(&task_id), "instant marker must embed the task hash");
+		assert!(marker.contains("|poll|"), "instant marker must be typed poll");
+
+		// Progress: partial arrival while still running - no full-content
+		// hash yet.
+		let partial = serde_json::json!({"output": "compiling...", "exit_code": serde_json::Value::Null}).to_string();
+		assert!(update_from_poll(&mut state, "process", &partial));
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Running);
+		assert!(state.bg_tasks[0].output_hash.is_none(), "no full-content hash while running");
+
+		// Full content arrives later: only at completion does the output
+		// hash appear, and it differs from the instant task hash.
+		let done = serde_json::json!({"output": "Finished\n", "exit_code": 0}).to_string();
+		assert!(update_from_poll(&mut state, "process", &done));
+		assert_eq!(state.bg_tasks[0].status, BgStatus::Done { exit_code:0 });
+		let out_hash = state.bg_tasks[0].output_hash.as_ref().expect("output hash at completion");
+		assert_ne!(
+			out_hash, &task_id,
+			"full-content hash arrives later and differs from the task hash"
+		);
+		assert_eq!(state.bg_tasks[0].live_eta_s, 0.0);
 	}
 }
