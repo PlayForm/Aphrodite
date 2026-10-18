@@ -444,203 +444,284 @@ async fn run_single(
 
 	// Restricted routes - loopback-only enforcement for everything except /health
 	let restricted = Router::new()
-        .route("/health/upstream", get({
-            let s = state.clone();
-            move |ConnectInfo(addr): ConnectInfo<SocketAddr>| {
-                let s = s.clone();
-                async move {
-                    if !addr.ip().is_loopback() {
-                        return (StatusCode::FORBIDDEN, Json(serde_json::json!({
-                            "error": "only loopback clients allowed"
-                        }))).into_response();
-                    }
-                    // F19: 60s TTL cache - see `upstream_health_cache`'s doc
-                    // comment for why an uncached probe here is the same
-                    // rate-limit-quota-burning cost class as the health
-                    // check this endpoint's sibling `/health` already fixed.
-                    const TTL: std::time::Duration = std::time::Duration::from_secs(60);
-                    if let Some((ok, at)) = *s.upstream_health_cache.lock().unwrap_or_else(|e| e.into_inner())
-                        && at.elapsed() < TTL {
-                            return Json(serde_json::json!({"upstream": ok, "cached": true})).into_response();
-                        }
-                    let ok = s.client
-                        .get(format!("{}/models", s.api_url.trim_end_matches('/')))
-                        .header("Authorization", format!("Bearer {}", s.api_key.expose()))
-                        .timeout(std::time::Duration::from_secs(5))
-                        .send()
-                        .await
-                        .map(|r| r.status().is_success())
-                        .unwrap_or(false);
-                    if let Ok(mut cache) = s.upstream_health_cache.lock() {
-                        *cache = Some((ok, std::time::Instant::now()));
-                    }
-                    Json(serde_json::json!({"upstream": ok, "cached": false})).into_response()
-                }
-            }
-        }))
-        .route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
-        .route("/stats", get({
-            let s = state.clone();
-            move || async move { Json(s.stats_json()) }
-        }))
-        .route("/stats/db", get({
-            let s = state.clone();
-            move || async move {
-                let mode = match s.mode {
-                    ProxyMode::Cache => "cache",
-                    ProxyMode::Token => "token",
-                };
-                match &s.ccr {
-                    Some(ccr) => match ccr.stats_db() {
-                        Some(stats) => Json(stats).into_response(),
-                        None => (
-                            StatusCode::OK,
-                            Json(serde_json::json!({
-                                "error": "stats_db not available for this backend",
-                                "mode": mode,
-                            })),
-                        )
-                            .into_response(),
-                    },
-                    None => (
-                        StatusCode::OK,
-                        Json(serde_json::json!({
-                            "error": "CCR not enabled",
-                            "mode": mode,
-                        })),
-                    )
-                        .into_response(),
-                }
-            }
-        }))
-        // NOTE: No auth on /metrics - intentional for local-only deployments.
-        // In production, add a reverse-proxy auth layer or firewall this endpoint.
-        .route("/metrics", get({
-            let s = state.clone();
-            move || async move {
-                let stats = s.stats_json();
-                let mut out = String::new();
-                let mode_str = stats["mode"].as_str().unwrap_or("unknown");
-                out.push_str(&format!("aphrodite_requests_total{{mode=\"{}\"}} {}\n",
-                    mode_str, stats["requests"]["total"]));
-                out.push_str(&format!("aphrodite_requests_compressed_total{{mode=\"{}\"}} {}\n",
-                    mode_str, stats["requests"]["compressed"]));
-                out.push_str(&format!("aphrodite_tokens_saved_total {}\n", stats["tokens_saved"]));
-                out.push_str(&format!("aphrodite_ccr_hits_total {}\n", stats["ccr"]["hits"]));
-                out.push_str(&format!("aphrodite_ccr_misses_total {}\n", stats["ccr"]["misses"]));
-                out.push_str(&format!("aphrodite_ccr_created_total {}\n", stats["ccr"]["created"]));
-                out.push_str(&format!("aphrodite_tool_relay_calls_total {}\n", stats["tool_relay_calls"]));
-                // LLM response cache
-                if let Some(cache) = stats["cache"].as_object() {
-                    out.push_str(&format!("aphrodite_cache_hits_total {}\n", cache["hits"]));
-                    out.push_str(&format!("aphrodite_cache_misses_total {}\n", cache["misses"]));
-                }
-                // Latency buckets
-                if let Some(buckets) = stats["latency_buckets_us"].as_array() {
-                    let mut total_count: u64 = 0;
-                    // F11: bucket 4 (`record_latency`'s last arm) has no
-                    // upper bound - it catches every sample >= 1s, including
-                    // 30s+ outliers - so labeling it "10.0" was actively
-                    // wrong (Prometheus consumers would assume everything in
-                    // it is <= 10s and mis-compute quantiles), and the
-                    // missing explicit "+Inf" bucket (required to equal
-                    // `_count`) broke `histogram_quantile()`. Relabeling
-                    // bucket 4 as "+Inf" is honest about its real bound and
-                    // satisfies the convention in one step - no new bucket
-                    // needed since it was already unbounded in practice.
-                    let le_labels = ["0.001", "0.01", "0.1", "1.0", "+Inf"];
-                    for (i, v) in buckets.iter().enumerate() {
-                        let le = le_labels.get(i).copied().unwrap_or("+Inf");
-                        let count = v.as_u64().unwrap_or(0);
-                        total_count += count;
-                        out.push_str(&format!("aphrodite_latency_seconds_bucket{{le=\"{}\"}} {}\n", le, total_count));
-                    }
-                    out.push_str(&format!("aphrodite_latency_seconds_count {}\n", total_count));
-                    if let Some(total_us) = stats["total_latency_micros"].as_u64() {
-                        out.push_str(&format!("aphrodite_latency_seconds_sum {:.6}\n", total_us as f64 / 1_000_000.0));
-                    }
-                }
-                if let Some(ratio) = stats["compression_ratio_ema"].as_f64() {
-                    out.push_str(&format!("aphrodite_compression_ratio_ema {:.2}\n", ratio));
-                }
-                // Inline CCR
-                if let Some(icc) = stats["inline_ccr"].as_object() {
-                    if let Some(h) = icc["hits"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_hits_total {h}\n")); }
-                    if let Some(m) = icc["misses"].as_u64() { out.push_str(&format!("aphrodite_inline_ccr_misses_total {m}\n")); }
-                }
-                // Tool relay success/failure
-                if let Some(tr) = stats["tool_relay"].as_object() {
-                    if let Some(s) = tr["success"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_success_total {s}\n")); }
-                    if let Some(f) = tr["failure"].as_u64() { out.push_str(&format!("aphrodite_tool_relay_failure_total {f}\n")); }
-                }
-                // Notify success/failure
-                if let Some(n) = stats["notify"].as_object() {
-                    if let Some(s) = n["success"].as_u64() { out.push_str(&format!("aphrodite_notify_success_total {s}\n")); }
-                    if let Some(f) = n["failure"].as_u64() { out.push_str(&format!("aphrodite_notify_failure_total {f}\n")); }
-                }
-                // Upstream errors
-                if let Some(ue) = stats["upstream_errors"].as_object() {
-                    if let Some(c) = ue["4xx"].as_u64() { out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"4xx\"}} {c}\n")); }
-                    if let Some(c) = ue["5xx"].as_u64() { out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"5xx\"}} {c}\n")); }
-                    if let Some(t) = ue["timeouts"].as_u64() { out.push_str(&format!("aphrodite_upstream_timeouts_total {t}\n")); }
-                    if let Some(c) = ue["connect_errors"].as_u64() { out.push_str(&format!("aphrodite_upstream_connect_errors_total {c}\n")); }
-                    // 02-F9: mid-stream SSE chunk errors - added to /stats when
-                    // sse_stream_errors was introduced, but missed here.
-                    if let Some(c) = ue["sse_stream_errors"].as_u64() { out.push_str(&format!("aphrodite_sse_stream_errors_total {c}\n")); }
-                }
-                // CCR store info
-                if let Some(cs) = stats["ccr_store"].as_object() {
-                    if let Some(e) = cs["entries"].as_u64() { out.push_str(&format!("aphrodite_ccr_store_entries {e}\n")); }
-                    if let Some(b) = cs["bytes_approx"].as_u64() { out.push_str(&format!("aphrodite_ccr_store_bytes {b}\n")); }
-                }
-                // Body bytes
-                if let Some(bb) = stats["body_bytes"].as_object() {
-                    if let Some(r) = bb["request"].as_u64() { out.push_str(&format!("aphrodite_request_body_bytes_total {r}\n")); }
-                    if let Some(r) = bb["response"].as_u64() { out.push_str(&format!("aphrodite_response_body_bytes_total {r}\n")); }
-                }
-                // Upstream latency
-                if let Some(ul) = stats["upstream_latency_micros"].as_u64() {
-                    out.push_str(&format!("aphrodite_upstream_latency_seconds_total {:.6}\n", ul as f64 / 1_000_000.0));
-                }
-                (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")], out)
-            }
-        }))
-        .route("/history", get({
-            let s = state.clone();
-            move || async move {
-                Json(s.request_history.lock().map(|v| v.clone()).unwrap_or_default())
-            }
-        }))
-        .route("/retrieve", post(retrieve::handle_retrieve))
-        .route("/tool/relay", post(handle_tool_relay))
-        .route("/ccr/create", post(handle_ccr_create))
-        .route("/ccr/list", get(handle_ccr_list))
-        .route("/ccr/{hash}", delete(handle_ccr_delete))
-        .route("/reload", post(handle_ccr_reload))
-        .route("/favicon.ico", get(|| async { StatusCode::NOT_FOUND }))
-        .route("/robots.txt", get(|| async { "User-agent: *\nDisallow: /\n" }))
-        .route("/", get(|| async {
-            Json(serde_json::json!({
-                "proxy": "aphrodite",
-                "version": env!("CARGO_PKG_VERSION"),
-                "git_hash": option_env!("APHRODITE_GIT_HASH"),
-                "build_date": option_env!("APHRODITE_BUILD_DATE"),
-                "target": option_env!("APHRODITE_TARGET"),
-                "profile": option_env!("APHRODITE_PROFILE"),
-            }))
-        }))
-        // 1 MB body limit on management routes only (F7) - the catch-all
-        // proxy route gets its own, much larger limit below: config
-        // advertises max_context up to 1,000,000 tokens, and a chat request
-        // at even 200k tokens is easily >1 MB of JSON with tool schemas and
-        // history, so a blanket 1 MB cap on `/{*path}` rejected large agent
-        // conversations with 413 before `proxy_handler` ever ran.
-        .layer(DefaultBodyLimit::max(1024 * 1024))
-        // 02-F1: bearer-token gate on management routes only - applied
-        // before merging with `catch_all` below, so it never guards the
-        // actual LLM-proxying `/{*path}` route (a separate concern; that
-        // traffic's credential is the upstream API key, not this token).
-        .layer(middleware::from_fn(require_mgmt_token));
+		.route(
+			"/health/upstream",
+			get({
+				let s = state.clone();
+				move |ConnectInfo(addr):ConnectInfo<SocketAddr>| {
+					let s = s.clone();
+					async move {
+						if !addr.ip().is_loopback() {
+							return (
+								StatusCode::FORBIDDEN,
+								Json(serde_json::json!({
+									"error": "only loopback clients allowed"
+								})),
+							)
+								.into_response();
+						}
+						// F19: 60s TTL cache - see `upstream_health_cache`'s doc
+						// comment for why an uncached probe here is the same
+						// rate-limit-quota-burning cost class as the health
+						// check this endpoint's sibling `/health` already fixed.
+						const TTL:std::time::Duration = std::time::Duration::from_secs(60);
+						if let Some((ok, at)) = *s.upstream_health_cache.lock().unwrap_or_else(|e| e.into_inner())
+							&& at.elapsed() < TTL
+						{
+							return Json(serde_json::json!({"upstream": ok, "cached": true})).into_response();
+						}
+						let ok = s
+							.client
+							.get(format!("{}/models", s.api_url.trim_end_matches('/')))
+							.header("Authorization", format!("Bearer {}", s.api_key.expose()))
+							.timeout(std::time::Duration::from_secs(5))
+							.send()
+							.await
+							.map(|r| r.status().is_success())
+							.unwrap_or(false);
+						if let Ok(mut cache) = s.upstream_health_cache.lock() {
+							*cache = Some((ok, std::time::Instant::now()));
+						}
+						Json(serde_json::json!({"upstream": ok, "cached": false})).into_response()
+					}
+				}
+			}),
+		)
+		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
+		.route(
+			"/stats",
+			get({
+				let s = state.clone();
+				move || async move { Json(s.stats_json()) }
+			}),
+		)
+		.route(
+			"/stats/db",
+			get({
+				let s = state.clone();
+				move || {
+					async move {
+						let mode = match s.mode {
+							ProxyMode::Cache => "cache",
+							ProxyMode::Token => "token",
+						};
+						match &s.ccr {
+							Some(ccr) => {
+								match ccr.stats_db() {
+									Some(stats) => Json(stats).into_response(),
+									None => {
+										(
+											StatusCode::OK,
+											Json(serde_json::json!({
+												"error": "stats_db not available for this backend",
+												"mode": mode,
+											})),
+										)
+											.into_response()
+									},
+								}
+							},
+							None => {
+								(
+									StatusCode::OK,
+									Json(serde_json::json!({
+										"error": "CCR not enabled",
+										"mode": mode,
+									})),
+								)
+									.into_response()
+							},
+						}
+					}
+				}
+			}),
+		)
+		// NOTE: No auth on /metrics - intentional for local-only deployments.
+		// In production, add a reverse-proxy auth layer or firewall this endpoint.
+		.route(
+			"/metrics",
+			get({
+				let s = state.clone();
+				move || {
+					async move {
+						let stats = s.stats_json();
+						let mut out = String::new();
+						let mode_str = stats["mode"].as_str().unwrap_or("unknown");
+						out.push_str(&format!(
+							"aphrodite_requests_total{{mode=\"{}\"}} {}\n",
+							mode_str, stats["requests"]["total"]
+						));
+						out.push_str(&format!(
+							"aphrodite_requests_compressed_total{{mode=\"{}\"}} {}\n",
+							mode_str, stats["requests"]["compressed"]
+						));
+						out.push_str(&format!("aphrodite_tokens_saved_total {}\n", stats["tokens_saved"]));
+						out.push_str(&format!("aphrodite_ccr_hits_total {}\n", stats["ccr"]["hits"]));
+						out.push_str(&format!("aphrodite_ccr_misses_total {}\n", stats["ccr"]["misses"]));
+						out.push_str(&format!("aphrodite_ccr_created_total {}\n", stats["ccr"]["created"]));
+						out.push_str(&format!("aphrodite_tool_relay_calls_total {}\n", stats["tool_relay_calls"]));
+						// LLM response cache
+						if let Some(cache) = stats["cache"].as_object() {
+							out.push_str(&format!("aphrodite_cache_hits_total {}\n", cache["hits"]));
+							out.push_str(&format!("aphrodite_cache_misses_total {}\n", cache["misses"]));
+						}
+						// Latency buckets
+						if let Some(buckets) = stats["latency_buckets_us"].as_array() {
+							let mut total_count:u64 = 0;
+							// F11: bucket 4 (`record_latency`'s last arm) has no
+							// upper bound - it catches every sample >= 1s, including
+							// 30s+ outliers - so labeling it "10.0" was actively
+							// wrong (Prometheus consumers would assume everything in
+							// it is <= 10s and mis-compute quantiles), and the
+							// missing explicit "+Inf" bucket (required to equal
+							// `_count`) broke `histogram_quantile()`. Relabeling
+							// bucket 4 as "+Inf" is honest about its real bound and
+							// satisfies the convention in one step - no new bucket
+							// needed since it was already unbounded in practice.
+							let le_labels = ["0.001", "0.01", "0.1", "1.0", "+Inf"];
+							for (i, v) in buckets.iter().enumerate() {
+								let le = le_labels.get(i).copied().unwrap_or("+Inf");
+								let count = v.as_u64().unwrap_or(0);
+								total_count += count;
+								out.push_str(&format!(
+									"aphrodite_latency_seconds_bucket{{le=\"{}\"}} {}\n",
+									le, total_count
+								));
+							}
+							out.push_str(&format!("aphrodite_latency_seconds_count {}\n", total_count));
+							if let Some(total_us) = stats["total_latency_micros"].as_u64() {
+								out.push_str(&format!(
+									"aphrodite_latency_seconds_sum {:.6}\n",
+									total_us as f64 / 1_000_000.0
+								));
+							}
+						}
+						if let Some(ratio) = stats["compression_ratio_ema"].as_f64() {
+							out.push_str(&format!("aphrodite_compression_ratio_ema {:.2}\n", ratio));
+						}
+						// Inline CCR
+						if let Some(icc) = stats["inline_ccr"].as_object() {
+							if let Some(h) = icc["hits"].as_u64() {
+								out.push_str(&format!("aphrodite_inline_ccr_hits_total {h}\n"));
+							}
+							if let Some(m) = icc["misses"].as_u64() {
+								out.push_str(&format!("aphrodite_inline_ccr_misses_total {m}\n"));
+							}
+						}
+						// Tool relay success/failure
+						if let Some(tr) = stats["tool_relay"].as_object() {
+							if let Some(s) = tr["success"].as_u64() {
+								out.push_str(&format!("aphrodite_tool_relay_success_total {s}\n"));
+							}
+							if let Some(f) = tr["failure"].as_u64() {
+								out.push_str(&format!("aphrodite_tool_relay_failure_total {f}\n"));
+							}
+						}
+						// Notify success/failure
+						if let Some(n) = stats["notify"].as_object() {
+							if let Some(s) = n["success"].as_u64() {
+								out.push_str(&format!("aphrodite_notify_success_total {s}\n"));
+							}
+							if let Some(f) = n["failure"].as_u64() {
+								out.push_str(&format!("aphrodite_notify_failure_total {f}\n"));
+							}
+						}
+						// Upstream errors
+						if let Some(ue) = stats["upstream_errors"].as_object() {
+							if let Some(c) = ue["4xx"].as_u64() {
+								out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"4xx\"}} {c}\n"));
+							}
+							if let Some(c) = ue["5xx"].as_u64() {
+								out.push_str(&format!("aphrodite_upstream_errors_total{{code=\"5xx\"}} {c}\n"));
+							}
+							if let Some(t) = ue["timeouts"].as_u64() {
+								out.push_str(&format!("aphrodite_upstream_timeouts_total {t}\n"));
+							}
+							if let Some(c) = ue["connect_errors"].as_u64() {
+								out.push_str(&format!("aphrodite_upstream_connect_errors_total {c}\n"));
+							}
+							// 02-F9: mid-stream SSE chunk errors - added to /stats when
+							// sse_stream_errors was introduced, but missed here.
+							if let Some(c) = ue["sse_stream_errors"].as_u64() {
+								out.push_str(&format!("aphrodite_sse_stream_errors_total {c}\n"));
+							}
+						}
+						// CCR store info
+						if let Some(cs) = stats["ccr_store"].as_object() {
+							if let Some(e) = cs["entries"].as_u64() {
+								out.push_str(&format!("aphrodite_ccr_store_entries {e}\n"));
+							}
+							if let Some(b) = cs["bytes_approx"].as_u64() {
+								out.push_str(&format!("aphrodite_ccr_store_bytes {b}\n"));
+							}
+						}
+						// Body bytes
+						if let Some(bb) = stats["body_bytes"].as_object() {
+							if let Some(r) = bb["request"].as_u64() {
+								out.push_str(&format!("aphrodite_request_body_bytes_total {r}\n"));
+							}
+							if let Some(r) = bb["response"].as_u64() {
+								out.push_str(&format!("aphrodite_response_body_bytes_total {r}\n"));
+							}
+						}
+						// Upstream latency
+						if let Some(ul) = stats["upstream_latency_micros"].as_u64() {
+							out.push_str(&format!(
+								"aphrodite_upstream_latency_seconds_total {:.6}\n",
+								ul as f64 / 1_000_000.0
+							));
+						}
+						(
+							StatusCode::OK,
+							[(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+							out,
+						)
+					}
+				}
+			}),
+		)
+		.route(
+			"/history",
+			get({
+				let s = state.clone();
+				move || async move { Json(s.request_history.lock().map(|v| v.clone()).unwrap_or_default()) }
+			}),
+		)
+		.route("/retrieve", post(retrieve::handle_retrieve))
+		.route("/tool/relay", post(handle_tool_relay))
+		.route("/ccr/create", post(handle_ccr_create))
+		.route("/ccr/list", get(handle_ccr_list))
+		.route("/ccr/{hash}", delete(handle_ccr_delete))
+		.route("/reload", post(handle_ccr_reload))
+		.route("/favicon.ico", get(|| async { StatusCode::NOT_FOUND }))
+		.route("/robots.txt", get(|| async { "User-agent: *\nDisallow: /\n" }))
+		.route(
+			"/",
+			get(|| {
+				async {
+					Json(serde_json::json!({
+						"proxy": "aphrodite",
+						"version": env!("CARGO_PKG_VERSION"),
+						"git_hash": option_env!("APHRODITE_GIT_HASH"),
+						"build_date": option_env!("APHRODITE_BUILD_DATE"),
+						"target": option_env!("APHRODITE_TARGET"),
+						"profile": option_env!("APHRODITE_PROFILE"),
+					}))
+				}
+			}),
+		)
+		// 1 MB body limit on management routes only (F7) - the catch-all
+		// proxy route gets its own, much larger limit below: config
+		// advertises max_context up to 1,000,000 tokens, and a chat request
+		// at even 200k tokens is easily >1 MB of JSON with tool schemas and
+		// history, so a blanket 1 MB cap on `/{*path}` rejected large agent
+		// conversations with 413 before `proxy_handler` ever ran.
+		.layer(DefaultBodyLimit::max(1024 * 1024))
+		// 02-F1: bearer-token gate on management routes only - applied
+		// before merging with `catch_all` below, so it never guards the
+		// actual LLM-proxying `/{*path}` route (a separate concern; that
+		// traffic's credential is the upstream API key, not this token).
+		.layer(middleware::from_fn(require_mgmt_token));
 
 	// Catch-all proxy route: its own, much larger body limit.
 	let catch_all = Router::new()
@@ -648,9 +729,9 @@ async fn run_single(
 		.layer(DefaultBodyLimit::max(64 * 1024 * 1024));
 
 	let restricted = restricted
-        .merge(catch_all)
-        // Loopback enforcement layer on all non-/health routes
-        .layer(middleware::from_fn(loopback_only));
+		.merge(catch_all)
+		// Loopback enforcement layer on all non-/health routes
+		.layer(middleware::from_fn(loopback_only));
 
 	// Public route (no loopback enforcement) merged with restricted routes.
 	// report 12 F1: no `CorsLayer` at all - this proxy has no legitimate

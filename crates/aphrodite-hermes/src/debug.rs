@@ -159,12 +159,7 @@ fn flag_enabled(path:&Path) -> bool {
 		// first log line can merge into the flag value (e.g. "on[2026-...]").
 		// A value-prefix check keeps the toggle readable in every case.
 		.map(|s| s.trim_start().to_lowercase())
-		.map(|s| {
-			s.starts_with("1")
-				|| s.starts_with("on")
-				|| s.starts_with("true")
-				|| s.starts_with("debug")
-		})
+		.map(|s| s.starts_with("1") || s.starts_with("on") || s.starts_with("true") || s.starts_with("debug"))
 		.unwrap_or(false);
 	guard.insert(key, (mtime, on));
 	on

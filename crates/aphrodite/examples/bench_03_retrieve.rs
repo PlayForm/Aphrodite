@@ -66,25 +66,25 @@ fn spawn(mode:&str, port:u16) -> Proxy {
 	// history/09-testing-quality.md T14 notes).
 	let _ = std::fs::remove_file(&db_path);
 	let child = Command::new(bin_path())
-        .args([
-            "--mode",
-            mode,
-            "--listen",
-            &listen,
-            "--api-url",
-            "http://127.0.0.1:1",
-            "--api-key",
-            "bench",
-            "--ccr-db-path",
-        ])
-        .arg(&db_path)
-        // See bin_path()'s doc comment: a repo-root aphrodite.toml would
-        // otherwise silently override --mode/--listen/--ccr-db-path.
-        .env("APHRODITE_CONFIG_PATH", "/nonexistent/aphrodite-bench.toml")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn");
+		.args([
+			"--mode",
+			mode,
+			"--listen",
+			&listen,
+			"--api-url",
+			"http://127.0.0.1:1",
+			"--api-key",
+			"bench",
+			"--ccr-db-path",
+		])
+		.arg(&db_path)
+		// See bin_path()'s doc comment: a repo-root aphrodite.toml would
+		// otherwise silently override --mode/--listen/--ccr-db-path.
+		.env("APHRODITE_CONFIG_PATH", "/nonexistent/aphrodite-bench.toml")
+		.stdout(Stdio::null())
+		.stderr(Stdio::null())
+		.spawn()
+		.expect("spawn");
 	let dl = Instant::now() + Duration::from_secs(5);
 	loop {
 		if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
