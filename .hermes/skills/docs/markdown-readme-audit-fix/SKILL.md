@@ -196,6 +196,17 @@ em dash `-` is a visual grouping separator between the element name and its
 subtitle. Replace it with a single space ` `. Do not replace it with a hyphen.
 `subgraph "Proxy - Cache"` → `subgraph "Proxy Cache"`.
 
+**Mermaid sequenceDiagram semicolon rule:** never put a `;` inside
+sequenceDiagram message or note text - mermaid's grammar rejects it at every
+security level (loose, strict, default), so the diagram fails to render on
+GitHub. The parse error is reported at the token AFTER the semicolon (typically
+a `<br/>`), which misleads debugging; the `;` itself is the culprit. There is
+no escape sequence - reword with a comma, period, or line break instead.
+Probe: extract each ```mermaid block and parse it with
+`mermaid.parse()` (mermaid 11 + jsdom + dompurify, `securityLevel: strict`);
+a `;` inside a message/note line fails, everything else (colons, quotes,
+braces, arrows, `#`, `<br/>`) passes.
+
 **Workflow rule:** each file is edited individually - read the surrounding
 context for every location, then patch. Do NOT batch-apply fixes without
 reading each file to confirm the context first, because a fix applied without
@@ -288,13 +299,14 @@ is the fix/enforcement pass on top of the same conventions.
 
 ## Claim-to-test table
 
-| Claim                                    | Test                                                                                                                     |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| The file set is repo-authored only       | `git ls-files '*.md' ':!:vendor/**' ':!:plugins/aphrodite/**'` lists no vendored paths                                   |
-| No broken local links remain             | `lychee --no-progress --offline {files...}` reports `0 Errors`                                                           |
-| No smart dashes/quotes in authored files | `python3 scripts/dash-normalizer.py --check` exits 0; `python3 scripts/dash-normalizer.py --full` reports zero instances |
-| No emoji-left-of-text in prose           | `scripts/emoji-placement-check.py` reports zero                                                                          |
-| Emoji count matches the edits            | `scripts/emoji-scanner.py` count dropped by exactly the number of edited locations                                       |
-| Emoji headers use em-quad, not space     | byte check finds `\xe2\x80\x81` before each emoji header                                                                 |
-| No backtick corruption after backticking | run the §9 patterns over all touched files; zero matches                                                                 |
-| Base emoji and modifier form one cluster | `od -c` on the line shows no spacing character between them                                                              |
+| Claim                                       | Test                                                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| The file set is repo-authored only          | `git ls-files '*.md' ':!:vendor/**' ':!:plugins/aphrodite/**'` lists no vendored paths                                   |
+| No broken local links remain                | `lychee --no-progress --offline {files...}` reports `0 Errors`                                                           |
+| No smart dashes/quotes in authored files    | `python3 scripts/dash-normalizer.py --check` exits 0; `python3 scripts/dash-normalizer.py --full` reports zero instances |
+| No emoji-left-of-text in prose              | `scripts/emoji-placement-check.py` reports zero                                                                          |
+| Emoji count matches the edits               | `scripts/emoji-scanner.py` count dropped by exactly the number of edited locations                                       |
+| Emoji headers use em-quad, not space        | byte check finds `\xe2\x80\x81` before each emoji header                                                                 |
+| No backtick corruption after backticking    | run the §9 patterns over all touched files; zero matches                                                                 |
+| Base emoji and modifier form one cluster    | `od -c` on the line shows no spacing character between them                                                              |
+| No `;` in sequenceDiagram message/note text | `mermaid.parse()` each ```mermaid block (mermaid 11 + jsdom + dompurify, `securityLevel: strict`)                        | All blocks parse; zero failures | Reword the `;` (comma/period/line break); never try to escape it |
