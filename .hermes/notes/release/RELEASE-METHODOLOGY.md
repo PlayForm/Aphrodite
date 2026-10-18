@@ -351,7 +351,7 @@ any tagged release with identical asset names.
 ## PART 5 - THE FORMATTER CONTRACT (why CI and VSCode must agree)
 
 - Repo `rustfmt.toml` uses **nightly-only unstable options**
-  (`space_after_colon = false` etc.). CI pins `nightly-2026-05-01`.
+  (`space_after_colon = false` etc.). CI pins latest nightly (Check.yml `toolchain: nightly`); stable rustfmt silently ignores them.
 - Stable rustfmt / rust-analyzer internal IGNORE those → space-after-colon →
   drift. The nightly-rustfmt contract is enforced in CI workflows (the
   `[rust]` block in `.vscode/settings.json` only selects rust-analyzer as the

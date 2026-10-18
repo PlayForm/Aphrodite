@@ -64,7 +64,7 @@ directives) so the defaults match the doctrine the docs teach.
 - Build: `cargo build --release -p aphrodite -p aphrodite-hermes` ✅ ({PENDING})
 - Check: `cargo check -p aphrodite -p aphrodite-hermes` ✅ ({PENDING} errors)
 - Tests: `cargo test -p aphrodite --lib` ✅ ({PENDING} passed / 0 failed)
-- Lint/format: `cargo +nightly-2026-05-01 fmt --all -- --check` ✅ ({PENDING});
+- Lint/format: `cargo +nightly fmt --all -- --check` ✅ (latest nightly, CI canonical);
   `npx prettier --check` on owned docs ✅ ({PENDING})
 - Version track: crates + pin + `package.json` {VERSION}; `plugin.yaml`
   {PLUGIN_VERSION}; `BINARY_VERSION` bumped LAST, after the release assets

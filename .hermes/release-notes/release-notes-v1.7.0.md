@@ -67,7 +67,7 @@ directives) so the defaults match the doctrine the docs teach.
   `cargo clippy --lib -D warnings` ✅ clean
 - Tests: `cargo test -p aphrodite --lib` ✅ 498 passed / 0 failed / 1
   ignored; `cargo test -p aphrodite-hermes --lib` ✅ 59 passed / 0 failed
-- Lint/format: `cargo +nightly-2026-05-01 fmt --all -- --check` ✅ clean;
+- Lint/format: `cargo +nightly fmt --all -- --check` ✅ clean (latest nightly, CI canonical);
   `npx prettier --check` on owned docs ✅ clean; FFI contract ✅ 0
   violations / 0 warnings; drift-guard (plugin shim vs
   `crates/aphrodite/templates/__init__.py`) byte-identical ✅

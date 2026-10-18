@@ -1733,7 +1733,10 @@ mod tests {
 			let g = s.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 			g.recent_markers.len()
 		};
-		assert_eq!(post_reset, 0, "reset must clear the real default session state (not a fallback clone)");
+		assert_eq!(
+			post_reset, 0,
+			"reset must clear the real default session state (not a fallback clone)"
+		);
 
 		// Compress under session "probe-a" through the hook path Hermes
 		// actually fires (transform_tool_result with session_id in kwargs).
@@ -1768,7 +1771,8 @@ mod tests {
 		// tests, where last_session() is empty - must NOT see it either.
 		let cat_def = with_shared(|s| serde_json::json!({"total": s.recent_markers.len()}));
 		assert_eq!(
-			cat_def["total"], 0,
+			cat_def["total"],
+			0,
 			"default session must NOT see session A's compression: last_session={:?}",
 			crate::debug::last_session()
 		);

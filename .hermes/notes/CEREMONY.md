@@ -109,7 +109,7 @@ detached-HEAD fallback to `Current` (latent risk, not active).
 ## Operational notes
 
 - **Formatter contract**: rustfmt.toml uses nightly-only unstable options;
-  CI pins `nightly-2026-05-01`; stable rustfmt silently ignores them.
+  CI pins latest nightly (Check.yml `toolchain: nightly`); stable rustfmt silently ignores them.
   `crates/aphrodite/templates/__init__.py` must stay byte-identical to
   `plugins/aphrodite/__init__.py` (drift-guard) - format the plugin first,
   then `cp` to the template.
