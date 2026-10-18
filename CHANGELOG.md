@@ -415,8 +415,8 @@ packaging, lifecycle, and configuration-defaults release.
   pattern (`^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$`) before downloading,
   rejecting malformed values such as `1|1.3.9`.
 - **Broken absolute `directives` symlink (feedback #2).** The plugin repository
-  shipped `directives -> /Users/nikola/.../Aphrodite/directives`, a developer-local
-  macOS path that was broken on other machines and caused `hermes plugins doctor`
+  shipped `directives -> <repo>/directives` (a developer-local
+  macOS path that was broken on other machines) and caused `hermes plugins doctor`
   to fail. It is now a real, portable `directives/` directory committed in the
   plugin repo. The directive loader was also moved under the Aphrodite namespace
   (`~/.hermes/aphrodite/directives` instead of bare `~/.hermes/directives`) so
