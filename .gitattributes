@@ -7,6 +7,13 @@
 *.yml text eol=lf
 *.md text eol=lf
 *.sh text eol=lf
+# Extensionless shell hooks - core.autocrlf=true would otherwise convert
+# them to CRLF and break the shebang (env: bash\r: No such file or directory)
+.githooks/pre-commit text eol=lf
+.githooks/post-checkout text eol=lf
+.githooks/post-commit text eol=lf
+.githooks/post-merge text eol=lf
+.githooks/pre-push text eol=lf
 
 # Binary
 *.png binary
