@@ -495,7 +495,13 @@ git merge --squash <Development-cutoff>
 # controlled restore of branch-owned identity ONLY (the ceremony invariant,
 # NOT a repair mechanism - boundaries' git repair taxonomy):
 git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite
-git -C plugins/aphrodite checkout <plugin-current-tip>     # float the gitlink
+# Float the gitlink by BRANCH NAME, never by raw SHA - `git checkout <sha>`
+# detaches HEAD (dangling-commit vector); `git checkout Current` lands on the
+# branch. The plugin Current tip was pushed in I2, so the branch name resolves
+# to it. After the float, verify HEAD is on a branch (post-checkout hook now
+# auto-re-attaches, but the ceremony still checks).
+git -C plugins/aphrodite checkout Current              # float the gitlink (branch, not SHA)
+git -C plugins/aphrodite symbolic-ref -q HEAD >/dev/null || echo "ERROR: plugin submodule detached" >&2
 git add -A
 git commit -m "release: sync vX.Y.Z from Development"
 git push origin Current

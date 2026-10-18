@@ -134,8 +134,30 @@ crates/packages; required secrets and manual inputs.
 ## 3. Publishing Separation - 4 Irreversible Events
 
 Separate these four events; never combine them in one opaque script invocation. `cargo
-publish` and a registry package version are **irreversible** (never re-tag or reuse a burned
-version); a GitHub release body is amendable - the gates reflect that difference.
+publish` and a registry package version are **irreversible** (never reuse a burned version); a
+GitHub release body is amendable - the gates reflect that difference.
+
+**Re-tagging is a deliberate owner decision, not an automatic taboo.** The tag is immutable
+as the historical record of what shipped, but when release content moves AFTER a tag was
+pushed (fmt alignment, hooks, docs, a re-run's second SHA256SUMS), the release owner may
+authorize re-tagging at the new Current tip to re-fire the whole Build -> Publish chain with
+the new content. This is a distinct path from a hotfix: same version, same release, but
+deliberately re-issued because the tag did not carry the final content. It requires: (1)
+explicit owner authorization ("re-tagging is not prohibited" - the default is HOLD, not
+refuse), (2) the crates version still free (a publish that 403'd before upload leaves it
+free; a publish that succeeded burns it - then release the next number, never re-tag), (3)
+recreate the tag at a Current tip carrying the full intended content, delete remote+local
+first, push, and confirm Build re-fires. The user's standing position: re-tagging is
+permitted when it triggers the whole CI workflow with all the new changes.
+
+**crates.io may enforce Trusted Publishing per crate - a token alone then 403s.** A publish
+step failing `403 Forbidden: New versions of this crate can only be published using Trusted
+Publishing` means the crate requires OIDC trusted publishing and `CARGO_REGISTRY_TOKEN` is no
+longer sufficient. Distinguish the two 403 classes by the message body: `authentication
+failed` = stale/expired token (refresh the secret); `can only be published using Trusted
+Publishing` = enforcement (configure the crate's trusted publisher mapping on crates.io, or
+the publish stays red no matter how fresh the token). Both look identical in a bare `cargo
+publish` error line, so read the full body before re-running.
 
 1. **Create the release-sync commit**
 2. **Create and push the immutable tag**

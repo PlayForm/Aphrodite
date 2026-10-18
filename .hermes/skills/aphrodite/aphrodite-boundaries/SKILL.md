@@ -112,6 +112,18 @@ faster.
   validate it.
 - A tag is immutable historical evidence: create it only after the exact
   release-sync commit and all tag prerequisites have passed.
+- **Every repo, worktree, and submodule must stay on its branch - NEVER a
+  detached HEAD.** A commit made on a detached HEAD lands on no branch and
+  becomes dangling once the worktree moves (the repeated 2026-10-18 hook-wedge
+  / Repositories-README / gitlink-float detachments). Enforcement: the
+  pre-commit hook refuses detached-HEAD commits (`.githooks/pre-commit`) and
+  the post-checkout hook auto-re-attaches to the containing branch
+  (`.githooks/post-checkout`); checkout by BRANCH NAME, never by raw SHA
+  (`git checkout <sha>` detaches; `git checkout <branch>` does not). After any
+  checkout or float, verify `git symbolic-ref -q HEAD` resolves (or the hook
+  has already re-attached). Hooks must be LF (`.gitattributes` pins
+  `.githooks/*` `eol=lf`) - CRLF breaks the shebang and silently disables the
+  guard.
 - Work bottom-up across submodules: validate and publish the plugin commit
   before updating the parent gitlink.
 - Never run git write commands (commit, add, reset, stash, checkout, restore,

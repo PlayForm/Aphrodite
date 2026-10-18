@@ -143,7 +143,11 @@ echo "<binary-version>" > plugins/aphrodite/BINARY_VERSION
 git -C plugins/aphrodite commit -m "chore: bump BINARY_VERSION to <v>"
 git -C plugins/aphrodite push Source Current
 # float the parent gitlink to that plugin commit (LAST commits of the cycle):
-git -C plugins/aphrodite checkout <plugin-commit>
+# checkout by BRANCH NAME (Current), never by raw SHA - a SHA checkout
+# detaches HEAD and creates a dangling-commit vector; Current was just pushed
+# above so the branch resolves to the new tip. Verify on-branch afterwards.
+git -C plugins/aphrodite checkout Current
+git -C plugins/aphrodite symbolic-ref -q HEAD > /dev/null || echo "ERROR: plugin submodule detached" >&2
 git add plugins/aphrodite && git commit -m "chore: float plugin submodule to <sha>"
 git push origin Current
 ```

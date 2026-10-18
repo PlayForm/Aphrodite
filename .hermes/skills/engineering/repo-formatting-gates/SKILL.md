@@ -91,6 +91,25 @@ and never a root-wide sweep the CI gate does not make.
   re-run `cargo fmt --all -- --check` under the fresh formatter. Never
   "repair" the diff list with the stale formatter - a stable/dated pass
   can re-introduce the divergence the newer rules remove.
+- **One workflow can carry TWO toolchain pins - grep the WHOLE file, not
+  just the main setup step.** A Check.yml may have a repo-wide `toolchain:
+  nightly` setup AND a separate "fmt only" step with its own dated pin
+  (`cargo +nightly-2026-05-01 fmt --check`). The dated step is the real
+  fmt gate; the main setup is irrelevant to it. When the repo moves to
+  latest nightly, remove BOTH the dated step and its `+nightly-<pin>`
+  command - leaving one resurrects the old formatter's output expectations
+  and the gate flips red on the exact files the new nightly reformatted.
+  `grep -n 'toolchain:\|+nightly' .github/workflows/*.yml` shows every
+  pin; zero dated pins must remain.
+- **Workflow files are branch-owned identity - a toolchain fix on
+  Development does NOT reach Current.** When a repo runs two branches
+  (Development + release Current), a CI/format fix committed on one branch
+  silently fails on the other: the release branch's Check.yml still has
+  the dated pin and its fmt gate flags the whole tree. After any
+  workflow/toolchain change, verify the equivalent file on BOTH branches
+  (`git -C <release-worktree> diff HEAD Development -- .github/workflows/`)
+  and port the fix across before declaring the gate green for the release
+  line.
 - **A stable pass reporting HUNDREDS of diffs is a tool divergence, not
   a repair signal.** `cargo fmt --check` under stable against a
   nightly-config repo reports the whole tree as unformatted (e.g. 684

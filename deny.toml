@@ -16,6 +16,9 @@ ignore = [
 	# paste is unmaintained (archived by author) with no safe upgrade
 	# available; it's a transitive compile-time dep of tokenizers/fastembed.
 	"RUSTSEC-2024-0436",
+	# smartstring is unmaintained (all versions affected, no safe upgrade);
+	# it's a transitive dep of rhai_codegen (the opt-in scripting engine).
+	"RUSTSEC-2026-0249",
 ]
 
 [licenses]
