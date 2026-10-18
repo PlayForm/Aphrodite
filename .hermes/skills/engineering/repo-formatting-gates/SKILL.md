@@ -118,6 +118,14 @@ install` from inside it.** Repos living under a parent workspace root that
   extension likewise resolves plugins from the ambient workspace - harmless
   when versions match, but verify with the local binary, never the editor
   log.
+- **A gate verdict must come from the formatter's own exit code, never
+  `cmd | tail -N && echo PASS`.** The `&&` binds to `tail`'s exit code (always
+  0), so a failing formatter piped through `tail` reports a false PASS - the
+  classic "fmt: CLEAN" on a red gate. Capture the real status: run the
+  formatter unpiped (output auto-truncates anyway), or test
+  `${PIPESTATUS[0]}` / `set -o pipefail` before echoing a verdict. A
+  `{PENDING}` release-note gate row filled from such a run is a false
+  release claim.
 - **Generated artifacts must be formatter-canonical BY CONSTRUCTION, and
   the formatter runs AFTER generation (user preference).** A hand-rolled
   exporter that emits tab-indented YAML fails prettier's parser outright

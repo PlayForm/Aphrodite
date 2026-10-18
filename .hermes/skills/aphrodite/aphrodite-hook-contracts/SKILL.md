@@ -132,6 +132,20 @@ def pre_tool_hook(
 
 **Safety boundary** - fail-closed on timeout: `pre_tool_call` is the sole member of `_HOOK_TIMEOUT_FAIL_CLOSED_HOOKS` (`hermes_cli/plugins_dispatch.py`); a hung/still-running callback blocks the tool with `"pre_tool_call plugin callback timed out or is still running"`. Keep the handler bounded, because a hung callback blocks the tool; after a timeout the same callback is suppressed for 60 s (`_HOOK_TIMEOUT_SUPPRESSION_SECONDS`). The Rust arm returns `{"action": "modify", "args": {"background": true, "notify_on_complete": true}}` to auto-background long terminal/process commands when the poll worker is enabled (CLAIM: read `crates/aphrodite-hermes/src/lib.rs`).
 
+**Wedge diagnosis (every tool call failing with the timeout):** the hook's FFI call into the Rust engine is not returning - a live proxy/dylib state issue, NOT a config problem. `~/.hermes/config.yaml` only enables the plugin; it never defines hook behavior, and a config misparse fails consistently from the first call, not intermittently. Distinguish the three plausible causes with read-only probes (all route through the same hook, so run them in a healthy session or from a shell):
+
+```sh
+curl -s -m 3 localhost:9797/health; curl -s -m 3 localhost:9798/health  # proxy alive?
+ls -la ~/.hermes/aphrodite/hotreload/        # pending dylib swap? (empty = none)
+ls -la ~/.hermes/aphrodite/binaries/*.dylib  # loaded dylib mtime - is it mid-swap?
+wc -c ~/.hermes/aphrodite/proxy-stderr.log   # 0 bytes = clean start
+cat ~/.hermes/aphrodite/session.current      # session registration intact?
+```
+
+- `auto_reload = true` in `aphrodite.toml` is a **config-watch only** knob (`watch aphrodite.toml and re-apply config`); it does NOT reload the dylib, so a hot-reload theory must show a non-empty `hotreload/` dir - an empty one rules it out.
+- **Subagent sessions fail structurally** when the parent's proxy/dylib is wedged: children share the same runtime home (`~/.hermes/aphrodite/`), so a wedged FFI state blocks them too even while the parent intermittently recovers. Do NOT re-dispatch verification to subagents while the parent hook is flaky - run it in the parent session or restart first.
+- **Recovery:** restart the Hermes session - a fresh process reloads the dylib and clears the wedge (this recovered it reliably). Verify proxy health with `aphrodite_rebuild`/`aphrodite_stats` after restart before resuming any ceremony.
+
 ## Hook: transform_tool_result
 
 **Invocation point:** `model_tools.py:854-856` in `_apply_transform_tool_result_hook` (after the tool result is produced, before it enters context; gated on `has_hook`, fail-open).

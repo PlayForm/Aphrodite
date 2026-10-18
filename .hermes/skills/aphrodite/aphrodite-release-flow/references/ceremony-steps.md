@@ -371,7 +371,13 @@ released plugin in one pass - never a Development-only commit.
 
 ```sh
 git -C plugins/aphrodite checkout Current
-git -C plugins/aphrodite merge --squash Development
+git -C plugins/aphrodite fetch Source
+# Merge the REMOTE-TRACKING ref, never the local `Development` branch: in a
+# release worktree the submodule's local branch is often STALE (points at an
+# old commit), and `merge --squash Development` then silently reports
+# "Already up to date" while staging nothing. Verify `git rev-parse
+# Source/Development` equals the plugin tip the parent gitlink expects.
+git -C plugins/aphrodite merge --squash Source/Development
 # selectively keep: version bump, docs, real fixes; discard dev-only scaffolding
 git -C plugins/aphrodite commit -m "release: sync vX.Y.Z"
 git -C plugins/aphrodite push Source Current
@@ -469,12 +475,23 @@ restore) and floating the gitlink to the released plugin tip.
 ```sh
 git checkout Current
 git merge --squash <Development-cutoff>
-# selective discard of dev-only scaffolding (I2 precedent): the debug TOOL is
-# Development-only (✝, classification DEV-engine-build.md) - drop the
-# tools.rs `aphrodite_debug` insert, the schemas.rs `schema_debug` entry,
-# and debug.rs `set_enabled_current`/`current_root` when staging; debug.rs
-# core (record_session/last_session/debug_line/enabled_for) CROSSES normally
-# (lib.rs session-tracking calls depend on it).
+# 1. .hermes/** NEVER crosses (∅): Current carries ZERO .hermes files (check
+#    `git ls-tree <tag> --name-only .hermes/` on prior tags - 0). The squash
+#    stages the whole dev tree as DU conflicts; exclude every staged .hermes
+#    path (`git status --short | grep '\.hermes/'` then per-path
+#    `git rm --cached` + `rm -f`) and keep Current's deletion. Do NOT resolve
+#    them "theirs" - that would resurrect the dev tree on Current.
+# 2. selective discard of dev-only scaffolding (I2 precedent): the debug TOOL
+#    is Development-only (✝, classification DEV-engine-build.md) - drop the
+#    tools.rs `aphrodite_debug` insert, the schemas.rs `schema_debug` entry
+#    AND its catalog-count test dev-build branch (the test asserts 14 tools
+#    under debug_assertions; with the tool stripped the tree registers 13 in
+#    EVERY build - rewrite the test to assert 13 unconditionally, or the dev
+#    profile fails it), and debug.rs `set_enabled_current`/`current_root`
+#    when staging; debug.rs core (record_session/last_session/debug_line/
+#    enabled_for) CROSSES normally (lib.rs session-tracking calls depend on
+#    it). Verify `git grep -n 'aphrodite_debug' -- crates/` shows only doc
+#    comments + the rewritten test before committing.
 # controlled restore of branch-owned identity ONLY (the ceremony invariant,
 # NOT a repair mechanism - boundaries' git repair taxonomy):
 git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite
