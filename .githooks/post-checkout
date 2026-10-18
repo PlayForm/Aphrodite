@@ -32,7 +32,9 @@ fi
 
 if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
 	HEAD_SHA="$(git rev-parse HEAD)"
-	HITS="$(git branch --contains "$HEAD_SHA" 2>/dev/null | sed 's/^[*+] //' | grep -v '^$' || true)"
+	# `git branch --contains` lists "(no branch)" for the detached HEAD
+	# itself - exclude it so the candidate set is real branches only.
+	HITS="$(git branch --contains "$HEAD_SHA" 2>/dev/null | sed 's/^[*+] //' | grep -v '^$' | grep -v '^(no branch)' || true)"
 	if [ -z "$HITS" ]; then
 		# Commit on no branch - genuinely dangling, cannot auto-pick a target.
 		echo "post-checkout: WARNING HEAD is detached at $HEAD_SHA and the commit is on NO branch - attach manually" >&2
