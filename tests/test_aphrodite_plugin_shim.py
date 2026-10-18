@@ -61,6 +61,12 @@ class _FailedDownloadPopen:
 
 def test_auto_launch_proceeds_when_unset(monkeypatch):
     monkeypatch.delenv("APHRODITE_NO_AUTO_LAUNCH", raising=False)
+    # register() never downloads by default (catalog review, PR 118488);
+    # APHRODITE_AUTO_DOWNLOAD=1 is the legacy escape hatch that still runs
+    # download.sh. This test drives that opt-in path: with the binary
+    # missing, _start_proxy runs download.sh BEFORE deciding there is
+    # nothing to launch.
+    monkeypatch.setenv("APHRODITE_AUTO_DOWNLOAD", "1")
     # Point at a binary that doesn't exist so _start_proxy returns early
     # via its own not-found branch, without this test needing to spawn or
     # mock a real process. Also isolate from any real install under
@@ -75,13 +81,31 @@ def test_auto_launch_proceeds_when_unset(monkeypatch):
             aphrodite_plugin._start_proxy()
 
     # Auto-download bootstrap: with the binary missing, _start_proxy runs
-    # download.sh BEFORE deciding there is nothing to launch...
+    # download.sh (via _ensure_binaries' subprocess.run, which constructs a
+    # Popen) BEFORE deciding there is nothing to launch...
     assert popen.call_count == 1
     cmd = popen.call_args[0][0]
     assert cmd[0] == "bash"
     assert "download.sh" in cmd[1]
     # ...and the not-found branch returns WITHOUT spawning the proxy binary
     # (call_count == 1 already proves no second Popen for the launch).
+
+
+def test_missing_binaries_never_download_without_opt_in(monkeypatch):
+    # Catalog review (PR 118488): register()/_start_proxy NEVER downloads -
+    # a download is an explicit setup step (`aphrodite setup` /
+    # `bash download.sh`). Without APHRODITE_AUTO_DOWNLOAD, a missing
+    # binary must produce no download attempt at all (no Popen), just the
+    # warn-and-return path.
+    monkeypatch.delenv("APHRODITE_NO_AUTO_LAUNCH", raising=False)
+    monkeypatch.delenv("APHRODITE_AUTO_DOWNLOAD", raising=False)
+    monkeypatch.setattr(aphrodite_plugin, "_BINARY_PATH", "/nonexistent/aphrodite-binary")
+    monkeypatch.setattr(
+        aphrodite_plugin, "_BINARIES_DIR", Path("/nonexistent/aphrodite-home/binaries")
+    )
+    with mock.patch("subprocess.Popen") as popen:
+        aphrodite_plugin._start_proxy()
+    popen.assert_not_called()
 
 
 def test_parse_port_env_missing_returns_default(monkeypatch):
