@@ -135,11 +135,12 @@ def pre_tool_hook(
 **Wedge diagnosis (every tool call failing with the timeout):** the hook's FFI call into the Rust engine is not returning - a live proxy/dylib state issue, NOT a config problem. `~/.hermes/config.yaml` only enables the plugin; it never defines hook behavior, and a config misparse fails consistently from the first call, not intermittently. Distinguish the three plausible causes with read-only probes (all route through the same hook, so run them in a healthy session or from a shell):
 
 ```sh
-curl -s -m 3 localhost:9797/health; curl -s -m 3 localhost:9798/health  # proxy alive?
-ls -la ~/.hermes/aphrodite/hotreload/        # pending dylib swap? (empty = none)
-ls -la ~/.hermes/aphrodite/binaries/*.dylib  # loaded dylib mtime - is it mid-swap?
-wc -c ~/.hermes/aphrodite/proxy-stderr.log   # 0 bytes = clean start
-cat ~/.hermes/aphrodite/session.current      # session registration intact?
+curl -s -m 3 localhost:9797/health
+curl -s -m 3 localhost:9798/health          # proxy alive?
+ls -la ~/.hermes/aphrodite/hotreload/       # pending dylib swap? (empty = none)
+ls -la ~/.hermes/aphrodite/binaries/*.dylib # loaded dylib mtime - is it mid-swap?
+wc -c ~/.hermes/aphrodite/proxy-stderr.log  # 0 bytes = clean start
+cat ~/.hermes/aphrodite/session.current     # session registration intact?
 ```
 
 **Root cause (shared-gateway mutex poisoning) - check this FIRST:** Hermes runs ONE plugin instance per gateway process for ALL sessions (parent + subagents). The dylib's hook dispatch must therefore key its state per `session_id` (`Mutex<HashMap<String, Arc<Mutex<AphroditeState>>>>`); a single process-global `Mutex<AphroditeState>` wedges the moment a second session appears. Mechanism: a hook (typically `pre_llm_call` → `build_turn_context`) exceeds Hermes' `plugins.hook_callback_timeout` (50 s); Hermes abandons the worker thread but the abandoned thread still holds the Rust mutex; every later hook blocks on `shared().lock()` → 50 s timeouts → `_HOOK_MAX_ABANDONED_WORKERS` reached → "3 abandoned worker(s) - the plugin is hung" → permanent skip until gateway restart. Signature in `~/.hermes/logs/gateway.error.log`: a `pre_llm_call` timeout immediately after a subagent spawn, then cascading `pre_tool_call`/`post_llm_call` timeouts, then the abandoned-workers line. Direct FFI probes of the dylib (incl. 40-turn histories, worker threads) return in ~7 ms - the dylib work is fast; the hang is pure lock contention.
