@@ -94,7 +94,7 @@ lru = "0.18.4"
 # Rhai micro-script engine (scripting.rs port). Exact-pinned, optional, and
 # only linked when the `scripting` feature is on - the default build (and the
 # cdylib consumed by aphrodite-hermes) must never pull rhai in.
-rhai = { version = "=1.25.1", optional = true }
+rhai = { version = "=1.26.1", optional = true }
 
 [features]
 default = ["proxy"]
