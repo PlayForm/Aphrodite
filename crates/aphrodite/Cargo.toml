@@ -90,11 +90,11 @@ toml = "1.1.6+spec-1.1.0"
 notify = { version = "8.2.0", optional = true }
 regex = "1.13.1"
 blake3 = "1.8.7"
-lru = "0.18.4"
+lru = "0.19.0"
 # Rhai micro-script engine (scripting.rs port). Exact-pinned, optional, and
 # only linked when the `scripting` feature is on - the default build (and the
 # cdylib consumed by aphrodite-hermes) must never pull rhai in.
-rhai = { version = "=1.26.1", optional = true }
+rhai = { version = "=1.27.0", optional = true }
 
 [features]
 default = ["proxy"]
