@@ -25,15 +25,15 @@ internal one to match it.
 
 The state below is the `1.7.0` binary with the `2.3.0` plugin.
 
-| Area                          | State                                                                                                 | Maintainer action                                                                                   |
-| :---------------------------- | :---------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| Shared-gateway lock wedge     | Fixed in `1.7.0`: per-session state registry, a bounded (~100 ms) lock, and a fail-open degrade       | Keep the regression probes in `crates/aphrodite-hermes/src/lib.rs` green.                           |
-| Token-mode store size         | Unbounded by bytes and entries; only the TTL purge limits it                                          | Retention design is open; document the operator reset until it ships.                               |
-| Per-session store isolation   | Not implemented; every session compresses into one `ccr.db`                                           | A reset invalidates markers for all sessions. Tracked as a feature request.                         |
-| Management route auth         | `APHRODITE_MGMT_TOKEN` unset by default; loopback peer and Host checks only                            | Startup already warns; hardening is open.                                                           |
-| At-rest encryption            | None; `ccr.db` is plaintext SQLite                                                                    | Full-disk encryption guidance only.                                                                 |
-| FFI dylib                     | Loaded into the Hermes process; the version handshake fails closed                                     | Treat the dylib as trusted code in the agent process; review every FFI change as a security change. |
-| CORS                          | No CORS layer by design; the proxy has no browser consumer                                             | Do not add `CorsLayer::permissive()`; it was removed for a reason (report 12 F1).                   |
+| Area                        | State                                                                                           | Maintainer action                                                                                   |
+| :-------------------------- | :---------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| Shared-gateway lock wedge   | Fixed in `1.7.0`: per-session state registry, a bounded (~100 ms) lock, and a fail-open degrade | Keep the regression probes in `crates/aphrodite-hermes/src/lib.rs` green.                           |
+| Token-mode store size       | Unbounded by bytes and entries; only the TTL purge limits it                                    | Retention design is open; document the operator reset until it ships.                               |
+| Per-session store isolation | Not implemented; every session compresses into one `ccr.db`                                     | A reset invalidates markers for all sessions. Tracked as a feature request.                         |
+| Management route auth       | `APHRODITE_MGMT_TOKEN` unset by default; loopback peer and Host checks only                     | Startup already warns; hardening is open.                                                           |
+| At-rest encryption          | None; `ccr.db` is plaintext SQLite                                                              | Full-disk encryption guidance only.                                                                 |
+| FFI dylib                   | Loaded into the Hermes process; the version handshake fails closed                              | Treat the dylib as trusted code in the agent process; review every FFI change as a security change. |
+| CORS                        | No CORS layer by design; the proxy has no browser consumer                                      | Do not add `CorsLayer::permissive()`; it was removed for a reason (report 12 F1).                   |
 
 ## Threat Model&#x2001;🧠
 
@@ -43,15 +43,15 @@ the user's machine. The assets worth protecting are prompt content, tool
 output, provider credentials, the management token, the store's integrity, and
 the agent's ability to keep working.
 
-| Threat                          | Impact            | Mitigation                                                                                                             |
-| :------------------------------ | :---------------- | :--------------------------------------------------------------------------------------------------------------------- |
-| Prompt and tool-output exposure | High              | Cache mode keeps entries in memory; token mode stores plaintext in `ccr.db`, so full-disk encryption and file permissions carry the risk. |
+| Threat                          | Impact            | Mitigation                                                                                                                                                                                 |
+| :------------------------------ | :---------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prompt and tool-output exposure | High              | Cache mode keeps entries in memory; token mode stores plaintext in `ccr.db`, so full-disk encryption and file permissions carry the risk.                                                  |
 | Provider key theft              | High              | The key comes from `aphrodite.toml` or the environment, is sent only to the provider, and is never written into a CCR entry or marker. Treat a config file that carries a key as a secret. |
-| CCR store tampering             | Medium            | Local file with WAL; no network-accessible SQL surface; management writes are gated by the optional bearer token and the loopback checks. |
-| Denial of service via growth    | High availability | No size cap on the token store; TTL purge only. Operator reset exists; retention is open.                              |
-| Hook stall and lock wedge       | High availability | Per-session state, bounded lock acquisition, fail-open degrade. `pre_tool_call` remains fail-closed in Hermes dispatch. |
-| Cross-origin management abuse   | Medium            | No CORS layer; loopback peer and Host allowlist; optional bearer token.                                                |
-| Supply chain compromise         | High              | `Cargo.lock`, `deny.toml`, `cargo deny` in CI, SHA-256 sums per target, explicit setup instead of download at register. |
+| CCR store tampering             | Medium            | Local file with WAL; no network-accessible SQL surface; management writes are gated by the optional bearer token and the loopback checks.                                                  |
+| Denial of service via growth    | High availability | No size cap on the token store; TTL purge only. Operator reset exists; retention is open.                                                                                                  |
+| Hook stall and lock wedge       | High availability | Per-session state, bounded lock acquisition, fail-open degrade. `pre_tool_call` remains fail-closed in Hermes dispatch.                                                                    |
+| Cross-origin management abuse   | Medium            | No CORS layer; loopback peer and Host allowlist; optional bearer token.                                                                                                                    |
+| Supply chain compromise         | High              | `Cargo.lock`, `deny.toml`, `cargo deny` in CI, SHA-256 sums per target, explicit setup instead of download at register.                                                                    |
 
 ### Trust Boundaries&#x2001;🧱
 
@@ -79,31 +79,31 @@ the agent's ability to keep working.
 
 ## Controls in the Code&#x2001;🛡️
 
-| Control                        | Location                                                                                                              | Notes                                                                                                       |
-| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------- |
-| Loopback peer and Host check   | `check_loopback_request` in [`crates/aphrodite/src/main.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/main.rs) | Rejects non-loopback peers and non-loopback `Host` values; `/health` is exempt from the peer check.          |
-| Management bearer token        | `require_mgmt_token` in the same file                                                                                 | Applied to management routes only, never to the catch-all LLM route; `/metrics` is exempt from the token.    |
-| Body limits                    | Router layers in the same file                                                                                        | 1 MiB on management routes, 64 MiB on the catch-all route, plus the optional `max_request_body_size` cap.    |
-| Prefetch refusal               | `refuse_reason` in [`crates/aphrodite/src/prefetch.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/prefetch.rs) | Refuses `.env` and `auth.json` by name, `~/.ssh`, the Hermes home, and non-file paths.                      |
-| Workspace-bounded file reads   | `read_path_guarded` in [`crates/aphrodite-hermes/src/tools.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite-hermes/src/tools.rs) | Canonicalizes the path, requires it under the current workspace, and caps the read at 10 MiB.                |
-| Prefetch size cap              | `MAX_PREFETCH_SIZE` in `prefetch.rs`                                                                                  | 10 MiB per file.                                                                                            |
-| Content addressing             | BLAKE3 hashes, 40 hex characters                                                                                      | A marker is only emitted when the store actually holds the hash; a failed store leaves content uncompressed. |
-| Store eviction                 | [`crates/aphrodite/src/state/store.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/state/store.rs) | Inline session store: 500 entries and a 256 MiB budget. Inline proxy cache: 1,024 LRU entries.              |
-| Bounded session lock           | `lock_bounded` in [`crates/aphrodite-hermes/src/lib.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite-hermes/src/lib.rs) | About 100 ms, then fail-open. The registry mutex is held only for the get-or-create.                        |
-| FFI version handshake          | Plugin `_check_version` against the dylib                                                                             | A mismatch fails closed; never report results from a mismatched dylib.                                      |
-| No CORS layer                  | Router construction in `main.rs`                                                                                      | Deliberate; see the report 12 F1 note in the code.                                                          |
+| Control                      | Location                                                                                                                                                     | Notes                                                                                                        |
+| :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------- |
+| Loopback peer and Host check | `check_loopback_request` in [`crates/aphrodite/src/main.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/main.rs)            | Rejects non-loopback peers and non-loopback `Host` values; `/health` is exempt from the peer check.          |
+| Management bearer token      | `require_mgmt_token` in the same file                                                                                                                        | Applied to management routes only, never to the catch-all LLM route; `/metrics` is exempt from the token.    |
+| Body limits                  | Router layers in the same file                                                                                                                               | 1 MiB on management routes, 64 MiB on the catch-all route, plus the optional `max_request_body_size` cap.    |
+| Prefetch refusal             | `refuse_reason` in [`crates/aphrodite/src/prefetch.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/prefetch.rs)             | Refuses `.env` and `auth.json` by name, `~/.ssh`, the Hermes home, and non-file paths.                       |
+| Workspace-bounded file reads | `read_path_guarded` in [`crates/aphrodite-hermes/src/tools.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite-hermes/src/tools.rs) | Canonicalizes the path, requires it under the current workspace, and caps the read at 10 MiB.                |
+| Prefetch size cap            | `MAX_PREFETCH_SIZE` in `prefetch.rs`                                                                                                                         | 10 MiB per file.                                                                                             |
+| Content addressing           | BLAKE3 hashes, 40 hex characters                                                                                                                             | A marker is only emitted when the store actually holds the hash; a failed store leaves content uncompressed. |
+| Store eviction               | [`crates/aphrodite/src/state/store.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/state/store.rs)                          | Inline session store: 500 entries and a 256 MiB budget. Inline proxy cache: 1,024 LRU entries.               |
+| Bounded session lock         | `lock_bounded` in [`crates/aphrodite-hermes/src/lib.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite-hermes/src/lib.rs)          | About 100 ms, then fail-open. The registry mutex is held only for the get-or-create.                         |
+| FFI version handshake        | Plugin `_check_version` against the dylib                                                                                                                    | A mismatch fails closed; never report results from a mismatched dylib.                                       |
+| No CORS layer                | Router construction in `main.rs`                                                                                                                             | Deliberate; see the report 12 F1 note in the code.                                                           |
 
 ## Data Protection&#x2001;💾
 
-| Data              | At rest                                                              | In transit          |
-| :---------------- | :------------------------------------------------------------------- | :------------------ |
-| Prompts           | Plaintext SQLite in token mode; memory only in cache mode            | TLS to the provider |
-| Responses         | Same as prompts                                                      | TLS to the provider |
-| Provider key      | `aphrodite.toml` or the environment; never inside a CCR entry        | TLS to the provider |
-| Management token  | Environment only                                                     | Loopback            |
-| Notify key        | Environment or CLI; sent as a bearer header to `notify_url`          | Whatever `notify_url` uses |
-| CCR payloads      | Plaintext in `ccr.db` and its WAL sidecar                            | Loopback            |
-| Metrics and stats | Plaintext, loopback only                                             | Loopback            |
+| Data              | At rest                                                       | In transit                 |
+| :---------------- | :------------------------------------------------------------ | :------------------------- |
+| Prompts           | Plaintext SQLite in token mode; memory only in cache mode     | TLS to the provider        |
+| Responses         | Same as prompts                                               | TLS to the provider        |
+| Provider key      | `aphrodite.toml` or the environment; never inside a CCR entry | TLS to the provider        |
+| Management token  | Environment only                                              | Loopback                   |
+| Notify key        | Environment or CLI; sent as a bearer header to `notify_url`   | Whatever `notify_url` uses |
+| CCR payloads      | Plaintext in `ccr.db` and its WAL sidecar                     | Loopback                   |
+| Metrics and stats | Plaintext, loopback only                                      | Loopback                   |
 
 The env-gated debug logger (`APHRODITE_DEBUG`) can emit request and marker
 detail. Treat its output as sensitive and never attach it unredacted to a
@@ -175,12 +175,12 @@ public issue.
 
 ### 2. Severity&#x2001;🎚️
 
-| Severity | Examples                                                                                                                       | Response                                    |
-| :------- | :----------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------ |
-| Critical | RCE in the proxy, dylib, or shim; release artifact substitution; key exfiltration with no local precondition                     | Fix and release within 14 days; expedite to 72 hours when exploited in the wild. |
-| High     | Local file disclosure outside the workspace; management auth bypass when a token is set; store integrity break; default-config lockout | Fix within 14 days.                         |
-| Medium   | DoS that needs an unusual load or a local attacker; metadata leak without secrets; hardening gap with a demonstrated effect     | Next release cycle.                         |
-| Low      | Defense in depth; missing best practice without exploitable impact                                                             | Convert to a regular issue unless the reporter wants an advisory. |
+| Severity | Examples                                                                                                                               | Response                                                                         |
+| :------- | :------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- |
+| Critical | RCE in the proxy, dylib, or shim; release artifact substitution; key exfiltration with no local precondition                           | Fix and release within 14 days; expedite to 72 hours when exploited in the wild. |
+| High     | Local file disclosure outside the workspace; management auth bypass when a token is set; store integrity break; default-config lockout | Fix within 14 days.                                                              |
+| Medium   | DoS that needs an unusual load or a local attacker; metadata leak without secrets; hardening gap with a demonstrated effect            | Next release cycle.                                                              |
+| Low      | Defense in depth; missing best practice without exploitable impact                                                                     | Convert to a regular issue unless the reporter wants an advisory.                |
 
 ### 3. Reproduction&#x2001;🧪
 
@@ -225,8 +225,9 @@ prompted the public policy.
 
 ### 5. Hook Stall and Lockout&#x2001;🔒
 
-1. The signature is `pre_tool_call plugin callback timed out or is still
-   running`, often with abandoned-worker lines in the gateway log.
+1. The signature is the `pre_tool_call` timeout line
+   (`pre_tool_call plugin callback timed out or is still running`), often with
+   abandoned-worker lines in the gateway log.
 2. Confirm the dylib version and the handshake. A `1.6.x` dylib predates the
    per-session registry and must be upgraded before triage continues.
 3. On `1.7.x`, verify the session ids are distinct and that the hook returns
@@ -265,14 +266,14 @@ prompted the public policy.
 
 ## Open Remediation Backlog&#x2001;📌
 
-| Item                                              | Why it matters                                                                 | State                     |
-| :------------------------------------------------ | :----------------------------------------------------------------------------- | :------------------------ |
-| Size-capped retention (`store_max_entries`, `store_max_bytes`, LRU, compaction) | The token store has no byte or entry bound; a full disk degrades the proxy and slows hooks. | Open; not in `1.7.0`.     |
-| Per-session store isolation                       | One shared `ccr.db` lets one session's reset or eviction invalidate another session's markers. | Open; not in `1.7.0`.     |
-| Management auth hardening                         | The management routes accept any loopback caller when the token is unset.       | Open; startup warning only. |
-| At-rest encryption option                         | `ccr.db` is plaintext; full-disk encryption is the only current answer.         | Open.                     |
-| Documented reset command                          | Operators delete `ccr.db`, the WAL, and the SHM by hand.                        | Open; described in the policy. |
-| Store-occupancy telemetry                         | `fill_pct` measures compression ratio, not bytes, which invites misreports.     | Open.                     |
+| Item                                                                            | Why it matters                                                                                 | State                          |
+| :------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------- | :----------------------------- |
+| Size-capped retention (`store_max_entries`, `store_max_bytes`, LRU, compaction) | The token store has no byte or entry bound; a full disk degrades the proxy and slows hooks.    | Open; not in `1.7.0`.          |
+| Per-session store isolation                                                     | One shared `ccr.db` lets one session's reset or eviction invalidate another session's markers. | Open; not in `1.7.0`.          |
+| Management auth hardening                                                       | The management routes accept any loopback caller when the token is unset.                      | Open; startup warning only.    |
+| At-rest encryption option                                                       | `ccr.db` is plaintext; full-disk encryption is the only current answer.                        | Open.                          |
+| Documented reset command                                                        | Operators delete `ccr.db`, the WAL, and the SHM by hand.                                       | Open; described in the policy. |
+| Store-occupancy telemetry                                                       | `fill_pct` measures compression ratio, not bytes, which invites misreports.                    | Open.                          |
 
 ## Internal Contacts and Roles&#x2001;📇
 
@@ -290,7 +291,7 @@ prompted the public policy.
 
 ## Version History&#x2001;🗓️
 
-| Version | Date       | Changes                                                                                                                                          |
-| :------ | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0.0   | 2026-06-16 | Initial security document for Aphrodite.                                                                                                         |
+| Version | Date       | Changes                                                                                                                                                                                   |
+| :------ | :--------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | 2026-06-16 | Initial security document for Aphrodite.                                                                                                                                                  |
 | 2.0.0   | 2026-10-30 | Split the public policy into the root `SECURITY.md`; refreshed versions and controls for `1.7.x` / `2.3.x`; added the known limitations, the triage runbook, and the remediation backlog. |

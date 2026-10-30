@@ -3,9 +3,9 @@
 The PlayForm team and the Aphrodite community are committed to the security of
 the CCR compression proxy and its Hermes Agent integration. Aphrodite runs on
 the user's machine, sits between the agent and the model provider, and keeps
-compressed prompt and tool output in a local cache, so a weakness here can
-expose conversation content, tool output, or the credentials that pay for the
-model.
+the prompt and tool output it compresses in a local store, so a weakness here
+can expose conversation content, tool output, or the credentials that pay for
+the model.
 
 This policy covers this repository and both halves it ships: the proxy binary
 in [`crates/aphrodite`](https://github.com/PlayForm/Aphrodite/tree/Development/crates/aphrodite)
@@ -182,7 +182,7 @@ the same release, and the version handshake fails closed on a mismatch.
 | Component                       | Supported          | Notes                                                                                                                                       |
 | :------------------------------ | :----------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
 | Proxy binary `1.7.x`            | :white_check_mark: | Security fixes land on `Current` and ship in the next `1.7` patch release.                                                                  |
-| Hermes plugin `2.3.x`           | :white_check_mark: | The plugin paired with binary `1.7.0`; later `2.3` patches pair with later `1.7` patches.                                                   |
+| Hermes plugin `2.3.x`           | :white_check_mark: | The plugin paired with binary `1.7.0`; install both halves from the same release.                                                           |
 | Binary `1.6.x` / plugin `2.2.x` | :x:                | Superseded by the `1.7.0` shared-gateway lock fix. Upgrade before reporting a wedge or lockout.                                             |
 | Binary `< 1.6.0`                | :x:                | Predates the per-session state registry, the bounded lock, and the fail-open degrade.                                                       |
 | Unreleased `Current` branch     | :white_check_mark: | Actively developed; fixes are applied here first. If unsure which line you run, report against `Current` and include the commit you tested. |
@@ -298,7 +298,10 @@ process.
    acknowledgement):** A maintainer reproduces the issue against a supported
    version, assesses severity and scope, and may ask you for logs or a second
    run. If the report is against an unsupported version we will say so and ask
-   you to retest on `1.7.x` before closing it.
+   you to retest on `1.7.x` before closing it. If we cannot reproduce it, or if
+   it falls outside this policy, we explain the reasoning in writing and point
+   you to the upstream project or the issue tracker where that is the better
+   path.
 
 ### Investigation and Fix&#x2001;🔧
 
@@ -306,8 +309,10 @@ process.
    fix may land in the proxy, the dylib, the plugin shim, the vendored store
    backend, or the release pipeline.
 
-4. **Communication and Updates:** We update you at confirmation, when a fix is
-   in review, and when a release carrying it is published.
+4. **Communication and Updates:** We send a status update at confirmation, when
+   a fix is in review, when a release carrying it is published, and at least
+   every 10 business days while the report is open. Questions in between are
+   welcome.
 
 5. **Fix Development and Testing:** The patch is reviewed and tested on the
    affected targets. A fix that changes the FFI contract or the store schema
@@ -334,9 +339,9 @@ If the issue is exploited in the wild, we expedite the whole sequence to
 ## Known Limitations and Availability Reports&#x2001;⚠️
 
 Aphrodite is a local, single-tenant tool, and a few of its operational limits
-are documented here rather than treated as secrets. They are still in scope
-when they cause a denial of service or expose data, and a report with data is
-welcome even when the underlying request is a feature.
+are documented here rather than left for users to discover. They are still in
+scope when they cause a denial of service or expose data, and a report with data
+is welcome even when the underlying request is a feature.
 
 ### The token-mode store has no size cap&#x2001;🗄️
 
@@ -355,10 +360,10 @@ file by entry count or bytes.
 | Token mode (`:9798`) | SQLite `ccr.db`        | **none**                | Sliding idle TTL, 8x max lifetime |
 
 Under sustained compression the database can grow to gigabytes, and a full
-disk then surfaces as proxy write failures and slower hooks. The supported
-operator reset is to stop the proxy, delete `ccr.db`, `ccr.db-wal`, and
-`ccr.db-shm`, and relaunch. Every marker that pointed into that store becomes
-unresolvable, which is expected.
+disk then surfaces as proxy write failures and slower hooks. The operator reset
+is to stop the proxy, delete `ccr.db`, `ccr.db-wal`, and `ccr.db-shm`, and
+relaunch. Every marker that pointed into that store becomes unresolvable, which
+is expected.
 
 Size-capped retention (`store_max_entries` / `store_max_bytes` with LRU
 eviction or fill-triggered compaction) and per-session store isolation are not
@@ -404,8 +409,8 @@ CORS-simple request could still reach.
 
 ### The token store is plaintext at rest&#x2001;💾
 
-`ccr.db` stores prompt content and tool output as plain SQLite rows, and
-compressed content stays readable to anyone who can read the file. There is no
+`ccr.db` stores prompt content and tool output as plain SQLite rows, and the
+stored content stays readable to anyone who can read the file. There is no
 at-rest encryption inside Aphrodite. Use full-disk encryption and restrict the
 runtime home's permissions on multi-user machines. Cache mode keeps entries in
 memory only and loses them on restart.
