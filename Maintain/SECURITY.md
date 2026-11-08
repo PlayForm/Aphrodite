@@ -23,17 +23,17 @@ internal one to match it.
 
 ## Current Posture&#x2001;📋
 
-The state below is the `1.7.0` binary with the `2.3.0` plugin.
+The state below is the `1.8.0` binary with the `2.3.1` plugin.
 
-| Area                        | State                                                                                           | Maintainer action                                                                                   |
-| :-------------------------- | :---------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| Shared-gateway lock wedge   | Fixed in `1.7.0`: per-session state registry, a bounded (~100 ms) lock, and a fail-open degrade | Keep the regression probes in `crates/aphrodite-hermes/src/lib.rs` green.                           |
-| Token-mode store size       | Unbounded by bytes and entries; only the TTL purge limits it                                    | Retention design is open; document the operator reset until it ships.                               |
-| Per-session store isolation | Not implemented; every session compresses into one `ccr.db`                                     | A reset invalidates markers for all sessions. Tracked as a feature request.                         |
-| Management route auth       | `APHRODITE_MGMT_TOKEN` unset by default; loopback peer and Host checks only                     | Startup already warns; hardening is open.                                                           |
-| At-rest encryption          | None; `ccr.db` is plaintext SQLite                                                              | Full-disk encryption guidance only.                                                                 |
-| FFI dylib                   | Loaded into the Hermes process; the version handshake fails closed                              | Treat the dylib as trusted code in the agent process; review every FFI change as a security change. |
-| CORS                        | No CORS layer by design; the proxy has no browser consumer                                      | Do not add `CorsLayer::permissive()`; it was removed for a reason (report 12 F1).                   |
+| Area                        | State                                                                                           | Maintainer action                                                                                    |
+| :-------------------------- | :---------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------- |
+| Shared-gateway lock wedge   | Fixed in `1.7.0`: per-session state registry, a bounded (~100 ms) lock, and a fail-open degrade | Keep the regression probes in `crates/aphrodite-hermes/src/lib.rs` green.                            |
+| Token-mode store size       | Bounded in `1.8.0`: `store_max_entries` / `store_max_bytes` with LRU eviction (`0` = unlimited) | Watch `/stats/db` (`evicted_total`, `freelist_bytes`); raise the caps if eviction thins hot entries. |
+| Per-session store isolation | Not implemented; every session compresses into one `ccr.db`                                     | A reset invalidates markers for all sessions. Tracked as a feature request.                          |
+| Management route auth       | `APHRODITE_MGMT_TOKEN` unset by default; loopback peer and Host checks only                     | Startup already warns; hardening is open.                                                            |
+| At-rest encryption          | None; `ccr.db` is plaintext SQLite                                                              | Full-disk encryption guidance only.                                                                  |
+| FFI dylib                   | Loaded into the Hermes process; the version handshake fails closed                              | Treat the dylib as trusted code in the agent process; review every FFI change as a security change.  |
+| CORS                        | No CORS layer by design; the proxy has no browser consumer                                      | Do not add `CorsLayer::permissive()`; it was removed for a reason (report 12 F1).                    |
 
 ## Threat Model&#x2001;🧠
 
@@ -266,14 +266,14 @@ prompted the public policy.
 
 ## Open Remediation Backlog&#x2001;📌
 
-| Item                                                                            | Why it matters                                                                                 | State                          |
-| :------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------- | :----------------------------- |
-| Size-capped retention (`store_max_entries`, `store_max_bytes`, LRU, compaction) | The token store has no byte or entry bound; a full disk degrades the proxy and slows hooks.    | Open; not in `1.7.0`.          |
-| Per-session store isolation                                                     | One shared `ccr.db` lets one session's reset or eviction invalidate another session's markers. | Open; not in `1.7.0`.          |
-| Management auth hardening                                                       | The management routes accept any loopback caller when the token is unset.                      | Open; startup warning only.    |
-| At-rest encryption option                                                       | `ccr.db` is plaintext; full-disk encryption is the only current answer.                        | Open.                          |
-| Documented reset command                                                        | Operators delete `ccr.db`, the WAL, and the SHM by hand.                                       | Open; described in the policy. |
-| Store-occupancy telemetry                                                       | `fill_pct` measures compression ratio, not bytes, which invites misreports.                    | Open.                          |
+| Item                                                                            | Why it matters                                                                                 | State                                                      |
+| :------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------- | :--------------------------------------------------------- |
+| Size-capped retention (`store_max_entries`, `store_max_bytes`, LRU, compaction) | The token store had no byte or entry bound; a full disk degrades the proxy and slows hooks.    | Shipped in `1.8.0` (LRU eviction; no compaction pass yet). |
+| Per-session store isolation                                                     | One shared `ccr.db` lets one session's reset or eviction invalidate another session's markers. | Open; not in `1.8.0`.                                      |
+| Management auth hardening                                                       | The management routes accept any loopback caller when the token is unset.                      | Open; startup warning only.                                |
+| At-rest encryption option                                                       | `ccr.db` is plaintext; full-disk encryption is the only current answer.                        | Open.                                                      |
+| Documented reset command                                                        | Operators delete `ccr.db`, the WAL, and the SHM by hand.                                       | Open; described in the policy.                             |
+| Store-occupancy telemetry                                                       | `fill_pct` measures compression ratio, not bytes, which invites misreports.                    | Open.                                                      |
 
 ## Internal Contacts and Roles&#x2001;📇
 
