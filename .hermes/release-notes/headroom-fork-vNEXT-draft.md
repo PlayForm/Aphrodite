@@ -56,11 +56,13 @@ created_at ASC` in batches of 256 rows, with exact freed rows/bytes from
 
 ### Verification
 
-- Fork range: `aphrodite-v0.10.0` (`02706ea1`) .. `20be515b` - the two
-  dependency commits plus the CCR-store change.
-- `cargo test -p aphrodite-headroom-core --lib` ✅ 900 passed / 0 failed / 1
-  ignored, including 9 store tests: entry-cap LRU order, byte-cap eviction,
-  overwrite-is-not-a-new-row, trim-at-open, index-plan assertion, stats caps.
+- Fork range: `aphrodite-v0.10.0` (`02706ea1`) .. `d4558b7c` - the two
+  dependency commits, the CCR-store change, and the upstream sync
+  (`bb8d18a5`).
+- `cargo test -p aphrodite-headroom-core --lib` ✅ 996 passed / 0 failed / 1
+  ignored (count is post-upstream-sync), including 9 store tests: entry-cap
+  LRU order, byte-cap eviction, overwrite-is-not-a-new-row, trim-at-open,
+  index-plan assertion, stats caps.
 - `cargo clippy -- -D warnings` ✅ for `headroom-core` and `headroom-parity` in
   the fork workspace (the MSRV lint that blocked it is fixed in this cycle);
   `cargo fmt --check` ✅ `headroom-core`. `headroom-parity` remains

@@ -53,12 +53,26 @@ nothing incremented - so both are now labelled or made live. Binary `1.7.0 →
   → `1.8.0`; `plugin.yaml` + `install_message` → `2.3.1`; headroom fork crate +
   parent pin → `0.2.0`. `BINARY_VERSION` deliberately unchanged - it is bumped
   LAST, after the `Aphrodite/v1.8.0` assets exist.
+- **Upstream sync (vendored headroom fork)**: the fork merged
+  `headroomlabs-ai/main` @ `bb8d18a5` into its `Current` (merge commit
+  `d4558b7c`; the fork was 396 commits behind / 49 ahead, merge-base
+  `c365c7ff`). 463 conflicted paths, all resolved by hand: 437 took upstream
+  where no fork invariant existed (fork side preserved under
+  `.hermes/tmp/merge-fork-side`), 3 deleted because upstream removed them,
+  6 hand-merged to keep fork work - the exact-pin `Cargo.toml`s with the `ml`
+  feature default-OFF, the `ml`-gated parity comparator, and the CCR store
+  retention feature in `sqlite.rs`. Post-merge repairs, each caught by the
+  gate that surfaced it: fork-workspace `cargo build` (proxy package name +
+  `headroom-core` alias, release-profile key, missing `pub mod vendor`,
+  `CcrStore` trait defaults with sqlite delegating, duplicate test module)
+  and `cargo clippy -D warnings` (edition-2024 pattern bindings in
+  `anchor_selector.rs`).
 
 ### Infrastructure
 
 - crates.io availability check: `curl -A <ua> https://crates.io/api/v1/crates/aphrodite` (and `.../aphrodite-hermes`, `.../aphrodite-headroom-core`) - `max_version` 1.7.0, 1.7.0, 0.1.3; `1.8.0` / `1.8.0` / `0.2.0` free.
 - `cargo check -p aphrodite -p aphrodite-hermes` ✅ (0 errors); `cargo tree -i aphrodite-headroom-core` → `0.2.0` from the path dep.
-- Tests: `cargo test -p aphrodite --lib` ✅ 500 passed / 0 failed / 1 ignored; `cargo test -p aphrodite-headroom-core --lib` ✅ 900 passed / 0 failed / 1 ignored (9 of them the store suite: caps, trim-at-open, index plan, stats).
+- Tests: `cargo test -p aphrodite --lib` ✅ 500 passed / 0 failed / 1 ignored; `cargo test -p aphrodite-headroom-core --lib` ✅ 996 passed / 0 failed / 1 ignored (incl. 9 store tests: entry-cap LRU order, byte-cap eviction, overwrite-is-not-a-new-row, trim-at-open, index plan, stats; count is post-upstream-sync).
 - Lint/format: `cargo clippy -p aphrodite -p aphrodite-headroom-core --lib -- -D warnings` ✅; `cargo clippy -- -D warnings` ✅ in the fork workspace for `headroom-core` and `headroom-parity`; `cargo fmt --check` ✅ parent crates and `headroom-core` (`headroom-parity` stays non-conformant with the inherited `hard_tabs` config - pre-existing, untouched); `ruff check plugins/aphrodite/` ✅; `pnpm run Check:FFI` ✅ 0 violations.
 - Store probe (release binary, 300k-row store): `/health` `fill_pct 90.0` + `store_entries 300000`; `--store-max-entries 5000` trims to 5000 with `evicted_total 295000`; median `POST /retrieve` 0.22 ms (pre-fix 37.40 ms, same data).
 - Known pre-existing reds (not touched by this release): `pnpm run FormatCheck` (2 files - `.githooks/post-checkout`, `.githooks/pre-commit`; the CRLF/eol trap for extensionless hooks); plugin `test_data_dir_honours_aphrodite_home` fails identically at `HEAD`.

@@ -76,8 +76,8 @@ compression_ratio_ema/20` clamped to `[1, 99]` - compression headroom, pinned
   `aarch64-apple-darwin`; `{PENDING}` for the 4-target CI matrix at tag time)
 - Check: `cargo check -p aphrodite -p aphrodite-hermes` ✅ 0 errors
 - Tests: `cargo test -p aphrodite --lib` ✅ 500 passed / 0 failed / 1 ignored;
-  `cargo test -p aphrodite-headroom-core --lib` ✅ 900 passed / 0 failed / 1
-  ignored
+  `cargo test -p aphrodite-headroom-core --lib` ✅ 996 passed / 0 failed / 1
+  ignored (count is post-upstream-sync)
 - Lint/format: `cargo clippy -p aphrodite -p aphrodite-headroom-core --lib --
 -D warnings` ✅; `cargo fmt --check` ✅ both crates; `ruff check
 plugins/aphrodite/` ✅; `pnpm run Check:FFI` ✅ 0 violations
