@@ -1,0 +1,34 @@
+# Cargo configuration for the Aphrodite workspace.
+#
+# The [alias] table mirrors .github/workflows/Check.yml 1:1: every value is the
+# CI command with the leading `cargo ` removed, so `cargo ci-check` executes
+# exactly what CI's `run: cargo check --workspace --release` executes.
+# Maintain/CheckParity.py asserts that equality against the workflow file and
+# fails when CI gains or changes a step, so the two cannot drift silently.
+#
+# Runtime: the --release profile is deliberate CI parity. CI checks and tests
+# in release (`cargo check --workspace --release`, `cargo test --workspace
+# --release`), and a debug-profile local run can pass on code release rejects -
+# `cfg!(debug_assertions)` paths differ and release-only optimizations change
+# what the benches compile. Cost is the first cold release build of the
+# workspace (several minutes); afterwards the release target dir is warm and
+# these aliases are incremental like any other cargo invocation.
+#
+# Aliases are single commands: cargo does not chain them (a value is one
+# argument list, not a script). There is deliberately no `ci-all` alias -
+# Maintain/Check.sh is the ordered runner, and it is the only place that
+# encodes CI's job and step order.
+#
+# `ci-deny` is `deny check`, not `deny --all-features check`: CI's Deny job
+# runs EmbarkStudios/cargo-deny-action with `command: check`, which expands to
+# exactly `cargo deny check`. Adding --all-features locally would enable
+# optional features and audit a different dependency graph than CI audits.
+
+[alias]
+ci-check = "check --workspace --release"
+ci-clippy = "clippy -p aphrodite -p aphrodite-hermes -- -D warnings"
+ci-fmt = "fmt --all -- --check"
+ci-test = "test --workspace --release"
+ci-hooks = "test --manifest-path Maintain/dynamic_hooks/rust/Cargo.toml"
+ci-dylib = "build --release -p aphrodite-hermes"
+ci-deny = "deny check"

@@ -1,2 +1,28 @@
 [toolchain]
-channel = "nightly"
+# Dated nightly pin. Deliberately NOT the floating `nightly` channel.
+#
+# Why: `channel = "nightly"` resolves to whatever nightly exists on the day the
+# command runs. CI resolved it at workflow start, this machine resolved it at
+# `rustup update` time, and the two sat one night apart. Clippy gained
+# `clippy::new_instead_of_clear` in between, so `cargo clippy -- -D warnings`
+# passed locally on a tree CI rejected (crates/aphrodite/src/chain_split.rs).
+# Copying CI's flags without pinning the compiler cannot catch that class of
+# failure - the lint set is part of the compiler.
+#
+# The channel date is one day AHEAD of the build date inside the version
+# string: channel `nightly-2026-11-08` is
+# `rustc 1.102.0-nightly (f5cedb83a 2026-11-07)`, which is the compiler CI
+# resolved when it reported 1.102.0-nightly.
+#
+# Both sides now resolve the same compiler:
+#   - locally, rustup reads this file for the repo directory;
+#   - in CI, .github/workflows/Check.yml passes the same date to
+#     dtolnay/rust-toolchain.
+# Keep the two in step - Maintain/CheckParity.py fails when they diverge.
+#
+# `components` mirrors the CI setup step, so a bare `rustup toolchain install`
+# in this directory yields a toolchain that can run `cargo fmt` and
+# `cargo clippy` (both CI gates).
+channel = "nightly-2026-11-08"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

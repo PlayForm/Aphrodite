@@ -59,15 +59,18 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Rust (nightly, latest)
-        # Repo-wide toolchain is LATEST NIGHTLY (rust-toolchain.toml channel
-        # = "nightly"): build, test, clippy, and fmt all run on the same
-        # nightly. `toolchain: nightly` resolves to whatever the latest
-        # nightly is on the day the workflow runs - deliberately never a
-        # dated pin.
+      - name: Setup Rust (nightly, pinned)
+        # Repo-wide toolchain is a DATED NIGHTLY (rust-toolchain.toml channel =
+        # "nightly-2026-11-08"): build, test, clippy, and fmt all run on that
+        # one compiler. The date is passed explicitly so the pin is
+        # authoritative here as well - a floating `nightly` made CI and local
+        # resolve different lint sets (`clippy::new_instead_of_clear` landed in
+        # the 2026-11-08 channel and rejected crates/aphrodite/src/chain_split.rs
+        # that the older local nightly accepted). Maintain/CheckParity.py fails
+        # when this date and rust-toolchain.toml disagree.
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2026-11-08
           components: rustfmt, clippy
 
       - name: Cache cargo
@@ -98,9 +101,9 @@ jobs:
       # repo's established no-space type-annotation style). Stable rustfmt
       # silently drops those settings instead of erroring, which turns the
       # check into a false-positive gate. No separate setup is needed here
-      # anymore: nightly IS the repo-wide toolchain (rust-toolchain.toml
-      # channel = "nightly", same as the Rust job setup above), so `cargo
-      # fmt` runs on the latest nightly and honors rustfmt.toml natively.
+      # anymore: the dated nightly IS the repo-wide toolchain
+      # (rust-toolchain.toml channel = "nightly-2026-11-08", same date as the
+      # Rust job setup above), so `cargo fmt` honors rustfmt.toml natively.
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
 
@@ -112,15 +115,18 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Rust (nightly, latest)
-        # Repo-wide toolchain is LATEST NIGHTLY (rust-toolchain.toml channel
-        # = "nightly"): build, test, clippy, and fmt all run on the same
-        # nightly. `toolchain: nightly` resolves to whatever the latest
-        # nightly is on the day the workflow runs - deliberately never a
-        # dated pin.
+      - name: Setup Rust (nightly, pinned)
+        # Repo-wide toolchain is a DATED NIGHTLY (rust-toolchain.toml channel =
+        # "nightly-2026-11-08"): build, test, clippy, and fmt all run on that
+        # one compiler. The date is passed explicitly so the pin is
+        # authoritative here as well - a floating `nightly` made CI and local
+        # resolve different lint sets (`clippy::new_instead_of_clear` landed in
+        # the 2026-11-08 channel and rejected crates/aphrodite/src/chain_split.rs
+        # that the older local nightly accepted). Maintain/CheckParity.py fails
+        # when this date and rust-toolchain.toml disagree.
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2026-11-08
           components: rustfmt, clippy
 
       - name: Cache cargo
