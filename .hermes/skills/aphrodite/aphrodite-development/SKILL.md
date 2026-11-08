@@ -63,10 +63,32 @@ source/installed comparison matrix and the pinned versions are the worked
 matrix in `references/mode-decision.md`; Step 1 below is the probe that fills
 it in.
 
-Current pins (verify against the manifests, never memorize): binary **1.6.2**
-(`crates/aphrodite` + `crates/aphrodite-hermes`), plugin **2.2.2**
-(`plugins/aphrodite/plugin.yaml`), `BINARY_VERSION` **1.6.2**
-(`~/.hermes/aphrodite/BINARY_VERSION`).
+Current pins (verify against the manifests, never memorize): binary **1.8.0**
+(`crates/aphrodite` + `crates/aphrodite-hermes`), plugin **2.3.1**
+(`plugins/aphrodite/plugin.yaml`), `BINARY_VERSION` **1.7.0**
+(`plugins/aphrodite/BINARY_VERSION`).
+
+**On `Development`, the version is deliberately one release ahead of what is
+published, and `BINARY_VERSION` deliberately lags behind it.** Both are correct
+states, not drift to repair:
+
+- The tree's version is `published + 1` because `Development` is where the next
+  release is prepared. Check it against the registry, not against intuition:
+  `curl -A <ua> https://crates.io/api/v1/crates/aphrodite` → `max_version`. A
+  tree at 1.8.0 while `max_version` is 1.7.0 means exactly one unreleased
+  version is queued - what the release expects. Never "sync" the tree down to
+  the published number, and never skip past an unreleased one.
+- `BINARY_VERSION` is the plugin's live download pointer, so it names the last
+  release whose assets actually exist. On `Development` it is expected to be
+  behind the crate version; it is bumped LAST, in the `Current` release commit,
+  after the tag's assets are live.
+- The promotion that turns this into a release (`Development` → `Current`) runs
+  in a **separate checkout** of the same repository checked out on `Current`
+  (`~/Developer/Application/PlayForm/Aphrodite-Release/` on the maintainer's
+  machine) and is usually triggered from a different machine entirely. A
+  development machine without that worktree is normal: do not infer from its
+  absence that the promotion happens here, and do not tag or transplant from
+  the `Development` checkout. Full ceremony: `aphrodite-release-flow`.
 
 ## C-001: auto-expand is configuration observability only
 
@@ -132,8 +154,11 @@ cat ~/.hermes/aphrodite/BINARY_VERSION
 - `WORKSPACE` non-zero but `RUNTIME_HOME:0` → **installed mode**: never
   `cargo build`; edits do not affect the installed plugin.
 - Both non-zero → **stop**: not an Aphrodite dev environment.
-- `LOADER:0` + `BINARY_VERSION` == the crate version (1.6.2) → the hooks-only
-  loader layout is intact.
+- `LOADER:0` → the hooks-only loader layout is intact. Do **not** expect
+  `BINARY_VERSION` to equal the crate version here: on `Development` the crate
+  is one release ahead of the published pin, and `BINARY_VERSION` names the
+  last release whose assets exist. Equality is a `Current`-at-tag-time
+  condition, not a development one.
 
 **Stop if**
 

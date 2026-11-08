@@ -77,10 +77,26 @@ release time (known drift case `a81acab6`: `package.json` lagged at `1.4.6` vs `
 
 ### Ledger rules (summary)
 
+- **`Development` carries `published + 1` by design.** The tree's version is one
+  release ahead of the registry because `Development` is where the next release
+  is prepared, and it stays there until the promotion runs. A tree at `1.8.0`
+  against a `max_version` of `1.7.0` is the expected state, not drift: never
+  "sync" it down to the published number, never skip past an unreleased one to
+  the next, and never bump again because a previous bump was not yet published.
+  Re-derive from the registry (`curl -A <ua> https://crates.io/api/v1/crates/<crate>`
+  → `max_version`), never from the tree.
+- **The promotion is not a local step.** `Development` → `Current` runs in a
+  separate checkout of the same repository on `Current`
+  (`~/Developer/Application/PlayForm/Aphrodite-Release/` on the maintainer's
+  machine) and is normally triggered from a different machine. Its absence on a
+  development machine means nothing: no tagging, no transplant, and no
+  `BINARY_VERSION` bump happens in the `Development` checkout.
 - **Local bump safe; public pointer never early.** Ahead of the tag, a local `BINARY_VERSION`
   bump is safe when the referenced binaries exist locally. At **tag time** "bump LAST": a
   `BINARY_VERSION` naming a not-yet-existing release errors on every download;
   `_check_version_published` warns before `download.sh` - treat that warning as a hard stop.
+  On `Development` this row is therefore expected to name the **previous**
+  release; equality with the crate version is a `Current`-at-tag-time condition.
 - **Two version tracks, never conflated:** binary `1.6.x` (parent crates + `package.json` +
   README badge) vs plugin `2.2.x` (`plugin.yaml`); separate ceremonies, separate repos.
 - **Bump together (binary track):** both parent crates + `aphrodite-hermes` dep pin +
