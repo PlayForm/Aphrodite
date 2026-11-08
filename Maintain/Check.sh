@@ -32,6 +32,15 @@
 # CHECK_STRICT=1 to turn any skip into a failure (what CI does, since CI
 # installs every tool it needs).
 #
+# Known host limitation: the `cargo ci-test` step is red on this Mac and green
+# on CI, for a reason that is neither this mirror nor the store code.
+# `in_memory_get_refreshes_idle_ttl`
+# (vendor/headroom/crates/headroom-core/tests/ccr_backends.rs) touches an entry
+# every 60 ms inside a 120 ms idle window; thread::sleep(60ms) on this host
+# actually returns after ~134 ms (measured), so the entry is already past its
+# window at the first check. That is a portability bug in the vendored test.
+# Do not "fix" it by dropping the step - CI runs the same command.
+#
 # Formatting is NOT part of this script: `cargo ci-fmt` only verifies. Run
 # Maintain/Format.sh to format, which then calls this script to check.
 #===============================================================================
