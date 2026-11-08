@@ -14,7 +14,9 @@
 # Configuration:
 #   .cargo/config.toml   - the ci-* aliases this script invokes; each value is
 #                          the CI command with the leading `cargo ` removed
-#   rust-toolchain.toml  - the dated nightly both CI and this machine resolve
+#   rust-toolchain.toml  - the nightly channel both CI and this machine resolve
+#                          (freshness is manual: `rustup toolchain install
+#                          nightly --profile minimal --force` before verifying)
 #   deny.toml            - cargo-deny policy for the Deny job
 #
 # Every step below is one step of Check.yml, run in the workflow's own order:

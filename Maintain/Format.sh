@@ -18,9 +18,10 @@
 #
 # The Rust pass ends with the same gate CI runs (`cargo fmt --all -- --check`),
 # so a formatted tree is always cargo-fmt compliant. Both Rust passes use the
-# toolchain pinned in rust-toolchain.toml (a dated nightly) - never a floating
-# `+nightly` override, because CI formats with the pinned rustfmt and a
-# different rustfmt version can format the tree differently.
+# channel declared in rust-toolchain.toml through rustup's directory lookup -
+# never a `+nightly` override, which bypasses that file's components
+# declaration and can select a different installed toolchain than CI formats
+# with. Keep the local nightly current; see the header of rust-toolchain.toml.
 #
 # The default invocation (no subcommand) then type-checks the tree with
 # `cargo check -p aphrodite -p aphrodite-hermes` - the fast debug pass, which
@@ -167,7 +168,7 @@ FormatRust() {
 	# `vendor/headroom` and `vendor/rtk` are separate Cargo workspace roots
 	# (their own [workspace] table) - cargo fmt here never touches them.
 	# No `+nightly`: rustup resolves rust-toolchain.toml for this directory,
-	# which is the same dated nightly CI installs.
+	# so this is the channel CI installs (keep it current - see that file).
 	cargo fmt --all
 
 	# Pass 2: direct rustfmt - catches any .rs files that are NOT part of

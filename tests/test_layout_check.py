@@ -4,6 +4,8 @@ Run directly:  python3 tests/test_layout_check.py
 Exit code is 0 when every case passes, 1 otherwise.
 """
 
+import contextlib
+import functools
 import os
 import sys
 import tempfile
@@ -24,6 +26,45 @@ def ok(condition, message=""):
     _ASSERTS += 1
     if not condition:
         raise AssertionError(message or "assertion failed")
+
+
+# Every ambient override layout_check.py reads. ``home_dir`` wins over
+# ``HERMES_HOME`` but NOT over ``APHRODITE_HOME`` (issue 40 F3: the shim
+# exports its own resolution there, so the heal must follow it), which means a
+# developer shell with the plugin installed - or any host where the shim has
+# run - silently redirects the whole suite at the live ``~/.hermes`` install
+# instead of the tmp fixture. CI stays green only because CI has no such env.
+# Each case therefore runs with these unset and sets the ones it means to test.
+_AMBIENT_OVERRIDES = (
+    "APHRODITE_HOME",
+    "HERMES_HOME",
+    "APHRODITE_CONFIG_PATH",
+    "APHRODITE_BINARY_PATH",
+    "APHRODITE_HERMES_DYLIB_PATH",
+)
+
+
+@contextlib.contextmanager
+def isolated_env():
+    """Hide inherited Aphrodite/Hermes overrides; restore them on exit."""
+    saved = {name: os.environ.pop(name, None) for name in _AMBIENT_OVERRIDES}
+    try:
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is not None:
+                os.environ[name] = value
+
+
+def hermetic(fn):
+    """Run ``fn`` with no inherited Aphrodite/Hermes environment override."""
+
+    @functools.wraps(fn)
+    def wrapper():
+        with isolated_env():
+            return fn()
+
+    return wrapper
 
 
 def make_tree(root):
@@ -379,6 +420,19 @@ def test_aphrodite_home_override_relocates_runtime_home():
             (home / ".hermes" / "aphrodite" / "aphrodite.toml").exists(),
             "existing config was moved out of the legacy tree",
         )
+
+
+# Wrap every case by name, so a test added later cannot forget the isolation
+# above. The failure this guards against is silent: the suite is green on CI
+# (no runtime home, no env override) and lies on a machine with the plugin
+# installed.
+globals().update(
+    {
+        name: hermetic(func)
+        for name, func in list(globals().items())
+        if name.startswith("test_") and callable(func)
+    }
+)
 
 
 def main():

@@ -1,7 +1,7 @@
 ---
 name: aphrodite-development
 description: "Use when developing the aphrodite plugin. Mode-branched (source vs installed) session setup, verifiable dev-loop gates, inert auto-expand doctrine."
-version: 2.2.0
+version: 2.3.0
 author: Hermes Agent
 license: MIT
 platforms: [macos]
@@ -406,6 +406,53 @@ test -d .hermes/tmp
 
 - A clean, hermetic working environment.
 
+### Step 7 - Reproduce CI locally (the mirror)
+
+**Purpose:** Run the gates CI runs, with CI's commands and CI's compiler, so a
+red pipeline is reproducible before the push.
+
+**Do**
+
+```sh
+bash Maintain/Check.sh          # every Check.yml step, in CI order
+bash Maintain/Check.sh rust     # rust | test | python | deny | parity
+cargo ci-check                  # one alias = one CI command
+python3 Maintain/CheckParity.py # fails when the mirror and CI drift
+```
+
+**Expected**
+
+- `cargo --list` shows `ci-check`, `ci-clippy`, `ci-fmt`, `ci-test`,
+  `ci-hooks`, `ci-dylib`, `ci-deny`, each equal to its CI `run:` line minus
+  the leading `cargo ` (`.cargo/config.toml`).
+- `Maintain/CheckParity.py` prints `OK: N check(s) passed`. It fails on a CI
+  step the mirror table does not know, a drifted alias value, an alias the
+  runner never invokes, or a `toolchain:` input that disagrees with
+  `rust-toolchain.toml`.
+- The channel is floating by policy (`channel = "nightly"`, never a dated pin:
+  a nightly that gains a lint is fixed in the code, not frozen away).
+  Freshness is a manual step, not the file's job: run
+  `rustup toolchain install nightly --profile minimal --force`, then confirm
+  `cargo fmt --version` and `cargo clippy --version` report the newest
+  nightly. A stale local channel is exactly the divergence that let
+  `clippy::new_instead_of_clear` pass locally and fail CI.
+
+**Stop if**
+
+- A script uses `cargo +nightly` or `rustup run nightly`: both bypass rustup's
+  directory lookup of `rust-toolchain.toml`, so they skip its components
+  declaration and can select a different installed toolchain than the one CI
+  installs.
+- `cargo ci-test` or the `pytest tests/` step is red locally while CI is
+  green: both are host-coupled, not mirror defects. The in-memory TTL test
+  sleeps 60 ms inside a 120 ms window while this host's `thread::sleep(60ms)`
+  returns after ~134 ms; the layout tests assert on the real
+  `~/.hermes/aphrodite`. Never make them pass by dropping the step.
+
+**Produces**
+
+- Evidence that the local tree passes the same gates CI will run.
+
 ## Retrieve-first doctrine
 
 In a compressed session every read returns `<<<CCR:hash|type|size>>>`. When a
@@ -437,6 +484,12 @@ gates). The per-mode lists are the worked criteria in
   (`git merge-base --is-ancestor <tip> <sha>` first, then
   `git branch -f Development <sha>` + `git checkout Development`) - never
   rewrite history to \"fix\" it.
+- **A `cargo +nightly` or `rustup run nightly` call bypasses
+  `rust-toolchain.toml`** - it skips the file's components declaration and can
+  select a different installed toolchain than CI installs. `Maintain/Format.sh`
+  therefore calls plain `cargo fmt` / `rustfmt`, which resolve the file through
+  rustup's directory lookup; `Maintain/CheckParity.py` fails when its channel
+  or components disagree with the workflow's `toolchain:` input.
 - Never assume a new import is safe - a symbol the target module lacks
   silently kills the plugin at session start. After adding imports, test
   `python3 -c "import aphrodite"`.
@@ -478,12 +531,13 @@ uncertainty (Validate). On any stop, recover per `aphrodite-boundaries`
 
 ## Local claim-to-test matrix
 
-| Claim                             | Evidence source                 | Test                                                | Pass condition                                    | Failure response                     |
-| --------------------------------- | ------------------------------- | --------------------------------------------------- | ------------------------------------------------- | ------------------------------------ |
-| Mode gate precedes build advice   | This skill                      | Run Step 1 in an installed-only home                | Mode declared `installed`; no cargo build advised | Fix the gate ordering                |
-| Watch rebuilds both packages      | `cargo watch` output            | Save in `crates/aphrodite-hermes/`                  | dylib mtime/version changes                       | Re-add `-p aphrodite-hermes`         |
-| Plugin resolves to repo source    | `readlink`                      | Step 2 check                                        | Symlink == `$PWD/plugins/aphrodite`               | Re-symlink; re-verify                |
-| Auto-expand is inert (C-001)      | `aphrodite-auto-expand-testing` | Fixture test in `references/auto-expand-fixture.md` | Marker appears; retrieval required                | Reactivation gate in the owner skill |
-| env_passthrough reaches proxy     | `aphrodite_stats`               | Step 4                                              | Proxy healthy, no key error                       | Set passthrough; restart session     |
-| Stale process does not mask edits | `aphrodite_rebuild`             | Step 5                                              | Version matches fresh build                       | Fresh-process restart                |
-| Scratch stays hermetic            | `git status --short`            | Step 6                                              | No probe artifacts outside `.hermes/tmp/`         | Move artifacts; edit directly        |
+| Claim                             | Evidence source                            | Test                                                | Pass condition                                    | Failure response                      |
+| --------------------------------- | ------------------------------------------ | --------------------------------------------------- | ------------------------------------------------- | ------------------------------------- |
+| Mode gate precedes build advice   | This skill                                 | Run Step 1 in an installed-only home                | Mode declared `installed`; no cargo build advised | Fix the gate ordering                 |
+| Watch rebuilds both packages      | `cargo watch` output                       | Save in `crates/aphrodite-hermes/`                  | dylib mtime/version changes                       | Re-add `-p aphrodite-hermes`          |
+| Plugin resolves to repo source    | `readlink`                                 | Step 2 check                                        | Symlink == `$PWD/plugins/aphrodite`               | Re-symlink; re-verify                 |
+| Auto-expand is inert (C-001)      | `aphrodite-auto-expand-testing`            | Fixture test in `references/auto-expand-fixture.md` | Marker appears; retrieval required                | Reactivation gate in the owner skill  |
+| env_passthrough reaches proxy     | `aphrodite_stats`                          | Step 4                                              | Proxy healthy, no key error                       | Set passthrough; restart session      |
+| Stale process does not mask edits | `aphrodite_rebuild`                        | Step 5                                              | Version matches fresh build                       | Fresh-process restart                 |
+| Scratch stays hermetic            | `git status --short`                       | Step 6                                              | No probe artifacts outside `.hermes/tmp/`         | Move artifacts; edit directly         |
+| Local gate == CI (same channel)   | `.cargo/config.toml` + `Maintain/Check.sh` | `python3 Maintain/CheckParity.py`                   | `OK: N check(s) passed`                           | Update SPEC + alias + runner together |
