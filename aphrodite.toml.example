@@ -79,7 +79,9 @@ ccr_ttl_seconds = 3600
 # Proxy path consumes: tool_threshold_token, tool_threshold_cache,
 # inline_threshold, code_multiplier (env > TOML > compiled-in default; the
 # last four hot-reload - edit + save, or POST /reload, with no restart),
-# auto_expand, auto_expand_limit, max_request_body_size.
+# auto_expand, auto_expand_limit, max_request_body_size, and the
+# store_max_entries / store_max_bytes retention caps (read when the store is
+# opened, so a change there takes effect on the next restart).
 # Dylib path consumes: context_engine, engine_* (load-bearing),
 # terminal_threshold, poll_worker, auto_reload, chain_split,
 # chain_split_min/max_segments, live_container, recursive_depth.
@@ -98,6 +100,23 @@ auto_expand = true          # WIRED (proxy): resolve just-stored content inline 
 auto_expand_limit = 102400  # WIRED (proxy): byte cap for auto-expanded content; 0 = unlimited (env APHRODITE_AUTO_EXPAND_LIMIT > TOML > default 102400)
 live_container = false      # WIRED (dylib): instant 'live' CCR markers for large tool results (progressive chunked retrieval + ETA); env APHRODITE_LIVE_CONTAINER > TOML > default false
 recursive_depth = 5         # WIRED (dylib): max nested expansion depth; env APHRODITE_RECURSIVE_DEPTH > TOML > default 5
+# ── Store retention (SQLite token proxy) ───────────────────────────────
+# ccr_ttl_seconds (above) bounds the store in TIME: a row idle for that
+# long is reclaimed. It does NOT bound space - a burst of compression
+# inside one TTL window is unlimited, and a hot entry's idle clock keeps
+# restarting. These two caps bound it in SPACE: past either one, the
+# least-recently-accessed rows are evicted (a cache policy - an evicted
+# hash becomes a retrieval miss, exactly like an expired one).
+# 0 = unlimited. Env: APHRODITE_STORE_MAX_ENTRIES / APHRODITE_STORE_MAX_BYTES.
+# Applied at startup (not hot-reloaded): the caps are set when the store is
+# opened, so a change takes effect on the next proxy restart.
+# Live occupancy: GET /stats (ccr_store) and GET /stats/db
+# (total_entries, total_bytes_original, database_size_bytes,
+# freelist_bytes, evicted_total). NOTE: the `fill_pct` field on /health is
+# a compression-headroom number (100 - ratio_ema/20, i.e. 90.0 on a fresh
+# process with an EMPTY store) - it is NOT store occupancy.
+store_max_entries = 100000  # max live rows (env APHRODITE_STORE_MAX_ENTRIES; 0 = unlimited)
+store_max_bytes = 536870912 # max stored payload bytes, SUM(LENGTH(original)) (env APHRODITE_STORE_MAX_BYTES; 0 = unlimited)
 # max_request_body_size = 10485760   # WIRED (proxy): optional request-body cap in bytes; unset = no cap (env APHRODITE_MAX_REQUEST_BODY_SIZE)
 catalog_mode = "tool"       # DOCUMENTED BUT UNWIRED: parsed (echoed by POST /reload), no consumer - catalog layout is compiled-in
 classifier_poll = true      # DOCUMENTED BUT UNWIRED: parsed, no reader (CCR skipping is not keyed on this flag)

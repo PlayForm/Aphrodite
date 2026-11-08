@@ -67,10 +67,10 @@ and leaves the target file untouched.
    target exists on the branch. Prints summary counts + a table. Run first to
    size the work and catch missing targets before any write.
 2. **Rewrite** - `aphrodite-link-rewrite.py`. Converts relative file links in
-   public files to absolute `https://github.com/<PROJECT>/tree/Current/...`
-   URLs (Current's link convention). Every rewritten target is verified to
-   exist on the `Current` ref; any relative link whose target is missing on
-   `Current` is reported and left untouched, and the run exits 1. Absolute
+   public files to absolute `https://github.com/<PROJECT>/tree/Development/...`
+   URLs. Every rewritten target is verified to exist on the same `Development`
+   ref the file was read from; any relative link whose target is missing on
+   `Development` is reported and left untouched, and the run exits 1. Absolute
    http(s) links and pure same-file anchors are left alone. Writes the working
    tree.
 3. **Branch-flip** - `aphrodite-link-branch-flip.py`. Flips
@@ -79,9 +79,14 @@ and leaves the target file untouched.
    occurrence sits inside a full Aphrodite URL - any stray `tree/Current`
    outside the URL form refuses the run. Writes the working tree.
 
-`rewrite` and `branch-flip` are inverse conventions. Use `rewrite` when the
-docs should mirror Current's absolute `tree/Current` links; use `branch-flip`
-when the docs must self-link to Development. Do not run both in one pass.
+The rule is not a preference: **a link names the branch the file lives on.** A
+file on `Development` links `tree/Development`; a file on `Current` links
+`tree/Current`. A Development file pointing at `tree/Current` shows Current's
+copy of the page, and 404s for a page that exists only on Development - which is
+exactly what a "point every link at Current" pass produced, and why it was
+reverted. `branch-flip` exists to repair the one case that breaks the rule: a
+file whose links carry the other branch (typically a `Current`-tree file merged
+into `Development`). Do not run both in one pass.
 
 ## VSCode settings utilities (all CRLF-safe)
 

@@ -108,12 +108,12 @@ the session's in-process inline store:
 
 ## Phase 6: Expire
 
-| Backend          | Expiry behavior                                                                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SQLite           | Lazy purge on `get` and `put`, debounced to once per 60 seconds; rows expire when idle past TTL or older than the 8x max lifetime. No background thread. |
-| In-Memory        | Lazy TTL check on `get`; expired entries evicted via an atomic check-and-remove; queue compaction when the eviction order grows past twice capacity.     |
-| Inline (proxy)   | LRU eviction at capacity (1,024). No TTL.                                                                                                                |
-| Inline (session) | LRU eviction at 500 entries and/or over the 256 MiB byte budget. No TTL.                                                                                 |
+| Backend          | Expiry behavior                                                                                                                                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQLite           | Lazy purge on `get` and `put`, debounced to once per 60 seconds; rows expire when idle past TTL or older than the 8x max lifetime. `store_max_entries` / `store_max_bytes` evict least-recently-accessed rows past either space cap. No background thread. |
+| In-Memory        | Lazy TTL check on `get`; expired entries evicted via an atomic check-and-remove; queue compaction when the eviction order grows past twice capacity.                                                                                                       |
+| Inline (proxy)   | LRU eviction at capacity (1,024). No TTL.                                                                                                                                                                                                                  |
+| Inline (session) | LRU eviction at 500 entries and/or over the 256 MiB byte budget. No TTL.                                                                                                                                                                                   |
 
 ## Thresholds
 

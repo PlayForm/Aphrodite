@@ -257,9 +257,12 @@ is in `references/readme-structure-template.md`:
   em-quad. Never place them before the prose they decorate, because
   decoration belongs at the end of the segment.
 - `https://` absolute URLs preferred for links.
-- Repo links: `github.com/PlayForm/Aphrodite/tree/Current/...` for the
-  parent. `github.com/PlayForm/Aphrodite-Hermes` is the plugin's own
-  repository. It is not a tree inside the parent.
+- Repo links: `github.com/PlayForm/Aphrodite/tree/<branch>/...` where
+  `<branch>` is the branch the file lives on - `Development` for a file on
+  Development, `Current` for a file on Current. Never point a Development file
+  at `tree/Current`: it renders Current's copy of the page, and 404s for a page
+  that exists only on Development. `github.com/PlayForm/Aphrodite-Hermes` is
+  the plugin's own repository. It is not a tree inside the parent.
 
 ## 9. Post-pass corruption scan (ALWAYS after backticking)
 

@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 """Rewrite relative repo links in Development's public markdown to absolute
-tree/Current URLs (Current's link convention).
+tree/Development URLs.
+
+The branch a link names must be the branch the file lives on. A link in a
+Development file that points at tree/Current shows Current's copy of the page -
+or 404s outright for a page that exists only on Development - so every rewrite
+here targets the same ref the file was read from, and existence is verified
+against that same ref.
 
 Rules:
 - Only touches public files: README.md, CHANGELOG.md, docs/**/*.md.
 - Absolute http(s) links and pure same-file anchors (#...) are left alone.
 - Relative FILE links are resolved against the file's dir, verified to exist
-  on the Current ref, and rewritten to
-  https://github.com/<PROJECT>/tree/Current/<resolved>[#anchor].
-- Any relative link whose target does NOT exist on Current is reported and
+  on the Development ref, and rewritten to
+  https://github.com/<PROJECT>/tree/Development/<resolved>[#anchor].
+- Any relative link whose target does NOT exist on Development is reported and
   left untouched (fail-soft, but the count must be 0 for the run to pass).
 - Byte-preserving elsewhere; asserts deterministic match counts.
 
@@ -23,15 +29,13 @@ from pathlib import Path
 PROJECT = "PlayForm/Aphrodite"
 REPO = Path(__file__).resolve().parents[5]
 DEV = "Development"
-CUR = "Current"
-BASE = f"https://github.com/{PROJECT}/tree/Current/"
+BASE = f"https://github.com/{PROJECT}/tree/{DEV}/"
 
 def git(*args):
     return subprocess.run(
         ["git", "-C", REPO, *args], capture_output=True, text=True, check=True
     ).stdout
 
-cur_tree = set(git("ls-tree", "-r", "--name-only", CUR).splitlines())
 dev_tree = set(git("ls-tree", "-r", "--name-only", DEV).splitlines())
 
 files = ["README.md", "CHANGELOG.md"]
@@ -87,10 +91,12 @@ for path in files:
             urlpart = parts[0]
         else:
             urlpart = target
+        if urlpart.startswith("#"):
+            return m.group(0)  # pure same-file anchor: no path to resolve
         resolved, anchor = resolve(urlpart, base_dir)
         if resolved is None:
             return m.group(0)  # absolute or escaping - leave
-        if resolved not in cur_tree:
+        if resolved not in dev_tree:
             problems.append((path, urlpart, resolved))
             return m.group(0)
         count += 1
@@ -110,8 +116,8 @@ for path in files:
 
 print(f"\nTOTAL: {total_changed} links across {total_files} files")
 if problems:
-    print("UNRESOLVED (target missing on Current):")
+    print("UNRESOLVED (target missing on Development):")
     for p in problems:
         print("  ", p)
     sys.exit(1)
-print("OK: all rewritten targets verified to exist on Current")
+print("OK: all rewritten targets verified to exist on Development")
