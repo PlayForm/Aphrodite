@@ -56,7 +56,7 @@ created_at ASC` in batches of 256 rows, with exact freed rows/bytes from
 
 ### Verification
 
-- Fork range: `aphrodite-v0.10.0` (`02706ea1`) .. `{PENDING}` - the two
+- Fork range: `aphrodite-v0.10.0` (`02706ea1`) .. `20be515b` - the two
   dependency commits plus the CCR-store change.
 - `cargo test -p aphrodite-headroom-core --lib` ✅ 900 passed / 0 failed / 1
   ignored, including 9 store tests: entry-cap LRU order, byte-cap eviction,

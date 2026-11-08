@@ -92,9 +92,8 @@ plugins/aphrodite/` ✅; `pnpm run Check:FFI` ✅ 0 violations
   `0.2.0`; README badges v1.8.0 / v2.3.1. `BINARY_VERSION` stays at `1.7.0`
   until the `Aphrodite/v1.8.0` assets exist - bump LAST.
 - Known pre-existing reds (not introduced here): `pnpm run FormatCheck` flags
-  four untouched files (`.githooks/post-checkout`, `.githooks/pre-commit`,
-  `.hermes/skills/engineering/repo-formatting-gates/SKILL.md`,
-  `docs/research/2026-10-19-hermes-aphrodite-research.md`); the plugin test
+  two untouched files (`.githooks/post-checkout`, `.githooks/pre-commit` - the
+  CRLF/eol trap for extensionless hooks); the plugin test
   `test_data_dir_honours_aphrodite_home` fails identically at the pre-change
   tree.
 

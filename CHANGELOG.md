@@ -29,10 +29,10 @@ nothing incremented - so both are now labelled or made live. Binary `1.7.0 →
   60 s debounce (the lookup predicate still refuses expired rows, so correctness
   is unchanged) and runs index-driven via `ccr_entries_expiry` (expression index
   on `last_accessed + ttl_seconds`) and `ccr_entries_created`; schema version 3.
-- **Fix (telemetry, `/health`)**: `fill_pct` is `100 -
-compression_ratio_ema/20` clamped to `[1, 99]` - compression headroom, not
-  store occupancy - so `/health` now reports `fill_pct_kind:
-"compression_headroom"` and `store_entries` beside it.
+- **Fix (telemetry, `/health`)**: `fill_pct` is
+  `100 - compression_ratio_ema/20` clamped to `[1, 99]` - compression headroom,
+  not store occupancy - so `/health` now reports
+  `fill_pct_kind: "compression_headroom"` and `store_entries` beside it.
 - **Fix (telemetry, `/stats`)**: `ccr_store.entries` / `bytes_approx` came from
   two `AtomicU64`s that were never incremented (a full store reported
   `entries: 0`). The fields now read the live backend; `/stats/db` gained
@@ -59,9 +59,9 @@ compression_ratio_ema/20` clamped to `[1, 99]` - compression headroom, not
 - crates.io availability check: `curl -A <ua> https://crates.io/api/v1/crates/aphrodite` (and `.../aphrodite-hermes`, `.../aphrodite-headroom-core`) - `max_version` 1.7.0, 1.7.0, 0.1.3; `1.8.0` / `1.8.0` / `0.2.0` free.
 - `cargo check -p aphrodite -p aphrodite-hermes` ✅ (0 errors); `cargo tree -i aphrodite-headroom-core` → `0.2.0` from the path dep.
 - Tests: `cargo test -p aphrodite --lib` ✅ 500 passed / 0 failed / 1 ignored; `cargo test -p aphrodite-headroom-core --lib` ✅ 900 passed / 0 failed / 1 ignored (9 of them the store suite: caps, trim-at-open, index plan, stats).
-- Lint/format: `cargo clippy -p aphrodite -p aphrodite-headroom-core --lib -- -D warnings` ✅; `cargo fmt --check` ✅ both crates; `ruff check plugins/aphrodite/` ✅; `pnpm run Check:FFI` ✅ 0 violations.
+- Lint/format: `cargo clippy -p aphrodite -p aphrodite-headroom-core --lib -- -D warnings` ✅; `cargo clippy -- -D warnings` ✅ in the fork workspace for `headroom-core` and `headroom-parity`; `cargo fmt --check` ✅ parent crates and `headroom-core` (`headroom-parity` stays non-conformant with the inherited `hard_tabs` config - pre-existing, untouched); `ruff check plugins/aphrodite/` ✅; `pnpm run Check:FFI` ✅ 0 violations.
 - Store probe (release binary, 300k-row store): `/health` `fill_pct 90.0` + `store_entries 300000`; `--store-max-entries 5000` trims to 5000 with `evicted_total 295000`; median `POST /retrieve` 0.22 ms (pre-fix 37.40 ms, same data).
-- Known pre-existing reds (not touched by this release): `pnpm run FormatCheck` (4 files: two `.githooks`, one engineering skill, one research note); plugin `test_data_dir_honours_aphrodite_home` fails identically at `HEAD`.
+- Known pre-existing reds (not touched by this release): `pnpm run FormatCheck` (2 files - `.githooks/post-checkout`, `.githooks/pre-commit`; the CRLF/eol trap for extensionless hooks); plugin `test_data_dir_honours_aphrodite_home` fails identically at `HEAD`.
 
 ## v1.7.0 - Feature port: TOML templates, auto-expand, context engine, live containers, scripting, caps (2026-10-13)
 
