@@ -177,8 +177,14 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish aphrodite-headroom-core to crates.io (opt-in)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_crates && steps.check.outputs.published == 'false' }}
+      # Reachable on workflow_run only. The job is already gated on the release
+      # tag and on Test passing, and the check step above decides whether the
+      # version is still free. Do NOT add `inputs.publish_crates` back here:
+      # that input exists only on workflow_dispatch, which this file
+      # deliberately makes a no-op, so gating on it made this step unreachable
+      # and left the fork crate unpublished while the job reported success.
+      - name: Publish aphrodite-headroom-core to crates.io
+        if: ${{ steps.check.outputs.published == 'false' }}
         working-directory: vendor/headroom
         run: cargo publish -p aphrodite-headroom-core --no-verify
         env:
