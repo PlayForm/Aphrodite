@@ -4,7 +4,7 @@
 #===============================================================================
 #
 # Usage:
-#   sh Maintain/Format.sh               # Run all formatters, then cargo check
+#   sh Maintain/Format.sh               # Format, type-check, then run the CI mirror
 #   sh Maintain/Format.sh dos2unix      # Normalize line endings only
 #   sh Maintain/Format.sh shell         # Format shell scripts only (prettier)
 #   sh Maintain/Format.sh prettier      # Format Markdown/JSON/YAML only
@@ -17,16 +17,21 @@
 #   rustfmt.toml   - rustfmt options (nightly, edition 2024)
 #
 # The Rust pass ends with the same gate CI runs (`cargo fmt --all -- --check`),
-# so a formatted tree is always cargo-fmt compliant.
+# so a formatted tree is always cargo-fmt compliant. Both Rust passes use the
+# toolchain pinned in rust-toolchain.toml (a dated nightly) - never a floating
+# `+nightly` override, because CI formats with the pinned rustfmt and a
+# different rustfmt version can format the tree differently.
 #
 # The default invocation (no subcommand) then type-checks the tree with
-# `cargo check -p aphrodite -p aphrodite-hermes` and fails the pipeline on a
-# compile error. Scope: the two workspace members only - the fork's
-# `headroom-core` comes in as a path dependency and is checked through them.
-# `--all-targets` (tests, benches, examples) is deliberately not part of the
-# first pass; add it once the bench targets compile cleanly. `cargo clippy
-# -- -D warnings` is a separate gate and stays out of this pipeline.
-# Subcommand invocations never run the check.
+# `cargo check -p aphrodite -p aphrodite-hermes` - the fast debug pass, which
+# fails first and names the failing command - and then runs Maintain/Check.sh,
+# the full local mirror of .github/workflows/Check.yml: cargo check --workspace
+# --release, clippy, fmt --check, the workspace tests, the dynamic_hooks tests,
+# the dylib build, the Python FFI tests, ruff, pyright and cargo deny, in CI's
+# own order. Maintain/CheckParity.py runs first inside Check.sh and fails when
+# the mirror and the workflow have drifted apart.
+# Set FORMAT_SKIP_CI=1 to stop after the fast type check (formatting only).
+# Subcommand invocations never run either check.
 #
 # TOML is handled by taplo/even-better-toml, Python by ruff - neither is
 # invoked from here; see .github/workflows/Check.yml.
@@ -149,8 +154,8 @@ FormatRust() {
 	\echo "========================================"
 	\echo "Format Rust"
 	\echo "========================================"
-	\echo "Tooling: cargo +nightly fmt  (workspace module tree, first)"
-	\echo "         rustfmt direct pass (orphan files, second)"
+	\echo "Tooling: cargo fmt            (workspace module tree, first)"
+	\echo "         rustfmt direct pass  (orphan files, second)"
 	\echo "Config:  rustfmt.toml"
 	\echo "========================================"
 	\echo ""
@@ -161,7 +166,9 @@ FormatRust() {
 	# declarations from crates/aphrodite and crates/aphrodite-hermes.
 	# `vendor/headroom` and `vendor/rtk` are separate Cargo workspace roots
 	# (their own [workspace] table) - cargo fmt here never touches them.
-	cargo +nightly fmt --all
+	# No `+nightly`: rustup resolves rust-toolchain.toml for this directory,
+	# which is the same dated nightly CI installs.
+	cargo fmt --all
 
 	# Pass 2: direct rustfmt - catches any .rs files that are NOT part of
 	# this workspace's module graph (orphan files, planned modules not yet
@@ -185,13 +192,13 @@ FormatRust() {
 		-not -path "*/.generated/*" \
 		-not -path "*/gen/*" \
 		| xargs -I {} sh -c \
-			'rustup run nightly rustfmt --config-path rustfmt.toml "$1" 2>/dev/null || true' \
+			'rustfmt --config-path rustfmt.toml "$1" 2>/dev/null || true' \
 			-- {}
 
 	# Compliance: the exact gate CI runs in Check.yml. A formatted tree must
 	# pass `cargo fmt --all -- --check` - fail loudly if it does not.
 	\echo "→ Verifying cargo fmt --all -- --check…"
-	cargo +nightly fmt --all -- --check
+	cargo fmt --all -- --check
 
 	\echo ""
 	\echo "Rust formatting complete (cargo fmt check passed)."
@@ -250,6 +257,14 @@ case "${1:-}" in
 		FormatPrettier
 		FormatRust
 		FormatCheck
+		if [ -z "${FORMAT_SKIP_CI:-}" ]; then
+			\echo "→ Running Maintain/Check.sh (full CI mirror)…"
+			\echo ""
+			bash "$Current/Check.sh"
+		else
+			\echo "→ Skipping Maintain/Check.sh (FORMAT_SKIP_CI is set)."
+			\echo ""
+		fi
 		\echo "→ Format complete."
 		;;
 	--help | -h)
@@ -259,7 +274,7 @@ case "${1:-}" in
 		\echo "  shell     Format shell scripts with Prettier (prettier-plugin-sh)"
 		\echo "  prettier  Format Markdown/JSON/YAML with Prettier"
 		\echo "  rust      Format Rust with rustfmt (nightly)"
-		\echo "  (no arg)  Run all four in order, then cargo check"
+		\echo "  (no arg)  Run all four in order, then cargo check, then Maintain/Check.sh"
 		;;
 	*)
 		\echo "Unknown target: $1"

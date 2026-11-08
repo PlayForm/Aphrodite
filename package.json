@@ -6,7 +6,9 @@
   "license": "CC0-1.0",
   "repository": "PlayForm/Aphrodite",
   "scripts": {
+    "Check": "bash Maintain/Check.sh",
     "Check:FFI": "python3 Maintain/check_ffi_contract.py",
+    "Check:Parity": "python3 Maintain/CheckParity.py",
     "Format": "bash Maintain/Format.sh",
     "Format:LineEndings": "bash Maintain/Format.sh dos2unix",
     "Format:Shell": "bash Maintain/Format.sh shell",
