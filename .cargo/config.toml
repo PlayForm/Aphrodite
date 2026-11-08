@@ -19,10 +19,21 @@
 # Maintain/Check.sh is the ordered runner, and it is the only place that
 # encodes CI's job and step order.
 #
-# `ci-deny` is `deny check`, not `deny --all-features check`: CI's Deny job
-# runs EmbarkStudios/cargo-deny-action with `command: check`, which expands to
-# exactly `cargo deny check`. Adding --all-features locally would enable
-# optional features and audit a different dependency graph than CI audits.
+# `ci-deny` carries `--all-features` because the action really passes it. At
+# EmbarkStudios/cargo-deny-action v2.1.1 the `arguments` input defaults to
+# `--all-features` and the action's entrypoint appends
+# `--log-level <log-level> --manifest-path <manifest-path> <arguments> <command>`,
+# so `command: check` with no other input executes
+#
+#   cargo deny --log-level warn --manifest-path ./Cargo.toml --all-features check
+#
+# (exactly the argv in the failing job's log). `warn` is cargo-deny's default log
+# level and `./Cargo.toml` its default manifest path, so the alias keeps the one
+# flag that changes the audited dependency graph and drops the two that do not.
+# `--all-features` is a global cargo-deny flag, accepted before the subcommand;
+# `cargo deny check --help` does not list it, `cargo deny --help` does.
+# Maintain/CheckParity.py derives the expected value from the action's defaults,
+# so removing the flag here fails the parity check.
 
 [alias]
 ci-check = "check --workspace --release"
@@ -31,4 +42,4 @@ ci-fmt = "fmt --all -- --check"
 ci-test = "test --workspace --release"
 ci-hooks = "test --manifest-path Maintain/dynamic_hooks/rust/Cargo.toml"
 ci-dylib = "build --release -p aphrodite-hermes"
-ci-deny = "deny check"
+ci-deny = "deny --all-features check"

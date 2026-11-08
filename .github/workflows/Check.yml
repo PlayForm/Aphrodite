@@ -59,6 +59,14 @@ jobs:
         with:
           submodules: recursive
 
+      # The local mirror (Maintain/Check.sh + the ci-* aliases in
+      # .cargo/config.toml) must stay the same gates as this file. That
+      # consistency is only a guarantee if CI enforces it too - otherwise it
+      # holds exactly until the next person forgets to run the checker.
+      # Placed before the compile steps so drift fails in seconds.
+      - name: Mirror parity
+        run: python3 Maintain/CheckParity.py
+
       - name: Setup Rust (nightly, floating)
         # Floating `nightly` - the repo tracks the newest nightly, deliberately
         # never a dated pin (rust-toolchain.toml channel = "nightly"). The

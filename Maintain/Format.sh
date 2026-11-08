@@ -26,11 +26,11 @@
 # The default invocation (no subcommand) then type-checks the tree with
 # `cargo check -p aphrodite -p aphrodite-hermes` - the fast debug pass, which
 # fails first and names the failing command - and then runs Maintain/Check.sh,
-# the full local mirror of .github/workflows/Check.yml: cargo check --workspace
-# --release, clippy, fmt --check, the workspace tests, the dynamic_hooks tests,
-# the dylib build, the Python FFI tests, ruff, pyright and cargo deny, in CI's
-# own order. Maintain/CheckParity.py runs first inside Check.sh and fails when
-# the mirror and the workflow have drifted apart.
+# the full local mirror of .github/workflows/Check.yml: the toolchain update,
+# cargo check --workspace --release, clippy, fmt --check, the workspace tests,
+# the dynamic_hooks tests, the dylib build, the Python FFI tests, ruff, pyright
+# and cargo deny, in CI's own order. Maintain/CheckParity.py runs first inside
+# Check.sh and fails when the mirror and the workflow have drifted apart.
 # Set FORMAT_SKIP_CI=1 to stop after the fast type check (formatting only).
 # Subcommand invocations never run either check.
 #
@@ -176,25 +176,45 @@ FormatRust() {
 	# wired into a crate root). Never touches vendor/ or plugins/ - those
 	# are separate submodules with their own formatting.
 	#
+	# A file rustfmt refuses is a real failure, not noise: pass 1 only walks
+	# the module graph, so this pass is the ONLY gate orphan files have. The
+	# per-file errors are collected and printed below; the previous
+	# `2>/dev/null || true` discarded them, which let "Rust formatting
+	# complete" print over a file rustfmt had declined to format.
+	#
 	# shellcheck disable=SC2038
 	# shellcheck disable=SC2016
-	find . -name "*.rs" \
-		-not -path "*/vendor/*" \
-		-not -path "*/plugins/*" \
-		-not -path "*/profiles/*" \
-		-not -path "*/.hermes/*" \
-		-not -path "*/target/*" \
-		-not -path "*/node_modules/*" \
-		-not -path "*/.git/*" \
-		-not -path "*/.fingerprint/*" \
-		-not -path "*/incremental/*" \
-		-not -path "*/deps/*" \
-		-not -path "*/Generated/*" \
-		-not -path "*/.generated/*" \
-		-not -path "*/gen/*" \
-		| xargs -I {} sh -c \
-			'rustfmt --config-path rustfmt.toml "$1" 2>/dev/null || true' \
-			-- {}
+	\echo "→ Formatting orphan .rs files (direct rustfmt)…"
+	OrphanFailures=$(
+		find . -name "*.rs" \
+			-not -path "*/vendor/*" \
+			-not -path "*/plugins/*" \
+			-not -path "*/profiles/*" \
+			-not -path "*/.hermes/*" \
+			-not -path "*/target/*" \
+			-not -path "*/node_modules/*" \
+			-not -path "*/.git/*" \
+			-not -path "*/.fingerprint/*" \
+			-not -path "*/incremental/*" \
+			-not -path "*/deps/*" \
+			-not -path "*/Generated/*" \
+			-not -path "*/.generated/*" \
+			-not -path "*/gen/*" \
+			-print0 \
+			| xargs -0 -n 1 sh -c \
+				'if ! Output=$(rustfmt --config-path rustfmt.toml "$1" 2>&1); then printf "  - %s\n%s\n" "$1" "$Output"; fi' \
+				--
+	)
+
+	if [ -n "$OrphanFailures" ]; then
+		\echo ""
+		\echo "Error: rustfmt could not format these files:"
+		\echo "$OrphanFailures"
+		\echo ""
+		\echo "  They sit outside the module graph, so \`cargo fmt\` never sees them"
+		\echo "  and this pass is their only gate. Fix the errors above."
+		exit 1
+	fi
 
 	# Compliance: the exact gate CI runs in Check.yml. A formatted tree must
 	# pass `cargo fmt --all -- --check` - fail loudly if it does not.
@@ -202,7 +222,7 @@ FormatRust() {
 	cargo fmt --all -- --check
 
 	\echo ""
-	\echo "Rust formatting complete (cargo fmt check passed)."
+	\echo "Rust formatting complete (cargo fmt check passed, orphan rustfmt clean)."
 	\echo ""
 }
 
