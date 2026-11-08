@@ -1,7 +1,7 @@
 > **Released with `Aphrodite/v1.8.0`** - fork commit `724da7bf` on `Current`
-> (the parent gitlink floats there). Two steps remain outside this note's
-> scope and outside CI: publishing `aphrodite-headroom-core` `0.2.0` to
-> crates.io, and creating the fork tag `aphrodite-v0.11.0`.
+> (the parent gitlink floats there). Publishing `aphrodite-headroom-core` `0.2.0`
+> to crates.io is automated by `Publish-Headroom-Core` as of the fix described
+> in the parent note; the fork tag `aphrodite-v0.11.0` is still created by hand.
 
 ## Headroom Fork: aphrodite-headroom-core 0.2.0 · fork tag aphrodite-v0.11.0
 
@@ -105,11 +105,13 @@ created_at ASC` in batches of 256 rows, with exact freed rows/bytes from
 ### What Ships
 
 - `aphrodite-headroom-core` **0.2.0** - the crate version this release pins.
-  Two steps are still outstanding and neither is automated by CI:
-  **publishing it to crates.io** (the `Publish-Headroom-Core` step is gated on a
-  `workflow_dispatch` input that no longer exists, so the chain never publishes
-  the fork) and **creating the fork tag `aphrodite-v0.11.0`**. The parent
-  gitlink already floats to `724da7bf`, the commit carrying 0.2.0.
+  Publishing it is now automated: `Publish-Headroom-Core` publishes the fork
+  crate on any `Aphrodite/v*` tag whose `Test` passes, whenever the version is
+  not already on crates.io. Before that fix the step was gated on a
+  `workflow_dispatch` input that no longer exists, so the job reported success
+  without publishing and `Publish-Aphrodite` failed on `^0.2.0`. The remaining
+  manual step is the **fork tag `aphrodite-v0.11.0`**; the parent gitlink
+  already floats to `724da7bf`, the commit carrying 0.2.0.
 - The main `Aphrodite/v1.8.0` release ships the 4-target binary matrix - see
   [`release-notes-v1.8.0.md`](release-notes-v1.8.0.md).
 

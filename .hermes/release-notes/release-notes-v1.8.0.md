@@ -1,5 +1,7 @@
-> **Released** - `Aphrodite/v1.8.0`, tag on `Current` at `b3fcd565`, with plugin
-> `v2.3.1` and `aphrodite-headroom-core` `0.2.0`.
+> **Released** - `Aphrodite/v1.8.0`, tag on `Current` at `8eb2d95f`, with plugin
+> `v2.3.1` and `aphrodite-headroom-core` `0.2.0`. The tag was re-cut from
+> `b3fcd565` after the publish-chain fix described under Infrastructure; the
+> release source is identical apart from `.github/workflows/Publish.yml`.
 
 **[Compare Aphrodite/v1.7.0...Aphrodite/v1.8.0](https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.7.0...Aphrodite/v1.8.0)**
 
@@ -60,9 +62,9 @@ is tracked separately.
   predicate was rewritten as `created_at < cutoff` so SQLite's
   OR-optimisation can drive both disjuncts from an index. Schema
   `user_version` 2 → 3.
-- **Fix (telemetry, `/health`)**: `fill_pct` is `100 -
-compression_ratio_ema/20` clamped to `[1, 99]` - compression headroom, pinned
-  near 90-99 by construction, not store occupancy. `/health` now returns
+- **Fix (telemetry, `/health`)**: `fill_pct` is
+  `100 - compression_ratio_ema/20` clamped to `[1, 99]` - compression headroom,
+  pinned near 90-99 by construction, not store occupancy. `/health` now returns
   `fill_pct_kind: "compression_headroom"` and `store_entries` beside it, and
   `/stats/db` carries the real capacity picture (`total_entries`,
   `total_bytes_original`, `database_size_bytes`, `freelist_bytes`,
@@ -99,8 +101,18 @@ those; they ship when the proxy itself is consumed.
 ### Infrastructure
 
 - Build: `cargo build --release -p aphrodite -p aphrodite-hermes` ✅ 1m39s on
-  `aarch64-apple-darwin`, from the tagged commit (`b3fcd565`); the CI 4-target
-  matrix is built by `Build.yml` on the tag and attaches all 12 assets.
+  `aarch64-apple-darwin`; the CI 4-target matrix is built by `Build.yml` on the
+  tag and attaches all 12 assets.
+- Release chain: the tag drives `Build.yml` → `Publish.yml` with no manual
+  step. Two failures were cleared on the way. The first `Build` run could not
+  check out the plugin gitlink (`upload-pack: not our ref 0558bc47` - the child
+  commit was not yet on `PlayForm/Aphrodite-Hermes`). `Publish-Aphrodite` then
+  failed on `aphrodite-headroom-core = "^0.2.0"` because `Publish-Headroom-Core`
+  reported success in 18s while publishing nothing: its publish step was gated
+  on `github.event_name == 'workflow_dispatch' && inputs.publish_crates`, which
+  is never true on a `workflow_run`. The step now runs on
+  `steps.check.outputs.published == 'false'` alone - the job is already gated on
+  the release tag and on `Test` - and the tag was re-cut to carry the fix.
 - Check / lint / format on the release line (`Current`): `cargo check
 --workspace --release` ✅ · `cargo clippy -p aphrodite -p aphrodite-hermes --
 -D warnings` ✅ 0 errors · `cargo fmt --all -- --check` ✅ · `pyright 1.1.411`
@@ -114,7 +126,8 @@ those; they ship when the proxy itself is consumed.
   `store_entries 300000`; `--store-max-entries 5000` trims to 5000 rows with
   `evicted_total 295000`; median `POST /retrieve` 0.22 ms (pre-fix 37.40 ms on
   the same file).
-- Shipped-artifact smoke test (installed `1.8.0 (b3fcd565, release)`): `/health`
+- Shipped-artifact smoke test (installed `1.8.0 (b3fcd565, release)`, built
+  before the publish-workflow fix and identical in source otherwise): `/health`
   → `version 1.8.0`, `fill_pct 90.0`, `fill_pct_kind compression_headroom`,
   `store_entries 0`; `/stats/db` → `max_entries 100` (the launched cap),
   `max_bytes 536870912`, `freelist_bytes 0`, `evicted_total 0`; `POST /retrieve`
@@ -144,7 +157,7 @@ those; they ship when the proxy itself is consumed.
 | `aphrodite-<target>` / `libaphrodite_hermes-<target>.{so,dylib,dll}` | per matrix target                        |
 | `SHA256SUMS-<target>.txt`                                            | checksums for that target's two binaries |
 | Plugin v2.3.1                                                        | Hermes (standalone repo)                 |
-| `aphrodite-headroom-core` 0.2.0                                      | crates.io                                |
+| `aphrodite-headroom-core` 0.2.0                                      | crates.io, by `Publish-Headroom-Core`    |
 
 ### Links
 
