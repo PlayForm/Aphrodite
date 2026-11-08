@@ -3571,7 +3571,7 @@ auto_expand_limit = 2048
 	fn test_stats_json_ccr_store_reports_live_values() {
 		let state = test_state_with_ccr();
 		let ccr = state.ccr.clone().expect("test state has a store");
-		assert!(ccr.put("live-entry", "payload"));
+		assert!(ccr.put_checked("live-entry", "payload"));
 
 		let v = state.stats_json();
 		assert_eq!(v["ccr_store"]["entries"], 1, "entries must be live, not a dead counter");
@@ -3585,7 +3585,10 @@ auto_expand_limit = 2048
 	/// content with an unresolvable marker.
 	struct FailingCcrStore;
 	impl headroom_core::ccr::CcrStore for FailingCcrStore {
-		fn put(&self, _hash:&str, _payload:&str) -> bool { false }
+		// Upstream's `put` returns nothing; the "did it land" answer is the
+		// fork's `put_checked`, which is what the F4 guard reads.
+		fn put(&self, _hash:&str, _payload:&str) {}
+		fn put_checked(&self, _hash:&str, _payload:&str) -> bool { false }
 		fn get(&self, _hash:&str) -> Option<String> { None }
 		fn len(&self) -> usize { 0 }
 		fn del(&self, _hash:&str) -> bool { false }
