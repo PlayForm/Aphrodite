@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-import tomllib
 from pathlib import Path
+
+try:
+	import tomllib
+except ModuleNotFoundError:  # Python < 3.11, e.g. macOS system python3 3.9
+	tomllib = None  # type: ignore[assignment]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "Check.yml"
@@ -288,12 +292,56 @@ class Report:
 			print(f"        {message}")
 
 
+def parse_simple_toml(text: str) -> dict:
+	"""Fallback reader for the two small config files this checker reads.
+
+	Handles only the shapes those files use: ``[table]`` headers,
+	``key = "string"`` and ``key = ["a", "b"]``. It exists because the macOS
+	system python3 (3.9) has no ``tomllib``, and a checker that dies on an
+	ImportError stops guarding the mirror while still exiting non-zero for the
+	wrong reason. tomllib is used whenever it is importable.
+	"""
+	document: dict = {}
+	current: dict = document
+	for raw in text.splitlines():
+		line = raw.strip()
+		if not line or line.startswith("#"):
+			continue
+		if line.startswith("[") and line.endswith("]"):
+			current = document.setdefault(line[1:-1].strip(), {})
+			continue
+		key, separator, value = line.partition("=")
+		if not separator:
+			continue
+		key = key.strip().strip("\"'")
+		value = value.strip()
+		if value.startswith("["):
+			items = []
+			for item in value.strip("[]").split(","):
+				item = item.strip()
+				if item:
+					items.append(item.strip("\"'"))
+			current[key] = items
+		elif value[:1] in ("'", '"'):
+			quote = value[0]
+			end = value.find(quote, 1)
+			current[key] = value[1:end] if end > 0 else value[1:]
+		else:
+			current[key] = value
+	return document
+
+
 def load_toml(path: Path) -> dict:
 	try:
-		with path.open("rb") as handle:
-			return tomllib.load(handle)
+		raw = path.read_bytes()
 	except FileNotFoundError:
 		raise SystemExit(f"error: {path} not found") from None
+
+	if tomllib is None:
+		return parse_simple_toml(raw.decode("utf-8"))
+
+	try:
+		return tomllib.loads(raw.decode("utf-8"))
 	except tomllib.TOMLDecodeError as error:
 		raise SystemExit(f"error: {path} is not valid TOML: {error}") from None
 

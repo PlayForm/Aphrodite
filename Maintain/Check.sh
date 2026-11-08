@@ -117,6 +117,11 @@ Should() {
 # mirrors a workflow it has drifted from is worse than no runner, because it
 # reports green for gates CI no longer runs. Failures name the divergence.
 MirrorParity() {
+	# Name the interpreter: python3 resolves differently between an interactive
+	# shell and a script's PATH here, and the macOS system python3 (3.9) has no
+	# tomllib. CheckParity.py carries a fallback parser, so either works - this
+	# line makes a failure attributable.
+	\echo "→ Interpreter: $(command -v python3) ($(python3 -c 'import sys; print(sys.version.split()[0])' 2> /dev/null || \echo unknown))"
 	python3 Maintain/CheckParity.py
 }
 
