@@ -338,12 +338,26 @@ load-balancer probes work. Does not call the upstream - see
 	"ccr": true,
 	"mode": "token",
 	"version": "1.6.5",
-	"fill_pct": 90.0
+	"fill_pct": 90.0,
+	"fill_pct_kind": "compression_headroom",
+	"store_entries": 0
 }
 ```
 
-`version` reports the compiled `CARGO_PKG_VERSION`; `fill_pct` is the current
-headroom fill percentage (0.0-99.0).
+`version` reports the compiled `CARGO_PKG_VERSION`.
+
+`fill_pct` is a **compression-headroom** number, not store occupancy: it is
+`100 - compression_ratio_ema/20` clamped to `[1, 99]`, so a fresh process
+reports exactly `90.0` **with an empty store** and drifts toward `99` as the
+ratio approaches `1.0` (i.e. when little is being compressed). `fill_pct_kind`
+states that explicitly so the field cannot be misread as a capacity gauge.
+Store occupancy is `store_entries` here, and the full picture is on
+`/stats/db` (`total_entries`, `total_bytes_original`, `database_size_bytes`,
+`freelist_bytes`, `max_entries`, `max_bytes`, `evicted_total`). In
+`/stats/db`, `max_entries` / `max_bytes` are `null` when no cap is set
+(`store_max_entries` / `store_max_bytes` = `0` = unlimited), and
+`freelist_bytes` is the reclaimable slack the file still holds after
+purges and evictions.
 
 ## handle_retrieve
 

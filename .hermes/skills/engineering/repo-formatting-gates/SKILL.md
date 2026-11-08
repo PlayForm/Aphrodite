@@ -93,7 +93,7 @@ and never a root-wide sweep the CI gate does not make.
   can re-introduce the divergence the newer rules remove.
 - **One workflow can carry TWO toolchain pins - grep the WHOLE file, not
   just the main setup step.** A Check.yml may have a repo-wide `toolchain:
-  nightly` setup AND a separate "fmt only" step with its own dated pin
+nightly` setup AND a separate "fmt only" step with its own dated pin
   (`cargo +nightly-2026-05-01 fmt --check`). The dated step is the real
   fmt gate; the main setup is irrelevant to it. When the repo moves to
   latest nightly, remove BOTH the dated step and its `+nightly-<pin>`

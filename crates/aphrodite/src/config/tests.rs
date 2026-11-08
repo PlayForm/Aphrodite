@@ -154,6 +154,59 @@ fn test_resolve_falls_back_to_toml_when_env_unset() {
 	assert_eq!(cli.ccr_ttl_seconds, 111);
 }
 
+/// Store retention caps: env > `[compression]` > shipped default, and the
+/// default must be FINITE. An unbounded store is the defect the key exists
+/// to fix, so "absent everywhere" resolving to unlimited would silently
+/// reinstate it.
+#[test]
+fn test_resolve_store_retention_caps_env_toml_defaults() {
+	let _g = env_guard();
+	for k in ["APHRODITE_STORE_MAX_ENTRIES", "APHRODITE_STORE_MAX_BYTES"] {
+		unsafe { std::env::remove_var(k) };
+	}
+
+	let toml = r#"
+		[compression]
+		store_max_entries = 1234
+		store_max_bytes = 5678
+
+		[[proxies]]
+		name = "token"
+		mode = "token"
+		api_key = "test-key"
+		"#;
+
+	let mc = multi_config_from_toml(toml);
+	let cli = mc.resolve(&mc.proxies[0]).unwrap();
+	assert_eq!(cli.store_max_entries, 1234);
+	assert_eq!(cli.store_max_bytes, 5678);
+
+	unsafe {
+		std::env::set_var("APHRODITE_STORE_MAX_ENTRIES", "9");
+		std::env::set_var("APHRODITE_STORE_MAX_BYTES", "10");
+	}
+	let mc = multi_config_from_toml(toml);
+	let cli = mc.resolve(&mc.proxies[0]).unwrap();
+	unsafe {
+		std::env::remove_var("APHRODITE_STORE_MAX_ENTRIES");
+		std::env::remove_var("APHRODITE_STORE_MAX_BYTES");
+	}
+	assert_eq!(cli.store_max_entries, 9);
+	assert_eq!(cli.store_max_bytes, 10);
+
+	let mc = multi_config_from_toml(
+		r#"
+		[[proxies]]
+		name = "token"
+		mode = "token"
+		api_key = "test-key"
+		"#,
+	);
+	let cli = mc.resolve(&mc.proxies[0]).unwrap();
+	assert_eq!(cli.store_max_entries, 100_000);
+	assert_eq!(cli.store_max_bytes, 536_870_912);
+}
+
 #[test]
 fn test_resolve_invalid_mode_falls_back_to_token() {
 	let mc = multi_config_from_toml(

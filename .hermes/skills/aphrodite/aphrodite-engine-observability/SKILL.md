@@ -101,13 +101,33 @@ access.** Verified: `GET /health` never calls the upstream API - it always
 returns HTTP 200 and conveys capability in the JSON body:
 
 ```json
-{ "status": "healthy", "ccr": true, "mode": "token|cache", "version": "1.6.2", "fill_pct": 0.42 }
+{
+	"status": "healthy",
+	"ccr": true,
+	"mode": "token|cache",
+	"version": "1.7.0",
+	"fill_pct": 90.0,
+	"fill_pct_kind": "compression_headroom",
+	"store_entries": 0
+}
 ```
 
 `status` is always `"healthy"` (liveness); `ccr` is the capability flag. The
 historical `status: healthy|degraded` dichotomy in
 `references/health-check-pattern.md` is STALE - a live upstream call was
 removed from `/health` precisely so it stays local-only.
+
+**`fill_pct` is compression headroom, not store occupancy.** It is
+`100 - compression_ratio_ema/20` clamped to `[1, 99]`, so a fresh process
+reports exactly **90.0 with an empty store** and drifts toward `99` as the
+ratio approaches 1.0 (i.e. when little is being compressed). It is pinned
+near 90-99 by construction, which makes any "fill_pct is high" observation
+true at all times and therefore worthless as a store-capacity signal -
+reading it that way produced a false unbounded-store report. `fill_pct_kind`
+states the semantic; store occupancy is `store_entries` on `/health` and
+`total_entries` / `total_bytes_original` / `database_size_bytes` on
+`/stats/db` (plus `max_entries` / `max_bytes` / `evicted_total` /
+`freelist_bytes` for retention).
 
 Layer 3 also verifies: the cache/store accepts and returns a known payload;
 a CCR marker parses and resolves locally (`aphrodite_compress` +
@@ -172,9 +192,41 @@ storage scope per cache before drawing conclusions.
 `inline_ccr_misses`, `tool_relay_calls`/`success`/`failure`, `notify_success`
 `/`failure`, `upstream_errors_4xx`, `upstream_errors_5xx`,
 `upstream_timeouts`, `upstream_connect_errors`, `sse_stream_errors`,
-`ccr_store_entries`, `ccr_store_bytes`, `compression_ratio_ema`,
-`compressions_by_type`, `fill_pct`(source:`AppState`fields in`crates/aphrodite/src/proxy.rs`). A health claim should cite the relevant
-counters, not a banner.
+`compression_ratio_ema`, `compressions_by_type`, `fill_pct`(source:`AppState`fields in`crates/aphrodite/src/proxy.rs`). A health claim should
+cite the relevant counters, not a banner.
+
+Store occupancy is NOT a counter: `/stats` `ccr_store.entries` /
+`bytes_approx` read the live backend, and `/stats/db` is the authoritative
+view (`total_entries`, `total_bytes_original`, `database_size_bytes`,
+`freelist_bytes`, `max_entries`, `max_bytes`, `evicted_total`). Two
+`AtomicU64` fields named `ccr_store_entries` / `ccr_store_bytes` used to sit
+in `AppState` and were never incremented - `/stats` reported `entries: 0` on
+a full store. Treat any "store is empty" reading that does not come from
+`/stats/db` as unverified.
+
+## Store retention (SQLite token proxy)
+
+The store is bounded on two independent axes, and confusing them produces
+wrong diagnoses:
+
+- **Time** - `ccr_ttl_seconds` (default 3600): idle window, restarted on
+  every hit, capped by an absolute lifetime of 8× the TTL. Rows are purged
+  lazily, debounced to once per 60 s (on both `put` and `get`; the lookup
+  predicate itself refuses expired rows, so skipping a sweep never serves
+  stale content).
+- **Space** - `[compression] store_max_entries` (default 100000) and
+  `store_max_bytes` (default 536870912; payload bytes, i.e.
+  `SUM(LENGTH(original))`, not file size). `0` = unlimited. Past either cap
+  the least-recently-accessed rows are evicted; an evicted hash degrades to
+  a retrieval miss, exactly like an expired one. Caps are applied when the
+  store is opened - an already-oversized DB is trimmed at open, and a
+  changed cap needs a proxy restart (not hot-reloaded).
+
+Env overrides: `APHRODITE_STORE_MAX_ENTRIES` / `APHRODITE_STORE_MAX_BYTES`.
+The sweep and the LRU eviction are index-driven (`ccr_entries_expiry`,
+`ccr_entries_created`, `ccr_entries_lru`); a full table walk per retrieval
+is what made retrieval O(rows) - measured 0.15 ms empty vs 37.4 ms at 300k
+rows before the indexes, 0.22 ms at 300k after.
 
 ## 'Proxy healthy' - two independent probes
 
@@ -206,3 +258,6 @@ collapse them into one "proxy healthy" boolean.
 | Logs contain load failures when they occur            | Log locations table                   | Corrupt dylib, start session, read logs                               | Load failure visible in proxy-stderr.log or plugin logger   | Fix log wiring                              |
 | No tracing subscriber inside the host                 | `tracing::dispatcher::has_been_set()` | Run a diagnostic in a subscriber-less process (`cargo run --example`) | `has_been_set()` false; stderr fallback prints              | Add stderr fallback or surfaced state field |
 | One compression owner per session                     | Layer-2 rule                          | Check `compression.enabled` config with Aphrodite active              | Hermes built-in compression disabled                        | Disable built-in compression; recheck       |
+| `fill_pct` is not store occupancy                     | `proxy.rs` `compute_fill_pct`         | Fresh proxy, EMPTY store, `GET /health`                               | `fill_pct` = 90.0 with `store_entries` = 0                  | Never read it as capacity; use `/stats/db`  |
+| Store caps bound rows and bytes                       | `store_max_entries` / `_bytes`        | Open a 300k-row DB with `--store-max-entries 5000`                    | `total_entries` = 5000, `evicted_total` = 295000            | Fix eviction path; re-check caps            |
+| Retrieval cost is independent of store size           | `ccr_entries_expiry` index            | Time `POST /retrieve` on empty vs 300k-row store                      | Same order of magnitude (measured 0.15 vs 0.22 ms)          | Sweep regressed to a scan; restore index    |

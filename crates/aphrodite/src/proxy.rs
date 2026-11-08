@@ -260,10 +260,10 @@ async fn ccr_len(ccr:&Arc<dyn CcrStore>) -> usize {
 ///   `inline_ccr_misses`, `tool_relay_success`, `tool_relay_failure`,
 ///   `notify_success`, `notify_failure`, `upstream_errors_4xx`,
 ///   `upstream_errors_5xx`, `upstream_timeouts`, `upstream_connect_errors`,
-///   `sse_stream_errors`, `ccr_store_entries`, `ccr_store_bytes`,
-///   `request_body_bytes`, `response_body_bytes`, `upstream_latency_micros`,
-///   `total_latency_micros` - only ever incremented via `fetch_add`, never
-///   reassigned; `latency_buckets` is a fixed histogram of the same class.
+///   `sse_stream_errors`, `request_body_bytes`, `response_body_bytes`,
+///   `upstream_latency_micros`, `total_latency_micros` - only ever
+///   incremented via `fetch_add`, never reassigned; `latency_buckets` is a
+///   fixed histogram of the same class.
 ///
 /// The remaining lock-guarded fields (`request_history`, `inline_ccr`,
 /// `last_errors`, `compressions_by_type`, `response_cache`,
@@ -396,8 +396,6 @@ pub struct AppState {
 	/// recorded, so an operator diagnosing "streams cut off" from `/stats`
 	/// saw nothing.
 	pub sse_stream_errors:AtomicU64,
-	pub ccr_store_entries:AtomicU64,
-	pub ccr_store_bytes:AtomicU64,
 	pub request_body_bytes:AtomicU64,
 	pub response_body_bytes:AtomicU64,
 	pub upstream_latency_micros:AtomicU64,
@@ -568,8 +566,20 @@ impl AppState {
 				"sse_stream_errors": self.sse_stream_errors.load(Ordering::Relaxed),
 			},
 			"ccr_store": {
-				"entries": self.ccr_store_entries.load(Ordering::Relaxed),
-				"bytes_approx": self.ccr_store_bytes.load(Ordering::Relaxed),
+				// Live store values, not counters: these two fields used to
+				// be atomics that nothing ever incremented, so `/stats`
+				// reported a permanent `entries: 0` no matter how full the
+				// store was - the same class of defect as `fill_pct` being
+				// read as store occupancy. `len()` is O(1) (maintained by
+				// the backend) and the byte total comes from the backend's
+				// own stats query, which `/stats` can afford.
+				"entries": self.ccr.as_ref().map(|c| c.len()).unwrap_or(0),
+				"bytes_approx": self
+					.ccr
+					.as_ref()
+					.and_then(|c| c.stats_db())
+					.and_then(|v| v.get("total_bytes_original").and_then(|n| n.as_u64()))
+					.unwrap_or(0),
 			},
 			"body_bytes": {
 				"request": self.request_body_bytes.load(Ordering::Relaxed),
@@ -834,8 +844,13 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 				std::fs::create_dir_all(parent)
 					.map_err(|e| anyhow::anyhow!("SQLite CCR: cannot create directory {}: {}", parent.display(), e))?;
 			}
-			let store = SqliteCcrStore::open(&db_path, cli.ccr_ttl_seconds)
-				.map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
+			let store = SqliteCcrStore::open_with_limits(
+				&db_path,
+				cli.ccr_ttl_seconds,
+				Some(cli.store_max_entries),
+				Some(cli.store_max_bytes),
+			)
+			.map_err(|e| anyhow::anyhow!("SQLite CCR: {}", e))?;
 			Some(Arc::new(store))
 		},
 		ProxyMode::Cache => {
@@ -899,8 +914,6 @@ pub async fn build_state(cli:&Cli, compression:Option<&CompressionConfig>) -> an
 		upstream_timeouts:AtomicU64::new(0),
 		upstream_connect_errors:AtomicU64::new(0),
 		sse_stream_errors:AtomicU64::new(0),
-		ccr_store_entries:AtomicU64::new(0),
-		ccr_store_bytes:AtomicU64::new(0),
 		request_body_bytes:AtomicU64::new(0),
 		response_body_bytes:AtomicU64::new(0),
 		upstream_latency_micros:AtomicU64::new(0),
@@ -2783,7 +2796,16 @@ pub async fn health_check(State(state):State<Arc<AppState>>) -> impl IntoRespons
 				ProxyMode::Token => "token",
 			},
 			"version": env!("CARGO_PKG_VERSION"),
+			// `fill_pct` is a COMPRESSION HEADROOM number, not store
+			// occupancy: it is `100 - compression_ratio_ema/20`, so a fresh
+			// process reports exactly 90.0 with an empty store and drifts
+			// toward 99 as the ratio approaches 1.0 (i.e. when little is
+			// being compressed). An operator who reads it as "the store is
+			// 90% full" gets a permanent false alarm - `store_entries` and
+			// `/stats/db` are the store occupancy answers.
 			"fill_pct": state.fill_pct.load(Ordering::Relaxed) as f64 / 100.0,
+			"fill_pct_kind": "compression_headroom",
+			"store_entries": state.ccr.as_ref().map(|c| c.len()).unwrap_or(0),
 		})),
 	)
 		.into_response()
@@ -2857,8 +2879,6 @@ pub(crate) mod tests {
 			upstream_timeouts:AtomicU64::new(0),
 			upstream_connect_errors:AtomicU64::new(0),
 			sse_stream_errors:AtomicU64::new(0),
-			ccr_store_entries:AtomicU64::new(0),
-			ccr_store_bytes:AtomicU64::new(0),
 			request_body_bytes:AtomicU64::new(0),
 			response_body_bytes:AtomicU64::new(0),
 			upstream_latency_micros:AtomicU64::new(0),
@@ -2899,6 +2919,8 @@ pub(crate) mod tests {
 			catalog_mode:None,
 			classifier_poll:None,
 			code_multiplier:Some(5.0),
+			store_max_entries:None,
+			store_max_bytes:None,
 		};
 		let t = resolve_thresholds(Some(&comp));
 		assert_eq!(t.cache, 4096);
@@ -2942,6 +2964,8 @@ pub(crate) mod tests {
 			catalog_mode:None,
 			classifier_poll:None,
 			code_multiplier:None,
+			store_max_entries:None,
+			store_max_bytes:None,
 		};
 		let t = resolve_thresholds(Some(&comp));
 		assert_eq!(t.auto_expand, true);
@@ -3508,8 +3532,6 @@ auto_expand_limit = 2048
 			upstream_timeouts:AtomicU64::new(0),
 			upstream_connect_errors:AtomicU64::new(0),
 			sse_stream_errors:AtomicU64::new(0),
-			ccr_store_entries:AtomicU64::new(0),
-			ccr_store_bytes:AtomicU64::new(0),
 			request_body_bytes:AtomicU64::new(0),
 			response_body_bytes:AtomicU64::new(0),
 			upstream_latency_micros:AtomicU64::new(0),
@@ -3539,6 +3561,23 @@ auto_expand_limit = 2048
 			mode:ProxyMode::Token,
 			..test_state()
 		}
+	}
+
+	/// Regression: `ccr_store.entries` / `bytes_approx` on `/stats` used to be
+	/// atomics that nothing ever incremented, so a full store still reported
+	/// `entries: 0` - the same "telemetry that lies" class as `fill_pct`
+	/// being read as store occupancy. They must reflect the live backend.
+	#[test]
+	fn test_stats_json_ccr_store_reports_live_values() {
+		let state = test_state_with_ccr();
+		let ccr = state.ccr.clone().expect("test state has a store");
+		assert!(ccr.put("live-entry", "payload"));
+
+		let v = state.stats_json();
+		assert_eq!(v["ccr_store"]["entries"], 1, "entries must be live, not a dead counter");
+		// The in-memory backend has no `stats_db`, so the byte total stays 0
+		// here; the SQLite backend's own stats test covers the real number.
+		assert_eq!(v["ccr_store"]["bytes_approx"], 0);
 	}
 
 	/// A `CcrStore` whose `put` always fails - used to test report 02's F4

@@ -29,7 +29,7 @@ BLOB, timestamps, TTL), 7 directive `.md` files, `session.current`
 instance was already listening). `~/.hermes/config.yaml` lists `aphrodite` as
 an enabled plugin toolset (line 582) with `allow_tool_override: true` (592-593)
 and per-platform toolset memberships (959-999). Hermes's own `compression:`
-block (lines 135-145) is a separate, *disabled* mechanism (`enabled: false`) -
+block (lines 135-145) is a separate, _disabled_ mechanism (`enabled: false`) -
 unrelated to Aphrodite.
 
 ## 1. What is Aphrodite?
@@ -55,10 +55,10 @@ unrelated to Aphrodite.
 
 Two modes (`README.md:247-254`):
 
-| Mode | Interception | Coverage |
-| --- | --- | --- |
-| Plugin | Hermes hooks `transform_tool_result`, `transform_terminal_output`, context engine | every tool result, terminal output |
-| Proxy | Reverse proxy on :9797 (cache) / :9798 (token) in front of any LLM API; compresses Chat Completions responses; tool relay for bidirectional calls | OpenAI-compatible clients |
+| Mode   | Interception                                                                                                                                      | Coverage                           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Plugin | Hermes hooks `transform_tool_result`, `transform_terminal_output`, context engine                                                                 | every tool result, terminal output |
+| Proxy  | Reverse proxy on :9797 (cache) / :9798 (token) in front of any LLM API; compresses Chat Completions responses; tool relay for bidirectional calls | OpenAI-compatible clients          |
 
 Crate/module map (`README.md:258-295`, verified against `src/` listings):
 
@@ -139,6 +139,7 @@ Terminal output goes through `transform_terminal_output*` (:429-446) with an
 ```
 <<<CCR:hash|type|size>>>
 ```
+
 "hash - BLAKE3 digest ... first 40 hex characters"; retrieval points tolerate the
 `|type|size` suffix echoed back; "There is no prefix or fuzzy matching: the
 full hash must be supplied." Inline-only entries use an `i:` prefix. The proxy
@@ -250,12 +251,12 @@ tool output arrives as a short marker instead of inline text:
   explore, focus, foresight, lazy-eval, lazy), `session.current`
   (contents `20261019_063036_eafb3d`, 22 bytes incl. newline), `proxy-stderr.log`
   (119 bytes: `Error: failed to bind listener "127.0.0.1:9797" ... Address already
-  in use (os error 48)` - evidence the cache proxy was already running when a
+in use (os error 48)` - evidence the cache proxy was already running when a
   second instance started).
 - `~/.hermes/config.yaml`: `plugins.enabled` includes `aphrodite` (line 582);
   `plugins.entries.aphrodite.allow_tool_override: true` (592-593); `aphrodite`
   appears in `known_plugin_toolsets` (1009) and per-platform toolset lists for
-  teams/telegram/whatsapp/yuanbao etc. (959-999). Hermes's *own* `compression:`
+  teams/telegram/whatsapp/yuanbao etc. (959-999). Hermes's _own_ `compression:`
   section (135-145, `enabled: false`, threshold 0.75, target_ratio 0.2) is an
   independent mechanism, NOT Aphrodite. `proxy:` block (933-935) is Hermes's
   docker-enforcement proxy setting, also unrelated.
@@ -296,7 +297,7 @@ Key knobs (name = default, meaning):
   `live_container = false`, `recursive_depth = 5` (:99-100);
   `max_request_body_size` unset = no cap (:101); `catalog_mode` and
   `classifier_poll` are DOCUMENTED BUT UNWIRED (:102-103); `code_multiplier =
-  1.0` (:104); `context_engine = true` (status flag for the bridge, :105-109);
+1.0` (:104); `context_engine = true` (status flag for the bridge, :105-109);
   `poll_worker = true`, `auto_reload = true` (:110-111); `chain_split = false`
   with min 2 / max 6 segments (:112-114).
 - `[previews]` `model_family = "code_first"`, `code_structure_map = true`
@@ -348,7 +349,7 @@ Key knobs (name = default, meaning):
 - `crates/aphrodite/src/proxy.rs:1154,:2241,:2441,:2773` - proxy_handler,
   tool relay, ccr create, health.
 - `vendor/headroom/crates/headroom-core/src/ccr/backends/sqlite.rs:89,145,340-351`
-  - SQLite CCR store (ccr_entries).
+    - SQLite CCR store (ccr_entries).
 - `aphrodite.toml.example:88-114` - compression knobs; :129-155 - prompts;
   :204-221 - directives/flow.
 - Live: `~/.hermes/config.yaml:582,592-593,959-999,135-145`;

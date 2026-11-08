@@ -132,6 +132,18 @@ pub struct Cli {
 	#[arg(long, default_value = "3600", env = "APHRODITE_CCR_TTL")]
 	pub ccr_ttl_seconds:u64,
 
+	/// Maximum live rows in the SQLite CCR store before least-recently-
+	/// accessed rows are evicted (0 = unlimited). A TTL bounds the store
+	/// only in time; this bounds it in space so a burst of compression
+	/// inside one TTL window cannot grow the file without limit.
+	#[arg(long, default_value = "100000", env = "APHRODITE_STORE_MAX_ENTRIES")]
+	pub store_max_entries:usize,
+
+	/// Maximum stored payload bytes (`SUM(LENGTH(original))`) before
+	/// least-recently-accessed rows are evicted (0 = unlimited).
+	#[arg(long, default_value = "536870912", env = "APHRODITE_STORE_MAX_BYTES")]
+	pub store_max_bytes:u64,
+
 	/// Disable CCR markers in compressed output
 	#[arg(long)]
 	pub no_ccr_marker:bool,
