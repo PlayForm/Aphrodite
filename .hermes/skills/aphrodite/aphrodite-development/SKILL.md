@@ -425,17 +425,26 @@ python3 Maintain/CheckParity.py # fails when the mirror and CI drift
 - `cargo --list` shows `ci-check`, `ci-clippy`, `ci-fmt`, `ci-test`,
   `ci-hooks`, `ci-dylib`, `ci-deny`, each equal to its CI `run:` line minus
   the leading `cargo ` (`.cargo/config.toml`).
-- `Maintain/CheckParity.py` prints `OK: N check(s) passed`. It fails on a CI
-  step the mirror table does not know, a drifted alias value, an alias the
-  runner never invokes, or a `toolchain:` input that disagrees with
-  `rust-toolchain.toml`.
+- `Maintain/CheckParity.py` prints `OK: N check(s) passed - command/config
+inventory consistent with Check.yml.` It fails on a CI step the mirror table
+  does not know, a drifted alias value, an alias the runner never invokes, a
+  changed command inside a mirrored shell function, an undeclared or stale
+  divergence, or a `toolchain:` input that disagrees with
+  `rust-toolchain.toml`. It is also a step of `Check.yml` (Rust job), so drift
+  fails remotely instead of only on the machine of whoever remembers to run it.
 - The channel is floating by policy (`channel = "nightly"`, never a dated pin:
   a nightly that gains a lint is fixed in the code, not frozen away).
-  Freshness is a manual step, not the file's job: run
-  `rustup toolchain install nightly --profile minimal --force`, then confirm
-  `cargo fmt --version` and `cargo clippy --version` report the newest
-  nightly. A stale local channel is exactly the divergence that let
+  `Check.sh` refreshes it itself before any gate -
+  `rustup toolchain install nightly --profile minimal --no-self-update --force`,
+  then probes `cargo fmt --version` / `cargo clippy --version` and records
+  `rustc -Vv` + `cargo -V` - and aborts if the update or a probe fails. A stale
+  local channel is exactly the divergence that let
   `clippy::new_instead_of_clear` pass locally and fail CI.
+- A missing required tool (uv, ruff, npx) FAILS the run by default: CI installs
+  every tool it needs, so a run without one cannot reproduce CI.
+  `CHECK_OPTIONAL=1` is the explicit permissive mode - the dependent step is
+  skipped, the summary prints `INCOMPLETE`, and the exit status stays 0 for the
+  steps that ran. There is no opt-in strictness flag to remember.
 
 **Stop if**
 
@@ -470,6 +479,13 @@ gates). The per-mode lists are the worked criteria in
 
 ## Validate-phase pitfalls
 
+- **An external writer mutates this tree mid-run** (the auto-committer plus a
+  formatter/linter pass): `write_file` can refuse a file as "modified since you
+  last read it" even when its content is byte-identical (mtime churn), so re-read
+  and retry rather than treating it as a collision; and a backtick-quoted command
+  inside a double-quoted `\echo` gets rewritten to `$(...)`, which turns an error
+  message into an executed command. Quote such commands with single quotes
+  (`'cargo fmt --check'`), never backticks.
 - **The repo's dev skills live in `.hermes/skills/` (Development branch only,
   never shipped with the plugin) - edit the files directly with
   `write_file`/`patch`, never via `skill_manage`; `skill_manage` writes to the

@@ -38,9 +38,9 @@ What is compared:
    on either side re-opens the local-vs-CI lint divergence this pins shut.
 
 What this does NOT prove, stated so the guarantee is not overread: the runner's
-control flow (that each job's branch really reaches every step), the compiler
-rustup resolves at run time, and an action's internals beyond the inputs
-declared here. It proves the command and config inventory is consistent - which
+``Should`` guards (that each branch selects the right job), the compiler rustup
+resolves at run time, and an action's internals beyond the inputs declared here.
+It proves the command and config inventory is consistent - which
 is what a drift guard can prove.
 
 Usage:
@@ -625,6 +625,29 @@ def apply_divergence(report: Report, function: str, commands: list[str]) -> tupl
     return mapped, True
 
 
+def check_runner_reachability(
+    report: Report, script: str, functions: dict[str, list[str]]
+) -> None:
+    """Every function that invokes a mirrored alias must be called by the router.
+
+    Without this, moving ``RunStep ... cargo ci-check`` into a function nobody
+    calls would still satisfy the ordered-invocation check.
+    """
+    called = set()
+    for raw in script.splitlines():
+        line = raw.strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", line):
+            called.add(line)
+
+    for name, commands in sorted(functions.items()):
+        if not any(RUNSTEP_RE.match(command) for command in commands):
+            continue
+        if name not in called:
+            report.fail(f"Maintain/Check.sh defines {name}() with alias steps but never calls it")
+            continue
+        report.ok(f"{name}() is called from the router")
+
+
 def check_scripts(
     report: Report, jobs: dict[str, list[dict]], functions: dict[str, list[str]]
 ) -> None:
@@ -787,6 +810,7 @@ def main() -> int:
     check_inventory(report, jobs)
     check_aliases(report, jobs, aliases)
     check_runner_order(report, script)
+    check_runner_reachability(report, script, functions)
     check_scripts(report, jobs, functions)
     check_divergence_inventory(report)
     check_toolchain(report, jobs, toolchain)

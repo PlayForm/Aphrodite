@@ -217,7 +217,7 @@ async fn ccr_put(ccr:&Arc<dyn CcrStore>, hash:&str, content:&str) -> bool {
 	let ccr = ccr.clone();
 	let hash = hash.to_owned();
 	let content = content.to_owned();
-	tokio::task::spawn_blocking(move || ccr.put(&hash, &content))
+	tokio::task::spawn_blocking(move || ccr.put_checked(&hash, &content))
 		.await
 		.unwrap_or(false)
 }

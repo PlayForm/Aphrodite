@@ -1,8 +1,8 @@
 # Cargo configuration for the Aphrodite workspace.
 #
-# The [alias] table mirrors .github/workflows/Check.yml 1:1: every value is the
-# CI command with the leading `cargo ` removed, so `cargo ci-check` executes
-# exactly what CI's `run: cargo check --workspace --release` executes.
+# The [alias] table mirrors the commands of .github/workflows/Check.yml: every
+# value is the CI command with the leading `cargo ` removed, so `cargo ci-check`
+# executes exactly what CI's `run: cargo check --workspace --release` executes.
 # Maintain/CheckParity.py asserts that equality against the workflow file and
 # fails when CI gains or changes a step, so the two cannot drift silently.
 #
