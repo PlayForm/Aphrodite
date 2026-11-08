@@ -4,7 +4,7 @@
 #===============================================================================
 #
 # Usage:
-#   sh Maintain/Format.sh               # Run all formatters
+#   sh Maintain/Format.sh               # Run all formatters, then cargo check
 #   sh Maintain/Format.sh dos2unix      # Normalize line endings only
 #   sh Maintain/Format.sh shell         # Format shell scripts only (prettier)
 #   sh Maintain/Format.sh prettier      # Format Markdown/JSON/YAML only
@@ -17,7 +17,16 @@
 #   rustfmt.toml   - rustfmt options (nightly, edition 2024)
 #
 # The Rust pass ends with the same gate CI runs (`cargo fmt --all -- --check`),
-# so a formatted tree is always cargo-check compliant.
+# so a formatted tree is always cargo-fmt compliant.
+#
+# The default invocation (no subcommand) then type-checks the tree with
+# `cargo check -p aphrodite -p aphrodite-hermes` and fails the pipeline on a
+# compile error. Scope: the two workspace members only - the fork's
+# `headroom-core` comes in as a path dependency and is checked through them.
+# `--all-targets` (tests, benches, examples) is deliberately not part of the
+# first pass; add it once the bench targets compile cleanly. `cargo clippy
+# -- -D warnings` is a separate gate and stays out of this pipeline.
+# Subcommand invocations never run the check.
 #
 # TOML is handled by taplo/even-better-toml, Python by ruff - neither is
 # invoked from here; see .github/workflows/Check.yml.
@@ -189,6 +198,35 @@ FormatRust() {
 	\echo ""
 }
 
+FormatCheck() {
+	\echo "========================================"
+	\echo "Check Type Safety"
+	\echo "========================================"
+	\echo "Tooling: cargo check (aphrodite, aphrodite-hermes)"
+	\echo "Scope:   workspace members; headroom-core via path dependency"
+	\echo "========================================"
+	\echo ""
+
+	cd "$Root"
+
+	# Type-check the two workspace members in the same invocation as the
+	# formatters, so a formatted tree is also known to compile. `set -e`
+	# would abort anyway; the explicit guard exists to name the failing
+	# command in the last lines of the output.
+	\echo "→ Running cargo check…"
+	if ! cargo check -p aphrodite -p aphrodite-hermes; then
+		\echo ""
+		\echo "Error: cargo check -p aphrodite -p aphrodite-hermes failed."
+		\echo "  Fix the compile errors reported above, then re-run:"
+		\echo "    bash Maintain/Format.sh"
+		exit 1
+	fi
+
+	\echo ""
+	\echo "Type check complete."
+	\echo ""
+}
+
 #===============================================================================
 # Main Command Router
 #===============================================================================
@@ -211,6 +249,7 @@ case "${1:-}" in
 		FormatShell
 		FormatPrettier
 		FormatRust
+		FormatCheck
 		\echo "→ Format complete."
 		;;
 	--help | -h)
@@ -220,7 +259,7 @@ case "${1:-}" in
 		\echo "  shell     Format shell scripts with Prettier (prettier-plugin-sh)"
 		\echo "  prettier  Format Markdown/JSON/YAML with Prettier"
 		\echo "  rust      Format Rust with rustfmt (nightly)"
-		\echo "  (no arg)  Run all four in order"
+		\echo "  (no arg)  Run all four in order, then cargo check"
 		;;
 	*)
 		\echo "Unknown target: $1"
