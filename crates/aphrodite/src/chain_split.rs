@@ -140,7 +140,11 @@ pub fn split_marked_output(output:&str) -> Vec<(usize, String)> {
 				parts.push((cur_idx, cur.trim().to_string()));
 			}
 			cur_idx += 1;
-			cur = String::new();
+			// `clear()` rather than `cur = String::new()`: same observable
+			// behaviour, but the buffer is reused - clippy's
+			// `new_instead_of_clear` denies the reallocation under
+			// `-D warnings` on the CI toolchain.
+			cur.clear();
 		} else {
 			cur.push_str(line);
 			cur.push('\n');

@@ -61,6 +61,14 @@ pub struct CompressionConfig {
 	pub catalog_mode:Option<String>,
 	pub classifier_poll:Option<bool>,
 	pub code_multiplier:Option<f64>,
+	/// `[compression] store_max_entries` - live-row cap for the SQLite
+	/// CCR store; LRU rows are evicted past it. Absent or 0 = unlimited.
+	/// The idle TTL bounds the store in *time* only, so a burst of
+	/// compression inside one TTL window is unbounded without this.
+	pub store_max_entries:Option<usize>,
+	/// `[compression] store_max_bytes` - cap on stored payload bytes
+	/// (`SUM(LENGTH(original))`). Absent or 0 = unlimited.
+	pub store_max_bytes:Option<u64>,
 }
 
 /// Preview knobs - model-aware templates, code structure maps.
@@ -193,6 +201,17 @@ impl MultiConfig {
 				.or(cfg.ccr_ttl_seconds)
 				.or_else(|| d.and_then(|d| d.ccr_ttl_seconds))
 				.unwrap_or(3600),
+			// Retention caps: env > [compression] > compiled-in default.
+			// 0 is passed through (not normalised here) - the store
+			// treats 0 as unlimited, and keeping the operator's literal
+			// value in `/stats/db` is more honest than silently rewriting
+			// it to null.
+			store_max_entries:env_parse_warn::<usize>("APHRODITE_STORE_MAX_ENTRIES")
+				.or_else(|| self.compression.as_ref().and_then(|c| c.store_max_entries))
+				.unwrap_or(100_000),
+			store_max_bytes:env_parse_warn::<u64>("APHRODITE_STORE_MAX_BYTES")
+				.or_else(|| self.compression.as_ref().and_then(|c| c.store_max_bytes))
+				.unwrap_or(536_870_912),
 			no_ccr_marker:false,
 			tool_relay:cfg.tool_relay.unwrap_or(false),
 			notify_url:std::env::var("APHRODITE_NOTIFY_URL").ok().or_else(|| cfg.notify_url.clone()),

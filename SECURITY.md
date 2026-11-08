@@ -181,8 +181,8 @@ the same release, and the version handshake fails closed on a mismatch.
 
 | Component                       | Supported          | Notes                                                                                                                                       |
 | :------------------------------ | :----------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
-| Proxy binary `1.7.x`            | :white_check_mark: | Security fixes land on `Current` and ship in the next `1.7` patch release.                                                                  |
-| Hermes plugin `2.3.x`           | :white_check_mark: | The plugin paired with binary `1.7.0`; install both halves from the same release.                                                           |
+| Proxy binary `1.8.x`            | :white_check_mark: | Security fixes land on `Current` and ship in the next `1.8` patch release.                                                                  |
+| Hermes plugin `2.3.x`           | :white_check_mark: | The plugin paired with binary `1.8.0`; install both halves from the same release.                                                           |
 | Binary `1.6.x` / plugin `2.2.x` | :x:                | Superseded by the `1.7.0` shared-gateway lock fix. Upgrade before reporting a wedge or lockout.                                             |
 | Binary `< 1.6.0`                | :x:                | Predates the per-session state registry, the bounded lock, and the fail-open degrade.                                                       |
 | Unreleased `Current` branch     | :white_check_mark: | Actively developed; fixes are applied here first. If unsure which line you run, report against `Current` and include the commit you tested. |

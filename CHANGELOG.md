@@ -1,5 +1,82 @@
 # Changelog
 
+## v1.8.0 - Bounded CCR store: retention caps, index-driven sweep, truthful telemetry (2026-11-08)
+
+The SQLite CCR store gains a **space** bound to go with its time bound, and
+retrieval stops paying for store size. `ccr_ttl_seconds` only ever bounded the
+store in _time_ - a burst of compression inside one TTL window was unlimited in
+rows and bytes - so `[compression] store_max_entries` / `store_max_bytes` now
+evict the least-recently-accessed rows past either cap (`0` = unlimited,
+trim-at-open for an already-oversized DB). The expiry sweep no longer runs
+un-debounced on every `get`: it shares the 60 s debounce and is index-driven,
+which took a missing-hash `POST /retrieve` from **37.40 ms to 0.22 ms** on a
+300k-row / 182 MB store. Two metrics that were read as store occupancy turned
+out to be fiction - `fill_pct` is compression headroom (90.0 on a fresh process
+with an _empty_ store) and `/stats`' `ccr_store.entries` came from atomics that
+nothing incremented - so both are now labelled or made live. Binary `1.7.0 →
+1.8.0`, plugin `2.3.0 → 2.3.1`, `aphrodite-headroom-core` `0.1.3 → 0.2.0`.
+
+- **Feature (store retention)**: `[compression] store_max_entries` (default
+  `100000`) and `store_max_bytes` (default `536870912`, payload bytes =
+  `SUM(LENGTH(original))`, not file size) with LRU eviction by
+  `last_accessed`; `0` = unlimited; env `APHRODITE_STORE_MAX_ENTRIES` /
+  `APHRODITE_STORE_MAX_BYTES`; caps apply at store open (not hot-reloaded) and
+  an already-oversized DB is trimmed at open. An evicted hash is a retrieval
+  miss, exactly like an expired one.
+- **Fix (store, retrieval cost)**: `get` ran the expiry sweep un-debounced,
+  making retrieval O(rows) behind the connection mutex - measured 0.15 ms on an
+  empty store, 27 ms at 100k rows, 37.40 ms at 300k. The sweep now shares the
+  60 s debounce (the lookup predicate still refuses expired rows, so correctness
+  is unchanged) and runs index-driven via `ccr_entries_expiry` (expression index
+  on `last_accessed + ttl_seconds`) and `ccr_entries_created`; schema version 3.
+- **Fix (telemetry, `/health`)**: `fill_pct` is
+  `100 - compression_ratio_ema/20` clamped to `[1, 99]` - compression headroom,
+  not store occupancy - so `/health` now reports
+  `fill_pct_kind: "compression_headroom"` and `store_entries` beside it.
+- **Fix (telemetry, `/stats`)**: `ccr_store.entries` / `bytes_approx` came from
+  two `AtomicU64`s that were never incremented (a full store reported
+  `entries: 0`). The fields now read the live backend; `/stats/db` gained
+  `max_entries`, `max_bytes`, `evicted_total`, `freelist_bytes`.
+- **Feature (headroom fork, 0.2.0)**: `SqliteCcrStore::open_with_limits` +
+  `max_entries()` / `max_bytes()` / `evicted_total()`; purge and eviction report
+  exact freed rows/bytes via `DELETE … RETURNING LENGTH(original)`; maintained
+  entry/byte counters so `len()` is O(1).
+- **Fix (plugin loader, 2.3.1)**: a missing `aphrodite.toml` is now reported
+  instead of inferred - with no config the binary falls back to a single
+  token-mode listener on the first port (second proxy never binds) and every
+  `[compression]` knob, including the new retention caps, is absent.
+- **Docs**: `[compression]` retention block in the shipped template; new rows in
+  `docs/config/aphrodite-toml.md` and `docs/config/env-vars.md`; `/health` and
+  `/stats/db` semantics in `docs/proxy/handlers.md`; counter inventory corrected
+  in `docs/proxy/architecture.md`; plugin README config sample.
+- **Chore (versions)**: binary crates + `aphrodite-hermes` pin + `package.json`
+  → `1.8.0`; `plugin.yaml` + `install_message` → `2.3.1`; headroom fork crate +
+  parent pin → `0.2.0`. `BINARY_VERSION` deliberately unchanged - it is bumped
+  LAST, after the `Aphrodite/v1.8.0` assets exist.
+- **Upstream sync (vendored headroom fork)**: the fork merged
+  `headroomlabs-ai/main` @ `bb8d18a5` into its `Current` (merge commit
+  `d4558b7c`; the fork was 396 commits behind / 49 ahead, merge-base
+  `c365c7ff`). 463 conflicted paths, all resolved by hand: 437 took upstream
+  where no fork invariant existed (fork side preserved under
+  `.hermes/tmp/merge-fork-side`), 3 deleted because upstream removed them,
+  6 hand-merged to keep fork work - the exact-pin `Cargo.toml`s with the `ml`
+  feature default-OFF, the `ml`-gated parity comparator, and the CCR store
+  retention feature in `sqlite.rs`. Post-merge repairs, each caught by the
+  gate that surfaced it: fork-workspace `cargo build` (proxy package name +
+  `headroom-core` alias, release-profile key, missing `pub mod vendor`,
+  `CcrStore` trait defaults with sqlite delegating, duplicate test module)
+  and `cargo clippy -D warnings` (edition-2024 pattern bindings in
+  `anchor_selector.rs`).
+
+### Infrastructure
+
+- crates.io availability check: `curl -A <ua> https://crates.io/api/v1/crates/aphrodite` (and `.../aphrodite-hermes`, `.../aphrodite-headroom-core`) - `max_version` 1.7.0, 1.7.0, 0.1.3; `1.8.0` / `1.8.0` / `0.2.0` free.
+- `cargo check -p aphrodite -p aphrodite-hermes` ✅ (0 errors); `cargo tree -i aphrodite-headroom-core` → `0.2.0` from the path dep.
+- Tests: `cargo test -p aphrodite --lib` ✅ 500 passed / 0 failed / 1 ignored; `cargo test -p aphrodite-headroom-core --lib` ✅ 996 passed / 0 failed / 1 ignored (incl. 9 store tests: entry-cap LRU order, byte-cap eviction, overwrite-is-not-a-new-row, trim-at-open, index plan, stats; count is post-upstream-sync).
+- Lint/format: `cargo clippy -p aphrodite -p aphrodite-headroom-core --lib -- -D warnings` ✅; `cargo clippy -- -D warnings` ✅ in the fork workspace for `headroom-core` and `headroom-parity`; `cargo fmt --check` ✅ parent crates and `headroom-core` (`headroom-parity` stays non-conformant with the inherited `hard_tabs` config - pre-existing, untouched); `ruff check plugins/aphrodite/` ✅; `pnpm run Check:FFI` ✅ 0 violations.
+- Store probe (release binary, 300k-row store): `/health` `fill_pct 90.0` + `store_entries 300000`; `--store-max-entries 5000` trims to 5000 with `evicted_total 295000`; median `POST /retrieve` 0.22 ms (pre-fix 37.40 ms, same data).
+- Known pre-existing reds (not touched by this release): `pnpm run FormatCheck` (2 files - `.githooks/post-checkout`, `.githooks/pre-commit`; the CRLF/eol trap for extensionless hooks); plugin `test_data_dir_honours_aphrodite_home` fails identically at `HEAD`.
+
 ## v1.7.0 - Feature port: TOML templates, auto-expand, context engine, live containers, scripting, caps (2026-10-13)
 
 The large feature port lands (HEAD 190f5f6b): TOML-driven marker-block and

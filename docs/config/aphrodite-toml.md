@@ -118,15 +118,17 @@ One shared table feeds two independent consumers:
 
 **Drives the Rust proxy** (env var wins over these if set; editing and saving, or `POST /reload`, applies immediately with no restart):
 
-| Field                   | Meaning                                                                                                | Env override                      | Compiled default | Shipped example |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------- | ---------------- | --------------- |
-| `tool_threshold_token`  | Token-proxy compression threshold, bytes                                                               | `APHRODITE_TOOL_THRESHOLD_TOKEN`  | `1024`           | `256`           |
-| `tool_threshold_cache`  | Cache-proxy compression threshold, bytes                                                               | `APHRODITE_TOOL_THRESHOLD_CACHE`  | `8192`           | `2048`          |
-| `inline_threshold`      | Inline-vs-durable CCR storage cutoff, bytes                                                            | `APHRODITE_INLINE_THRESHOLD`      | `256`            | `1024`          |
-| `code_multiplier`       | Multiplies the threshold for `code_*` content types (keeps code inline)                                | `APHRODITE_CODE_MULTIPLIER`       | `3.0`            | `1.0`           |
-| `auto_expand`           | Resolve the just-stored content inline instead of emitting a CCR marker, capped at `auto_expand_limit` | `APHRODITE_AUTO_EXPAND`           | `false`          | `true`          |
-| `auto_expand_limit`     | Byte cap for auto-expanded content                                                                     | `APHRODITE_AUTO_EXPAND_LIMIT`     | `102400`         | `102400`        |
-| `max_request_body_size` | Proxy request-body cap, bytes; over-size bodies rejected with 413 while being read                     | `APHRODITE_MAX_REQUEST_BODY_SIZE` | none (no cap)    | -               |
+| Field                   | Meaning                                                                                                 | Env override                      | Compiled default | Shipped example |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------- | ---------------- | --------------- |
+| `tool_threshold_token`  | Token-proxy compression threshold, bytes                                                                | `APHRODITE_TOOL_THRESHOLD_TOKEN`  | `1024`           | `256`           |
+| `tool_threshold_cache`  | Cache-proxy compression threshold, bytes                                                                | `APHRODITE_TOOL_THRESHOLD_CACHE`  | `8192`           | `2048`          |
+| `inline_threshold`      | Inline-vs-durable CCR storage cutoff, bytes                                                             | `APHRODITE_INLINE_THRESHOLD`      | `256`            | `1024`          |
+| `code_multiplier`       | Multiplies the threshold for `code_*` content types (keeps code inline)                                 | `APHRODITE_CODE_MULTIPLIER`       | `3.0`            | `1.0`           |
+| `auto_expand`           | Resolve the just-stored content inline instead of emitting a CCR marker, capped at `auto_expand_limit`  | `APHRODITE_AUTO_EXPAND`           | `false`          | `true`          |
+| `auto_expand_limit`     | Byte cap for auto-expanded content                                                                      | `APHRODITE_AUTO_EXPAND_LIMIT`     | `102400`         | `102400`        |
+| `max_request_body_size` | Proxy request-body cap, bytes; over-size bodies rejected with 413 while being read                      | `APHRODITE_MAX_REQUEST_BODY_SIZE` | none (no cap)    | -               |
+| `store_max_entries`     | Max live rows in the SQLite CCR store; past it the least-recently-accessed rows are evicted (`0` = off) | `APHRODITE_STORE_MAX_ENTRIES`     | `100000`         | `100000`        |
+| `store_max_bytes`       | Max stored payload bytes (`SUM(LENGTH(original))`); past it LRU rows are evicted (`0` = off)            | `APHRODITE_STORE_MAX_BYTES`       | `536870912`      | `536870912`     |
 
 The compiled defaults apply when neither env nor TOML sets a value; the shipped example config sets the values in the last column, so installations using it see those instead.
 

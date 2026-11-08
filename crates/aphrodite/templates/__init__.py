@@ -961,6 +961,25 @@ def _start_proxy():
                     log_dir / "proxy-stderr.log",
                 )
 
+    # A missing aphrodite.toml is silent but not harmless: with no config the
+    # binary takes its standalone-CLI fallback (main.rs: one listener, mode
+    # token, first port only), so the second proxy never binds AND every
+    # `[compression]` knob - including the store retention caps
+    # (store_max_entries / store_max_bytes) that bound ccr.db - is absent.
+    # Say so, with the repair, instead of leaving the operator to infer it
+    # from a dead port.
+    config_path = _data_dir() / "aphrodite.toml"
+    if not config_path.exists():
+        _log.warning(
+            "aphrodite.toml is missing at %s - the proxy is running on "
+            "compiled-in CLI defaults: a single token-mode listener on :%d, no "
+            "listener on :%d, and no store retention caps from TOML. Run "
+            "`aphrodite setup` to restore the config.",
+            config_path,
+            _cache_port,
+            _token_port,
+        )
+
 
 # ── Plugin registration ──
 

@@ -1,2 +1,32 @@
 [toolchain]
+# Floating `nightly` - deliberately the newest nightly, never a dated pin.
+#
+# Policy: latest nightly, always. A dated pin freezes the compiler, which is
+# the opposite of that policy; the compiler is expected to move under us.
+#
+# Why this file exists at all: without it, `cargo` in this directory would use
+# whatever the machine's default toolchain happens to be (stable, an old
+# nightly, a distro build) and CI would use its own. Declaring the channel
+# makes every invocation in this directory agree on the *channel*, and the
+# components list makes `cargo fmt` / `cargo clippy` present instead of
+# failing with "no such command".
+#
+# Freshness is NOT this file's job: `channel = "nightly"` selects the installed
+# nightly, and rustup advances it only when told to. Update before verifying
+# (`rustup toolchain install nightly --profile minimal --force`), then probe
+# `cargo fmt --version` and `cargo clippy --version`; a failed update or a
+# missing component is a hard failure, never permission to verify with the
+# older compiler.
+#
+# Consequence to respect: the lint set moves with the compiler. A nightly can
+# gain a lint that rejects code which passed yesterday - that is how
+# `clippy::new_instead_of_clear` surfaced in
+# crates/aphrodite/src/chain_split.rs. The answer is to fix the code, never to
+# freeze the compiler.
+#
+# Maintain/CheckParity.py asserts that this channel and components list match
+# the `dtolnay/rust-toolchain` steps in .github/workflows/Check.yml, so CI and
+# local cannot silently select different toolchains.
 channel = "nightly"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
