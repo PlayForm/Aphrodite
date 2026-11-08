@@ -45,6 +45,14 @@ created_at ASC` in batches of 256 rows, with exact freed rows/bytes from
   stays exact.
 - **Chore (deps, carried from post-0.1.3)**: `fc58ee39` (fastembed → 5) and
   `41e3602b` (crate-version refresh), both `Cargo.toml` only.
+- **Fix (fork workspace build)**: `headroom-parity` used
+  `headroom_core::transforms::kompress`, which headroom-core gates behind
+  `ml` (default-OFF), so a plain `cargo build` in `vendor/headroom` had failed
+  since 2026-08-07 with `could not find kompress in transforms` - invisible to
+  CI, which only builds `headroom-core` through the parent's path dependency.
+  The comparator is now `#[cfg(feature = "ml")]` and parity declares
+  `ml = ["headroom-core/ml"]`, so the fork workspace builds without the ML
+  stack and the kompress leg is opt-in.
 
 ### Verification
 
@@ -53,7 +61,12 @@ created_at ASC` in batches of 256 rows, with exact freed rows/bytes from
 - `cargo test -p aphrodite-headroom-core --lib` ✅ 900 passed / 0 failed / 1
   ignored, including 9 store tests: entry-cap LRU order, byte-cap eviction,
   overwrite-is-not-a-new-row, trim-at-open, index-plan assertion, stats caps.
-- `cargo fmt --check` / `cargo clippy -- -D warnings` ✅ on the crate.
+- `cargo clippy -- -D warnings` ✅ for `headroom-core` and `headroom-parity` in
+  the fork workspace (the MSRV lint that blocked it is fixed in this cycle);
+  `cargo fmt --check` ✅ `headroom-core`. `headroom-parity` remains
+  non-conformant with the inherited `hard_tabs` config - pre-existing, whole
+  file, deliberately not rewritten here.
+- `cargo build` ✅ fork workspace default-members (the parity `ml` gate fix).
 - Parent-side proof (`Aphrodite/v1.8.0`): 300k-row store trimmed to 5000 with
   `evicted_total 295000`; median `POST /retrieve` 0.22 ms.
 
