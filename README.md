@@ -143,6 +143,95 @@ ceiling.
 
 ---
 
+## See It Work 💬
+
+A real session against this repository. The markers and preview lines below
+are verbatim - this README was written by an agent whose context looked exactly
+like this.
+
+**`ls` at the repo root** - 32 entries, 377 bytes:
+
+```text
+<<<CCR:c5e9b7d52756100736cf1c40ccd36b2e9b718841|ls|377>>>
+[ls:32 files 0 dirs | .toml×6 .md×5 .lock×2]
+```
+
+**`find . -name '*.md'`** - 172 paths, 3,984 bytes:
+
+```text
+<<<CCR:958522eb61f963cd9f4ce24ff21490b583fdb166|ls|3984>>>
+[ls:172 files 0 dirs | .md×172]
+```
+
+**`ls crates/aphrodite/src`** - 34 files across 9 directories, 640 bytes:
+
+```text
+<<<CCR:14b3d51415867039316d2c80f540123db86cf891|ls|640>>>
+[ls:34 files 9 dirs | .rs×22]
+```
+
+Three tool calls, ~5 KB of listings, ~120 characters in context. The agent
+knows how many files, which directories, and which extensions - the shape of
+the answer - without holding a single path. When a path matters it asks for it:
+
+```text
+aphrodite_retrieve("14b3d51415867039316d2c80f540123db86cf891")
+
+{"found": true, "source": "ccr", "hash": "14b3d51415867039316d2c80f540123db86cf891",
+ "content": "builtin_directives\ncatalog.rs\nchain_split.rs\nconfig\n..."}
+```
+
+The `size` field is the price of that call: 640 bytes re-enter context when the
+marker resolves, zero when it does not. Markers persist for the whole session,
+so deferring is free and retrieving is always one call away.
+
+---
+
+## Session Lifecycle 🔄
+
+One turn, end to end:
+
+1. **Session start** - `on_session_start` boots the engine, seeds the active
+   directive set into `~/.hermes/aphrodite/directives/`, and health-checks the
+   proxies.
+2. **Tool call** - `pre_tool_call` decides dispatch: prefetch-aware, and slow
+   terminal or process calls are auto-backgrounded by `poll_worker`.
+3. **Tool result** - `transform_tool_result` (or `transform_terminal_output`
+   for shell) classifies, previews, stores, and relays the marker.
+4. **Before the model call** - `pre_llm_call` injects the active directives
+   within `[flow] budget_chars`, and archives overflowing middle turns to CCR
+   once the session passes `engine_threshold_pct`.
+5. **After the model call** - `post_llm_call` records savings and updates the
+   adaptive threshold EMA.
+6. **Retrieval** - whenever the agent asks: `aphrodite_retrieve(hash)` returns
+   the stored bytes unchanged.
+
+Nothing is rewritten retroactively. A marker stored in turn 3 is the same
+marker in turn 40, and the content behind it never changed - which is why
+retrieval is always safe.
+
+### Directives 🧭
+
+Directives are short behavioral instructions injected each turn and swappable
+mid-conversation. Seven ship inside the binary:
+
+| Directive      | Focus                                                   |
+| :------------- | :------------------------------------------------------ |
+| `focus`        | Targeted execution, marker-aware retrieval              |
+| `foresight`    | Anticipate and prefetch; never wait on I/O              |
+| `lazy`         | Defer work, activate on demand, never busy-spin         |
+| `lazy-eval`    | Accumulate markers, resolve on demand                   |
+| `explore`      | Read broadly, prefetch aggressively                     |
+| `cleanup`      | Catalog, summarize, verify nothing is left behind       |
+| `ccr-handling` | How to read markers and retrieve the content behind them |
+
+`[directives] active = [...]` selects the set - an empty list seeds `focus` +
+`foresight` + `lazy` - and `aphrodite_directive` swaps it mid-session.
+Directives change what the model does with markers; they never change the
+marker format.
+
+---
+
 ## Features ⭐
 
 - **TOML templates** - `[templates.preview.<family>.<ctype>]` format strings,
@@ -196,7 +285,7 @@ first match wins, and each type carries its own compression threshold tier.
 | `json` / `json_array`                    | starts with `{` / `[` and parses as JSON                     | `[json:5items 3L]` or `[json:30 keys 1L \| status, error, …]`                     |
 | `tool_output`                            | JSON containing `exit_code` or `"status"`                    | `[tool_output:1L 58B \| {"exit_code": 0, "output": "ok"}]`                        |
 | `terminal`                               | shell/exit-code traces (hook override)                       | `[terminal:14L exit code: 0]` (exit code / last output line)                      |
-| `error`                                  | first-line `error`/`Error`/`Traceback`/`panic`               | `[error:2L 120B \| error: could not compile \`aphrodite\`]`                       |
+| `error`                                  | first-line `error`/`Error`/`Traceback`/`panic`               | ``[error:2L 120B \| error: could not compile `aphrodite`]``                       |
 | `log`                                    | `[INFO/WARN/ERROR/DEBUG/TRACE]` or timestamp prefix          | `[log:12L 540B \| [2026-09-15T10:00:00Z INFO aphrodite] …]`                       |
 | `linter`                                 | `error[E`/`error:`/`warning:`/`clippy`/`tsc`                 | `[linter:4L 260B \| error[E0308]: mismatched types]`                              |
 | `text` (fallback)                        | unrecognized content                                         | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)          |
