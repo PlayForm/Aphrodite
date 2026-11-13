@@ -528,6 +528,17 @@ Thirteen tools ship with the plugin:
 | `aphrodite_prefetch`        | Read + compress files on demand; markers returned inline             |
 | `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors                       |
 
+Typical calls:
+
+```text
+aphrodite_retrieve(hash)               → the full content behind a marker
+aphrodite_catalog()                    → every marker this session, with previews
+aphrodite_search("preview builder")    → find a stored entry by keyword or type
+aphrodite_compress(content, type)      → compress content the agent already holds
+aphrodite_stats()                      → proxy health, engine status, savings
+aphrodite_directive(action: "list")    → current directive set, swappable in place
+```
+
 ---
 
 ## Configuration 🎛️
