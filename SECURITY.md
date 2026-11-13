@@ -318,7 +318,7 @@ process.
    affected targets. A fix that changes the FFI contract or the store schema
    also updates the version handshake and the migration path.
 
-### Coordinated Disclosure&#x2001;🤝
+### Coordinated Disclosure&#x2001;🫱🏻‍🫲🏿
 
 6. **Advisory and Release:** Once a fixed release is available we publish a
    GitHub Security Advisory, note the fix in the changelog, and credit the
