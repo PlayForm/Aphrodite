@@ -86,6 +86,42 @@ git submodule update --init --recursive
 cargo build --release -p aphrodite -p aphrodite-hermes
 ```
 
+### LLM provider configuration 🔑
+
+The proxy sits in front of an upstream LLM API, so it needs that API's key -
+Hermes' own provider config is not reused. `api_key` resolves
+`[[proxies]] api_key` → `[defaults] api_key` → `APHRODITE_API_KEY`, and the
+proxy refuses to start when the chain resolves empty
+(`no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml`).
+
+```sh
+export APHRODITE_API_KEY=sk-...     # env var
+aphrodite setup --api-key sk-...    # or write it through setup
+```
+
+```toml
+# ~/.hermes/aphrodite/aphrodite.toml
+[defaults]
+api_key = "sk-..."                  # or per listener: [[proxies]] api_key
+```
+
+### Verify it's running ✅
+
+```sh
+curl -s 127.0.0.1:9797/health
+# {"status":"healthy","ccr":true,"mode":"cache","version":"1.8.0","fill_pct":90.0,...}
+
+curl -s 127.0.0.1:9797/version
+# 1.8.0
+
+curl -s 127.0.0.1:9798/stats
+# {"mode":"token","proxy":"aphrodite","ccr_backend":"enabled","tool_relay_enabled":true,...}
+```
+
+Inside a session the same information arrives as tools: `aphrodite_stats`
+(proxy health, engine status, inline store size) and `aphrodite_rebuild`
+(binary and dylib version plus a rebuild hint).
+
 ---
 
 ## The Problem 🔥
@@ -349,38 +385,48 @@ Aphrodite compresses output in **two modes**:
 ```text
 crates/aphrodite/          ← Core engine (binary + cdylib)
   main.rs                  ← CLI entry, version intercept, config bootstrap
+  lib.rs                   ← Crate surface shared by the binary and the cdylib
   proxy.rs                 ← HTTP proxy: classify → compress → store → preview; SSE pass-through; tool relay
   hooks.rs                 ← transform_tool_result, transform_terminal_output, session/LLM hooks
-  preview.rs               ← Type detection + enriched preview builder (all types)
-  resolve.rs               ← CCR marker resolution (recursive, nested markers)
   retrieve.rs              ← /retrieve endpoint + retrieval plumbing
-  templates.rs            ← TOML template resolution (preview/marker/prompts/reverse)
-  marker.rs                ← Marker parsing, hash normalization, validity checks
+  templates.rs             ← TOML template resolution (preview/marker/prompts/reverse)
   stage2.rs                ← Semantic reduction (JSON minify, build, diff, code)
-  struct_extract.rs        ← Code structure extraction (Rust, Python, Go, JS/TS)
-  config_loader.rs / config/     ← TOML schema, config reload, multi-proxy resolution
-  state.rs                 ← AppState: counters, caches, adaptive EMA state
-  directives.rs            ← Behavioral directive registry
   session.rs               ← Session state, turn history
   catalog.rs               ← CCR catalog listing (TOC, tool formats)
   prefetch.rs              ← Background file prefetch → CCR
   poll_worker.rs           ← Auto-backgrounding of slow tool calls
-  flow.rs / setup.rs       ← Plugin bootstrap, `aphrodite setup` installer
+  chain_split.rs           ← Opt-in fine-grained command splitting
+  flow.rs / home.rs        ← Plugin bootstrap and runtime-home resolution
+  debug.rs                 ← Per-session debug switch
+  scripting.rs             ← Optional Rhai scripting feature
+  preview/                 ← Type detection + enriched preview builders
+    detect.rs type.rs lang.rs input.rs state.rs
+    builders/ detectors/ line/ text/
+  marker/                  ← Marker parsing, formatting, hash normalization (parse.rs, format.rs)
+  resolve/                 ← Recursive marker resolution (expand, one, recursive, filter)
+  struct_extract/          ← Code structure maps (rust, python, go, js)
+  config/                  ← TOML schema, env overrides, multi-proxy resolution (cli.rs, env.rs, proxy.rs)
+  config_loader.rs         ← Dylib-side config load + auto-reload
+  state/                   ← AppState: counters, store, markers, files, events, chain-split
+  directives/              ← Directive registry (model, load, build, builtin, action)
+  setup/                   ← `aphrodite setup`: dylib install, verify, macOS wiring
   builtin_directives/      ← Shipped directive markdown (focus, foresight, cleanup, explore, lazy, lazy-eval, ccr-handling)
 
 crates/aphrodite-hermes/   ← Hermes bridge (cdylib)
   lib.rs                   ← FFI surface, hook dispatch
   tools.rs                 ← 13 tool dispatch handlers
   schemas.rs               ← JSON Schema definitions
-  skills.rs                ← Bundled Hermes skills
-  bin/                     ← Helper binaries
+  directives.rs            ← Directive FFI
+  debug.rs                 ← Debug FFI
+  bin/setup-helper.rs      ← Setup helper binary
 
 plugins/aphrodite/         ← Thin Python loader (ctypes FFI) + plugin manifest
-  __init__.py              ← loads dylib, registers hooks/tools/engine
+  __init__.py              ← loads the dylib, registers hooks / tools / engine
+  _bindings.py             ← Generated ctypes bindings (cbindgen → ctypesgen)
   plugin.yaml              ← Manifest: 6 hooks, 13 tools, context engine
+  BINARY_VERSION           ← Distribution pointer for the binary release
   download.sh / download.ps1 ← Binary + dylib fetch from GitHub Releases
-  directives/              ← Plugin-side directive set
-  binaries/                ← Cached prebuilt binaries
+  layout_check.py / layout_schema.json ← Runtime-home layout contract
 ```
 
 ### Data flow
@@ -605,10 +651,8 @@ variables `hash` and `tail`), and `auto_expand_guidance` (internal).
 
 > [!TIP]
 >
-> **Directives** seed short behavioral instructions injected each turn,
-> swappable mid-conversation via `aphrodite_directive`.
-> Built-in set (baked into the binary): `focus`, `foresight`,
-> `ccr-handling`, `cleanup`, `explore`, `lazy`, `lazy-eval`.
+> **Directives** are covered under [Session Lifecycle](#session-lifecycle)
+> above - seven built-ins, swapped mid-conversation via `aphrodite_directive`.
 
 ---
 
