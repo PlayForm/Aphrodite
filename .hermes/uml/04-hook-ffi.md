@@ -83,7 +83,7 @@ flowchart TD
     B --> D
     C --> D
     D --> E["directives = build_directive_context (directives.rs:157) - NEVER dropped"]
-    D --> F["nudges = render_nudges (flow.rs:132) - ≤2 inline [nudge:…], NEVER dropped"]
+    D --> F["nudges = render_nudges (flow.rs:132) - ≤2 inline [nudge:...], NEVER dropped"]
     D --> G["recall = session::catalog_summary (session.rs:66) - droppable FIRST"]
     E --> H["assemble top-down under state.flow_budget_chars (default 4000)"]
     F --> H
@@ -92,7 +92,7 @@ flowchart TD
     I -->|yes| J["pop last section (recall block) - directives+nudges survive"]
     I -->|no| K["emit context"]
     J --> I
-    K --> L["injected into model turn:<br/>[directives]…<br/>[nudge:…]<br/>[recall]…<br/>retrieve hint"]
+    K --> L["injected into model turn:<br/>[directives]...<br/>[nudge:...]<br/>[recall]...<br/>retrieve hint"]
 ```
 
 `post_llm_call` (hooks.rs:462) is the mirror choke point on both paths:
@@ -132,7 +132,7 @@ flowchart LR
 ```
 
 Both `guarded()` wrappers (core `lib.rs:141`, hermes `lib.rs:225`) catch panics
-across the FFI boundary and return `{"error":"internal error: panicked…"}`
+across the FFI boundary and return `{"error":"internal error: panicked..."}`
 instead of aborting the process. `_with_meta` variants exist only on the bridge
 because the handle-based core ABI has no Hermes `status`/`error_type`
 telemetry to plumb. The bridge no longer exposes any skill export

@@ -4,7 +4,7 @@ use crate::preview::input::Input;
 
 /// HTML preview: title, heading count, link count, body size estimate.
 pub(crate) fn build_html_preview(inp:&Input<'_>) -> String {
-	// Extract <title>…</title> text (anywhere on a line, case-insensitive).
+	// Extract <title>...</title> text (anywhere on a line, case-insensitive).
 	let title = inp.raw.lines().find_map(|l| {
 		let lower = l.to_lowercase();
 		let start = lower.find("<title>")? + 7;

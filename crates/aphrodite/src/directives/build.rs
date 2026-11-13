@@ -47,7 +47,7 @@ pub fn build_directive_context(all:&HashMap<String, Directive>, active:&[String]
 	// cutting directive text that never exceeded the budget.
 	if out.chars().count() > MAX_COMBINED_CHARS {
 		let trunc:String = out.chars().take(MAX_COMBINED_CHARS).collect();
-		out = format!("{}…\n", trunc);
+		out = format!("{}...\n", trunc);
 	}
 	out
 }
@@ -83,7 +83,7 @@ mod tests {
 		// old byte-based gate and truncated valid content.
 		assert!(out.len() > MAX_COMBINED_CHARS, "byte length exceeds the cap");
 		// Untruncated: full content present, no ellipsis.
-		assert!(!out.contains('…'), "within-cap content must not be truncated");
+		assert!(!out.contains("..."), "within-cap content must not be truncated");
 		assert!(out.ends_with("\u{2014}\n"));
 	}
 
@@ -94,9 +94,9 @@ mod tests {
 	fn test_combined_char_cap_truncates_over_cap_content() {
 		let (all, active) = active("focus", &"-".repeat(4100));
 		let out = build_directive_context(&all, &active);
-		assert!(out.ends_with("…\n"), "over-cap content must be truncated");
-		let content_part = out.trim_end_matches("…\n");
+		assert!(out.ends_with("...\n"), "over-cap content must be truncated");
+		let content_part = out.trim_end_matches("...\n");
 		assert_eq!(content_part.chars().count(), MAX_COMBINED_CHARS);
-		assert_eq!(out.chars().count(), MAX_COMBINED_CHARS + 2);
+		assert_eq!(out.chars().count(), MAX_COMBINED_CHARS + 4);
 	}
 }

@@ -124,7 +124,7 @@ memory scoping.
 Background reviews may not delete memory entries unattended: every
 `replace`/`remove` consolidation op - single or inside a batch - is staged
 to `$HERMES_HOME/pending/memory/<id>.json` (skills: `pending/skills/`),
-surfacing as the "💾 Self-improvement review … staged for your approval"
+surfacing as the "💾 Self-improvement review ... staged for your approval"
 warning. `memory.write_approval: false` does NOT stop this - the delete
 gate is fail-closed. Clear it: `/memory pending` → discard/approve.
 

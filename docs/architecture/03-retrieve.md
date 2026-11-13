@@ -38,7 +38,7 @@ sequenceDiagram
     else full-document window
         P-->>HR: (content verbatim, truncated=false)  ← byte-exact, keeps trailing \n
     else partial window
-        P-->>HR: ("[lines a-b/total]\n…", truncated=true)
+        P-->>HR: ("[lines a-b/total]\n...", truncated=true)
     end
     HR-->>C: 200 {found:true, content, source:"ccr", truncated}
 ```
@@ -61,7 +61,7 @@ flowchart TD
     H -->|yes| I["return cached"]
     H -->|no| J["content = resolve_one(hash)?  (None → propagate)"]
     J --> K["resolved.insert(hash, content)"]
-    K --> L["find_markers(content) - scan &lt;&lt;&lt;CCR:…&gt;&gt;&gt;"]
+    K --> L["find_markers(content) - scan &lt;&lt;&lt;CCR:...&gt;&gt;&gt;"]
     L --> M{"nested markers?"}
     M -->|none| N["return content"]
     M -->|yes| O["for each nested: recurse(depth+1) or reuse cache"]
@@ -79,7 +79,7 @@ flowchart TD
     end
 ```
 
-`find_markers` walks `<<<CCR:` … `>>>` pairs, tolerating unclosed prefixes without panicking. `marker::extract_hashes` additionally recognizes `[CCR:…]` and the `⫷…⫸` glyph forms via a `LazyLock` regex whose hash class is anchored to `[0-9a-fA-F:i]{6,64}` (never crossing a newline).
+`find_markers` walks `<<<CCR:` ... `>>>` pairs, tolerating unclosed prefixes without panicking. `marker::extract_hashes` additionally recognizes `[CCR:...]` and the `⫷...⫸` glyph forms via a `LazyLock` regex whose hash class is anchored to `[0-9a-fA-F:i]{6,64}` (never crossing a newline).
 
 ## Call sites
 

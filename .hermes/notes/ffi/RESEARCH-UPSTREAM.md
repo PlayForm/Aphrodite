@@ -137,7 +137,7 @@ Verified present verbatim in real raw `_bindings.raw.py:11-440` AND retained in 
 
 Loader block (real raw `_bindings.raw.py:442-860`): `_libs = {}`, `_libdirs = []`, `# Begin loader`, full `LibraryLoader`/`Lookup`/`DarwinLibraryLoader`/`PosixLibraryLoader` (+ `ld.so.conf` cache)/`WindowsLibraryLoader`/`loaderclass`, `load_library = loaderclass.get(...)()`, `add_library_search_dirs([])`, `# End loader`. Also retained in the artifact.
 
-Header/docstring: `r"""Wrapper for <header>` + generated command line + `Do not modify this file.` (raw 1-7), `__docformat__ = "restructuredtext"` (raw 9), `# Begin preamble for Python` / `# End preamble` markers (raw 11/440), `# Begin libraries` … `# End libraries` with the load line (raw 862-866), `# No modules`, `# No prefix-stripping`.
+Header/docstring: `r"""Wrapper for <header>` + generated command line + `Do not modify this file.` (raw 1-7), `__docformat__ = "restructuredtext"` (raw 9), `# Begin preamble for Python` / `# End preamble` markers (raw 11/440), `# Begin libraries` ... `# End libraries` with the load line (raw 862-866), `# No modules`, `# No prefix-stripping`.
 
 **Size accounting (final artifact):** 31,692 B / 982 lines total; head (preamble + loader + libraries) = **27,519 B (~87%)**; the rewritten declaration loops + `bind_to()` binder = ~4,200 B. The lean-ification target is the head.
 
@@ -403,7 +403,7 @@ Each recommendation names the `finalize_bindings.py` target (file:line = `crates
 
 **Target (file:line):** new head-strip step in `postprocess` (after line 225, before `_LOAD_LINE_RE`)
 
-**Change:** Remove from `head`: the `# Begin loader` … `# End loader` block (raw 442-860, ~420 lines incl. all `LibraryLoader` classes, `loaderclass`, `load_library`, `add_library_search_dirs([])`), and `# Begin libraries`/`# End libraries` markers; keep `_libs = {}` (bind_to assigns `_libs[PLACEHOLDER]`) and the rewritten load line. Also `# No modules`/`# No prefix-stripping` markers.
+**Change:** Remove from `head`: the `# Begin loader` ... `# End loader` block (raw 442-860, ~420 lines incl. all `LibraryLoader` classes, `loaderclass`, `load_library`, `add_library_search_dirs([])`), and `# Begin libraries`/`# End libraries` markers; keep `_libs = {}` (bind_to assigns `_libs[PLACEHOLDER]`) and the rewritten load line. Also `# No modules`/`# No prefix-stripping` markers.
 
 **Why / risk:** Kills ~60% of the 27.5 KB head. **Keep `String`/`MutableString`/`UserString`/`ReturnString` unless R5 lands** - argtypes still reference `String` (raw 875/901/914/988). Do NOT remove `_variadic_function`/`UNCHECKED` while any shape could reference them.
 

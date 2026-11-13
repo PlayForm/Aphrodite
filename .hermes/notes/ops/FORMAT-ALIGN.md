@@ -40,7 +40,7 @@ byte-stability). The format pass had touched it (an auto-committer even
 swept the formatted copy into the plugin submodule as `ec73dc6`). It was
 **restored** from git (submodule commit `455732d`, the `Development` gitlink):
 
-- on-disk sha256 `5dc2770e…` == gitlink `455732d:_bindings.py` (byte-identical);
+- on-disk sha256 `5dc2770e...` == gitlink `455732d:_bindings.py` (byte-identical);
 - codegen pipeline re-verified: `python3 crates/aphrodite-hermes/codegen/test_finalize_bindings.py` → 23 tests OK;
 - submodule reset back to the recorded gitlink (final submodule HEAD `b54d388` has a tree byte-identical to `455732d`, so the artifact is byte-stable at HEAD);
 - **config guard added**: `ruff.toml` `extend-exclude` now lists
@@ -98,7 +98,7 @@ struct_lit_single_line=true under nightly-2026-05-01).
 - `rustup run nightly-2026-05-01 cargo fmt --all -- --check` → exit 0
 - `ruff format --check --config ruff.toml . --exclude vendor` → 52 files already formatted, exit 0
 - `npx prettier --check README.md docs/**/*.md .hermes/**/*.md` → all clean, exit 0
-- `plugins/aphrodite/_bindings.py` sha256 `5dc2770e…` == gitlink (byte-stable)
+- `plugins/aphrodite/_bindings.py` sha256 `5dc2770e...` == gitlink (byte-stable)
 - codegen pipeline test: 23/23 OK; plugin shim drift-guard: SHIM-IDENTICAL
 
 ## Out of scope / left as-is

@@ -220,7 +220,7 @@ crates/aphrodite/src/
 │   ├── mod.rs                      ← pub mod Detect; pub mod Preview; pub mod Line; pub mod Text; pub mod State;
 │   ├── Detect.rs                   ← pub fn Fn(content) -> Option<&'static str>  (the or_else pipeline)
 │   ├── Detect/
-│   │   ├── mod.rs                  ← pub mod Input; pub mod IsJson; pub mod IsTest; pub mod IsDiff; …
+│   │   ├── mod.rs                  ← pub mod Input; pub mod IsJson; pub mod IsTest; pub mod IsDiff; ...
 │   │   ├── Input.rs                ← pub struct Input (typed, pre-computed once) + new/count/any/majority
 │   │   ├── IsJson.rs               ← pub fn Fn(inp: &Input) -> bool
 │   │   ├── IsTest.rs               ← pub fn Fn(inp: &Input) -> bool
@@ -238,7 +238,7 @@ crates/aphrodite/src/
 │   │   └── IsLs.rs                 ← pub fn Fn(inp: &Input) -> bool
 │   ├── Preview.rs                  ← pub fn Fn(type_str, content) -> String  (build_preview)
 │   ├── Preview/
-│   │   ├── mod.rs                  ← pub mod GitStatus; pub mod GitLog; pub mod Ls; …
+│   │   ├── mod.rs                  ← pub mod GitStatus; pub mod GitLog; pub mod Ls; ...
 │   │   ├── GitStatus.rs            ← pub fn Fn(content, lines) -> String
 │   │   ├── GitLog.rs               ← pub fn Fn(content, lines) -> String
 │   │   ├── Ls.rs                   ← pub fn Fn(content, lines) -> String
@@ -276,7 +276,7 @@ crates/aphrodite/src/
 │   │   ├── mod.rs
 │   │   └── ApplyPreviewCap.rs      ← pub fn Fn(preview, max_chars) -> String
 │   └── State/
-│       ├── mod.rs                  ← pub mod PreviewMaxChars; pub mod ErrorLineRe; …
+│       ├── mod.rs                  ← pub mod PreviewMaxChars; pub mod ErrorLineRe; ...
 │       ├── PreviewMaxChars.rs      ← pub static PREVIEW_MAX_CHARS: AtomicU32  + Fn() -> u32 + set Fn
 │       ├── ErrorLineRe.rs          ← static ERROR_LINE_RE: LazyLock<Regex>
 │       ├── FailedCountRe.rs        ← static FAILED_COUNT_RE: LazyLock<Regex>
@@ -323,7 +323,7 @@ pub fn Fn(content: &str) -> Option<&'static str> {
         .or_else(|| Entry::IsTest::Fn(&inp).then_some("test"))
         .or_else(|| Entry::IsDiff::Fn(&inp).then_some("diff"))
         .or_else(|| Entry::IsCode::Fn(&inp).then_some("code"))
-        // …remaining shapes in current arm order…
+        // ...remaining shapes in current arm order...
         .or_else(|| Entry::IsHtmlOrXml::Fn(&inp))
 }
 ```

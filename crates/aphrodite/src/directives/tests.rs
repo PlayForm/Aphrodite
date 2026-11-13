@@ -339,8 +339,8 @@ fn test_load_directives_truncates_at_max_chars_with_ellipsis() {
 	let loaded = load_directives(&dir.path());
 	let content = &loaded["huge"].content;
 	// MAX_DIRECTIVE_CHARS worth of 'x' plus the ellipsis marker.
-	assert_eq!(content.chars().count(), MAX_DIRECTIVE_CHARS + 1);
-	assert!(content.ends_with('…'));
+	assert_eq!(content.chars().count(), MAX_DIRECTIVE_CHARS + 3);
+	assert!(content.ends_with("..."));
 }
 
 #[test]
@@ -351,5 +351,5 @@ fn test_load_directives_under_cap_is_not_truncated() {
 
 	let loaded = load_directives(&dir.path());
 	assert_eq!(loaded["small"].content, small);
-	assert!(!loaded["small"].content.ends_with('…'));
+	assert!(!loaded["small"].content.ends_with("..."));
 }

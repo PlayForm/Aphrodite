@@ -79,7 +79,7 @@ per-category INDEX.md files are the library catalog.
   crates/, docs/, Maintain/.
 - Anonymization: zero local absolute paths remain in notes/, uml/,
   classification/ (the user-home prefix -> `~`, the drive prefix ->
-  `…/`, the Temporary scratch -> `…/.playform/Temporary`; 5 files
+  `.../`, the Temporary scratch -> `.../.playform/Temporary`; 5 files
   scrubbed).
 - Prettier: all touched .md files pass `npx prettier --check` (repo
   `.prettierrc`: tabs, width 100, proseWrap preserve).

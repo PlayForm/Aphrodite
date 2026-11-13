@@ -57,7 +57,7 @@ shared one when unset).
 | Status bar text + usage                     | `status_bar_text`, `status_bar_good/warn/bad/critical`                  | -                        |
 | Diff add/remove (line + word)               | `diff_added` / `diff_removed` / `diff_added_word` / `diff_removed_word` | built-in                 |
 | Code syntax (string/number/keyword/comment) | `syntax_string` / `syntax_number` / `syntax_keyword` / `syntax_comment` | accent/text/border/muted |
-| Completion menu                             | `completion_menu_bg` / `completion_menu_current_bg` / `…_meta_bg`       | -                        |
+| Completion menu                             | `completion_menu_bg` / `completion_menu_current_bg` / `..._meta_bg`     | -                        |
 
 Note the sharing: `ui_accent` colors tool markers **and** headings/links/
 chevrons, so to recolor _only_ tool calls (the classic "change the gold `●`")

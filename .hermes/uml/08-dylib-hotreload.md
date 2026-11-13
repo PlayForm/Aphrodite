@@ -19,7 +19,7 @@ flowchart TD
     C --> D{"_state.dylib set AND current_mtime == _state.dylib_mtime?"}
     D -->|yes| E["return cached _dylib - no reload"]
     D -->|no| F{"_state.dylib already existed?"}
-    F -->|yes| G["_log.warning: reload resets ALL session CCR state<br/>(every &lt;&lt;&lt;CCR:…&gt;&gt;&gt; marker becomes unresolvable)"]
+    F -->|yes| G["_log.warning: reload resets ALL session CCR state<br/>(every &lt;&lt;&lt;CCR:...&gt;&gt;&gt; marker becomes unresolvable)"]
     F -->|no| H["first load"]
     G --> P
     H --> P["_probe_dylib(path) (__init__.py:373) - smoke-test in a SUBPROCESS<br/>(once per unique path; a ctypes SIGSEGV cannot be caught by<br/>try/except and would kill the whole Hermes gateway)"]
@@ -67,7 +67,7 @@ stateDiagram-v2
     [*] --> ImageA: first CDLL load (gen 0)
     ImageA --> ImageA: calls mutate AphroditeState<br/>(bridge OnceLock / core HANDLES)
     ImageA --> Reload: dylib rebuilt on disk (mtime changes)
-    Reload --> ImageB: fresh copy ~/.hermes/aphrodite/hotreload/…gen1 → CDLL
+    Reload --> ImageB: fresh copy ~/.hermes/aphrodite/hotreload/...gen1 → CDLL
     note right of ImageB
       ImageB starts with DEFAULT state
       (re-reads aphrodite.toml via shared()/aphrodite_init).

@@ -182,7 +182,7 @@ is active, resolve the real home from `$HERMES_HOME` - never hardcode
 | "Can app X use my Nous Portal subscription/OAuth?"                        | `references/portal-auth-for-third-party-apps.md`        |
 | Spawning extra Hermes instances (tmux/PTY, one-shot, resume, multi-agent) | `references/spawning-instances.md`                      |
 | Surface orientation (desktop, dashboard, TUI, proxy)                      | `references/surfaces.md`                                |
-| Connecting a messaging platform (Telegram, Discord, Slack, WhatsApp, …)   | docs: `/user-guide/messaging`                           |
+| Connecting a messaging platform (Telegram, Discord, Slack, WhatsApp, ...) | docs: `/user-guide/messaging`                           |
 
 The reference list above is not the feature list - it is the set of topics that
 need more than their docs page. For everything else Hermes ships, fetch

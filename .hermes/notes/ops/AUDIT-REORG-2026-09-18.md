@@ -129,7 +129,7 @@ sound.
   `../CHANGELOG.md` (verified: `Maintain/CHANGELOG.md` does not exist;
   CHANGELOG.md is at repo root on both lines).
 - **AGENTS.md** (out of scope, one link-fix line only, recorded here):
-  `(v1.4.0…v1.4.3-draft)` → `(v1.4.0…v1.4.3)`.
+  `(v1.4.0...v1.4.3-draft)` → `(v1.4.0...v1.4.3)`.
 
 Deliberately left as historical (recorded, not changed): `MERGE-PARENT-EXEC.md`
 row 12 and `CONTINUE-2026-09-15.md` line 123 tree mentions (describe the tree
@@ -180,5 +180,5 @@ at their time); `HERMES-REWRITE-A.md` `SPLIT-MD-REWRITE.md` mentions
 - Git: 5 renames staged (git mv); no commits, no pushes made.
 - Version facts verified against source: crates at 1.4.6
   (`crates/aphrodite/Cargo.toml`, `crates/aphrodite-hermes/Cargo.toml` pin
-  `version = "1.4.6"`); tags `Aphrodite/v1.4.0`…`v1.4.5` exist, `v1.4.6` does
+  `version = "1.4.6"`); tags `Aphrodite/v1.4.0`...`v1.4.5` exist, `v1.4.6` does
   not; submodule log contains `098134e` (final sync-back pick).

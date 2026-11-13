@@ -35,7 +35,7 @@
 
 - Global backtick totals are **even before and after** for both files (values in the per-file table; deltas come from retained backticks inside the added fences).
 - Fence pairing: every ` ``` ` opener has a closer. Fence pairs: ISSUE-11 20 (19 P-fences + 1 M1), RELEASE-METHODOLOGY 31 (30 pre-existing + 1 B4). No stray single backticks introduced.
-- Label:value block lines (`**Location:**`, `**Trigger:**`, `**What it does:**`, …) remaining in the rebuilt files: **0**.
+- Label:value block lines (`**Location:**`, `**Trigger:**`, `**What it does:**`, ...) remaining in the rebuilt files: **0**.
 
 ## Prettier result
 

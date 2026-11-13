@@ -201,4 +201,4 @@ Captured includes joint rows (a single file covering 2+ matrix rows - model_fami
 
 ## Quality spot-check log
 
-- BATCH 4 (final): every new capture verified against its stream-json session transcript (sess-*.jsonl in `.hermes/tmp/example-exchange/`): marker strings quoted byte-for-byte (e357cd16…|ls|5896, 940fbe94…|ls|5889, 997cb298…|ls|576, b1b5c7c7…|diff|987, 2607dcd7…|json|1728, fafc789b…|build_error|801); session IDs recorded; scratch changes removed (git status clean; grep EXAMPLE-CAPTURE in runtime config == 0).
+- BATCH 4 (final): every new capture verified against its stream-json session transcript (sess-*.jsonl in `.hermes/tmp/example-exchange/`): marker strings quoted byte-for-byte (e357cd16...|ls|5896, 940fbe94...|ls|5889, 997cb298...|ls|576, b1b5c7c7...|diff|987, 2607dcd7...|json|1728, fafc789b...|build_error|801); session IDs recorded; scratch changes removed (git status clean; grep EXAMPLE-CAPTURE in runtime config == 0).

@@ -52,7 +52,7 @@ pub fn load_directives(dir:&PathBuf) -> HashMap<String, Directive> {
 		// Trim each directive to a reasonable size.
 		let content = if content.len() > MAX_DIRECTIVE_CHARS {
 			let trunc:String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
-			format!("{}…", trunc)
+			format!("{}...", trunc)
 		} else {
 			content
 		};

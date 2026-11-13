@@ -61,7 +61,7 @@ hermes config set approvals.mode off   # bypass everything (not recommended)
 
 Per-invocation bypass without changing config:
 
-- `hermes --yolo …`
+- `hermes --yolo ...`
 - `export HERMES_YOLO_MODE=1`
 
 Note: YOLO / `approvals.mode: off` does NOT turn off secret redaction. They are
@@ -108,8 +108,8 @@ the running process to pick it up.
 
 ## Verification
 
-| Claim                           | Test                                        | Pass condition                                     |
-| ------------------------------- | ------------------------------------------- | -------------------------------------------------- |
-| Redaction is on by default      | `hermes config get security.redact_secrets` | `true`                                             |
-| Toggle needs a restart          | Set it, then read it back mid-session       | Running process unchanged; new session picks it up |
-| YOLO does not disable redaction | `--yolo` session, print a fake `sk-…` value | Still redacted in context                          |
+| Claim                           | Test                                          | Pass condition                                     |
+| ------------------------------- | --------------------------------------------- | -------------------------------------------------- |
+| Redaction is on by default      | `hermes config get security.redact_secrets`   | `true`                                             |
+| Toggle needs a restart          | Set it, then read it back mid-session         | Running process unchanged; new session picks it up |
+| YOLO does not disable redaction | `--yolo` session, print a fake `sk-...` value | Still redacted in context                          |

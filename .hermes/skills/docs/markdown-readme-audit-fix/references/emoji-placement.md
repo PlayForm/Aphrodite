@@ -18,11 +18,11 @@ Universal rule: every emoji is preceded by an em-quad and appears **at the
 end** of a heading, sentence, or labeled item - never before the prose it
 decorates.
 
-| Sub-pattern         | Before (wrong)                                 | After (correct)                                |
-| ------------------- | ---------------------------------------------- | ---------------------------------------------- |
-| Link/markup line    | `&#x2001;📖 **[CCR Protocol Docs](...)**`      | `**[CCR Protocol Docs](...)**&#x2001;📖`       |
-| Bold-intro sentence | `Welcome to **Aphrodite**💋, the lightweight…` | `Welcome to **Aphrodite**, the lightweight…💋` |
-| Heading title       | `## \`CCR\`💋 in \`Aphrodite\`🌐 Ecosystem`    | `## \`CCR\` in \`Aphrodite\`🌐 Ecosystem💋`    |
+| Sub-pattern         | Before (wrong)                                   | After (correct)                                  |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| Link/markup line    | `&#x2001;📖 **[CCR Protocol Docs](...)**`        | `**[CCR Protocol Docs](...)**&#x2001;📖`         |
+| Bold-intro sentence | `Welcome to **Aphrodite**💋, the lightweight...` | `Welcome to **Aphrodite**, the lightweight...💋` |
+| Heading title       | `## \`CCR\`💋 in \`Aphrodite\`🌐 Ecosystem`      | `## \`CCR\` in \`Aphrodite\`🌐 Ecosystem💋`      |
 
 Manual TYPE-D fix - always the same two-step rewrite:
 
@@ -37,7 +37,7 @@ Right: <text> <more_text> <em-quad> <emoji>
 
 ## NOT errors - leave as-is
 
-- Table cell status rows: `| Status | 📝 Specified …` (status icon inside cell).
+- Table cell status rows: `| Status | 📝 Specified ...` (status icon inside cell).
 - Ecosystem heading combos: `&#x2001;🍃 + &#x2001;🌐` - the _second_ emoji is
   furthest-right; reorganize so all decorative emoji are after the text.
 - Lines where the emoji is the entire content: `<h3>&#x2001;💋</h3>` or
@@ -54,7 +54,7 @@ is quoted.
 | Sub-pattern    | Before (wrong)                 | After (correct)               |
 | -------------- | ------------------------------ | ----------------------------- |
 | Subgraph title | `"&#x2001;⛰️ Proxy - Backend"` | `"Proxy - Backend&#x2001;⛰️"` |
-| Node label     | `"&#x2001;🚀 Bootstrap/…"`     | `"Bootstrap/&#x2001;🚀"`      |
+| Node label     | `"&#x2001;🚀 Bootstrap/..."`   | `"Bootstrap/&#x2001;🚀"`      |
 
 The em-quad is still meaningful inside mermaid quotes - it separates label text
 from the emoji decoration. Do not omit it. The only forbidden placement is

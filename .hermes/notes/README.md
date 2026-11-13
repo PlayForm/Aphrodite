@@ -35,4 +35,4 @@ taxonomy + uml + classification pass) and `HERMES-REWRITE-B.md` (the AGENTS.md
 
 Format contract: prettier-clean (repo `.prettierrc`: tabs, width 100,
 proseWrap preserve), anonymized (zero local absolute paths - repo-relative or
-`…/`-elided references only).
+`.../`-elided references only).

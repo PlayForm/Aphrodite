@@ -12,7 +12,7 @@
 - **Long prose cells** broken into readable segments with `<br>` at sentence/segment boundaries (CEREMONY 6 cells, DEVELOP 5 cells, DOCS-UPDATE 11 cells, FORENSICS 6 cells).
 - **Cells containing code/output content** rendered as full fenced `text` blocks directly AFTER their table, referenced from the cell (`→ P1`..`→ P3` in DEVELOP's verification matrix: the direct-finalize validation message, the bind_to replay signature map, the artifact-shape grep summary). All other code stays in inline backtick spans, intact.
 - **Nothing truncated:** every original cell's full text re-appears in the rebuilt file (see preservation proof). Fence interiors carry the moved output verbatim with backtick code-span delimiters dropped (words preserved), per the established convention.
-- Path redaction in the forensics file follows the convention already set by the `4bb050e` rewrite: user-home roots → `~`, machine-specific path prefixes → `…/` (e.g. `…/PlayForm/Aphrodite/...`, `…/Application/...`). Verbatim log/crash excerpts keep every other byte.
+- Path redaction in the forensics file follows the convention already set by the `4bb050e` rewrite: user-home roots → `~`, machine-specific path prefixes → `.../` (e.g. `.../PlayForm/Aphrodite/...`, `.../Application/...`). Verbatim log/crash excerpts keep every other byte.
 
 ## Per-file summary
 
@@ -47,4 +47,4 @@
 - Restored-from commits (`72283c8`, `d87bb8c`, `c38199e`) are the last versions whose tables were untouched by the `8c2386d`/`10dc03b`/`4bb050e` rewrites.
 - The environment's auto-committer committed the rebuilt files as `96010b7` mid-run; a later fix to the `PART 7` diff-block spacing (`+I11` vs `+ I11`, aligning the fence byte-for-byte with `72283c8`) is still an uncommitted working-tree change on `CEREMONY-AUDIT.md` only. Working tree is otherwise clean for these four files; nothing else was committed by the agent.
 - `<br>` is used inside table cells only; fences carry the full output content, so no cell exceeds ~140 chars of prose.
-- No local absolute paths anywhere in this report (all paths are repo-relative `.hermes/notes/...`, `crates/...`, `~/.hermes/...`, `…/PlayForm/...`).
+- No local absolute paths anywhere in this report (all paths are repo-relative `.hermes/notes/...`, `crates/...`, `~/.hermes/...`, `.../PlayForm/...`).

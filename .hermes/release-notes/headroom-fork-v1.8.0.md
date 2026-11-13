@@ -40,7 +40,7 @@ path pin, so the retention knobs land there as
 max_entries, max_bytes)`; `None`/`0` = unlimited, normalised inside the
   constructor. Past either cap the store evicts by `last_accessed ASC,
 created_at ASC` in batches of 256 rows, with exact freed rows/bytes from
-  `DELETE … RETURNING LENGTH(original)`. An already-oversized DB is trimmed at
+  `DELETE ... RETURNING LENGTH(original)`. An already-oversized DB is trimmed at
   open, not only on the next `put`.
 - **Feature (telemetry)**: `max_entries()`, `max_bytes()`, `evicted_total()`
   accessors; `stats_db()` gained `max_entries`, `max_bytes`, `evicted_total`,

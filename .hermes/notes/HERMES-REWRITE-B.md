@@ -29,7 +29,7 @@ file is a first-read map covering, all verified against the live tree:
   "DEPRECATED - superseded by aphrodite-release-flow v2.0.0" so it never
   auto-triggers. Not deleted.
 - **`aphrodite-release-flow` v2.0.0** - 2 patches: "deleted branch-release-flow"
-  → "retired … (deprecated in place)"; B4 branch-identity audit gate (I11)
+  → "retired ... (deprecated in place)"; B4 branch-identity audit gate (I11)
   added to the ceremony (points at RELEASE-METHODOLOGY.md `### B4`).
 - **`aphrodite-testing-discipline` v1.0.0** - env-var-hermeticity lesson
   ADDED (was missing): the leaked `APHRODITE_PREVIEW_MAX_CHARS=20` shell

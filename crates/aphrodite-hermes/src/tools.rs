@@ -38,10 +38,10 @@ pub fn dispatch(name:&str, args_json:&str) -> serde_json::Value {
 
 fn str_arg<'a>(args:&'a serde_json::Value, key:&str) -> &'a str { args.get(key).and_then(|v| v.as_str()).unwrap_or("") }
 
-/// Largest file `aphrodite_retrieve(path=…)` will read directly.
+/// Largest file `aphrodite_retrieve(path=...)` will read directly.
 const MAX_PATH_READ:u64 = 10 * 1024 * 1024;
 
-/// Read a file requested via `aphrodite_retrieve(path=…)`, confined to the
+/// Read a file requested via `aphrodite_retrieve(path=...)`, confined to the
 /// current workspace and capped at [`MAX_PATH_READ`]. Returns `Err(reason)` if
 /// the path escapes the workspace, is too large, or can't be read - so the tool
 /// can't be coerced into exfiltrating arbitrary files (e.g. /etc/passwd,

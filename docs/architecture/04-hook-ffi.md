@@ -64,7 +64,7 @@ flowchart TD
     B --> D
     C --> D
     D --> E["directives = build_directive_context - NEVER dropped"]
-    D --> F["nudges = render_nudges - ≤2 inline [nudge:…], never dropped"]
+    D --> F["nudges = render_nudges - ≤2 inline [nudge:...], never dropped"]
     D --> G["recall = session::catalog_summary - droppable FIRST"]
     E --> H["assemble top-down under state.flow_budget_chars (default 4000)"]
     F --> H
@@ -73,7 +73,7 @@ flowchart TD
     I -->|yes| J["pop last section (recall block) - directives+nudges survive"]
     I -->|no| K["emit context"]
     J --> I
-    K --> L["injected into model turn:<br/>[directives]…<br/>[nudge:…]<br/>[recall]…<br/>retrieve hint"]
+    K --> L["injected into model turn:<br/>[directives]...<br/>[nudge:...]<br/>[recall]...<br/>retrieve hint"]
 ```
 
 `post_llm_call` is the mirror choke point on both paths: `archive_turn` (last marker of the turn → `conv_index`) → `next_turn` (turn++) → `flow::purge_expired_nudges` (after the counter advances, so a `ttl=1` nudge renders exactly once) → `poll_worker::expire_stale_tasks`.
@@ -109,7 +109,7 @@ flowchart LR
     style Note1 fill:#eef
 ```
 
-Both `guarded()` wrappers (core and bridge) catch panics across the FFI boundary and return `{"error":"internal error: panicked…"}` instead of aborting the process.
+Both `guarded()` wrappers (core and bridge) catch panics across the FFI boundary and return `{"error":"internal error: panicked..."}` instead of aborting the process.
 The `_with_meta` variants exist only on the bridge, because the handle-based core ABI has no Hermes `status`/`error_type` telemetry to plumb.
 The bridge exposes no skill export; the plugin registers tools and hooks only, and skills live dev-side.
 

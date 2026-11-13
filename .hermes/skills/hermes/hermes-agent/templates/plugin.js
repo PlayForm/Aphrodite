@@ -58,7 +58,7 @@ export default {
   name: 'Aphrodite Proxy',
   register(ctx) {
     // Register locale bundles - scoped to this plugin, torn down on reload.
-    // Values are literals or interpolators (`arg => `…${arg}…``).
+    // Values are literals or interpolators (`arg => `...${arg}...``).
     ctx.i18n.register({
       en: {
         paneTitle: 'Aphrodite Proxy',

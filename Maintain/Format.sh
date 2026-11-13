@@ -111,10 +111,10 @@ FormatShell() {
 
 	cd "$Root"
 
-	\echo "→ Installing dependencies…"
+	\echo "→ Installing dependencies..."
 	pnpm install --frozen-lockfile 2> /dev/null || pnpm install
 
-	\echo "→ Running Prettier on shell scripts…"
+	\echo "→ Running Prettier on shell scripts..."
 	pnpm exec prettier --write \
 		--ignore-path .prettierignore \
 		"**/*.sh"
@@ -135,10 +135,10 @@ FormatPrettier() {
 
 	cd "$Root"
 
-	\echo "→ Installing dependencies…"
+	\echo "→ Installing dependencies..."
 	pnpm install --frozen-lockfile 2> /dev/null || pnpm install
 
-	\echo "→ Running Prettier (md, json, yaml)…"
+	\echo "→ Running Prettier (md, json, yaml)..."
 	pnpm exec prettier --write \
 		--ignore-path .prettierignore \
 		"**/*.md" \
@@ -184,7 +184,7 @@ FormatRust() {
 	#
 	# shellcheck disable=SC2038
 	# shellcheck disable=SC2016
-	\echo "→ Formatting orphan .rs files (direct rustfmt)…"
+	\echo "→ Formatting orphan .rs files (direct rustfmt)..."
 	OrphanFailures=$(
 		find . -name "*.rs" \
 			-not -path "*/vendor/*" \
@@ -218,7 +218,7 @@ FormatRust() {
 
 	# Compliance: the exact gate CI runs in Check.yml. A formatted tree must
 	# pass `cargo fmt --all -- --check` - fail loudly if it does not.
-	\echo "→ Verifying cargo fmt --all -- --check…"
+	\echo "→ Verifying cargo fmt --all -- --check..."
 	cargo fmt --all -- --check
 
 	\echo ""
@@ -241,7 +241,7 @@ FormatCheck() {
 	# formatters, so a formatted tree is also known to compile. `set -e`
 	# would abort anyway; the explicit guard exists to name the failing
 	# command in the last lines of the output.
-	\echo "→ Running cargo check…"
+	\echo "→ Running cargo check..."
 	if ! cargo check -p aphrodite -p aphrodite-hermes; then
 		\echo ""
 		\echo "Error: cargo check -p aphrodite -p aphrodite-hermes failed."
@@ -279,7 +279,7 @@ case "${1:-}" in
 		FormatRust
 		FormatCheck
 		if [ -z "${FORMAT_SKIP_CI:-}" ]; then
-			\echo "→ Running Maintain/Check.sh (full CI mirror)…"
+			\echo "→ Running Maintain/Check.sh (full CI mirror)..."
 			\echo ""
 			bash "$Current/Check.sh"
 		else

@@ -8,7 +8,7 @@ https://hermes-agent.nousresearch.com/docs/reference/cli-commands
 - The repo's dev instance runs with `hermes --profile dev-aphrodite`
   (plugin symlinked at `~/.hermes/profiles/dev-aphrodite/plugins/aphrodite`).
 - CCR state is inspected with the in-session `aphrodite_*` tools
-  (`aphrodite_stats`, `aphrodite_rebuild`, `aphrodite_catalog`, …) - they are
+  (`aphrodite_stats`, `aphrodite_rebuild`, `aphrodite_catalog`, ...) - they are
   session tools, not CLI subcommands.
 - Dev loop: `cargo watch -x 'build -p aphrodite -p aphrodite-hermes' -x 'run -p aphrodite'`
   rebuilds the proxy and the `libaphrodite_hermes.dylib` bridge on every save;
@@ -70,7 +70,7 @@ hermes status [--all]       Component status
 hermes tools [list|enable NAME|disable NAME]   Per-platform toolsets (curses UI with no args)
 
 hermes skills list|browse|search QUERY|inspect ID
-hermes skills install ID    Hub identifier OR a direct https://…/SKILL.md URL
+hermes skills install ID    Hub identifier OR a direct https://.../SKILL.md URL
 hermes skills config        Enable/disable skills per platform
 hermes skills check|update|uninstall|publish PATH
 hermes skills tap add REPO  Add a GitHub repo as a skill source
@@ -127,7 +127,7 @@ is the documented dev session (see `.hermes/skills/aphrodite/aphrodite-developme
 
 ```
 hermes auth                 Interactive credential manager
-hermes auth add [PROVIDER]  Add OAuth or API-key credential (nous, openai-codex, qwen-oauth, …)
+hermes auth add [PROVIDER]  Add OAuth or API-key credential (nous, openai-codex, qwen-oauth, ...)
 hermes auth list|remove P IDX|reset PROVIDER|status
 ```
 

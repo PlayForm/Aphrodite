@@ -13,7 +13,7 @@ dependency that Aphrodite extends.
 | **Proxy binaries**        | ✅ Dual-proxy mode (:9797 cache + :9798 token) with TOML config                         | Single proxy, CLI only   |
 | **Tool relay**            | ✅ Bidirectional `/tool/relay` - LLM calls Hermes tools through proxy                   | ❌                       |
 | **CCR endpoints**         | ✅ `/ccr/create`, `/ccr/list`, `/ccr/{hash}` REST API                                   | Basic CCR store          |
-| **Content classifier**    | ✅ 26-type classifier (diff, build, terminal, code, JSON, table…)                       | Generic                  |
+| **Content classifier**    | ✅ 26-type classifier (diff, build, terminal, code, JSON, table...)                     | Generic                  |
 | **Preview templates**     | ✅ TOML-driven `[type:key=val]` format, 3 families (compact/balance/code_first)         | ❌                       |
 | **Context engine**        | ✅ Async middle-message compression with head/tail protection                           | ❌                       |
 | **Auto-expand**           | ✅ Configurable marker resolution (off by default)                                      | ❌                       |
@@ -94,8 +94,8 @@ The plugin ships as a directory that you symlink into Hermes manually (the
   → /path/to/repo/plugins/aphrodite/
 
 Hermes auto-discovers it via `plugin.yaml`:
-  - 5 lifecycle hooks (on_session_start, transform_tool_result, …)
-  - 13 tools (aphrodite_retrieve, compress, stats, rebuild, …)
+  - 5 lifecycle hooks (on_session_start, transform_tool_result, ...)
+  - 13 tools (aphrodite_retrieve, compress, stats, rebuild, ...)
   - Context engine (AphroditeContextEngine)
   - TOML-driven config (aphrodite.toml)
 ```

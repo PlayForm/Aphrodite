@@ -22,7 +22,7 @@ auto-reload for the dylib.
   path), so a broken config is visible in the host log / proxy-stderr
   instead of only in the binary's string table. `aphrodite_stats` now
   reports **`config_error`** - e.g.
-  `"/path/aphrodite.toml: TOML parse error at line 1…"` - so "defaults in
+  `"/path/aphrodite.toml: TOML parse error at line 1..."` - so "defaults in
   effect (parse failed)" is one call away from being told apart from
   "config not set". Regression tests cover the broken-file warn + record
   path and lock in that multibyte TOML comments parse (an em dash in a

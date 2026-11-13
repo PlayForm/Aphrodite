@@ -39,7 +39,7 @@ tool output → classify → template → store → <<<CCR:hash|type|size>>>
 
 Four pipeline stages, all under 1ms:
 
-1. **Classify** - 26-type regex classifier (`diff`, `build_output`, `code_rust`, …)
+1. **Classify** - 26-type regex classifier (`diff`, `build_output`, `code_rust`, ...)
 2. **Template** - TOML-driven preview templates per content type
 3. **Store** - blake3 hash → SQLite or in-memory → CCR marker
 4. **Preview** - Structured `[type:metadata]` the LLM reads instantly
@@ -55,7 +55,7 @@ src/
 ├── hooks.rs             ← transform_tool_result, terminal, pre/post LLM
 ├── session.rs           ← Turn lifecycle, conversation index, catalog
 ├── state.rs             ← AphroditeState, inline store, LRU, markers
-├── marker.rs            ← CCR marker formatting + parsing (<<<CCR:…>>>)
+├── marker.rs            ← CCR marker formatting + parsing (<<<CCR:...>>>)
 ├── catalog.rs           ← Full/compact/TOC catalog display
 ├── chain_split.rs       ← Fine-grained chain splitting (SEG_MARKER segments)
 ├── resolve.rs           ← Recursive CCR expansion (5 levels deep)

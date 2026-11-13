@@ -136,7 +136,7 @@ returning the original L1.
    (`vendor/headroom/crates/headroom-core/src/transforms/content_detector.rs:272-283`,
    `parsed.as_array()?`; test `json_object_falls_through_to_text` :570) →
    `"text"`.
-3. `build_preview("text", …)` upgrades via `detect_semantic_type`
+3. `build_preview("text", ...)` upgrades via `detect_semantic_type`
    (`preview.rs:733-734`) → the JSON arm (56-66) → **excluded** because
    `is_envelope_json_object` (255-275) hits the `success` guard key →
    stays `text`.
@@ -166,14 +166,14 @@ Sources: `~/.hermes/hermes-agent/tools/*` (authoritative Hermes source).
 Compiled by a delegated research pass that read each file; the integration
 files (`lib.rs:409-457`, `hooks.rs:161-198`) were re-verified directly.
 
-| Family                     | Hermes producer (file:line)                                    | Envelope keys                                                                    | Aphrodite unwrap             |
-| -------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------- |
-| terminal                   | `terminal_tool_result.py:258` (+`_result` wrapper 261-277)     | `output`, `exit_code`, `error` + `cwd`, `full_output_path`, `truncation_note`, … | F1 ✓                         |
-| patch                      | `file_tools.py:952-985`; `file_operations_common.py:73-83`     | `success`, `diff`, `files_modified`, `lint`, `error`, …                          | F2 ✓ (via `diff`/`error`)    |
-| write_file                 | `file_tools.py:811-868`; `file_operations_common.py:48-49`     | `bytes_written`, `dirs_created`, `verified`, `lint`, `error`, `warning`          | GAP on success; error → F2 ✓ |
-| read_file                  | `file_tools.py:650-704`; `file_operations_common.py:29-30`     | `content`, `total_lines`, `file_size`, `truncated`, `hint`, `is_binary`, `error` | F5 ✓                         |
-| search_files               | `file_tools.py:1047-1069`; `file_operations_common.py:127-153` | `total_count`, `matches` / `matches_format`+`matches_text`, `truncated`, `files` | F4 ✓                         |
-| error envelope (all tools) | `registry.py:999-1002`                                         | `error` (str) + extras                                                           | F2 error ✓                   |
+| Family                     | Hermes producer (file:line)                                    | Envelope keys                                                                      | Aphrodite unwrap             |
+| -------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------- |
+| terminal                   | `terminal_tool_result.py:258` (+`_result` wrapper 261-277)     | `output`, `exit_code`, `error` + `cwd`, `full_output_path`, `truncation_note`, ... | F1 ✓                         |
+| patch                      | `file_tools.py:952-985`; `file_operations_common.py:73-83`     | `success`, `diff`, `files_modified`, `lint`, `error`, ...                          | F2 ✓ (via `diff`/`error`)    |
+| write_file                 | `file_tools.py:811-868`; `file_operations_common.py:48-49`     | `bytes_written`, `dirs_created`, `verified`, `lint`, `error`, `warning`            | GAP on success; error → F2 ✓ |
+| read_file                  | `file_tools.py:650-704`; `file_operations_common.py:29-30`     | `content`, `total_lines`, `file_size`, `truncated`, `hint`, `is_binary`, `error`   | F5 ✓                         |
+| search_files               | `file_tools.py:1047-1069`; `file_operations_common.py:127-153` | `total_count`, `matches` / `matches_format`+`matches_text`, `truncated`, `files`   | F4 ✓                         |
+| error envelope (all tools) | `registry.py:999-1002`                                         | `error` (str) + extras                                                             | F2 error ✓                   |
 
 **Recognized-but-nuanced:** `execute_code` local (`code_kernel.py:727-755`,
 `status/output/exit_code`) is F1 only when `output` is non-empty; the remote
@@ -186,21 +186,21 @@ its top-level-array list form (:2374) are GAPs.
 `detect_type` + semantic upgrade; no envelope fields extracted):
 
 1. write_file success: `bytes_written/dirs_created/verified/lint/lsp_diagnostics/warning`
-2. skill_view: `success/name/description/tags/related_skills/content/path/…` (`skills_tool.py:631-644`) - multi-key blocks F5/F6
+2. skill_view: `success/name/description/tags/related_skills/content/path/...` (`skills_tool.py:631-644`) - multi-key blocks F5/F6
 3. skills_list: `success/skills/categories/message` (`skills_tool.py:248-255`)
-4. todo_list: `todos/revision/summary{…}` (`todo_tool.py:210-211`)
+4. todo_list: `todos/revision/summary{...}` (`todo_tool.py:210-211`)
 5. memory writes: `success/staged/pending_id/message/proposal_staged` (`memory_tool.py:77,159-161`)
 6. cronjob: `success/forwarded_to_gateway/note` + job payloads (`cronjob_tools.py:143-157`)
-7. browser tools success envelopes: `success+url/title/snapshot/element_count/typed/element/result/analysis/data/…` (`browser_tool.py:768,817,893,1013,1200,1256`)
-8. web_search success: `success/data.web[…]` (`web_tools.py:305-311`)
+7. browser tools success envelopes: `success+url/title/snapshot/element_count/typed/element/result/analysis/data/...` (`browser_tool.py:768,817,893,1013,1200,1256`)
+8. web_search success: `success/data.web[...]` (`web_tools.py:305-311`)
 9. web_extract: `results` (array; single-key but `results` ∉ F6 keys) (`web_tools.py:396-399`)
 10. image_generate success: `success/image/modality/upscaled` (`image_generation_tool.py:472-476`)
 11. execute_code remote success: `status/output` without `exit_code`
 12. process_manage timeout / list (see above)
-13. delegate_task: `results[{status,summary,…}], total_duration_seconds` (`delegate_tool_dispatch.py:185-196`)
+13. delegate_task: `results[{status,summary,...}], total_duration_seconds` (`delegate_tool_dispatch.py:185-196`)
 14. session_search success: `success/mode/query/detail/results/count/message` (`session_search_tool.py:310,446,493`)
 15. desktop_project: `success/id/slug/name` (`project_tools.py:62-63` - UNVERIFIED, file not independently re-read)
-16. annotate_preview fallback: `{"text": …}` (`annotate_preview_tool.py:44-46`)
+16. annotate_preview fallback: `{"text": ...}` (`annotate_preview_tool.py:44-46`)
 17. vision_analyze success: `success/analysis/scale_note` (`vision_tools.py:752`)
 18. read_file dedup stub: `status/message/path/dedup/content_returned` (`file_tools.py:507-513`)
 
@@ -216,7 +216,7 @@ at `hooks.rs:379-381`), with the unwrap's `(payload, type)` threaded as
 
 **Problem:** one string (`type`) today carries content semantics only; the
 envelope provenance (which Hermes family produced the result) is dropped after
-unwrap, so `{"success": true, "data": …}` is indistinguishable from a plain
+unwrap, so `{"success": true, "data": ...}` is indistinguishable from a plain
 user JSON object, and a read_file'd JSON file is labeled `text` while its
 preview renders `json` (see §8).
 
@@ -226,7 +226,7 @@ preview renders `json` (see §8).
   `generic`} - **provenance**: how the result arrived (the six unwrap
   families). `None`/absent = no envelope recognized.
 - `content_type` - **what the payload IS**: `json`, `text`, `diff`,
-  `terminal`, `build_output`, `code_*`, `search`, … (the full classifier set -
+  `terminal`, `build_output`, `code_*`, `search`, ... (the full classifier set -
   catalog doc §2).
 - `unwrap_hermes_result` returns `(envelope_kind, payload, content_type)`:
   the kind is structural (which branch fired), the content type is
@@ -234,7 +234,7 @@ preview renders `json` (see §8).
   unchanged).
 - `compress_into` records both on the `MarkerEntry` (`tools.rs:276-284`) and
   the compress response (`286-292`); the marker/catalog carries `kind` in
-  metadata (`marker.rs:67-82` meta key `kind=…`) while the marker line stays
+  metadata (`marker.rs:67-82` meta key `kind=...`) while the marker line stays
   `<<<CCR:hash|type|size>>>` for backward compatibility.
 - **Change points:** `tools.rs` (unwrap return type + every branch's return),
   `compress_into` (thread kind through), `state.rs` `MarkerEntry` (+`kind`
@@ -258,7 +258,7 @@ Ordered so a follow-up agent can execute each step and gate on the previous:
    add `kind: Option<EnvelopeKind>` to the `MarkerEntry` (`state.rs`) and to
    the response JSON (`286-292`).
 3. **Marker/catalog carries kind** - `marker.rs:39-47` `ccr_marker` gains a
-   kind param emitted as `kind=…` in the meta line (`marker.rs:67-82`); the
+   kind param emitted as `kind=...` in the meta line (`marker.rs:67-82`); the
    marker line format unchanged. Catalog rendering (`catalog_mode`) shows the
    kind column.
 4. **`detect_type` untouched; semantic detector untouched** - content_type
@@ -278,7 +278,7 @@ Ordered so a follow-up agent can execute each step and gate on the previous:
 1. **Label-vs-preview mismatch (read_file→JSON).** `tools.rs:210-211` types a
    JSON payload via headroom `detect_type` → `"text"`, while `build_preview`
    upgrades it to `json` (733-734). The marker `type` field says `text`, the
-   preview renders `[json:…]`. The `type` field therefore already conflates
+   preview renders `[json:...]`. The `type` field therefore already conflates
    envelope and content - the exact conflation §5 removes.
 2. **Proxy vs hook classifier divergence.** `proxy_detect_content_type`
    returns `tool_output` for `{exit_code|status}` envelopes (`proxy.rs:1335-1337`)
@@ -288,7 +288,7 @@ Ordered so a follow-up agent can execute each step and gate on the previous:
    never parsed - Hermes ships `"path-grouped"`; other values (if any) would
    silently fall to the `"N total"` branch. UNVERIFIED whether Hermes emits
    other formats.
-4. **`{"success": …}` single-key vs multi-key asymmetry** - the unwrap honors
+4. **`{"success": ...}` single-key vs multi-key asymmetry** - the unwrap honors
    only single-key success-strings, but the semantic GUARD list excludes any
    object carrying `success` from `json` (255-275). A principled `json`
    classification for unwrap-rejected objects (§3 rule) requires the GUARD to

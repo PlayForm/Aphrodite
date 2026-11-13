@@ -24,7 +24,7 @@ apply it file-by-file; the amendment log at the end tracks each fold-in.
 | `K` (kind)  | `P` Process · `A` Artifact · `C` Config · `T` Test · `D` Doc · `S` Script · `M` Manifest · `G` Git-meta · `V` Vendor                 | what the halted process is                |
 | `P` (phase) | `D` Development · `C` Current · `B` Both (shared) · `R` Ritual (ceremony-time only)                                                  | which branch line the process is alive on |
 | `L` (layer) | `1` core engine · `2` hermes bridge · `3` plugin/loader · `4` release infra · `5` identity/protected · `6` meta/process · `7` vendor | which subsystem it belongs to             |
-| `N` (seq)   | 01…99                                                                                                                                | sequence within (kind, phase, layer)      |
+| `N` (seq)   | 01...99                                                                                                                              | sequence within (kind, phase, layer)      |
 
 ### Ceremony annotations (suffix, comma-separated)
 

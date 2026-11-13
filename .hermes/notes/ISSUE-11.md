@@ -59,7 +59,7 @@ at the time - the reporter's config attempts could not help.
   surfaces `test result: FAILED...`, never a clean `[build:0E 0W 3L]`).
 - **WS4**: `preview_max_chars` wired end-to-end (env > TOML > default 120,
   single choke point at the end of `build_preview`, char-boundary-safe with
-  closing `]` + `…` preserved, applied at startup / hot-reload / dylib init).
+  closing `]` + `...` preserved, applied at startup / hot-reload / dylib init).
 
 Test counts before -> after: `cargo test -p aphrodite` 348 -> 406 (current
 verified: 377 lib + 29 bins, 1 ignored); `cargo test -p aphrodite-hermes`

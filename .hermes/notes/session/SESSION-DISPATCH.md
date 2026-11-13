@@ -10,7 +10,7 @@ Next wave: release ceremony + 1.5.0 backlog (section "Next wave" below).**
 
 All agents: do NOT commit (auto-committer sweeps); no githooks exist (branch
 discipline manual); write deliverables to both sigserve scratch
-(`…/.playform/Temporary/sigserve/`) AND `.hermes/notes/` (prettier
+(`.../.playform/Temporary/sigserve/`) AND `.hermes/notes/` (prettier
 --write + --check against repo .prettierrc: tabs, width 100, proseWrap
 preserve); deliverables anonymized (repo-relative paths, ZERO local absolute
 paths). Pairs of 2 per task, disjoint file ownership.
@@ -69,7 +69,7 @@ paths). Pairs of 2 per task, disjoint file ownership.
   error/linter/log arms (first real error/lint line or tail).
 - WS4: `preview_max_chars` wired end-to-end (config field was declared but
   unread; now enforced at the `build_preview` choke point, env > TOML > default
-  120, char-boundary-safe with closing `]` + `…` preserved; startup + `/reload`
+  120, char-boundary-safe with closing `]` + `...` preserved; startup + `/reload`
     - dylib init).
 - 12 new tests; `cargo test -p aphrodite` 348 -> 389.
 - Record: `.hermes/notes/PAIR-B2.md`; test-race fix in

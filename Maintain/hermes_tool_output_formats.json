@@ -596,7 +596,7 @@
       "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n[diff:1f +12/-3 42L src/main.rs]\n<<<CCR:f1e2d3c4|diff|4521|token|files=1|+=12|-=3|ln=42>>>",
       "[json:total_items,by_type,items 30L]\n<<<CCR:1234abcd|json|8234|token|keys=total_items,by_type,items|ln=30>>>",
       "\n<<<CCR:9a8b7c6d|build_output|12345|token|preview=Compiling...|errors=3|warnings=2|ln=234>>>",
-      "\n<<<CCR:i:abcd1234|terminal|5678|inline>> PREVIEW…(use aphrodite_retrieve)"
+      "\n<<<CCR:i:abcd1234|terminal|5678|inline>> PREVIEW...(use aphrodite_retrieve)"
     ],
     "classification_type": "CCR marker (detected by regex: <<<CCR:...>>> or [CCR:...] or ⫷CCR:...⫸). Sub-classified into: code_rust, code_python, code_go, code_js, code, error, diff, git, json, tool_output, build_output, log, linter, terminal, text, search_results, search_files, process_output, tabular, commit",
     "key_extraction_fields": [

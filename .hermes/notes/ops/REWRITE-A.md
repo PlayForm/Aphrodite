@@ -27,12 +27,12 @@ Nothing committed.
   (Date/Event/Method/Repo/Scope/Predecessors) was also separated with blank
   lines (rendering fix, zero content change).
 - **Anonymization (zero local absolute paths):** `HERMES-UPDATE-ERROR-FORENSICS.md`
-  rewritten: the user home -> `~`, the local drive prefix + repo root -> `…/`
-  (e.g. `…/PlayForm/Aphrodite`), the Temporary scratch -> `…/.playform/Temporary`.
+  rewritten: the user home -> `~`, the local drive prefix + repo root -> `.../`
+  (e.g. `.../PlayForm/Aphrodite`), the Temporary scratch -> `.../.playform/Temporary`.
   No local absolute path remains in any file.
 - **Location note:** `ISSUE-11-BATTERY-AFTER.md` does not exist in
   `.hermes/notes/`; it lives in the sigserve scratch dir
-  (`…/.playform/Temporary/sigserve/`). It was rewritten in place there.
+  (`.../.playform/Temporary/sigserve/`). It was rewritten in place there.
 - **Pre-existing, kept verbatim:** `DEVELOP.md` prose has a code span split
   across two lines (`for _lib in` / `_libs.values():`) - globally balanced,
   left as authored.

@@ -60,7 +60,7 @@ export default function register(sdk) {
 `React`, `h` (createElement - no JSX in .mjs), components `Box`, `Text`,
 `Dialog`, `Overlay`, `WidgetGrid`, `GridAreas`, and loaders `Shimmer`,
 `ShimmerRows`, `useShimmerPhase` - use `ShimmerRows` for loading phases
-instead of a bare "loading…" line.
+instead of a bare "loading..." line.
 
 Expand/collapse: `sdk.Accordion` - the same primitive the session panel's
 tool/skill sections use. `h(Accordion, { t, title: 'details', count: 3,
@@ -111,7 +111,7 @@ Contract essentials:
   late reply can never resurrect it.
 - Animation: own a timer inside a component via `React.useState` +
   `React.useEffect` (see the template); keep intervals ≥ 250ms.
-- Colors: ALWAYS theme tones (`t.color.primary/label/muted/ok/error/…`),
+- Colors: ALWAYS theme tones (`t.color.primary/label/muted/ok/error/...`),
   never hardcoded hexes - widgets must survive `/skin` and light/dark.
 
 ## Procedure

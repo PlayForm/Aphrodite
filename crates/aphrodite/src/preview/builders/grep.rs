@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use crate::preview::{input::Input, line::grep::is_grep_line};
 
 /// grep/ripgrep preview: hit count, distinct files, first location.
-/// `[grep:38 hits in 9 files | src/x.rs:12 …]`.
+/// `[grep:38 hits in 9 files | src/x.rs:12 ...]`.
 pub(crate) fn build_grep_preview(inp:&Input<'_>) -> String {
 	let mut hits = 0usize;
 	let mut files:BTreeSet<String> = BTreeSet::new();
@@ -27,7 +27,7 @@ pub(crate) fn build_grep_preview(inp:&Input<'_>) -> String {
 		return format!("[grep:{}L]", inp.total);
 	}
 	match first {
-		Some(loc) => format!("[grep:{} hits in {} files | {} …]", hits, files.len(), loc),
+		Some(loc) => format!("[grep:{} hits in {} files | {} ...]", hits, files.len(), loc),
 		None => format!("[grep:{} hits in {} files]", hits, files.len()),
 	}
 }

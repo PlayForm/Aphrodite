@@ -17,7 +17,7 @@ pub(crate) struct Input<'a> {
 	pub(crate) raw:&'a str,            // original content
 	pub(crate) trimmed:&'a str,        // raw.trim_start()
 	pub(crate) non_empty:Vec<&'a str>, // lines().map(trim_end).filter(|l| !l.trim().is_empty()) - order kept
-	pub(crate) total:usize,            // raw.lines().count()   → the `NL` in every [type:NL …] arm
+	pub(crate) total:usize,            // raw.lines().count()   → the `NL` in every [type:NL ...] arm
 	pub(crate) n:usize,                // non_empty.len()        → majority denominators
 	pub(crate) bytes:usize,            // raw.len()              → the `NB` in error/lint/log/generic arms
 }

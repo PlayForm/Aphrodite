@@ -63,7 +63,7 @@ re-introduces the class fails verification loudly.
 ### `utf8_boundary.txt` - multibyte straddling offsets (slice-panic class)
 
 Built as `("a" + "€"*700 + "b" + "🜲"*500 + "é"*300) * 4`, so 2-, 3-, and 4-byte
-codepoints deliberately **straddle byte offsets 500 / 1000 / 1500 / …**.
+codepoints deliberately **straddle byte offsets 500 / 1000 / 1500 / ...**.
 Any byte-indexed slicing (`&content[..n]`, `content[..500]`-style chunking, or
 `len()`-based offset arithmetic) that lands mid-codepoint panics
 (`byte index N is not a char boundary`) or corrupts output. The Rust

@@ -7,7 +7,7 @@ it. New commands land often; `/help` in-session is always authoritative.
 
 In the Aphrodite repo, run the dev session with `hermes --profile dev-aphrodite`.
 CCR state is not a slash command - inspect it with the `aphrodite_*` session
-tools (`aphrodite_stats`, `aphrodite_rebuild`, `aphrodite_catalog`, …).
+tools (`aphrodite_stats`, `aphrodite_rebuild`, `aphrodite_catalog`, ...).
 
 ### Session
 
@@ -73,7 +73,7 @@ tools (`aphrodite_stats`, `aphrodite_rebuild`, `aphrodite_catalog`, …).
 /cron [sub]              Manage scheduled tasks (CLI)
 /suggestions (/suggest)  Review suggested automations
 /blueprint (/bp) [name]  Set up an automation from a blueprint
-/curator [sub]           Skill maintenance (status, run, pin, archive, …)
+/curator [sub]           Skill maintenance (status, run, pin, archive, ...)
 /kanban [sub]            Multi-profile collaboration board
 /moa <prompt>            One prompt through the Mixture-of-Agents preset
 /reload                  Reload .env into the running session (CLI)

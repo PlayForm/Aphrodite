@@ -31,12 +31,12 @@ Predecessors: `.hermes/notes/ISSUE-11-ROOT-CAUSE.md`, `ISSUE-11-FIXDESIGN.md`,
 
 ### WS4 - `preview_max_chars` wired end-to-end (config plumbing, B2)
 
-| Behavior                        | Before (1.4.5)                                         | After (1.4.6)                                                                                                                                                                          |
-| ------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preview_max_chars` enforcement | declared-but-unread config field (never read anywhere) | enforced at the single choke point (end of `build_preview`): every path (proxy, hooks, prefetch, poll_worker, engine C-ABI, Hermes dylib) renders bounded previews                     |
-| Resolution chain                | no resolution chain (key never read)                   | env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > default (120); absent key = unlimited (legacy behavior)                                                                                     |
-| Truncation safety               | n/a (no cap applied)                                   | char-boundary-safe truncation preserves the closing `]` + `…` marker so `render_marker` / `parse_preview` / `chain_split` keep working (no `[text:[text:...]]` double-wrap regression) |
-| Application points              | n/a (never applied anywhere)                           | applied at startup (`main.rs`), on hot-reload (`proxy.rs` `/reload`), and in dylib init (`crates/aphrodite-hermes/src/lib.rs`)                                                         |
+| Behavior                        | Before (1.4.5)                                         | After (1.4.6)                                                                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preview_max_chars` enforcement | declared-but-unread config field (never read anywhere) | enforced at the single choke point (end of `build_preview`): every path (proxy, hooks, prefetch, poll_worker, engine C-ABI, Hermes dylib) renders bounded previews                       |
+| Resolution chain                | no resolution chain (key never read)                   | env `APHRODITE_PREVIEW_MAX_CHARS` > TOML > default (120); absent key = unlimited (legacy behavior)                                                                                       |
+| Truncation safety               | n/a (no cap applied)                                   | char-boundary-safe truncation preserves the closing `]` + `...` marker so `render_marker` / `parse_preview` / `chain_split` keep working (no `[text:[text:...]]` double-wrap regression) |
+| Application points              | n/a (never applied anywhere)                           | applied at startup (`main.rs`), on hot-reload (`proxy.rs` `/reload`), and in dylib init (`crates/aphrodite-hermes/src/lib.rs`)                                                           |
 
 ## 2. Test counts before -> after
 
@@ -58,11 +58,11 @@ New regression coverage: 6 tools.rs tests (hint-keeps-type-and-full-preview, bar
 
 Spot evidence the fix works (PAIR-B1/B2 probes on the rebuilt dylib):
 
-| case                                                                | before (1.4.5)                       | after (rebuilt 1.4.6 dylib)                                        |
-| ------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
-| the issue's exact repro `{"success": true, "data": {"web": [...]}}` | `[text:1L 2B \| ok]`                 | `[tool_result:1L 52B \| {...}]`                                    |
-| failing test run                                                    | `[build:0E 0W 3L]`                   | `[build:0E 0W 3L \| test result: FAILED. 1 passed; 2 failed; ...]` |
-| real 25-hit search                                                  | `[search:20 hits …]` / `[search:1L]` | `[search:25 hits in 25 files \| f0.rs:0 …]`                        |
+| case                                                                | before (1.4.5)                         | after (rebuilt 1.4.6 dylib)                                        |
+| ------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------ |
+| the issue's exact repro `{"success": true, "data": {"web": [...]}}` | `[text:1L 2B \| ok]`                   | `[tool_result:1L 52B \| {...}]`                                    |
+| failing test run                                                    | `[build:0E 0W 3L]`                     | `[build:0E 0W 3L \| test result: FAILED. 1 passed; 2 failed; ...]` |
+| real 25-hit search                                                  | `[search:20 hits ...]` / `[search:1L]` | `[search:25 hits in 25 files \| f0.rs:0 ...]`                      |
 
 ## 4. Remaining deferrals
 

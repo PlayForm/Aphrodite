@@ -162,7 +162,7 @@ Relationships / invariants:
   retrieval ratio adapts `chain_split_min_segments` within
   `[chain_split_floor, chain_split_max_segments]`. Ring capped at
   `SPLIT_EVENT_CAP` (16).
-- `ActiveDirective` with `inline=Some(..)` renders as a `[nudge:…]`; `name` set
+- `ActiveDirective` with `inline=Some(..)` renders as a `[nudge:...]`; `name` set
   keys into `directives`. `expires_after_turn=None` is permanent.
 - `catalog_summary` is delta-only: it emits `+N new compressions this turn`
   (or a cache-stable "no change" line) using `last_emitted_marker_count` /

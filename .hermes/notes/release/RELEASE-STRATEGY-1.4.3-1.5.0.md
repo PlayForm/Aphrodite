@@ -37,9 +37,9 @@ deviation is explicitly flagged in §10.
 
 **Property:** Tags
 
-**Parent P (`PlayForm/Aphrodite`):** `Aphrodite/v0.x … Aphrodite/v1.4.2` - **no `Aphrodite/v1.4.3`, no `Aphrodite/v1.5.0`**
+**Parent P (`PlayForm/Aphrodite`):** `Aphrodite/v0.x ... Aphrodite/v1.4.2` - **no `Aphrodite/v1.4.3`, no `Aphrodite/v1.5.0`**
 
-**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** `v1.62.x, v2.0.x, v2.1.0 … v2.1.2` - **no `v2.1.3`**
+**Submodule S (`plugins/aphrodite`, `PlayForm/Aphrodite-Hermes`):** `v1.62.x, v2.0.x, v2.1.0 ... v2.1.2` - **no `v2.1.3`**
 
 ---
 
@@ -172,7 +172,7 @@ PARENT  PlayForm/Aphrodite
  * d798c4f  (empty msg, no tree)    1.5.0 track ──► * B release: sync v1.4.3 from Development  ★ Aphrodite/v1.4.3
  * 50ff098  Tier 3 error hints                      * 0028705 (previous Current tip; 1.4.2-era released state)
  * 85771ee  Tier 1 teaching loop                    * c876fbe/cda5d0a/fd6c939 (Current-owned cleanup)
- * 8521b27  chain-split docs   ◄─ 1.4.3 CUTOFF ───── * 3100948 …shared history…
+ * 8521b27  chain-split docs   ◄─ 1.4.3 CUTOFF ───── * 3100948 ...shared history...
  * d26dd89  chain-split output invisible + dirs      *
  * 5e18dd3  continuation notes (1.4.3 prep)
  * 475917d  chain-split core (opt-in, default OFF)
@@ -181,13 +181,13 @@ PARENT  PlayForm/Aphrodite
  * 5effa73  bench suite (DEV-INFRA → not on Current)
  * 48abe46  gitignore · db12c86 draft · 8afe8e0 notes
  * 5d8c09a  bump v1.4.3   (1.4.3 prep freeze area)
- * …        pre-1.4.3 history (shared up to 3100948)
+ * ...        pre-1.4.3 history (shared up to 3100948)
 
 SUBMODULE  plugins/aphrodite (PlayForm/Aphrodite-Hermes)
  S-Development                              S-Current
  * b6fecad  drop phantom gitlink             * C release: sync v2.1.3   ★ v2.1.3  ◄── gitlink of BOTH A and B
  * 90e7c9f  remove phantom gitlink  ───────► * 5b62d68 (prev S-Current tip; Current-owned)
- * 15e03d8  directives restyle                * 0c1f130 …shared history…
+ * 15e03d8  directives restyle                * 0c1f130 ...shared history...
  * 4238b38  marker handling decision-based
  * 350e8c2  perf probe + plugin.yaml 2.1.3
  * 1086c4a  README fix
@@ -316,7 +316,7 @@ git checkout Current && git pull --ff-only Source Current
 git checkout -b promote/v1.4.3 Current # or promote/v1.5.0
 git merge --squash 8521b27             # cutoff for 1.4.3; `Development` for 1.5.0
 git checkout HEAD -- .gitmodules .github/workflows plugins/aphrodite .hermes bench skills
-# … float gitlink + verify as §7.2/§7.3 …
+# ... float gitlink + verify as §7.2/§7.3 ...
 git commit -m "release: sync v1.4.3 from Development"
 git push Source promote/v1.4.3 # open PR promote/v1.4.3 → Current; review; merge
 git checkout Current && git pull --ff-only Source Current

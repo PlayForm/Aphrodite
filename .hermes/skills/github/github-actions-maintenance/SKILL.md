@@ -89,7 +89,7 @@ versions-only pair, both run from the target repo root (cwd-based, repository-ag
 `sh Source/prepublishOnly.sh` (sources `Fetch.sh` first, so the `Workflow/`
 templates must exist and carry pins; the `Build` CLI is a separate npm package).
 The `Build` helper CATCHES tsc errors and still exits 0 - grep the build log for
-`error TS` to see real failures. A `Cannot find module '…/pnpm/global/store/…/typescript/bin/tsc'`
+`error TS` to see real failures. A `Cannot find module '.../pnpm/global/store/.../typescript/bin/tsc'`
 failure means the global pnpm typescript link is corrupt (dir exists, package content
 incomplete) - repair with `pnpm add -g typescript@<version>` matching the linked
 version, then re-run the build.
@@ -150,12 +150,12 @@ Why it "always worked" until it didn't: gh CLI only calls `enablePullRequestAuto
   known-good SHA predates the file; re-check the intended tag's SHA before
   committing.
 - **macOS BSD sed has no `\s`.** `/usr/bin/sed -E` (BSD) does not implement GNU `\s`,
-  so `s|(uses:\s+)…|` never matches: the script logs "Updated" and rewrites every
+  so `s|(uses:\s+)...|` never matches: the script logs "Updated" and rewrites every
   file byte-identical while claiming success. Write `[[:space:]]` instead.
 - **Verify a claimed update actually landed.** A "New action part" log line does not
   mean the rewrite fired - grep the file for the new pin after running `Update.sh`/
   absorb (the BSD-sed case above rewrote files unchanged while logging success).
-- **`while read` drops an unterminated final line.** `while IFS= read -r line; do …
+- **`while read` drops an unterminated final line.** `while IFS= read -r line; do ...
 done < file` never enters the body for the last line when the file has no trailing
   newline (read exits non-zero at EOF), so rewrites silently delete it. Preserve
   byte-fidelity with `while IFS= read -r line || { Newline=0; [ -n "$line" ]; }; do`

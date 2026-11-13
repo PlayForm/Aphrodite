@@ -34,24 +34,24 @@ the c_int-default restype truncation is the exact SIGSEGV class this repo
 fixed). "Before" = 1.4.5 behavior, from
 `.hermes/notes/ISSUE-11-PREVIEW-BATTERY.md` / `ISSUE-11-VERIFY-1.4.5.md`.
 
-| payload (type hint)                                                    | before (1.4.5)                      | after (fixed)                                                                                       |
-| ---------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `{"success": true, "data": {"web": [{"title": "x"}]}}` (`tool_result`) | type `text` · `[text:1L 2B \| ok]`  | type `tool_result` · `[tool_result:1L 52B \| {"success": true, "data": {"web": [{"title": "x"}]}}]` |
-| `{"success": true}` (none)                                             | `[text:1L 2B \| ok]`                | `[text:1L 17B \| {"success": true}]`                                                                |
-| `{"success": "ok", "data": [1]}` (`tool_result`)                       | `[text:1L 2B \| ok]`                | `[tool_result:1L 30B \| {"success": "ok", "data": [1]}]`                                            |
-| `{"result": "ok", "data": {"web": [{"title": "x"}]}}` (`tool_result`)  | `[text:1L 2B \| ok]`                | `[tool_result:1L 51B \| {"result": "ok", "data": {"web": [{"title": "x"}]}}]`                       |
-| real search shape `matches_text`, 19 total (none)                      | `[search:1L]`                       | `[search:2 hits in 2 files \| src/a.rs:10 …]`                                                       |
-| search `matches` array, 25 entries (none)                              | `[search:20 hits …]` (take(20) cap) | `[search:25 hits in 25 files \| f0.rs:0 …]`                                                         |
-| `{"total_count": 0, "matches": []}` (none)                             | `[search:1L]`                       | `[text:1L 7B \| 0 total]`                                                                           |
-| `{"total_count": 5, "truncated": true}` (none)                         | `[search:1L]`                       | `[text:1L 19B \| 5 total (truncated)]`                                                              |
-| `{"total_count": 42, "items": [1, 2, 3]}` (none)                       | `[search:1L]`                       | `[text:1L 39B \| {"total_count": 42, "items": [1, 2, 3]}]`                                          |
-| terminal envelope no hint                                              | `[terminal:2L exit code: 1]`        | unchanged `[terminal:2L exit code: 1]`                                                              |
-| terminal envelope + hint `tool_result`                                 | hint dropped (type terminal/text)   | `[tool_result:1L 58B \| {"output": "error: broke\nexit code: 1\n", "exit_code": 1}]` (hint wins)    |
+| payload (type hint)                                                    | before (1.4.5)                        | after (fixed)                                                                                       |
+| ---------------------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `{"success": true, "data": {"web": [{"title": "x"}]}}` (`tool_result`) | type `text` · `[text:1L 2B \| ok]`    | type `tool_result` · `[tool_result:1L 52B \| {"success": true, "data": {"web": [{"title": "x"}]}}]` |
+| `{"success": true}` (none)                                             | `[text:1L 2B \| ok]`                  | `[text:1L 17B \| {"success": true}]`                                                                |
+| `{"success": "ok", "data": [1]}` (`tool_result`)                       | `[text:1L 2B \| ok]`                  | `[tool_result:1L 30B \| {"success": "ok", "data": [1]}]`                                            |
+| `{"result": "ok", "data": {"web": [{"title": "x"}]}}` (`tool_result`)  | `[text:1L 2B \| ok]`                  | `[tool_result:1L 51B \| {"result": "ok", "data": {"web": [{"title": "x"}]}}]`                       |
+| real search shape `matches_text`, 19 total (none)                      | `[search:1L]`                         | `[search:2 hits in 2 files \| src/a.rs:10 ...]`                                                     |
+| search `matches` array, 25 entries (none)                              | `[search:20 hits ...]` (take(20) cap) | `[search:25 hits in 25 files \| f0.rs:0 ...]`                                                       |
+| `{"total_count": 0, "matches": []}` (none)                             | `[search:1L]`                         | `[text:1L 7B \| 0 total]`                                                                           |
+| `{"total_count": 5, "truncated": true}` (none)                         | `[search:1L]`                         | `[text:1L 19B \| 5 total (truncated)]`                                                              |
+| `{"total_count": 42, "items": [1, 2, 3]}` (none)                       | `[search:1L]`                         | `[text:1L 39B \| {"total_count": 42, "items": [1, 2, 3]}]`                                          |
+| terminal envelope no hint                                              | `[terminal:2L exit code: 1]`          | unchanged `[terminal:2L exit code: 1]`                                                              |
+| terminal envelope + hint `tool_result`                                 | hint dropped (type terminal/text)     | `[tool_result:1L 58B \| {"output": "error: broke\nexit code: 1\n", "exit_code": 1}]` (hint wins)    |
 
-| Hook path (`transform_tool_result`, what the LLM sees)  | Before (1.4.5)                   | After (fixed)                                            |
-| ------------------------------------------------------- | -------------------------------- | -------------------------------------------------------- |
-| 1,212-byte real search envelope compressed via the hook | `[search:1L]`                    | `[search:25 hits in 25 files \| f0.rs:0 …]` - real count |
-| Sub-threshold payloads                                  | pass through raw (`null` marker) | unchanged - pass through raw (`null` marker) as before   |
+| Hook path (`transform_tool_result`, what the LLM sees)  | Before (1.4.5)                   | After (fixed)                                              |
+| ------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| 1,212-byte real search envelope compressed via the hook | `[search:1L]`                    | `[search:25 hits in 25 files \| f0.rs:0 ...]` - real count |
+| Sub-threshold payloads                                  | pass through raw (`null` marker) | unchanged - pass through raw (`null` marker) as before     |
 
 ## Test results
 
@@ -71,7 +71,7 @@ fixed). "Before" = 1.4.5 behavior, from
   adapted - see deviation below).
 - `test_compress_search_result_shows_real_match_count` - real Hermes
   `matches_text` shape: type `search`, preview counts the real hits
-  (`[search:2 hits in 2 files …]`), no `[search:1L]`.
+  (`[search:2 hits in 2 files ...]`), no `[search:1L]`.
 - `test_compress_search_matches_array_counts_all_matches` - 25-entry `matches`
   array previews `25 hits`, not the old 20-cap.
 - `test_compress_search_zero_or_count_only_surfaces_total` -

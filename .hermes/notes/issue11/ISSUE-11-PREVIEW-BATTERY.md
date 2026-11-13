@@ -1,7 +1,7 @@
 # ISSUE-11 PREVIEW BATTERY - Empirical preview-quality audit of aphrodite-hermes 1.4.5
 
 **Date:** 2026-09-17 · **Binary:** `target/release/libaphrodite_hermes.dylib` (built 17:01:49, fresh vs. latest source 16:44:06) · **Version:** `1.4.5` (confirmed via `aphrodite_hermes_version`)
-**Repo:** `…/PlayForm/Aphrodite` (branch `Development`)
+**Repo:** `.../PlayForm/Aphrodite` (branch `Development`)
 **Scope:** catalog every MISLEADING / SHALLOW / TYPE-WRONG preview like issue #11 (`{'success':true,...}` → literal `"ok"`) across all compression types, and score the engine.
 
 ---
@@ -69,7 +69,7 @@ Probe scripts: `/tmp/aphrodite_probe.py` (battery) and `/tmp/aphrodite_probe2.py
 | term_build_output                         | tool_result | build_output  | `[build:0E 0W 2L]`                                                                        | OK         |
 | term_test_result                          | tool_result | build_output  | `[build:0E 0W 3L]`                                                                        | MISLEADING |
 | term_warning                              | tool_result | build_output  | `[build:0E 2W 4L]`                                                                        | OK         |
-| search_shape                              | tool_result | search        | `[search:2 hits in 2 files \| src/a.rs:10 …]`                                             | MISLEADING |
+| search_shape                              | tool_result | search        | `[search:2 hits in 2 files \| src/a.rs:10 ...]`                                           | MISLEADING |
 | search_zero                               | tool_result | search        | `[search:1L]`                                                                             | SHALLOW    |
 | search_count_only                         | tool_result | search        | `[search:1L]`                                                                             | MISLEADING |
 | read_file                                 | tool_result | text          | `[text:3L 33B \| fn main() {]`                                                            | SHALLOW    |
@@ -142,7 +142,7 @@ Probe scripts: `/tmp/aphrodite_probe.py` (battery) and `/tmp/aphrodite_probe2.py
 | tiny_success (`{"success": true}`)                                                                   | text          | `[text:1L 2B \| ok]`                                                         | MISLEADING |
 | success_plus_id (`{"success": true, "id": 42}`)                                                      | text          | `[text:1L 2B \| ok]`                                                         | MISLEADING |
 | search_zero (`{"total_count": 0, ...}`)                                                              | search        | `[search:1L]`                                                                | SHALLOW    |
-| search_shape_array (150 total, truncated, 1 match)                                                   | search        | `[search:1 hits in 1 files \| src/a.rs:10 …]`                                | MISLEADING |
+| search_shape_array (150 total, truncated, 1 match)                                                   | search        | `[search:1 hits in 1 files \| src/a.rs:10 ...]`                              | MISLEADING |
 | term_test_result (`test result: ok. 10 passed; 0 failed`)                                            | build_output  | `[build:0E 0W 3L]`                                                           | MISLEADING |
 | read_file wrapper (rust code)                                                                        | text          | `[text:3L 33B \| fn main() {]`                                               | SHALLOW    |
 | patch_diff                                                                                           | diff          | `[diff:0F +1/-1 5L]`                                                         | OK         |
@@ -152,24 +152,24 @@ Probe scripts: `/tmp/aphrodite_probe.py` (battery) and `/tmp/aphrodite_probe2.py
 
 ### 4.2 `transform_terminal_output` (raw terminal output, no wrapper)
 
-| payload                                             | returned type | preview verbatim                                            | verdict |
-| --------------------------------------------------- | ------------- | ----------------------------------------------------------- | ------- |
-| term_test_result_raw (`test result: ok. 3 passed`)  | test          | `[test:3 pass 0 fail 0 ignored]`                            | OK      |
-| term_cargo_raw (`Compiling … Finished dev profile`) | text          | `[text:4L 379B \| Compiling foo v0.1.0]`                    | SHALLOW |
-| term_error_raw (`error[E0432]: …`)                  | build         | `[build:1E 0W 4L \| error[E0432]: unresolved import `foo`]` | OK      |
-| term_ls_raw (`ls -l` listing)                       | ls            | `[ls:2 files 1 dirs \| .toml×1]`                            | OK      |
-| term_git_raw (porcelain status)                     | git           | `[git:1M 1A 1?? \| src/a.rs src/b.rs src/c.rs]`             | OK      |
-| term_prose_raw                                      | text          | `[text:4L 351B \| All 12 tests passed.]`                    | OK      |
-| term_markdown_raw (table)                           | text          | `[text:6L 374B \| \| Name \| Age \|]`                       | SHALLOW |
-| term_plain_ok                                       | text          | `[text:3L 319B \| ok]`                                      | OK      |
-| term_rust_code_raw                                  | text          | `[text:9L 441B \| use std::collections::HashMap;]`          | SHALLOW |
+| payload                                               | returned type | preview verbatim                                            | verdict |
+| ----------------------------------------------------- | ------------- | ----------------------------------------------------------- | ------- |
+| term_test_result_raw (`test result: ok. 3 passed`)    | test          | `[test:3 pass 0 fail 0 ignored]`                            | OK      |
+| term_cargo_raw (`Compiling ... Finished dev profile`) | text          | `[text:4L 379B \| Compiling foo v0.1.0]`                    | SHALLOW |
+| term_error_raw (`error[E0432]: ...`)                  | build         | `[build:1E 0W 4L \| error[E0432]: unresolved import `foo`]` | OK      |
+| term_ls_raw (`ls -l` listing)                         | ls            | `[ls:2 files 1 dirs \| .toml×1]`                            | OK      |
+| term_git_raw (porcelain status)                       | git           | `[git:1M 1A 1?? \| src/a.rs src/b.rs src/c.rs]`             | OK      |
+| term_prose_raw                                        | text          | `[text:4L 351B \| All 12 tests passed.]`                    | OK      |
+| term_markdown_raw (table)                             | text          | `[text:6L 374B \| \| Name \| Age \|]`                       | SHALLOW |
+| term_plain_ok                                         | text          | `[text:3L 319B \| ok]`                                      | OK      |
+| term_rust_code_raw                                    | text          | `[text:9L 441B \| use std::collections::HashMap;]`          | SHALLOW |
 
 **Key contrast:** the raw terminal path is _strong_ (test/ls/git/build_error all get rich, truthful previews) - but the **tool-result wrapper path regresses the same content**:
 
-| Content             | Raw terminal path (correct)                 | Tool-result wrapper path (regressed, before 1.4.5)                                                             |
-| ------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| test output         | `[test:3 pass 0 fail 0 ignored]`            | the identical test output inside `{"output":…,"exit_code":0}` becomes `[build:0E 0W 3L]` instead of `[test:…]` |
-| real search results | rich `[search:N hits in M files …]` preview | collapse to `[search:1L]`                                                                                      |
+| Content             | Raw terminal path (correct)                   | Tool-result wrapper path (regressed, before 1.4.5)                                                                 |
+| ------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| test output         | `[test:3 pass 0 fail 0 ignored]`              | the identical test output inside `{"output":...,"exit_code":0}` becomes `[build:0E 0W 3L]` instead of `[test:...]` |
+| real search results | rich `[search:N hits in M files ...]` preview | collapse to `[search:1L]`                                                                                          |
 
 ---
 
@@ -180,7 +180,7 @@ Probe scripts: `/tmp/aphrodite_probe.py` (battery) and `/tmp/aphrodite_probe2.py
 | Payload class           | Hint                                       | Observed behavior                                                                                                                                                                                                                     |
 | ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Wrapper-shaped payloads | any (e.g. `terminal`, `text`)              | hint discarded (good) - e.g. `term_short` with hint `terminal` still returns `text`, `term_test_result` with hint `text` still returns `build_output`. Consequence: **a caller hint can never rescue the test→build_output misroute** |
-| Non-wrapper payloads    | `""` / `text`                              | detected type (best quality: `array_objects_nohint → json_array [json:2items …]`)                                                                                                                                                     |
+| Non-wrapper payloads    | `""` / `text`                              | detected type (best quality: `array_objects_nohint → json_array [json:2items ...]`)                                                                                                                                                   |
 | Non-wrapper payloads    | `tool_result` / `terminal` / anything else | **literal marker type** - the documented `type=tool_result` call pattern therefore retypes every raw payload as `tool_result` and drops to the generic first-line fallback preview (24 of 25 raw rows in Table A)                     |
 | `rust_code`             | `terminal`                                 | `[terminal:7L }]` - preview is the _last_ line of the code (`}`), actively misleading                                                                                                                                                 |
 
@@ -191,7 +191,7 @@ Probe scripts: `/tmp/aphrodite_probe.py` (battery) and `/tmp/aphrodite_probe2.py
 | #   | Case                                                                                                                             | Before (1.4.5 broken preview)                                                                                                                                                                                                                                                                                                                                                                                       | What an LLM would wrongly conclude                                                                                                                                                                   |
 | --- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Real `search_files` result (both paths)                                                                                          | `[search:1L]` - `unwrap_hermes_result` only reads the `matches` array; the real Hermes shape ships `matches_text` (path-grouped). The `"19 total"` label is built, then `build_search_preview` regex-counts it and finds zero `file:line:` hits → `[search:1L]`. The _entire_ search result is invisible behind a 1-line marker.                                                                                    | the search found nothing usable - skips real references, re-runs the search, or asserts a symbol/pattern "doesn't exist" in the codebase                                                             |
-| 2   | Test-summary wrapper (both paths)                                                                                                | `test result:` routes to `build_output` in the unwrap heuristics; the preview counts only the literal substrings `error`/`warning`. **`test result: FAILED. 3 failed` also previews as `[build:0E 0W …]`** - a failing test run looks like a clean build. The raw terminal path already handles this correctly (`[test:3 pass 0 fail 0 ignored]`), so the wrapper path is a pure regression.                        | "build clean, no failures" - misses red tests entirely                                                                                                                                               |
+| 2   | Test-summary wrapper (both paths)                                                                                                | `test result:` routes to `build_output` in the unwrap heuristics; the preview counts only the literal substrings `error`/`warning`. **`test result: FAILED. 3 failed` also previews as `[build:0E 0W ...]`** - a failing test run looks like a clean build. The raw terminal path already handles this correctly (`[test:3 pass 0 fail 0 ignored]`), so the wrapper path is a pure regression.                      | "build clean, no failures" - misses red tests entirely                                                                                                                                               |
 | 3   | `{"success": true, "id": 42}` (both paths)                                                                                       | `[text:1L 2B \| ok]` - the `obj.len() <= 2` heuristic in the success branch fires on _any_ success-plus-one-key envelope, dropping real data. Strictly worse than issue #11's original `{"success":true}` case: it is data loss, not just terseness. (`{"diff": "", "success": true}` → `ok` is the same class: an LLM assumes a patch applied changes when it didn't.)                                             | told "create resource X and report its id" wrongly concludes success and answers without the id - or hallucinates one                                                                                |
 | 4   | `type=tool_result` hint poisoning (compress path, 24/25 raw payloads)                                                            | any non-wrapper content passed with the documented hint gets marker type literally `tool_result` and a 60-char first-line preview: unified diff → `[tool_result:6L 83B \| --- a/foo.rs]`, ls → first line, git status → first line, html → no title/stats, **pretty JSON → `[tool_result:5L 63B \| {]`** (the preview is a lone brace).                                                                             | the payload is an unknown/trivial blob - the diff/code/html/json/ls/git/test typing and all enriched previews are dead on this path. Most actively misleading single preview in the battery: the `{` |
 | 5   | JSON object envelopes → `text`/`tool_result` with raw first-60-chars preview (nested_obj, flat_json, flat_many_keys; both paths) | `detect_type` only returns `json_array` for arrays - objects fall to `text` (no-hint) or `tool_result` (hint), and the fallback preview truncates mid-value at 60 chars. A 7-key config object previews as `{"user":"alice","role":"admin","status":"active","plan":"pro` - the LLM sees one-and-a-half key/value pairs and a wrong type; it cannot see `org`, `age`, `city`, or even that this is structured data. | the payload is a one-and-a-half-pair blob, not structured data; `org`/`age`/`city` and the object's shape are invisible                                                                              |
@@ -211,14 +211,14 @@ Probe scripts: `/tmp/aphrodite_probe.py` (battery) and `/tmp/aphrodite_probe2.py
 
 ## Appendix A - probe scripts
 
-- `/tmp/aphrodite_probe.py` - Table A battery (75 rows): loads the dylib, dispatches `aphrodite_compress` via `aphrodite_hermes_dispatch_tool` with `{"content": …, "type": …}`, prints `payload | hint | type | size | preview | marker`, verifies round-trip via `aphrodite_retrieve`.
+- `/tmp/aphrodite_probe.py` - Table A battery (75 rows): loads the dylib, dispatches `aphrodite_compress` via `aphrodite_hermes_dispatch_tool` with `{"content": ..., "type": ...}`, prints `payload | hint | type | size | preview | marker`, verifies round-trip via `aphrodite_retrieve`.
 - `/tmp/aphrodite_probe2.py` - Table B (production hooks): calls `aphrodite_hermes_call_hook("transform_tool_result"/"transform_terminal_output")` with realistic Hermes shapes (real `search_files` `matches_text` output, test wrappers, raw terminal outputs), padding payloads past the production thresholds (tool 512 B, terminal 256 B) so they are compressible.
 
 Key call logic (both scripts):
 
 ```python
 import ctypes, json
-lib = ctypes.CDLL("…/PlayForm/Aphrodite/target/release/libaphrodite_hermes.dylib")
+lib = ctypes.CDLL(".../PlayForm/Aphrodite/target/release/libaphrodite_hermes.dylib")
 lib.aphrodite_hermes_dispatch_tool.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 lib.aphrodite_hermes_dispatch_tool.restype = ctypes.c_void_p
 lib.aphrodite_hermes_free_string.argtypes = [ctypes.c_void_p]

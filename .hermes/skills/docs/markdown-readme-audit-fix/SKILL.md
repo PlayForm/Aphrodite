@@ -231,7 +231,7 @@ is in `references/readme-structure-template.md`:
   because the alert renders only in that three-part shape.
 - **Code fences are labeled** with a bold source/file callout before the
   block.
-- **Hero images are centered** with `<p align="center">…</p>`, sized for wide
+- **Hero images are centered** with `<p align="center">...</p>`, sized for wide
   captures, descriptive `alt`.
 - **Contributing/License are short link-style headers** backed by real files
   (`CONTRIBUTING.md`, `LICENSE`), never full prose in the README.

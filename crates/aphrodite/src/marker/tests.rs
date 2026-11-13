@@ -304,7 +304,7 @@ fn test_marker_format_configured_renders_toml_template() {
 	// populated only when the ccr_marker_hint knob is enabled - the template
 	// decides where it lands; a format without {hint} never emits it).
 	let fmt = "{preview}{hint}\n[{type}: {meta}{center_seg}]\n<<<CCR:{hash}|{type}|{size}>>>";
-	set_marker_templates(Some(fmt), Some("…(use aphrodite_retrieve)"), true);
+	set_marker_templates(Some(fmt), Some("...(use aphrodite_retrieve)"), true);
 	let m = ccr_marker(
 		"abc123def456abc123def456abc123def456",
 		"code_rust",
@@ -316,7 +316,7 @@ fn test_marker_format_configured_renders_toml_template() {
 	);
 	assert_eq!(
 		m,
-		"[code_rust:3fns 42L]…(use aphrodite_retrieve)\n[code_rust: \
+		"[code_rust:3fns 42L]...(use aphrodite_retrieve)\n[code_rust: \
 		 err=2;center=mid]\n<<<CCR:abc123def456abc123def456abc123def456|code_rust|1234>>>",
 		"configured format must win over the fallback grammar"
 	);
@@ -355,7 +355,7 @@ fn test_marker_fallback_byte_identical_when_unconfigured() {
 #[test]
 fn test_marker_fallback_appends_hint_only_when_knob_enabled() {
 	let _g = marker_templates_test_guard();
-	set_marker_templates(None, Some("…(use aphrodite_retrieve)"), true);
+	set_marker_templates(None, Some("...(use aphrodite_retrieve)"), true);
 	let m = ccr_marker(
 		"abc123def456abc123def456abc123def456",
 		"text",
@@ -366,7 +366,7 @@ fn test_marker_fallback_appends_hint_only_when_knob_enabled() {
 		None,
 	);
 	assert_eq!(
-		m, "<<<CCR:abc123def456abc123def456abc123def456|text|12>>>\n[text:53L 1913B]…(use aphrodite_retrieve)",
+		m, "<<<CCR:abc123def456abc123def456abc123def456|text|12>>>\n[text:53L 1913B]...(use aphrodite_retrieve)",
 		"opt-in knob appends the hint after the preview text"
 	);
 	set_marker_templates(None, None, false);

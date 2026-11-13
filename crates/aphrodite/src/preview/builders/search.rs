@@ -31,7 +31,7 @@ pub(crate) fn build_search_preview(inp:&Input<'_>) -> String {
 		return format!("[search:{}L]", inp.total);
 	}
 	match first {
-		Some(loc) => format!("[search:{} hits in {} files | {} …]", hits, files.len(), loc),
+		Some(loc) => format!("[search:{} hits in {} files | {} ...]", hits, files.len(), loc),
 		None => format!("[search:{} hits in {} files]", hits, files.len()),
 	}
 }

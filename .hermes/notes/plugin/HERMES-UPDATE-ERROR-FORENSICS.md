@@ -13,7 +13,7 @@
 `~/.hermes/logs/errors.log:6148` (identical at `~/.hermes/logs/agent.log:14697` and `~/.hermes/logs/gateway.error.log:2336`):
 
 ```
-2026-09-17 20:34:46,909 ERROR aphrodite: aphrodite-hermes dylib could not be loaded (Dylib not found. Tried: ['~/.hermes/aphrodite/binaries/libaphrodite_hermes.dylib', '~/.hermes/aphrodite/binaries/libaphrodite_hermes.dylib', '…/PlayForm/Aphrodite/plugins/aphrodite/binaries/libaphrodite_hermes.dylib', '…/PlayForm/Aphrodite/plugins/binaries/libaphrodite_hermes.dylib', '…/PlayForm/target/release/libaphrodite_hermes.dylib', '…/Application/target/release/libaphrodite_hermes.dylib']) - plugin disabled; run download.sh (or unset APHRODITE_NO_AUTO_DOWNLOAD) to fetch the binaries, then restart Hermes
+2026-09-17 20:34:46,909 ERROR aphrodite: aphrodite-hermes dylib could not be loaded (Dylib not found. Tried: ['~/.hermes/aphrodite/binaries/libaphrodite_hermes.dylib', '~/.hermes/aphrodite/binaries/libaphrodite_hermes.dylib', '.../PlayForm/Aphrodite/plugins/aphrodite/binaries/libaphrodite_hermes.dylib', '.../PlayForm/Aphrodite/plugins/binaries/libaphrodite_hermes.dylib', '.../PlayForm/target/release/libaphrodite_hermes.dylib', '.../Application/target/release/libaphrodite_hermes.dylib']) - plugin disabled; run download.sh (or unset APHRODITE_NO_AUTO_DOWNLOAD) to fetch the binaries, then restart Hermes
 ```
 
 Preceding it, the auto-download failure (`errors.log:6138-6147`, `agent.log:14687-14696`):
@@ -56,7 +56,7 @@ Signature: **EXC_BAD_ACCESS → `_platform_strlen` on an invalid pointer, called
 `~/.hermes/logs/tui_gateway_crash.log:11692-11723` - the visible crash-loop at 20:33:
 
 ```
-[tui-parent] 2026-09-17T17:33:17.320Z [lifecycle] spawned gateway child pid=97516 ... cwd=…/PlayForm/Aphrodite
+[tui-parent] 2026-09-17T17:33:17.320Z [lifecycle] spawned gateway child pid=97516 ... cwd=.../PlayForm/Aphrodite
 [tui-parent] 2026-09-17T17:33:19.662Z [lifecycle] child exit pid=97516 signal=SIGSEGV
 ... (repeats: 97543 @20:33:22, 97548 @20:33:24, 97553 @20:33:27, 97583 @20:33:29, 97592 @20:33:32 - all SIGSEGV ~1.5-2.5s after spawn)
 [tui-parent] 2026-09-17T17:33:33.311Z [lifecycle] GatewayClient.kill reason=app.die pid=97596 ...
@@ -80,7 +80,7 @@ All times EEST (UTC+3).
 
 | Time                               | Event                                                                                                                                                                                                                                                                     |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~19:27-19:28                       | dylib appears at `~/.hermes/aphrodite/binaries/` (loads switch from repo-checkout path `…/plugins/aphrodite/binaries/` to `~/.hermes/aphrodite/binaries/` in agent.log).<br>First SIGSEGV crash reports begin.                                                            |
+| ~19:27-19:28                       | dylib appears at `~/.hermes/aphrodite/binaries/` (loads switch from repo-checkout path `.../plugins/aphrodite/binaries/` to `~/.hermes/aphrodite/binaries/` in agent.log).<br>First SIGSEGV crash reports begin.                                                          |
 | 19:27-20:24                        | **Continuous crash-restart loop:** dylib "loaded" every ~30 s (agent.log), each followed by a SIGSEGV crash report ~2 s later.<br>40+ crashes, all with the dylib loaded.                                                                                                 |
 | 20:24:59-20:26:03                  | `hermes update` (pid 94438): already up to date; runs **pending fleet restart** ("Restarting gateways left on pre-update code... ✓ Service restarted"), restarting gateways per profile.<br>3 more crashes at 20:24:40/43/45/47 during the restart.                       |
 | 20:26-20:32                        | Fleet-restart gateway cycles in agent.log (plugin re-registration every ~30 s; dylib loaded at 20:26:04/34, 20:27:04, 20:30:39, 20:31:10, 20:31:40, 20:32:11, 20:32:41).                                                                                                  |

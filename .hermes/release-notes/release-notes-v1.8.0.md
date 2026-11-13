@@ -74,7 +74,7 @@ is tracked separately.
   reported `entries: 0`. The fields now read the live backend.
 - **Feature (fork API)**: `SqliteCcrStore::open_with_limits` plus
   `max_entries()` / `max_bytes()` / `evicted_total()`; exact freed-row/byte
-  accounting via `DELETE … RETURNING LENGTH(original)`; maintained entry/byte
+  accounting via `DELETE ... RETURNING LENGTH(original)`; maintained entry/byte
   counters so `len()` is O(1).
 - **Fix (plugin loader, 2.3.1)**: a missing `aphrodite.toml` is now reported
   instead of inferred. With no config the binary falls back to a single

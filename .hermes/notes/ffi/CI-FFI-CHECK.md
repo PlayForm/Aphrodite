@@ -9,15 +9,15 @@ Local checkout: the Aphrodite monorepo at `24c8258` (contains FFI commits `d1fc9
 
 **This run is the `Check` workflow (Check.yml), NOT ffi-check.yml.** The ffi-check run for the same push is 35265794725 (run #2, see below).
 
-| Field             | Value                                                                                                 |
-| ----------------- | ----------------------------------------------------------------------------------------------------- |
-| Workflow          | Check (`.github/workflows/Check.yml`, id 297334145)                                                   |
-| Run number        | 525                                                                                                   |
-| Branch            | Development                                                                                           |
-| Head SHA          | `11e07d0af71e4b61b6673b653d0abe75f70b63ac` ("refactor(ffi): simplify the bindings codegen pipeline…") |
-| Event / actor     | push / NikolaRHristov                                                                                 |
-| Created / updated | 2026-09-17T19:35:34Z / 19:39:27Z                                                                      |
-| **Conclusion**    | **FAILURE**                                                                                           |
+| Field             | Value                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| Workflow          | Check (`.github/workflows/Check.yml`, id 297334145)                                                     |
+| Run number        | 525                                                                                                     |
+| Branch            | Development                                                                                             |
+| Head SHA          | `11e07d0af71e4b61b6673b653d0abe75f70b63ac` ("refactor(ffi): simplify the bindings codegen pipeline...") |
+| Event / actor     | push / NikolaRHristov                                                                                   |
+| Created / updated | 2026-09-17T19:35:34Z / 19:39:27Z                                                                        |
+| **Conclusion**    | **FAILURE**                                                                                             |
 
 ### Per-job results (all 4 jobs)
 
@@ -38,7 +38,7 @@ Local checkout: the Aphrodite monorepo at `24c8258` (contains FFI commits `d1fc9
 ##[error]plugins/aphrodite/_bindings.py:398:5: N802 Function name `UNCHECKED` should be lowercase
 ##[error]plugins/aphrodite/_bindings.py:407:7: N801 Class name `_variadic_function` should use CapWords convention
 ##[error]plugins/aphrodite/_bindings.py:407:26: UP004 Class `_variadic_function` inherits from `object`
-##[error]plugins/aphrodite/_bindings.py:437:27: SIM101 …merge into a single call
+##[error]plugins/aphrodite/_bindings.py:437:27: SIM101 ...merge into a single call
 ##[error]plugins/aphrodite/_bindings.py:483..489: E402 Module level import not at top of file (×7)
 ##[error]plugins/aphrodite/_bindings.py:514..966: UP008/C408/UP032/UP031/B009/UP024/UP028 (×~20)
 ##[error]plugins/aphrodite/_bindings.py:901..975: B009 + F405 `c_void_p` may be undefined, or defined from star imports
@@ -56,7 +56,7 @@ warning: aphrodite-hermes@1.4.6: ctypesgen not found (tried `python3 -m ctypesge
 error: doc list item without indentation
    --> crates/aphrodite-hermes/src/lib.rs:539:5
 539 | /// with `aphrodite_hermes_free_string`.
-    = help: … rust-clippy/rust-1.96.0/index.html#doc_lazy_continuation
+    = help: ... rust-clippy/rust-1.96.0/index.html#doc_lazy_continuation
     = note: `-D clippy::doc-lazy-continuation` implied by `-D warnings`
 error: could not compile `aphrodite-hermes` (lib) due to 1 previous error
 ```
@@ -81,10 +81,10 @@ Test compiles `kompress` unconditionally while the module is `ml`-feature-gated.
 
 ## (b) ffi-check.yml workflow history
 
-| Run | ID          | Head SHA      | Branch      | Event | Created              | Conclusion |
-| --- | ----------- | ------------- | ----------- | ----- | -------------------- | ---------- |
-| 2   | 35265794725 | `11e07d0af7…` | Development | push  | 2026-09-17T19:35:34Z | ❌ failure |
-| 1   | 35263203992 | `0d9e3ecbb8…` | Development | push  | 2026-09-17T19:09:35Z | ❌ failure |
+| Run | ID          | Head SHA        | Branch      | Event | Created              | Conclusion |
+| --- | ----------- | --------------- | ----------- | ----- | -------------------- | ---------- |
+| 2   | 35265794725 | `11e07d0af7...` | Development | push  | 2026-09-17T19:35:34Z | ❌ failure |
+| 1   | 35263203992 | `0d9e3ecbb8...` | Development | push  | 2026-09-17T19:09:35Z | ❌ failure |
 
 ### Step-level results (identical in both runs, job "Static FFI contract check")
 
@@ -103,7 +103,7 @@ Contract checks (the actual checker) **pass in CI on both commits**. The only ff
 `test_cli_exit_codes_and_missing_files` removes the inline line
 `dylib.aphrodite_hermes_materialize_directives.restype = ctypes.c_void_p` from a fixture and expects CLI exit 1.
 But the checker now auto-detects the **committed generated bindings** as the restype ground truth
-(`restype source : generated bindings`, `bindings file: …/plugins/aphrodite/_bindings.py`) - the generated file still
+(`restype source : generated bindings`, `bindings file: .../plugins/aphrodite/_bindings.py`) - the generated file still
 declares the restype, so the removed inline line is masked: `0 violation(s), 0 warning(s) -> PASS`, exit 0.
 The test's regression-detection premise predates the "prefer generated bindings" design; it no longer exercises
 the path it intends to guard.
@@ -128,7 +128,7 @@ Workflow triggers on push/PR to `Development` for paths:
   `FAIL test_cli_exit_codes_and_missing_files` (11/12, exit 1) - byte-for-byte the same failure as CI. It is a test-suite bug,
   not an environment/OS issue. (Local "checker PASS" refers to the contract checks, which _do_ pass in CI steps 3-4.)
 - **ctypesgen availability differs but both paths are healthy**: CI ubuntu has no ctypesgen →
-  `warning: … skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect`
+  `warning: ... skipping FFI generation - the committed plugins/aphrodite/_bindings.py remains in effect`
   (graceful degradation confirmed working in cargo check AND cargo test). Locally ctypesgen is installed and generation actually runs.
   **Implication: CI never exercises the real cbindgen→ctypesgen→finalize codegen path - it always uses the committed artifact.**
 - **"Cargo tests green" (local) vs cargo test FAIL (CI)**: the CI failure is `kompress_parity` in `vendor/headroom` (pre-existing,
@@ -168,7 +168,7 @@ Attribution:
    exit 0 with a comment, or re-point the test at the inline-setup path). Currently the inline-setup regression path has zero
    working coverage, on every platform.
 2. **Exclude generated code from ruff** in the plugin's lint config (`per-file-ignores` for `_bindings.py`: N802/N805/N801/
-   N811/N812/E402/F405/UP*/B009/SIM*…), and fix the two remaining `test_perf_probe.py` lints (or exclude the test file too).
+   N811/N812/E402/F405/UP*/B009/SIM*...), and fix the two remaining `test_perf_probe.py` lints (or exclude the test file too).
    Also fix `__init__.py:78` N812 (use `import _bindings as _GENERATED_BINDINGS` under a `# noqa: N812` or alias the module).
    This unblocks the ruff+pyright job (pyright never even runs today).
 3. **Add the codegen sources to the ffi-check trigger paths**: `crates/aphrodite-hermes/build.rs`,

@@ -80,7 +80,7 @@ cbindgen 0.29 -> aphrodite_hermes.h
 - WS4 wired `[previews] preview_max_chars` end-to-end: env
   `APHRODITE_PREVIEW_MAX_CHARS` > TOML > default 120, enforced at the single
   choke point (end of `build_preview`), char-boundary-safe truncation that
-  preserves the closing `]` + `…`; applied at startup (`main.rs`), on
+  preserves the closing `]` + `...`; applied at startup (`main.rs`), on
   `/reload` (`proxy.rs`), in dylib init (`crates/aphrodite-hermes/src/lib.rs`),
   and by `config_loader::apply_previews`.
 - `tools::unwrap_hermes_result` (`crates/aphrodite-hermes/src/tools.rs`): the

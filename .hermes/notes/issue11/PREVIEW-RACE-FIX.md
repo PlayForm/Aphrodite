@@ -105,7 +105,7 @@ Notes:
   1 ignored, exit 0 → green
 - `python3 Maintain/check_ffi_contract.py`: 0 violations, 0 warnings → PASS
 - `python3 .hermes/tmp/issue11_repro.py`: exit 0, enriched previews intact
-  (issue_json_indented → `[tool_result:4L 58…]`, type-control → `[text:3L 21B | {]`)
+  (issue_json_indented → `[tool_result:4L 58...]`, type-control → `[text:3L 21B | {]`)
   → repro SURVIVED
 - `prettier --check` on touched files: see run output (md files clean; .rs
   files are not prettier-parsed in this repo)

@@ -181,13 +181,13 @@ proxy: identical (shared)
 
 ```text
 P13 · grep / ripgrep
-hook:  [grep:N hits in M files | src/x.rs:12 …] (preview.rs:526-551)
+hook:  [grep:N hits in M files | src/x.rs:12 ...] (preview.rs:526-551)
 proxy: identical (shared)
 ```
 
 ```text
 P14 · search
-hook:  [search:N hits in M files | loc …] (preview.rs:612-642)
+hook:  [search:N hits in M files | loc ...] (preview.rs:612-642)
 proxy: never produced by proxy classifier
 ```
 
@@ -284,7 +284,7 @@ Per family:
 
 - **text / plain:** `[text:NL NB | first 80 chars | last 60 chars]` - first AND last line (the tail
   often carries the conclusion); plus word count when lines > 20. Never mid-paragraph truncation without
-  a hint character (`…`).
+  a hint character (`...`).
 - **terminal:** `[terminal:NL | exit code: N | last line 60]` - include the exit code explicitly when
   present (`exit code: 0` is a fact the LLM needs); command name when the caller supplies it.
 - **log:** `[log:NL | ERR×N WARN×M | first ERR line 80]` - level tallies (uppercase levels only, same
