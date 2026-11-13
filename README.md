@@ -95,8 +95,8 @@ proxy refuses to start when the chain resolves empty
 (`no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml`).
 
 ```sh
-export APHRODITE_API_KEY=sk-...     # env var
-aphrodite setup --api-key sk-...    # or write it through setup
+export APHRODITE_API_KEY=sk-...  # env var
+aphrodite setup --api-key sk-... # or write it through setup
 ```
 
 ```toml
@@ -251,14 +251,14 @@ retrieval is always safe.
 Directives are short behavioral instructions injected each turn and swappable
 mid-conversation. Seven ship inside the binary:
 
-| Directive      | Focus                                                   |
-| :------------- | :------------------------------------------------------ |
-| `focus`        | Targeted execution, marker-aware retrieval              |
-| `foresight`    | Anticipate and prefetch; never wait on I/O              |
-| `lazy`         | Defer work, activate on demand, never busy-spin         |
-| `lazy-eval`    | Accumulate markers, resolve on demand                   |
-| `explore`      | Read broadly, prefetch aggressively                     |
-| `cleanup`      | Catalog, summarize, verify nothing is left behind       |
+| Directive      | Focus                                                    |
+| :------------- | :------------------------------------------------------- |
+| `focus`        | Targeted execution, marker-aware retrieval               |
+| `foresight`    | Anticipate and prefetch; never wait on I/O               |
+| `lazy`         | Defer work, activate on demand, never busy-spin          |
+| `lazy-eval`    | Accumulate markers, resolve on demand                    |
+| `explore`      | Read broadly, prefetch aggressively                      |
+| `cleanup`      | Catalog, summarize, verify nothing is left behind        |
 | `ccr-handling` | How to read markers and retrieve the content behind them |
 
 `[directives] active = [...]` selects the set - an empty list seeds `focus` +
@@ -662,8 +662,8 @@ variables `hash` and `tail`), and `auto_expand_guidance` (internal).
 
 > [!TIP]
 >
-> **Directives** are covered under [Session Lifecycle](#session-lifecycle)
-> above - seven built-ins, swapped mid-conversation via `aphrodite_directive`.
+> **Directives** are covered under **Session Lifecycle** above - seven
+> built-ins, swapped mid-conversation via `aphrodite_directive`.
 
 ---
 
