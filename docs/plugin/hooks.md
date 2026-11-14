@@ -49,6 +49,10 @@ The one-shot first-turn orientation is rendered later by the context assembler
 on the first `pre_llm_call` (see below), so a session reset followed
 by a fresh turn behaves exactly like a new session.
 
+The loop closes on itself, so the state a turn leaves behind is the state the next
+turn reads. That is why the reset seam exists: a new session starts from a clean
+baseline instead of inheriting the previous session's counters and markers.
+
 ## pre_tool_call
 
 Fires before a tool executes and can modify the pending call. Two interventions are possible,
@@ -96,6 +100,9 @@ Fires after every tool call with the tool's result. The pipeline:
 
 The hook tracks file references before the skip gates, so it records `read_file`
 and `search_files` results for `aphrodite_files` and the catalog even when it never compresses them.
+
+The gate is the reason retrieval stays cheap: a marker the model resolves comes back
+whole, because nothing downstream of the gate rewrites it a second time.
 
 ## transform_terminal_output
 
