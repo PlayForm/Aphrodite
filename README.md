@@ -109,10 +109,10 @@ api_key = "sk-..."                  # or per listener: [[proxies]] api_key
 
 ```sh
 curl -s 127.0.0.1:9797/health
-# {"status":"healthy","ccr":true,"mode":"cache","version":"1.8.0","fill_pct":90.0,...}
+# {"status":"healthy","ccr":true,"mode":"cache","version":"1.8.1","fill_pct":90.0,...}
 
 curl -s 127.0.0.1:9797/version
-# 1.8.0
+# 1.8.1
 
 curl -s 127.0.0.1:9798/stats
 # {"mode":"token","proxy":"aphrodite","ccr_backend":"enabled","tool_relay_enabled":true,...}
