@@ -23,7 +23,20 @@ with the cap arithmetic adjusted so the marker still fits inside the budget
 hand at release staging: `cargo build --release` registers exactly the 13
 declared production tools, a debug build registers 14, and the catalog test
 asserts whichever profile it is compiled under. Binary `1.8.0 → 1.8.1`; plugin
-`2.3.1` unchanged.
+`2.3.1` unchanged; `aphrodite-headroom-core` `0.2.0 → 0.2.1`.
+
+- **Fix (dependency security)**: `rusqlite` `0.40.2 → 0.41` in the owned headroom
+  fork, pulling `libsqlite3-sys` `0.39.1` / bundled SQLite 3.54.1. Closes
+  RUSTSEC-2026-0459 (CVE-2026-119375): a database opened together with a sibling
+  `-wal` whose page size differs could return uninitialized page-cache bytes to
+  ordinary queries. No API reaches the parent - `CcrStore`, `SqliteCcrStore` and
+  the retention surface are unchanged. `rustls` 0.23.46, `rustls-webpki`
+  0.103.17 and `webpki-roots` / `webpki-root-certs` 1.0.12 resolve without
+  constraint changes, so `cargo deny check` is clean on all four categories.
+- **Fix (lint, floating nightly)**: five `clippy::unnecessary_to_owned` hits from
+  `.contains(&x.to_string())` in `directives/action.rs`, `hooks.rs`,
+  `resolve/recursive.rs` and `proxy.rs`, surfaced when CI's floating nightly
+  moved to clippy 0.1.102. Rewritten as `iter().any(|i| i == x)`.
 
 - **Fix (tool catalog)**: `aphrodite_debug` is now behind `#[cfg(debug_assertions)]`
   in `schemas.rs` / `tools.rs` / `debug.rs` rather than removed from the release

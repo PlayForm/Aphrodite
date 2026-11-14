@@ -22,8 +22,24 @@ being stripped from the release tree by hand at staging: a release dylib
 registers exactly the 13 declared production tools, a debug build registers 14,
 and the catalog test asserts whichever profile it was compiled under.
 
+One dependency had to move for the release to be shippable: `libsqlite3-sys`
+0.38.2 bundles a SQLite affected by RUSTSEC-2026-0459 (CVE-2026-119375), so the
+owned headroom fork bumps `rusqlite` `0.40.2 → 0.41` (`aphrodite-headroom-core`
+`0.2.0 → 0.2.1`, bundled SQLite 3.54.1). No API reaches the parent.
+
 ### Changes
 
+- **Fix (dependency security)**: `rusqlite` `0.40.2 → 0.41` in
+  `vendor/headroom/crates/headroom-core`, pulling `libsqlite3-sys` `0.39.1` /
+  bundled SQLite 3.54.1. Closes RUSTSEC-2026-0459 (CVE-2026-119375): a database
+  opened together with a sibling `-wal` whose page size differs could return
+  uninitialized page-cache bytes to ordinary queries. `CcrStore`,
+  `SqliteCcrStore` and the retention surface are unchanged, so the parent pin
+  moves with no code delta.
+- **Fix (lint, floating nightly)**: five `clippy::unnecessary_to_owned` hits from
+  `.contains(&x.to_string())` in `directives/action.rs`, `hooks.rs`,
+  `resolve/recursive.rs` and `proxy.rs`, surfaced when CI's floating nightly
+  moved to clippy 0.1.102. Rewritten as `iter().any(|i| i == x)`.
 - **Fix (tool catalog)**: `aphrodite_debug` is behind
   `#[cfg(debug_assertions)]` in `crates/aphrodite-hermes/src/{schemas,tools,debug}.rs`
   instead of being deleted from the release tree during staging. The staging
@@ -56,12 +72,12 @@ and the catalog test asserts whichever profile it was compiled under.
 
 ### What this release does not include
 
-No engine, store, proxy or FFI behaviour changes beyond the two above - the
-`1.8.0` retention caps, the index-driven sweep and the headroom fork resync are
-carried over untouched. `aphrodite-headroom-core` stays at `0.2.0` (no fork
-delta in this release), and the plugin is unchanged at `v2.3.1`: its README,
+No engine, store, proxy or FFI behaviour changes beyond the three above - the
+`1.8.0` retention caps, the index-driven sweep and the headroom fork's
+compression/detection code are carried over untouched; the fork moves only its
+`rusqlite` constraint. The plugin is unchanged at `v2.3.1`: its README,
 `plugin.yaml` wording and loader message already landed on `Current` with
-`1.8.0`, so this ceremony only moves the parent.
+`1.8.0`, so this ceremony moves the parent and the fork crate only.
 
 ### Infrastructure
 
@@ -113,6 +129,7 @@ delta in this release), and the plugin is unchanged at `v2.3.1`: its README,
 | `aphrodite-<target>` / `libaphrodite_hermes-<target>.{so,dylib,dll}` | per matrix target                        |
 | `SHA256SUMS-<target>.txt`                                            | checksums for that target's two binaries |
 | Plugin v2.3.1                                                        | Hermes (standalone repo, unchanged)      |
+| `aphrodite-headroom-core` 0.2.1                                      | crates.io, by `Publish-Headroom-Core`    |
 
 ### Links
 
