@@ -327,11 +327,15 @@ Returns `{mode, total, turn, items: [...]}`.
 }
 ```
 
-Re-runs type detection and preview generation against content already in the
-store and rewrites the catalog entry in place - handy after a classifier
-improvement or when an entry was stored with a wrong hint. Content and hashes
-are never modified, so existing markers keep resolving. Omit `hash` to
-reclassify every entry in the session. Returns `{status: "ok", reclassified:
+Re-runs type detection and preview generation against content already in the store
+and rewrites the catalog entry in place - handy after a classifier improvement or
+when an entry was stored with a wrong hint.
+
+Content and hashes are never modified, so existing markers keep resolving.
+
+Omit `hash` to reclassify every entry in the session.
+
+Returns `{status: "ok", reclassified:
 <count>}`.
 
 ## 11. aphrodite_prefetch
@@ -356,24 +360,25 @@ reclassify every entry in the session. Returns `{status: "ok", reclassified:
 ```
 
 Despite the name this is synchronous: the tool reads and compresses every path
-before the call returns, so each returned hash
-is immediately resolvable through `aphrodite_retrieve`.
+before the call returns, so each returned hash is immediately resolvable
+through `aphrodite_retrieve`.
 
 One marker per file, no file bodies in context.
 
 The tool skips oversized files rather than truncating them,
-and a batch larger than the inline-store budget evicts older entries (including ones from the same
-batch).
+and a batch larger than the inline-store budget evicts older entries (including ones
+from the same batch).
 
-Returns `{total, loaded, skipped_size, missing, inline_store_bytes, inline_store_byte_budget,
-results: [{path, status: "loaded"|"skipped"|"missing", hash, type, size, preview, reason}]}`.
+Returns `{total, loaded, skipped_size, missing, inline_store_bytes,
+inline_store_byte_budget, results: [{path, status: "loaded"|"skipped"|"missing", hash, type,
+size, preview, reason}]}`.
 
 ## 12. aphrodite_prefetch_status
 
 Takes no arguments.
 
-Because prefetch is synchronous, everything it loads
-is already `ready` by the time the call returns - `loading` and `errors` are always empty.
+Because prefetch is synchronous, everything it loads is already `ready`
+by the time the call returns - `loading` and `errors` are always empty.
 
 Returns `{loading: [], ready: [{path, hash, type, size}], errors: [], total_ready}`.
 
@@ -383,19 +388,20 @@ Takes no arguments.
 
 Reports state rather than performing a rebuild - the dylib cannot safely rebuild itself mid-session.
 
-Returns `{status: "ok", version, proxies, hint: "rebuild via `cargo build --release -p aphrodite`;
-restart the Hermes session to pick up the new dylib"}`.
+Returns `{status: "ok", version, proxies, hint: "rebuild
+via `cargo build --release -p aphrodite`; restart the Hermes session to pick up the new dylib"}`.
 
 ## Content-type hints
 
-`aphrodite_compress`'s `type` hint accepts `code`, `log`, `diff`, `error`, `json`, `build_output`,
-or `text`.
+`aphrodite_compress`'s `type` hint accepts `code`, `log`, `diff`, `error`, `json`,
+`build_output`, or `text`.
 
 A hint of `"text"` (or an empty hint) is treated as no hint - the type is auto-detected instead.
 
-`aphrodite_search`'s `type` filter matches the same taxonomy (e.g. `source_code`, `terminal`,
-`build_output`, `diff`, `json`, `search`, `text`).
+`aphrodite_search`'s `type` filter matches the same taxonomy (e.g. `source_code`,
+`terminal`, `build_output`, `diff`, `json`, `search`, `text`).
 
-See [Content
+See
+[Content
 Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
 for the full classification reference.

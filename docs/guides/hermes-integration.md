@@ -116,9 +116,10 @@ The plugin directory stays a pure loader.
 
 ## Proxy subprocesses
 
-Two proxies launch when the plugin loads: a cache proxy on `:9797` (in-memory backend,
-compresses payloads above 8 KB) and a token proxy on `:9798` (SQLite backend,
-compresses above 1 KB).
+Two proxies launch when the plugin loads:
+
+- a cache proxy on `:9797` (in-memory backend, compresses payloads above 8 KB)
+- and a token proxy on `:9798` (SQLite backend, compresses above 1 KB).
 
 The plugin guards the launch - it probes both health endpoints first and skips launching
 when a healthy proxy already owns the ports, and `APHRODITE_NO_AUTO_LAUNCH` disables
