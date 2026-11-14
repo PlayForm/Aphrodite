@@ -9,7 +9,7 @@ the routing table, auth model, and middleware are in
 
 Every management handler below (everything except `proxy_handler` and `health_check`)
 additionally requires `Authorization: Bearer <token>` once `APHRODITE_MGMT_TOKEN` is set -
-see [Architecture: Management-Route Authentication](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#management-route-authentication).
+see [Architecture: Management-Route Authentication](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md).
 
 ## proxy_handler
 

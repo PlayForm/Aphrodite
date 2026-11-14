@@ -39,9 +39,15 @@ flowchart TD
 
 Fires when a Hermes session starts.
 
-It resets every piece of per-session state to a clean baseline: the turn counter,
-the conversation index, recent markers, referenced files, tool-event telemetry,
-ephemeral directives, and the manual directive latch.
+It resets every piece of per-session state to a clean baseline:
+
+- the turn counter
+- the conversation index
+- recent markers
+- referenced files
+- tool-event telemetry
+- ephemeral directives
+- and the manual directive latch.
 
 It injects nothing.
 

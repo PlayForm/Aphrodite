@@ -61,7 +61,7 @@ two more paths exist entirely inside the agent, no CLI needed:
 | Tool              | What it checks                                                                                                                                                          |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `aphrodite_stats` | Proxy health + engine status - see [aphrodite_stats](../tool-relay/tools.md#3-aphrodite_stats)                                                                          |
-| `aphrodite_test`  | An in-process compress/retrieve smoke test that doesn't depend on the HTTP proxy being reachable at all - see [aphrodite_test](../tool-relay/tools.md#8-aphrodite_test) |
+| `aphrodite_test`  | An in-process compress/retrieve smoke test that doesn't depend on the HTTP proxy being reachable at all - see [aphrodite_test](../tool-relay/tools.md#3-aphrodite_stats) |
 
 ## Two separate config files
 

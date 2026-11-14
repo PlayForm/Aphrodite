@@ -129,7 +129,15 @@ are deliberately excluded so their raw-JSON previews survive.
 ### Headroom Classifier
 
 The hook/FFI pipeline classifies via `headroom_core::transforms`,
-which yields exactly one of: `json_array`, `source_code`, `search`, `build`, `diff`, `html`, `text`.
+which yields exactly one of:
+
+- `json_array`
+- `source_code`
+- `search`
+- `build`
+- `diff`
+- `html`
+- `text`.
 
 These strings are what appear as the `type` field in hook-pipeline markers.
 

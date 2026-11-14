@@ -1,9 +1,11 @@
 # Retrieve & Recursive Marker Resolution
 
 Two related paths turn a `<<<CCR:hash|type|size>>>` marker back into content:
-the HTTP `/retrieve` endpoint (inline_ccr → CcrStore, query filter + pagination,
-byte-exact round-trip) and the in-process recursive resolver `resolve::expand` (nested
-markers, depth limit, cycle-safe, never writes back).
+
+- the HTTP `/retrieve` endpoint (inline_ccr → CcrStore, query filter + pagination,
+  byte-exact round-trip)
+- and the in-process recursive resolver `resolve::expand` (nested
+  markers, depth limit, cycle-safe, never writes back).
 
 ## /retrieve HTTP path
 
