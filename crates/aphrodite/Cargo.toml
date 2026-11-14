@@ -52,7 +52,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-headroom-core = { package = "aphrodite-headroom-core", path = "../../vendor/headroom/crates/headroom-core", version = "0.2.0", default-features = false }
+headroom-core = { package = "aphrodite-headroom-core", path = "../../vendor/headroom/crates/headroom-core", version = "0.2.1", default-features = false }
 axum = { version = "0.8.9", features = ["macros"], optional = true }
 tokio = { version = "1.54.1", features = [
 	"macros",

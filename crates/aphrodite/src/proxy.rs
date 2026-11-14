@@ -2041,7 +2041,7 @@ fn generate_metadata(content:&str, ct:&str) -> String {
 						}
 						if end < bytes.len() && end + 2 < bytes.len() && bytes[end + 1] == b':' {
 							let key = &l[start..end];
-							if !key.starts_with('_') && !keys.contains(&key.to_string()) {
+							if !key.starts_with('_') && !keys.iter().any(|k| k == key) {
 								keys.push(key.to_string());
 								if keys.len() >= 10 {
 									break;
