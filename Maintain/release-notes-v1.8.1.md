@@ -133,10 +133,20 @@ compression/detection code are carried over untouched; the fork moves only its
   `vendor/headroom/crates/headroom-core/benches/ccr_store.rs:61` implements
   `CcrStore::put` as `-> bool` against a unit-returning trait, so the fork's
   bench target does not compile - no gate builds benches.
-- Still outstanding at tag time: the `Aphrodite/v1.8.1` tag, the `Build.yml`
-  4-target matrix and its 12 assets, `Publish.yml` via `workflow_run`,
-  `Publish-Headroom-Core` publishing 0.2.1, the `aphrodite-v0.12.0` fork tag,
-  and the `BINARY_VERSION` bump to `1.8.1`.
+- Release chain: `Aphrodite/v1.8.1` (signed, cut on `1f7d0e23`) drove `Build.yml`
+  - `Release`, all four matrix legs and `Finalize` succeeded; the release carries
+  the full 12-asset matrix. `Publish.yml` followed on `workflow_run`: `aphrodite`
+  1.8.1, `aphrodite-hermes` 1.8.1 and `aphrodite-headroom-core` 0.2.1 are all
+  live on crates.io (the last gated on `published == 'false'`, since 0.2.0 was
+  already there).
+- `Bump plugin submodule gitlink` failed inside `Publish.yml` and is expected to:
+  it commits on the tag's detached HEAD and pushes to `Current`, which by then
+  already carried `51343c1f` - the manual float of that same gitlink. Its outcome
+  is in place (`Current` -> `8c09607`, the child commit whose `BINARY_VERSION`
+  1.8.1 matches its in-tree `SHA256SUMS.txt`), so the job is redundant rather
+  than broken; re-running it only rebuilds the same behind-tip commit.
+- Still outstanding: the `aphrodite-v0.12.0` fork tag - the crate itself is
+  published as 0.2.1.
 
 ### What Ships
 
