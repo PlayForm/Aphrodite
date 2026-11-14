@@ -139,13 +139,13 @@ Answer `Y` if prompted to allow tool overrides.
 Before trusting Hermes to launch the proxy for you, confirm the binary itself runs.
 
 This does **not** require a real upstream API key or a Hermes session - see [Troubleshooting:
-verify the proxy without Hermes](troubleshooting.md#proxy-doesnt-auto-launch)
+verify the proxy without Hermes](troubleshooting.md#verify-the-proxy-without-hermes)
 for the placeholder-key pattern and what a healthy response looks like.
 
 ### Step 6: Configure
 
 Two different files, two different repos - see [Troubleshooting:
-two config files](troubleshooting.md#proxy-doesnt-auto-launch) if this is confusing.
+two config files](troubleshooting.md#two-separate-config-files) if this is confusing.
 
 On the Hermes side (`config.yaml`), the plugin needs to be enabled and, optionally, wired
 as the context engine:
