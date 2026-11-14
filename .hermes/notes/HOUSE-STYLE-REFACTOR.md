@@ -1,11 +1,13 @@
 # House-Style Refactor - Aphrodite crates
 
-Target: both crates under `crates/` adopt the PlayForm Rust house style
-(`PlayForm/Cargo/Run`, `Dotology`) - one item per file, item named by kind,
-deeply nested PascalCase modules, `mod.rs` facades. Package identity is
-unchanged: `crates/aphrodite` stays `aphrodite`, `crates/aphrodite-hermes`
-stays `aphrodite-hermes`, and every `libaphrodite_hermes.dylib` path, CI
-alias, release asset and plugin loader reference stays valid.
+Both crates under `crates/` adopt the PlayForm Rust house style
+(`PlayForm/Cargo/Run`, `Dotology`): one export per file, item named by kind,
+deeply nested PascalCase modules grouped by function, `mod.rs` facades.
+
+Package identity is unchanged: `crates/aphrodite` stays `aphrodite`,
+`crates/aphrodite-hermes` stays `aphrodite-hermes`, and every
+`libaphrodite_hermes.dylib` path, CI alias, release asset and plugin loader
+reference stays valid.
 
 ## The contract
 
@@ -15,25 +17,36 @@ alias, release asset and plugin loader reference stays valid.
    `#![allow(non_snake_case)]` gate, module declarations and re-exports -
    nothing else.
 2. **A module is a PascalCase directory** with a `mod.rs` facade listing
-   `pub mod <Leaf>;` one per line. A module that is a single unit today
-   (`hooks.rs`) becomes a directory (`Hook/`) even before it is split.
-3. **A leaf file owns exactly one item and names it by kind**:
-   `Struct` (struct), `Enum` (enum), `Fn` (function), `Trait`, `Const`.
-   The file and directory names carry the domain; the item name carries the
-   kind. Consumers path to it: `Preview::Builder::Build::Fn`,
-   `State::Marker::Struct`.
-4. **Deep nesting is the default.** A leaf that is a group of related items
-   (`Proxy/Body/Request` with 445 lines of trait impl) becomes another
-   directory, never a 400-line file. Practical ceiling: a leaf file over
-   ~150 lines is a signal to nest once more.
-5. **Facades re-export, they do not define.** A facade may `pub use` a
+   `pub mod <Leaf>;` one per line.
+3. **One export per file.** A leaf file owns exactly one item and names it by
+   kind: `Struct`, `Enum`, `Fn`, `Trait`, `Const`. The directory path carries
+   the domain, the item name carries the kind. Consumers path to it:
+   `Preview::Builder::Build::Fn`, `State::Marker::Struct`.
+4. **Full words, never abbreviations.** `Configuration` not `Config`,
+   `Environment` not `Env`, `Language` not `Lang`, `Number` not `Num`,
+   `Directory` not `Dir`.
+5. **Acronyms and product names fully capitalised**: `URL`, `URI`, `ID`,
+   `JSON`, `XML`, `HTML`, `CSV`, `YAML`, `JS`, `CLI`, `API`, `SDK`, `CCR`,
+   `SSE`, `ABI`, `FFI`.
+6. **Singular, action-oriented, present tense.** `Action` not `Actions`,
+   `Hook` not `Hooks`, `Template` not `Templates`. A directory that groups
+   behaviour is named for the shared verb or purpose: `Render/`, `Parse/`,
+   `Resolve/`, `Load/`, `Store/`.
+7. **Deep nesting is the default.** A leaf that is a group of related items
+   becomes another directory. A leaf file over ~150 lines is a signal to nest
+   once more; the practical ceiling is one screen.
+8. **Facades re-export, they do not define.** A facade may `pub use` a
    child's item when the child owns the module's canonical item
    (`Token/mod.rs` → `pub use Token::Struct;`), and must not carry logic.
-6. **Tests stay with their module**: `<Module>/Test.rs`, declared
-   `#[cfg(test)] mod Test;` in the facade. A test file over ~200 lines
-   splits by area (`<Module>/Test/<Area>.rs`).
-7. **Formatting**: rustfmt with the repo's `rustfmt.toml` (hard tabs,
-   `space_after_colon = false`, `max_width = 120`).
+9. **Documentation is part of the file.** Every module file opens with a
+   `//!` block saying what the module is for and why it exists; every public
+   item carries `///` docs in the house voice - what it does, what it is not,
+   and the consequence of getting it wrong. No `//! TODO`.
+10. **Tests stay with their module**: `<Module>/Test.rs`, declared
+    `#[cfg(test)] mod Test;`. A test file over ~200 lines splits by area into
+    `<Module>/Test/<Area>.rs`.
+11. **Formatting**: rustfmt with the repo's `rustfmt.toml` (hard tabs,
+    `space_after_colon = false`, `max_width = 120`).
 
 ### Deviations, and why
 
@@ -41,71 +54,99 @@ alias, release asset and plugin loader reference stays valid.
   defines `pub extern "C" fn aphrodite_compress`, not `fn Fn`. The symbol
   name IS the ABI contract that `aphrodite-hermes`, the ctypes bindings and
   `Maintain/check_ffi_contract.py` assert; renaming it would break codegen
-  (cbindgen → `_bindings.py`) and the plugin. One export per file still
-  holds.
-- **Struct field names stay `snake_case`.** Several structs are
-  `serde`-serialised onto the proxy wire (`ToolRelayRequest`,
-  `CcrNotification`, the config tables). Renaming fields to PascalCase
-  changes the JSON that a third-party client sees - a wire break, not a
-  style change.
+  (cbindgen → `_bindings.py`) and the plugin. One export per file still holds.
+- **Struct field names stay `snake_case`.** Several structs are `serde`-
+  serialised onto the proxy wire (`ToolRelayRequest`, `CcrNotification`, the
+  configuration tables). Renaming fields changes JSON a third-party client
+  sees - a wire break, not a style change.
 - **`BuiltinDirective/` keeps lowercase `.md` filenames.** The filenames are
-  the directive identifiers (`focus`, `foresight`, `ccr-handling`) surfaced
-  to the model and to `aphrodite_directive("add", ...)`; the directory is
+  the directive identifiers (`focus`, `foresight`, `ccr-handling`) surfaced to
+  the model and to `aphrodite_directive("add", ...)`; the directory is
   PascalCase, the data filenames are keys.
 
-## Module map (aphrodite crate)
+## Naming applied in phase 1 (done)
 
 `src/` → `Source/`, `lib.rs` → `Library.rs`, `main.rs` → `Main.rs`,
-`builtin_directives/` → `BuiltinDirective/`.
+`tests.rs` → `Test.rs`, `builtin_directives/` → `BuiltinDirective/`.
 
-| Old path                          | New path                            | Split into                                                                 |
-| --------------------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
-| `lib.rs`                          | `Library.rs` + `Abi/`               | one file per `aphrodite_*` export, `Abi/Handle/{Table,Alloc,Get}.rs`       |
-| `main.rs`                         | `Main.rs` + `Boot/` + `Guard/`      | `Boot/{Router,Listen,Shutdown,Config}.rs`, `Guard/{Loopback,Host,Bearer}.rs` |
-| `proxy.rs`                        | `Proxy/`                            | `State/`, `Threshold/`, `Body/`, `Cache/`, `Ccr/`, `Relay/`, `Metadata/`   |
-| `hooks.rs`                        | `Hook/`                             | `Live/`, `ToolResult/`, `Terminal/`, `Session.rs`, `Llm.rs`, `Path.rs`     |
-| `config_loader.rs`                | `ConfigLoader/`                     | `Config/` (per method group), `Warn.rs`                                    |
-| `poll_worker.rs`                  | `PollWorker/`                       | `Task/`, `Should/`, `Check.rs`, `Update.rs`, `Insert.rs`, `Status.rs`      |
-| `flow.rs`                         | `Flow/`                             | `Prompt/`, `Nudge/`, `Signature/`, `Window/`, `TurnContext/`               |
-| `retrieve.rs`                     | `Retrieve/`                         | `Live/`, `Page/`, `Filter.rs`, `Request.rs`, `Response.rs`                 |
-| `session.rs`                      | `Session/`                          | `Turn.rs`, `Archive.rs`, `Index.rs`, `Catalog.rs`, `Engine.rs`, `Start.rs`  |
-| `prefetch.rs`                     | `Prefetch/`                         | `Arrival/`, `Read/`, `Outcome.rs`, `Insert.rs`, `Status.rs`                |
-| `templates.rs`                    | `Template/`                         | `Vars/`, `Extract/`, `Render.rs`, `Set.rs`, `Get.rs`, `Family.rs`          |
-| `stage2.rs`                       | `Stage2/`                           | one reducer per file + `Registry.rs`, `Compress.rs`                        |
-| `debug.rs`                        | `Debug/`                            | `Level/`, `Log/`, `Counter.rs`, `Timing.rs`, `Metrics.rs`, `Path.rs`       |
-| `catalog.rs`                      | `Catalog/`                          | `Build.rs`, `Format.rs`, `Size.rs`                                         |
-| `scripting.rs`                    | `Scripting/`                        | `Engine/`, `Script.rs`, `Payload.rs`                                       |
-| `chain_split.rs`                  | `ChainSplit/`                       | one file per fn + `Segment.rs`                                             |
-| `home.rs`                         | `Home/`                             | `Hermes.rs`, `Runtime.rs`, `Plugin.rs`, `Env.rs`, `Tilde.rs`, `Path.rs`    |
-| `state/mod.rs`                    | `State/`                            | `Struct.rs`, `Default.rs`, `Const.rs`, `Template.rs` + existing submodules |
-| `directives/`                     | `Directive/`                        | existing 5 leaves, PascalCase, `Test.rs`                                   |
-| `marker/`                         | `Marker/`                           | `Format/`, `Parse/`, `Test.rs`                                             |
-| `preview/`                        | `Preview/`                          | `Builder/`, `Detector/`, `Line/`, `Text/` + existing leaves                |
-| `resolve/`                        | `Resolve/`                          | existing leaves, PascalCase, `Test.rs`                                     |
-| `setup/`                          | `Setup/`                            | `Dylib/`, `Write/`, `Run/`, `Verify.rs`, `Macos.rs`                        |
-| `struct_extract/`                 | `StructExtract/`                    | existing leaves, PascalCase, `Test.rs`                                     |
-| `config/`                         | `Config/`                           | `Proxy/` (one struct per file), `Cli/`, `Env.rs`, `Test.rs`                |
+| Old                    | New                            | Old                 | New                    |
+| ---------------------- | ------------------------------ | ------------------- | ---------------------- |
+| `catalog.rs`           | `Catalog/`                     | `hooks.rs`          | `Hook/`                |
+| `chain_split.rs`       | `ChainSplit/`                  | `marker/`           | `Marker/`              |
+| `config_loader.rs`     | `ConfigurationLoader/`         | `poll_worker.rs`    | `PollWorker/`          |
+| `config/`              | `Configuration/`               | `prefetch.rs`       | `Prefetch/`            |
+| `config/cli.rs`        | `Configuration/CLI.rs`         | `preview/builders/` | `Preview/Builder/`     |
+| `config/env.rs`        | `Configuration/Environment.rs` | `preview/detectors/`| `Preview/Detector/`    |
+| `debug.rs`             | `Debug/`                       | `preview/line/`     | `Preview/Line/`        |
+| `directives/`          | `Directive/`                   | `preview/text/`     | `Preview/Text/`        |
+| `flow.rs`              | `Flow/`                        | `preview/lang.rs`   | `Preview/Language.rs`  |
+| `home.rs`              | `Home/`                        | `preview/type.rs`   | `Preview/Type.rs`      |
+| `proxy.rs`             | `Proxy/`                       | `resolve/`          | `Resolve/`             |
+| `retrieve.rs`          | `Retrieve/`                    | `setup/`            | `Setup/`               |
+| `scripting.rs`         | `Scripting/`                   | `stage2.rs`         | `Stage2/`              |
+| `session.rs`           | `Session/`                     | `state/`            | `State/`               |
+| `struct_extract/`      | `StructExtract/`               | `templates.rs`      | `Template/`            |
+| `hermes/schemas.rs`    | `Schema/`                      | `hermes/tools.rs`   | `Tool/`                |
+| `hermes/directives.rs` | `Directive/`                   | `hermes/bin/`       | `Bin/`                 |
 
-## Module map (aphrodite-hermes crate)
+Acronym leaves: `JSON`, `XML`, `HTML`, `CSV`, `YAML`, `JS`, `YAMLKey`,
+`EnvelopeJSON`, `MarkdownHeading`, `MarkdownStructure`, `NumberBefore`.
 
-| Old path              | New path                                  | Split into                                                             |
-| --------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
-| `lib.rs`              | `Library.rs` + `Session/` + `Abi/`        | `Session/{Registry,Lock,With,Broadcast,Watcher}.rs`, `Abi/` per export  |
-| `tools.rs`            | `Tool/`                                   | `Registry/`, `Dispatch.rs`, `Read.rs`, `Unwrap.rs`, `Compress.rs`       |
-| `schemas.rs`          | `Schema/`                                 | one file per tool schema + `All.rs`, `Get.rs`                           |
-| `directives.rs`       | `Directive/`                              | `Resolve.rs`, `Builtin.rs`, `Materialize/`                              |
-| `debug.rs`            | `Debug/`                                  | `Flag/`, `Chain/`, `Session/`, `Log.rs`                                 |
-| `bin/setup-helper.rs` | `Bin/SetupHelper.rs`                      | unchanged body, `[[bin]] path` updated                                  |
+## Module map - the target trees (phase 2)
 
-## Migration phases
+### aphrodite
 
-1. **Layout + naming** (parent, whole tree, one commit-shaped change):
-   `src/` → `Source/`, `lib.rs` → `Library.rs`, `main.rs` → `Main.rs`,
-   PascalCase every module file and directory, update `Cargo.toml` paths,
-   `include_str!` paths, the packaging test's path normalisation and every
-   `mod`/`use` path. Gate: `cargo check --workspace --all-targets`,
-   `cargo test --workspace`, `cargo clippy -p aphrodite -p aphrodite-hermes
-   -- -D warnings`, `cargo fmt --all -- --check`.
+| Module                 | Leaves                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `Library.rs`           | crate docs, `pub mod`, `pub use Preview::{build_preview, detect_type}`                                              |
+| `Abi/`                 | one file per `aphrodite_*` export; `Handle/{Table,Allocate,Lookup}.rs`; `Guard.rs`                                   |
+| `Main.rs`              | `fn main()` only                                                                                                    |
+| `Boot/`                | `Router/`, `Listen/`, `Shutdown/`, `Configuration/`                                                                  |
+| `Guard/`               | `Loopback/`, `Host/`, `Bearer/`, `Token/`                                                                            |
+| `Proxy/`               | `State/`, `Threshold/`, `Body/`, `Cache/`, `CCR/`, `Relay/`, `Metadata/`, `Marker/`, `Test/`                         |
+| `Hook/`                | `Live/`, `ToolResult/`, `Terminal/`, `Session/`, `Llm/`, `Path/`, `Test/`                                            |
+| `ConfigurationLoader/` | `Config/`, `Warn/`, `Test/`                                                                                          |
+| `PollWorker/`          | `Task/`, `Should/`, `Check/`, `Update/`, `Insert/`, `Status/`, `Test/`                                                |
+| `Flow/`                | `Prompt/`, `Nudge/`, `Signature/`, `Window/`, `TurnContext/`, `Test/`                                                 |
+| `Retrieve/`            | `Live/`, `Page/`, `Filter/`, `Request/`, `Response/`, `Test/`                                                         |
+| `Session/`             | `Start/`, `Turn/`, `Archive/`, `Index/`, `Catalog/`, `Engine/`, `Test/`                                               |
+| `Prefetch/`            | `Arrival/`, `Read/`, `Outcome/`, `Insert/`, `Status/`, `Test/`                                                        |
+| `Template/`            | `Vars/`, `Extract/`, `Render/`, `Set/`, `Get/`, `Family/`, `Test/`                                                    |
+| `Stage2/`              | one reducer per file, `Registry/`, `Compress/`, `Test/`                                                               |
+| `Debug/`               | `Level/`, `Log/`, `Counter/`, `Timing/`, `Metrics/`, `Path/`, `Test/`                                                 |
+| `Catalog/`             | `Build/`, `Format/`, `Size/`, `Test/`                                                                                 |
+| `Scripting/`           | `Engine/`, `Script/`, `Payload/`, `Test/`                                                                             |
+| `ChainSplit/`          | `Segment/`, `Split/`, `MarkedCommand/`, `MarkedOutput/`, `ErrorHint/`, `Test/`                                         |
+| `Home/`                | `Hermes/`, `Runtime/`, `Plugin/`, `Environment/`, `Tilde/`, `Path/`, `Test/`                                          |
+| `State/`               | `Struct/`, `Default/`, `Const/`, `Template/` + `ChainSplit/`, `Directive/`, `Event/`, `File/`, `Marker/`, `Store/`     |
+| `Directive/`           | `Action/`, `Build/`, `Builtin/`, `Load/`, `Model/`, `Test/`                                                            |
+| `Marker/`              | `Format/`, `Parse/`, `Test/`                                                                                          |
+| `Preview/`             | `Builder/`, `Detector/`, `Line/`, `Text/`, `Input/`, `Language/`, `Type/`, `Detect/`, `State/`, `Test/`                |
+| `Resolve/`             | `Expand/`, `Filter/`, `One/`, `Parse/`, `Recursive/`, `Test/`                                                          |
+| `Setup/`               | `Dylib/`, `Write/`, `Run/`, `Verify/`, `Macos/`, `Test/`                                                               |
+| `StructExtract/`       | `Detect/`, `Format/`, `Go/`, `JS/`, `Python/`, `Rust/`, `Test/`                                                        |
+| `Configuration/`       | `CLI/`, `Environment/`, `Proxy/`, `Test/`                                                                              |
+
+### aphrodite-hermes
+
+| Module       | Leaves                                                          |
+| ------------ | --------------------------------------------------------------- |
+| `Library.rs` | crate docs, `pub mod`, re-exports                               |
+| `Session/`   | `Registry/`, `Lock/`, `With/`, `Broadcast/`, `Watcher/`          |
+| `Abi/`       | one file per `aphrodite_hermes_*` export                        |
+| `Hook/`      | `FailOpen/`, `Replacement/`, `PostTool/`, `Log/`                 |
+| `Tool/`      | `Registry/`, `Dispatch/`, `Read/`, `Unwrap/`, `Compress/`, `Test/` |
+| `Schema/`    | one file per tool schema, `All/`, `Get/`, `Test/`                 |
+| `Directive/` | `Resolve/`, `Builtin/`, `Materialize/`, `Test/`                   |
+| `Debug/`     | `Flag/`, `Chain/`, `Session/`, `Log/`, `Test/`                    |
+| `Health/`    | `Proxy/`, `Port/`                                                 |
+| `Bin/`       | `SetupHelper.rs`                                                  |
+
+## Phases
+
+1. **Layout + naming** (parent, whole tree): done - `Source/`, PascalCase,
+   full words, capitalised acronyms, `Cargo.toml` paths, `include_str!` paths,
+   the packaging test's path normalisation, every `mod`/`use` path.
 2. **Atomization** (one worker per module, disjoint ownership): split each
    monolith into its leaf tree, rename items to their kind, keep the facade
    exporting the old name as an alias until phase 3.
@@ -121,8 +162,8 @@ through one line in the owning facade:
 pub use Struct::Struct as ProxyConfig; // TODO(house-style): drop after sweep
 ```
 
-The alias is deleted in phase 3. Never leave an alias in a file the worker
-does not own.
+The alias is deleted in phase 3. Never edit a file you do not own - if a call
+site outside your module needs a change, leave it to the sweep.
 
 ## Verification (no new gates)
 
