@@ -7,7 +7,7 @@
 pub struct ActiveDirective {
 	/// Key into `state.directives`, or empty for an inline entry.
 	pub name:String,
-	/// Literal nudge text for synthesized entries (rendered as `[nudge: …]`).
+	/// Literal nudge text for synthesized entries (rendered as `[nudge: ...]`).
 	pub inline:Option<String>,
 	/// Last turn on which this entry renders; `None` = permanent.
 	pub expires_after_turn:Option<usize>,

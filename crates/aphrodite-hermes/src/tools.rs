@@ -38,10 +38,10 @@ pub fn dispatch(name:&str, args_json:&str) -> serde_json::Value {
 
 fn str_arg<'a>(args:&'a serde_json::Value, key:&str) -> &'a str { args.get(key).and_then(|v| v.as_str()).unwrap_or("") }
 
-/// Largest file `aphrodite_retrieve(path=…)` will read directly.
+/// Largest file `aphrodite_retrieve(path=...)` will read directly.
 const MAX_PATH_READ:u64 = 10 * 1024 * 1024;
 
-/// Read a file requested via `aphrodite_retrieve(path=…)`, confined to the
+/// Read a file requested via `aphrodite_retrieve(path=...)`, confined to the
 /// current workspace and capped at [`MAX_PATH_READ`]. Returns `Err(reason)` if
 /// the path escapes the workspace, is too large, or can't be read - so the tool
 /// can't be coerced into exfiltrating arbitrary files (e.g. /etc/passwd,
@@ -588,6 +588,34 @@ fn tool_registry() -> HashMap<&'static str, ToolHandler> {
 			"proxies": proxy_health(),
 			"hint": "rebuild via `cargo build --release -p aphrodite`; restart the session to pick up the new dylib",
 		})
+	});
+
+	// ── debug: per-session debug toggle (Rust-side only) ──
+	// Dev-only: gated behind debug_assertions so release dylibs register
+	// exactly the 13 production tools (catalog validate rule 6 - the
+	// manifest declares 13; a release dylib registering aphrodite_debug
+	// fails `hermes plugins validate` as an undeclared tool). Dev builds
+	// (cargo watch / debug profile) keep it; `cargo build --release` drops
+	// it. The debug-prefix/session-record machinery in debug.rs remains
+	// live in both profiles (it only activates on a flag file).
+	// Flips the session-scoped flag file in the runtime home. Resolution is
+	// root-session based (see debug.rs): the CURRENT session's root id keys the
+	// flag, so subagents inherit it and other sessions stay quiet. Pure Rust -
+	// the customer-facing Python shim is untouched.
+	#[cfg(debug_assertions)]
+	m.insert("aphrodite_debug", |args| {
+		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
+		match crate::debug::set_enabled_current(on) {
+			Ok((session, flag)) => {
+				serde_json::json!({
+					"status": "ok",
+					"debug": on,
+					"session": session,
+					"flag": flag,
+				})
+			},
+			Err(e) => serde_json::json!({"error": e}),
+		}
 	});
 
 	// ── context engine pre-LLM hook (registered via ctx.register_context_engine) ──

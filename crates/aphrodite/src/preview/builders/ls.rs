@@ -3,7 +3,7 @@
 use crate::preview::input::Input;
 
 /// directory-listing preview: file/dir counts + top extensions.
-/// `[ls:42 files 7 dirs | .rs×18 .md×9 …]`.
+/// `[ls:42 files 7 dirs | .rs×18 .md×9 ...]`.
 pub(crate) fn build_ls_preview(inp:&Input<'_>) -> String {
 	use std::collections::HashMap;
 	let mut files = 0usize;

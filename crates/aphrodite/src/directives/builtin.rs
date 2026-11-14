@@ -34,7 +34,7 @@ pub fn loaded_builtins() -> HashMap<String, Directive> {
 	for (name, content) in builtin_directives() {
 		let content = if content.len() > MAX_DIRECTIVE_CHARS {
 			let trunc:String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
-			format!("{}…", trunc)
+			format!("{}...", trunc)
 		} else {
 			content.to_string()
 		};

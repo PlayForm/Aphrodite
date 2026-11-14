@@ -196,9 +196,9 @@ OPERATING RULES (token-efficiency):
 # code = "[{type}:{fns}fns|{structs}structs {sigs} {ln}L]"
 # [templates.marker]
 # format = "{preview}\n[{type}: {meta}{center_seg}]\n<<<CCR:{hash}|{type}|{size}>>>"
-# hint = "…(use aphrodite_retrieve)"
+# hint = "...(use aphrodite_retrieve)"
 # [templates.prompts]
-# session_inject = "CCR markers (<<<CCR:hash|type|size>>>) are compressed content…"
+# session_inject = "CCR markers (<<<CCR:hash|type|size>>>) are compressed content..."
 # [templates.reverse]
 # build_output = "build_output"
 

@@ -47,7 +47,7 @@ graph TB
 	end
 
 	LLMCLIENT["OpenAI/Anthropic-compatible client"]
-	UPSTREAM["Upstream LLM API (DeepSeek/OpenAI/…)"]
+	UPSTREAM["Upstream LLM API (DeepSeek/OpenAI/...)"]
 
 	HERMES -->|register/invoke| SHIM
 	SHIM -.->|"C-ABI ctypes"| BR

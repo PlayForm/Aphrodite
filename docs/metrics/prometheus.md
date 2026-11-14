@@ -34,13 +34,19 @@ or reverse-proxy auth layer recommended for production.
 
 ### CCR Operations
 
-| Metric                        | Type    | Labels | Description                  |
-| ----------------------------- | ------- | ------ | ---------------------------- |
-| `aphrodite_ccr_hits_total`    | counter | -      | CCR cache hits               |
-| `aphrodite_ccr_misses_total`  | counter | -      | CCR cache misses             |
-| `aphrodite_ccr_created_total` | counter | -      | New CCR entries created      |
-| `aphrodite_ccr_store_entries` | gauge   | -      | Current entries in CCR store |
-| `aphrodite_ccr_store_bytes`   | gauge   | -      | Approximate bytes stored     |
+| Metric                        | Type    | Labels | Description                                         |
+| ----------------------------- | ------- | ------ | --------------------------------------------------- |
+| `aphrodite_ccr_hits_total`    | counter | -      | CCR cache hits                                      |
+| `aphrodite_ccr_misses_total`  | counter | -      | CCR cache misses                                    |
+| `aphrodite_ccr_created_total` | counter | -      | New CCR entries created                             |
+| `aphrodite_ccr_store_entries` | gauge   | -      | Live row count from the backend (`len()`, O(1))     |
+| `aphrodite_ccr_store_bytes`   | gauge   | -      | Live stored payload bytes (`SUM(LENGTH(original))`) |
+
+Both store gauges are read from the live backend on every scrape - they are not
+atomics the proxy increments. `bytes_approx` is the field name `/stats` has
+always used for the byte total; the value behind it is the exact
+`SUM(LENGTH(original))`, so it no longer approximates anything. `fill_pct` on
+`/health` is a different number: compression headroom, not store occupancy.
 
 ### Tool Relay
 
@@ -103,6 +109,25 @@ See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 | Metric                            | Type  | Labels | Description                                     |
 | --------------------------------- | ----- | ------ | ----------------------------------------------- |
 | `aphrodite_compression_ratio_ema` | gauge | -      | Exponential moving average of compression ratio |
+
+## Retention and Eviction Telemetry
+
+The retention caps and the eviction counter are **not** Prometheus metrics -
+they live on `/stats/db` (SQLite backend only), which is why the catalog above
+stays at 28 names. Scrape `/stats/db` to alert on a store sitting at its cap:
+
+| `/stats/db` field | Meaning                                                             |
+| ----------------- | ------------------------------------------------------------------- |
+| `max_entries`     | Configured row cap (`store_max_entries`), `null` = unlimited        |
+| `max_bytes`       | Configured payload-byte cap (`store_max_bytes`), `null` = unlimited |
+| `evicted_total`   | Rows evicted by cap enforcement since the store was opened          |
+| `freelist_bytes`  | Pages freed by purge and eviction that the file still holds         |
+
+A store that sits at `max_entries` or `max_bytes` is working as configured, not
+failing: eviction is a cache policy, so an evicted hash is a retrieval miss
+exactly like an expired one. `evicted_total` climbing steadily while
+`total_entries` holds flat is the signal that the cap, not the TTL, is what is
+reclaiming the store.
 
 ## Latency Bucket Boundaries
 
@@ -198,7 +223,7 @@ the full JSON object:
     "tool_relay": {"total": u64, "success": u64, "failure": u64},
     "notify": {"success": u64, "failure": u64},
     "upstream_errors": {"4xx": u64, "5xx": u64, "timeouts": u64, "connect_errors": u64, "sse_stream_errors": u64},
-    "ccr_store": {"entries": u64, "bytes_approx": u64},
+    "ccr_store": {"entries": u64, "bytes_approx": u64},  // both live: len() and SUM(LENGTH(original))
     "body_bytes": {"request": u64, "response": u64},
     "upstream_latency_micros": u64
 }
@@ -225,12 +250,21 @@ the in-memory backend has no database to report:
 	"total_bytes_original": 45234000,
 	"total_bytes_compressed": 73344,
 	"oldest_entry_age_seconds": 3421,
-	"database_size_bytes": 52428800
+	"database_size_bytes": 52428800,
+	"freelist_bytes": 81920,
+	"max_entries": 100000,
+	"max_bytes": 536870912,
+	"evicted_total": 0
 }
 ```
 
 `total_bytes_compressed` is an estimate (24 bytes per entry, matching the
-24-char BLAKE3 hex key); originals are stored uncompressed. When the backend
-is in-memory or CCR is disabled, the endpoint still returns HTTP 200 with
+40-char BLAKE3 hex prefix used as the CCR key); originals are stored
+uncompressed. `max_entries` / `max_bytes` echo the configured caps and are
+`null` when the cap is unlimited (`store_max_entries` / `store_max_bytes` =
+`0`). `evicted_total` counts rows evicted by cap enforcement since this store
+was opened, so it resets on restart. `freelist_bytes` is the reclaimable slack
+the file still holds after purge and eviction. When the backend is in-memory or
+CCR is disabled, the endpoint still returns HTTP 200 with
 `{"error": "stats_db not available for this backend" | "CCR not enabled",
 "mode": ...}`.

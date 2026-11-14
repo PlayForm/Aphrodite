@@ -39,7 +39,7 @@ sequenceDiagram
                 CC->>CC: budget_mult = clamp(0.50 + hdr/100*0.50, 0.50..1.0)
                 loop each choice.message.content (string)
                     CC->>CT: proxy_detect_content_type(content)
-                    CT-->>CC: ct (tool_output|code_rust|error|diff|json|text|…)
+                    CT-->>CC: ct (tool_output|code_rust|error|diff|json|text|...)
                     CC->>TH: threshold = threshold_for(ct).max(base) * budget_mult
                     alt content.len() > threshold  (COMPRESS)
                         CC->>CC: hash = compute_key(bytes) - BLAKE3, 40 hex

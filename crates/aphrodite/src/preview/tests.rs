@@ -175,7 +175,7 @@ fn test_detect_and_preview_ripgrep() {
 	let _g = cap_guard();
 	assert_eq!(detect_semantic_type(RIPGREP), Some("grep"));
 	let p = build_preview("text", RIPGREP);
-	assert_eq!(p, "[grep:4 hits in 3 files | src/preview.rs:12 …]");
+	assert_eq!(p, "[grep:4 hits in 3 files | src/preview.rs:12 ...]");
 }
 
 const GIT_LOG:&str = "commit abc1234def5678\nAuthor: Nikola <n@x.io>\nDate:   Mon Jul 14\n\n    fix(preview): stop \
@@ -613,7 +613,7 @@ fn test_generic_arm_long_line_samples_head_and_tail() {
 	let c = "word ".repeat(2000);
 	let p = build_preview("tool_result", &c);
 	assert!(p.starts_with("[tool_result:1L 10000B | "), "got {p}");
-	assert!(p.contains("…"), "long line must be sampled head+tail: {p}");
+	assert!(p.contains("..."), "long line must be sampled head+tail: {p}");
 	assert!(p.contains("word"), "both ends are words: {p}");
 	assert!(p.chars().count() < 120, "sample must stay compact: {p}");
 }

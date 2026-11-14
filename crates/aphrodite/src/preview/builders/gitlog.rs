@@ -3,7 +3,7 @@
 use crate::preview::input::Input;
 
 /// git log preview: commit count + first->last short hash and subject.
-/// `[gitlog:20 commits | abc123 fix(x): … → def456 …]`.
+/// `[gitlog:20 commits | abc123 fix(x): ... → def456 ...]`.
 pub(crate) fn build_gitlog_preview(inp:&Input<'_>) -> String {
 	// Collect `commit <hash>` entries and, if present, the following subject.
 	let all:Vec<&str> = inp.raw.lines().collect();

@@ -56,7 +56,7 @@ patterns and majority votes - so ordinary prose is never mis-tagged.
 | 2     | `test`         | `test result:`, `=== RUN`, `--- PASS:`, `N passed` / `N failed`, `running N tests`                                |
 | 3     | `diff`         | `diff --git`, `---` + `+++` header pair, or `@@` hunk with change lines                                           |
 | 4     | `code`         | Strong signature line (`fn main(`, `def x(`, `struct X`, `#include`, shebang) or two or more statement-line votes |
-| 5     | `table`        | Two or more `                                                                                                     | `-prefixed lines with a separator row |
+| 5     | `table`        | Two or more `\|`-prefixed lines with a separator row                                                              |
 | 6     | `markdown`     | Two or more heading lines plus structure or body prose                                                            |
 | 7     | `yaml`         | Three or more top-level lowercase `key: value` lines                                                              |
 | 8     | `html` / `xml` | `<!DOCTYPE html` / `<html` open, or `<` open with `</` close                                                      |

@@ -86,6 +86,42 @@ git submodule update --init --recursive
 cargo build --release -p aphrodite -p aphrodite-hermes
 ```
 
+### LLM provider configuration 🔑
+
+The proxy sits in front of an upstream LLM API, so it needs that API's key -
+Hermes' own provider config is not reused. `api_key` resolves
+`[[proxies]] api_key` → `[defaults] api_key` → `APHRODITE_API_KEY`, and the
+proxy refuses to start when the chain resolves empty
+(`no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml`).
+
+```sh
+export APHRODITE_API_KEY=sk-...  # env var
+aphrodite setup --api-key sk-... # or write it through setup
+```
+
+```toml
+# ~/.hermes/aphrodite/aphrodite.toml
+[defaults]
+api_key = "sk-..."                  # or per listener: [[proxies]] api_key
+```
+
+### Verify it's running ✅
+
+```sh
+curl -s 127.0.0.1:9797/health
+# {"status":"healthy","ccr":true,"mode":"cache","version":"1.8.0","fill_pct":90.0,...}
+
+curl -s 127.0.0.1:9797/version
+# 1.8.0
+
+curl -s 127.0.0.1:9798/stats
+# {"mode":"token","proxy":"aphrodite","ccr_backend":"enabled","tool_relay_enabled":true,...}
+```
+
+Inside a session the same information arrives as tools: `aphrodite_stats`
+(proxy health, engine status, inline store size) and `aphrodite_rebuild`
+(binary and dylib version plus a rebuild hint).
+
 ---
 
 ## The Problem 🔥
@@ -108,22 +144,22 @@ full content only when it actually needs it.
 ```text
  ANY OUTPUT ────────► Aphrodite ────────► Agent (preview, not raw)
                         │
-                        ├─ build log    → [build:2E 5W 210L | error[E0432]: …]
+                        ├─ build log    → [build:2E 5W 210L | error[E0432]: ...]
                         ├─ cargo test   → [test:220 pass 0 fail 1 ignored | 0.31s]
                         ├─ terminal     → [terminal:14L exit code: 0]
                         ├─ Rust file    → [code:3fns|2structs fn main() 414L]
                         ├─ Python file  → [code:2fns|1class def handle() 87L]
-                        ├─ grep/ripgrep → [grep:4 hits in 3 files | src/x.rs:12 …]
-                        ├─ search_files → [search:15 hits in 3 files | src/x.rs:12 …]
+                        ├─ grep/ripgrep → [grep:4 hits in 3 files | src/x.rs:12 ...]
+                        ├─ search_files → [search:15 hits in 3 files | src/x.rs:12 ...]
                         ├─ git status   → [git:2M 1A 1D 3?? | src/x.rs +N more]
-                        ├─ git log      → [gitlog:2 commits | abc1234 fix… → def5678 feat…]
+                        ├─ git log      → [gitlog:2 commits | abc1234 fix... → def5678 feat...]
                         ├─ diff         → [diff:2F +7/-3 12L | src/main.rs Cargo.toml]
                         ├─ ls / find    → [ls:12 files 0 dirs | .rs×10]
-                        ├─ JSON blob    → [json:30 keys 1L | status, error, …]
+                        ├─ JSON blob    → [json:30 keys 1L | status, error, ...]
                         ├─ web page     → [html:8h 42a 3img 342L | Aphrodite Docs]
-                        ├─ compiler err → [error:2L 120B | error: could not compile …]
+                        ├─ compiler err → [error:2L 120B | error: could not compile ...]
                         ├─ app log      → [log:12L 540B | [INFO aphrodite] proxy starting]
-                        └─ plain text   → [text:3L 50B | first line hint …]
+                        └─ plain text   → [text:3L 50B | first line hint ...]
 
     Agent decides:
     • Preview is enough → skip retrieval, keep reasoning
@@ -143,7 +179,97 @@ ceiling.
 
 ---
 
-## Features ⭐
+## See It Work 💬
+
+A real session against this repository. The markers and preview lines below
+are verbatim - this README was written by an agent whose context looked exactly
+like this.
+
+**`ls` at the repo root** - 32 entries, 377 bytes:
+
+```text
+<<<CCR:c5e9b7d52756100736cf1c40ccd36b2e9b718841|ls|377>>>
+[ls:32 files 0 dirs | .toml×6 .md×5 .lock×2]
+```
+
+**`find . -name '*.md'`** - 172 paths, 3,984 bytes:
+
+```text
+<<<CCR:958522eb61f963cd9f4ce24ff21490b583fdb166|ls|3984>>>
+[ls:172 files 0 dirs | .md×172]
+```
+
+**`ls crates/aphrodite/src`** - 34 files across 9 directories, 640 bytes:
+
+```text
+<<<CCR:14b3d51415867039316d2c80f540123db86cf891|ls|640>>>
+[ls:34 files 9 dirs | .rs×22]
+```
+
+Three tool calls, 5,001 bytes of listings, 279 characters in context - 18x
+less. The agent knows how many files, which directories, and which extensions -
+the shape of the answer - without holding a single path. When a path matters it
+asks for it:
+
+```text
+aphrodite_retrieve("14b3d51415867039316d2c80f540123db86cf891")
+
+{"found": true, "source": "ccr", "hash": "14b3d51415867039316d2c80f540123db86cf891",
+ "content": "builtin_directives\ncatalog.rs\nchain_split.rs\nconfig\n..."}
+```
+
+The `size` field is the price of that call: 640 bytes re-enter context when the
+marker resolves, zero when it does not. Markers persist for the whole session,
+so deferring is free and retrieving is always one call away.
+
+---
+
+## Session Lifecycle 🔄
+
+One turn, end to end:
+
+1. **Session start** - `on_session_start` boots the engine, seeds the active
+   directive set into `~/.hermes/aphrodite/directives/`, and health-checks the
+   proxies.
+2. **Tool call** - `pre_tool_call` decides dispatch: prefetch-aware, and slow
+   terminal or process calls are auto-backgrounded by `poll_worker`.
+3. **Tool result** - `transform_tool_result` (or `transform_terminal_output`
+   for shell) classifies, previews, stores, and relays the marker.
+4. **Before the model call** - `pre_llm_call` injects the active directives
+   within `[flow] budget_chars`, and archives overflowing middle turns to CCR
+   once the session passes `engine_threshold_pct`.
+5. **After the model call** - `post_llm_call` records savings and updates the
+   adaptive threshold EMA.
+6. **Retrieval** - whenever the agent asks: `aphrodite_retrieve(hash)` returns
+   the stored bytes unchanged.
+
+Nothing is rewritten retroactively. A marker stored in turn 3 is the same
+marker in turn 40, and the content behind it never changed - which is why
+retrieval is always safe.
+
+### Directives 🧭
+
+Directives are short behavioral instructions injected each turn and swappable
+mid-conversation. Seven ship inside the binary:
+
+| Directive      | Focus                                                    |
+| :------------- | :------------------------------------------------------- |
+| `focus`        | Targeted execution, marker-aware retrieval               |
+| `foresight`    | Anticipate and prefetch; never wait on I/O               |
+| `lazy`         | Defer work, activate on demand, never busy-spin          |
+| `lazy-eval`    | Accumulate markers, resolve on demand                    |
+| `explore`      | Read broadly, prefetch aggressively                      |
+| `cleanup`      | Catalog, summarize, verify nothing is left behind        |
+| `ccr-handling` | How to read markers and retrieve the content behind them |
+
+`[directives] active = [...]` selects the set - an empty list seeds `focus` +
+`foresight` + `lazy` - and `aphrodite_directive` swaps it mid-session.
+Directives change what the model does with markers; they never change the
+marker format.
+
+---
+
+## Features ⭐
 
 - **TOML templates** - `[templates.preview.<family>.<ctype>]` format strings,
   `[templates.marker]` format + hint, `[templates.prompts]` prompt templates,
@@ -178,28 +304,28 @@ first match wins, and each type carries its own compression threshold tier.
 
 ### Output Type Catalog
 
-| Content type                             | Detected from                                                | Enriched preview shape                                                            |
-| :--------------------------------------- | :----------------------------------------------------------- | :-------------------------------------------------------------------------------- |
-| `build` / `build_output` / `build_error` | `Compiling` / `Finished` / `running` / `test` first line     | `[build:1E 1W 142L \| error[E0432]: unresolved import ...]` (first error message) |
-| `diff`                                   | `diff --git` / `@@ -` / `+++` / `---` headers                | `[diff:2F +7/-3 12L \| src/main.rs Cargo.toml +N more]` (first file names)        |
-| `git` (status)                           | porcelain status codes (`M`/`A`/`D`/`R`/`??`/`UU`, majority) | `[git:2M 2A 1D 3?? \| src/x.rs src/y.rs +5 more]` (code tallies + paths)          |
-| `gitlog`                                 | `commit <hash>` blocks + `Author:`                           | `[gitlog:2 commits \| abc1234 fix… → def5678 feat…]` (first→last hash/subject)    |
-| `ls` / `dir`                             | `ls -l` mode strings / bare path tokens (majority)           | `[ls:3 files 2 dirs \| .rs×2 .md×1]` (counts + top extensions)                    |
-| `test` / `test_output`                   | `test result:` / `=== RUN` / pytest / jest summaries         | `[test:220 pass 0 fail 1 ignored \| 0.31s]` (or `\| FAIL name` on failure)        |
-| `grep` / `ripgrep`                       | `path:line:match` hits (majority)                            | `[grep:4 hits in 3 files \| src/preview.rs:12 …]` (hits, files, first location)   |
-| `code_rust`                              | `fn`/`impl`/`struct`/`enum` + (`->` or `&` or `use`)         | `[code:3fns\|2structs fn main() 414L]` (structure map + first signature)          |
-| `code_python`                            | `def` + (`import`/`class`/`from`/`self.`)                    | `[code:2fns\|1class def handle() 87L]`                                            |
-| `code_go`                                | (`func`/`package`) + `import (`                              | `[code:4fns func main() 210L]`                                                    |
-| `code_js` / `code_ts`                    | (`function`/`const`/`=>`) + (`import`/`export`)              | `[code:3fns export default 145L]`                                                 |
-| `code` (generic)                         | `fn`/`def`/`class`/`import` fallback                         | `[code:2fns 96L]`                                                                 |
-| `search`                                 | search-result JSON (`total_count` + `query`)                 | `[search:15 hits in 3 files \| src/x.rs:12 …]`                                    |
-| `json` / `json_array`                    | starts with `{` / `[` and parses as JSON                     | `[json:5items 3L]` or `[json:30 keys 1L \| status, error, …]`                     |
-| `tool_output`                            | JSON containing `exit_code` or `"status"`                    | `[tool_output:1L 58B \| {"exit_code": 0, "output": "ok"}]`                        |
-| `terminal`                               | shell/exit-code traces (hook override)                       | `[terminal:14L exit code: 0]` (exit code / last output line)                      |
-| `error`                                  | first-line `error`/`Error`/`Traceback`/`panic`               | `[error:2L 120B \| error: could not compile \`aphrodite\`]`                       |
-| `log`                                    | `[INFO/WARN/ERROR/DEBUG/TRACE]` or timestamp prefix          | `[log:12L 540B \| [2026-09-15T10:00:00Z INFO aphrodite] …]`                       |
-| `linter`                                 | `error[E`/`error:`/`warning:`/`clippy`/`tsc`                 | `[linter:4L 260B \| error[E0308]: mismatched types]`                              |
-| `text` (fallback)                        | unrecognized content                                         | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)          |
+| Content type                             | Detected from                                                | Enriched preview shape                                                             |
+| :--------------------------------------- | :----------------------------------------------------------- | :--------------------------------------------------------------------------------- |
+| `build` / `build_output` / `build_error` | `Compiling` / `Finished` / `running` / `test` first line     | `[build:1E 1W 142L \| error[E0432]: unresolved import ...]` (first error message)  |
+| `diff`                                   | `diff --git` / `@@ -` / `+++` / `---` headers                | `[diff:2F +7/-3 12L \| src/main.rs Cargo.toml +N more]` (first file names)         |
+| `git` (status)                           | porcelain status codes (`M`/`A`/`D`/`R`/`??`/`UU`, majority) | `[git:2M 2A 1D 3?? \| src/x.rs src/y.rs +5 more]` (code tallies + paths)           |
+| `gitlog`                                 | `commit <hash>` blocks + `Author:`                           | `[gitlog:2 commits \| abc1234 fix... → def5678 feat...]` (first→last hash/subject) |
+| `ls` / `dir`                             | `ls -l` mode strings / bare path tokens (majority)           | `[ls:3 files 2 dirs \| .rs×2 .md×1]` (counts + top extensions)                     |
+| `test` / `test_output`                   | `test result:` / `=== RUN` / pytest / jest summaries         | `[test:220 pass 0 fail 1 ignored \| 0.31s]` (or `\| FAIL name` on failure)         |
+| `grep` / `ripgrep`                       | `path:line:match` hits (majority)                            | `[grep:4 hits in 3 files \| src/preview.rs:12 ...]` (hits, files, first location)  |
+| `code_rust`                              | `fn`/`impl`/`struct`/`enum` + (`->` or `&` or `use`)         | `[code:3fns\|2structs fn main() 414L]` (structure map + first signature)           |
+| `code_python`                            | `def` + (`import`/`class`/`from`/`self.`)                    | `[code:2fns\|1class def handle() 87L]`                                             |
+| `code_go`                                | (`func`/`package`) + `import (`                              | `[code:4fns func main() 210L]`                                                     |
+| `code_js` / `code_ts`                    | (`function`/`const`/`=>`) + (`import`/`export`)              | `[code:3fns export default 145L]`                                                  |
+| `code` (generic)                         | `fn`/`def`/`class`/`import` fallback                         | `[code:2fns 96L]`                                                                  |
+| `search`                                 | search-result JSON (`total_count` + `query`)                 | `[search:15 hits in 3 files \| src/x.rs:12 ...]`                                   |
+| `json` / `json_array`                    | starts with `{` / `[` and parses as JSON                     | `[json:5items 3L]` or `[json:30 keys 1L \| status, error, ...]`                    |
+| `tool_output`                            | JSON containing `exit_code` or `"status"`                    | `[tool_output:1L 58B \| {"exit_code": 0, "output": "ok"}]`                         |
+| `terminal`                               | shell/exit-code traces (hook override)                       | `[terminal:14L exit code: 0]` (exit code / last output line)                       |
+| `error`                                  | first-line `error`/`Error`/`Traceback`/`panic`               | ``[error:2L 120B \| error: could not compile `aphrodite`]``                        |
+| `log`                                    | `[INFO/WARN/ERROR/DEBUG/TRACE]` or timestamp prefix          | `[log:12L 540B \| [2026-09-15T10:00:00Z INFO aphrodite] ...]`                      |
+| `linter`                                 | `error[E`/`error:`/`warning:`/`clippy`/`tsc`                 | `[linter:4L 260B \| error[E0308]: mismatched types]`                               |
+| `text` (fallback)                        | unrecognized content                                         | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)           |
 
 > [!NOTE]
 >
@@ -260,38 +386,48 @@ Aphrodite compresses output in **two modes**:
 ```text
 crates/aphrodite/          ← Core engine (binary + cdylib)
   main.rs                  ← CLI entry, version intercept, config bootstrap
+  lib.rs                   ← Crate surface shared by the binary and the cdylib
   proxy.rs                 ← HTTP proxy: classify → compress → store → preview; SSE pass-through; tool relay
   hooks.rs                 ← transform_tool_result, transform_terminal_output, session/LLM hooks
-  preview.rs               ← Type detection + enriched preview builder (all types)
-  resolve.rs               ← CCR marker resolution (recursive, nested markers)
   retrieve.rs              ← /retrieve endpoint + retrieval plumbing
-  templates.rs            ← TOML template resolution (preview/marker/prompts/reverse)
-  marker.rs                ← Marker parsing, hash normalization, validity checks
+  templates.rs             ← TOML template resolution (preview/marker/prompts/reverse)
   stage2.rs                ← Semantic reduction (JSON minify, build, diff, code)
-  struct_extract.rs        ← Code structure extraction (Rust, Python, Go, JS/TS)
-  config_loader.rs / config/     ← TOML schema, config reload, multi-proxy resolution
-  state.rs                 ← AppState: counters, caches, adaptive EMA state
-  directives.rs            ← Behavioral directive registry
   session.rs               ← Session state, turn history
   catalog.rs               ← CCR catalog listing (TOC, tool formats)
   prefetch.rs              ← Background file prefetch → CCR
   poll_worker.rs           ← Auto-backgrounding of slow tool calls
-  flow.rs / setup.rs       ← Plugin bootstrap, `aphrodite setup` installer
+  chain_split.rs           ← Opt-in fine-grained command splitting
+  flow.rs / home.rs        ← Plugin bootstrap and runtime-home resolution
+  debug.rs                 ← Per-session debug switch
+  scripting.rs             ← Optional Rhai scripting feature
+  preview/                 ← Type detection + enriched preview builders
+    detect.rs type.rs lang.rs input.rs state.rs
+    builders/ detectors/ line/ text/
+  marker/                  ← Marker parsing, formatting, hash normalization (parse.rs, format.rs)
+  resolve/                 ← Recursive marker resolution (expand, one, recursive, filter)
+  struct_extract/          ← Code structure maps (rust, python, go, js)
+  config/                  ← TOML schema, env overrides, multi-proxy resolution (cli.rs, env.rs, proxy.rs)
+  config_loader.rs         ← Dylib-side config load + auto-reload
+  state/                   ← AppState: counters, store, markers, files, events, chain-split
+  directives/              ← Directive registry (model, load, build, builtin, action)
+  setup/                   ← `aphrodite setup`: dylib install, verify, macOS wiring
   builtin_directives/      ← Shipped directive markdown (focus, foresight, cleanup, explore, lazy, lazy-eval, ccr-handling)
 
 crates/aphrodite-hermes/   ← Hermes bridge (cdylib)
   lib.rs                   ← FFI surface, hook dispatch
   tools.rs                 ← 13 tool dispatch handlers
   schemas.rs               ← JSON Schema definitions
-  skills.rs                ← Bundled Hermes skills
-  bin/                     ← Helper binaries
+  directives.rs            ← Directive FFI
+  debug.rs                 ← Debug FFI
+  bin/setup-helper.rs      ← Setup helper binary
 
 plugins/aphrodite/         ← Thin Python loader (ctypes FFI) + plugin manifest
-  __init__.py              ← loads dylib, registers hooks/tools/engine
+  __init__.py              ← loads the dylib, registers hooks / tools / engine
+  _bindings.py             ← Generated ctypes bindings (cbindgen → ctypesgen)
   plugin.yaml              ← Manifest: 6 hooks, 13 tools, context engine
+  BINARY_VERSION           ← Distribution pointer for the binary release
   download.sh / download.ps1 ← Binary + dylib fetch from GitHub Releases
-  directives/              ← Plugin-side directive set
-  binaries/                ← Cached prebuilt binaries
+  layout_check.py / layout_schema.json ← Runtime-home layout contract
 ```
 
 ### Data flow
@@ -393,6 +529,17 @@ Thirteen tools ship with the plugin:
 | `aphrodite_prefetch`        | Read + compress files on demand; markers returned inline             |
 | `aphrodite_prefetch_status` | Live prefetch schedule: loading, ready, errors                       |
 
+Typical calls:
+
+```text
+aphrodite_retrieve(hash)               → the full content behind a marker
+aphrodite_catalog()                    → every marker this session, with previews
+aphrodite_search("preview builder")    → find a stored entry by keyword or type
+aphrodite_compress(content, type)      → compress content the agent already holds
+aphrodite_stats()                      → proxy health, engine status, savings
+aphrodite_directive(action: "list")    → current directive set, swappable in place
+```
+
 ---
 
 ## Configuration 🎛️
@@ -489,10 +636,10 @@ _default = "[{type}:{ln}L | {first}]"
 
 [templates.marker]
 format = "{preview}\n[{type}: {meta}{center_seg}]\n<<<CCR:{hash}|{type}|{size}>>>"
-hint = "…(use aphrodite_retrieve)"
+hint = "...(use aphrodite_retrieve)"
 
 [templates.prompts]
-session_inject = "CCR markers (<<<CCR:hash|type|size>>>) are compressed content…"
+session_inject = "CCR markers (<<<CCR:hash|type|size>>>) are compressed content..."
 
 [templates.reverse]
 build_output = "build" # remap a content type to a key in the active family
@@ -516,10 +663,8 @@ variables `hash` and `tail`), and `auto_expand_guidance` (internal).
 
 > [!TIP]
 >
-> **Directives** seed short behavioral instructions injected each turn,
-> swappable mid-conversation via `aphrodite_directive`.
-> Built-in set (baked into the binary): `focus`, `foresight`,
-> `ccr-handling`, `cleanup`, `explore`, `lazy`, `lazy-eval`.
+> **Directives** are covered under **Session Lifecycle** above - seven
+> built-ins, swapped mid-conversation via `aphrodite_directive`.
 
 ---
 
@@ -606,7 +751,7 @@ dual-proxy architecture.
 
 ## Contributing 🫱🏻‍🫲🏿
 
-| Want to…          | Start here                                                                                 |
+| Want to...        | Start here                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------------ |
 | Report a bug      | [Open an issue](https://github.com/PlayForm/Aphrodite/issues/new?template=bug_report.md)   |
 | Suggest a feature | [Start a discussion](https://github.com/PlayForm/Aphrodite/discussions/new?category=ideas) |

@@ -426,13 +426,17 @@ mod tests {
 		set_preview_family(Some("code_first".to_string()));
 
 		// Template renders first; the cap (8 chars) truncates it on a char
-		// boundary, preserving the closing `]`.
+		// boundary, keeping room for the three-char `...` marker and the
+		// closing `]`.
 		crate::preview::set_preview_max_chars(Some(8));
 		let out = crate::preview::build_preview("diff", "a\nb\n");
-		assert_eq!(out, "[tpl d…]");
+		assert_eq!(out, "[tpl...]");
 
-		// Unregistered -> hardcoded diff arm, unchanged.
+		// Unregistered -> hardcoded diff arm. Lift the cap first: at 8 chars
+		// the three-char `...` leaves only `[dif`, which cannot distinguish
+		// the arm that rendered from any other.
 		set_templates(None);
+		crate::preview::set_preview_max_chars(None);
 		let out = crate::preview::build_preview("diff", "a\nb\n");
 		assert!(out.starts_with("[diff"), "hardcoded fallback expected, got {out:?}");
 

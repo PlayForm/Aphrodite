@@ -39,7 +39,7 @@ nothing incremented - so both are now labelled or made live. Binary `1.7.0 →
   `max_entries`, `max_bytes`, `evicted_total`, `freelist_bytes`.
 - **Feature (headroom fork, 0.2.0)**: `SqliteCcrStore::open_with_limits` +
   `max_entries()` / `max_bytes()` / `evicted_total()`; purge and eviction report
-  exact freed rows/bytes via `DELETE … RETURNING LENGTH(original)`; maintained
+  exact freed rows/bytes via `DELETE ... RETURNING LENGTH(original)`; maintained
   entry/byte counters so `len()` is O(1).
 - **Fix (plugin loader, 2.3.1)**: a missing `aphrodite.toml` is now reported
   instead of inferred - with no config the binary falls back to a single

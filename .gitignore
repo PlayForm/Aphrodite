@@ -132,3 +132,4 @@ placeholder/
 .hermes/skills/**/__pycache__/
 
 Site/
+*.mp4

@@ -176,7 +176,7 @@ BootstrapToolchain() {
 	fi
 	\echo "→ rustup: $(command -v rustup)"
 
-	\echo "→ Updating the nightly toolchain (channel: rust-toolchain.toml)…"
+	\echo "→ Updating the nightly toolchain (channel: rust-toolchain.toml)..."
 	if ! rustup toolchain install nightly --profile minimal --no-self-update --force; then
 		\echo ""
 		\echo "Error: rustup could not install/update the nightly toolchain."

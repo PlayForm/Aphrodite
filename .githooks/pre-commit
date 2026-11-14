@@ -14,11 +14,11 @@
 set -euo pipefail
 
 # Detect detachment: `git symbolic-ref -q HEAD` fails when HEAD is detached.
-if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
+if ! git symbolic-ref -q HEAD > /dev/null 2>&1; then
 	# Resolve the branch(es) that contain this commit so the message can name
 	# the exact re-attach command instead of a generic hint.
 	HEAD_SHA="$(git rev-parse HEAD)"
-	BRANCH_HITS="$(git branch --contains "$HEAD_SHA" 2>/dev/null | sed 's/^[*+] //' | grep -v '^$' || true)"
+	BRANCH_HITS="$(git branch --contains "$HEAD_SHA" 2> /dev/null | sed 's/^[*+] //' | grep -v '^$' || true)"
 	SUGGEST=""
 	if [ -n "$BRANCH_HITS" ]; then
 		# Pick the first local branch that contains the commit as the suggested
