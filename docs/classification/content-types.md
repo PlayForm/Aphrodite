@@ -1,16 +1,18 @@
 # Content Type Taxonomy
 
-The classifier labeled every payload that enters the compression pipeline
-with a content type so thresholds and previews can adapt per type - errors
-stay visible in context while Aphrodite compressed verbose build and log
-output at the base threshold. Classification is layered: a vendored base classifier assigns one
-of seven coarse types, an Aphrodite-side semantic detector refines common
-tool-output shapes, the Hermes bridge unwraps wrapper envelopes before either
-runs, and an explicit caller-supplied type hint always wins. Across all
-stages the pipeline can emit **30 distinct content types**.
+The classifier labeled every payload that enters the compression pipeline with a content type
+so thresholds and previews can adapt per type - errors stay visible in context
+while Aphrodite compressed verbose build and log output at the base threshold.
 
-The preview each type produces is documented in the
-[Enriched Preview Catalog](../proxy/compression.md#enriched-preview-catalog).
+Classification is layered: a vendored base classifier assigns one of seven coarse types,
+an Aphrodite-side semantic detector refines common tool-output shapes,
+the Hermes bridge unwraps wrapper envelopes before either runs,
+and an explicit caller-supplied type hint always wins.
+
+Across all stages the pipeline can emit **30 distinct content types**.
+
+The preview each type produces is documented in the [Enriched
+Preview Catalog](../proxy/compression.md#enriched-preview-catalog).
 
 ## Classification Pipeline
 
@@ -21,18 +23,18 @@ The preview each type produces is documented in the
 | Proxy heuristics    | `crates/aphrodite/src/proxy.rs`        | The standalone proxy path's own ladder: JSON envelopes, per-language code, errors, build, linter, diff, git, log                                                        |
 | Envelope unwrap     | `crates/aphrodite-hermes/src/tools.rs` | The Hermes plugin path: unwraps `{output, exit_code}`, `{diff}`, `{error}`, `{total_count, matches}`, `{content, total_lines}` envelopes before classifying the payload |
 
-The proxy path classifies raw pushed content; the Hermes plugin path
-unwraps envelopes first, then runs the same base classifier and semantic
-detector on the extracted payload. Both paths share the semantic detector, so
-the semantic detector tagged a `git status` or `ls -l` result the same way
-whether it arrived through the proxy or through a Hermes tool call.
+The proxy path classifies raw pushed content; the Hermes plugin path unwraps envelopes first,
+then runs the same base classifier and semantic detector on the extracted payload.
+
+Both paths share the semantic detector, so the semantic detector tagged a `git status`
+or `ls -l` result the same way whether it arrived through the proxy or through a Hermes tool call.
 
 ## Base Classifier (7 Types)
 
-The vendored `headroom-core` content detector is regex-based and
-confidence-gated: each candidate type must clear a confidence floor, and the
-first candidate to clear its floor wins. JSON objects deliberately do not
-match - only arrays do - so an object falls through to `text`.
+The vendored `headroom-core` content detector is regex-based and confidence-gated:
+each candidate type must clear a confidence floor, and the first candidate to clear its floor wins.
+
+JSON objects deliberately do not match - only arrays do - so an object falls through to `text`.
 
 | Type          | Detection signal                                                            | Confidence floor          |
 | ------------- | --------------------------------------------------------------------------- | ------------------------- |
@@ -46,9 +48,10 @@ match - only arrays do - so an object falls through to `text`.
 
 ## Semantic Refinement (15 Types)
 
-`detect_semantic_type` runs after the base classifier and before the loose
-first-line heuristics. Detection is deliberately conservative - line-prefix
-patterns and majority votes - so ordinary prose is never mis-tagged.
+`detect_semantic_type` runs after the base classifier and before the loose first-line heuristics.
+
+Detection is deliberately conservative - line-prefix patterns and majority votes -
+so ordinary prose is never mis-tagged.
 
 | Order | Type           | Detection signal                                                                                                  |
 | ----- | -------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -67,17 +70,16 @@ patterns and majority votes - so ordinary prose is never mis-tagged.
 | 13    | `grep`         | `path:line:match` on a majority of lines                                                                          |
 | 14    | `ls`           | `ls -l` mode strings, or a majority of bare path-like tokens                                                      |
 
-A JSON object is excluded from `json` when any of its keys matches the
-Hermes wrapper envelope guard (`output`, `exit_code`, `diff`, `error`,
-`success`, `total_count`, `matches`, `matches_text`, `content`,
-`total_lines`, `result`, `message`, `found`, `preview`, `name`,
-`description`): those objects are wrappers whose payload lives inside, and
-the bridge unwraps them instead of previewing the key list.
+A JSON object is excluded from `json` when any of its keys matches the Hermes wrapper envelope
+guard (`output`, `exit_code`, `diff`, `error`, `success`, `total_count`, `matches`,
+`matches_text`, `content`, `total_lines`, `result`, `message`, `found`, `preview`,
+`name`, `description`): those objects are wrappers whose payload lives inside,
+and the bridge unwraps them instead of previewing the key list.
 
 ## Proxy Heuristics
 
-The standalone proxy path classifies raw content with its own ladder, running
-the semantic detector between the code step and the error step:
+The standalone proxy path classifies raw content with its own ladder,
+running the semantic detector between the code step and the error step:
 
 1. JSON: `{`- or `[`-prefixed. Invalid JSON → `text`; contains `exit_code` or
    the quoted key `"status"` → `tool_output`; otherwise `json`
@@ -100,9 +102,10 @@ the semantic detector between the code step and the error step:
 
 ## Envelope Unwrap (Hermes Bridge)
 
-Before classification, the Hermes bridge extracts the meaningful payload from
-wrapper envelopes. The stored content is always the original bytes - the
-extracted payload is used only for classification and preview:
+Before classification, the Hermes bridge extracts the meaningful payload from wrapper envelopes.
+
+The stored content is always the original bytes - the extracted payload is used only
+for classification and preview:
 
 | Envelope                                | Extracted payload                          | Classified as                                                                                                                                                                                            |
 | --------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -111,9 +114,8 @@ extracted payload is used only for classification and preview:
 | `{total_count, matches / matches_text}` | One `path:line:content` row per real match | `search`                                                                                                                                                                                                 |
 | `{content, total_lines}`                | `content`                                  | Base classifier's verdict                                                                                                                                                                                |
 
-A caller-supplied `type` hint (from the tool schema) overrides the detected
-type. For JSON payloads the preview is built from the full stored content,
-never from an unwrap fragment.
+A caller-supplied `type` hint (from the tool schema) overrides the detected type.
+For JSON payloads the preview is built from the full stored content, never from an unwrap fragment.
 
 ## Complete Registry (30 Types)
 
@@ -163,11 +165,14 @@ before compression. Base is the floor for all types.
 | Tracked                               | `diff`, `git`, `text`                                    | ×2                              |
 | Default                               | `tool_output`, `json`, everything else                   | ×1                              |
 
-The code multiplier is configurable (`compression.code_multiplier` or
-`APHRODITE_CODE_MULTIPLIER`) and defaults to 3.0. Auto-tune adjusts the base
-from the historical compression-ratio EMA: ratio above 20 → ×2.0, ratio
-below 3 → ×0.5, otherwise ×1.0. The noisy group is exempt - build, lint, and
-log output stays fully visible because a coding session needs to read it.
+The code multiplier is configurable (`compression.code_multiplier`
+or `APHRODITE_CODE_MULTIPLIER`) and defaults to 3.0.
+
+Auto-tune adjusts the base from the historical compression-ratio EMA: ratio above 20 → ×2.0,
+ratio below 3 → ×0.5, otherwise ×1.0.
+
+The noisy group is exempt - build, lint, and log output stays fully visible
+because a coding session needs to read it.
 
 ## Detection Examples
 
@@ -222,8 +227,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored
 { "output": "error: could not compile `aphrodite`", "exit_code": 101 }
 ```
 
-→ unwrapped to the message, type=`build_error` (contains `error: could not`),
-threshold BASE
+→ unwrapped to the message, type=`build_error` (contains `error: could not`), threshold BASE
 
 ### Marker-shaped preview (the doubling regression, fixed in v1.3.4)
 
@@ -231,6 +235,7 @@ threshold BASE
 [text:[text:53L 1913B]]
 ```
 
-→ an already-self-describing preview re-wrapped in `render_marker`; the fix
-emits the preview exactly once (regression-tested). Shown here as the type
-catalog's known failure shape, sourced from CHANGELOG.md v1.3.4.
+→ an already-self-describing preview re-wrapped in `render_marker`;
+the fix emits the preview exactly once (regression-tested).
+
+Shown here as the type catalog's known failure shape, sourced from CHANGELOG.md v1.3.4.

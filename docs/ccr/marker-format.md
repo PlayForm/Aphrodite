@@ -1,9 +1,9 @@
 # CCR Marker Format
 
-CCR markers are compact strings that stand in for compressed content in an
-agent's context. Each marker carries the content's hash, type, and size plus
-a human-readable preview, so the reader can decide whether to retrieve the
-full content without expanding anything first.
+CCR markers are compact strings that stand in for compressed content in an agent's context.
+
+Each marker carries the content's hash, type, and size plus a human-readable preview,
+so the reader can decide whether to retrieve the full content without expanding anything first.
 
 ## Wire Format
 
@@ -19,19 +19,21 @@ The canonical marker line is the stable contract shared by every pipeline:
 | type  | Detected content type (see Content Types below)                  |
 | size  | Original content size in bytes                                   |
 
-Hashes are lowercase 40-character hex digests computed by
-`headroom_core::ccr::compute_key` (BLAKE3, truncated to 160 bits). Inline-only
-entries use an `i:` prefix followed by at least 6 hex characters. Every
-retrieval entry point tolerates a hash argument that carries a trailing
-`|type|size` suffix or surrounding whitespace - an agent sometimes echoes a
-whole marker back - and normalizes it before an exact-match lookup. There is
-no prefix or fuzzy matching: the full hash must be supplied.
+Hashes are lowercase 40-character hex digests computed by `headroom_core::ccr::compute_key`
+(BLAKE3, truncated to 160 bits).
+
+Inline-only entries use an `i:` prefix followed by at least 6 hex characters.
+
+Every retrieval entry point tolerates a hash argument that carries a trailing `|type|size` suffix
+or surrounding whitespace - an agent sometimes echoes a whole marker back - and normalizes it
+before an exact-match lookup.
+
+There is no prefix or fuzzy matching: the full hash must be supplied.
 
 ## Marker Layouts
 
-Two pipelines render markers. They share the same vocabulary but differ in
-layout: the proxy pipeline leads with the preview, the hook/FFI pipeline
-leads with the marker line.
+Two pipelines render markers. They share the same vocabulary but differ in layout:
+the proxy pipeline leads with the preview, the hook/FFI pipeline leads with the marker line.
 
 ### Proxy Pipeline
 
@@ -70,8 +72,7 @@ Built by `marker::render_marker` (`marker` module):
 
 ## Hash Extraction
 
-`marker::extract_hashes` recognizes three delimiter families, opened and
-closed independently:
+`marker::extract_hashes` recognizes three delimiter families, opened and closed independently:
 
 | Style    | Form                          |
 | -------- | ----------------------------- |
@@ -79,11 +80,11 @@ closed independently:
 | Bracket  | `[CCR:...]`                   |
 | Unicode  | `⧗CCR:...⧘` (U+2AF7 / U+2AF8) |
 
-The hash capture is anchored to hex characters (plus the `i:` prefix) and
-excludes newlines, so an unterminated marker can never capture downstream
-text - including other markers - as a bogus multi-line hash. Recursive marker
-expansion uses a separate ASCII-only scanner restricted to `<<<CCR:...>>>`
-forms.
+The hash capture is anchored to hex characters (plus the `i:` prefix) and excludes newlines,
+so an unterminated marker can never capture downstream text - including other markers -
+as a bogus multi-line hash.
+
+Recursive marker expansion uses a separate ASCII-only scanner restricted to `<<<CCR:...>>>` forms.
 
 ## Content Types
 
@@ -110,34 +111,37 @@ First-match-wins over the content (`proxy::proxy_detect_content_type`):
 | `log`          | A line has a bracketed `INFO`/`WARN`/`ERROR`/`DEBUG`/`TRACE`/`FATAL`/`PANIC` marker, or a timestamp-shaped line                               |
 | `text`         | Fallback: none of the above matched                                                                                                           |
 
-Code detection only runs on content with more than 3 lines. Invalid JSON
-starting with `{` or `[` is treated as `text`.
+Code detection only runs on content with more than 3 lines. Invalid JSON starting with `{`
+or `[` is treated as `text`.
 
 ### Semantic Detector
 
-`preview::detect_semantic_type` upgrades generic buckets
-(`text`/`terminal`/`log`) to a high-signal shape using conservative
-line-prefix and majority-vote rules: `json`, `test`, `diff`, `code`, `table`,
-`markdown`, `yaml`, `html`, `xml`, `csv`, `build`, `git`, `ls`, `grep`,
-`gitlog`. Hermes wrapper envelopes (objects carrying `output`/`exit_code`/
-`error`/`success`/`total_count`/`content`/`result`/`found`/`preview`-style
-keys) are deliberately excluded so their raw-JSON previews survive.
+`preview::detect_semantic_type` upgrades generic buckets (`text`/`terminal`/`log`)
+to a high-signal shape using conservative line-prefix and majority-vote rules: `json`,
+`test`, `diff`, `code`, `table`, `markdown`, `yaml`, `html`, `xml`, `csv`, `build`, `git`,
+`ls`, `grep`, `gitlog`.
+
+Hermes wrapper envelopes (objects carrying
+`output`/`exit_code`/
+`error`/`success`/`total_count`/`content`/`result`/`found`/`preview`-style keys)
+are deliberately excluded so their raw-JSON previews survive.
 
 ### Headroom Classifier
 
-The hook/FFI pipeline classifies via `headroom_core::transforms`, which
-yields exactly one of: `json_array`, `source_code`, `search`, `build`,
-`diff`, `html`, `text`. These strings are what appear as the `type` field in
-hook-pipeline markers.
+The hook/FFI pipeline classifies via `headroom_core::transforms`,
+which yields exactly one of: `json_array`, `source_code`, `search`, `build`, `diff`, `html`, `text`.
+
+These strings are what appear as the `type` field in hook-pipeline markers.
 
 ## Previews
 
-Previews are self-describing `[type:...]` strings built by
-`preview::build_preview`, shared by the proxy and hook paths. They carry
-decision-relevant facts rather than generic counts: error and warning lines
-are tallied line-by-line (never substring matches), the first real error
-message is surfaced, diffs name the changed files, test output shows
-pass/fail/ignored tallies, and JSON previews show item or key counts.
+Previews are self-describing `[type:...]` strings built by `preview::build_preview`, shared
+by the proxy and hook paths.
+
+They carry decision-relevant facts rather than generic counts: error
+and warning lines are tallied line-by-line (never substring matches),
+the first real error message is surfaced, diffs name the changed files,
+test output shows pass/fail/ignored tallies, and JSON previews show item or key counts.
 
 ### Preview Length Cap
 
@@ -149,13 +153,12 @@ The rendered preview is capped in characters when configured:
 | TOML `[previews] preview_max_chars` | Shipped default 0 (unlimited) |
 | Key absent                          | Unlimited (legacy behavior)   |
 
-Truncation is char-safe and preserves the closing `]` of a self-describing
-preview so downstream parsing keeps working.
+Truncation is char-safe and preserves the closing `]` of a self-describing preview
+so downstream parsing keeps working.
 
 ### Headroom-Budget Truncation
 
-The hook pipeline's `headroom_budget` parameter, when supplied, truncates the
-preview further:
+The hook pipeline's `headroom_budget` parameter, when supplied, truncates the preview further:
 
 | Budget        | Preview max      |
 | ------------- | ---------------- |
@@ -167,8 +170,7 @@ preview further:
 ### Sanitization
 
 Both pipelines sanitize preview and metadata text: newlines become spaces,
-control characters are stripped, and `|` in metadata values is replaced with
-`/`.
+control characters are stripped, and `|` in metadata values is replaced with `/`.
 
 ## Metadata Encoding Rules
 
@@ -180,5 +182,5 @@ control characters are stripped, and `|` in metadata values is replaced with
 | Total cap                | 400 chars                                   | 300 chars                 |
 | Truncation               | char-safe                                   | char-safe, `...` appended |
 
-Common keys: `lang`, `fns`, `structs`, `traits`, `impls`, `classes`,
-`types`, `path` (prefetch), `center`.
+Common keys: `lang`, `fns`, `structs`, `traits`, `impls`, `classes`, `types`,
+`path` (prefetch), `center`.

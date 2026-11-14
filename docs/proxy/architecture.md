@@ -1,19 +1,20 @@
 # Proxy Architecture
 
-Aphrodite ships a local reverse proxy that sits between any OpenAI-compatible
-client and an upstream LLM API. It forwards Chat Completions traffic,
-compresses eligible response content into CCR markers, serves identical
-requests from a response cache, relays tools on request, and exposes
-management endpoints for stats, retrieval, and CCR control. This page covers
-the listener model, shared state, routing, middleware, streaming, and
-lifecycle; the individual handlers are documented in
-[Handlers](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/handlers.md).
+Aphrodite ships a local reverse proxy that sits between any OpenAI-compatible client
+and an upstream LLM API.
+
+It forwards Chat Completions traffic, compresses eligible response content into CCR markers,
+serves identical requests from a response cache, relays tools on request,
+and exposes management endpoints for stats, retrieval, and CCR control.
+
+This page covers the listener model, shared state, routing, middleware, streaming,
+and lifecycle; the individual handlers are documented
+in [Handlers](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/handlers.md).
 
 ## Two-Listener Model
 
 A single binary can run two listeners with different roles - a cache proxy
-and a token proxy - each with its own `AppState` and CCR backend. Both bind to
-loopback by default.
+and a token proxy - each with its own `AppState` and CCR backend. Both bind to loopback by default.
 
 | Listener | Default port | CCR backend                       | Compression threshold | Tool relay  | Mode               |
 | -------- | ------------ | --------------------------------- | --------------------- | ----------- | ------------------ |
@@ -51,9 +52,10 @@ CLIENT ← response with upstream headers + X-Aphrodite-* headers
 
 ## AppState
 
-`AppState` is the shared per-listener state, wrapped in `Arc` and cloned into
-every handler. It holds the upstream client configuration, the CCR backend,
-and all counters and caches used by the hot paths.
+`AppState` is the shared per-listener state, wrapped in `Arc` and cloned into every handler.
+
+It holds the upstream client configuration, the CCR backend, and all counters and caches used
+by the hot paths.
 
 | Group                 | Contents                                                                                                                                                                                                                      |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -65,8 +67,8 @@ and all counters and caches used by the hot paths.
 | Mutex-protected state | 6 `Mutex` fields: `request_history` (last 50), `last_errors` (last 100), `compressions_by_type`, `inline_ccr` (1024-entry LRU), `response_cache` (128-entry LRU, TTL-stamped), `upstream_health_cache`                        |
 | Task tracking         | `TaskTracker` for background callbacks (tool relay, CCR notifications)                                                                                                                                                        |
 
-`tokens_saved` accumulates raw bytes saved (original minus replacement), never
-a token estimate; the name is kept for API compatibility.
+`tokens_saved` accumulates raw bytes saved (original minus replacement), never a token estimate;
+the name is kept for API compatibility.
 
 ## Routing Table
 
@@ -93,10 +95,11 @@ a token estimate; the name is kept for API compatibility.
 ## Management-Route Authentication
 
 When `APHRODITE_MGMT_TOKEN` is set, every "Loopback + mgmt token" route above
-requires `Authorization: Bearer <token>`. This closes a cross-site-write gap:
-a hostile local page could previously issue a CORS "simple request" that lands
-as a write (seed CCR entries, evict markers via `/reload`) even though it
-cannot read the reply.
+requires `Authorization: Bearer <token>`.
+
+This closes a cross-site-write gap: a hostile local page could previously issue a CORS
+"simple request" that lands as a write (seed CCR entries, evict markers via `/reload`) even
+though it cannot read the reply.
 
 | Property        | Behavior                                                                                                    |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -104,11 +107,11 @@ cannot read the reply.
 | Set             | Missing or wrong bearer token → 401                                                                         |
 | Exempt          | `/health` (external health checks), `/metrics` (Prometheus scrapers), and the LLM-proxying `/{*path}` route |
 
-Loopback enforcement adds a second layer beyond the peer-IP check: the `Host`
-header must name a loopback address (`localhost`, `127.0.0.1`, `[::1]`, `::1`).
-A missing or unparseable `Host` is rejected, not waved through - this blocks
-DNS-rebinding, where an attacker's hostname resolves to 127.0.0.1 and the
-browser genuinely is a loopback peer.
+Loopback enforcement adds a second layer beyond the peer-IP check:
+the `Host` header must name a loopback address (`localhost`, `127.0.0.1`, `[::1]`, `::1`).
+
+A missing or unparseable `Host` is rejected, not waved through - this blocks DNS-rebinding,
+where an attacker's hostname resolves to 127.0.0.1 and the browser genuinely is a loopback peer.
 
 ## Middleware Stack
 
@@ -121,8 +124,8 @@ browser genuinely is a loopback peer.
 
 ## Streaming (SSE)
 
-Requests whose body sets `"stream": true`, and upstream responses with
-`Content-Type: text/event-stream`, take a dedicated pass-through path:
+Requests whose body sets `"stream": true`, and upstream responses
+with `Content-Type: text/event-stream`, take a dedicated pass-through path:
 
 | Aspect         | Behavior                                                                                                                                                                                                                                         |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -146,10 +149,11 @@ HttpClient::builder()
     .build()
 ```
 
-A second `stream_client` is built with the same pool/keepalive tuning but no
-total timeout - see [Streaming (SSE)](#streaming-sse) above. The client is
-built without gzip/brotli auto-decompression, so `Accept-Encoding: gzip` from
-a caller is stripped rather than forwarded.
+A second `stream_client` is built with the same pool/keepalive tuning
+but no total timeout - see [Streaming (SSE)](#streaming-sse) above.
+
+The client is built without gzip/brotli auto-decompression, so `Accept-Encoding: gzip`
+from a caller is stripped rather than forwarded.
 
 ## Response Cache
 
@@ -182,12 +186,14 @@ Configuration resolution: env var > TOML (`[[proxies]]` entry over `[defaults]`)
 > CLI defaults. Config path resolution: `APHRODITE_CONFIG_PATH` →
 > `./aphrodite.toml` (CWD) → `~/.hermes/aphrodite/aphrodite.toml`.
 
-Each `[[proxies]]` entry spawns its own Tokio task with an independent
-`run_single()`. All listeners are bound before any server task spawns - a bind
-failure aborts startup loudly instead of leaving a silently dead listener. A
-shared `tokio::sync::watch` channel propagates the shutdown signal to all
-listeners, and a config-file watcher (500 ms debounce) applies `[compression]`
-threshold changes to every live `AppState`.
+Each `[[proxies]]` entry spawns its own Tokio task with an independent `run_single()`.
+
+All listeners are bound before any server task spawns - a bind failure aborts startup loudly
+instead of leaving a silently dead listener.
+
+A shared `tokio::sync::watch` channel propagates the shutdown signal to all listeners,
+and a config-file watcher (500 ms debounce) applies `[compression]` threshold changes
+to every live `AppState`.
 
 ## Worker Threads
 

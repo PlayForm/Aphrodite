@@ -1,6 +1,12 @@
 # Config Resolution Precedence
 
-Two independent resolution stacks share the same **env > TOML > default** precedence but live in different modules: the proxy's `MultiConfig::resolve`, which produces one `Cli` per listener, and the Hermes/FFI `Config` loader, whose `apply_compression` writes straight into `AphroditeState`. Both read the same `aphrodite.toml`; nearly the whole schema is consumed at runtime, with a small residual set that stays parsed-but-inert (`catalog_mode`, `code_structure_map`, `rust_preview_lines`, `classifier_poll`).
+Two independent resolution stacks share the same **env > TOML > default** precedence but live
+in different modules: the proxy's `MultiConfig::resolve`, which produces one `Cli` per listener,
+and the Hermes/FFI `Config` loader, whose `apply_compression` writes straight into `AphroditeState`.
+
+Both read the same `aphrodite.toml`; nearly the whole schema is consumed at runtime,
+with a small residual set that stays parsed-but-inert (`catalog_mode`,
+`code_structure_map`, `rust_preview_lines`, `classifier_poll`).
 
 ## Precedence flowchart
 

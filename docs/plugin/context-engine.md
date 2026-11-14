@@ -1,15 +1,16 @@
 # Context Engine
 
-The context engine is the dylib session's middle-turn archiver: when the
-conversation index fills up, it packs the middle turns into one compact CCR
-entry and replaces them with a single marker, so the model sees a short
-history (head + marker + tail) instead of a growing list of archived turns.
+The context engine is the dylib session's middle-turn archiver:
+when the conversation index fills up, it packs the middle turns into one compact CCR entry
+and replaces them with a single marker, so the model sees a short history (head + marker +
+tail) instead of a growing list of archived turns.
 
 The archive is **in-place but recoverable**: the middle turns are removed
-from Aphrodite's own conversation index and stored (BLAKE3-keyed) in the
-inline/CCR store, where `aphrodite_retrieve` can restore them. The engine
-never touches Hermes' message store - Hermes holds the raw conversation; the
-engine compacts Aphrodite's archived-turn index only.
+from Aphrodite's own conversation index and stored (BLAKE3-keyed) in the inline/CCR store,
+where `aphrodite_retrieve` can restore them.
+
+The engine never touches Hermes' message store - Hermes holds the raw conversation;
+the engine compacts Aphrodite's archived-turn index only.
 
 ## Activation
 
@@ -26,21 +27,22 @@ The plugin registers the engine instance only when explicitly requested:
 APHRODITE_CONTEXT_ENGINE=1
 ```
 
-Without the flag the plugin registers hooks and tools only and runs the
-hook + proxy path, and the dylib session never consults the engine. If
-registration fails (for example the host does not expose the `ContextEngine`
-base class), the plugin logs a warning and continues on the hook + proxy
-path - registration is best-effort, never fatal.
+Without the flag the plugin registers hooks and tools only and runs the hook + proxy path,
+and the dylib session never consults the engine.
 
-Hermes selects the registered engine by name; the plugin registers under the
-name `aphrodite`.
+If registration fails (for example the host does not expose the `ContextEngine` base class),
+the plugin logs a warning and continues on the hook + proxy path - registration is
+best-effort, never fatal.
+
+Hermes selects the registered engine by name; the plugin registers under the name `aphrodite`.
 
 ## What the engine does
 
-The engine runs inside the dylib session, triggered by the `pre_llm_call`
-context assembler each turn. All gates run **before any mutation**; when any
-gate fails the engine is a no-op and the session is byte-identical to an
-engine-less run.
+The engine runs inside the dylib session, triggered by the `pre_llm_call` context assembler
+each turn.
+
+All gates run **before any mutation**; when any gate fails the engine is a no-op
+and the session is byte-identical to an engine-less run.
 
 | Gate           | Condition for archiving                                                                           |
 | -------------- | ------------------------------------------------------------------------------------------------- |
@@ -66,14 +68,13 @@ When all gates pass:
    `[engine-offload: ...]` section - it is never dropped under budget
    pressure, because the archive already mutated the index.
 
-The marker is a normal CCR entry of type `context`: its `size` is the
-retrieval cost, and `aphrodite_retrieve` returns the packed JSON of the
-archived turns.
+The marker is a normal CCR entry of type `context`: its `size` is the retrieval cost,
+and `aphrodite_retrieve` returns the packed JSON of the archived turns.
 
 ## Engine configuration
 
-Settings resolve env > TOML > compiled default in the dylib session. The
-standalone HTTP proxy never reads them.
+Settings resolve env > TOML > compiled default in the dylib session. The standalone HTTP proxy
+never reads them.
 
 | Setting           | Env Var                          | TOML key                       | Compiled default | Shipped example |
 | ----------------- | -------------------------------- | ------------------------------ | ---------------- | --------------- |
@@ -83,10 +84,11 @@ standalone HTTP proxy never reads them.
 | Protect last N    | `APHRODITE_ENGINE_PROTECT_LAST`  | `engine_protect_last`          | 5                | 5               |
 | Min messages      | `APHRODITE_ENGINE_MIN_MSGS`      | `engine_min_msgs`              | 8                | 8               |
 
-Threshold semantics: `0` = never archive, `>= 100` = engine off (escape
-hatch), anything between = the fill percentage of the conversation index
-(`total * 100 / 50`) at or above which archiving triggers. Environment
-overrides TOML, which overrides the default.
+Threshold semantics: `0` = never archive, `>= 100` = engine off (escape hatch), anything
+between = the fill percentage of the conversation index (`total * 100 / 50`) at or above
+which archiving triggers.
+
+Environment overrides TOML, which overrides the default.
 
 ## See also
 

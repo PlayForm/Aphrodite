@@ -1,10 +1,11 @@
 # Proxy Retry
 
-Transient network failures to the upstream LLM API don't fail the entire
-request. A bounded retry loop with exponential backoff and jitter avoids both
-immediate failure and thundering-herd retry storms - but only failures that
-happen before the request reaches the upstream are retried, so a request the
-upstream may have accepted is never re-sent.
+Transient network failures to the upstream LLM API don't fail the entire request.
+
+A bounded retry loop with exponential backoff and jitter avoids both immediate failure
+and thundering-herd retry storms - but only failures that happen
+before the request reaches the upstream are retried, so a request the upstream may have accepted
+is never re-sent.
 
 ## Algorithm
 
@@ -45,17 +46,19 @@ let ms = (base_ms as f64 * jitter) as u64;
 
 ## Retry Scope
 
-**Only connect-phase failures** are retried - errors reqwest classifies as
-`is_connect()`, which means the request never left and resending is safe:
-connection refused, DNS resolution failure, TLS handshake error, and connect
-timeouts. Everything else fails fast on the first attempt.
+**Only connect-phase failures** are retried - errors reqwest classifies as `is_connect()`,
+which means the request never left and resending is safe: connection refused,
+DNS resolution failure, TLS handshake error, and connect timeouts.
 
-Why the narrow scope: a post-send request timeout (`e.is_timeout()` after the
-body was already transmitted) may have been accepted by the upstream. Blindly
-retrying a non-idempotent `POST /v1/chat/completions` risks double token
-billing, and combined with the 300s per-attempt timeout, 3 blind retries could
-hold a client for ~15 minutes. Non-connect errors now fail fast on the first
-attempt instead.
+Everything else fails fast on the first attempt.
+
+Why the narrow scope: a post-send request timeout (`e.is_timeout()`
+after the body was already transmitted) may have been accepted by the upstream.
+
+Blindly retrying a non-idempotent `POST /v1/chat/completions` risks double token billing,
+and combined with the 300s per-attempt timeout, 3 blind retries could hold a client for ~15 minutes.
+
+Non-connect errors now fail fast on the first attempt instead.
 
 | Retried (connect-phase) | Not Retried (fail fast)                      |
 | ----------------------- | -------------------------------------------- |
@@ -67,8 +70,7 @@ attempt instead.
 
 ## Final Failure
 
-After the retry budget is exhausted (or a non-connect error fails on the first
-attempt):
+After the retry budget is exhausted (or a non-connect error fails on the first attempt):
 
 - Increment `upstream_timeouts` when the final error is a timeout, otherwise
   increment `upstream_connect_errors` - the two counters are disjoint.
@@ -80,16 +82,17 @@ attempt):
 { "error": "upstream request failed" }
 ```
 
-The specific transport error is never sent to the client - `reqwest::Error`'s
-`Display` can embed the upstream URL/host, which would leak the configured
-`api_url` to whoever hit the proxy. The detail lives server-side in
-`last_errors`/`/stats` only.
+The specific transport error is never sent to the client - `reqwest::Error`'s `Display` can
+embed the upstream URL/host, which would leak the configured `api_url` to whoever hit the proxy.
+
+The detail lives server-side in `last_errors`/`/stats` only.
 
 ## Upstream Timeout
 
-Separate from retry: the HTTP client has a global timeout that applies to each
-individual attempt. A single slow request can consume up to `timeout` seconds
-before the retry mechanism (for connect-phase failures only) kicks in.
+Separate from retry: the HTTP client has a global timeout that applies to each individual attempt.
+
+A single slow request can consume up to `timeout` seconds before the retry mechanism
+(for connect-phase failures only) kicks in.
 
 ```rust
 .timeout(Duration::from_secs(cli.timeout))  // default 300s, max 600s
@@ -106,8 +109,10 @@ if t > 600 {
 ```
 
 **Streaming exemption**: `"stream": true` requests go out on a separate client
-with **no total timeout** - reqwest's client-level `.timeout()` bounds the
-whole request including the response body stream, which used to cut off
-legitimately slow but progressing SSE streams mid-answer. Hang protection for
-streams comes from `connect_timeout` + `tcp_keepalive` instead. See
-[Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#streaming-sse).
+with **no total timeout** - reqwest's client-level `.timeout()` bounds the whole request
+including the response body stream, which used to cut off legitimately slow
+but progressing SSE streams mid-answer.
+
+Hang protection for streams comes from `connect_timeout` + `tcp_keepalive` instead.
+
+See [Architecture: Streaming (SSE)](https://github.com/PlayForm/Aphrodite/tree/Development/docs/proxy/architecture.md#streaming-sse).

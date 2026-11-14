@@ -1,9 +1,11 @@
 # Examples
 
-Real tool results captured from live sessions against the Aphrodite 1.4.6
-binary, shown the way the model sees them: verbatim markers, rendered previews,
-and the byte economics of compression. Where the rest of the docs describe how
-the pieces work, the examples show what actually lands in a session's context.
+Real tool results captured from live sessions against the Aphrodite 1.4.6 binary,
+shown the way the model sees them: verbatim markers, rendered previews, and the byte economics
+of compression.
+
+Where the rest of the docs describe how the pieces work, the examples show what actually lands
+in a session's context.
 
 | Page                                      | What it shows                                                                                                                                                                      |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -11,8 +13,8 @@ the pieces work, the examples show what actually lands in a session's context.
 
 ## What the captures demonstrate
 
-The examples are organized by the behavior they exercise, mirroring the
-configuration knobs behind them:
+The examples are organized by the behavior they exercise,
+mirroring the configuration knobs behind them:
 
 | Behavior area               | Captured variants                                                                                                                                                                                                                             | Documented in                                                              |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -29,8 +31,8 @@ configuration knobs behind them:
 
 ## Token economics at a glance
 
-Real captured payloads and the marker-plus-preview block that replaced them in
-the relayed result (full details in [What the LLM Actually Sees](llm-view.md)):
+Real captured payloads and the marker-plus-preview block that replaced them
+in the relayed result (full details in [What the LLM Actually Sees](llm-view.md)):
 
 | Content             | Raw bytes | Marker + preview | Ratio |
 | ------------------- | --------- | ---------------- | ----- |
@@ -40,9 +42,8 @@ the relayed result (full details in [What the LLM Actually Sees](llm-view.md)):
 | Git diff            | 987       | ~114 chars       | ~9x   |
 | Build error (rustc) | 801       | ~117 chars       | ~7x   |
 
-The pattern behind every row: the model sees the shape and summary of the
-content for the price of a few hundred characters, and pays the full token
-cost only when it calls `aphrodite_retrieve`.
+The pattern behind every row: the model sees the shape and summary of the content for the price
+of a few hundred characters, and pays the full token cost only when it calls `aphrodite_retrieve`.
 
 ## Reading a marker
 
@@ -51,7 +52,8 @@ cost only when it calls `aphrodite_retrieve`.
 [preview line]
 ```
 
-The marker line names the stored entry (BLAKE3 hash, detected content type,
-original byte size); the preview line summarizes it. Retrieval by hash restores
-the original content byte-for-byte, and because hashing is content-addressed,
-the same output always produces the same marker.
+The marker line names the stored entry (BLAKE3 hash, detected content type, original byte size);
+the preview line summarizes it.
+
+Retrieval by hash restores the original content byte-for-byte, and
+because hashing is content-addressed, the same output always produces the same marker.

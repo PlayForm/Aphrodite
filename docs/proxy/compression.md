@@ -1,16 +1,18 @@
 # Compression Pipeline
 
-The proxy decides whether to compress each piece of Chat Completions response
-content, and if so, how. The pipeline detects content type, computes adaptive
-thresholds, stores the original content by hash, replaces it with a compact
-CCR marker, and tracks token savings. "Compression" here means the marker
-substitution in the model-facing response - the stored bytes are kept verbatim,
-not codec-compressed.
+The proxy decides whether to compress each piece of Chat Completions response content, and
+if so, how.
 
-Two sources update the compression-ratio EMA: the Chat Completions path
-(using the rendered marker length) and the direct `/ccr/create` endpoint
-(using a trigram-uniqueness heuristic for the compressed-size estimate), so
-`/stats` reflects the compressibility of everything flowing through the proxy.
+The pipeline detects content type, computes adaptive thresholds, stores the original content
+by hash, replaces it with a compact CCR marker, and tracks token savings.
+
+"Compression" here means the marker substitution in the model-facing response - the stored bytes
+are kept verbatim, not codec-compressed.
+
+Two sources update the compression-ratio EMA: the Chat Completions path (using the rendered
+marker length) and the direct `/ccr/create` endpoint (using a trigram-uniqueness heuristic
+for the compressed-size estimate), so `/stats` reflects the compressibility
+of everything flowing through the proxy.
 
 ## What Is Never Compressed
 
@@ -89,16 +91,17 @@ Two sources update the compression-ratio EMA: the Chat Completions path
              └─────────────┘               │
 ```
 
-A failed store put never produces a marker: the content is left uncompressed
-rather than swapped for an unresolvable hash.
+A failed store put never produces a marker: the content is left uncompressed rather than swapped
+for an unresolvable hash.
 
 ## 1. Content Type Detection
 
-`detect_content_type` classifies the content into one of the supported types
-(JSON/tool output, language-specific code, error, build output, linter, diff,
-git, log, text, plus semantic detection for git status / git log / ls / test /
-grep shapes). The full type taxonomy is documented in
-[CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md).
+`detect_content_type` classifies the content into one of the supported types (JSON/tool
+output, language-specific code, error, build output, linter, diff, git, log, text,
+plus semantic detection for git status / git log / ls / test / grep shapes).
+
+The full type taxonomy is documented in [CCR:
+Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md).
 
 ## 2. Threshold Computation
 
@@ -136,15 +139,13 @@ fn threshold_for(&self, ct: &str) -> usize {
 }
 ```
 
-The code multiplier is live-configurable (`[compression] code_multiplier` in
-the TOML, `APHRODITE_CODE_MULTIPLIER` env var, default 3.0) and applies to all
-code types.
+The code multiplier is live-configurable (`[compression] code_multiplier`
+in the TOML, `APHRODITE_CODE_MULTIPLIER` env var, default 3.0) and applies to all code types.
 
 ### Headroom Budget Adjustment
 
-The `x-headroom-budget` header (sent by Hermes from its own context-fill
-tracking) adjusts the threshold further. It is a smooth linear curve, never a
-step function:
+The `x-headroom-budget` header (sent by Hermes from its own context-fill tracking)
+adjusts the threshold further. It is a smooth linear curve, never a step function:
 
 ```rust
 let budget_mult = headroom_budget
@@ -157,10 +158,10 @@ let budget_mult = headroom_budget
 let threshold = (threshold_for(ct).max(base) as f64 * budget_mult) as usize;
 ```
 
-Budget values come from Hermes' own context-fill tracking, creating a feedback
-loop: the fuller the agent's context, the more aggressively the proxy
-compresses. The multiplier never drops below 0.5× - semantics and tool chains
-are worth the tokens.
+Budget values come from Hermes' own context-fill tracking, creating a feedback loop:
+the fuller the agent's context, the more aggressively the proxy compresses.
+
+The multiplier never drops below 0.5× - semantics and tool chains are worth the tokens.
 
 ## 3. Content-Addressable Hashing
 
@@ -171,9 +172,8 @@ pub fn compute_key(payload: &[u8]) -> String {
 }
 ```
 
-BLAKE3, first 40 hex chars (160 bits). Deterministic - same content always
-yields the same hash, so identical content is stored once and shared across
-requests and listeners.
+BLAKE3, first 40 hex chars (160 bits). Deterministic - same content always yields the same hash,
+so identical content is stored once and shared across requests and listeners.
 
 ## 4. CCR Cache
 
@@ -184,15 +184,19 @@ requests and listeners.
 
 ### Storage Is Verbatim (no codec)
 
-CCR backends store the original content bytes as-is - the "compression" is the
-marker substitution in the LLM-facing response, not a byte-level codec. See
-[CCR: Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/lifecycle.md) for the store/retrieve contract.
+CCR backends store the original content bytes as-is - the "compression" is the marker
+substitution in the LLM-facing response, not a byte-level codec.
+
+See [CCR: Lifecycle](https://github.com/PlayForm/Aphrodite/tree/Development/docs/ccr/lifecycle.md)
+for the store/retrieve contract.
 
 ## 5. Marker Generation
 
-Both modes render a three-line block: the preview line, a structure line
-(`[type: metadata]`), and the marker line. Cache mode uses a simpler form with
-no metadata; token mode carries structured metadata plus an enriched preview.
+Both modes render a three-line block: the preview line, a structure line (`[type: metadata]`),
+and the marker line.
+
+Cache mode uses a simpler form with no metadata; token mode carries structured metadata plus
+an enriched preview.
 
 ```
 {preview line}
@@ -205,25 +209,30 @@ no metadata; token mode carries structured metadata plus an enriched preview.
 | Cache | First 512 bytes of the content, raw      | None (empty structure line)                                                                             |
 | Token | Enriched, type-aware preview (see below) | `lang=rs`, `fns=main,init`, `ln=42`, `keys=status,error`, ... (pipe-safe `key=value;key=value`, capped) |
 
-Metadata is generated per content type: line counts (`ln=`), language tags
-(`lang=rs|py|go|js|gen`), function/struct names for code, JSON keys for JSON
-content, and more. Markers on their own line are easy for the model to scan
-and to pass back to `aphrodite_retrieve` verbatim.
+Metadata is generated per content type: line counts (`ln=`),
+language tags (`lang=rs|py|go|js|gen`), function/struct names for code, JSON keys
+for JSON content, and more.
+
+Markers on their own line are easy for the model to scan and to pass back
+to `aphrodite_retrieve` verbatim.
 
 ## Enriched Preview Catalog
 
-Every marker carries a compact, human-readable preview built by `build_preview`
-(`crates/aphrodite/src/preview.rs`). These enriched previews are **automatic
-and default** - no flag - and are emitted identically on both the proxy path
-and the Hermes hook/FFI path (both funnel through the same `build_preview`
-function).
+Every marker carries a compact, human-readable preview built
+by `build_preview` (`crates/aphrodite/src/preview.rs`).
 
-When the classifier only reaches a generic bucket (`text`/`terminal`/`log`/
-empty), a semantic detector (`detect_semantic_type`) upgraded the arm to a
-high-signal shape (git status, git log, grep, ls, test) before the preview
-was built. Detection is conservative (line-prefix / marker patterns, majority
-votes) so ordinary prose is never mis-tagged. An explicit non-generic type
-from the classifier is always honored as-is.
+These enriched previews are **automatic and default** - no flag - and are emitted identically
+on both the proxy path and the Hermes hook/FFI path (both funnel
+through the same `build_preview` function).
+
+When the classifier only reaches a generic bucket (`text`/`terminal`/`log`/ empty),
+a semantic detector (`detect_semantic_type`) upgraded the arm
+to a high-signal shape (git status, git log, grep, ls, test) before the preview was built.
+
+Detection is conservative (line-prefix / marker patterns, majority votes) so ordinary prose is
+never mis-tagged.
+
+An explicit non-generic type from the classifier is always honored as-is.
 
 | Content type                         | Enriched preview shape                                                          |
 | ------------------------------------ | ------------------------------------------------------------------------------- |
@@ -240,10 +249,14 @@ from the classifier is always honored as-is.
 | terminal (`terminal`)                | `[terminal:14L exit code: 0]` (exit-code / last-output-line context)            |
 | plain text / unrecognized (fallback) | `[text:3L 50B \| some unrecognizable prose here]` (first non-empty line)        |
 
-The rendered preview length is capped by `[previews] preview_max_chars`
-(`APHRODITE_PREVIEW_MAX_CHARS` env var, applied end-to-end including
-config reload). See also
-[CCR: Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md) for the underlying type taxonomy.
+The rendered preview length is capped by `[previews]
+preview_max_chars` (`APHRODITE_PREVIEW_MAX_CHARS` env var,
+applied end-to-end including config reload).
+
+See also [CCR:
+Content
+Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
+for the underlying type taxonomy.
 
 ## 6. EMA Update
 
@@ -287,8 +300,7 @@ Higher compression ratio → lower fill → more headroom available.
 
 ## 7. Token Savings Tracking
 
-Savings are raw bytes throughout (the counter keeps its `tokens_saved` name
-for API compatibility):
+Savings are raw bytes throughout (the counter keeps its `tokens_saved` name for API compatibility):
 
 ```rust
 state.tokens_saved.fetch_add(
@@ -297,10 +309,11 @@ state.tokens_saved.fetch_add(
 );
 ```
 
-The subtractee is the rendered marker length (hundreds of chars), never the
-bare 40-char hash - the marker is far longer than the hash, so subtracting
-`hash.len()` would overstate savings. Response-cache hits add the whole cached
-body length:
+The subtractee is the rendered marker length (hundreds of chars),
+never the bare 40-char hash - the marker is far longer than the hash,
+so subtracting `hash.len()` would overstate savings.
+
+Response-cache hits add the whole cached body length:
 
 ```rust
 state.tokens_saved.fetch_add(cached_body.len() as u64, Ordering::Relaxed);
@@ -308,10 +321,9 @@ state.tokens_saved.fetch_add(cached_body.len() as u64, Ordering::Relaxed);
 
 ## 8. Inline Store (Below Threshold, Above Inline Threshold)
 
-Content that is below the compression threshold but above the inline threshold
-(256 bytes by default, live-configurable) goes into `inline_ccr` - a 1024-entry
-in-memory LRU - so later retrievals find small entries without a backend
-round-trip:
+Content that is below the compression threshold but above the inline threshold (256 bytes
+by default, live-configurable) goes into `inline_ccr` - a 1024-entry in-memory LRU -
+so later retrievals find small entries without a backend round-trip:
 
 ```rust
 let hash = compute_key(content.as_bytes());
@@ -323,8 +335,8 @@ if map.contains(&hash) {
 }
 ```
 
-The tool-relay `aphrodite_compress` path stores inline content to the durable
-backend as well, so the entry survives inline-LRU eviction and proxy restarts.
+The tool-relay `aphrodite_compress` path stores inline content to the durable backend as well,
+so the entry survives inline-LRU eviction and proxy restarts.
 
 ## Auto-Tune State Machine
 
@@ -364,11 +376,13 @@ Initial values at startup:
 
 ## Chain-Split (Hermes Plugin Side)
 
-Chain-split is a Hermes plugin-side feature, not a proxy one: `pre_tool_call`
-rewrites chained shell commands (`cd x && cargo build && cargo test`) by
-echoing segment markers to stderr, and `transform_tool_result` splits the
-produced output into per-segment pieces so each segment was compressed
-independently (`[chain:3 | build ...]` previews). It is opt-in
-(`chain_split = false` by default), and constructs that would corrupt control
-flow (heredocs, loops spanning segments) are left untouched. The proxy itself
-only ever sees Chat Completions responses and never performs chain splitting.
+Chain-split is a Hermes plugin-side feature, not a proxy one:
+`pre_tool_call` rewrites chained shell commands (`cd x && cargo build && cargo test`)
+by echoing segment markers to stderr, and `transform_tool_result` splits the produced output
+into per-segment pieces so each segment was compressed independently (`[chain:3 | build
+...]` previews).
+
+It is opt-in (`chain_split = false` by default), and constructs
+that would corrupt control flow (heredocs, loops spanning segments) are left untouched.
+
+The proxy itself only ever sees Chat Completions responses and never performs chain splitting.

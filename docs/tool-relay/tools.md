@@ -1,11 +1,13 @@
 # Tool Relay Tools
 
-Aphrodite exposes 13 tools to the Hermes agent for compression, retrieval,
-stats, and session management. Every tool is a thin relay into the Rust dylib:
-the plugin registers each tool from the dylib's schema list (toolset
-`aphrodite`), and every call dispatches through `aphrodite_hermes_dispatch_tool`
-and returns the JSON result verbatim. There is no separate Python-side tool
-logic to know about.
+Aphrodite exposes 13 tools to the Hermes agent for compression, retrieval, stats,
+and session management.
+
+Every tool is a thin relay into the Rust dylib: the plugin registers each tool
+from the dylib's schema list (toolset `aphrodite`), and every call dispatches
+through `aphrodite_hermes_dispatch_tool` and returns the JSON result verbatim.
+
+There is no separate Python-side tool logic to know about.
 
 > **Schema detail lives in the schema, not here.** Each registered
 > `description` documents its own return shape, and every parameter carries a
@@ -33,13 +35,14 @@ logic to know about.
 | 12  | `aphrodite_prefetch_status` | Live prefetch schedule - what is loaded and ready    |
 | 13  | `aphrodite_rebuild`         | Report binary and proxy state (never rebuilds)       |
 
-All handlers share one session store, so content compressed by a hook or by
-`aphrodite_compress` stays resolvable by `aphrodite_retrieve` for the life of
-the session. The one caveat: markers do not survive a session restart - the
-dylib is loaded once per process, so a new session starts a fresh store.
-There is also an internal 14th registry entry,
-`context_engine_pre_llm` - the context engine's own pre-LLM hook, not a tool an
-agent calls directly.
+All handlers share one session store, so content compressed by a hook or
+by `aphrodite_compress` stays resolvable by `aphrodite_retrieve` for the life of the session.
+
+The one caveat: markers do not survive a session restart - the dylib is loaded once per process,
+so a new session starts a fresh store.
+
+There is also an internal 14th registry entry, `context_engine_pre_llm` - the context engine's
+own pre-LLM hook, not a tool an agent calls directly.
 
 ## 1. aphrodite_compress
 
@@ -71,10 +74,14 @@ agent calls directly.
 }
 ```
 
-Detects a content type automatically unless a `type` hint is given (a hint of
-`"text"` is treated as no hint). Hashes and stores the content, then returns
-`{hash, type, size, preview, marker}`. The marker is what goes into context
-instead of the content; see [Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
+Detects a content type automatically unless a `type` hint is given (a hint of `"text"` is treated
+as no hint).
+
+Hashes and stores the content, then returns `{hash, type, size, preview, marker}`.
+
+The marker is what goes into context instead of the content;
+see [Content
+Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
 for the taxonomy behind the type field.
 
 ## 2. aphrodite_retrieve
@@ -111,13 +118,12 @@ for the taxonomy behind the type field.
 | `hash` given | Resolves the marker from the session store; nested markers are expanded recursively. Truncated hashes never resolve - exact match only                                      |
 | `query` set  | Filters the result to matching lines (case-insensitive substring)                                                                                                           |
 
-Returns `{found: true, source: "path"|"ccr", hash|path, content}` or
-`{found: false, error}`.
+Returns `{found: true, source: "path"|"ccr", hash|path, content}` or `{found: false, error}`.
 
 ## 3. aphrodite_stats
 
-Takes no arguments. One call covers both halves of the system: session state
-held by the dylib, and a live TCP poll of the two proxy ports.
+Takes no arguments. One call covers both halves of the system: session state held by the dylib,
+and a live TCP poll of the two proxy ports.
 
 ```json
 {
@@ -143,26 +149,31 @@ held by the dylib, and a live TCP poll of the two proxy ports.
 }
 ```
 
-The `chain_split_*` fields are telemetry for the opt-in chain-split CCR engine
-(`chain_split = true` in `aphrodite.toml`); they stay in the response even when
-the engine is off. `proxies` reflects a live TCP poll of the two configured
-proxy ports (400ms timeout; ports come from `APHRODITE_TOKEN_PORT` /
-`APHRODITE_CACHE_PORT`, defaulting to 9797/9798). `alive: false` means nothing
-answered on that port - the plugin still works, it just is not proxying.
+The `chain_split_*` fields are telemetry for the opt-in chain-split CCR engine (`chain_split =
+true` in `aphrodite.toml`); they stay in the response even when the engine is off.
+
+`proxies` reflects a live TCP poll of the two configured proxy ports (400ms timeout; ports come
+from `APHRODITE_TOKEN_PORT` / `APHRODITE_CACHE_PORT`, defaulting to 9797/9798).
+
+`alive: false` means nothing answered on that port - the plugin still works, it just is
+not proxying.
 
 ## 4. aphrodite_files
 
-Takes no arguments. Lists every file path referenced in the current session;
-tool hooks populate it as reads, writes, and prefetches happen, so it doubles
-as a record of what has already been looked at. Returns
-`{total, files: [{path, tool}]}` where `tool` is the tool that first referenced
-the path.
+Takes no arguments.
+
+Lists every file path referenced in the current session; tool hooks populate it as reads,
+writes, and prefetches happen, so it doubles as a record of what has already been looked at.
+
+Returns `{total, files: [{path, tool}]}` where `tool` is the tool that first referenced the path.
 
 ## 5. aphrodite_diff
 
-Takes no arguments. Walks the archived conversation index in turn order, one
-entry per turn that produced a compression. Returns
-`{total, turns: [{turn, hash, summary, size}]}`; each `hash` is resolvable
+Takes no arguments.
+
+Walks the archived conversation index in turn order, one entry per turn that produced a compression.
+
+Returns `{total, turns: [{turn, hash, summary, size}]}`; each `hash` is resolvable
 through `aphrodite_retrieve`.
 
 ## 6. aphrodite_search
@@ -229,9 +240,11 @@ Matches case-insensitively against each entry's preview line and CCR type only
 | `remove` | Drop one directive from the active set                                       | `{active}`                       |
 | `reset`  | Clear actives, ephemerals, and the manual latch; back to automatic selection | `{active}`                       |
 
-An unknown directive name returns `{error}` and changes nothing. The
-`pre_llm_call` hook injects active directive bodies into every turn -
-see [Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md)
+An unknown directive name returns `{error}` and changes nothing.
+
+The `pre_llm_call` hook injects active directive bodies
+into every turn - see
+[Directives](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/directives.md)
 for the full mechanism.
 
 ## 8. aphrodite_test
@@ -255,11 +268,15 @@ for the full mechanism.
 }
 ```
 
-Compresses built-in samples in-process and checks that each round-trips
-byte-identical, then reports proxy health alongside. `status` is `"ok"` only
-when every check passed. Returns
-`{mode, status: "ok"|"fail", passed, total, checks: [{type, hash, roundtrip}], proxies}`.
-This is the same tool [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
+Compresses built-in samples in-process and checks that each round-trips byte-identical,
+then reports proxy health alongside.
+
+`status` is `"ok"` only when every check passed.
+
+Returns `{mode, status: "ok"|"fail", passed, total, checks: [{type, hash, roundtrip}], proxies}`.
+
+This is the same
+tool [Troubleshooting](https://github.com/PlayForm/Aphrodite/tree/Development/docs/install/troubleshooting.md#verify-the-proxy-without-hermes)
 points to for confirming things work without a full Hermes session.
 
 ## 9. aphrodite_catalog
@@ -283,10 +300,12 @@ points to for confirming things work without a full Hermes session.
 }
 ```
 
-The complete inventory, newest first - unlike `aphrodite_search` it filters
-nothing. `mode: "toc"` returns `{hash, type, size, preview}` per entry; the
-default full mode adds `{turn, center}` (the `_ccr_center` label from compress
-time). Returns `{mode, total, turn, items: [...]}`.
+The complete inventory, newest first - unlike `aphrodite_search` it filters nothing.
+
+`mode: "toc"` returns `{hash, type, size, preview}` per entry;
+the default full mode adds `{turn, center}` (the `_ccr_center` label from compress time).
+
+Returns `{mode, total, turn, items: [...]}`.
 
 ## 10. aphrodite_reclassify
 
@@ -337,35 +356,46 @@ reclassify every entry in the session. Returns `{status: "ok", reclassified:
 ```
 
 Despite the name this is synchronous: the tool reads and compresses every path
-before the call returns, so each returned hash is immediately resolvable through
-`aphrodite_retrieve`. One marker per file, no file bodies in context.
-The tool skips oversized files rather than truncating them, and a batch larger
-than the inline-store budget evicts older entries (including ones from the
-same batch).
-Returns `{total, loaded, skipped_size, missing, inline_store_bytes,
-inline_store_byte_budget, results: [{path, status: "loaded"|"skipped"|"missing",
-hash, type, size, preview, reason}]}`.
+before the call returns, so each returned hash
+is immediately resolvable through `aphrodite_retrieve`.
+
+One marker per file, no file bodies in context.
+
+The tool skips oversized files rather than truncating them,
+and a batch larger than the inline-store budget evicts older entries (including ones from the same
+batch).
+
+Returns `{total, loaded, skipped_size, missing, inline_store_bytes, inline_store_byte_budget,
+results: [{path, status: "loaded"|"skipped"|"missing", hash, type, size, preview, reason}]}`.
 
 ## 12. aphrodite_prefetch_status
 
-Takes no arguments. Because prefetch is synchronous, everything it loads is
-already `ready` by the time the call returns - `loading` and `errors` are
-always empty. Returns
-`{loading: [], ready: [{path, hash, type, size}], errors: [], total_ready}`.
+Takes no arguments.
+
+Because prefetch is synchronous, everything it loads
+is already `ready` by the time the call returns - `loading` and `errors` are always empty.
+
+Returns `{loading: [], ready: [{path, hash, type, size}], errors: [], total_ready}`.
 
 ## 13. aphrodite_rebuild
 
-Takes no arguments. Reports state rather than performing a rebuild - the dylib
-cannot safely rebuild itself mid-session. Returns
-`{status: "ok", version, proxies, hint: "rebuild via `cargo build --release -p
-aphrodite`; restart the Hermes session to pick up the new dylib"}`.
+Takes no arguments.
+
+Reports state rather than performing a rebuild - the dylib cannot safely rebuild itself mid-session.
+
+Returns `{status: "ok", version, proxies, hint: "rebuild via `cargo build --release -p aphrodite`;
+restart the Hermes session to pick up the new dylib"}`.
 
 ## Content-type hints
 
-`aphrodite_compress`'s `type` hint accepts `code`, `log`, `diff`, `error`,
-`json`, `build_output`, or `text`. A hint of `"text"` (or an empty hint) is
-treated as no hint - the type is auto-detected instead. `aphrodite_search`'s
-`type` filter matches the same taxonomy (e.g. `source_code`, `terminal`,
-`build_output`, `diff`, `json`, `search`, `text`). See
-[Content Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
+`aphrodite_compress`'s `type` hint accepts `code`, `log`, `diff`, `error`, `json`, `build_output`,
+or `text`.
+
+A hint of `"text"` (or an empty hint) is treated as no hint - the type is auto-detected instead.
+
+`aphrodite_search`'s `type` filter matches the same taxonomy (e.g. `source_code`, `terminal`,
+`build_output`, `diff`, `json`, `search`, `text`).
+
+See [Content
+Types](https://github.com/PlayForm/Aphrodite/tree/Development/docs/classification/content-types.md)
 for the full classification reference.

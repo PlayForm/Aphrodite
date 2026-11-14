@@ -1,10 +1,11 @@
 # Prometheus Metrics
 
 All proxy operations expose counters, gauges, and histograms at `GET /metrics`
-in the Prometheus text exposition format, for monitoring, alerting, and
-dashboards. This page is the full metric catalog - see
-[Metrics Endpoint](../api/metrics-endpoint.md) for the endpoint behavior and
-raw output shape, and [Metrics Queries](queries.md) for ready-made PromQL.
+in the Prometheus text exposition format, for monitoring, alerting, and dashboards.
+
+This page is the full metric catalog - see [Metrics Endpoint](../api/metrics-endpoint.md)
+for the endpoint behavior and raw output shape, and [Metrics Queries](queries.md)
+for ready-made PromQL.
 
 ## Endpoint
 
@@ -42,11 +43,13 @@ or reverse-proxy auth layer recommended for production.
 | `aphrodite_ccr_store_entries` | gauge   | -      | Live row count from the backend (`len()`, O(1))     |
 | `aphrodite_ccr_store_bytes`   | gauge   | -      | Live stored payload bytes (`SUM(LENGTH(original))`) |
 
-Both store gauges are read from the live backend on every scrape - they are not
-atomics the proxy increments. `bytes_approx` is the field name `/stats` has
-always used for the byte total; the value behind it is the exact
-`SUM(LENGTH(original))`, so it no longer approximates anything. `fill_pct` on
-`/health` is a different number: compression headroom, not store occupancy.
+Both store gauges are read from the live backend on every scrape - they are
+not atomics the proxy increments.
+
+`bytes_approx` is the field name `/stats` has always used for the byte total;
+the value behind it is the exact `SUM(LENGTH(original))`, so it no longer approximates anything.
+
+`fill_pct` on `/health` is a different number: compression headroom, not store occupancy.
 
 ### Tool Relay
 
@@ -112,9 +115,10 @@ See [Callbacks](../tool-relay/callbacks.md) for how these are triggered.
 
 ## Retention and Eviction Telemetry
 
-The retention caps and the eviction counter are **not** Prometheus metrics -
-they live on `/stats/db` (SQLite backend only), which is why the catalog above
-stays at 28 names. Scrape `/stats/db` to alert on a store sitting at its cap:
+The retention caps and the eviction counter are **not** Prometheus metrics - they live
+on `/stats/db` (SQLite backend only), which is why the catalog above stays at 28 names.
+
+Scrape `/stats/db` to alert on a store sitting at its cap:
 
 | `/stats/db` field | Meaning                                                             |
 | ----------------- | ------------------------------------------------------------------- |
@@ -123,11 +127,11 @@ stays at 28 names. Scrape `/stats/db` to alert on a store sitting at its cap:
 | `evicted_total`   | Rows evicted by cap enforcement since the store was opened          |
 | `freelist_bytes`  | Pages freed by purge and eviction that the file still holds         |
 
-A store that sits at `max_entries` or `max_bytes` is working as configured, not
-failing: eviction is a cache policy, so an evicted hash is a retrieval miss
-exactly like an expired one. `evicted_total` climbing steadily while
-`total_entries` holds flat is the signal that the cap, not the TTL, is what is
-reclaiming the store.
+A store that sits at `max_entries` or `max_bytes` is working as configured, not failing:
+eviction is a cache policy, so an evicted hash is a retrieval miss exactly like an expired one.
+
+`evicted_total` climbing steadily while `total_entries` holds flat is the signal that the cap,
+not the TTL, is what is reclaiming the store.
 
 ## Latency Bucket Boundaries
 
@@ -141,11 +145,12 @@ Latency is tracked in 5 fixed buckets, each holding a cumulative count:
 | 3            | 1.0      | 100ms - 1s        |
 | 4            | +Inf     | >= 1s (unbounded) |
 
-Buckets are cumulative in the output, as the format requires: each bucket's
-count includes all observations from lower buckets. The last bucket is labeled
-`+Inf`, not `10.0` - it catches every sample at or above 1s (including long
-outliers), and the explicit `+Inf` bucket is what makes
-`histogram_quantile()` work at all.
+Buckets are cumulative in the output, as the format requires:
+each bucket's count includes all observations from lower buckets.
+
+The last bucket is labeled `+Inf`, not `10.0` - it catches every sample at
+or above 1s (including long outliers), and the explicit `+Inf` bucket is what
+makes `histogram_quantile()` work at all.
 
 ## Example Output
 
@@ -187,8 +192,7 @@ aphrodite_upstream_latency_seconds_total 180.000000
 
 ## /stats JSON Schema
 
-`/metrics` is built from the same underlying stats as `/stats`, which returns
-the full JSON object:
+`/metrics` is built from the same underlying stats as `/stats`, which returns the full JSON object:
 
 ```json
 {
@@ -229,20 +233,21 @@ the full JSON object:
 }
 ```
 
-`compression_ratio_ema` is stored at x100 precision in the proxy and divided
-by 100 for output.
+`compression_ratio_ema` is stored at x100 precision in the proxy and divided by 100 for output.
 
 ## Endpoint: /stats
 
-Loopback only, plus `Authorization: Bearer <token>` when
-`APHRODITE_MGMT_TOKEN` is set (`/metrics` itself stays exempt so scrapers keep
-working). Returns the JSON object above directly. Also serves `/history` for
-the request-history array alone.
+Loopback only, plus `Authorization: Bearer <token>` when `APHRODITE_MGMT_TOKEN` is set
+(`/metrics` itself stays exempt so scrapers keep working).
+
+Returns the JSON object above directly.
+
+Also serves `/history` for the request-history array alone.
 
 ## Endpoint: /stats/db
 
-Database-level stats, available only for the SQLite (token-mode) backend -
-the in-memory backend has no database to report:
+Database-level stats, available only for the SQLite (token-mode)
+backend - the in-memory backend has no database to report:
 
 ```json
 {
@@ -258,13 +263,16 @@ the in-memory backend has no database to report:
 }
 ```
 
-`total_bytes_compressed` is an estimate (24 bytes per entry, matching the
-40-char BLAKE3 hex prefix used as the CCR key); originals are stored
-uncompressed. `max_entries` / `max_bytes` echo the configured caps and are
-`null` when the cap is unlimited (`store_max_entries` / `store_max_bytes` =
-`0`). `evicted_total` counts rows evicted by cap enforcement since this store
-was opened, so it resets on restart. `freelist_bytes` is the reclaimable slack
-the file still holds after purge and eviction. When the backend is in-memory or
-CCR is disabled, the endpoint still returns HTTP 200 with
-`{"error": "stats_db not available for this backend" | "CCR not enabled",
-"mode": ...}`.
+`total_bytes_compressed` is an estimate (24 bytes per entry,
+matching the 40-char BLAKE3 hex prefix used as the CCR key); originals are stored uncompressed.
+
+`max_entries` / `max_bytes` echo the configured caps and are `null`
+when the cap is unlimited (`store_max_entries` / `store_max_bytes` = `0`).
+
+`evicted_total` counts rows evicted by cap enforcement since this store was opened, so it resets
+on restart.
+
+`freelist_bytes` is the reclaimable slack the file still holds after purge and eviction.
+
+When the backend is in-memory or CCR is disabled, the endpoint still returns HTTP 200
+with `{"error": "stats_db not available for this backend" | "CCR not enabled", "mode": ...}`.

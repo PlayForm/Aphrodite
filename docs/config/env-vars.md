@@ -1,16 +1,28 @@
 # Environment Variables
 
-Aphrodite reads a set of `APHRODITE_*` environment variables (plus a few non-prefixed ones) across three surfaces: the Rust proxy, the `aphrodite setup` subcommand, and the Hermes-plugin dylib session.
-This page lists every variable with a live reader, what precedence applies, and what it gates.
-Variables with no reader anywhere are listed at the bottom under "Documented but currently inactive" - setting those is a silent no-op.
+Aphrodite reads a set of `APHRODITE_*` environment variables (plus a few non-prefixed ones)
+across three surfaces: the Rust proxy, the `aphrodite setup` subcommand,
+and the Hermes-plugin dylib session.
 
-Precedence rule: where it says "env > TOML > default", the env var wins if set and parses; otherwise the matching `aphrodite.toml` key wins if present; otherwise the compiled-in default applies.
-A present-but-malformed value (e.g. `APHRODITE_CCR_TTL=abc`) is never silently treated as absent - it logs a warning and falls through to the next precedence level.
-Boolean env vars share one truthiness rule everywhere: `"1"` / `"true"` (case-insensitive) is true; anything else present, or absent, is false.
+This page lists every variable with a live reader, what precedence applies, and what it gates.
+
+Variables with no reader anywhere are listed at the bottom under "Documented
+but currently inactive" - setting those is a silent no-op.
+
+Precedence rule: where it says "env > TOML > default", the env var wins if set and parses;
+otherwise the matching `aphrodite.toml` key wins if present;
+otherwise the compiled-in default applies.
+
+A present-but-malformed value (e.g. `APHRODITE_CCR_TTL=abc`) is never silently treated
+as absent - it logs a warning and falls through to the next precedence level.
+
+Boolean env vars share one truthiness rule everywhere: `"1"` / `"true"` (case-insensitive)
+is true; anything else present, or absent, is false.
 
 ## Rust proxy - multi-proxy mode (aphrodite.toml present)
 
-Resolution lives in the multi-proxy config resolver; per-proxy TOML values beat `[defaults]`, and env beats both.
+Resolution lives in the multi-proxy config resolver; per-proxy TOML values beat `[defaults]`,
+and env beats both.
 
 | Variable                          | Precedence                                                        | Default (no override)                            | Effect                                                                                                       |
 | --------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -33,9 +45,19 @@ Resolution lives in the multi-proxy config resolver; per-proxy TOML values beat 
 | `APHRODITE_AUTO_EXPAND_LIMIT`     | env > `[compression]` > const                                     | `102400` bytes                                   | Byte cap for auto-expanded content                                                                           |
 | `APHRODITE_MAX_REQUEST_BODY_SIZE` | env > `[compression]` > const                                     | none (no cap)                                    | Proxy request-body cap in bytes; over-size bodies are rejected with 413 while being read (startup-only)      |
 
-`APHRODITE_MODE` / `APHRODITE_LISTEN` are deliberately **not** honored in multi-proxy mode - a single process-wide value would incorrectly apply to every `[[proxies]]` entry at once and break the cache/token split. Use per-proxy TOML `mode` / `listen` (or the two port vars above) instead; they work in CLI-fallback mode only.
+`APHRODITE_MODE` / `APHRODITE_LISTEN` are deliberately **not** honored
+in multi-proxy mode - a single process-wide value would incorrectly apply
+to every `[[proxies]]` entry at once and break the cache/token split.
 
-The threshold/multiplier vars, plus `auto_expand` / `auto_expand_limit`, are also what `POST /reload` and the config-file watcher re-resolve and apply live to a running proxy. `max_request_body_size` is the exception: it is resolved at startup only (a `/reload` echoes it but cannot change a live cap).
+Use per-proxy TOML `mode` / `listen` (or the two port vars above) instead; they work
+in CLI-fallback mode only.
+
+The threshold/multiplier vars, plus `auto_expand` / `auto_expand_limit`,
+are also what `POST /reload` and the config-file watcher re-resolve and apply live
+to a running proxy.
+
+`max_request_body_size` is the exception: it is resolved at startup only (a `/reload` echoes it
+but cannot change a live cap).
 
 ## Rust proxy - either mode
 
@@ -49,14 +71,16 @@ The threshold/multiplier vars, plus `auto_expand` / `auto_expand_limit`, are als
 
 ## Rust proxy - CLI-fallback mode only (no aphrodite.toml present)
 
-The env-attributed CLI fields above (`API_URL`, `MODEL`, `API_KEY`, `CCR_TTL`, `DB`, `NOTIFY_URL`, `NOTIFY_KEY`, `LOG_COMPACT`) all work here via clap directly, PLUS:
+The env-attributed CLI fields above (`API_URL`, `MODEL`, `API_KEY`, `CCR_TTL`, `DB`,
+`NOTIFY_URL`, `NOTIFY_KEY`, `LOG_COMPACT`) all work here via clap directly, PLUS:
 
 | Variable           | Default          | Effect                         |
 | ------------------ | ---------------- | ------------------------------ |
 | `APHRODITE_MODE`   | `token`          | Proxy mode (`cache` / `token`) |
 | `APHRODITE_LISTEN` | `127.0.0.1:9797` | Bind address                   |
 
-`max_context`, `max_output`, `tool_relay`, `dev`, `timeout`, and `no_ccr_marker` are flag-only in CLI mode - they have no env var.
+`max_context`, `max_output`, `tool_relay`, `dev`, `timeout`, and `no_ccr_marker` are flag-only
+in CLI mode - they have no env var.
 
 ## `aphrodite setup`
 
@@ -72,7 +96,11 @@ The setup subcommand accepts these as flags or env vars (clap `env` attributes):
 
 ## Hermes plugin / aphrodite-hermes dylib
 
-The dylib initializes its session state from `aphrodite.toml` (searching `./aphrodite.toml` then `~/.hermes/aphrodite/aphrodite.toml`), with env vars on top - a **separate** resolution path from the Rust proxy above, feeding the Hermes hook/tool-dispatch session rather than the HTTP proxy.
+The dylib initializes its session state from `aphrodite.toml` (searching `./aphrodite.toml`
+then `~/.hermes/aphrodite/aphrodite.toml`), with env vars
+on top - a **separate** resolution path from the Rust proxy above,
+feeding the Hermes hook/tool-dispatch session rather than the HTTP proxy.
+
 The Python plugin reads a few vars of its own at registration time.
 
 | Variable                                        | Precedence                         | Default                                                      | Effect                                                                                                                                                                                                                                                                                |
@@ -110,21 +138,36 @@ The Python plugin reads a few vars of its own at registration time.
 | `REPO`                                          | release repository                 | `PlayForm/Aphrodite`                                         | Which GitHub repo `download.sh` fetches release assets from                                                                                                                                                                                                                           |
 | `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT` | same as the Rust proxy table above | `9797` / `9798`                                              | Proxy health-poll and the dylib's own port resolution; malformed values warn and fall back                                                                                                                                                                                            |
 
-The plugin exports `APHRODITE_HOME` (its resolved runtime home - the single
-decision, so the dylib and the spawned proxy binary agree) and
-`APHRODITE_DIRECTIVES_DIR` (pointing at `<runtime-home>/directives`) into the
-environment it manages. The startup log prints the resolved home and its
-source (`runtime home: <path> (decided by ...)`); on an upgrade the pre-2.2
-`~/.hermes/aphrodite` home is adopted (with a warning) when it holds the
-existing install and the Hermes-home-derived one does not.
+The plugin exports `APHRODITE_HOME` (its resolved runtime home - the single decision,
+so the dylib and the spawned proxy binary agree) and `APHRODITE_DIRECTIVES_DIR` (pointing
+at `<runtime-home>/directives`) into the environment it manages.
+
+The startup log prints the resolved home and its source (`runtime home: <path> (decided
+by ...)`); on an upgrade the pre-2.2 `~/.hermes/aphrodite` home is adopted (with a warning)
+when it holds the existing install and the Hermes-home-derived one does not.
 
 ## Documented but currently inactive
 
-These names appear in older docs or scripts but have **no reader anywhere** in this codebase as of this writing - setting them is a silent no-op.
-Do not document them alongside the live vars above without this caveat; if one gets wired up, move its row into the tables above.
+These names appear in older docs or scripts but have **no reader anywhere** in this codebase as
+of this writing - setting them is a silent no-op.
 
-`APHRODITE_DEBUG`, `APHRODITE_PASSTHROUGH`, `HERMES_DEV`, `APHRODITE_RECENT_MARKERS_MAX`, `APHRODITE_CATALOG` (catalog mode is TOML-only, `compression.catalog_mode`, with no env override), `APHRODITE_TOOL_THRESHOLD` (no `_TOKEN` / `_CACHE` suffix - superseded by the two suffixed vars above), `HEADROOM_SSE_BUFFER_MAX_BYTES` (read only by the vendored `headroom` Python package this repo's binaries don't run).
+Do not document them alongside the live vars above without this caveat; if one gets wired up,
+move its row into the tables above.
+
+`APHRODITE_DEBUG`, `APHRODITE_PASSTHROUGH`, `HERMES_DEV`,
+`APHRODITE_RECENT_MARKERS_MAX`, `APHRODITE_CATALOG` (catalog mode is
+TOML-only, `compression.catalog_mode`, with no env override),
+`APHRODITE_TOOL_THRESHOLD` (no `_TOKEN` / `_CACHE` suffix - superseded
+by the two suffixed vars above), `HEADROOM_SSE_BUFFER_MAX_BYTES` (read only
+by the vendored `headroom` Python package this repo's binaries don't run).
 
 ## Build-time metadata
 
-`APHRODITE_VERSION`, `APHRODITE_GIT_HASH`, `APHRODITE_PROFILE`, `APHRODITE_BUILD_DATE`, and `APHRODITE_TARGET` are embedded at compile time and reported by `--version` and the root `/` endpoint. They are read during the build, not at runtime - exporting them has no effect on a running proxy. `APHRODITE_SKIP_FFI_GEN` (`"1"` / `"true"`) is also build-time only: it skips the cbindgen+ctypesgen regeneration in `crates/aphrodite-hermes/build.rs`.
+`APHRODITE_VERSION`, `APHRODITE_GIT_HASH`, `APHRODITE_PROFILE`, `APHRODITE_BUILD_DATE`,
+and `APHRODITE_TARGET` are embedded at compile time and reported by `--version`
+and the root `/` endpoint.
+
+They are read during the build, not at runtime - exporting them has no effect on a running proxy.
+
+`APHRODITE_SKIP_FFI_GEN` (`"1"` / `"true"`) is also build-time only:
+it skips the cbindgen+ctypesgen regeneration in `crates/aphrodite-hermes/build.rs`.

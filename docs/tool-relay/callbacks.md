@@ -1,15 +1,17 @@
 # Callbacks
 
-Two distinct callback surfaces exist around the tool relay: the Hermes-side
-hooks that fire when a tool result comes back, and the proxy-side HTTP
-deliveries (`callback_url` on the relay, `notify_url` on CCR creation). Both
-are described below.
+Two distinct callback surfaces exist around the tool relay: the Hermes-side hooks that fire
+when a tool result comes back, and the proxy-side HTTP deliveries (`callback_url`
+on the relay, `notify_url` on CCR creation).
+
+Both are described below.
 
 ## What fires when a tool result is transformed
 
 The plugin registers every hook the dylib exposes through a single generic
-dispatcher (`aphrodite_hermes_call_hook`), so the wrappers live in Rust, not
-Python. The hooks that fire around tool results:
+dispatcher (`aphrodite_hermes_call_hook`), so the wrappers live in Rust, not Python.
+
+The hooks that fire around tool results:
 
 | Hook                        | Fires when                          | What it does                                                                                                                 |
 | --------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -19,16 +21,17 @@ Python. The hooks that fire around tool results:
 | `pre_llm_call`              | Every turn before the model call    | Injects directives, nudges, and the recall catalog into context                                                              |
 | `post_llm_call`             | After the model call returns        | Post-turn bookkeeping (e.g. ephemeral directive expiry)                                                                      |
 
-A compressed result is not lost - the marker handed back is resolvable through
-`aphrodite_retrieve` for the life of the session. See
-[Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md)
+A compressed result is not lost - the marker handed back is resolvable
+through `aphrodite_retrieve` for the life of the session.
+
+See [Hooks](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/hooks.md)
 for the full hook reference.
 
 ## Tool relay callback
 
-`POST /tool/relay` runs the tool synchronously unless the request carries a
-`callback_url`, in which case the call becomes asynchronous: the proxy answers
-immediately and POSTs the real result to the callback URL later.
+`POST /tool/relay` runs the tool synchronously unless the request carries a `callback_url`, in
+which case the call becomes asynchronous: the proxy answers immediately and POSTs the real result
+to the callback URL later.
 
 ```
 Hermes Agent
@@ -86,16 +89,18 @@ Content-Type: application/json
 }
 ```
 
-The relay accepts `aphrodite_retrieve`, `aphrodite_compress`, and
-`aphrodite_list`; any other tool name returns an error. A relayed
-`aphrodite_retrieve` without a `hash` (e.g. only a `query`) is rejected up
-front with HTTP 400.
+The relay accepts `aphrodite_retrieve`, `aphrodite_compress`, and `aphrodite_list`;
+any other tool name returns an error.
+
+A relayed `aphrodite_retrieve` without a `hash` (e.g. only a `query`) is rejected up front
+with HTTP 400.
 
 ### SSRF protection
 
-The relay accepts only `https://` URLs for `callback_url` and rejects
-anything else - `http://` including loopback, `file://`, and other schemes -
+The relay accepts only `https://` URLs for `callback_url`
+and rejects anything else - `http://` including loopback, `file://`, and other schemes -
 with HTTP 400 and `{"success": false, "error": "callback_url must use the https scheme"}`.
+
 Nothing is executed for a rejected request.
 
 ### Timeouts and delivery
@@ -105,17 +110,20 @@ Nothing is executed for a rejected request.
 | Tool relay callback POST     | 5 seconds |
 | CCR-create notification POST | 5 seconds |
 
-There are no retries - delivery is fire-and-forget. The callback POST carries
-no auth header (the relay result is posted as-is), and its outcome is not
-tracked: relay calls are counted in `/stats` under `tool_relay` as `total` /
-`success` / `failure`.
+There are no retries - delivery is fire-and-forget.
+
+The callback POST carries no auth header (the relay result is posted as-is), and its outcome is
+not tracked: relay calls are counted in `/stats` under `tool_relay`
+as `total` / `success` / `failure`.
 
 ## CCR create notification
 
-`POST /ccr/create` stores content directly in the CCR backend (JSON body or
-raw octet-stream). When a `notify_url` is configured, every successful create
-fires a webhook so external subscribers can track store growth without
-polling. The chat-compression and tool-compress paths do not trigger it.
+`POST /ccr/create` stores content directly in the CCR backend (JSON body or raw octet-stream).
+
+When a `notify_url` is configured, every successful create fires a webhook
+so external subscribers can track store growth without polling.
+
+The chat-compression and tool-compress paths do not trigger it.
 
 ```json
 POST {notify_url}
@@ -131,17 +139,19 @@ Content-Type: application/json
 }
 ```
 
-`ttl` defaults to 3600 seconds and `tags` to an empty list when the request
-omits them. Unlike the tool-relay callback, the proxy sends this notification
-with `Authorization: Bearer {notify_key}` whenever a key is configured, and its
-outcome is counted in the `notify` counters.
+`ttl` defaults to 3600 seconds and `tags` to an empty list when the request omits them.
+
+Unlike the tool-relay callback, the proxy sends this notification with `Authorization:
+Bearer {notify_key}` whenever a key is configured, and its outcome is counted
+in the `notify` counters.
 
 ## Task tracker
 
-The proxy spawns both delivery paths onto its task tracker. On graceful
-shutdown the tracker stops accepting new tasks and then waits for any in-flight
-callback or notification to finish, so none are lost mid-delivery (a second
-shutdown signal aborts remaining tasks).
+The proxy spawns both delivery paths onto its task tracker.
+
+On graceful shutdown the tracker stops accepting new tasks and then waits
+for any in-flight callback or notification to finish, so none are lost mid-delivery (a
+second shutdown signal aborts remaining tasks).
 
 ## Configuration
 
@@ -153,11 +163,14 @@ notify_url = "https://hermes.internal/aphrodite/callback"
 notify_key = "hermes-api-key-123"
 ```
 
-They can also be set via CLI flags (`--notify-url`, `--notify-key`) or
-environment variables (`APHRODITE_NOTIFY_URL`, `APHRODITE_NOTIFY_KEY`), with
-the environment taking precedence over TOML. Only `notify_url` is required for
-notifications to fire - if it is unset (the default), no notifications are
-sent. `notify_key` is optional and only adds the Bearer header when present.
+They can also be set via CLI flags (`--notify-url`, `--notify-key`)
+or environment variables (`APHRODITE_NOTIFY_URL`, `APHRODITE_NOTIFY_KEY`),
+with the environment taking precedence over TOML.
+
+Only `notify_url` is required for notifications to fire - if it is unset (the default),
+no notifications are sent.
+
+`notify_key` is optional and only adds the Bearer header when present.
 
 ## Metrics
 
@@ -167,11 +180,15 @@ sent. `notify_key` is optional and only adds the Bearer header when present.
 | `tool_relay.total` / `.success` / `.failure` | Tool relay call outcomes, in `/stats`         |
 
 Exposed at `/metrics` as `aphrodite_notify_success_total`,
-`aphrodite_notify_failure_total`, `aphrodite_tool_relay_calls_total`,
-`aphrodite_tool_relay_success_total`, and `aphrodite_tool_relay_failure_total`.
-See [Prometheus Metrics](https://github.com/PlayForm/Aphrodite/tree/Development/docs/metrics/prometheus.md)
+`aphrodite_notify_failure_total`,
+`aphrodite_tool_relay_calls_total`, `aphrodite_tool_relay_success_total`,
+and `aphrodite_tool_relay_failure_total`.
+
+See
+[Prometheus
+Metrics](https://github.com/PlayForm/Aphrodite/tree/Development/docs/metrics/prometheus.md)
 for the full metrics reference.
 
-`/tool/relay` is one of the loopback-restricted management routes: it accepts
-any loopback caller without a credential until `APHRODITE_MGMT_TOKEN` is set,
-after which the bearer token is required.
+`/tool/relay` is one of the loopback-restricted management routes:
+it accepts any loopback caller without a credential until `APHRODITE_MGMT_TOKEN` is set, after
+which the bearer token is required.

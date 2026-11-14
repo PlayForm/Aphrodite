@@ -1,16 +1,17 @@
 # Plugin Hooks
 
-The plugin registers six hooks with Hermes. Every hook is a thin dispatch that
-forwards its arguments to the Rust dylib (`libaphrodite_hermes.dylib`); the
-dylib holds all of the actual behavior and replies with JSON that the Python
-module hands back to Hermes.
+The plugin registers six hooks with Hermes.
 
-Registration is driven by the dylib's hook list: on plugin load the shim asks
-the dylib for its hook names and registers one callback per name.
+Every hook is a thin dispatch that forwards its arguments
+to the Rust dylib (`libaphrodite_hermes.dylib`); the dylib holds all of the actual behavior
+and replies with JSON that the Python module hands back to Hermes.
 
-It is the reason the six hooks below are always registered together: the
-dispatch surface is the dylib's own contract, and `plugin.yaml` declares the
-same set under `provides_hooks`.
+Registration is driven by the dylib's hook list: on plugin load the shim asks the dylib
+for its hook names and registers one callback per name.
+
+It is the reason the six hooks below are always registered together:
+the dispatch surface is the dylib's own contract, and `plugin.yaml` declares the same set
+under `provides_hooks`.
 
 | Hook                        | Purpose                                                           | When it fires                  |
 | --------------------------- | ----------------------------------------------------------------- | ------------------------------ |
@@ -36,20 +37,22 @@ flowchart TD
 
 ## on_session_start
 
-Fires when a Hermes session starts. It resets every piece of per-session
-state to a clean baseline: the turn counter, the conversation index, recent
-markers, referenced files, tool-event telemetry, ephemeral directives, and
-the manual directive latch.
+Fires when a Hermes session starts.
 
-It injects nothing. The one-shot first-turn orientation is rendered later by
-the context assembler on the first `pre_llm_call` (see below), so a session
-reset followed by a fresh turn behaves exactly like a new session.
+It resets every piece of per-session state to a clean baseline: the turn counter,
+the conversation index, recent markers, referenced files, tool-event telemetry,
+ephemeral directives, and the manual directive latch.
+
+It injects nothing.
+
+The one-shot first-turn orientation is rendered later by the context assembler
+on the first `pre_llm_call` (see below), so a session reset followed
+by a fresh turn behaves exactly like a new session.
 
 ## pre_tool_call
 
-Fires before a tool executes and can modify the pending call. Two
-interventions are possible, both driven by the poll worker and chain-split
-features:
+Fires before a tool executes and can modify the pending call. Two interventions are possible,
+both driven by the poll worker and chain-split features:
 
 - **Auto-backgrounding.** When the poll worker is enabled
   (`APHRODITE_POLL_WORKER`, default on), the hook rewrites a `terminal` or
@@ -91,9 +94,8 @@ Fires after every tool call with the tool's result. The pipeline:
    with a preview. Hermes swaps the tool output for the marker; retrieval
    returns the exact original bytes.
 
-The hook tracks file references before the skip gates, so it records
-`read_file` and `search_files` results for `aphrodite_files` and the catalog
-even when it never compresses them.
+The hook tracks file references before the skip gates, so it records `read_file`
+and `search_files` results for `aphrodite_files` and the catalog even when it never compresses them.
 
 ## transform_terminal_output
 
@@ -116,12 +118,13 @@ Fires after every terminal execution. The pipeline mirrors tool results:
 
 ## pre_llm_call
 
-Fires before each LLM request. It first runs the poll-worker checkpoint
-(pushing status nudges for running, completed, and failed background tasks),
-then the single context assembler composes the per-turn injection. The
-assembler builds every section in a fixed order under one hard byte cap
-(`flow_budget_chars`, default 4,000), dropping sections from the bottom when
-over budget:
+Fires before each LLM request.
+
+It first runs the poll-worker checkpoint (pushing status nudges for running, completed,
+and failed background tasks), then the single context assembler composes the per-turn injection.
+
+The assembler builds every section in a fixed order under one hard byte cap
+(`flow_budget_chars`, default 4,000), dropping sections from the bottom when over budget:
 
 1. First-turn orientation (`[aphrodite: first-turn orientation]`, turn 0 only)
 2. `[directives: ...]` block - never dropped
@@ -137,21 +140,22 @@ over budget:
 8. `[recall]` catalog summary - the first section dropped under budget
    pressure
 
-The assembler builds the first-turn orientation from the `[prompts]
-session_inject` template (default compiled into the binary, `{VERSION}`
-interpolated to the plugin version). The hook injects it once on turn 0, then
-never again; an empty string disables it entirely.
+The assembler builds the first-turn orientation from the `[prompts] session_inject`
+template (default compiled into the binary, `{VERSION}` interpolated to the plugin version).
 
-The hook returns `{"context": ...}`, which Hermes injects into the model's
-turn. When the assembled context is empty, the hook injects nothing.
+The hook injects it once on turn 0, then never again; an empty string disables it entirely.
+
+The hook returns `{"context": ...}`, which Hermes injects into the model's turn.
+When the assembled context is empty, the hook injects nothing.
 
 ## post_llm_call
 
-Fires after each LLM response. It archives the last marker recorded this
-turn into the conversation index (so `aphrodite_diff` can report per-turn
-compressions), advances the turn counter, purges expired nudges (after the
-counter advances, so a one-shot nudge renders exactly once), and expires
-stale poll-worker tasks.
+Fires after each LLM response.
+
+It archives the last marker recorded this turn into the conversation index
+(so `aphrodite_diff` can report per-turn compressions), advances the turn counter,
+purges expired nudges (after the counter advances, so a one-shot nudge renders exactly once),
+and expires stale poll-worker tasks.
 
 ## Thresholds
 
@@ -163,13 +167,17 @@ stale poll-worker tasks.
 | `pre_llm_call` (context engine) | `[compression] engine_threshold_pct`     | 45 (shipped example 30)     | engine disabled, `0` = never, `100+` = off, below `engine_min_msgs`, fill % below threshold, middle < 3 turns |
 | `pre_tool_call` (chain split)   | `[compression] chain_split_min_segments` | -                           | feature off by default (`chain_split = false`)                                                                |
 
-Each setting has an environment-variable equivalent (`APHRODITE_TOOL_THRESHOLD_TOKEN`,
-`APHRODITE_TERMINAL_THRESHOLD`, `APHRODITE_FLOW_BUDGET_CHARS`,
-`APHRODITE_CHAIN_SPLIT`, `APHRODITE_ENGINE_THRESHOLD_PCT`); environment
-overrides TOML, which overrides the
-default. The context-engine row is the `pre_llm_call` trigger for
+Each setting has an environment-variable equivalent
+(`APHRODITE_TOOL_THRESHOLD_TOKEN`, `APHRODITE_TERMINAL_THRESHOLD`,
+`APHRODITE_FLOW_BUDGET_CHARS`, `APHRODITE_CHAIN_SPLIT`,
+`APHRODITE_ENGINE_THRESHOLD_PCT`); environment overrides TOML, which overrides the default.
+
+The context-engine row is the `pre_llm_call` trigger for
 [Context Engine](https://github.com/PlayForm/Aphrodite/tree/Development/docs/plugin/context-engine.md).
-See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md)
+
+See
+[aphrodite.toml
+Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md)
 for the full schema.
 
 ## See also

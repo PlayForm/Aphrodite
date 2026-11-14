@@ -1,21 +1,23 @@
 # CCR Examples - What the LLM Actually Sees
 
 Every example on this page is a real tool result captured from a live session
-against the 1.4.6 binary. Marker strings are quoted verbatim; hashes are the
-BLAKE3 digests the proxy computed for the stored bytes. Because hashing is
-content-addressed, the same bytes always produce the same hash - which is why
-the same marker reappears across sessions whenever the proxy compressed
-the same output.
+against the 1.4.6 binary.
 
-The marker schema and the retrieval mechanics behind these examples are
-documented in [CCR: Marker Format](../ccr/marker-format.md), [CCR:
-Lifecycle](../ccr/lifecycle.md), and the content taxonomy in
-[Content Types](../classification/content-types.md).
+Marker strings are quoted verbatim; hashes are the BLAKE3 digests the proxy computed
+for the stored bytes.
+
+Because hashing is content-addressed, the same bytes always produce the same hash -
+which is why the same marker reappears across sessions whenever the proxy compressed the
+same output.
+
+The marker schema and the retrieval mechanics behind these examples are documented in [CCR:
+Marker Format](../ccr/marker-format.md), [CCR: Lifecycle](../ccr/lifecycle.md),
+and the content taxonomy in [Content Types](../classification/content-types.md).
 
 ## The Shape of a Compressed Tool Result
 
-When a tool result crossed its compression threshold, the proxy replaced
-the raw output in the relayed result with a two-line block:
+When a tool result crossed its compression threshold, the proxy replaced the raw output
+in the relayed result with a two-line block:
 
 ```
 <<<CCR:hash|type|size>>>
@@ -28,10 +30,11 @@ the raw output in the relayed result with a two-line block:
 | type  | Detected content type (for example `ls`, `source_code`, `diff`, `json`, `build_error`) |
 | size  | Original content size in bytes                                                         |
 
-The preview line is a type-aware summary rendered from the content itself -
-function counts, key names, error counts, change statistics. The model answers
-from the preview when it can, and calls `aphrodite_retrieve` with the hash when
-it needs the full content.
+The preview line is a type-aware summary rendered from the content itself - function counts,
+key names, error counts, change statistics.
+
+The model answers from the preview when it can, and calls `aphrodite_retrieve` with the hash
+when it needs the full content.
 
 ### Conversation Flow
 
@@ -52,15 +55,15 @@ sequenceDiagram
     Agent-->>LLM: two-line relayed result
 ```
 
-Whether the output is compressed at all is decided by the thresholds in
-[`[compression]`](../config/aphrodite-toml.md): `tool_threshold_token` (512
-bytes default) scaled by `code_multiplier` (3.0 default) for code types, and
-`terminal_threshold` (1024 bytes default) for terminal output.
+Whether the output is compressed at all is decided by the thresholds
+in [`[compression]`](../config/aphrodite-toml.md): `tool_threshold_token` (512 bytes
+default) scaled by `code_multiplier` (3.0 default) for code types,
+and `terminal_threshold` (1024 bytes default) for terminal output.
 
 ## Scenario 1: Reading a Rust File
 
-`cat bench/corpus/code_rust.rs` produced 2,645 bytes of Rust source - above
-the code threshold of 1,536 bytes (512 x 3.0), so the proxy compressed it.
+`cat bench/corpus/code_rust.rs` produced 2,645 bytes of Rust source - above the code threshold
+of 1,536 bytes (512 x 3.0), so the proxy compressed it.
 
 ### What the model sees
 
@@ -76,9 +79,9 @@ the code threshold of 1,536 bytes (512 x 3.0), so the proxy compressed it.
 -> Arc<Self>`, and the file is 112 lines.
 - To see the actual code it calls `aphrodite_retrieve("f8d6c87de81a74c79a9af2909022ffec0534f49c")`.
 
-A shorter read that stayed under the threshold was relayed raw - for example a
-50-line excerpt compressed at 2,370 bytes rendered as
-`[code:2fns fn detect_type(content:&str) -> String 50L]`.
+A shorter read that stayed under the threshold was relayed raw -
+for example a 50-line excerpt compressed at 2,370 bytes rendered
+as `[code:2fns fn detect_type(content:&str) -> String 50L]`.
 
 ## Scenario 2: Build Error
 
@@ -93,13 +96,15 @@ with two E0308 errors across 11 lines.
 ```
 
 The preview renders the build family summary - 2 errors, 0 warnings, 11 lines -
-and appends the first error line. The model sees the failing diagnostic
-directly and only retrieves the full trace when it needs the rest.
+and appends the first error line.
+
+The model sees the failing diagnostic directly and only retrieves the full trace
+when it needs the rest.
 
 ## Scenario 3: JSON Tool Output
 
-A 1,728-byte pretty-printed JSON document (nested dictionaries, list of
-records, 116 lines) crossed the tool threshold, and the proxy compressed it.
+A 1,728-byte pretty-printed JSON document (nested dictionaries, list of records, 116 lines)
+crossed the tool threshold, and the proxy compressed it.
 
 ### What the model sees
 
@@ -108,14 +113,13 @@ records, 116 lines) crossed the tool threshold, and the proxy compressed it.
 [json:5keys 116L | a, b, c, items, summary]
 ```
 
-The preview lists the string-named top-level keys and the line count, so the
-model knows what the document contains without expanding it.
+The preview lists the string-named top-level keys and the line count,
+so the model knows what the document contains without expanding it.
 
 ## Scenario 4: Multi-Turn Memory Flow
 
-Compression is not a one-shot transform: the stored entry stays retrievable
-for the session, and content-addressed hashing means the same output maps to
-the same entry every time.
+Compression is not a one-shot transform: the stored entry stays retrievable for the session,
+and content-addressed hashing means the same output maps to the same entry every time.
 
 ```mermaid
 graph TD
@@ -152,8 +156,7 @@ The same 5,889-byte directory listing, two ways.
 [ls:68 files 32 dirs | .json×13 .txt×13 .py×11]
 ```
 
-~106 characters carry the summary: 68 files, 32 directories, and the extension
-histogram.
+~106 characters carry the summary: 68 files, 32 directories, and the extension histogram.
 
 ### Expanded (what the model sees after retrieval)
 
@@ -164,15 +167,15 @@ AphroditeRetrieve("e357cd16e409796079cf2db87f00ea1fc9c1cf69")
 Result: {"found": true, "source": "ccr", "hash": "e357cd16...", "content": "total 48\n..."}
 ```
 
-The full listing replaced the marker in context. The model pays the token cost
-only when it actually needs the details.
+The full listing replaced the marker in context. The model pays the token cost only
+when it actually needs the details.
 
 ## Scenario 6: Session Orientation with Directives
 
-Directives are the real session-mode mechanism: the `directives.active` list
-selects which directive files from the runtime home
-(`~/.hermes/aphrodite/directives/`) the injection assembler loads into the
-per-turn flow budget.
+Directives are the real session-mode mechanism: the `directives.active` list selects
+which directive files from the runtime home (`~/.hermes/aphrodite/directives/`)
+the injection assembler loads into the per-turn flow budget.
+
 See [Directives](../plugin/directives.md) for the full story.
 
 | Active list             | Behavior captured                                                                |
@@ -181,15 +184,15 @@ See [Directives](../plugin/directives.md) for the full story.
 | `["explore"]`           | The agent explored tools (`tool_describe aphrodite_retrieve`) before retrieving. |
 | `[]`                    | No directive files loaded.                                                       |
 
-Directives change what the model does, not the marker shape - the relayed
-tool-result block (marker + preview) is byte-identical across directive sets,
-and directive names not in the active list are silently filtered out.
+Directives change what the model does, not the marker shape - the relayed tool-result block
+(marker + preview) is byte-identical across directive sets, and directive names not
+in the active list are silently filtered out.
 
 ## Scenario 7: Preview Families - Same Content, Different Previews
 
-The `model_family` setting (`compact`, `code_first`, `balance`) selects which
-preview template renders the summary. The same content therefore produces
-different preview text:
+The `model_family` setting (`compact`, `code_first`, `balance`) selects
+which preview template renders the summary. The same content therefore produces different
+preview text:
 
 | Content                            | compact (Claude)                                   | code_first (DeepSeek/Qwen)                                          | balance                                                 |
 | ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -208,8 +211,8 @@ Two more preview knobs from the captures:
 
 ## Token Economics
 
-Byte economics of the real captures above - raw stored bytes versus the
-marker-plus-preview block that actually enters the model's context:
+Byte economics of the real captures above - raw stored bytes versus the marker-plus-preview
+block that actually enters the model's context:
 
 | Content             | Raw bytes | Marker + preview | Ratio | What the model sees                               |
 | ------------------- | --------- | ---------------- | ----- | ------------------------------------------------- |
@@ -219,7 +222,7 @@ marker-plus-preview block that actually enters the model's context:
 | Git diff            | 987       | ~114 chars       | ~9x   | Marker + `[diff:1F +31/-0 40L ...]`               |
 | Build error (rustc) | 801       | ~117 chars       | ~7x   | Marker + `[build:2E 0W 11L \| error[E0308]: ...]` |
 
-Ratios are byte compression of the relayed result; actual token savings depend
-on the tokenizer. The rule of thumb holds across all five: the model sees the
-shape and the summary of the content, and pays full price only when it asks
-for the details.
+Ratios are byte compression of the relayed result; actual token savings depend on the tokenizer.
+
+The rule of thumb holds across all five: the model sees the shape and the summary
+of the content, and pays full price only when it asks for the details.

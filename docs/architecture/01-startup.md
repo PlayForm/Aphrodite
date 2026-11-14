@@ -1,6 +1,15 @@
 # Process Startup & Dual-Proxy Launch
 
-`aphrodite` startup splits into two halves. The binary half resolves configuration (env > TOML > default), binds every listener before spawning any server, builds one `AppState` per listener with a CCR store backend, and arms a config-file reload watcher. The Hermes plugin half runs once per Hermes home inside `register()`: it loads and smoke-tests the dylib, checks the runtime layout (report-only), materializes the built-in directives, registers hooks and tools, and launches the proxy when it is not already healthy.
+`aphrodite` startup splits into two halves.
+
+The binary half resolves configuration (env > TOML > default), binds every listener
+before spawning any server, builds one `AppState` per listener with a CCR store backend,
+and arms a config-file reload watcher.
+
+The Hermes plugin half runs once per Hermes home inside `register()`: it loads
+and smoke-tests the dylib, checks the runtime layout (report-only),
+materializes the built-in directives, registers hooks and tools, and launches the proxy
+when it is not already healthy.
 
 ## Startup sequence
 
@@ -92,7 +101,12 @@ flowchart TD
 
 ## Plugin startup (register() - the Hermes-side half)
 
-`register()` runs once per Hermes home (one `PluginManager` per home) and is a **pure loader**: all logic lives in the dylib. Runtime artifacts (binary, dylib, `aphrodite.toml`, `ccr.db`, logs) live under the canonical runtime home `$HERMES_HOME/aphrodite` (else `~/.hermes/aphrodite`), never inside the plugin tree.
+`register()` runs once per Hermes home (one `PluginManager` per home) and is a **pure loader**:
+all logic lives in the dylib.
+
+Runtime artifacts (binary, dylib, `aphrodite.toml`, `ccr.db`, logs) live
+under the canonical runtime home `$HERMES_HOME/aphrodite` (else `~/.hermes/aphrodite`),
+never inside the plugin tree.
 
 ```mermaid
 sequenceDiagram
@@ -135,8 +149,11 @@ sequenceDiagram
     end
 ```
 
-The layout check and the directives materialize are best-effort by design: either failing degrades to a warning and the plugin still registers (never a raise).
-The dylib load itself is the one hard gate - if the smoke test or the FFI assertion fails, `register()` logs "plugin disabled" and returns.
+The layout check and the directives materialize are best-effort by design:
+either failing degrades to a warning and the plugin still registers (never a raise).
+
+The dylib load itself is the one hard gate - if the smoke test
+or the FFI assertion fails, `register()` logs "plugin disabled" and returns.
 
 ## Call sites
 

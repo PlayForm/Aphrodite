@@ -1,9 +1,9 @@
 # Metrics Queries
 
 PromQL reference for monitoring and alerting on Aphrodite proxy metrics - see
-[Prometheus Metrics](prometheus.md) for the full metric catalog these queries
-draw on. Every metric name below is cross-checked against the actual `/metrics`
-output.
+[Prometheus Metrics](prometheus.md) for the full metric catalog these queries draw on.
+
+Every metric name below is cross-checked against the actual `/metrics` output.
 
 ## CCR Cache Performance
 
@@ -156,11 +156,12 @@ rate(aphrodite_tool_relay_failure_total[5m]) > 0
 
 ## Quick curl (no Prometheus server needed)
 
-Every query above assumes a Prometheus server scraping `/metrics`. If you just
-want a number right now, hit the proxy directly. The default listen port
-depends on the mode: cache mode binds `127.0.0.1:9797`, token mode
-`127.0.0.1:9798` (both configurable via `APHRODITE_CACHE_PORT` /
-`APHRODITE_TOKEN_PORT`):
+Every query above assumes a Prometheus server scraping `/metrics`.
+
+If you just want a number right now, hit the proxy directly.
+
+The default listen port depends on the mode: cache mode binds `127.0.0.1:9797`,
+token mode `127.0.0.1:9798` (both configurable via `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT`):
 
 ```bash
 # Full metrics dump (Prometheus text format)
@@ -177,8 +178,7 @@ curl -s http://127.0.0.1:9798/stats | python3 -m json.tool
 ```
 
 If you do have a Prometheus server, `PROM=http://localhost:9090/api/v1/query`
-and `curl -s "$PROM" --data-urlencode 'query=...'` runs any query from this
-page ad hoc, e.g.:
+and `curl -s "$PROM" --data-urlencode 'query=...'` runs any query from this page ad hoc, e.g.:
 
 ```bash
 # CCR entries created, parsed out of the JSON response
