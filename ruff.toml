@@ -14,8 +14,8 @@ target-version = "py311"
 # and break the artifact's determinism (lint per-file-ignores below are
 # belt-and-suspenders; this exclude is what keeps formatters off it).
 extend-exclude = [
-    "crates/aphrodite/templates",
-    "plugins/aphrodite/_bindings.py",
+	"crates/aphrodite/templates",
+	"plugins/aphrodite/_bindings.py",
 ]
 
 [lint]
@@ -38,7 +38,19 @@ preview = false
 # F405/B009 plus SIM/UP/C408 siblings), so the whole observed family is
 # ignored here rather than chased per regeneration.
 [lint.per-file-ignores]
-"plugins/aphrodite/_bindings.py" = ["N801", "N802", "N805", "N811", "N812", "E402", "F405", "B009", "SIM", "UP", "C408"]
+"plugins/aphrodite/_bindings.py" = [
+	"N801",
+	"N802",
+	"N805",
+	"N811",
+	"N812",
+	"E402",
+	"F405",
+	"B009",
+	"SIM",
+	"UP",
+	"C408",
+]
 # Perf-probe exclusions: UP031 (percent-format in hot-path probe) is a known
 # pre-existing pattern in the probe harness, not new code (documented in
 # .hermes/AGENTS.md as the 2 known perf-probe exclusions).

@@ -625,9 +625,7 @@ def apply_divergence(report: Report, function: str, commands: list[str]) -> tupl
     return mapped, True
 
 
-def check_runner_reachability(
-    report: Report, script: str, functions: dict[str, list[str]]
-) -> None:
+def check_runner_reachability(report: Report, script: str, functions: dict[str, list[str]]) -> None:
     """Every function that invokes a mirrored alias must be called by the router.
 
     Without this, moving ``RunStep ... cargo ci-check`` into a function nobody
