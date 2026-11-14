@@ -1,5 +1,56 @@
 # Changelog
 
+## v1.8.1 - Docs catch up to the engine, ASCII ellipsis markers, compile-time debug gate (2026-11-14)
+
+A documentation and wording release with two engine-side consequences. The docs
+tree stops advertising a version it does not own (`docs/README.md` said "1.6.6
+binary / 2.2.6 plugin" two releases after that pairing shipped) and now points at
+the manifests and the newest changelog entry instead, the README gains the
+sections a new install actually needs - LLM provider configuration, a
+"Verify it's running" check, "See It Work", session lifecycle, directives - and
+the retention work that shipped in `1.8.0` is finally documented where operators
+look for it (`docs/ccr/backends/sqlite.md` "Retention: Space Caps",
+`docs/metrics/prometheus.md` "Retention and Eviction Telemetry",
+`aphrodite.toml.example`, and the backend expiry table in
+`docs/ccr/lifecycle.md`).
+
+The two behaviour changes are small and deliberate. **Truncation markers are
+ASCII now**: every preview cap and directive cap emits `...` instead of `U+2026`,
+with the cap arithmetic adjusted so the marker still fits inside the budget
+(`apply_preview_cap` keeps the closing `]`; the directive cap keeps its exact
+`MAX_COMBINED_CHARS` / `MAX_DIRECTIVE_CHARS` character count). And the dev-only
+`aphrodite_debug` tool is **gated at compile time** instead of being stripped by
+hand at release staging: `cargo build --release` registers exactly the 13
+declared production tools, a debug build registers 14, and the catalog test
+asserts whichever profile it is compiled under. Binary `1.8.0 → 1.8.1`; plugin
+`2.3.1` unchanged.
+
+- **Fix (tool catalog)**: `aphrodite_debug` is now behind `#[cfg(debug_assertions)]`
+  in `schemas.rs` / `tools.rs` / `debug.rs` rather than removed from the release
+  tree during staging. The staging strip was a manual step that had to be
+  repeated every ceremony and silently diverged from `Development`; the gate is
+  the same contract enforced by the compiler. `hermes plugins validate` rule 6
+  (13 declared tools) holds for a release dylib without touching the tree.
+- **Chore (preview + directive truncation)**: `U+2026` → `...` in
+  `preview/builders/cap.rs`, the per-type preview builders, the directive
+  builders/loader, and the default marker hint. `apply_preview_cap` takes
+  `max_chars - 4` and appends `...]`; the directive cap keeps
+  `MAX_DIRECTIVE_CHARS` + 3 and `MAX_COMBINED_CHARS` + 4. Tests updated to the
+  new character counts.
+- **Docs (README)**: new sections - LLM provider configuration, Verify it's
+  running, See It Work, Session Lifecycle, Directives, Features; corrected
+  tuning defaults (`engine_threshold_pct` 30, `terminal_threshold` 256,
+  `code_multiplier` 1.0, `retrieve_guidance = "minimal"`, `ccr_marker_hint`
+  off); `aphrodite.toml.example` documents the `store_max_entries` /
+  `store_max_bytes` retention caps and their restart semantics.
+- **Docs (tree)**: `docs/README.md` and `docs/architecture/README.md` no longer
+  pin a binary/plugin version; `docs/ccr/content-types.md` links retargeted to
+  `docs/classification/content-types.md`; the `table` classifier row's escaped
+  pipe fixed; preview-shape table refreshed; sqlite and prometheus pages gain
+  the retention/eviction sections.
+- **Chore**: `.gitignore` ignores `*.mp4`; `.githooks/{pre-commit,post-checkout}`
+  whitespace-normalized (`>/dev/null` → `> /dev/null`).
+
 ## v1.8.0 - Bounded CCR store: retention caps, index-driven sweep, truthful telemetry (2026-11-08)
 
 The SQLite CCR store gains a **space** bound to go with its time bound, and
