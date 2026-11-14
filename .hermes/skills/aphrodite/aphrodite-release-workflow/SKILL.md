@@ -227,6 +227,21 @@ never publish. Recovery sequence, in order:
    REFUSES installs when the file says 1.6.4 but the sums say 1.6.5 - a
    rewind that undid the BINARY_VERSION bump recreates exactly that trap.
 
+### Gitlink-bump job non-fast-forward - expected, not a release failure
+
+`Publish.yml`'s `Bump plugin submodule gitlink` job commits on the tag's
+**detached HEAD** and pushes to `Current`. When `Current` already carries a
+gitlink float for the same child commit (the normal case - `BINARY_VERSION` is
+bumped LAST, and that commit is what gets floated), the job's commit sits behind
+`Current` and the push is rejected `non-fast-forward` / "pushed branch tip is
+behind its remote counterpart".
+
+The publish jobs have already succeeded by then, so the run is red while the
+release is complete. Re-running the job cannot help - it rebuilds the same
+behind-tip commit. Verify the intent instead: `Current`'s gitlink equals the
+child commit whose `BINARY_VERSION` and in-tree `SHA256SUMS.txt` header both
+name the released version. If it does, record the job as redundant.
+
 ```text
 Ready for approval:
 - Current commit: <sha>
