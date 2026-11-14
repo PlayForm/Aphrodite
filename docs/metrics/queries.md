@@ -1,13 +1,13 @@
 # Metrics Queries
 
 PromQL reference for monitoring and alerting on Aphrodite proxy metrics - see
-[Prometheus Metrics](prometheus.md) for the full metric catalog these queries
-draw on. Every metric name below is cross-checked against the actual `/metrics`
-output.
+[Prometheus Metrics](prometheus.md) for the full metric catalog these queries draw on.
+
+Every metric name below is cross-checked against the actual `/metrics` output.
 
 ## CCR Cache Performance
 
-```promql
+```text
 # CCR hit rate (%)
 rate(aphrodite_ccr_hits_total[5m]) / (rate(aphrodite_ccr_hits_total[5m]) + rate(aphrodite_ccr_misses_total[5m])) * 100
 
@@ -20,7 +20,7 @@ rate(aphrodite_ccr_created_total[5m])
 
 ## Latency
 
-```promql
+```text
 # P50 latency (seconds) - requires histogram_quantile
 histogram_quantile(0.50, rate(aphrodite_latency_seconds_bucket[5m]))
 
@@ -36,7 +36,7 @@ rate(aphrodite_latency_seconds_sum[5m]) / rate(aphrodite_latency_seconds_count[5
 
 ## Compression Efficiency
 
-```promql
+```text
 # Compression ratio (EMA)
 aphrodite_compression_ratio_ema
 
@@ -49,7 +49,7 @@ rate(aphrodite_requests_compressed_total[5m]) / rate(aphrodite_requests_total[5m
 
 ## Error Rates
 
-```promql
+```text
 # Upstream 4xx rate
 rate(aphrodite_upstream_errors_total{code="4xx"}[5m])
 
@@ -74,7 +74,7 @@ rate(aphrodite_upstream_connect_errors_total[5m])
 
 ## Tool Relay
 
-```promql
+```text
 # Tool relay success rate
 rate(aphrodite_tool_relay_success_total[5m]) / rate(aphrodite_tool_relay_calls_total[5m]) * 100
 
@@ -87,7 +87,7 @@ rate(aphrodite_tool_relay_calls_total[5m])
 
 ## Cache Performance
 
-```promql
+```text
 # LLM response cache hit rate
 rate(aphrodite_cache_hits_total[5m]) / (rate(aphrodite_cache_hits_total[5m]) + rate(aphrodite_cache_misses_total[5m])) * 100
 
@@ -97,7 +97,7 @@ rate(aphrodite_ccr_hits_total[5m]) + rate(aphrodite_cache_hits_total[5m])
 
 ## Store Metrics
 
-```promql
+```text
 # CCR store entries (gauge)
 aphrodite_ccr_store_entries
 
@@ -110,7 +110,7 @@ aphrodite_ccr_store_bytes / aphrodite_ccr_store_entries
 
 ## Throughput
 
-```promql
+```text
 # Requests per second
 rate(aphrodite_requests_total[5m])
 
@@ -120,7 +120,7 @@ rate(aphrodite_response_body_bytes_total[5m])
 
 ## Inline CCR
 
-```promql
+```text
 # Inline CCR hit rate
 rate(aphrodite_inline_ccr_hits_total[5m]) / (rate(aphrodite_inline_ccr_hits_total[5m]) + rate(aphrodite_inline_ccr_misses_total[5m])) * 100
 ```
@@ -140,7 +140,7 @@ rate(aphrodite_inline_ccr_hits_total[5m]) / (rate(aphrodite_inline_ccr_hits_tota
 
 ### Alerts
 
-```promql
+```text
 # High upstream error rate
 rate(aphrodite_upstream_errors_total{code="5xx"}[5m]) > 0.1
 
@@ -156,11 +156,12 @@ rate(aphrodite_tool_relay_failure_total[5m]) > 0
 
 ## Quick curl (no Prometheus server needed)
 
-Every query above assumes a Prometheus server scraping `/metrics`. If you just
-want a number right now, hit the proxy directly. The default listen port
-depends on the mode: cache mode binds `127.0.0.1:9797`, token mode
-`127.0.0.1:9798` (both configurable via `APHRODITE_CACHE_PORT` /
-`APHRODITE_TOKEN_PORT`):
+Every query above assumes a Prometheus server scraping `/metrics`.
+
+If you just want a number right now, hit the proxy directly.
+
+The default listen port depends on the mode: cache mode binds `127.0.0.1:9797`,
+token mode `127.0.0.1:9798` (both configurable via `APHRODITE_CACHE_PORT` / `APHRODITE_TOKEN_PORT`):
 
 ```bash
 # Full metrics dump (Prometheus text format)
@@ -177,8 +178,7 @@ curl -s http://127.0.0.1:9798/stats | python3 -m json.tool
 ```
 
 If you do have a Prometheus server, `PROM=http://localhost:9090/api/v1/query`
-and `curl -s "$PROM" --data-urlencode 'query=...'` runs any query from this
-page ad hoc, e.g.:
+and `curl -s "$PROM" --data-urlencode 'query=...'` runs any query from this page ad hoc, e.g.:
 
 ```bash
 # CCR entries created, parsed out of the JSON response

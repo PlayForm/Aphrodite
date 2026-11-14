@@ -1,9 +1,9 @@
 # In-Memory CCR Backend
 
-The in-memory backend is a process-local, sharded concurrent store used for
-cache-mode deployments. It is lightweight by design - no persistence is
-needed for an ephemeral cache - and distinct keys never contend on reads;
-capacity-bound eviction is the only serialized step.
+The in-memory backend is a process-local, sharded concurrent store used for cache-mode deployments.
+
+It is lightweight by design - no persistence is needed for an ephemeral cache -
+and distinct keys never contend on reads; capacity-bound eviction is the only serialized step.
 
 ## Structure
 
@@ -40,10 +40,9 @@ InMemoryCcrStore::with_capacity_and_ttl(10_000, Duration::from_secs(cli.ccr_ttl_
 
 ## Expiry: Sliding Idle Window
 
-Like the SQLite backend, the TTL is an idle window: every successful `get`
-restarts the entry's clock via `last_accessed`, bounded by an absolute max
-lifetime of 8x the idle TTL measured from insertion - so constant access can
-never pin an entry forever.
+Like the SQLite backend, the TTL is an idle window: every successful `get` restarts the
+entry's clock via `last_accessed`, bounded by an absolute max lifetime
+of 8x the idle TTL measured from insertion - so constant access can never pin an entry forever.
 
 ## Operations
 
@@ -69,17 +68,16 @@ never pin an entry forever.
 
 ### del / len
 
-`del` removes by hash and reports whether it existed; `len` is the live
-DashMap entry count.
+`del` removes by hash and reports whether it existed; `len` is the live DashMap entry count.
 
 ## Eviction
 
-Capacity eviction pops the front of the order queue (oldest) and removes it
-from the map, looping until under capacity; a soft-cap race may briefly push
-the store over capacity, and the loop handles it. Queue compaction prunes
-stale keys (expired or evicted entries whose keys linger in the queue) once
-the queue exceeds twice the capacity, preventing unbounded growth under
-sustained churn.
+Capacity eviction pops the front of the order queue (oldest) and removes it from the map,
+looping until under capacity; a soft-cap race may briefly push the store over capacity,
+and the loop handles it.
+
+Queue compaction prunes stale keys (expired or evicted entries whose keys linger in the queue)
+once the queue exceeds twice the capacity, preventing unbounded growth under sustained churn.
 
 ## Concurrency Model
 
@@ -92,5 +90,5 @@ sustained churn.
 
 ## Idempotency
 
-Re-storing the same hash overwrites in place - the same semantics as the
-SQLite backend's `ON CONFLICT(hash) DO UPDATE`.
+Re-storing the same hash overwrites in place - the same semantics as the SQLite backend's
+`ON CONFLICT(hash) DO UPDATE`.

@@ -2,11 +2,11 @@
 
 Directives are short behavioral instruction files - one `.md` file each -
 that `pre_llm_call` injects inline into the LLM's context on every call.
+
 Unlike file content (which the transform hooks compress into CCR markers),
-directives travel verbatim: they are compact enough to never need
-compression, and the active set can be listed, swapped, and stacked
-mid-conversation via the `aphrodite_directive` tool without touching any
-config file.
+directives travel verbatim: they are compact enough to never need compression,
+and the active set can be listed, swapped, and stacked mid-conversation
+via the `aphrodite_directive` tool without touching any config file.
 
 ## Design principle: usage, not mechanism
 
@@ -22,15 +22,16 @@ Directives teach the LLM **retrieval vocabulary and decision-making only**:
   original tool for that specific item).
 
 They never explain the compression mechanism - no marker-injection details,
-no chain/split/segment vocabulary, no storage internals. The story the LLM
-sees stays the same; the machinery changes underneath, and behavior is
-learned from consequences, not from instructions about the mechanism.
+no chain/split/segment vocabulary, no storage internals.
+
+The story the LLM sees stays the same; the machinery changes underneath,
+and behavior is learned from consequences, not from instructions about the mechanism.
 
 ## Built-in directives
 
 The binary ships seven directives, baked in at compile time and materialized
-into `~/.hermes/aphrodite/directives/` on plugin registration (user-modified
-files are never overwritten):
+into `~/.hermes/aphrodite/directives/` on plugin registration (user-modified files are
+never overwritten):
 
 | Directive      | Role                                                                                                             |
 | -------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -42,8 +43,8 @@ files are never overwritten):
 | `lazy-eval`    | Deferred resolution: markers accumulate across turns, and you decide when to resolve them from type and size     |
 | `ccr-handling` | Marker vocabulary: how to read `<<<CCR:hash\|type\|size>>>` and when to retrieve vs. skip - the shared reference |
 
-Any `.md` file you drop into a discovered directives directory becomes a
-directive named after its file stem - the built-ins are not special-cased.
+Any `.md` file you drop into a discovered directives directory becomes a directive named
+after its file stem - the built-ins are not special-cased.
 
 ## Discovery and loading
 
@@ -66,19 +67,24 @@ directive named after its file stem - the built-ins are not special-cased.
 active = []                        # e.g. ["focus", "foresight"]
 ```
 
-`active` only seeds which loaded directives start active. Names not found in
-the loaded set are filtered out rather than erroring. Everything else -
-activation, deactivation, stacking - happens at runtime through the tool
-below. See [aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md#directives)
+`active` only seeds which loaded directives start active.
+
+Names not found in the loaded set are filtered out rather than erroring.
+
+Everything else - activation, deactivation, stacking - happens at runtime through the tool below.
+
+See
+[aphrodite.toml Configuration](https://github.com/PlayForm/Aphrodite/tree/Development/docs/config/aphrodite-toml.md#directives)
 for where this section sits in the full schema.
 
 ## Injection mechanics
 
-`pre_llm_call` builds the directive block via the shared context assembler
-and places it at the **top** of the per-turn injected context - the first
-section after the first-turn orientation, ahead of nudges and the recall
-catalog. Directives and nudges are never dropped when the context budget is
-tight; the recall catalog is the first section to go.
+`pre_llm_call` builds the directive block via the shared context assembler and places it
+at the **top** of the per-turn injected context - the first section
+after the first-turn orientation, ahead of nudges and the recall catalog.
+
+Directives and nudges are never dropped when the context budget is tight;
+the recall catalog is the first section to go.
 
 ```text
 [directives: focus]
@@ -98,8 +104,8 @@ focus:
 
 ## The `aphrodite_directive` tool
 
-Registered in the Hermes bridge's tool registry with this schema (see
-[Tool Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/tools.md#7-aphrodite_directive)
+Registered in the Hermes bridge's tool registry with this schema (see [Tool
+Relay: Tools](https://github.com/PlayForm/Aphrodite/tree/Development/docs/tool-relay/tools.md#7-aphrodite_directive)
 for its place in the full 13-tool reference):
 
 ```json
@@ -121,19 +127,18 @@ for its place in the full 13-tool reference):
 | `remove` | Drop a directive from the active set                   | `{active: [...]}`                                                                    |
 | `reset`  | Clear the active set, ephemerals, and the manual latch | `{active: []}`                                                                       |
 
-`load` is the lazy-activation action: unlike `add` (which is silent when the
-name is unknown or already active), `load` returns a distinct
-`{loaded, active}` shape and **errors** on an unknown name, so a lazy-load
-typo surfaces instead of being swallowed. It is idempotent when the directive
-is already active.
+`load` is the lazy-activation action: unlike `add` (which is silent when the name is unknown
+or already active), `load` returns a distinct `{loaded, active}` shape and **errors**
+on an unknown name, so a lazy-load typo surfaces instead of being swallowed.
 
-An unknown action returns
-`{error: "unknown action: ... (use list|swap|add|load|remove|reset)"}`.
+It is idempotent when the directive is already active.
+
+An unknown action returns `{error: "unknown action: ... (use list|swap|add|load|remove|reset)"}`.
 
 ### Dispatch paths
 
-All three entry points delegate to the same shared action handler, so they
-expose the identical action set and error shape:
+All three entry points delegate to the same shared action handler,
+so they expose the identical action set and error shape:
 
 | Path                                         | Caller                                          |
 | -------------------------------------------- | ----------------------------------------------- |
@@ -141,8 +146,7 @@ expose the identical action set and error shape:
 | Core C ABI export `aphrodite_directive`      | Handle-based FFI consumers of `libaphrodite`    |
 | `aphrodite_dispatch`'s `"directive"` arm     | The universal string-dispatch C ABI entry point |
 
-The active set persists across a session reset - it is per-process state, not
-per-turn.
+The active set persists across a session reset - it is per-process state, not per-turn.
 
 ## See also
 

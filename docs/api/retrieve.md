@@ -1,8 +1,7 @@
 # Retrieve Endpoint
 
-`POST /retrieve` resolves a CCR hash back to its original content, with
-optional line filtering and pagination. It is the HTTP path behind the
-`aphrodite_retrieve` tool and external callers.
+`POST /retrieve` resolves a CCR hash back to its original content, with optional line filtering
+and pagination. It is the HTTP path behind the `aphrodite_retrieve` tool and external callers.
 
 ## Endpoint
 
@@ -10,9 +9,8 @@ optional line filtering and pagination. It is the HTTP path behind the
 | ------ | ----------- | -------- | ----------------------------------------------- |
 | POST   | `/retrieve` | Loopback | Bearer token when `APHRODITE_MGMT_TOKEN` is set |
 
-Loopback only, plus `Authorization: Bearer <token>` when
-`APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat) - see
-[Environment Variables](../config/env-vars.md).
+Loopback only, plus `Authorization: Bearer <token>` when `APHRODITE_MGMT_TOKEN` is set (unset =
+any loopback caller, back-compat) - see [Environment Variables](../config/env-vars.md).
 
 ## Request
 
@@ -38,9 +36,9 @@ pub struct RetrieveRequest {
 }
 ```
 
-`handle_retrieve` normalized the `hash` argument before lookup: it stripped
-the `|type|size` marker-body suffix and surrounding whitespace, so a hash
-echoed back in full marker form still resolves.
+`handle_retrieve` normalized the `hash` argument before lookup:
+it stripped the `|type|size` marker-body suffix and surrounding whitespace, so a hash echoed back
+in full marker form still resolves.
 
 ## Response
 
@@ -56,10 +54,10 @@ echoed back in full marker form still resolves.
 }
 ```
 
-`truncated` is `true` when `content` is a partial window of a larger stored
-document - because of `offset`/`limit`, or because an explicit `limit` hit the
-10,000-line server cap. `limit: 0` requests the FULL document and never
-truncates - see [Pagination](#pagination).
+`truncated` is `true` when `content` is a partial window of a larger stored document - because
+of `offset`/`limit`, or because an explicit `limit` hit the 10,000-line server cap.
+
+`limit: 0` requests the FULL document and never truncates - see [Pagination](#pagination).
 
 ### Not Found (404)
 
@@ -180,18 +178,20 @@ fn filter_content(content: &str, query: Option<&str>) -> String {
 
 ## Pagination
 
-`limit: 0` requests the FULL document with no cap - this is the round-trip
-contract: a full-document retrieval returns the exact original bytes (the
-lossy lines/join round-trip is skipped entirely, so a trailing newline is
-preserved and the body hashes back to the marker's own hash). Any explicit
-`limit` - including one above 10,000 - is clamped to a 10,000-line server cap.
-When the returned window does not cover the whole document (because of
-`offset`, an explicit `limit`, or the cap), a `[lines a-b/total]` header is
-prepended to `content` and `truncated` is `true`, so a caller can distinguish
-a truncated result from a genuinely short document without parsing the header.
+`limit: 0` requests the FULL document with no cap - this is the round-trip contract:
+a full-document retrieval returns the exact original bytes (the lossy lines/join round-trip
+is skipped entirely, so a trailing newline is preserved and the body hashes back
+to the marker's own hash).
 
-An empty stored document (`content: ""`) is a valid zero-line entry, not an
-out-of-range offset - it returns empty content with `truncated: false`.
+Any explicit `limit` - including one above 10,000 - is clamped to a 10,000-line server cap.
+
+When the returned window does not cover the whole document (because of `offset`,
+an explicit `limit`, or the cap), a `[lines a-b/total]` header is prepended to `content`
+and `truncated` is `true`, so a caller can distinguish a truncated result
+from a genuinely short document without parsing the header.
+
+An empty stored document (`content: ""`) is a valid zero-line entry,
+not an out-of-range offset - it returns empty content with `truncated: false`.
 
 ## Source Tracking
 
@@ -200,8 +200,8 @@ out-of-range offset - it returns empty content with `truncated: false`.
 | `"ccr"`        | Found - served by the inline store or CCR backend |
 | `"none"`       | Not found (error response)                        |
 
-The success path always reports `"ccr"` regardless of which store served the
-content. `source` is `"none"` on 400/404 error responses.
+The success path always reports `"ccr"` regardless of which store served the content. `source`
+is `"none"` on 400/404 error responses.
 
 ## Production Notes
 

@@ -1,6 +1,10 @@
 # Core Data Model
 
-The principal data structures behind the compression engine: the per-session `AphroditeState` (FFI/Hermes path), the per-listener `AppState` (proxy path), the marker/event records they hold, and the vendored `CcrStore` trait with its backends. The two runtime states share the marker/CCR concepts but are separate structs in separate processes.
+The principal data structures behind the compression engine:
+the per-session `AphroditeState` (FFI/Hermes path), the per-listener `AppState` (proxy path),
+the marker/event records they hold, and the vendored `CcrStore` trait with its backends.
+
+The two runtime states share the marker/CCR concepts but are separate structs in separate processes.
 
 ```mermaid
 classDiagram

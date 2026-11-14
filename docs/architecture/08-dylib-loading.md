@@ -1,10 +1,12 @@
 # Dylib Loading (load-once per process)
 
-The Python shim loads the Rust dylib exactly once per process from the
-resolved path (`ctypes.CDLL` on the canonical candidate). There is **no
-hot-reload**: `dlopen` memoizes loaded images by canonical path, and the
-plugin does not work around that with fresh copies. To pick up a newly
-built dylib, **restart the Hermes session** - a new process loads the new
+The Python shim loads the Rust dylib exactly once per process
+from the resolved path (`ctypes.CDLL` on the canonical candidate).
+
+There is **no hot-reload**: `dlopen` memoizes loaded images by canonical path,
+and the plugin does not work around that with fresh copies.
+
+To pick up a newly built dylib, **restart the Hermes session** - a new process loads the new
 image; a running process keeps the image it loaded at startup.
 
 ## Load flow

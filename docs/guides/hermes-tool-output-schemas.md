@@ -1,18 +1,20 @@
 # Hermes Tool Output Schemas
 
-Every Hermes tool returns output with its own shape: unified diffs, JSON
-envelopes, grep listings, markdown, console logs. Aphrodite classifies each
-result into a content type, builds a compact preview, and - when the result
-is above the compression threshold and eligible - replaces it with a CCR
-marker. This page maps the tool surface: what each tool returns, how Aphrodite
-classifies that output, and how much compression typically helps.
+Every Hermes tool returns output with its own shape: unified diffs, JSON envelopes,
+grep listings, markdown, console logs.
 
-The catalog below covers 43 tool-output shapes: 31 Hermes tools, 10 Aphrodite
-meta-tools, and two special entries. The classification pipeline and its 30
-content types are documented in [Content Type
-Taxonomy](../classification/content-types.md); the exact preview strings are
-in the [Enriched Preview
-Catalog](../proxy/compression.md#enriched-preview-catalog).
+Aphrodite classifies each result into a content type, builds a compact preview, and -
+when the result is above the compression threshold and eligible - replaces it with a CCR marker.
+
+This page maps the tool surface: what each tool returns, how Aphrodite classifies that output,
+and how much compression typically helps.
+
+The catalog below covers 43 tool-output shapes: 31 Hermes tools, 10 Aphrodite meta-tools,
+and two special entries.
+
+The classification pipeline and its 30 content types are documented
+in [Content Type Taxonomy](../classification/content-types.md); the exact preview strings are
+in the [Enriched Preview Catalog](../proxy/compression.md#enriched-preview-catalog).
 
 ## Classification Pipeline
 
@@ -25,16 +27,18 @@ Classification runs in stages, and the first match wins at each stage:
 | Semantic refinement | Conservative shape detection for git status/log, grep, ls, test output, tables, markdown, YAML, XML, CSV                                                                          |
 | Caller hint         | An explicit `type` hint on the call overrides the detected type                                                                                                                   |
 
-The stored content is always the original bytes - the extracted payload is
-used only for classification and preview. A caller-supplied type hint always
-wins. See [Content Type
-Taxonomy](../classification/content-types.md#classification-pipeline) for
-the full detection order and signals.
+The stored content is always the original bytes - the extracted payload is used only
+for classification and preview.
+
+A caller-supplied type hint always wins.
+
+See [Content Type Taxonomy](../classification/content-types.md#classification-pipeline)
+for the full detection order and signals.
 
 ## Threshold Groups
 
-Each content type has a threshold multiplier that decides how many bytes
-survive in context before compression:
+Each content type has a threshold multiplier that decides how many bytes survive in context
+before compression:
 
 | Group                          | Types                                                    | Multiplier                      |
 | ------------------------------ | -------------------------------------------------------- | ------------------------------- |
@@ -44,11 +48,12 @@ survive in context before compression:
 | Tracked                        | `diff`, `git`, `text`                                    | ×2                              |
 | Default                        | `tool_output`, `json`, everything else                   | ×1                              |
 
-The base itself is auto-tuned from the historical compression-ratio EMA
-(ratio above 20 → ×2.0, below 3 → ×0.5); the noisy group is exempt so build,
-lint, and log output stays readable during a coding session. See [Content
-Type Taxonomy](../classification/content-types.md#threshold-groups) for the
-full registry.
+The base itself is auto-tuned from the historical compression-ratio EMA (ratio above 20 →
+×2.0, below 3 → ×0.5); the noisy group is exempt so build, lint,
+and log output stays readable during a coding session.
+
+See [Content Type Taxonomy](../classification/content-types.md#threshold-groups)
+for the full registry.
 
 ## Tool-by-Tool Reference
 
@@ -90,11 +95,11 @@ full registry.
 
 ### Aphrodite meta-tools
 
-The plugin ships thirteen `aphrodite_*` tools; the ten below are the ones the
-output catalog tracks. `auto_expand` expands meta-tool output inline - the
-tools are never compressed - so the agent always sees it (the remaining three, `directive`,
-`prefetch`, and `prefetch_status`, return short status text classified as
-`json`/`text`).
+The plugin ships thirteen `aphrodite_*` tools; the ten below are the ones the output catalog tracks.
+
+`auto_expand` expands meta-tool output inline - the tools are never compressed - so the agent
+always sees it (the remaining three, `directive`, `prefetch`, and `prefetch_status`,
+return short status text classified as `json`/`text`).
 
 | Tool                   | Typical output shape                                      | Classification                                    |
 | ---------------------- | --------------------------------------------------------- | ------------------------------------------------- |
@@ -118,10 +123,11 @@ tools are never compressed - so the agent always sees it (the remaining three, `
 
 ## Skip Gates
 
-Compression only happens when the result is eligible. Aphrodite leaves a
-result untouched when it is empty; when the tool is in the essential set - the
-agent needs raw output; when the tool is one of Aphrodite's own or a
-headroom helper; or when the result is below the threshold.
+Compression only happens when the result is eligible.
+
+Aphrodite leaves a result untouched when it is empty; when the tool is
+in the essential set - the agent needs raw output; when the tool is one of Aphrodite's own
+or a headroom helper; or when the result is below the threshold.
 
 | Gate            | Applies to                                                                                            | Setting (default)                                           |
 | --------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
@@ -132,8 +138,8 @@ headroom helper; or when the result is below the threshold.
 
 ## Preview Forms
 
-The preview each type carries is compact and type-aware. Representative
-examples from the enriched catalog:
+The preview each type carries is compact and type-aware. Representative examples
+from the enriched catalog:
 
 ```text
 [build:1E 1W 142L | error[E0432]: unresolved import ...]
@@ -150,15 +156,15 @@ examples from the enriched catalog:
 [text:3L 50B | some unrecognizable prose here]
 ```
 
-When the classifier only reaches a generic bucket (`text`/`terminal`/`log`/
-empty), a semantic detector upgrades the arm to a high-signal shape (git
-status, git log, grep, ls, test) before Aphrodite builds the preview. The rendered
-preview length is capped by `preview_max_chars` (shipped default 0 =
-unlimited; `APHRODITE_PREVIEW_MAX_CHARS` overrides it, and environment beats
-TOML).
-The [Enriched Preview
-Catalog](../proxy/compression.md#enriched-preview-catalog) is authoritative
-for the exact emitted strings.
+When the classifier only reaches a generic bucket (`text`/`terminal`/`log`/ empty),
+a semantic detector upgrades the arm to a high-signal shape (git status, git log, grep, ls,
+test) before Aphrodite builds the preview.
+
+The rendered preview length is capped by `preview_max_chars` (shipped default 0 =
+unlimited; `APHRODITE_PREVIEW_MAX_CHARS` overrides it, and environment beats TOML).
+
+The [Enriched Preview Catalog](../proxy/compression.md#enriched-preview-catalog)
+is authoritative for the exact emitted strings.
 
 ## See also
 

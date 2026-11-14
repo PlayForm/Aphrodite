@@ -2,8 +2,8 @@
 
 ## Proxy doesn't auto-launch
 
-When Hermes loads the plugin, it tries to launch the proxy binary
-automatically. Here's what actually happens, in order:
+When Hermes loads the plugin, it tries to launch the proxy binary automatically. Here's
+what actually happens, in order:
 
 | Step              | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,17 +22,18 @@ automatically. Here's what actually happens, in order:
 | 4   | Confirm nothing else is already bound to `:9797`/`:9798`                                                                                                                                                                  |
 | 5   | If all of the above look fine, launch the binary yourself in a terminal (see [below](#verify-the-proxy-without-hermes)) so you see errors directly instead of through the log file                                        |
 
-To stop the plugin from launching a proxy at all (for example, because you
-manage it yourself per [Verify the proxy without Hermes](#verify-the-proxy-without-hermes)),
-set `APHRODITE_NO_AUTO_LAUNCH=1` in the environment - there is no
-`auto_start` key in either config file.
+To stop the plugin from launching a proxy at all (for example, because you manage it yourself
+per [Verify the proxy without Hermes](#verify-the-proxy-without-hermes)),
+set `APHRODITE_NO_AUTO_LAUNCH=1` in the environment - there is no `auto_start` key
+in either config file.
 
 ## Verify the proxy without Hermes
 
-You don't need a real Hermes session, a real Hermes install, or a real
-upstream API key to confirm the `aphrodite` binary itself works. The API-key
-requirement only matters once a request actually needs to reach an upstream
-LLM - starting the proxy and hitting `/health` never calls upstream at all,
+You don't need a real Hermes session, a real Hermes install, or a real upstream API key
+to confirm the `aphrodite` binary itself works.
+
+The API-key requirement only matters once a request actually needs
+to reach an upstream LLM - starting the proxy and hitting `/health` never calls upstream at all,
 so a placeholder value is enough:
 
 ```bash
@@ -45,17 +46,17 @@ curl http://127.0.0.1:9798/health
 # {"status":"healthy","ccr":true,"mode":"token","version":"<current version>","fill_pct":...}
 ```
 
-Invoked this way, with no `aphrodite.toml` in the working directory,
-`--api-key` (or `APHRODITE_API_KEY` in the environment) is required as a
-flag - the error names it explicitly: "no API key configured - set
-APHRODITE_API_KEY env var or api_key in aphrodite.toml". This is a
-legitimate way to confirm the binary launches and serves `/health`/`/metrics`
-correctly, entirely independent of Hermes - it doesn't need to be a real
-provider key unless you go on to send a completion request through the
-proxy.
+Invoked this way, with no `aphrodite.toml` in the working directory, `--api-key`
+(or `APHRODITE_API_KEY` in the environment) is required
+as a flag - the error names it explicitly: "no API key configured - set APHRODITE_API_KEY env var
+or api_key in aphrodite.toml".
 
-Once the plugin is registered with a live Hermes session, two more paths
-exist entirely inside the agent, no CLI needed:
+This is a legitimate way to confirm the binary launches
+and serves `/health`/`/metrics` correctly, entirely independent of Hermes - it doesn't need
+to be a real provider key unless you go on to send a completion request through the proxy.
+
+Once the plugin is registered with a live Hermes session,
+two more paths exist entirely inside the agent, no CLI needed:
 
 | Tool              | What it checks                                                                                                                                                          |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -72,22 +73,23 @@ Aphrodite touches two config files with no shared keys:
 | `config.yaml`    | Hermes Agent itself                  | `providers.*`, `plugins.enabled`, `context.engine`, `model.*`, and hundreds more unrelated to Aphrodite                                                                 |
 
 Conflating the two is an easy mistake: `cache_port`, `token_port`,
-`compression_threshold`, `classifier_poll`, `context_engine`, and `previews`
-belong to `aphrodite.toml`, not Hermes's `config.yaml`. The proxy resolves
-its config from `~/.hermes/aphrodite/aphrodite.toml` (or
-`APHRODITE_CONFIG_PATH`) when no `aphrodite.toml` sits in the working
-directory.
+`compression_threshold`, `classifier_poll`, `context_engine`, and `previews` belong
+to `aphrodite.toml`, not Hermes's `config.yaml`.
 
-The only Aphrodite-relevant keys that belong in `config.yaml` are
-`plugins.enabled: [aphrodite]` (added automatically by
-`hermes plugins enable aphrodite`) and, optionally,
-`context.engine: aphrodite` / `context.engine_threshold_pct` if you want
-Hermes to route its context-engine offloading through Aphrodite. Everything
-else that tunes _how_ Aphrodite compresses - thresholds, preview style,
-ports, prompt wording - belongs in `aphrodite.toml`.
+The proxy resolves its config from `~/.hermes/aphrodite/aphrodite.toml`
+(or `APHRODITE_CONFIG_PATH`) when no `aphrodite.toml` sits in the working directory.
 
-There is no `auto_start` key in either file: the plugin always attempts to
-launch the proxy if a binary is present at the resolved path. Set
-`APHRODITE_NO_AUTO_LAUNCH=1` to prevent it from launching a proxy itself
-(for example, because you're launching it manually per
-[Verify the proxy without Hermes](#verify-the-proxy-without-hermes)).
+The only Aphrodite-relevant keys that belong in `config.yaml` are `plugins.enabled:
+[aphrodite]` (added automatically by `hermes plugins enable aphrodite`) and,
+optionally, `context.engine: aphrodite` / `context.engine_threshold_pct` if you want Hermes
+to route its context-engine offloading through Aphrodite.
+
+Everything else that tunes _how_ Aphrodite compresses - thresholds, preview style, ports,
+prompt wording - belongs in `aphrodite.toml`.
+
+There is no `auto_start` key in either file: the plugin always attempts to launch the proxy
+if a binary is present at the resolved path.
+
+Set `APHRODITE_NO_AUTO_LAUNCH=1` to prevent it from launching a proxy itself (for example,
+because you're launching it manually per [Verify the proxy
+without Hermes](#verify-the-proxy-without-hermes)).

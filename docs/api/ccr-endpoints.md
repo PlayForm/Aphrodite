@@ -1,19 +1,22 @@
 # CCR Management Endpoints
 
-These loopback-only endpoints let external tools and scripts create, list, and
-delete compressed content entries in the CCR store directly, and re-apply
-the compression configuration live. The Hermes plugin itself compresses and
-retrieves in-process through its dylib bindings - these HTTP routes are for
-anything outside the plugin process.
+These loopback-only endpoints let external tools and scripts create, list,
+and delete compressed content entries in the CCR store directly,
+and re-apply the compression configuration live.
+
+The Hermes plugin itself compresses and retrieves in-process
+through its dylib bindings - these HTTP routes are for anything outside the plugin process.
 
 ## Authentication
 
 All four routes are loopback only, and require `Authorization: Bearer <token>`
 when `APHRODITE_MGMT_TOKEN` is set (unset = any loopback caller, back-compat
-with a one-time startup warning). This management-route auth closes a real
-gap: a hostile local page can issue a CORS "simple request" that lands as a
-write (seeding CCR entries) even though it cannot read the reply. Note this
-token is distinct from `notify_key` below, which authenticates the outbound
+with a one-time startup warning).
+
+This management-route auth closes a real gap: a hostile local page can issue a CORS "simple
+request" that lands as a write (seeding CCR entries) even though it cannot read the reply.
+
+Note this token is distinct from `notify_key` below, which authenticates the outbound
 notification callback.
 
 ## POST /ccr/create
@@ -35,8 +38,8 @@ Creates a new CCR entry. Accepts a JSON body or raw octet-stream bytes.
 }
 ```
 
-`key` overrides the content hash; `ttl_seconds` defaults to 3600; `tags` is
-optional. With no `key`, the hash is computed from the content itself.
+`key` overrides the content hash; `ttl_seconds` defaults to 3600; `tags` is optional.
+With no `key`, the hash is computed from the content itself.
 
 **Response:**
 
@@ -50,16 +53,17 @@ optional. With no `key`, the hash is computed from the content itself.
 }
 ```
 
-`compressed_size`/`marker_size` are the bare hash length - this endpoint's
-wire contract is the hash, not a rendered marker. `token_savings_ratio` is
-`original_size / hash_length` (1.0 for empty content).
+`compressed_size`/`marker_size` are the bare hash length - this endpoint's wire contract is
+the hash, not a rendered marker.
+
+`token_savings_ratio` is `original_size / hash_length` (1.0 for empty content).
 
 ### Octet-Stream Mode
 
 **Content-Type:** `application/octet-stream`
 
-Raw UTF-8 bytes as the body; the hash is computed from the content. Response
-is the same JSON schema as JSON mode.
+Raw UTF-8 bytes as the body; the hash is computed from the content. Response is the same JSON
+schema as JSON mode.
 
 ### Notification
 
@@ -90,9 +94,9 @@ If `notify_url` is configured, an async POST fires on success:
 | 500    | Backend store write failed         |
 | 503    | CCR not enabled                    |
 
-A 503 (rather than a fabricated success) is returned when the CCR store is
-disabled - e.g. token mode with `--no-ccr-marker` - so callers never receive a
-hash that would 404 on a later `/retrieve`.
+A 503 (rather than a fabricated success) is returned when the CCR store is disabled - e.g.
+token mode with `--no-ccr-marker` - so callers never receive a hash that would 404
+on a later `/retrieve`.
 
 ### Types
 
@@ -126,8 +130,7 @@ pub struct CcrNotification {
 
 ## GET /ccr/list
 
-Returns the CCR entry count and backend info (no listing of individual
-entries).
+Returns the CCR entry count and backend info (no listing of individual entries).
 
 ### Response (CCR enabled)
 
@@ -187,11 +190,13 @@ Deletes a specific CCR entry by hash.
 
 ## POST /reload
 
-Hot-reloads `aphrodite.toml` (or `APHRODITE_CONFIG_PATH`) and applies the
-`[compression]` thresholds to the live proxy state - cache/token/inline
-thresholds, the code multiplier, and the auto-expand knobs. The
-`[previews] preview_max_chars` cap is kept in sync too. Other `[compression]`
-keys are echoed for visibility but not applied by the proxy.
+Hot-reloads `aphrodite.toml` (or `APHRODITE_CONFIG_PATH`)
+and applies the `[compression]` thresholds to the live proxy state - cache/token/inline
+thresholds, the code multiplier, and the auto-expand knobs.
+
+The `[previews] preview_max_chars` cap is kept in sync too.
+
+Other `[compression]` keys are echoed for visibility but not applied by the proxy.
 
 ### Response (200 OK)
 
