@@ -23,7 +23,14 @@ with the cap arithmetic adjusted so the marker still fits inside the budget
 hand at release staging: `cargo build --release` registers exactly the 13
 declared production tools, a debug build registers 14, and the catalog test
 asserts whichever profile it is compiled under. Binary `1.8.0 → 1.8.1`; plugin
-`2.3.1` unchanged; `aphrodite-headroom-core` `0.2.0 → 0.2.1`.
+`2.3.1 → 2.3.2`; `aphrodite-headroom-core` `0.2.0 → 0.2.1`.
+
+- **Chore (plugin track)**: `plugin.yaml` `2.3.1 → 2.3.2` with its
+  `install_message` header and the plugin README badge. The cycle had already
+  moved plugin content - the `rhai pinned` correction, the regenerated in-tree
+  `SHA256SUMS.txt`, `BINARY_VERSION 1.8.1` - leaving three commits past `v2.3.1`
+  with no release, so the version advances and is tagged `v2.3.2` alongside this
+  binary.
 
 - **Fix (dependency security)**: `rusqlite` `0.40.2 → 0.41` in the owned headroom
   fork, pulling `libsqlite3-sys` `0.39.1` / bundled SQLite 3.54.1. Closes

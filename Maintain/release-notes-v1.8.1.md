@@ -1,6 +1,6 @@
 **[Compare Aphrodite/v1.8.0...Aphrodite/v1.8.1](https://github.com/PlayForm/Aphrodite/compare/Aphrodite/v1.8.0...Aphrodite/v1.8.1)**
 
-## Aphrodite v1.8.1 💋 Plugin v2.3.1
+## Aphrodite v1.8.1 💋 Plugin v2.3.2
 
 ### Summary
 
@@ -75,19 +75,21 @@ owned headroom fork bumps `rusqlite` `0.40.2 → 0.41` (`aphrodite-headroom-core
 No engine, store, proxy or FFI behaviour changes beyond the three above - the
 `1.8.0` retention caps, the index-driven sweep and the headroom fork's
 compression/detection code are carried over untouched; the fork moves only its
-`rusqlite` constraint. The plugin is unchanged at `v2.3.1`: its README,
-`plugin.yaml` wording and loader message already landed on `Current` with
-`1.8.0`, so this ceremony moves the parent and the fork crate only.
+`rusqlite` constraint. The plugin does move this cycle: its `install_message`
+carried a stale `rhai pinned 1.25.1`, the tag's `Finalize` regenerated its
+in-tree `SHA256SUMS.txt`, and `BINARY_VERSION` had to name `1.8.1` - three
+commits past `v2.3.1`, so the plugin version advances to `v2.3.2` and is tagged
+alongside this binary, the way `v2.3.1` paired with `BINARY_VERSION 1.8.0`.
 
 ### Infrastructure
 
 - Version track: `crates/aphrodite` + `crates/aphrodite-hermes` + the
   `aphrodite-hermes` dependency pin + `package.json` → `1.8.1`, README release
   badge → v1.8.1; `aphrodite-headroom-core` `0.2.0 → 0.2.1` (fork) and the parent
-  pin `crates/aphrodite/Cargo.toml` :55 moved with it. `plugin.yaml` stays
-  `2.3.1` - the plugin carries no delta in this release - and `BINARY_VERSION`
-  moves to `1.8.1` only after the release assets exist: it names a release, so
-  it is set last.
+  pin `crates/aphrodite/Cargo.toml` :55 moved with it. `plugin.yaml` and its
+  `install_message` header move `2.3.1 → 2.3.2` with the plugin README badge,
+  and `BINARY_VERSION` moves to `1.8.1` only after the release assets exist: it
+  names a release, so it is set last.
 - crates.io availability before tagging: `aphrodite` `max_version` 1.8.0,
   `aphrodite-hermes` `max_version` 1.8.0, `aphrodite-headroom-core` `max_version`
   0.2.0 → `1.8.1` / `1.8.1` / `0.2.1` free.
@@ -159,7 +161,7 @@ compression/detection code are carried over untouched; the fork moves only its
 | -------------------------------------------------------------------- | ---------------------------------------- |
 | `aphrodite-<target>` / `libaphrodite_hermes-<target>.{so,dylib,dll}` | per matrix target                        |
 | `SHA256SUMS-<target>.txt`                                            | checksums for that target's two binaries |
-| Plugin v2.3.1                                                        | Hermes (standalone repo, unchanged)      |
+| Plugin v2.3.2                                                        | Hermes (standalone repo, `v2.3.2` tag)   |
 | `aphrodite-headroom-core` 0.2.1                                      | crates.io, by `Publish-Headroom-Core`    |
 
 ### Links
