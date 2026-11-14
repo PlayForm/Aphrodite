@@ -82,40 +82,61 @@ compression/detection code are carried over untouched; the fork moves only its
 ### Infrastructure
 
 - Version track: `crates/aphrodite` + `crates/aphrodite-hermes` + the
-  `aphrodite-hermes` dependency pin + `package.json` → `1.8.1` in one commit
-  (`c8f6e310`), README release badge → v1.8.1. `plugin.yaml` stays `2.3.1` -
-  the plugin carries no delta in this release - and `BINARY_VERSION` moves to
-  `1.8.1` only after the release assets exist: it names a release, so it is set
-  last.
+  `aphrodite-hermes` dependency pin + `package.json` → `1.8.1`, README release
+  badge → v1.8.1; `aphrodite-headroom-core` `0.2.0 → 0.2.1` (fork) and the parent
+  pin `crates/aphrodite/Cargo.toml` :55 moved with it. `plugin.yaml` stays
+  `2.3.1` - the plugin carries no delta in this release - and `BINARY_VERSION`
+  moves to `1.8.1` only after the release assets exist: it names a release, so
+  it is set last.
 - crates.io availability before tagging: `aphrodite` `max_version` 1.8.0,
-  `aphrodite-hermes` `max_version` 1.8.0 → `1.8.1` free on both.
-- Gates on the release tree (`Current` at `c8f6e310`): `cargo check
-  --workspace` ✅ · `cargo build --release -p aphrodite -p aphrodite-hermes` ✅
-  1m42s on `aarch64-apple-darwin` · `cargo fmt --all -- --check` ✅ ·
-  `cargo clippy -p aphrodite -p aphrodite-hermes -- -D warnings` ✅ (the CI
-  invocation; `--all-targets` additionally lints `examples/` and the test
-  modules that CI never lints, and reports 16 pre-existing lints in files this
-  release does not touch).
+  `aphrodite-hermes` `max_version` 1.8.0, `aphrodite-headroom-core` `max_version`
+  0.2.0 → `1.8.1` / `1.8.1` / `0.2.1` free.
+- Toolchain: the local nightly was `1.102.0-nightly (8eb778d04 2026-11-12)` /
+  clippy 0.1.101 while CI resolves the newest; refreshed with `rustup toolchain
+  install nightly --profile minimal --force` → `5f4effd57 2026-11-13` /
+  clippy 0.1.102, which reproduced CI's five `clippy::unnecessary_to_owned`
+  errors locally. No formatting drift from the bump (`cargo fmt --all --
+  --check` clean).
+- Gates on the final release tree: `cargo check --workspace --release` ✅ 37.52s
+  · `cargo build --release -p aphrodite -p aphrodite-hermes` ✅ 29.15s ·
+  `cargo fmt --all -- --check` ✅ · `cargo clippy -p aphrodite -p
+  aphrodite-hermes -- -D warnings` ✅ (the CI invocation) · `cargo deny check` ✅
+  `advisories ok, bans ok, licenses ok, sources ok` (was red on four advisories
+  before the `rusqlite`/`rustls` resolution). `--all-targets` additionally
+  builds targets CI never builds and reports 16 pre-existing lints in `examples/`
+  and test modules this release does not touch.
 - Tests: `cargo test -p aphrodite --lib` ✅ 500 passed / 0 failed / 1 ignored ·
+  `cargo test -p aphrodite --bins` ✅ 16 passed / 0 failed ·
   `cargo test -p aphrodite-hermes --lib` ✅ 61 passed / 0 failed. One transient
-  failure was observed on the first run of the battery (499 passed / 1 failed)
-  and did not reproduce across 16 subsequent runs; the test name was not
+  failure was observed on the first run of an earlier battery (499 passed / 1
+  failed) and did not reproduce across 16 subsequent runs; the test name was not
   captured, so it is recorded as a pre-existing flake risk rather than a
   blocker - the test code is byte-identical to `Development`'s.
 - Transplant audit: 41 files, +370/−135, one commit (`809da98f`). Held back and
   verified unchanged: `.gitmodules`, `.github/workflows/*`,
   `.github/Update.md`, the `plugins/aphrodite` gitlink, and
-  `crates/aphrodite/Cargo.toml` (whose only delta was `Current`'s `lru 0.19.0` /
-  `rhai =1.27.0` pins - crossing it would have reverted them). `README.md` was
-  the only file edited on both sides; `git merge-file` resolved it clean and
-  kept `Current`'s inclusivity-emoji contribution heading.
+  `crates/aphrodite/Cargo.toml` (held back from the transplant because its only
+  Development delta was `Current`'s `lru 0.19.0` / `rhai =1.27.0` pins - crossing
+  it would have reverted them; it is touched afterwards only to move the
+  headroom-core pin). `README.md` was the only file edited on both sides;
+  `git merge-file` resolved it clean and kept `Current`'s inclusivity-emoji
+  contribution heading.
+- Fork cycle: `vendor/headroom` `177a4f41 → c8029afb` (`f9556f13` is the
+  version-carrying bump commit). `RELEASE-CYCLE.md` records 0.2.1 with the
+  `aphrodite-v0.12.0` fork tag still to cut; `CHANGELOG.md` gains the 0.2.1
+  entry and corrects the 0.2.0 row, which still claimed "not published" although
+  crates.io has served 0.2.0 since `Aphrodite/v1.8.0`.
 - Known pre-existing reds, not introduced here: `Maintain/Check.sh` on `Current`
   calls `cargo ci-hooks` (`Maintain/dynamic_hooks/`), which the previous
   promotion also held back from this line; `Maintain/CheckParity.py` compares
-  against a `Check.yml` that is deliberately test-free on this branch.
+  against a `Check.yml` that is deliberately test-free on this branch; and
+  `vendor/headroom/crates/headroom-core/benches/ccr_store.rs:61` implements
+  `CcrStore::put` as `-> bool` against a unit-returning trait, so the fork's
+  bench target does not compile - no gate builds benches.
 - Still outstanding at tag time: the `Aphrodite/v1.8.1` tag, the `Build.yml`
-  4-target matrix and its 12 assets, `Publish.yml` via `workflow_run`, and the
-  `BINARY_VERSION` bump to `1.8.1`.
+  4-target matrix and its 12 assets, `Publish.yml` via `workflow_run`,
+  `Publish-Headroom-Core` publishing 0.2.1, the `aphrodite-v0.12.0` fork tag,
+  and the `BINARY_VERSION` bump to `1.8.1`.
 
 ### What Ships
 
