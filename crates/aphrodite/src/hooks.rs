@@ -342,7 +342,7 @@ fn transform_tool_result_inner(
 	// never recorded. Skipping compression and recording a reference are
 	// independent decisions; do both regardless of which tools land in
 	// which list.
-	if state.file_tools.contains(&tool_name.to_string())
+	if state.file_tools.iter().any(|t| t == tool_name)
 		&& let Some(path) = extract_file_path(content, tool_name)
 	{
 		state.record_file(path, tool_name.to_string());

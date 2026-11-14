@@ -25,7 +25,7 @@ pub fn resolve_recursive(
 	visited:&mut Vec<String>,
 ) -> Option<String> {
 	// Cycle detection
-	if visited.contains(&hash_val.to_string()) {
+	if visited.iter().any(|v| v == hash_val) {
 		return resolved.get(hash_val).cloned();
 	}
 	visited.push(hash_val.to_string());

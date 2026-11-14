@@ -46,7 +46,7 @@ pub fn handle_action(state:&mut crate::state::AphroditeState, action:&str, name:
 			}
 		},
 		"add" => {
-			if state.directives.contains_key(name) && !state.active_directives.contains(&name.to_string()) {
+			if state.directives.contains_key(name) && !state.active_directives.iter().any(|d| d == name) {
 				state.active_directives.push(name.to_string());
 			}
 			state.manual_directive_turn = Some(state.turn_counter);
@@ -62,7 +62,7 @@ pub fn handle_action(state:&mut crate::state::AphroditeState, action:&str, name:
 			if !state.directives.contains_key(name) {
 				return serde_json::json!({"error": format!("unknown directive: {}", name)});
 			}
-			if !state.active_directives.contains(&name.to_string()) {
+			if !state.active_directives.iter().any(|d| d == name) {
 				state.active_directives.push(name.to_string());
 			}
 			state.manual_directive_turn = Some(state.turn_counter);
