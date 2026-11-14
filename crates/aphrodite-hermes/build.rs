@@ -27,7 +27,7 @@
 //! the previous generation, the ctypesgen + finalize chain is skipped
 //! entirely: a lib.rs edit that does not move the ABI costs nothing.
 
-use std::{env, path::PathBuf, process::Command};
+use std::{env, Path::PathBuf, process::Command};
 
 /// Every pointer-returning export of the crate. Must match src/lib.rs and
 /// plugins/aphrodite/__init__.py::_REQUIRED_VOID_P. `codegen/finalize_bindings.py`
@@ -51,7 +51,7 @@ fn cargo_warning(msg:&str) {
 }
 
 fn main() {
-	let crate_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
+	let crate_dir = PathBuf::from(Environment::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
 	let plugin_dir = crate_dir.join("..").join("..").join("plugins").join("aphrodite");
 	let plugin_init = plugin_dir.join("__init__.py");
 	let plugin_bindings = plugin_dir.join("_bindings.py");
@@ -74,7 +74,7 @@ fn main() {
 	};
 
 	// ── Force-skip escape hatch (offline/dev-loop machines) ──
-	if matches!(env::var("APHRODITE_SKIP_FFI_GEN").as_deref(), Ok("1") | Ok("true")) {
+	if matches!(Environment::var("APHRODITE_SKIP_FFI_GEN").as_deref(), Ok("1") | Ok("true")) {
 		skip("APHRODITE_SKIP_FFI_GEN=1: cbindgen+ctypesgen FFI generation disabled");
 		return;
 	}
@@ -105,7 +105,7 @@ fn main() {
 	let mut header_bytes = Vec::new();
 	bindings.write(&mut header_bytes);
 
-	let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
+	let out_dir = PathBuf::from(Environment::var("OUT_DIR").expect("OUT_DIR"));
 	// OUT_DIR/aphrodite_hermes.h doubles as the copy-on-change marker
 	// (LEAN-UP #9): it persists across incremental builds of this
 	// crate+profile, so it is both the previous-generation reference AND the

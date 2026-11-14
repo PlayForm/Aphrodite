@@ -18,8 +18,8 @@
 //! NOTE on detection: the proxy's own classifier lives in proxy.rs
 //! (`proxy_detect_content_type`) and is not exposed over HTTP, so this
 //! bench verifies coverage against the same underlying engine pieces the
-//! hook/FFI path uses - `preview::detect_type` (headroom classifier) plus
-//! `preview::detect_semantic_type` (Aphrodite's tool-output override).
+//! hook/FFI path uses - `Preview::detect_type` (headroom classifier) plus
+//! `Preview::detect_semantic_type` (Aphrodite's tool-output override).
 
 use std::{
 	process::{Command, Stdio},
@@ -180,7 +180,7 @@ fn corpus() -> Vec<Sample> {
 			label: "test",
 			content: "running 330 tests\n".to_string()
 						+ (0..40)
-							.map(|i| format!("test module_{}::tests::test_case_{} ... ok\n", i % 8, i))
+							.map(|i| format!("test module_{}::Test::test_case_{} ... ok\n", i % 8, i))
 							.collect::<String>()
 							.as_str()
 						+ "test result: ok. 329 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s\n",
@@ -275,8 +275,8 @@ fn classify(content:&str) -> (String, Option<&'static str>) {
 	// `detect_type` = headroom classifier; `detect_semantic_type` = the
 	// Aphrodite tool-output override that takes precedence in preview.rs.
 	(
-		aphrodite::preview::detect_type(content),
-		aphrodite::preview::detect_semantic_type(content),
+		aphrodite::Preview::detect_type(content),
+		aphrodite::Preview::detect_semantic_type(content),
 	)
 }
 

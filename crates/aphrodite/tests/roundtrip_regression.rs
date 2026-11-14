@@ -31,7 +31,7 @@ fn limit_zero_returns_full_document_over_10000_lines_byte_identical() {
 		"regression needs a document over the 10,000-line cap"
 	);
 
-	let (got, truncated) = aphrodite::retrieve::paginate(&content, 0, 0).expect("paginate ok");
+	let (got, truncated) = aphrodite::Retrieve::paginate(&content, 0, 0).expect("paginate ok");
 	assert_eq!(got, content, "limit:0 must return the exact original bytes");
 	assert!(!truncated, "limit:0 never truncates");
 }
@@ -40,7 +40,7 @@ fn limit_zero_returns_full_document_over_10000_lines_byte_identical() {
 fn full_document_retrieval_preserves_content_addressing_hash() {
 	// Round-trip contract: the returned body hashes to the marker's own hash.
 	let content = wide_document();
-	let (got, _) = aphrodite::retrieve::paginate(&content, 0, 0).expect("paginate ok");
+	let (got, _) = aphrodite::Retrieve::paginate(&content, 0, 0).expect("paginate ok");
 
 	let original_hash = headroom_core::ccr::compute_key(content.as_bytes());
 	let retrieved_hash = headroom_core::ccr::compute_key(got.as_bytes());
@@ -57,10 +57,10 @@ fn large_document_round_trips_through_store_and_expand() {
 	let content = wide_document();
 	let hash = headroom_core::ccr::compute_key(content.as_bytes());
 
-	let mut state = aphrodite::state::AphroditeState::default();
+	let mut state = aphrodite::State::AphroditeState::default();
 	state.inline_store_put(hash.clone(), content.clone());
 
-	let expanded = aphrodite::resolve::expand(&mut state, &hash).expect("entry found");
+	let expanded = aphrodite::Resolve::expand(&mut state, &hash).expect("entry found");
 	assert_eq!(expanded, content, "expand must return the exact original bytes");
 	assert_eq!(headroom_core::ccr::compute_key(expanded.as_bytes()), hash);
 }
@@ -70,7 +70,7 @@ fn explicit_limit_over_cap_still_truncates() {
 	// The 02-F5 safety cap still applies to explicit limits - only limit:0
 	// means the full document.
 	let content = wide_document();
-	let (got, truncated) = aphrodite::retrieve::paginate(&content, 0, 999_999).expect("paginate ok");
+	let (got, truncated) = aphrodite::Retrieve::paginate(&content, 0, 999_999).expect("paginate ok");
 	assert!(truncated);
 	assert!(got.starts_with("[lines 1-10000/"), "explicit limit must still window");
 	assert!(got.len() < content.len());

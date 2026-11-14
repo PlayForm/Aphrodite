@@ -7,19 +7,19 @@ license.workspace = true
 repository.workspace = true
 description = "aphrodite: Chat Completions proxy with CCR, tool relay, and programmatic CCR for Hermes agent integration."
 exclude = ["examples/", "tests/", "benches/", ".hermes/", ".plans/"]
-# NOTE: do NOT add `*.md` here. `src/builtin_directives/*.md` are embedded into
+# NOTE: do NOT add `*.md` here. `Source/BuiltinDirective/*.md` are embedded into
 # the binary via `include_str!` (see src/directives/) and MUST ship in the
 # crates.io tarball. Cargo does NOT auto-include `include_str!` targets, so a
 # recursive `*.md` exclude previously stripped them from v1.3.8, producing a
 # tarball that failed to compile on `cargo install`. Removing `*.md` from
-# `exclude` is sufficient - `src/` (including the directive .md files) ships by
+# `exclude` is sufficient - `Source/` (including the directive .md files) ships by
 # default. (An `include = [...]` list was tried but cargo then ignores `exclude`
-# entirely and drops src/lib.rs/src/main.rs, breaking the package - so `include`
+# entirely and drops Source/Library.rs/Source/Main.rs, breaking the package - so `include`
 # is intentionally NOT used here.)
 
 [[bin]]
 name = "aphrodite"
-path = "src/main.rs"
+path = "Source/Main.rs"
 required-features = ["proxy"]
 
 [[example]]
@@ -49,7 +49,7 @@ required-features = ["proxy"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-path = "src/lib.rs"
+path = "Source/Library.rs"
 
 [dependencies]
 headroom-core = { package = "aphrodite-headroom-core", path = "../../vendor/headroom/crates/headroom-core", version = "0.2.1", default-features = false }

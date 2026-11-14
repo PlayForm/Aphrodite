@@ -16,7 +16,7 @@
 //! this reliably: it runs against the checkout (files present) and is skipped
 //! under `cargo publish --no-verify`.
 
-use std::{path::Path, process::Command};
+use std::{Path::Path, process::Command};
 
 /// Extract the path argument from `include_str!("...")` occurrences wherever
 /// they appear on a line (they sit inside a tuple, e.g.

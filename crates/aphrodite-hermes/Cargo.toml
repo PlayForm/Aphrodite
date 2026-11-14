@@ -9,11 +9,11 @@ description = "aphrodite-hermes: Hermes Agent-specific integration for Aphrodite
 
 [[bin]]
 name = "aphrodite-hermes-setup"
-path = "src/bin/setup-helper.rs"
+path = "Source/Bin/SetupHelper.rs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-path = "src/lib.rs"
+path = "Source/Library.rs"
 
 [dependencies]
 aphrodite = { path = "../aphrodite", version = "1.8.1", default-features = false }
