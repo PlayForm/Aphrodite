@@ -10,6 +10,7 @@ license = "CC0-1.0"
 repository = "https://github.com/PlayForm/Aphrodite"
 
 [workspace.dependencies]
+anyhow = "1.0.104"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = [
 	"preserve_order",
@@ -17,5 +18,4 @@ serde_json = { version = "1.0.154", features = [
 	"raw_value",
 ] }
 bytes = "1.12.1"
-thiserror = "2.0.21"
 tracing = "0.1.44"

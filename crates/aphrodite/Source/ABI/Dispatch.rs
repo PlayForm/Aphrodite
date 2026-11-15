@@ -3,9 +3,9 @@
 
 use std::os::raw::c_char;
 
-use super::{
+use crate::ABI::{
 	Guard::{Cstr, MaximumContent, ToJSONError, ToJSONOk},
-	Handle::WithState,
+	Handle::Lookup::WithState,
 };
 
 /// Universal hook dispatcher. Python calls this for every hook handler.
@@ -64,8 +64,8 @@ pub extern "C" fn AphroditeDispatch(
 	match WithState(Hid, |s| {
 		match name.as_ref() {
 			"on_session_start" | "session_start" => crate::Hook::Session::Fn::Fn(s),
-			"transform_tool_result" => crate::Hook::TransformToolResult(s, Content, Tool),
-			"transform_terminal_output" => crate::Hook::TransformTerminalOutput(s, Content),
+			"transform_tool_result" => crate::Hook::ToolResult::Entry::Fn::TransformToolResult(s, Content, Tool),
+			"transform_terminal_output" => crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(s, Content),
 			"pre_llm_call" => crate::Hook::LLM::Pre::Fn::Fn(s),
 			"post_llm_call" => crate::Hook::LLM::Post::Fn::Fn(s),
 			"catalog" => {

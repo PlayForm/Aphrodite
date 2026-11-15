@@ -9,7 +9,7 @@
 
 use crate::{
 	PollWorker::Task::{Const::StaleTurnAge, Status::Enum::BgStatus},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 /// Expire background tasks that the agent has stopped polling.

@@ -40,12 +40,4 @@ pub mod Struct;
 pub mod Template;
 
 #[cfg(test)]
-mod Test;
-
-pub use ChainSplit::SplitEvent;
-pub use Const::DefaultInlineByteBudget;
-pub use Directive::ActiveDirective;
-pub use Event::ToolEvent;
-pub use Marker::MarkerEntry;
-pub use Struct::AphroditeState;
-pub use Template::TemplatesConfiguration;
+pub mod Test;

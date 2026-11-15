@@ -5,7 +5,7 @@ use crate::{
 		Insert::Fn::InsertBgTask,
 		Task::{Const::MaximumBgTasks, Status::Enum::BgStatus},
 	},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 #[test]

@@ -5,7 +5,7 @@
 //! running build would otherwise crowd out the behavioural directives the
 //! turn actually needs. Stale tasks are silent - the agent already left them.
 
-use crate::{PollWorker::Task::Status::Enum::BgStatus, State::AphroditeState};
+use crate::{PollWorker::Task::Status::Enum::BgStatus, State::Struct::AphroditeState};
 
 /// Check all background tasks and push ephemeral nudges for any that
 /// need the agent's attention. Called from `PreLLMCall`.
@@ -30,7 +30,7 @@ pub fn CheckBgTasks(State:&mut AphroditeState) {
 				} else {
 					String::from(" (not polled yet)")
 				};
-				crate::Flow::PushNudge(
+				crate::Flow::Nudge::Push::Fn::PushNudge(
 					State,
 					&format!(
 						"poll worker: `{}` still running since turn {}{}. Use process(action='poll').",
@@ -42,7 +42,7 @@ pub fn CheckBgTasks(State:&mut AphroditeState) {
 			},
 			BgStatus::Done { ExitCode } => {
 				let HashPreview = task.OutputPreview.as_deref().unwrap_or("[output available]");
-				crate::Flow::PushNudge(
+				crate::Flow::Nudge::Push::Fn::PushNudge(
 					State,
 					&format!(
 						"✓ poll worker: `{}` completed (exit {}). Retrieve: aphrodite_retrieve(hash={}) - {}",
@@ -57,7 +57,7 @@ pub fn CheckBgTasks(State:&mut AphroditeState) {
 			},
 			BgStatus::Failed { ExitCode } => {
 				let HashPreview = task.OutputPreview.as_deref().unwrap_or("[error output available]");
-				crate::Flow::PushNudge(
+				crate::Flow::Nudge::Push::Fn::PushNudge(
 					State,
 					&format!(
 						"✗ poll worker: `{}` failed (exit {}). Retrieve: aphrodite_retrieve(hash={}) - {}",

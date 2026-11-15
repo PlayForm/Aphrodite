@@ -1,8 +1,8 @@
 //! The rolling turn window and its aggregate.
 
 use crate::{
-	Flow::TurnWindow,
-	State::{AphroditeState, ToolEvent},
+	Flow::Window::Turn::Fn::TurnWindow,
+	State::{Event::Struct::ToolEvent, Struct::AphroditeState},
 };
 
 #[test]

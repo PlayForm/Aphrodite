@@ -9,7 +9,7 @@
 
 use crate::{
 	PollWorker::Task::Status::Enum::BgStatus,
-	State::{AphroditeState, MarkerEntry},
+	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
 };
 
 /// Update a background task's status based on a `process(action='poll')`
@@ -94,7 +94,7 @@ pub fn UpdateFromPoll(State:&mut AphroditeState, ToolName:&str, Content:&str) ->
 
 	for (i, ExitCodeValue, AccOutput) in Completions {
 		let hash = headroom_core::ccr::compute_key(AccOutput.as_bytes());
-		let Preview = crate::BuildPreview("terminal", &AccOutput);
+		let Preview = crate::Preview::Builder::Entry::Fn("terminal", &AccOutput);
 		State.InlineStorePut(hash.clone(), AccOutput);
 
 		// Collect task metadata BEFORE mutably borrowing bg_tasks[i],

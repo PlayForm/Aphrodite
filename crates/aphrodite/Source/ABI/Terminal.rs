@@ -17,6 +17,6 @@ stateful!(
 		if Content.len() > MaximumContent {
 			return serde_json::json!({"error":"content exceeds 16MB limit"});
 		}
-		crate::Hook::TransformTerminalOutput(s, &Content)
+		crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(s, &Content)
 	}
 );

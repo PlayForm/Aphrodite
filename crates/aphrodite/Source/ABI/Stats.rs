@@ -3,9 +3,9 @@
 
 use std::os::raw::c_char;
 
-use super::{
+use crate::ABI::{
 	Guard::{Cstr, Guarded, ToJSONError, ToJSONOk},
-	Handle::GetHandle,
+	Handle::Lookup::GetHandle,
 };
 
 /// Answer with the session's counters and the configuration actually in

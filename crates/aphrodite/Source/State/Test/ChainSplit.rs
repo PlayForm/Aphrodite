@@ -2,8 +2,8 @@
 //! every adaptation branch (raise, hold, clamp at both ends, minimum events).
 
 use crate::State::{
-	AphroditeState,
 	Const::{SplitAdaptMinimumEvents, SplitEventCap},
+	Struct::AphroditeState,
 };
 
 #[test]

@@ -25,12 +25,12 @@ pub fn Load(
 		// process-global preview builder - the key was declared in the
 		// config structs but never read anywhere, so every preview knob
 		// was a no-op. Absent -> unlimited (legacy behavior).
-		aphrodite::Preview::SetPreviewMaximumChars(Configuration.Previews.as_ref().and_then(|p| p.PreviewMaximumChars));
+		aphrodite::Preview::State::Set::Fn(Configuration.Previews.as_ref().and_then(|p| p.PreviewMaximumChars));
 		// ── TOML-driven marker block templates (pre-Rust port): register the
 		// `[templates.marker]` format/hint strings and the `[prompts]
 		// ccr_marker_hint` knob process-globally, mirroring the preview-cap
 		// registration above (the marker builder has no AphroditeState).
-		aphrodite::Marker::SetMarkerTemplates(
+		aphrodite::Marker::Format::Const::SetMarkerTemplates(
 			Configuration
 				.Templates
 				.as_ref()
@@ -49,11 +49,12 @@ pub fn Load(
 		// instead of the hardcoded per-arm builders. Absent -> hardcoded.
 		aphrodite::Template::Family::Set::Fn::Fn(Configuration.Previews.as_ref().and_then(|p| p.ModelFamily.clone()));
 		aphrodite::Template::Set::Fn::Fn(Configuration.Templates.clone());
-		let LogCompact = aphrodite::Configuration::EnvironmentBool("APHRODITE_LOG_COMPACT");
+		let LogCompact = aphrodite::Configuration::Environment::Bool::Fn::EnvironmentBool("APHRODITE_LOG_COMPACT");
 		Ok((Some(Configuration), None, LogCompact))
 	} else {
 		let CLI = CLI::parse();
-		let LogCompact = CLI.LogCompact || aphrodite::Configuration::EnvironmentBool("APHRODITE_LOG_COMPACT");
+		let LogCompact =
+			CLI.LogCompact || aphrodite::Configuration::Environment::Bool::Fn::EnvironmentBool("APHRODITE_LOG_COMPACT");
 		Ok((None, Some(CLI), LogCompact))
 	}
 }

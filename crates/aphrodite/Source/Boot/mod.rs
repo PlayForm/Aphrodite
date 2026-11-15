@@ -10,13 +10,10 @@
 //! Nothing here is a second copy of `crate::Proxy` - that module is the
 //! request-handling engine, and this tree only decides when and where it runs.
 
-mod Banner;
-mod Configuration;
-mod Fn;
-mod Listen;
-mod Route;
-mod Run;
-mod State;
-
-pub use Banner::Announce;
-pub use Fn::Fn;
+pub mod Banner;
+pub mod Configuration;
+pub mod Fn;
+pub mod Listen;
+pub mod Route;
+pub mod Run;
+pub mod State;

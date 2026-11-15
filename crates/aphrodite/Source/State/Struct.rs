@@ -12,12 +12,12 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use super::{
-	ChainSplit::SplitEvent,
-	Directive::ActiveDirective,
-	Event::ToolEvent,
-	Marker::MarkerEntry,
-	Template::TemplatesConfiguration,
+use crate::State::{
+	ChainSplit::Struct::SplitEvent,
+	Directive::Struct::ActiveDirective,
+	Event::Struct::ToolEvent,
+	Marker::Struct::MarkerEntry,
+	Template::Struct::TemplatesConfiguration,
 };
 
 /// Session state - one per loaded dylib instance.

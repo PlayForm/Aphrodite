@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use super::super::Struct::Struct;
-use crate::ConfigurationLoader::WarnParseFailure;
+use crate::ConfigurationLoader::Warn::Fn::WarnParseFailure;
 
 impl Struct {
 	/// Load from an explicit TOML file path, bypassing `load()`'s search

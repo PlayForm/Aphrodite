@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use crate::{
 	Resolve::{One, Parse::Find},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 // Depth limit is `AphroditeState::recursive_depth` - config-driven via

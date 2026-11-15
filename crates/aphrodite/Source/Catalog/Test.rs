@@ -3,7 +3,7 @@
 
 use crate::{
 	Catalog::{Build::Fn::Fn as BuildCatalog, Format::Fn::Fn as FormatCatalogTable},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 #[test]
@@ -16,7 +16,7 @@ fn TestEmptyCatalog() {
 #[test]
 fn TestCatalogWithItems() {
 	let mut s = AphroditeState::default();
-	s.RecordMarker(crate::State::MarkerEntry {
+	s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 		hash:"abc123def456".into(),
 		CCRType:"code_rust".into(),
 		Size:1024,
@@ -25,7 +25,7 @@ fn TestCatalogWithItems() {
 		Center:None,
 		meta:None,
 	});
-	s.RecordMarker(crate::State::MarkerEntry {
+	s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 		hash:"def789abc012".into(),
 		CCRType:"diff".into(),
 		Size:2048,
@@ -49,7 +49,7 @@ fn TestCatalogWithItems() {
 #[test]
 fn TestTocMode() {
 	let mut s = AphroditeState::default();
-	s.RecordMarker(crate::State::MarkerEntry {
+	s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -68,13 +68,13 @@ fn TestTocMode() {
 #[test]
 fn TestTocHintUsesConfiguredSearchHintTemplate() {
 	let mut s = AphroditeState::default();
-	s.Templates = Some(crate::State::TemplatesConfiguration::default());
+	s.Templates = Some(crate::State::Template::Struct::TemplatesConfiguration::default());
 	s.Templates
 		.as_mut()
 		.unwrap()
 		.Prompts
 		.insert("search_hint".into(), "custom search hint".into());
-	s.RecordMarker(crate::State::MarkerEntry {
+	s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -110,7 +110,7 @@ fn TestByTypeJSONDeterministic() {
 	.iter()
 	.enumerate()
 	{
-		s.RecordMarker(crate::State::MarkerEntry {
+		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:hash.to_string(),
 			CCRType:CCRType.to_string(),
 			Size:100 + i * 10,
@@ -136,7 +136,7 @@ fn TestTableSortsByTurnAndCapsTwenty() {
 	// insertion order would wrongly place it in the newest window.
 	let mut s = AphroditeState::default();
 	for i in 0..25 {
-		s.RecordMarker(crate::State::MarkerEntry {
+		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:format!("h{:02}", i),
 			CCRType:"text".into(),
 			Size:100,

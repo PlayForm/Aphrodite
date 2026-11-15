@@ -13,7 +13,7 @@ use axum::{
 	response::{IntoResponse, Json},
 };
 
-use crate::Guard::CheckLoopbackRequest;
+use crate::Guard::Loopback::Fn::CheckLoopbackRequest;
 
 /// Middleware that rejects non-loopback clients on all routes except /health.
 /// /health is intentionally exempt so external load-balancer probes work.

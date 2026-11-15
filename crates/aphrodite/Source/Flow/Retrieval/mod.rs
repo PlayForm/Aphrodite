@@ -6,5 +6,3 @@
 
 pub mod AutoExpand;
 pub mod Guidance;
-
-pub(crate) use self::{AutoExpand::AutoExpandGuidanceBlock, Guidance::RetrievalGuidanceBlock};

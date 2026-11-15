@@ -2,9 +2,9 @@
 
 use std::os::raw::c_char;
 
-use super::{
+use crate::ABI::{
 	Guard::{Cstr, ToJSONError, ToJSONOk},
-	Handle::WithState,
+	Handle::Lookup::WithState,
 };
 
 /// Run the `OnSessionStart` hook body and answer with its JSON result.
@@ -24,7 +24,7 @@ pub extern "C" fn AphroditeSessionStart(Handle:*const c_char) -> *mut c_char {
 		Ok(ID) => ID,
 		Err(_) => return ToJSONError("invalid handle"),
 	};
-	match WithState(Hid, crate::Session::OnSessionStart) {
+	match WithState(Hid, crate::Session::Start::Fn::OnSessionStart) {
 		Ok(v) => ToJSONOk(&v),
 		Err(e) => ToJSONError(&e),
 	}

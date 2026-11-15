@@ -19,6 +19,6 @@ use crate::Proxy::{Format::Fn::Fn as ProxyFormatCCROutput, Metadata::Fn::Fn as G
 pub(crate) fn Fn(hash:&str, Content:&str, Ct:&str, Center:Option<&str>) -> String {
 	let Size = Content.len();
 	let Metadata = GenerateMetadata(Content, Ct);
-	let Preview = crate::Preview::BuildPreview(Ct, Content);
+	let Preview = crate::Preview::Builder::Entry::Fn(Ct, Content);
 	ProxyFormatCCROutput(&Preview, Ct, &Metadata, Center, hash, Size)
 }

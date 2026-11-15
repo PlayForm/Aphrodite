@@ -9,7 +9,7 @@
 use super::*;
 use crate::{
 	Resolve::{Expand::Fn as Expand, Recursive::Inline::Fn as ResolveInline},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 #[test]

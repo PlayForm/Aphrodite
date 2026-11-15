@@ -31,7 +31,7 @@ pub(crate) async fn Fn(State:&AppState, Tool:&str, Params:&serde_json::Value) ->
 			// marker body back as the hash argument instead of the bare
 			// hash, and the lookups below (inline_ccr, CCR backend) are
 			// exact-match only.
-			let hash = crate::Marker::NormalizeHash(HashRaw);
+			let hash = crate::Marker::Parse::Normalize::NormalizeHash(HashRaw);
 			// Check inline_ccr first (no round-trip needed for tiny entries)
 			if let Ok(mut Map) = State.InlineCCR.lock()
 				&& let Some(Content) = Map.get(hash)

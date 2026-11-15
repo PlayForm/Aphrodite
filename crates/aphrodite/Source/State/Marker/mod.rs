@@ -11,5 +11,3 @@
 
 pub mod Record;
 pub mod Struct;
-
-pub use Struct::MarkerEntry;

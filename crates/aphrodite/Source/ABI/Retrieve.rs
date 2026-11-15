@@ -2,9 +2,9 @@
 
 use std::{ffi::CString, os::raw::c_char};
 
-use super::{
+use crate::ABI::{
 	Guard::{Cstr, Guarded, ToJSONError},
-	Handle::GetHandle,
+	Handle::Lookup::GetHandle,
 };
 
 /// Return the raw content stored under `hash` - not a JSON envelope.

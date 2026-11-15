@@ -3,7 +3,7 @@
 
 use crate::{
 	PollWorker::{Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus, Update::Fn::UpdateFromPoll},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 #[test]

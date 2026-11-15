@@ -1,6 +1,6 @@
 //! `Host` header parsing and the loopback allowlist.
 
-use crate::Guard::{HostHeaderToHostname, Loopback::Fn::AllowedLoopbackHosts};
+use crate::Guard::{Host::Fn::HostHeaderToHostname, Loopback::Fn::AllowedLoopbackHosts};
 
 // ── T5 (F1): Host-header validation must accept every loopback form a
 // real client uses and reject a DNS-rebinding attacker's own hostname,

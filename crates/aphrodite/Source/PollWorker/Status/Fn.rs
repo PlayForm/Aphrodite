@@ -9,7 +9,7 @@
 
 use crate::{
 	PollWorker::Task::{Status::Enum::BgStatus, Struct::BgTask},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 /// Render bg task status lines for injection into `BuildTurnContext`.

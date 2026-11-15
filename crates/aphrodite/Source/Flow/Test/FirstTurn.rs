@@ -2,8 +2,8 @@
 //! when `SessionInject` is non-empty.
 
 use crate::{
-	Flow::{BuildTurnContext, ShippedSessionInject},
-	State::AphroditeState,
+	Flow::{Prompt::Const::ShippedSessionInject, TurnContext::Fn::BuildTurnContext},
+	State::Struct::AphroditeState,
 };
 
 // ── First-turn session injection: rendered only on turn 0, dropped after ──

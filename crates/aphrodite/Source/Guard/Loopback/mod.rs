@@ -8,6 +8,3 @@
 
 pub mod Fn;
 pub mod Middleware;
-
-pub use Fn::CheckLoopbackRequest;
-pub use Middleware::LoopbackOnly;

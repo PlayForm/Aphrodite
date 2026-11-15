@@ -6,7 +6,7 @@
 //! context; it is instrumentation, and the `T0` option is how the whole block
 //! costs one atomic load when the logger is off.
 
-use crate::{Flow::SectionLabel, State::AphroditeState};
+use crate::{Flow::Section::Label::Fn::SectionLabel, State::Struct::AphroditeState};
 
 /// Emit the `pre_turn_sections` line: one label + byte size per surviving
 /// section, the flow budget, the floor, and the cumulative metrics snapshot.

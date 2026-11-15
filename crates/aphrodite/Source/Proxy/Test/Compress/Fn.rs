@@ -11,7 +11,10 @@ use crate::{
 	Proxy::{
 		Compress::Chat::Fn::Fn as CompressChatCompletion,
 		State::CCR::Get::Fn::Fn as CCRGet,
-		Test::Support::{ChatCompletionBody, TestStateWithCCR, TestStateWithFailingCCR},
+		Test::Support::{
+			Chat::Fn::ChatCompletionBody,
+			State::Fn::{TestStateWithCCR, TestStateWithFailingCCR},
+		},
 	},
 };
 

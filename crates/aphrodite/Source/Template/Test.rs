@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use crate::{
-	State::TemplatesConfiguration,
+	State::Template::Struct::TemplatesConfiguration,
 	Template::{
 		Family::{Get::Fn::Fn as GetPreviewFamily, Set::Fn::Fn as SetPreviewFamily},
 		Get::Fn::Fn as GetTemplates,
@@ -106,7 +106,7 @@ fn TestTemplatesRegistryRoundtrip() {
 #[test]
 fn TestBuildPreviewConsultsRegisteredTemplates() {
 	let _G = TemplatesTestGuard();
-	let _Cap = crate::Preview::PreviewCapTestGuard();
+	let _Cap = crate::Preview::State::Guard::Fn();
 	let mut FamMap = HashMap::new();
 	FamMap.insert("diff".to_string(), "[tpl {type} {ln}L]".to_string());
 	let mut Preview = HashMap::new();
@@ -122,19 +122,19 @@ fn TestBuildPreviewConsultsRegisteredTemplates() {
 	// Template renders first; the cap (8 chars) truncates it on a char
 	// boundary, keeping room for the three-char `...` marker and the
 	// closing `]`.
-	crate::Preview::SetPreviewMaximumChars(Some(8));
-	let Out = crate::Preview::BuildPreview("diff", "a\nb\n");
+	crate::Preview::State::Set::Fn(Some(8));
+	let Out = crate::Preview::Builder::Entry::Fn("diff", "a\nb\n");
 	assert_eq!(Out, "[tpl...]");
 
 	// Unregistered -> hardcoded diff arm. Lift the cap first: at 8 chars
 	// the three-char `...` leaves only `[dif`, which cannot distinguish
 	// the arm that rendered from any other.
 	SetTemplates(None);
-	crate::Preview::SetPreviewMaximumChars(None);
-	let Out = crate::Preview::BuildPreview("diff", "a\nb\n");
+	crate::Preview::State::Set::Fn(None);
+	let Out = crate::Preview::Builder::Entry::Fn("diff", "a\nb\n");
 	assert!(Out.starts_with("[diff"), "hardcoded fallback expected, got {Out:?}");
 
 	// Restore globals for later tests.
-	crate::Preview::SetPreviewMaximumChars(None);
+	crate::Preview::State::Set::Fn(None);
 	SetPreviewFamily(None);
 }

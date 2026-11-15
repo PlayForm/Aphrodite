@@ -8,5 +8,3 @@
 //! growing a name-resolution path it does not have.
 
 pub mod Struct;
-
-pub use Struct::ActiveDirective;

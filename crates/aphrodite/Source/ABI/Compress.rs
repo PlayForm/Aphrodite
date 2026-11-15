@@ -36,9 +36,9 @@ stateful!(
 		};
 		let hash = headroom_core::ccr::compute_key(Content.as_bytes());
 		s.InlineStorePut(hash.clone(), Content.to_string());
-		let Preview = crate::BuildPreview(&t, &Content);
-		let Marker = crate::Marker::CCRMarker(&hash, &t, Content.len(), &Preview, None, None, None);
-		s.RecordMarker(crate::State::MarkerEntry {
+		let Preview = crate::Preview::Builder::Entry::Fn(&t, &Content);
+		let Marker = crate::Marker::Format::Entry::CCRMarker(&hash, &t, Content.len(), &Preview, None, None, None);
+		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:hash.clone(),
 			CCRType:t.clone(),
 			Size:Content.len(),

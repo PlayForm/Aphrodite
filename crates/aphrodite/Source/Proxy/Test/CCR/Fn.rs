@@ -6,7 +6,7 @@ use bytes::Bytes;
 
 use crate::Proxy::{
 	CCR::Create::{Handle::Fn::Fn as HandleCCRCreate, Response::Struct::Struct as CCRCreateResponse},
-	Test::Support::{TestState, TestStateWithFailingCCR},
+	Test::Support::State::Fn::{TestState, TestStateWithFailingCCR},
 };
 
 #[test]

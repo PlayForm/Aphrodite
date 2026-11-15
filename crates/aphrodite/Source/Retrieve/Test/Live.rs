@@ -49,7 +49,7 @@ fn SeedLiveContainer(state:&AppState, hash:&str, Content:&str) -> usize {
 // content and marks the container complete.
 #[test]
 fn TestRetrieveLiveContainerChunkedProgressThenFullContent() {
-	let state = crate::Proxy::Test::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
 	let hash = "livehash_abc123";
 	let Content = (0..40)
 		.map(|i| format!("container line {i:02} - payload content\n"))
@@ -118,7 +118,7 @@ fn TestRetrieveLiveContainerChunkedProgressThenFullContent() {
 // no `Live` field appears in the response (byte-identical shape).
 #[test]
 fn TestRetrievePlainEntryHasNoLiveField() {
-	let state = crate::Proxy::Test::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put("plain1".to_string(), "plain content".to_string());
@@ -151,7 +151,7 @@ fn TestRetrievePlainEntryHasNoLiveField() {
 // (warn + degrade) instead of panicking or 500ing.
 #[test]
 fn TestRetrieveLiveContainerMalformedEnvelopeDegradesToPlain() {
-	let state = crate::Proxy::Test::TestStateWithCCR();
+	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put("livehash_malformed".to_string(), "the plain content".to_string());

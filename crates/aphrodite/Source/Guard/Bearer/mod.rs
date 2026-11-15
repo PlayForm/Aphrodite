@@ -2,6 +2,3 @@
 
 pub mod Fn;
 pub mod Middleware;
-
-pub use Fn::CheckBearerToken;
-pub use Middleware::RequireMgmtToken;

@@ -7,7 +7,7 @@ use axum::{
 	response::{IntoResponse, Json},
 };
 
-use crate::Guard::{CheckBearerToken, MgmtToken};
+use crate::Guard::{Bearer::Fn::CheckBearerToken, Token::Fn::MgmtToken};
 
 /// Bearer gate for the management routes.
 ///

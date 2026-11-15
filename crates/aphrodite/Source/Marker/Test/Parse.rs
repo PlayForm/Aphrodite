@@ -1,7 +1,12 @@
 //! The reading half: hash normalization, hash validity, hash extraction across
 //! all three delimiter families, and preview parsing.
 
-use crate::Marker::{ExtractHashes, IsValidCCRHash, NormalizeHash, ParsePreview};
+use crate::Marker::Parse::{
+	Extract::ExtractHashes,
+	Normalize::NormalizeHash,
+	Preview::ParsePreview,
+	Valid::IsValidCCRHash,
+};
 
 // ── T5 (F3): normalize_hash ────────────────────────────────────
 #[test]

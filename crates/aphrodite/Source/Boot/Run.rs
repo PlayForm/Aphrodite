@@ -6,7 +6,7 @@
 //! instead - the value of this file is that the whole startup sequence reads in
 //! one screen.
 
-use crate::Boot::{Announce, Configuration, Listen};
+use crate::Boot::{Banner::Announce, Configuration, Listen};
 
 /// Start every configured proxy and block until the process is asked to stop.
 ///
@@ -16,11 +16,12 @@ use crate::Boot::{Announce, Configuration, Listen};
 /// does not fail this function - which is exactly why a bind failure is fatal
 /// here but a serve failure is not.
 pub async fn Run() -> anyhow::Result<()> {
-	let (ConfigurationPath, UseMultiConfiguration) = Configuration::Resolve();
-	let (MultiConfiguration, CLIFallback, LogCompact) = Configuration::Load(&ConfigurationPath, UseMultiConfiguration)?;
-	Configuration::Subscribe(LogCompact)?;
-	let Compression = Configuration::Compression(MultiConfiguration.as_ref());
-	let Proxies = Configuration::Assemble(MultiConfiguration, CLIFallback)?;
+	let (ConfigurationPath, UseMultiConfiguration) = Configuration::Path::Resolve();
+	let (MultiConfiguration, CLIFallback, LogCompact) =
+		Configuration::Load::Load(&ConfigurationPath, UseMultiConfiguration)?;
+	Configuration::Tracing::Subscribe(LogCompact)?;
+	let Compression = Configuration::Compression::Compression(MultiConfiguration.as_ref());
+	let Proxies = Configuration::Proxies::Assemble(MultiConfiguration, CLIFallback)?;
 	Announce(Proxies.len());
 
 	// ── Shared shutdown watch channel ────────────────────────────────
@@ -28,10 +29,10 @@ pub async fn Run() -> anyhow::Result<()> {
 	// each run_single() task waits on the receiver for graceful_shutdown.
 	let (ShutdownTx, ShutdownRx) = tokio::sync::watch::channel(false);
 
-	let Bound = Listen::Bind(Proxies, Compression.as_ref()).await?;
-	Listen::watch(&ConfigurationPath, &Bound);
-	let Handles = Listen::Spawn(Bound, ShutdownRx);
-	Listen::Drain(ShutdownTx, Handles).await;
+	let Bound = Listen::Bind::Bind(Proxies, Compression.as_ref()).await?;
+	Listen::Watcher::watch(&ConfigurationPath, &Bound);
+	let Handles = Listen::Spawn::Spawn(Bound, ShutdownRx);
+	Listen::Drain::Drain(ShutdownTx, Handles).await;
 
 	Ok(())
 }

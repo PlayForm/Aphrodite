@@ -4,7 +4,9 @@
 //! path sets an explicit mode on every artifact it writes instead of inheriting the
 //! process umask. Every write step ends here; none of them relies on the default.
 
-use std::{fs, io, path::Path};
+use std::{fs, path::Path};
+
+use anyhow::Context;
 
 /// Set `path` to `Mode`, Unix only.
 ///
@@ -17,13 +19,16 @@ use std::{fs, io, path::Path};
 /// ownership and a nested file needs its own call. On non-Unix targets the call is
 /// a no-op that returns `Ok`: Windows has no mode bits, and failing there would
 /// make setup unusable rather than safer.
-pub(crate) fn Fn(path:&Path, Mode:u32) -> io::Result<()> {
+pub(crate) fn Fn(path:&Path, Mode:u32) -> anyhow::Result<()> {
 	#[cfg(unix)]
 	{
 		use std::os::unix::fs::PermissionsExt;
-		let mut Perms = fs::metadata(path)?.permissions();
+		let mut Perms = fs::metadata(path)
+			.with_context(|| format!("read the permissions of {}", path.display()))?
+			.permissions();
 		Perms.set_mode(Mode);
-		fs::set_permissions(path, Perms)?;
+		fs::set_permissions(path, Perms)
+			.with_context(|| format!("set mode {Mode:o} on {}", path.display()))?;
 	}
 	#[cfg(not(unix))]
 	let _ = (path, Mode);

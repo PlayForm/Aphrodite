@@ -15,20 +15,20 @@ pub(crate) fn Fn(Content:&str, Ct:&str) -> String {
 	let mut Parts:Vec<String> = Vec::new();
 
 	match Ct {
-		"code_rust" => Rust::Fn(Content, LineCount, &mut Parts),
-		"code_python" => Python::Fn(Content, LineCount, &mut Parts),
-		"code_go" => Go::Fn(Content, LineCount, &mut Parts),
-		"code_js" => JS::Fn(Content, LineCount, &mut Parts),
-		"code" => Code::Fn(Content, LineCount, &mut Parts),
-		"error" => Error::Fn(Content, &mut Parts),
-		"diff" => Diff::Fn(Content, &mut Parts),
-		"git" => Git::Fn(Content, &mut Parts),
-		"build_output" => Build::Fn(Content, &mut Parts),
-		"log" => Log::Fn(Content, LineCount, &mut Parts),
-		"linter" => Linter::Fn(Content, LineCount, &mut Parts),
-		"json" | "tool_output" => JSON::Fn(Content, &mut Parts),
-		"text" => Text::Fn(Content, LineCount, &mut Parts),
-		_ => Text::Fn(Content, LineCount, &mut Parts),
+		"code_rust" => Rust::Fn::Fn(Content, LineCount, &mut Parts),
+		"code_python" => Python::Fn::Fn(Content, LineCount, &mut Parts),
+		"code_go" => Go::Fn::Fn(Content, LineCount, &mut Parts),
+		"code_js" => JS::Fn::Fn(Content, LineCount, &mut Parts),
+		"code" => Code::Fn::Fn(Content, LineCount, &mut Parts),
+		"error" => Error::Fn::Fn(Content, &mut Parts),
+		"diff" => Diff::Fn::Fn(Content, &mut Parts),
+		"git" => Git::Fn::Fn(Content, &mut Parts),
+		"build_output" => Build::Fn::Fn(Content, &mut Parts),
+		"log" => Log::Fn::Fn(Content, LineCount, &mut Parts),
+		"linter" => Linter::Fn::Fn(Content, LineCount, &mut Parts),
+		"json" | "tool_output" => JSON::Fn::Fn(Content, &mut Parts),
+		"text" => Text::Fn::Fn(Content, LineCount, &mut Parts),
+		_ => Text::Fn::Fn(Content, LineCount, &mut Parts),
 	}
 
 	// Build final string: ;-separated key=value pairs (; safe within CCR marker's |

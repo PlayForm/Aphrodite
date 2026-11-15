@@ -5,10 +5,7 @@
 //! that map. Registering first and pushing second means an interruption can
 //! only lose an event, never attribute a resolve to the wrong one.
 
-use super::{
-	super::{AphroditeState, Const::SplitEventCap},
-	Struct::SplitEvent,
-};
+use crate::State::{ChainSplit::Struct::SplitEvent, Const::SplitEventCap, Struct::AphroditeState};
 
 impl AphroditeState {
 	/// Record a chain-split event (Tier 1 teaching loop): a chain's output

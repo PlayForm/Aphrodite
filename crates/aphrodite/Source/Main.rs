@@ -17,4 +17,4 @@
 mod Boot;
 mod Guard;
 
-fn main() -> anyhow::Result<()> { Boot::Fn() }
+fn main() -> anyhow::Result<()> { Boot::Fn::Fn() }

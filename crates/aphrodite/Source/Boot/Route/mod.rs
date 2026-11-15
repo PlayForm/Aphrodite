@@ -6,13 +6,11 @@
 //! layer inside a group instead would leave the other groups unguarded, which is
 //! the one mistake this module exists to make hard.
 
-mod Build;
-mod CCR;
-mod Chat;
-mod Health;
-mod Management;
-mod Metrics;
-mod Relay;
-mod Retrieve;
-
-pub use Build::Build;
+pub mod Build;
+pub mod CCR;
+pub mod Chat;
+pub mod Health;
+pub mod Management;
+pub mod Metrics;
+pub mod Relay;
+pub mod Retrieve;

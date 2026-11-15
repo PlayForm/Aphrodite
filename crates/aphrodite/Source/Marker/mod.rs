@@ -20,14 +20,8 @@
 //! This facade re-exports the exact public names the rest of the crate (and
 //! `aphrodite-hermes` via `Library.rs`) depends on.
 
-mod Format;
-mod Parse;
+pub mod Format;
+pub mod Parse;
 
 #[cfg(test)]
-mod Test;
-
-pub use Format::{Const::SetMarkerTemplates, Entry::CCRMarker};
-pub use Parse::{Extract::ExtractHashes, Normalize::NormalizeHash, Preview::ParsePreview, Valid::IsValidCCRHash};
-pub(crate) use Format::Vars::SubstituteVars;
-#[cfg(test)]
-pub(crate) use Format::Const::{MarkerHintEnabled, MarkerTemplatesTestGuard, RegisteredMarkerFormat};
+pub mod Test;

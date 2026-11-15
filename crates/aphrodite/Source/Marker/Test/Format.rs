@@ -5,7 +5,10 @@
 //! registered templates are process-global and `ConfigurationLoader`'s
 //! `ApplyCompression` tests mutate them concurrently under `cargo test`.
 
-use crate::Marker::{CCRMarker, ExtractHashes, MarkerTemplatesTestGuard, ParsePreview};
+use crate::Marker::{
+	Format::{Const::MarkerTemplatesTestGuard, Entry::CCRMarker},
+	Parse::{Extract::ExtractHashes, Preview::ParsePreview},
+};
 
 #[test]
 fn TestMarkerFormat() {
@@ -49,7 +52,7 @@ fn TestMarkerFormat() {
 // `\[\w+:\[` doubling signature for ANY content type. ──
 #[test]
 fn TestMarkerPreviewNeverDoublesBracketPrefix() {
-	let _G = crate::Preview::PreviewCapTestGuard();
+	let _G = crate::Preview::State::Guard::Fn();
 	let _G2 = MarkerTemplatesTestGuard();
 	let Re = regex::Regex::new(r"\[\w+:\[").unwrap();
 	for ty in [
@@ -64,7 +67,8 @@ fn TestMarkerPreviewNeverDoublesBracketPrefix() {
 		"code_rust",
 		"json_array",
 	] {
-		let Preview = crate::BuildPreview(ty, "M crates/aphrodite/src/preview.rs\nA src/new.rs\n?? tmp\n");
+		let Preview =
+			crate::Preview::Builder::Entry::Fn(ty, "M crates/aphrodite/src/preview.rs\nA src/new.rs\n?? tmp\n");
 		let m = CCRMarker("abc123def456abc123def456abc123def456", ty, 42, &Preview, None, None, None);
 		assert!(
 			!Re.is_match(&m),

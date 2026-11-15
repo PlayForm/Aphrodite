@@ -8,7 +8,7 @@
 use std::sync::{Arc, Mutex};
 
 use super::Table::Handles;
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Next handle ID to hand out from `AllocHandle`. Wraps on overflow rather
 /// than panicking - see the `wrapping_add` call there.

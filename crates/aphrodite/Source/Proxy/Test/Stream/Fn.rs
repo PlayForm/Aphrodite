@@ -9,7 +9,10 @@ use crate::Proxy::{
 	Cache::{Get::Fn::Fn as ResponseCacheGet, Key::Fn::Fn as CacheKeyFromBody},
 	Handle::Proxy::Fn::Fn as ProxyHandler,
 	Stream::Fn::Fn as IsSSE,
-	Test::Support::{HeaderValue, SpawnMockUpstream, TestRequest, TestState},
+	Test::Support::{
+		State::Fn::TestState,
+		Upstream::Fn::{HeaderValue, SpawnMockUpstream, TestRequest},
+	},
 	Threshold::Const::ChatCompletionsPath,
 };
 

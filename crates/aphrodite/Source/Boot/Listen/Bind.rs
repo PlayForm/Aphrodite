@@ -6,7 +6,7 @@ use aphrodite::Configuration::{
 	Proxy::Compression::Struct::Struct as CompressionConfiguration,
 };
 
-use crate::Boot::State::{self, Bound};
+use crate::Boot::{State, State::Listener::Bound};
 
 /// Bind every listener and build its `AppState`, returning them ready to serve.
 ///
@@ -57,7 +57,7 @@ pub async fn Bind(
 		let Listener = tokio::net::TcpListener::bind(CLI.Listen)
 			.await
 			.with_context(|| format!("failed to bind listener \"{name}\" on {}", CLI.Listen))?;
-		let State = State::Build(&CLI, Compression).await?;
+		let State = State::Build::Build(&CLI, Compression).await?;
 		Bound.push(Bound { name, CLI, Listener, State });
 	}
 	Ok(Bound)

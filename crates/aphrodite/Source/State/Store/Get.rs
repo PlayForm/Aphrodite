@@ -1,6 +1,6 @@
 //! Reading from the inline store.
 
-use super::super::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 impl AphroditeState {
 	/// Retrieve from inline store with LRU promotion (O(1) hash lookup).

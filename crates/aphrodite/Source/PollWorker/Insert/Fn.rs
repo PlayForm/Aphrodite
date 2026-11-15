@@ -9,7 +9,7 @@
 
 use crate::{
 	PollWorker::Task::{Const::MaximumBgTasks, Status::Enum::BgStatus, Struct::BgTask},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 /// Insert a new background task into the state, evicting the oldest

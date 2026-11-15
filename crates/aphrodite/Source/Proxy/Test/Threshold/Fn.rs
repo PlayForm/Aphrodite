@@ -17,7 +17,7 @@ use crate::{
 		CCR::Reload::Fn::Fn as HandleCCRReload,
 		Cache::Hash::Fn::Fn as Fnv1a64,
 		State::Struct::Struct as AppState,
-		Test::Support::{ReloadTestLock, TestState},
+		Test::Support::{Lock::Const::ReloadTestLock, State::Fn::TestState},
 		Threshold::{
 			Const::{
 				AutoExpandLimitDefault,

@@ -8,7 +8,7 @@ use axum::{Router, extract::DefaultBodyLimit, middleware};
 
 use crate::{
 	Boot::Route::{CCR, Chat, Health, Management, Relay, Retrieve},
-	Guard::{LoopbackOnly, RequireMgmtToken},
+	Guard::{Bearer::Middleware::RequireMgmtToken, Loopback::Middleware::LoopbackOnly},
 };
 
 /// Build one listener's complete router.

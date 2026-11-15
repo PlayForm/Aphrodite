@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 use super::Recursive;
 
 /// Resolve `HashValue` and every nested marker, but only when the result fits.

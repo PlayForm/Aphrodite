@@ -1,6 +1,6 @@
 //! Recording a referenced file.
 
-use super::super::{AphroditeState, Const::ReferencedFilesCap};
+use crate::State::{Const::ReferencedFilesCap, Struct::AphroditeState};
 
 impl AphroditeState {
 	/// Record a referenced file.

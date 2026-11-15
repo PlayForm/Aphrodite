@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 use crate::Proxy::{
 	Compress::Chat::Fn::Fn as CompressChatCompletion,
 	Format::Fn::Fn as ProxyFormatCCROutput,
-	Test::Support::{ChatCompletionBody, TestStateWithCCR},
+	Test::Support::{Chat::Fn::ChatCompletionBody, State::Fn::TestStateWithCCR},
 };
 
 /// Corpus 07_tokens_saved.py: the AtomicU64 must actually be incremented

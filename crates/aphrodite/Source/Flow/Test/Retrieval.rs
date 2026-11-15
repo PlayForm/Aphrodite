@@ -2,7 +2,7 @@
 //! and verbose inject progressively more, and an unknown value warns and
 //! degrades to standard rather than injecting nothing.
 
-use crate::{Flow::BuildTurnContext, State::AphroditeState};
+use crate::{Flow::TurnContext::Fn::BuildTurnContext, State::Struct::AphroditeState};
 
 #[test]
 fn TestRetrieveGuidanceMinimalInjectsNothing() {

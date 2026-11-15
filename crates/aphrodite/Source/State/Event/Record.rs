@@ -1,9 +1,6 @@
 //! Recording a tool event into the bounded ring.
 
-use super::{
-	super::{AphroditeState, Const::ToolEventCap},
-	Struct::ToolEvent,
-};
+use crate::State::{Const::ToolEventCap, Event::Struct::ToolEvent, Struct::AphroditeState};
 
 impl AphroditeState {
 	/// Record a per-call tool event into the bounded ring (P2/T6). Caps at

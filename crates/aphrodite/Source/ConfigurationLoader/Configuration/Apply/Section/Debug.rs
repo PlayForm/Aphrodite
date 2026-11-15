@@ -1,7 +1,7 @@
 //! `[compression] debug_level` - the dev-only per-session logger.
 
 use super::super::super::Struct::Struct;
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Capture `APHRODITE_DEBUG` into `state.debug_level` and mirror it into the
 /// process-global level.

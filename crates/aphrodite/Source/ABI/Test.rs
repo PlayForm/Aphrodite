@@ -11,25 +11,27 @@ use std::{
 	os::raw::c_char,
 };
 
-use super::{
-	Catalog::AphroditeCatalog,
-	Classify::AphroditeClassify,
-	Compress::AphroditeCompress,
-	ConfigurationGet::AphroditeConfigurationGet,
-	ConfigurationSet::AphroditeConfigurationSet,
-	Destroy::AphroditeDestroy,
-	Dispatch::AphroditeDispatch,
-	FreeString::AphroditeFreeString,
-	Guard::{Guarded, MaximumContent},
-	Handle::{Handles, WithState},
-	Initialise::AphroditeInit,
-	Reload::AphroditeReload,
-	Retrieve::AphroditeRetrieve,
-	Search::AphroditeSearch,
-	SessionStart::AphroditeSessionStart,
-	Stats::AphroditeStats,
+use crate::{
+	ABI::{
+		Catalog::AphroditeCatalog,
+		Classify::AphroditeClassify,
+		Compress::AphroditeCompress,
+		ConfigurationGet::AphroditeConfigurationGet,
+		ConfigurationSet::AphroditeConfigurationSet,
+		Destroy::AphroditeDestroy,
+		Dispatch::AphroditeDispatch,
+		FreeString::AphroditeFreeString,
+		Guard::{Guarded, MaximumContent},
+		Handle::{Lookup::WithState, Table::Handles},
+		Initialise::AphroditeInit,
+		Reload::AphroditeReload,
+		Retrieve::AphroditeRetrieve,
+		Search::AphroditeSearch,
+		SessionStart::AphroditeSessionStart,
+		Stats::AphroditeStats,
+	},
+	Preview::Builder::Entry::Fn as BuildPreview,
 };
-use crate::BuildPreview;
 
 // ── T9 (F10): build_preview's "terminal" arm ──────────────────
 // `Hook::transform_terminal_output` overrides the classified type to
@@ -38,7 +40,7 @@ use crate::BuildPreview;
 // `_` branch (a bare line/byte count with no exit-code context).
 #[test]
 fn TestBuildPreviewTerminalSurfacesExitCode() {
-	let _G = crate::Preview::PreviewCapTestGuard();
+	let _G = crate::Preview::State::Guard::Fn();
 	let Preview = BuildPreview("terminal", "running tests\nall good\nexit code: 1\n");
 	assert!(Preview.starts_with("[terminal:"));
 	assert!(
@@ -49,7 +51,7 @@ fn TestBuildPreviewTerminalSurfacesExitCode() {
 
 #[test]
 fn TestBuildPreviewTerminalFallsBackToFirstLine() {
-	let _G = crate::Preview::PreviewCapTestGuard();
+	let _G = crate::Preview::State::Guard::Fn();
 	// ISSUE-11 residual #2: the terminal-arm fallback used to be the LAST
 	// non-empty line - a multi-line block previewed as its closing brace
 	// (`[terminal:7L }]`). The FIRST meaningful line is the honest

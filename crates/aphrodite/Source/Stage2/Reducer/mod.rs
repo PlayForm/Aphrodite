@@ -4,5 +4,3 @@
 //! carries the domain (`Reducer`), so consumers path to `Reducer::Reducer`.
 
 pub mod Type;
-
-pub use Type::Reducer;

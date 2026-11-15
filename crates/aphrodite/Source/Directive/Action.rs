@@ -22,7 +22,7 @@
 /// `ToJSONError` call, the dispatch arm embedded `{"error": ...}` inside an
 /// otherwise-success value). This always returns the latter shape - callers
 /// pass the result straight through their own success serializer.
-pub fn Fn(State:&mut crate::State::AphroditeState, Action:&str, name:&str) -> serde_json::Value {
+pub fn Fn(State:&mut crate::State::Struct::AphroditeState, Action:&str, name:&str) -> serde_json::Value {
 	match Action {
 		"list" => {
 			// P3/T10: surface ephemeral (nudge/TTL) entries with their expiry so

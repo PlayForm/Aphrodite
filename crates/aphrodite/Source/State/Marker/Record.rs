@@ -1,9 +1,6 @@
 //! Recording a marker into the catalog.
 
-use super::{
-	super::{AphroditeState, Const::RecentMarkersCap},
-	Struct::MarkerEntry,
-};
+use crate::State::{Const::RecentMarkersCap, Marker::Struct::MarkerEntry, Struct::AphroditeState};
 
 impl AphroditeState {
 	/// Record a compression marker.

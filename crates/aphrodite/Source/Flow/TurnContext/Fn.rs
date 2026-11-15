@@ -15,10 +15,10 @@
 
 use crate::{
 	Flow::{
-		JoinSections,
-		TurnContext::{Budget::DropToBudget, Collect::CollectSections, Log::LogPreTurn},
+		Section::Label::Fn::JoinSections,
+		TurnContext::{Budget::Fn::DropToBudget, Collect::Fn::CollectSections, Log::Fn::LogPreTurn},
 	},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 /// Assemble the complete per-turn injected context, in fixed order, hard-capped

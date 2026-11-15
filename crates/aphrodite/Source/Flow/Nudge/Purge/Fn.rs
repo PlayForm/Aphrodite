@@ -6,7 +6,7 @@
 //! the time turn N + 2 does. Purging before the counter advanced would delete
 //! the nudge before the model ever saw it.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Purge expired ephemeral directives (P3/T9). Called from `PostLLMCall`
 /// AFTER `NextTurn` advances the counter, so a nudge pushed during turn N

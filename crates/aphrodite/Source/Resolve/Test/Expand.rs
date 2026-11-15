@@ -7,7 +7,7 @@
 
 use crate::{
 	Resolve::{Expand::Fn as Expand, One::Fn as ResolveOne},
-	State::AphroditeState,
+	State::Struct::AphroditeState,
 };
 
 #[test]

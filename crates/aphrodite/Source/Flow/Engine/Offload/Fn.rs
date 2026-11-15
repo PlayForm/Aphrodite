@@ -6,7 +6,7 @@
 //! Collapsing them would make "the engine ran and archived nothing"
 //! indistinguishable from "the engine was never asked".
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Context-engine trigger + offload section (pre-Rust port of `_engine.py`
 /// `compress`): while the context engine is enabled
@@ -33,7 +33,7 @@ pub(crate) fn EngineArchivePrompt(State:&mut AphroditeState) -> Option<String> {
 	if !State.ContextEngineEnabled {
 		return None;
 	}
-	crate::Session::EngineMaybeArchive(State)
+	crate::Session::Engine::Fn::EngineMaybeArchive(State)
 }
 
 /// Wrap the engine's offload prompt into the injected section text; `None`

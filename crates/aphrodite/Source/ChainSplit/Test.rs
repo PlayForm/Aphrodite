@@ -2,9 +2,9 @@
 //! per-segment error hints.
 
 use crate::ChainSplit::{
+	Const::SegMarker,
 	ErrorHint::Fn::Fn as SegmentErrorHint,
 	Marked::{Command::Fn::Fn as BuildMarkedCommand, Output::Fn::Fn as SplitMarkedOutput},
-	SegMarker,
 	Split::Fn::Fn as SplitChain,
 };
 
