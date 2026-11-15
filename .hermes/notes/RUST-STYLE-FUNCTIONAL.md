@@ -500,6 +500,114 @@ and what each forbids changing.
   collateral of a style pass. The two that do not stand are `clippy::match_bool` and
   `clippy::single_match`, whose only reason was §4.3.
 
+## 10. Control flow: types and fluent chains, not `if` and `for`
+
+**No `if` statement and no `for` loop** in code you write or touch. Each is a signal that a decision or a sequence has not been given a type yet.
+
+| Instead of | Write |
+| --- | --- |
+| `if cond { a } else { b }` | a domain enum matched structurally, or `Option`/`Result` with `map_or` / `and_then` |
+| `if let Some(x) = ...` | `match`, or `map` / `filter_map` / `and_then` |
+| `if cond { push }` where the collection decides | push a **variant** - the condition is a value that selects it |
+| `for x in xs { ... }` | `xs.iter().for_each(...)`, `.try_for_each(...)`, `.map(...)`, `.filter_map(...)`, `.fold(...)` |
+| `for x in xs { if p(x) { ... } }` | `.filter(p)` then the adapter - and if the predicate needs two branches, the element needs a variant |
+| a loop with an accumulator | `.fold(Initial, Step)` where `Step` is a named function, not a closure body |
+| a loop with an early exit | `ControlFlow` with `.try_for_each` |
+| `while let Some(x) = it.next()` | `it.by_ref().take_while(...)`, `.scan(...)`, or an iterator that terminates itself |
+| `if` selecting one of two computations | `then` / `unwrap_or_else` - with **no side effect inside the closure** |
+
+### Composition is the point
+
+The replacement for `if` and `for` is not "a combinator instead of a loop" - it is **composition**. A step is a small named value or function; the pipeline is the sequence of steps.
+
+```rust
+// Not this - one function, a loop, a branch and three statements
+for Line in Lines { if Boundary(Line) { Push(&mut Parts, &mut Current); } else { Append(&mut Current, Line); } }
+
+// This - the decision is a variant, the step is named, the chain is the composition
+Lines.map(Classify).fold(Accumulator::Struct::New(), Accumulator::Step::Fn).Finish()
+```
+
+Composition is what makes the type visible: `Classify` returns a value, `Step` consumes one and returns the next, `Finish` closes the sequence. A closure body holding three statements is not composition - it is a loop with different syntax, and it is the reason `let _ = cond.then(|| ...)` exists at all.
+
+Prefer composition over an inline block even where the block would be legal: a named step can be tested, reused and read on its own; a block inside a closure cannot.
+
+### The permitted residue
+
+These stay, and each is declared in the handoff rather than left silently:
+
+- **A `for` whose body contains `.await`.** An iterator adapter cannot await - `for_each` takes `FnMut(Item)` and would drop the future. Use `futures::stream::iter(...).for_each(...).await` when the dependency is already present; if it is not, keep the loop and say so. This is a language limit, not a preference.
+- **`#[cfg]` / `cfg!()`** - compile-time, not control flow.
+- **A const-context branch** `match` cannot express.
+- **A `match` guard** - a predicate inside a genuinely structural match.
+- **`let ... else`** - the flat early-exit form.
+
+### The forbidden shapes, restated
+
+`let _ = cond.then(|| side_effect)` is not an improvement on `if` - it hides a mutation in an expression and allocates a closure. `filter(|_| cond)` is a predicate that ignores its subject. `match ()`, a boolean `match` with a no-op arm, and `Err(())` as a loop sentinel are all banned.
+
+### The counts must fall
+
+Both counts are measured with fixed probes and reported before and after:
+
+```sh
+grep -rnE '(^|[^A-Za-z0-9_])if[ (]' crates/*/Source --include=*.rs | grep -vE '^\S+:[0-9]+:\s*//' | wc -l
+grep -rnE '^\s*for ' crates/*/Source --include=*.rs | grep -vE '^\S+:[0-9]+:\s*//' | wc -l
+```
+
+A rise is a defect, not a data point. When a site is exempt under the residue list, name the file and the reason; an unexplained `if` or `for` means the decision or the sequence still has no type.
+
+## 11. Construction: builders, factories, and semantics in types
+
+A struct whose fields are all `Option` with "`None` = the default" is not a data record - it is a **builder that has not been written as one**.
+
+```rust
+// Six optional fields, each documented as "None = something happens"
+pub struct Struct {
+	pub Limit:Option<u32>,
+	pub Format:Option<String>,
+	...
+}
+
+// The same six, with every default applied in one place
+Rendering::Builder::Struct::New()
+	.WithLimit(Limit)
+	.WithFormat(Format)
+	.Build()
+```
+
+### Builder
+
+- Every setter **consumes `self` and returns `Self`**, so a half-built value cannot be stored, cloned or passed on by accident.
+- `Build` is the **only** place defaults are applied. Six `unwrap_or` calls spread across six call sites are six chances to disagree about what absent means.
+- A field that must be supplied gets **typestate**: `Builder<Unset>` has no `Build`; `.WithSource(...)` returns `Builder<Set>`, which does. The compiler then proves the source was provided - no runtime check, no `expect`, no comment saying "caller must set this first".
+- A builder is for construction with **optional parts or an ordering constraint**. A struct whose every field is required and validated at construction does not get one: `Struct { ... }` is already the factory.
+
+### Factory
+
+- A constructor returns a **validated type**, never a struct with public fields the caller is trusted to check.
+- `TryFrom` / `From` where the conversion is total or fallible in the obvious way; a named `Fn` (`Parse`, `Decode`, `Resolve`) where it is not.
+- **Fields private, constructor the only door.** A type whose invariants can be bypassed by a struct literal has no invariants.
+
+### Semantics belong in the type
+
+| Instead of | Use |
+| --- | --- |
+| a `bool` field | a two-variant enum - `Enable` is a variant, not a flag |
+| a `String` that is one of four values | an enum |
+| `usize` where `0` means unlimited | `Option<NonZeroUsize>` |
+| a `String` identifier that must match a format | a newtype with a private constructor |
+| two values that must travel together | one struct |
+| a value only valid after a step | a distinct type that step produces |
+
+### Algorithms, not procedures
+
+Express the step as a **named transformation** and let the sequence compose (§10). A procedure is a list of statements the reader must execute in their head; an algorithm is a value with a name.
+
+### Where not to
+
+The research corpus §7 still stands: no generic planner/executor framework, no enum per boolean, no trait for one implementation, no typestate for a lifecycle with a single transition. A builder for a two-field struct with both fields required is ceremony, not design.
+
 ## Claim-to-test
 
 Every claim below is settled by running the probe; a claim whose probe cannot be run is not
