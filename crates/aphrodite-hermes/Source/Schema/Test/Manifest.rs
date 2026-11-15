@@ -34,9 +34,9 @@ fn test_catalog_tool_count_matches_manifest() {
 		"aphrodite_prefetch_status",
 		"aphrodite_rebuild",
 	];
-	for name in production {
+	production.iter().for_each(|name| {
 		assert!(names.iter().any(|n| n == name), "missing production tool {name}");
-	}
+	});
 	#[cfg(debug_assertions)]
 	{
 		assert_eq!(names.len(), 14, "dev build must register 14 tools (13 + aphrodite_debug)");

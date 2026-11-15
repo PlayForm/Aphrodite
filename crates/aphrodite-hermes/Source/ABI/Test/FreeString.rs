@@ -23,27 +23,30 @@ use crate::{
 #[test]
 fn test_free_string_round_trip_symmetric() {
 	// Varying lengths incl. empty string: allocate, read, free, repeat.
-	for i in 0..256 {
+	(0..256).for_each(|i| {
 		let payload = format!("round-trip-{i}-{}", "x".repeat(i % 64));
 		let ptr = to_c_string(&payload);
 		assert!(!ptr.is_null(), "to_c_string returned null for payload #{i}");
 		let read = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
 		assert_eq!(read, payload, "read-back mismatch for payload #{i}");
 		aphrodite_hermes_free_string(ptr);
-	}
+	});
+
 	// Empty string must round-trip too (CString is NUL-terminated).
 	let ptr = to_c_string("");
 	assert!(!ptr.is_null());
 	assert_eq!(unsafe { CStr::from_ptr(ptr) }.to_bytes(), b"");
 	aphrodite_hermes_free_string(ptr);
+
 	// Error-JSON path (`to_json_error` → `to_c_string`) pairs identically.
-	for i in 0..64 {
+	(0..64).for_each(|i| {
 		let ptr = to_json_error(&format!("boom-{i}"));
 		assert!(!ptr.is_null());
 		let read = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
 		assert!(read.contains("boom-"), "error payload #{i} corrupted");
 		aphrodite_hermes_free_string(ptr);
-	}
+	});
+
 	// Interior NUL: CString::new fails → null; free_string(null) is a no-op.
 	let ptr = to_c_string("a\0b");
 	assert!(ptr.is_null());

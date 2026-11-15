@@ -13,20 +13,34 @@
 /// so an unusual-but-real status is reported rather than dropped.
 pub(crate) fn Fn(Line:&str) -> Option<&str> {
 	let b = Line.as_bytes();
-	if b.len() < 4 {
-		return None;
+
+	match b.len() < 4 {
+		true => {
+			return None;
+		},
+		false => {},
 	}
+
 	let Codes = *b"MADRCU?! T";
 	let C0 = b[0];
 	let C1 = b[1];
+
 	// Reject an all-space prefix (that's just indented prose).
-	if (C0 == b' ' && C1 == b' ') || !Codes.contains(&C0) || !Codes.contains(&C1) {
-		return None;
+	match (C0 == b' ' && C1 == b' ') || !Codes.contains(&C0) || !Codes.contains(&C1) {
+		true => {
+			return None;
+		},
+		false => {},
 	}
+
 	// Column 3 must be a space separating code from path, and a path follows.
-	if b[2] != b' ' || Line[3..].trim().is_empty() {
-		return None;
+	match b[2] != b' ' || Line[3..].trim().is_empty() {
+		true => {
+			return None;
+		},
+		false => {},
 	}
+
 	// A two-char code of at least one real status letter (not `  `).
 	Line.get(..2)
 }

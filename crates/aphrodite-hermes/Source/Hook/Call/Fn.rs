@@ -29,7 +29,7 @@ pub(crate) fn call(hook_name:*const c_char, args_json:*const c_char) -> *mut c_c
 	guarded(std::panic::AssertUnwindSafe(move || {
 		let input = match decode(&args) {
 			Ok(input) => input,
-			Err(e) => return to_json_error(&format!("invalid args: {}", e)),
+			Err(e) => return to_json_error(&format!("invalid args: {e:#}")),
 		};
 
 		// `dispatch` returns None when THIS session's lock is wedged by an

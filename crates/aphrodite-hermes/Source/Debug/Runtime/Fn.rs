@@ -22,11 +22,11 @@ use std::path::PathBuf;
 /// It does not create the home - callers that write are responsible for the
 /// directory existing, and a failed write degrades to "no persistence".
 pub(crate) fn Fn() -> PathBuf {
-	if let Ok(home) = std::env::var("APHRODITE_DEBUG_HOME")
-		&& !home.is_empty()
-	{
-		return PathBuf::from(home);
+	match std::env::var("APHRODITE_DEBUG_HOME") {
+		Ok(home) if !home.is_empty() => return PathBuf::from(home),
+		_ => {},
 	}
+
 	#[cfg(test)]
 	{
 		// Hermetic tests: route debug flags / session persistence away from

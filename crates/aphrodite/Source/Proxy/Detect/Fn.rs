@@ -20,14 +20,25 @@ pub(crate) fn Fn(Content:&str) -> &'static str {
 	// exclude Hermes wrapper envelopes from `JSON` on purpose (raw-JSON
 	// preview is the payload); recognize them here so the stored type still
 	// routes to the tool_output alias arm on the json builder.
-	if Content.starts_with('{') || Content.starts_with('[') {
-		if serde_json::from_str::<serde_json::Value>(Content).is_err() {
-			return "text";
-		}
-		if Content.contains("exit_code") || Content.contains("\"status\"") {
-			return "tool_output";
-		}
-		return "json";
+	match Content.starts_with('{') || Content.starts_with('[') {
+		true => {
+			match serde_json::from_str::<serde_json::Value>(Content).is_err() {
+				true => {
+					return "text";
+				},
+				false => {},
+			}
+
+			match Content.contains("exit_code") || Content.contains("\"status\"") {
+				true => {
+					return "tool_output";
+				},
+				false => {},
+			}
+
+			return "json";
+		},
+		false => {},
 	}
 	match crate::Preview::Detect::SemanticType::Fn(Content) {
 		// Language refinement: shape "code" → code_rust/python/go/js.
@@ -42,34 +53,38 @@ pub(crate) fn Fn(Content:&str) -> &'static str {
 		// class). diff/git/gitlog/log are already pipeline detectors.
 		None => {
 			let FirstLine = Content.lines().next().unwrap_or("");
-			if FirstLine.starts_with("error")
-				|| FirstLine.starts_with("Error")
-				|| FirstLine.starts_with("ERROR")
-				|| FirstLine.starts_with("Traceback")
-				|| FirstLine.starts_with("panic")
-				|| FirstLine.starts_with("thread '")
-			{
-				"error"
-			} else if FirstLine.starts_with("Compiling ")
-				|| FirstLine.starts_with("   Compiling ")
-				|| FirstLine.contains("Finished")
-				|| FirstLine.starts_with("running ")
-				|| FirstLine.starts_with("test ")
-			{
-				"build_output"
-			} else if FirstLine.starts_with("error[E")
-				|| FirstLine.starts_with("error: ")
-				|| FirstLine.starts_with("warning[")
-				|| FirstLine.starts_with("warning: ")
-				|| (FirstLine.contains("|") && (FirstLine.contains("error") || FirstLine.contains("warning")))
-				|| FirstLine.contains("mypy")
-				|| FirstLine.contains("clippy")
-				|| FirstLine.contains("eslint")
-				|| FirstLine.contains("tsc ")
-			{
-				"linter"
-			} else {
-				"text"
+
+			match () {
+				_ if FirstLine.starts_with("error")
+					|| FirstLine.starts_with("Error")
+					|| FirstLine.starts_with("ERROR")
+					|| FirstLine.starts_with("Traceback")
+					|| FirstLine.starts_with("panic")
+					|| FirstLine.starts_with("thread '") =>
+				{
+					"error"
+				},
+				_ if FirstLine.starts_with("Compiling ")
+					|| FirstLine.starts_with("   Compiling ")
+					|| FirstLine.contains("Finished")
+					|| FirstLine.starts_with("running ")
+					|| FirstLine.starts_with("test ") =>
+				{
+					"build_output"
+				},
+				_ if FirstLine.starts_with("error[E")
+					|| FirstLine.starts_with("error: ")
+					|| FirstLine.starts_with("warning[")
+					|| FirstLine.starts_with("warning: ")
+					|| (FirstLine.contains("|") && (FirstLine.contains("error") || FirstLine.contains("warning")))
+					|| FirstLine.contains("mypy")
+					|| FirstLine.contains("clippy")
+					|| FirstLine.contains("eslint")
+					|| FirstLine.contains("tsc ") =>
+				{
+					"linter"
+				},
+				_ => "text",
 			}
 		},
 	}

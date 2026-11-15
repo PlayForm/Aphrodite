@@ -13,16 +13,20 @@ use crate::Boot::{Listen::Serve::Serve, State::Listener::Bound};
 /// propagate: one dead listener must not take the process down while its
 /// siblings are still answering.
 pub fn Spawn(Bound:Vec<Bound>, ShutdownRx:Receiver<bool>) -> Vec<JoinHandle<()>> {
-	let mut Handles = Vec::new();
-	for b in Bound {
-		let Rx = ShutdownRx.clone();
-		let Handle = tokio::spawn(async move {
-			if let Err(e) = Serve(b, Rx).await {
-				tracing::error!(%e, "proxy listener failed");
-			}
-		});
-		Handles.push(Handle);
-	}
+	let Handles:Vec<JoinHandle<()>> = Bound
+		.into_iter()
+		.map(|b| {
+			let Rx = ShutdownRx.clone();
+			tokio::spawn(async move {
+				match Serve(b, Rx).await {
+					Err(e) => {
+						tracing::error!(%e, "proxy listener failed");
+					},
+					Ok(_) => {},
+				}
+			})
+		})
+		.collect();
 	// Drop the original sender so run_single receivers get a RecvError::Closed
 	// when main() finishes (SIGTERM alternative: drop triggers changed() wakeup).
 	drop(ShutdownRx);

@@ -11,14 +11,20 @@
 pub(crate) fn Fn(Content:&str, ChunkSize:usize) -> Vec<&str> {
 	let mut Chunks = Vec::new();
 	let mut Start = 0usize;
-	for (Index, _Character) in Content.char_indices() {
-		if Index >= Start + ChunkSize {
-			Chunks.push(&Content[Start..Index]);
-			Start = Index;
+	Content.char_indices().for_each(|(Index, _Character)| {
+		match Index >= Start + ChunkSize {
+			true => {
+				Chunks.push(&Content[Start..Index]);
+				Start = Index;
+			},
+			false => {},
 		}
-	}
-	if Start < Content.len() {
-		Chunks.push(&Content[Start..]);
+	});
+	match Start < Content.len() {
+		true => {
+			Chunks.push(&Content[Start..]);
+		},
+		false => {},
 	}
 	Chunks
 }

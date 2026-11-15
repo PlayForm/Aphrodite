@@ -44,19 +44,23 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 			// the failure line instead of a success-looking summary -
 			// a failing test run used to preview as
 			// `[build:0E 0W 3L]` (ISSUE-11-PREVIEW-BATTERY #2).
-			if e == 0
-				&& w == 0
-				&& let Some(Fail) = Inp.raw.lines().map(|l| l.trim()).find(|l| Failure::Fn(l))
-			{
-				return format!(
-					"[build:{}E {}W {}L | {}]",
-					e,
-					w,
-					Inp.Total,
-					Fail.chars().take(60).collect::<String>()
-				);
+			let Fail = match e == 0 && w == 0 {
+				true => Inp.raw.lines().map(|l| l.trim()).find(|l| Failure::Fn(l)),
+				false => None,
+			};
+
+			match Fail {
+				Some(Fail) => {
+					format!(
+						"[build:{}E {}W {}L | {}]",
+						e,
+						w,
+						Inp.Total,
+						Fail.chars().take(60).collect::<String>()
+					)
+				},
+				None => format!("[build:{}E {}W {}L]", e, w, Inp.Total),
 			}
-			format!("[build:{}E {}W {}L]", e, w, Inp.Total)
 		},
 	}
 }

@@ -22,14 +22,26 @@ use crate::Home::{Environment::Path::Fn::Fn as EnvironmentPath, Tilde::Fn::Fn as
 /// lost to `$HERMES_HOME`, or a `$HOME` that won over a set `$HERMES_HOME`,
 /// silently splits the binary and the plugin across two directories.
 pub fn Fn() -> Option<PathBuf> {
-	if let Some(h) = EnvironmentPath("APHRODITE_HOME") {
-		return Some(ExpandTilde(h));
+	match EnvironmentPath("APHRODITE_HOME") {
+		Some(h) => {
+			return Some(ExpandTilde(h));
+		},
+		None => {},
 	}
-	if let Some(h) = EnvironmentPath("HERMES_HOME") {
-		return Some(ExpandTilde(h).join("aphrodite"));
+
+	match EnvironmentPath("HERMES_HOME") {
+		Some(h) => {
+			return Some(ExpandTilde(h).join("aphrodite"));
+		},
+		None => {},
 	}
-	if let Some(h) = EnvironmentPath("HOME") {
-		return Some(ExpandTilde(h).join(".hermes").join("aphrodite"));
+
+	match EnvironmentPath("HOME") {
+		Some(h) => {
+			return Some(ExpandTilde(h).join(".hermes").join("aphrodite"));
+		},
+		None => {},
 	}
+
 	dirs::home_dir().map(|h| h.join(".hermes").join("aphrodite"))
 }

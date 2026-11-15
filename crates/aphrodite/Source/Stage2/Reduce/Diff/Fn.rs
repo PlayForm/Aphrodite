@@ -15,28 +15,41 @@ pub fn ReduceDiff(Content:&str) -> Option<String> {
 	let mut CurrentFile:Option<String> = None;
 	let mut Hunks:usize = 0;
 
-	for Line in Content.lines() {
-		if Line.starts_with("diff --git ") {
-			if let Some(f) = CurrentFile.take() {
-				Files.push((f, Hunks));
-			}
-			CurrentFile = Some(Line.to_string());
-			Hunks = 0;
-		} else if Line.starts_with("@@ ") {
-			Hunks += 1;
+	Content.lines().for_each(|Line| {
+		match () {
+			_ if Line.starts_with("diff --git ") => {
+				match CurrentFile.take() {
+					Some(f) => {
+						Files.push((f, Hunks));
+					},
+					None => {},
+				}
+				CurrentFile = Some(Line.to_string());
+				Hunks = 0;
+			},
+			_ if Line.starts_with("@@ ") => {
+				Hunks += 1;
+			},
+			_ => {},
 		}
-	}
-	if let Some(f) = CurrentFile {
-		Files.push((f, Hunks));
+	});
+	match CurrentFile {
+		Some(f) => {
+			Files.push((f, Hunks));
+		},
+		None => {},
 	}
 
-	if Files.is_empty() {
-		return None;
+	match Files.is_empty() {
+		true => {
+			return None;
+		},
+		false => {},
 	}
 
 	let mut Parts = vec![format!("[diff:{} files]", Files.len())];
-	for (Fname, Hcount) in &Files {
+	Files.iter().for_each(|(Fname, Hcount)| {
 		Parts.push(format!("  {} ({} hunks)", Fname, Hcount));
-	}
+	});
 	Some(Parts.join("\n"))
 }

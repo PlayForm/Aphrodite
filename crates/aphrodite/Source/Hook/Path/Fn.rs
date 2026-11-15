@@ -13,10 +13,9 @@ pub(crate) fn Fn(Content:&str, Tool:&str) -> Option<String> {
 			// First line often contains path
 			Content.lines().next().and_then(|Line| {
 				let Line = Line.trim();
-				if Line.starts_with('/') || Line.starts_with("./") {
-					Some(Line.to_string())
-				} else {
-					None
+				match Line.starts_with('/') || Line.starts_with("./") {
+					true => Some(Line.to_string()),
+					false => None,
 				}
 			})
 		},
@@ -28,10 +27,9 @@ pub(crate) fn Fn(Content:&str, Tool:&str) -> Option<String> {
 		"search_files" => {
 			Content.lines().next().and_then(|Line| {
 				let path = Line.split(':').next().unwrap_or("").trim();
-				if path.starts_with('/') || path.starts_with("./") {
-					Some(path.to_string())
-				} else {
-					None
+				match path.starts_with('/') || path.starts_with("./") {
+					true => Some(path.to_string()),
+					false => None,
 				}
 			})
 		},

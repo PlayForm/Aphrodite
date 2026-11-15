@@ -24,11 +24,13 @@ pub(crate) fn Fn(State:&AppState, Ck:u64) -> Option<Vec<u8>> {
 			.peek(&Ck)
 			.map(|(InsertedAt, _)| InsertedAt.elapsed() >= State.ResponseCacheTtl)
 			.unwrap_or(false);
-		if Expired {
-			Cache.pop(&Ck);
-			None
-		} else {
-			Cache.get(&Ck).map(|(_, body)| body.clone())
+		match Expired {
+			true => {
+				Cache.pop(&Ck);
+
+				None
+			},
+			false => Cache.get(&Ck).map(|(_, body)| body.clone()),
 		}
 	})
 }

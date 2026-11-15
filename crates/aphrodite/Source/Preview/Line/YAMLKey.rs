@@ -12,24 +12,38 @@
 /// legitimate YAML keys and stay accepted. It is not a YAML parser and nested
 /// keys are deliberately ignored - only top-level keys vote.
 pub(crate) fn Fn(Line:&str) -> bool {
-	if Line.starts_with(' ') || Line.as_bytes().first() == Some(&9) {
-		return false;
+	match Line.starts_with(' ') || Line.as_bytes().first() == Some(&9) {
+		true => {
+			return false;
+		},
+		false => {},
 	}
+
 	let t = Line.trim_end();
 	let Index = match t.find(':') {
 		Some(i) => i,
 		None => return false,
 	};
-	if Index == 0 || Index > 64 {
-		return false;
+
+	match Index == 0 || Index > 64 {
+		true => {
+			return false;
+		},
+		false => {},
 	}
+
 	let Key = &t[..Index];
-	if !Key
+
+	match !Key
 		.chars()
 		.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 	{
-		return false;
+		true => {
+			return false;
+		},
+		false => {},
 	}
+
 	// Exclude log-marker keys (`error:`/`warning:`/...) so a compiler log is
 	// never mis-tagged as yaml. `debug:`/`trace:` are legitimate yaml keys.
 	!matches!(Key, "error" | "warning" | "note" | "info" | "warn")

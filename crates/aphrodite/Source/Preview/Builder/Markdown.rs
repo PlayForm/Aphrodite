@@ -14,23 +14,41 @@ use crate::Preview::{Input::Struct::Struct as Input, Line::MarkdownHeading};
 pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let mut Levels:Vec<usize> = Vec::new();
 	let mut FirstHeading:Option<String> = None;
-	for Line in Inp.raw.lines() {
-		if MarkdownHeading::Fn(Line) {
-			let t = Line.trim_start();
-			let n = t.chars().take_while(|c| *c == '#').count();
-			Levels.push(n);
-			if FirstHeading.is_none() {
-				FirstHeading = Some(t.chars().take(48).collect());
-			}
+
+	Inp.raw.lines().for_each(|Line| {
+		match MarkdownHeading::Fn(Line) {
+			true => {
+				let t = Line.trim_start();
+				let n = t.chars().take_while(|c| *c == '#').count();
+
+				Levels.push(n);
+
+				match FirstHeading.is_none() {
+					true => {
+						FirstHeading = Some(t.chars().take(48).collect());
+					},
+					false => {},
+				}
+			},
+			false => {},
 		}
+	});
+
+	match Levels.is_empty() {
+		true => {
+			return format!("[md:{}L]", Inp.Total);
+		},
+		false => {},
 	}
-	if Levels.is_empty() {
-		return format!("[md:{}L]", Inp.Total);
-	}
+
 	let Tally:Vec<String> = (1..=6)
 		.filter_map(|l| {
 			let c = Levels.iter().filter(|&&x| x == l).count();
-			if c > 0 { Some(format!("h{l}×{c}")) } else { None }
+
+			match c > 0 {
+				true => Some(format!("h{l}×{c}")),
+				false => None,
+			}
 		})
 		.collect();
 	match FirstHeading {

@@ -31,10 +31,16 @@ use crate::StructExtract::{
 /// every category of the call, so the tail categories of a long file are dropped
 /// once it is spent.
 pub fn Fn(Content:&str, Language:&str) -> HashMap<String, Vec<String>> {
-	let LanguageTag = if Language.is_empty() { AutoDetect(Content) } else { Language.to_string() };
+	let LanguageTag = match Language.is_empty() {
+		true => AutoDetect(Content),
+		false => Language.to_string(),
+	};
 
-	if LanguageTag.is_empty() {
-		return HashMap::new();
+	match LanguageTag.is_empty() {
+		true => {
+			return HashMap::new();
+		},
+		false => {},
 	}
 
 	let mut Result:HashMap<String, Vec<String>> = HashMap::new();

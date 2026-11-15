@@ -24,11 +24,11 @@ pub(crate) fn Fn(path:&Path) -> bool {
 		.unwrap_or(0.0);
 	let cache = FLAG_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
 	let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-	if let Some((cached_mtime, cached_on)) = guard.get(&key)
-		&& *cached_mtime == mtime
-	{
-		return *cached_on;
+	match guard.get(&key) {
+		Some((cached_mtime, cached_on)) if *cached_mtime == mtime => return *cached_on,
+		_ => {},
 	}
+
 	let on = std::fs::read_to_string(path)
 		.ok()
 		// PREFIX match on the first token, NOT a whole-line match: the

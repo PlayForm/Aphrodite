@@ -12,9 +12,10 @@ use std::{ffi::CString, os::raw::c_char};
 /// Free a string returned by any aphrodite_hermes_* function.
 #[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_free_string(s:*mut c_char) {
-	if !s.is_null() {
-		unsafe {
+	match s.is_null() {
+		true => {},
+		false => unsafe {
 			let _ = CString::from_raw(s);
-		}
+		},
 	}
 }

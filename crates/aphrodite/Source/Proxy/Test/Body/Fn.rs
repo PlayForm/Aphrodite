@@ -41,12 +41,16 @@ fn TestBodyWantsStreamLargeBodyFlagAtEnd() {
 	// W2-4 fast path: the flag sits after a large messages array, so a
 	// byte scan (not the full serde parse) must find it.
 	let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
-	for i in 0..500 {
-		if i > 0 {
-			body.push(',');
+	(0..500).for_each(|i| {
+		match i > 0 {
+			true => {
+				body.push(',');
+			},
+			false => {},
 		}
+
 		body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
-	}
+	});
 	body.push_str("],\"stream\":true}");
 	assert!(BodyWantsStream(body.as_bytes()));
 }
@@ -66,12 +70,16 @@ fn TestBodyWantsStreamLargeBodyWithoutFlag() {
 	// W2-4: large body with no `Stream` key anywhere - fast path misses
 	// and the parse agrees.
 	let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
-	for i in 0..500 {
-		if i > 0 {
-			body.push(',');
+	(0..500).for_each(|i| {
+		match i > 0 {
+			true => {
+				body.push(',');
+			},
+			false => {},
 		}
+
 		body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
-	}
+	});
 	body.push_str("]}");
 	assert!(!BodyWantsStream(body.as_bytes()));
 }

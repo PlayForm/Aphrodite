@@ -16,51 +16,70 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let mut Files = 0usize;
 	let mut dirs = 0usize;
 	let mut Ext:HashMap<String, usize> = HashMap::new();
-	for Line in Inp.raw.lines() {
-		let t = Line.trim();
-		if t.is_empty() {
-			continue;
-		}
-		// Skip the `total N` header `ls -l` prints (not a filesystem entry).
-		if let Some(Rest) = t.strip_prefix("total ")
-			&& Rest.chars().all(|c| c.is_ascii_digit())
-			&& !Rest.is_empty()
-		{
-			continue;
-		}
-		let b = Line.as_bytes();
-		// `ls -l` long form: mode string in the first column.
-		let IsLong = b.len() >= 10
-			&& matches!(b[0], b'-' | b'd' | b'l' | b'c' | b'b' | b'p' | b's')
-			&& b[1..10]
-				.iter()
-				.all(|&c| matches!(c, b'r' | b'w' | b'x' | b'-' | b's' | b't' | b'S' | b'T'));
-		let (IsDirectory, name) = if IsLong {
-			let name = Line.split_whitespace().last().unwrap_or("");
-			(b[0] == b'd', name)
-		} else if let Some(Stripped) = t.strip_suffix('/') {
-			(true, Stripped)
-		} else {
-			(false, t)
-		};
-		if IsDirectory {
-			dirs += 1;
-		} else {
-			Files += 1;
-			// File extension: text after the last `.` in the basename.
-			let Base = name.rsplit('/').next().unwrap_or(name);
-			if let Some(Dot) = Base.rfind('.')
-				&& Dot > 0
-				&& Dot < Base.len() - 1
-			{
-				let e:String = Base[Dot..].chars().take(8).collect();
-				*Ext.entry(e).or_insert(0) += 1;
+
+	Inp.raw
+		.lines()
+		.filter(|Line| {
+			let t = Line.trim();
+
+			// Skip the `total N` header `ls -l` prints (not a filesystem entry).
+			match t.strip_prefix("total ") {
+				Some(Rest) => Rest.is_empty() || !Rest.chars().all(|c| c.is_ascii_digit()),
+				None => !t.is_empty(),
 			}
-		}
+		})
+		.for_each(|Line| {
+			let t = Line.trim();
+			let b = Line.as_bytes();
+			// `ls -l` long form: mode string in the first column.
+			let IsLong = b.len() >= 10
+				&& matches!(b[0], b'-' | b'd' | b'l' | b'c' | b'b' | b'p' | b's')
+				&& b[1..10]
+					.iter()
+					.all(|&c| matches!(c, b'r' | b'w' | b'x' | b'-' | b's' | b't' | b'S' | b'T'));
+			let (IsDirectory, name) = match IsLong {
+				true => {
+					let name = Line.split_whitespace().last().unwrap_or("");
+
+					(b[0] == b'd', name)
+				},
+				false => {
+					match t.strip_suffix('/') {
+						Some(Stripped) => (true, Stripped),
+						None => (false, t),
+					}
+				},
+			};
+
+			match IsDirectory {
+				true => {
+					dirs += 1;
+				},
+				false => {
+					Files += 1;
+					// File extension: text after the last `.` in the basename.
+					let Base = name.rsplit('/').next().unwrap_or(name);
+					let Dot = Base.rfind('.').filter(|&Dot| Dot > 0 && Dot < Base.len() - 1);
+
+					match Dot {
+						Some(Dot) => {
+							let e:String = Base[Dot..].chars().take(8).collect();
+
+							*Ext.entry(e).or_insert(0) += 1;
+						},
+						None => {},
+					}
+				},
+			}
+		});
+
+	match Files == 0 && dirs == 0 {
+		true => {
+			return format!("[ls:{}L]", Inp.Total);
+		},
+		false => {},
 	}
-	if Files == 0 && dirs == 0 {
-		return format!("[ls:{}L]", Inp.Total);
-	}
+
 	let mut Top:Vec<(String, usize)> = Ext.into_iter().collect();
 	Top.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 	let ExtStr = Top
@@ -69,9 +88,9 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 		.map(|(e, n)| format!("{}×{}", e, n))
 		.collect::<Vec<_>>()
 		.join(" ");
-	if ExtStr.is_empty() {
-		format!("[ls:{} files {} dirs]", Files, dirs)
-	} else {
-		format!("[ls:{} files {} dirs | {}]", Files, dirs, ExtStr)
+
+	match ExtStr.is_empty() {
+		true => format!("[ls:{} files {} dirs]", Files, dirs),
+		false => format!("[ls:{} files {} dirs | {}]", Files, dirs, ExtStr),
 	}
 }

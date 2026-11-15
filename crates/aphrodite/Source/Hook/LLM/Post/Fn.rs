@@ -14,14 +14,17 @@ pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	// recorded marker is usually the least informative (e.g. a tiny confirm
 	// echo), while the largest carries the most content for the conversation
 	// index. Ties keep the later-recorded entry.
-	if let Some(Largest) = State
+	match State
 		.RecentMarkers
 		.iter()
 		.filter(|m| m.Turn == State.TurnCounter)
 		.max_by_key(|m| m.Size)
 	{
-		let (hash, Summary, Size) = (Largest.hash.clone(), Largest.Preview.clone(), Largest.Size);
-		crate::Session::Archive::Fn::ArchiveTurn(State, &hash, &Summary, Size);
+		Some(Largest) => {
+			let (hash, Summary, Size) = (Largest.hash.clone(), Largest.Preview.clone(), Largest.Size);
+			crate::Session::Archive::Fn::ArchiveTurn(State, &hash, &Summary, Size);
+		},
+		None => {},
 	}
 	crate::Session::Turn::Fn::NextTurn(State);
 	// P3/T9: purge expired ephemeral nudges AFTER advancing the turn, so a

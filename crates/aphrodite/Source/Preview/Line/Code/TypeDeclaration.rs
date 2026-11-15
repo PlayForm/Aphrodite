@@ -8,17 +8,14 @@
 /// scope here; they are handled by their own predicates.
 pub(crate) fn Fn(t:&str) -> bool {
 	let Stripped = t.strip_prefix("pub ").unwrap_or(t);
-	for Kw in ["struct ", "enum ", "trait "] {
-		if let Some(Rest) = Stripped.strip_prefix(Kw) {
-			let NameLength = Rest
-				.trim_start()
+
+	["struct ", "enum ", "trait "].into_iter().any(|Kw| {
+		Stripped.strip_prefix(Kw).is_some_and(|Rest| {
+			Rest.trim_start()
 				.chars()
 				.take_while(|c| c.is_alphanumeric() || *c == '_')
-				.count();
-			if NameLength > 0 {
-				return true;
-			}
-		}
-	}
-	false
+				.count()
+				> 0
+		})
+	})
 }

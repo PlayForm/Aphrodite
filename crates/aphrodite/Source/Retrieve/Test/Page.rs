@@ -38,7 +38,9 @@ fn TestPaginatePreservesTrailingNewlineOnPartialWindowReachingEnd() {
 // out-of-range offset. ──
 #[test]
 fn TestPaginateEmptyContentReturnsEmptyOkNotError() {
-	assert_eq!(Paginate("", 0, 0), Ok((String::new(), false)));
+	let (Result, Truncated) = Paginate("", 0, 0).expect("an empty document is a valid stored entry, not an error");
+	assert_eq!(Result, "");
+	assert!(!Truncated);
 }
 
 #[test]
@@ -46,7 +48,7 @@ fn TestPaginateOffsetAtOrPastTotalIsError() {
 	let Content = "a\nb\nc"; // 3 lines
 	assert!(Paginate(Content, 3, 0).is_err());
 	assert!(Paginate(Content, 10, 0).is_err());
-	let Error = Paginate(Content, 3, 0).unwrap_err();
+	let Error = format!("{:#}", Paginate(Content, 3, 0).unwrap_err());
 	assert!(Error.contains("out of range"));
 	assert!(Error.contains("3 lines"));
 }

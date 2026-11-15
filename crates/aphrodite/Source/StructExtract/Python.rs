@@ -24,53 +24,84 @@ use crate::StructExtract::{
 /// are already cut to the signature cap.
 pub(super) fn Fn(Content:&str, Result:&mut HashMap<String, Vec<String>>, Budget:&mut isize) {
 	let mut Fns:Vec<String> = Vec::new();
-	for Line in Content.lines() {
-		if *Budget <= 0 {
-			break;
+	// `Err(())` is the spent-budget sentinel: it stops the scan exactly where the
+	// `break` did, and the result is discarded because the budget, not the walk,
+	// is the outcome.
+	let _ = Content.lines().try_for_each(|Line| -> Result<(), ()> {
+		match *Budget <= 0 {
+			true => {
+				return Err(());
+			},
+			false => {},
 		}
 		let Trimmed = Line.trim();
 		let Lower = Trimmed.to_lowercase();
 		let IsDef = (Lower.starts_with("def ") || Lower.starts_with("async def ")) && Trimmed.contains('(');
-		if IsDef {
-			let After = Trimmed.trim_start_matches("async ").trim_start_matches("def ");
-			if let Some(Paren) = After.find('(') {
-				let name = &After[..Paren];
-				let ParamsEnd = After[Paren..].find(')').unwrap_or(0);
-				let Params = if ParamsEnd > 1 { &After[Paren + 1..Paren + ParamsEnd] } else { "" };
-				let s = format!("def {}({})", name, Parameters(Params));
-				let STrunc = if s.len() > MaximumSigLength {
-					Floor(&s, MaximumSigLength - 3).to_string() + "..."
-				} else {
-					s
-				};
-				let Slen = STrunc.len();
-				Fns.push(STrunc);
-				*Budget -= Slen as isize + 1;
-			}
+		match IsDef {
+			true => {
+				let After = Trimmed.trim_start_matches("async ").trim_start_matches("def ");
+				match After.find('(') {
+					Some(Paren) => {
+						let name = &After[..Paren];
+						let ParamsEnd = After[Paren..].find(')').unwrap_or(0);
+						let Params = match ParamsEnd > 1 {
+							true => &After[Paren + 1..Paren + ParamsEnd],
+							false => "",
+						};
+						let s = format!("def {}({})", name, Parameters(Params));
+						let STrunc = match s.len() > MaximumSigLength {
+							true => Floor(&s, MaximumSigLength - 3).to_string() + "...",
+							false => s,
+						};
+						let Slen = STrunc.len();
+						Fns.push(STrunc);
+						*Budget -= Slen as isize + 1;
+					},
+					None => {},
+				}
+			},
+			false => {},
 		}
+		Ok(())
+	});
+	match Fns.is_empty() {
+		false => {
+			Result.insert("fns".into(), Fns);
+		},
+		true => {},
 	}
-	if !Fns.is_empty() {
-		Result.insert("fns".into(), Fns);
-	}
-	if *Budget <= 0 {
-		return;
+	match *Budget <= 0 {
+		true => {
+			return;
+		},
+		false => {},
 	}
 
 	let mut Classes:Vec<String> = Vec::new();
-	for Line in Content.lines() {
-		if *Budget <= 0 {
-			break;
+	let _ = Content.lines().try_for_each(|Line| -> Result<(), ()> {
+		match *Budget <= 0 {
+			true => {
+				return Err(());
+			},
+			false => {},
 		}
 		let Trimmed = Line.trim();
-		if let Some(Rest) = Trimmed.strip_prefix("class ") {
-			let name = Rest.split(['(', ':']).next().unwrap_or("?");
-			let s = Signature("class", name);
-			let Slen = s.len();
-			Classes.push(s);
-			*Budget -= Slen as isize + 1;
+		match Trimmed.strip_prefix("class ") {
+			Some(Rest) => {
+				let name = Rest.split(['(', ':']).next().unwrap_or("?");
+				let s = Signature("class", name);
+				let Slen = s.len();
+				Classes.push(s);
+				*Budget -= Slen as isize + 1;
+			},
+			None => {},
 		}
-	}
-	if !Classes.is_empty() {
-		Result.insert("classes".into(), Classes);
+		Ok(())
+	});
+	match Classes.is_empty() {
+		false => {
+			Result.insert("classes".into(), Classes);
+		},
+		true => {},
 	}
 }

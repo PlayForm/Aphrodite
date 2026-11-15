@@ -23,63 +23,81 @@ use serde_json::{Map, Value};
 pub(crate) fn Fn(obj:&Map<String, Value>) -> Option<(String, &'static str)> {
 	let count = obj.get("total_count").and_then(|c| c.as_u64())?;
 	let truncated = obj.get("truncated").and_then(|t| t.as_bool()).unwrap_or(false);
-	// ISSUE-11 WS2: build ONE grep-style line per REAL match and let
-	// the search preview count them. The old take(20) cap made a
-	// 5,000-hit search preview as "[search:20 hits ...]" - a count
-	// that lied about the total.
-	let mut lines:Vec<String> = Vec::new();
-	if let Some(matches) = obj.get("matches").and_then(|m| m.as_array()) {
-		for m in matches {
-			if let (Some(p), Some(l)) = (m.get("path").or(m.get("file")).and_then(|v| v.as_str()), m.get("line")) {
-				let content = m.get("content").and_then(|c| c.as_str()).unwrap_or("");
-				lines.push(format!("{}:{}:{}", p, l, content));
+
+	// ISSUE-11 WS2: ONE grep-style line per REAL match, counted by the search
+	// preview. The old take(20) cap made a 5,000-hit search preview as
+	// "[search:20 hits ...]" - a count that lied about the total.
+	let mut lines:Vec<String> = obj
+		.get("matches")
+		.and_then(|m| m.as_array())
+		.into_iter()
+		.flatten()
+		.filter_map(|m| {
+			let path = m.get("path").or(m.get("file")).and_then(|v| v.as_str())?;
+			let line = m.get("line")?;
+			let content = m.get("content").and_then(|c| c.as_str()).unwrap_or("");
+
+			Some(format!("{}:{}:{}", path, line, content))
+		})
+		.collect();
+
+	// Real Hermes search_files results ship `matches_text` (path-grouped:
+	// "path\n  <line>: <content>") instead of a `matches` array. The old code
+	// ignored it, so every real search collapsed to "[search:1L]" ("N total" has
+	// no file:line: rows for the preview regex to count). Normalize it to the
+	// same grep-style lines so the preview shows the real hit count and files.
+	lines = match (lines.is_empty(), obj.get("matches_text").and_then(|t| t.as_str())) {
+		(true, Some(text)) => {
+			text.lines()
+				.fold((None::<&str>, Vec::new()), |(current_path, mut rows), raw| {
+					let trimmed = raw.trim();
+
+					match (trimmed.is_empty(), raw.trim_start().len() != raw.len()) {
+						// Blank line: no row, the path carries over.
+						(true, _) => (current_path, rows),
+						// Indented row under the current path: "<line>: <content>".
+						(false, true) => {
+							match (current_path, trimmed.split_once(':')) {
+								(Some(path), Some((line_number, rest))) => {
+									rows.push(format!("{}:{}:{}", path, line_number.trim(), rest.trim_start()));
+
+									(current_path, rows)
+								},
+								_ => (current_path, rows),
+							}
+						},
+						// A path header for the rows that follow.
+						(false, false) => (Some(trimmed), rows),
+					}
+				})
+				.1
+		},
+		_ => lines,
+	};
+
+	match lines.is_empty() {
+		true => {
+			// No per-match content to count. Surface the REAL total and the
+			// truncated flag as the payload itself, typed `text` so the generic
+			// preview arm renders "0 total" / "N total (truncated)" instead of an
+			// unreadable "[search:1L]".
+			let is_search_shape = obj.get("matches").is_some()
+				|| obj.get("matches_text").is_some()
+				|| obj.get("matches_format").is_some()
+				|| truncated;
+
+			match is_search_shape {
+				true => {
+					let label = match truncated {
+						true => format!("{} total (truncated)", count),
+						false => format!("{} total", count),
+					};
+
+					Some((label, "text"))
+				},
+				false => None,
 			}
-		}
-	}
-	// Real Hermes search_files results ship `matches_text` (path-
-	// grouped: "path\n  <line>: <content>") instead of a `matches`
-	// array. The old code ignored it, so every real search collapsed
-	// to "[search:1L]" ("N total" has no file:line: rows for the
-	// preview regex to count). Normalize it to the same grep-style
-	// lines so the preview shows the real hit count and files.
-	if lines.is_empty()
-		&& let Some(text) = obj.get("matches_text").and_then(|t| t.as_str())
-	{
-		let mut cur_path:Option<&str> = None;
-		for raw in text.lines() {
-			let t = raw.trim();
-			if t.is_empty() {
-				continue;
-			}
-			if raw.trim_start().len() != raw.len() {
-				// Indented row under the current path: "<line>: <content>".
-				if let (Some(p), Some((lno, rest))) = (cur_path, t.split_once(':')) {
-					lines.push(format!("{}:{}:{}", p, lno.trim(), rest.trim_start()));
-				}
-			} else {
-				cur_path = Some(t);
-			}
-		}
-	}
-	if lines.is_empty() {
-		// No per-match content to count. Surface the REAL total and
-		// the truncated flag as the payload itself, typed `text` so
-		// the generic preview arm renders "0 total" / "N total
-		// (truncated)" instead of an unreadable "[search:1L]".
-		let is_search_shape = obj.get("matches").is_some()
-			|| obj.get("matches_text").is_some()
-			|| obj.get("matches_format").is_some()
-			|| truncated;
-		if !is_search_shape {
-			return None;
-		}
-		let label = if truncated {
-			format!("{} total (truncated)", count)
-		} else {
-			format!("{} total", count)
-		};
-		Some((label, "text"))
-	} else {
-		Some((lines.join("\n"), "search"))
+		},
+		false => Some((lines.join("\n"), "search")),
 	}
 }

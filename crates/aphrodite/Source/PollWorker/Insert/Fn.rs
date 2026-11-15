@@ -16,24 +16,35 @@ use crate::{
 /// completed/stale task if at capacity.
 pub fn InsertBgTask(State:&mut AphroditeState, TaskID:String, Tool:String, command:String, Turn:usize) {
 	// Deduplicate: don't track the same command twice while it's running.
-	if State.BgTasks.iter().any(|t| t.ID == TaskID && t.Status == BgStatus::Running) {
-		return;
+	match State.BgTasks.iter().any(|t| t.ID == TaskID && t.Status == BgStatus::Running) {
+		true => {
+			return;
+		},
+		false => {},
 	}
 
 	// Evict oldest non-running task if at capacity.
-	while State.BgTasks.len() >= MaximumBgTasks {
-		// Prefer evicting stale, then done/failed.
-		let StalePos = State.BgTasks.iter().position(|t| t.Status == BgStatus::Stale);
-		let DonePos = State
-			.BgTasks
-			.iter()
-			.position(|t| matches!(t.Status, BgStatus::Done { .. } | BgStatus::Failed { .. }));
-		let Pos = StalePos.or(DonePos);
-		if let Some(p) = Pos {
-			State.BgTasks.remove(p);
-		} else {
-			// All running - drop the oldest running task.
-			State.BgTasks.remove(0);
+	loop {
+		match State.BgTasks.len() >= MaximumBgTasks {
+			true => {
+				// Prefer evicting stale, then done/failed.
+				let StalePos = State.BgTasks.iter().position(|t| t.Status == BgStatus::Stale);
+				let DonePos = State
+					.BgTasks
+					.iter()
+					.position(|t| matches!(t.Status, BgStatus::Done { .. } | BgStatus::Failed { .. }));
+				let Pos = StalePos.or(DonePos);
+				match Pos {
+					Some(p) => {
+						State.BgTasks.remove(p);
+					},
+					None => {
+						// All running - drop the oldest running task.
+						State.BgTasks.remove(0);
+					},
+				}
+			},
+			false => break,
 		}
 	}
 

@@ -70,8 +70,11 @@ async fn TestSSEResponseIsStreamedWithHeaderAndNotCached() {
 	// cache (F3's whole point - a cached entry is a single buffered JSON
 	// body, nothing like a stream).
 	let CacheKey = CacheKeyFromBody(r#"{"model":"x","messages":[]}"#.as_bytes(), State.APIKey.Expose());
-	if let Some(Ck) = CacheKey {
-		assert!(ResponseCacheGet(&State, Ck).is_none(), "SSE response must not be cached");
+	match CacheKey {
+		Some(Ck) => {
+			assert!(ResponseCacheGet(&State, Ck).is_none(), "SSE response must not be cached");
+		},
+		None => {},
 	}
 }
 

@@ -228,10 +228,13 @@ fn TestCompressChatCompletionBudgetHeaderLowersEffectiveThreshold() {
 			.block_on(CompressChatCompletion(&StateLowBudget, &body, Some("0")));
 
 	// A lower budget must never compress *less* than no budget at all.
-	if ResultNoBudget.is_some() {
-		assert!(
-			ResultLowBudget.is_some(),
-			"lower budget must compress at least as much as no budget"
-		);
+	match ResultNoBudget.is_some() {
+		true => {
+			assert!(
+				ResultLowBudget.is_some(),
+				"lower budget must compress at least as much as no budget"
+			);
+		},
+		false => {},
 	}
 }

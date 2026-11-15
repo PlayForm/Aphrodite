@@ -1,7 +1,13 @@
 [workspace]
 resolver = "2"
 members = ["crates/aphrodite", "crates/aphrodite-hermes"]
-exclude = ["Maintain/dynamic_hooks"]
+# `vendor/headroom` is its own workspace (its `Cargo.toml` carries `[workspace]`
+# with `workspace.dependencies`). It is consumed as a PATH dependency by
+# `crates/aphrodite`, and a path dependency that roots its own workspace must be
+# excluded from this one - otherwise cargo resolves the nested crate's
+# `workspace = true` inheritance against THIS manifest and fails with
+# "`dependency.thiserror` was not found in `workspace.dependencies`".
+exclude = ["Maintain/dynamic_hooks", "vendor/headroom"]
 
 [workspace.package]
 edition = "2024"

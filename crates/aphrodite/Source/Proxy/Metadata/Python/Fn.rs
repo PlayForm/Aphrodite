@@ -16,9 +16,14 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			After.split(['(', ' ', ':']).next().filter(|s| !s.is_empty())
 		})
 		.collect();
-	if !Fns.is_empty() {
-		Parts.push(format!("fns={}", Fns.join(",")));
+
+	match !Fns.is_empty() {
+		true => {
+			Parts.push(format!("fns={}", Fns.join(",")));
+		},
+		false => {},
 	}
+
 	let Classes:Vec<&str> = Content
 		.lines()
 		.filter(|l| {
@@ -31,9 +36,14 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			After.split(['(', ' ', ':']).next().filter(|s| !s.is_empty())
 		})
 		.collect();
-	if !Classes.is_empty() {
-		Parts.push(format!("classes={}", Classes.join(",")));
+
+	match !Classes.is_empty() {
+		true => {
+			Parts.push(format!("classes={}", Classes.join(",")));
+		},
+		false => {},
 	}
+
 	let Imports:Vec<&str> = Content
 		.lines()
 		.filter(|l| {
@@ -42,16 +52,21 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 		})
 		.filter_map(|l| {
 			let t = l.trim_start();
-			if let Some(Rest) = t.strip_prefix("import ") {
-				Rest.split([' ', ',', ';']).next().filter(|s| !s.is_empty())
-			} else {
-				t.strip_prefix("from ")?.split(' ').next().filter(|s| !s.is_empty())
+
+			match t.strip_prefix("import ") {
+				Some(Rest) => Rest.split([' ', ',', ';']).next().filter(|s| !s.is_empty()),
+				None => t.strip_prefix("from ")?.split(' ').next().filter(|s| !s.is_empty()),
 			}
 		})
 		.collect();
-	if !Imports.is_empty() {
-		Parts.push(format!("imports={}", Imports.join(",")));
+
+	match !Imports.is_empty() {
+		true => {
+			Parts.push(format!("imports={}", Imports.join(",")));
+		},
+		false => {},
 	}
+
 	// Decorators: @route, @dataclass, @staticmethod, etc.
 	let Decorators:Vec<&str> = Content
 		.lines()
@@ -65,8 +80,13 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			name.split(['(', ' ']).next().filter(|s| !s.is_empty())
 		})
 		.collect();
-	if !Decorators.is_empty() {
-		Parts.push(format!("decorators={}", Decorators.join(",")));
+
+	match !Decorators.is_empty() {
+		true => {
+			Parts.push(format!("decorators={}", Decorators.join(",")));
+		},
+		false => {},
 	}
+
 	Parts.push(format!("ln={}", LineCount));
 }

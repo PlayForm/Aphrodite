@@ -31,26 +31,36 @@ pub async fn Fn(
 	let RequestID = uuid::Uuid::new_v4().to_string();
 	let RequestIDShort = &RequestID[..8];
 
-	if state.Dev {
-		// Log incoming headers
-		let mut HdrLog = String::new();
-		for (k, v) in Headers.iter() {
-			let Value = v.to_str().unwrap_or("?");
-			if k.as_str().to_lowercase() != "authorization" {
-				HdrLog.push_str(&format!("  {}: {}", k.as_str(), TruncateCharSafe(Value, 80)));
-			} else {
-				HdrLog.push_str("  authorization: [REDACTED]");
-			}
-			HdrLog.push('\n');
-		}
-		tracing::info!(
-			ID = %RequestIDShort,
-			Method = %Method,
-			path = %path.path(),
-			BodyLength = body.len(),
-			Headers = %HdrLog,
-			">>> REQ"
-		);
+	match state.Dev {
+		true => {
+			// Log incoming headers
+			let mut HdrLog = String::new();
+
+			Headers.iter().for_each(|(k, v)| {
+				let Value = v.to_str().unwrap_or("?");
+
+				match k.as_str().to_lowercase() != "authorization" {
+					true => {
+						HdrLog.push_str(&format!("  {}: {}", k.as_str(), TruncateCharSafe(Value, 80)));
+					},
+					false => {
+						HdrLog.push_str("  authorization: [REDACTED]");
+					},
+				}
+
+				HdrLog.push('\n');
+			});
+
+			tracing::info!(
+				ID = %RequestIDShort,
+				Method = %Method,
+				path = %path.path(),
+				BodyLength = body.len(),
+				Headers = %HdrLog,
+				">>> REQ"
+			);
+		},
+		false => {},
 	}
 
 	// F10: forward the query string too - `path.path()` excludes it, so any
@@ -72,10 +82,16 @@ pub async fn Fn(
 	} else {
 		None
 	};
-	if let Some(Ck) = CacheKey
-		&& let Some(Cached) = Lookup::Fn::Fn(&state, Some(Ck), RequestIDShort, &Method, path.path(), T0)
-	{
-		return Cached;
+	match CacheKey {
+		Some(Ck) => {
+			match Lookup::Fn::Fn(&state, Some(Ck), RequestIDShort, &Method, path.path(), T0) {
+				Some(Cached) => {
+					return Cached;
+				},
+				None => {},
+			}
+		},
+		None => {},
 	}
 	// 02-F2: a `"stream": true` request goes out on `StreamClient` (no total
 	// timeout), not the bounded `Client` - see `Forward`'s doc comment.

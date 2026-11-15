@@ -111,9 +111,10 @@ fn test_unwrap_hermes_result_table() {
 		("no matching shape", serde_json::json!({"a": 1, "b": 2}), None),
 	];
 
-	for (label, input, expected) in cases {
+	cases.into_iter().for_each(|(label, input, expected)| {
 		let content = input.to_string();
 		let got = Unwrap::Fn::Fn(&content);
+
 		match expected {
 			Some((c, t)) => {
 				let (gc, gt) = got.unwrap_or_else(|| panic!("{label}: expected Some, got None"));
@@ -122,5 +123,5 @@ fn test_unwrap_hermes_result_table() {
 			},
 			None => assert!(got.is_none(), "{label}: expected None, got {got:?}"),
 		}
-	}
+	});
 }

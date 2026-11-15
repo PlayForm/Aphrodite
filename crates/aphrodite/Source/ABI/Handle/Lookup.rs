@@ -28,12 +28,9 @@ pub(crate) fn GetHandle(Hid:usize) -> Option<Arc<Mutex<AphroditeState>>> {
 ///
 /// An unknown handle is an error, not a default: silently inventing a session
 /// would answer with plausible JSON for a session that never existed.
-pub(crate) fn WithState<T>(Hid:usize, f:impl FnOnce(&mut AphroditeState) -> T) -> Result<T, String> {
-	let Session = match GetHandle(Hid) {
-		Some(s) => s,
-		None => return Err(format!("invalid handle: {}", Hid)),
-	};
+pub(crate) fn WithState<T>(Hid:usize, f:impl FnOnce(&mut AphroditeState) -> T) -> anyhow::Result<T> {
+	let Session = GetHandle(Hid).ok_or_else(|| anyhow::anyhow!("invalid handle: {Hid}"))?;
 	let mut State = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 	std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut State)))
-		.map_err(|_| "internal error: hook panicked".to_string())
+		.map_err(|_| anyhow::anyhow!("internal error: hook panicked"))
 }

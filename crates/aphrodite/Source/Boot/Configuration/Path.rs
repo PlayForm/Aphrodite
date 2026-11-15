@@ -25,19 +25,19 @@ pub fn Resolve() -> (String, bool) {
 		.clone()
 		.unwrap_or_else(|| "aphrodite.toml".to_string());
 	let UseMultiConfiguration = std::path::Path::new(&ConfigurationPath).exists();
-	if UseMultiConfiguration || ExplicitConfigurationPath.is_some() {
-		(ConfigurationPath, UseMultiConfiguration)
-	} else {
-		// Runtime home resolution is a single shared decision
-		// (Home::Runtime::Fn::Fn: $APHRODITE_HOME -> $HERMES_HOME -> $HOME ->
-		// platform default) so a setup run under a non-default Hermes home
-		// (Docker, profile gateways) finds the config the plugin shim will
-		// use - never a second, shadow home (issue 40).
-		let HomeConfiguration = Home::Configuration::Fn::Fn();
-		if HomeConfiguration.exists() {
-			(HomeConfiguration.to_string_lossy().into_owned(), true)
-		} else {
-			(ConfigurationPath, false)
-		}
+	match UseMultiConfiguration || ExplicitConfigurationPath.is_some() {
+		true => (ConfigurationPath, UseMultiConfiguration),
+		false => {
+			// Runtime home resolution is a single shared decision
+			// (Home::Runtime::Fn::Fn: $APHRODITE_HOME -> $HERMES_HOME -> $HOME ->
+			// platform default) so a setup run under a non-default Hermes home
+			// (Docker, profile gateways) finds the config the plugin shim will
+			// use - never a second, shadow home (issue 40).
+			let HomeConfiguration = Home::Configuration::Fn::Fn();
+			match HomeConfiguration.exists() {
+				true => (HomeConfiguration.to_string_lossy().into_owned(), true),
+				false => (ConfigurationPath, false),
+			}
+		},
 	}
 }

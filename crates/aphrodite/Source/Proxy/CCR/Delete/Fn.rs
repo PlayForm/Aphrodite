@@ -22,13 +22,15 @@ pub async fn Fn(
 	match &state.ccr {
 		Some(ccr) => {
 			let Existed = CCRDel(ccr, &hash).await;
-			if Existed {
-				(StatusCode::OK, Json(serde_json::json!({"deleted": true, "hash": hash})))
-			} else {
-				(
-					StatusCode::NOT_FOUND,
-					Json(serde_json::json!({"deleted": false, "hash": hash, "error": "not found"})),
-				)
+
+			match Existed {
+				true => (StatusCode::OK, Json(serde_json::json!({"deleted": true, "hash": hash}))),
+				false => {
+					(
+						StatusCode::NOT_FOUND,
+						Json(serde_json::json!({"deleted": false, "hash": hash, "error": "not found"})),
+					)
+				},
 			}
 		},
 		None => {

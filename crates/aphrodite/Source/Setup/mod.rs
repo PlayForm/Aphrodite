@@ -9,16 +9,16 @@
 //! and then cannot load its dylib or its loader, and the symptom appears in the
 //! gateway on a later run.
 //!
-//! The work is grouped by what it touches. `Run/` orchestrates and owns the error
-//! type and the resolved context; `Verify/` checks prerequisites and hashes the
-//! artifact; `Dylib/` locates, downloads and checksums the shared libraries;
-//! `Write/` writes every installed file, the two `include_str!` templates
-//! included; `MacOS.rs` applies the Gatekeeper-safe treatment to each artifact copy
-//! on macOS.
+//! The work is grouped by what it touches. `Run/` orchestrates and owns the
+//! resolved context; `Verify/` checks prerequisites and hashes the artifact;
+//! `Dylib/` locates, downloads and checksums the shared libraries; `Write/`
+//! writes every installed file, the two `include_str!` templates included;
+//! `MacOS.rs` applies the Gatekeeper-safe treatment to each artifact copy on
+//! macOS.
 //!
-//! This facade declares the leaves and carries no logic. `Run::Entry::Fn` and
-//! `Run::Error::Enum` are the only items anything outside `Setup/` names, and
-//! `Run` is `pub` because the binary - a separate crate target - calls it.
+//! This facade declares the leaves and carries no logic. `Run::Entry::Fn` is the
+//! only item anything outside `Setup/` names, and `Run` is `pub` because the
+//! binary - a separate crate target - calls it.
 
 mod Dylib;
 #[cfg(target_os = "macos")]

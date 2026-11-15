@@ -18,9 +18,15 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
 		.raw
 		.lines()
 		.any(|l| l.trim_start().starts_with("On branch ") || l.trim_start().starts_with("Your branch "));
-	if OnBranch {
-		return true;
+
+	match OnBranch {
+		true => {
+			return true;
+		},
+		false => {},
 	}
+
 	let StatusLines = Inp.NonEmpty.iter().filter(|l| GitStatus::Fn(l).is_some()).count();
+
 	StatusLines >= 2 && StatusLines * 2 >= Inp.NonEmpty.len()
 }

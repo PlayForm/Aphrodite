@@ -31,27 +31,31 @@ pub fn ReduceCode(Content:&str) -> Option<String> {
 	];
 
 	let mut Sigs:Vec<String> = Vec::new();
-	for Line in Content.lines() {
+	Content.lines().for_each(|Line| {
 		let Trimmed = Line.trim();
 		// Lowercase ONCE per line (was recomputed inside regex_match for
 		// every one of the 9 patterns → 9 allocs/line). Bug 18-P12.
 		let Lower = Trimmed.to_lowercase();
-		for Sp in &Patterns {
-			if let Some(_Caps) = crate::Stage2::Regex::Fn::RegexMatch(Trimmed, &Lower, Sp.Pattern) {
-				let SigLine:String = Trimmed.chars().take(120).collect();
-				Sigs.push(format!("  [{}] {}", Sp.Kind, SigLine));
+		Patterns.iter().for_each(|Sp| {
+			match crate::Stage2::Regex::Fn::RegexMatch(Trimmed, &Lower, Sp.Pattern) {
+				Some(_Caps) => {
+					let SigLine:String = Trimmed.chars().take(120).collect();
+					Sigs.push(format!("  [{}] {}", Sp.Kind, SigLine));
+				},
+				None => {},
 			}
-		}
-	}
+		});
+	});
 
-	if Sigs.is_empty() {
-		None
-	} else {
-		let mut Result = String::from("[code structure]");
-		for Sig in Sigs.iter().take(50) {
-			Result.push('\n');
-			Result.push_str(Sig);
-		}
-		Some(Result)
+	match Sigs.is_empty() {
+		true => None,
+		false => {
+			let mut Result = String::from("[code structure]");
+			Sigs.iter().take(50).for_each(|Sig| {
+				Result.push('\n');
+				Result.push_str(Sig);
+			});
+			Some(Result)
+		},
 	}
 }

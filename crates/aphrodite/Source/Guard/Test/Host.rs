@@ -26,9 +26,9 @@ fn TestHostHeaderToHostnameIpv6Bracketed() {
 
 #[test]
 fn TestAllowedLoopbackHostsAcceptsRealClients() {
-	for h in ["127.0.0.1", "localhost", "[::1]"] {
+	["127.0.0.1", "localhost", "[::1]"].into_iter().for_each(|h| {
 		assert!(AllowedLoopbackHosts.contains(&h), "{h} must be an allowed loopback host");
-	}
+	});
 }
 
 #[test]

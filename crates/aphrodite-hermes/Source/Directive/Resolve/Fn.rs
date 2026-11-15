@@ -34,28 +34,36 @@ use std::path::PathBuf;
 pub(crate) fn Fn(home_param:&str) -> (PathBuf, Vec<String>) {
 	let mut warnings:Vec<String> = Vec::new();
 
-	if !home_param.is_empty() {
-		return (PathBuf::from(home_param).join("directives"), warnings);
-	}
-	if let Ok(dir) = std::env::var("APHRODITE_DIRECTIVES_DIR")
-		&& !dir.trim().is_empty()
-	{
-		return (PathBuf::from(dir), warnings);
-	}
-	if let Ok(home) = std::env::var("APHRODITE_HOME")
-		&& !home.trim().is_empty()
-	{
-		return (PathBuf::from(home).join("directives"), warnings);
-	}
-	match aphrodite::Home::Runtime::Opt::Fn::Fn() {
-		Some(home) => (home.join("directives"), warnings),
-		None => {
-			warnings.push(
-				"neither $HOME nor $HERMES_HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; using \
-				 current directory"
-					.into(),
-			);
-			(PathBuf::from(".").join("directives"), warnings)
+	// The three overrides, in precedence order. Each is resolved to its
+	// directives directory (or `None` when unset/blank) so the chain below is
+	// one `match` on the decision rather than three early returns.
+	let explicit_home = (!home_param.is_empty()).then(|| PathBuf::from(home_param).join("directives"));
+	let directive_directory = std::env::var("APHRODITE_DIRECTIVES_DIR")
+		.ok()
+		.filter(|dir| !dir.trim().is_empty())
+		.map(PathBuf::from);
+	let home_override = std::env::var("APHRODITE_HOME")
+		.ok()
+		.filter(|home| !home.trim().is_empty())
+		.map(|home| PathBuf::from(home).join("directives"));
+
+	match (explicit_home, directive_directory, home_override) {
+		(Some(dir), ..) => (dir, warnings),
+		(None, Some(dir), _) => (dir, warnings),
+		(None, None, Some(dir)) => (dir, warnings),
+		(None, None, None) => {
+			match aphrodite::Home::Runtime::Opt::Fn::Fn() {
+				Some(home) => (home.join("directives"), warnings),
+				None => {
+					warnings.push(
+						"neither $HOME nor $HERMES_HOME nor $APHRODITE_HOME nor $APHRODITE_DIRECTIVES_DIR is set; \
+						 using current directory"
+							.into(),
+					);
+
+					(PathBuf::from(".").join("directives"), warnings)
+				},
+			}
 		},
 	}
 }

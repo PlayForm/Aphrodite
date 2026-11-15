@@ -36,7 +36,7 @@ pub(crate) async fn Fn(
 	Headers:&axum::http::HeaderMap,
 	CacheKey:Option<u64>,
 	IsChatCompletion:bool,
-	UpstreamResult:Result<reqwest::Response, String>,
+	UpstreamResult:anyhow::Result<reqwest::Response>,
 	FinalErrorWasTimeout:bool,
 ) -> Response {
 	match UpstreamResult {
@@ -44,11 +44,17 @@ pub(crate) async fn Fn(
 			let Status = response.status();
 			// Track upstream errors by status code
 			let StatusCode = Status.as_u16();
-			if StatusCode >= 500 {
-				State.UpstreamErrors5xx.fetch_add(1, Ordering::Relaxed);
-			} else if StatusCode >= 400 {
-				State.UpstreamErrors4xx.fetch_add(1, Ordering::Relaxed);
+
+			match () {
+				_ if StatusCode >= 500 => {
+					State.UpstreamErrors5xx.fetch_add(1, Ordering::Relaxed);
+				},
+				_ if StatusCode >= 400 => {
+					State.UpstreamErrors4xx.fetch_add(1, Ordering::Relaxed);
+				},
+				_ => {},
 			}
+
 			// F5: capture the full upstream response header map before
 			// consuming the body, not just `content-type` - the proxy used
 			// to rebuild the response with only `Content-Type`, silently
@@ -61,43 +67,58 @@ pub(crate) async fn Fn(
 			// forwarded chunk-by-chunk, not buffered into a single JSON blob
 			// (which an SSE client can't parse). Skip compression + cache
 			// entirely for this path.
-			if IsSSE(ContentType.as_ref()) {
-				// 02-F9: count bytes and observe mid-stream errors as chunks
-				// flow through - once `Body::from_stream` owns the raw
-				// `bytes_stream()`, a later chunk `Err` (F2's failure mode)
-				// and every SSE byte were otherwise invisible to `/stats`.
-				let StateForStream = State.clone();
-				let Stream = response.bytes_stream().inspect(move |Chunk| {
-					match Chunk {
-						Ok(bytes) => {
-							StateForStream
-								.ResponseBodyBytes
-								.fetch_add(bytes.len() as u64, Ordering::Relaxed);
+			match IsSSE(ContentType.as_ref()) {
+				true => {
+					// 02-F9: count bytes and observe mid-stream errors as chunks
+					// flow through - once `Body::from_stream` owns the raw
+					// `bytes_stream()`, a later chunk `Err` (F2's failure mode)
+					// and every SSE byte were otherwise invisible to `/stats`.
+					let StateForStream = State.clone();
+					let Stream = response.bytes_stream().inspect(move |Chunk| {
+						match Chunk {
+							Ok(bytes) => {
+								StateForStream
+									.ResponseBodyBytes
+									.fetch_add(bytes.len() as u64, Ordering::Relaxed);
+							},
+							Err(_) => {
+								StateForStream.SSEStreamErrors.fetch_add(1, Ordering::Relaxed);
+							},
+						}
+					});
+
+					match State.Dev {
+						true => {
+							tracing::info!(ID = %RequestIDShort, Status = %Status, "<<< STREAM (SSE)");
 						},
-						Err(_) => {
-							StateForStream.SSEStreamErrors.fetch_add(1, Ordering::Relaxed);
-						},
+						false => {},
 					}
-				});
-				if State.Dev {
-					tracing::info!(ID = %RequestIDShort, Status = %Status, "<<< STREAM (SSE)");
-				}
-				State.RecordLatency(T0.elapsed());
-				State.RecordRequest(
-					RequestIDShort,
-					Method.as_str(),
-					path,
-					Status.as_u16(),
-					false,
-					T0.elapsed().as_millis(),
-				);
-				let mut Builder = Response::builder().status(Status);
-				Builder = CopyUpstreamHeaders(Builder, &UpstreamHeaders);
-				if let Some(Ct) = ContentType {
-					Builder = Builder.header("Content-Type", Ct);
-				}
-				Builder = Builder.header("X-Aphrodite-Streamed", "true");
-				return Builder.body(Body::from_stream(Stream)).unwrap();
+
+					State.RecordLatency(T0.elapsed());
+					State.RecordRequest(
+						RequestIDShort,
+						Method.as_str(),
+						path,
+						Status.as_u16(),
+						false,
+						T0.elapsed().as_millis(),
+					);
+
+					let mut Builder = Response::builder().status(Status);
+					Builder = CopyUpstreamHeaders(Builder, &UpstreamHeaders);
+
+					match ContentType {
+						Some(Ct) => {
+							Builder = Builder.header("Content-Type", Ct);
+						},
+						None => {},
+					}
+
+					Builder = Builder.header("X-Aphrodite-Streamed", "true");
+
+					return Builder.body(Body::from_stream(Stream)).unwrap();
+				},
+				false => {},
 			}
 
 			// Buffer the full response body (non-streaming path). Cap at
@@ -111,7 +132,8 @@ pub(crate) async fn Fn(
 					// `RecordError` - the client gets a generic message.
 					// `/stats`'s `LastErrors` still has the real string for
 					// an operator to diagnose from.
-					State.RecordError(format!("body read: {}", e));
+					State.RecordError(format!("body read: {e:#}"));
+
 					return (
 						StatusCode::BAD_GATEWAY,
 						Json(serde_json::json!({"error": "upstream request failed"})),
@@ -128,91 +150,131 @@ pub(crate) async fn Fn(
 
 			// Only compress Chat Completions responses
 			let Elapsed = T0.elapsed();
-			if IsChatCompletion && State.ccr.is_some() {
-				// Extract headroom budget from inbound headers for compression
-				// aggressiveness. `HeaderMap::get` is already case-insensitive
-				// (F20), so the second lookup below used to be permanently
-				// dead - removed rather than kept as misleading "just in case"
-				// code implying case-sensitive matching.
-				let HeadroomBudget = Headers.get("x-headroom-budget").and_then(|v| v.to_str().ok());
-				if State.Dev && HeadroomBudget.is_some() {
-					tracing::info!(
-						ID = %RequestIDShort,
-						Budget = %HeadroomBudget.unwrap_or(""),
-						"headroom budget applied to compression threshold"
-					);
-				}
-				if let Some(Compressed) = CompressChatCompletion(State, &ResponseBody, HeadroomBudget).await {
-					State.RequestsCompressed.fetch_add(1, Ordering::Relaxed);
-					State.RecordLatency(Elapsed);
-					State.RecordRequest(
-						RequestIDShort,
-						Method.as_str(),
-						path,
-						Status.as_u16(),
-						true,
-						Elapsed.as_millis(),
-					);
-					if State.Dev {
-						let Elapsed = T0.elapsed();
-						let CompLength = serde_json::to_vec(&Compressed).map(|v| v.len()).unwrap_or(0);
-						tracing::info!(
-							ID = %RequestIDShort,
-							Status = %Status,
-							OriginalLength = ResponseBody.len(),
-							CompressedLength = CompLength,
-							Ratio = format!("{:.1}x", ResponseBody.len() as f64 / CompLength.max(1) as f64),
-							ElapsedMs = Elapsed.as_millis(),
-							"<<< COMPRESSED"
-						);
+
+			match IsChatCompletion && State.ccr.is_some() {
+				true => {
+					// Extract headroom budget from inbound headers for compression
+					// aggressiveness. `HeaderMap::get` is already case-insensitive
+					// (F20), so the second lookup below used to be permanently
+					// dead - removed rather than kept as misleading "just in case"
+					// code implying case-sensitive matching.
+					let HeadroomBudget = Headers.get("x-headroom-budget").and_then(|v| v.to_str().ok());
+
+					match State.Dev && HeadroomBudget.is_some() {
+						true => {
+							tracing::info!(
+								ID = %RequestIDShort,
+								Budget = %HeadroomBudget.unwrap_or(""),
+								"headroom budget applied to compression threshold"
+							);
+						},
+						false => {},
 					}
-					let body = serde_json::to_vec(&Compressed).unwrap_or_else(|_| ResponseBody.to_vec());
-					// Store in LLM response cache - only successful responses (F2):
-					// caching an upstream 4xx/5xx here would replay it as a 200 to
-					// every later identical request, and a client would parse the
-					// error body as a real chat completion. TTL-stamped (F5,
-					// report 06) so it's checked against `ResponseCacheTtl` on
-					// the hit path instead of replaying forever.
-					if let Some(Ck) = CacheKey
-						&& Status.is_success()
-						&& body.len() <= ResponseCacheMaximumBodyBytes
-						&& let Ok(mut Cache) = State.ResponseCache.lock()
-					{
-						Cache.put(Ck, (std::time::Instant::now(), body.clone()));
+
+					match CompressChatCompletion(State, &ResponseBody, HeadroomBudget).await {
+						Some(Compressed) => {
+							State.RequestsCompressed.fetch_add(1, Ordering::Relaxed);
+							State.RecordLatency(Elapsed);
+							State.RecordRequest(
+								RequestIDShort,
+								Method.as_str(),
+								path,
+								Status.as_u16(),
+								true,
+								Elapsed.as_millis(),
+							);
+
+							match State.Dev {
+								true => {
+									let Elapsed = T0.elapsed();
+									let CompLength = serde_json::to_vec(&Compressed).map(|v| v.len()).unwrap_or(0);
+									tracing::info!(
+										ID = %RequestIDShort,
+										Status = %Status,
+										OriginalLength = ResponseBody.len(),
+										CompressedLength = CompLength,
+										Ratio = format!("{:.1}x", ResponseBody.len() as f64 / CompLength.max(1) as f64),
+										ElapsedMs = Elapsed.as_millis(),
+										"<<< COMPRESSED"
+									);
+								},
+								false => {},
+							}
+
+							let body = serde_json::to_vec(&Compressed).unwrap_or_else(|_| ResponseBody.to_vec());
+							// Store in LLM response cache - only successful responses (F2):
+							// caching an upstream 4xx/5xx here would replay it as a 200 to
+							// every later identical request, and a client would parse the
+							// error body as a real chat completion. TTL-stamped (F5,
+							// report 06) so it's checked against `ResponseCacheTtl` on
+							// the hit path instead of replaying forever.
+							match CacheKey {
+								Some(Ck) => {
+									match Status.is_success() && body.len() <= ResponseCacheMaximumBodyBytes {
+										true => {
+											match State.ResponseCache.lock() {
+												Ok(mut Cache) => {
+													Cache.put(Ck, (std::time::Instant::now(), body.clone()));
+												},
+												Err(_) => {},
+											}
+										},
+										false => {},
+									}
+								},
+								None => {},
+							}
+
+							let mut Builder = Response::builder().status(Status);
+							Builder = CopyUpstreamHeaders(Builder, &UpstreamHeaders);
+
+							return Builder
+								.header("Content-Type", "application/json; charset=utf-8")
+								.header("X-Aphrodite-Compressed", "true")
+								.header("X-Aphrodite-Cache", "MISS")
+								.header("X-Aphrodite-Fill-Pct", {
+									let v = State.FillPct.load(Ordering::Relaxed) as f64 / 100.0;
+
+									match v.is_finite() {
+										true => format!("{:.1}", v),
+										false => "0.0".to_string(),
+									}
+								})
+								.body(Body::from(body))
+								.unwrap();
+						},
+						None => {},
 					}
-					let mut Builder = Response::builder().status(Status);
-					Builder = CopyUpstreamHeaders(Builder, &UpstreamHeaders);
-					return Builder
-						.header("Content-Type", "application/json; charset=utf-8")
-						.header("X-Aphrodite-Compressed", "true")
-						.header("X-Aphrodite-Cache", "MISS")
-						.header("X-Aphrodite-Fill-Pct", {
-							let v = State.FillPct.load(Ordering::Relaxed) as f64 / 100.0;
-							if v.is_finite() { format!("{:.1}", v) } else { "0.0".to_string() }
-						})
-						.body(Body::from(body))
-						.unwrap();
-				}
+				},
+				false => {},
 			}
 
-			if State.Dev {
-				let Elapsed = T0.elapsed();
-				let BodyPreview = if ResponseBody.len() > 500 {
-					let s = std::str::from_utf8(&ResponseBody).unwrap_or("?");
-					let Preview:String = s.char_indices().take_while(|(i, _)| *i < 200).map(|(_, c)| c).collect();
-					format!("{}... ({} total)", Preview, ResponseBody.len())
-				} else {
-					std::str::from_utf8(&ResponseBody).unwrap_or("?").to_string()
-				};
-				tracing::info!(
-					ID = %RequestIDShort,
-					Status = %Status,
-					ResponseLength = ResponseBody.len(),
-					ElapsedMs = Elapsed.as_millis(),
-					body = %BodyPreview,
-					"<<< RES"
-				);
+			match State.Dev {
+				true => {
+					let Elapsed = T0.elapsed();
+					let BodyPreview = match ResponseBody.len() > 500 {
+						true => {
+							let s = std::str::from_utf8(&ResponseBody).unwrap_or("?");
+							let Preview:String =
+								s.char_indices().take_while(|(i, _)| *i < 200).map(|(_, c)| c).collect();
+
+							format!("{}... ({} total)", Preview, ResponseBody.len())
+						},
+						false => std::str::from_utf8(&ResponseBody).unwrap_or("?").to_string(),
+					};
+
+					tracing::info!(
+						ID = %RequestIDShort,
+						Status = %Status,
+						ResponseLength = ResponseBody.len(),
+						ElapsedMs = Elapsed.as_millis(),
+						body = %BodyPreview,
+						"<<< RES"
+					);
+				},
+				false => {},
 			}
+
 			// Use already-extracted content_type (fetched before response.bytes())
 			State.RecordLatency(T0.elapsed());
 			State.RecordRequest(
@@ -223,44 +285,73 @@ pub(crate) async fn Fn(
 				false,
 				T0.elapsed().as_millis(),
 			);
+
 			// Store raw response in LLM cache if applicable - success only (F2, see
 			// the compressed-path cache write above for the full rationale).
-			if let Some(Ck) = CacheKey
-				&& Status.is_success()
-				&& ResponseBody.len() <= ResponseCacheMaximumBodyBytes
-				&& let Ok(mut Cache) = State.ResponseCache.lock()
-			{
-				Cache.put(Ck, (std::time::Instant::now(), ResponseBody.to_vec()));
+			match CacheKey {
+				Some(Ck) => {
+					match Status.is_success() && ResponseBody.len() <= ResponseCacheMaximumBodyBytes {
+						true => {
+							match State.ResponseCache.lock() {
+								Ok(mut Cache) => {
+									Cache.put(Ck, (std::time::Instant::now(), ResponseBody.to_vec()));
+								},
+								Err(_) => {},
+							}
+						},
+						false => {},
+					}
+				},
+				None => {},
 			}
+
 			let mut Builder = Response::builder().status(Status);
 			Builder = CopyUpstreamHeaders(Builder, &UpstreamHeaders);
 			Builder = Builder.header("X-Aphrodite-Cache", "MISS");
 			Builder = Builder.header("X-Aphrodite-Fill-Pct", {
 				let v = State.FillPct.load(Ordering::Relaxed) as f64 / 100.0;
-				if v.is_finite() { format!("{:.1}", v) } else { "0.0".to_string() }
+
+				match v.is_finite() {
+					true => format!("{:.1}", v),
+					false => "0.0".to_string(),
+				}
 			});
-			if let Some(Ct) = ContentType {
-				Builder = Builder.header("Content-Type", Ct);
+
+			match ContentType {
+				Some(Ct) => {
+					Builder = Builder.header("Content-Type", Ct);
+				},
+				None => {},
 			}
+
 			Builder.body(Body::from(ResponseBody)).unwrap()
 		},
 		Err(e) => {
-			if FinalErrorWasTimeout {
-				State.UpstreamTimeouts.fetch_add(1, Ordering::Relaxed);
-			} else {
-				State.UpstreamConnectErrors.fetch_add(1, Ordering::Relaxed);
+			match FinalErrorWasTimeout {
+				true => {
+					State.UpstreamTimeouts.fetch_add(1, Ordering::Relaxed);
+				},
+				false => {
+					State.UpstreamConnectErrors.fetch_add(1, Ordering::Relaxed);
+				},
 			}
+
 			State.RecordLatency(T0.elapsed());
 			State.RecordRequest(RequestIDShort, Method.as_str(), path, 502, false, T0.elapsed().as_millis());
-			State.RecordError(format!("upstream: {}", e));
-			if State.Dev {
-				tracing::error!(
-					ID = %RequestIDShort,
-					error = %e,
-					ElapsedMs = T0.elapsed().as_millis(),
-					"<<< ERR"
-				);
+			State.RecordError(format!("upstream: {e:#}"));
+
+			match State.Dev {
+				true => {
+					tracing::error!(
+						ID = %RequestIDShort,
+						error = %e,
+						ElapsedMs = T0.elapsed().as_millis(),
+						"<<< ERR"
+					);
+				},
+				false => {},
 			}
+
 			// 02-F8: same rule as the body-read error above - `reqwest::Error`'s
 			// `Display` can embed the upstream URL and, in some TLS/DNS
 			// failure modes, host/proxy details; a caller shouldn't be able

@@ -15,11 +15,14 @@
 /// tunable cosmetics.
 pub(crate) fn Fn(Line:&str) -> String {
 	let Chars:Vec<char> = Line.chars().collect();
-	if Chars.len() > 100 {
-		let Head:String = Chars[..28].iter().collect();
-		let Tail:String = Chars[Chars.len() - 28..].iter().collect();
-		format!("{Head}...{Tail}")
-	} else {
-		Line.chars().take(60).collect()
+
+	match Chars.len() > 100 {
+		true => {
+			let Head:String = Chars[..28].iter().collect();
+			let Tail:String = Chars[Chars.len() - 28..].iter().collect();
+
+			format!("{Head}...{Tail}")
+		},
+		false => Line.chars().take(60).collect(),
 	}
 }

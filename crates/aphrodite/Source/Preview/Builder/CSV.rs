@@ -21,10 +21,10 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 		.first()
 		.map(|r| r.split(',').map(|c| c.trim()).take(5).collect())
 		.unwrap_or_default();
-	let More = if Cols > Header.len() {
-		format!(" +{} more", Cols - Header.len())
-	} else {
-		String::new()
+	let More = match Cols > Header.len() {
+		true => format!(" +{} more", Cols - Header.len()),
+		false => String::new(),
 	};
+
 	format!("[csv:{} rows {} cols | {}{}]", Rows.len(), Cols, Header.join(", "), More)
 }

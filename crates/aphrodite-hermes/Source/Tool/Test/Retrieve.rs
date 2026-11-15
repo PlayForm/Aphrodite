@@ -18,11 +18,13 @@ fn test_retrieve_normalizes_pipe_suffixed_and_whitespace_hash() {
 	let compressed = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
 	let hash = compressed["hash"].as_str().expect("hash present").to_string();
 
-	for hash_arg in [hash.clone(), format!("{hash}|tool|1024"), format!("  {hash}  ")] {
-		let retrieved = dispatch("aphrodite_retrieve", &serde_json::json!({"hash": hash_arg}).to_string());
-		assert_eq!(retrieved["found"], true, "hash arg {hash_arg:?} must resolve: {retrieved:?}");
-		assert_eq!(retrieved["content"], content);
-	}
+	[hash.clone(), format!("{hash}|tool|1024"), format!("  {hash}  ")]
+		.into_iter()
+		.for_each(|hash_arg| {
+			let retrieved = dispatch("aphrodite_retrieve", &serde_json::json!({ "hash": hash_arg }).to_string());
+			assert_eq!(retrieved["found"], true, "hash arg {hash_arg:?} must resolve: {retrieved:?}");
+			assert_eq!(retrieved["content"], content);
+		});
 }
 
 #[test]

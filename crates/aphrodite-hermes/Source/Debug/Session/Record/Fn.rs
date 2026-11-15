@@ -18,9 +18,11 @@ use crate::Debug::{Chain, Chain::State::SESSION_PARENTS, Runtime, Session::State
 /// turn, not to be a one-time record. The parent edge, by contrast, is inserted
 /// once (`or_insert_with`) so a later contradictory edge cannot rewrite history.
 pub(crate) fn Fn(session:&str, parent:&str) {
-	if session.is_empty() {
-		return;
+	match session {
+		"" => return,
+		_ => {},
 	}
+
 	{
 		let mut last = LAST_SESSION
 			.get_or_init(|| Mutex::new(String::new()))
@@ -28,23 +30,31 @@ pub(crate) fn Fn(session:&str, parent:&str) {
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
 		*last = session.to_string();
 	}
+
 	// Persist across process restarts: a fresh Hermes process (and every
 	// separate shim exec) starts with empty Rust statics, so the session id
 	// is mirrored to a tiny file that `last_session()` reads back.
 	// Best-effort - a failed
 	// write degrades to "no persistence", never an error.
 	let _ = std::fs::write(Runtime::Fn::Fn().join("session.current"), session);
-	if parent.is_empty() || session == parent {
+
+	match parent {
 		// Root session (no parent): publish it directly so the env-gated
 		// logger targets `debug.<root>` (crate::debug).
-		aphrodite::Debug::Root::Note::Fn::Fn(session);
-		return;
+		p if p.is_empty() || p == session => {
+			aphrodite::Debug::Root::Note::Fn::Fn(session);
+
+			return;
+		},
+		_ => {},
 	}
+
 	let mut map = SESSION_PARENTS
 		.get_or_init(|| Mutex::new(HashMap::new()))
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	map.entry(session.to_string()).or_insert_with(|| parent.to_string());
+
 	// Publish the ROOT of this session tree (root-most ancestor) so the
 	// env-gated logger targets `debug.<root>` for the whole tree.
 	let root = Chain::Fn::Fn(session).last().cloned().unwrap_or_else(|| session.to_string());

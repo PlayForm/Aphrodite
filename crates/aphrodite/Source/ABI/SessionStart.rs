@@ -26,6 +26,6 @@ pub extern "C" fn AphroditeSessionStart(Handle:*const c_char) -> *mut c_char {
 	};
 	match WithState(Hid, crate::Session::Start::Fn::OnSessionStart) {
 		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&e),
+		Err(e) => ToJSONError(&format!("{e:#}")),
 	}
 }

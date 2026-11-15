@@ -31,28 +31,42 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let Imgs = Inp.raw.matches("<img ").count() + Inp.raw.matches("<IMG ").count();
 	let Scripts = Inp.raw.matches("<script").count() + Inp.raw.matches("<SCRIPT").count();
 
-	let mut Parts:Vec<String> = Vec::new();
-	if let Some(t) = Title {
-		Parts.push(t);
-	}
+	let Parts:Vec<String> = Title.into_iter().collect();
 	let mut Stats:Vec<String> = Vec::new();
-	if Headings > 0 {
-		Stats.push(format!("{}h", Headings));
+
+	match Headings > 0 {
+		true => {
+			Stats.push(format!("{}h", Headings));
+		},
+		false => {},
 	}
-	if Links > 0 {
-		Stats.push(format!("{}a", Links));
+
+	match Links > 0 {
+		true => {
+			Stats.push(format!("{}a", Links));
+		},
+		false => {},
 	}
-	if Imgs > 0 {
-		Stats.push(format!("{}img", Imgs));
+
+	match Imgs > 0 {
+		true => {
+			Stats.push(format!("{}img", Imgs));
+		},
+		false => {},
 	}
-	if Scripts > 0 {
-		Stats.push(format!("{}script", Scripts));
+
+	match Scripts > 0 {
+		true => {
+			Stats.push(format!("{}script", Scripts));
+		},
+		false => {},
 	}
+
 	Stats.push(format!("{}L", Inp.Total));
 	let StatsStr = Stats.join(" ");
-	if Parts.is_empty() {
-		format!("[html:{}]", StatsStr)
-	} else {
-		format!("[html:{} | {}]", StatsStr, Parts.join(" | "))
+
+	match Parts.is_empty() {
+		true => format!("[html:{}]", StatsStr),
+		false => format!("[html:{} | {}]", StatsStr, Parts.join(" | ")),
 	}
 }

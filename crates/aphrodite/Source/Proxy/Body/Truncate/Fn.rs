@@ -10,12 +10,8 @@
 /// log. Walk back to the last char boundary instead (max 3 bytes for
 /// UTF-8).
 pub(crate) fn Fn(s:&str, Maximum:usize) -> &str {
-	if s.len() <= Maximum {
-		return s;
+	match s.len() <= Maximum {
+		true => s,
+		false => &s[..(0..=Maximum).rev().find(|&b| s.is_char_boundary(b)).unwrap_or(0)],
 	}
-	let mut End = Maximum;
-	while End > 0 && !s.is_char_boundary(End) {
-		End -= 1;
-	}
-	&s[..End]
 }

@@ -52,9 +52,8 @@ pub(crate) fn config_template() -> &'static AphroditeState {
 			// on change. Only config fields are mutated - session CCR state,
 			// directive selection, and telemetry survive a reload (the
 			// dropped dylib-binary hot-reload wiped them; fa85dfa).
-			if s.AutoReload {
-				spawn_config_watcher();
-			}
+			s.AutoReload.then(spawn_config_watcher);
+
 			s
 		};
 		#[cfg(test)]

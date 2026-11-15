@@ -17,16 +17,18 @@ use crate::{
 pub fn RenderBgTaskStatus(State:&AphroditeState) -> String {
 	let Active:Vec<&BgTask> = State.BgTasks.iter().filter(|t| t.Status == BgStatus::Running).collect();
 
-	if Active.is_empty() {
-		return String::new();
+	match Active.is_empty() {
+		true => {
+			return String::new();
+		},
+		false => {},
 	}
 
 	let mut Lines = vec![format!("[poll workers] {} active task(s):", Active.len())];
-	for task in Active.iter().take(3) {
-		let PollInformation = if task.PollCount > 0 {
-			format!("polled {}×", task.PollCount)
-		} else {
-			"not polled yet".to_string()
+	Active.iter().take(3).for_each(|task| {
+		let PollInformation = match task.PollCount > 0 {
+			true => format!("polled {}×", task.PollCount),
+			false => "not polled yet".to_string(),
 		};
 		Lines.push(format!(
 			"  · `{}` - running since turn {} ({})",
@@ -36,12 +38,15 @@ pub fn RenderBgTaskStatus(State:&AphroditeState) -> String {
 		// only rendered when the feature is enabled, so the off-path stays
 		// byte-identical. ETA is the elapsed-so-far heuristic (0.0 on a
 		// just-created task = no time elapsed yet, not "arrived").
-		if State.LiveContainer {
-			Lines.push(format!(
-				"    · [live container] {} bytes arrived so far, ETA ~{:.1}s",
-				task.LiveBytesArrived, task.LiveEtaS
-			));
+		match State.LiveContainer {
+			true => {
+				Lines.push(format!(
+					"    · [live container] {} bytes arrived so far, ETA ~{:.1}s",
+					task.LiveBytesArrived, task.LiveEtaS
+				));
+			},
+			false => {},
 		}
-	}
+	});
 	Lines.join("\n")
 }

@@ -11,27 +11,36 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_catalog", |args| {
 		let mode = {
 			let m = Arg::Fn::Fn(args, "mode");
-			if m.is_empty() { "full" } else { m }
+
+			match m.is_empty() {
+				true => "full",
+				false => m,
+			}
 		};
+
 		crate::Session::With::Fn::with_shared(|state| {
 			let items:Vec<serde_json::Value> = state
 				.RecentMarkers
 				.iter()
 				.rev()
 				.map(|e| {
-					if mode == "toc" {
-						serde_json::json!({
-							"hash": &e.hash,
-							"type": e.CCRType, "size": e.Size, "preview": e.Preview,
-						})
-					} else {
-						serde_json::json!({
-							"hash": e.hash, "type": e.CCRType, "size": e.Size,
-							"preview": e.Preview, "turn": e.Turn, "center": e.Center,
-						})
+					match mode {
+						"toc" => {
+							serde_json::json!({
+								"hash": &e.hash,
+								"type": e.CCRType, "size": e.Size, "preview": e.Preview,
+							})
+						},
+						_ => {
+							serde_json::json!({
+								"hash": e.hash, "type": e.CCRType, "size": e.Size,
+								"preview": e.Preview, "turn": e.Turn, "center": e.Center,
+							})
+						},
 					}
 				})
 				.collect();
+
 			serde_json::json!({"mode": mode, "total": items.len(), "items": items, "turn": state.TurnCounter})
 		})
 	})

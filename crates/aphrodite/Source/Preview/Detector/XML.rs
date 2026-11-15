@@ -14,12 +14,14 @@ use crate::Preview::Input::Struct::Struct as Input;
 /// opens and closes still classifies, because the arm only needs to know which
 /// preview to render.
 pub(crate) fn Fn(Inp:&Input<'_>) -> Option<&'static str> {
-	if Inp.Trimmed.starts_with("<!DOCTYPE html") || Inp.Trimmed.starts_with("<html") || Inp.Trimmed.starts_with("<HTML")
-	{
-		return Some("html");
+	match () {
+		_ if Inp.Trimmed.starts_with("<!DOCTYPE html")
+			|| Inp.Trimmed.starts_with("<html")
+			|| Inp.Trimmed.starts_with("<HTML") =>
+		{
+			Some("html")
+		},
+		_ if Inp.Trimmed.starts_with('<') && Inp.raw.trim_end().ends_with('>') && Inp.raw.contains("</") => Some("xml"),
+		_ => None,
 	}
-	if Inp.Trimmed.starts_with('<') && Inp.raw.trim_end().ends_with('>') && Inp.raw.contains("</") {
-		return Some("xml");
-	}
-	None
 }

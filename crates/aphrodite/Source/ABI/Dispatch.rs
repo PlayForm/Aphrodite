@@ -140,6 +140,6 @@ pub extern "C" fn AphroditeDispatch(
 		}
 	}) {
 		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&e),
+		Err(e) => ToJSONError(&format!("{e:#}")),
 	}
 }

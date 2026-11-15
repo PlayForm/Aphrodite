@@ -13,8 +13,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// Only the non-macOS copy paths use `.with_context`; on macOS every copy goes
+// through `MacOS::Fn`, which supplies its own context.
+#[cfg(not(target_os = "macos"))]
+use anyhow::Context;
+
 use super::Download;
-use crate::Setup::Run::{Context::Struct as SetupContext, Error::Enum as SetupError};
+use crate::Setup::Run::Context::Struct as SetupContext;
 #[cfg(target_os = "macos")]
 use crate::Setup::MacOS::Fn as InstallMacOSArtifact;
 #[cfg(not(target_os = "macos"))]
@@ -34,7 +39,7 @@ use crate::Setup::Write::Permissions::Fn as SecurePerms;
 /// library that cannot be found is skipped with a warning, because setup
 /// completing without it is the correct outcome and aborting there would make
 /// the documented `cargo install` path unusable.
-pub(crate) fn Fn(Context:&SetupContext) -> Result<(), SetupError> {
+pub(crate) fn Fn(Context:&SetupContext) -> anyhow::Result<()> {
 	// The core `libaphrodite` cdylib is BEST-EFFORT: it exists for external
 	// embedders, is not published on GitHub Releases (Build.yml ships only
 	// `aphrodite-<target>` + `libaphrodite_hermes-<target>`), and the Hermes
@@ -76,7 +81,7 @@ pub(crate) fn Fn(Context:&SetupContext) -> Result<(), SetupError> {
 				InstallMacOSArtifact(&Src, &Dest, Some(name), 0o755)?;
 				#[cfg(not(target_os = "macos"))]
 				{
-					fs::copy(&Src, &Dest)?;
+					fs::copy(&Src, &Dest).with_context(|| format!("copy {} to {}", Src.display(), Dest.display()))?;
 					SecurePerms(&Dest, 0o755)?;
 				}
 				Found = true;
@@ -102,7 +107,8 @@ pub(crate) fn Fn(Context:&SetupContext) -> Result<(), SetupError> {
 				InstallMacOSArtifact(&TargetRelease, &Dest, Some(name), 0o755)?;
 				#[cfg(not(target_os = "macos"))]
 				{
-					fs::copy(&TargetRelease, &Dest)?;
+					fs::copy(&TargetRelease, &Dest)
+						.with_context(|| format!("copy {} to {}", TargetRelease.display(), Dest.display()))?;
 					SecurePerms(&Dest, 0o755)?;
 				}
 				Found = true;
@@ -118,8 +124,8 @@ pub(crate) fn Fn(Context:&SetupContext) -> Result<(), SetupError> {
 			// without requiring a full source checkout.
 			if let Err(e) = Download::Fn(name, &Dest) {
 				if Required {
-					return Err(SetupError::DylibNotFound(format!(
-						"dylib '{name}' not found locally and download failed: {e}.  \
+					return Err(e.context(format!(
+						"dylib '{name}' not found locally and download failed.  \
 						 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
 						 or download manually from \
 						 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",

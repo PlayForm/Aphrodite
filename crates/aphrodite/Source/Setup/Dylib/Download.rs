@@ -26,9 +26,10 @@ use super::{Checksum, TargetTriple};
 /// verified - leaving a corrupt dylib behind would make the plugin fail to load
 /// on every subsequent start with nothing pointing at the download.
 ///
-/// Returns `String` rather than `SetupError` because the caller decides whether
-/// the failure is fatal: the Hermes dylib is required, the core one is not.
-pub(super) fn Fn(DestName:&str, Dest:&Path) -> Result<(), String> {
+/// Returns `anyhow::Result` rather than the setup error type because the caller
+/// decides whether the failure is fatal: the Hermes dylib is required, the core
+/// one is not.
+pub(super) fn Fn(DestName:&str, Dest:&Path) -> anyhow::Result<()> {
 	// ── Determine the target triple ──────────────────────────────
 	let Triple = TargetTriple::Fn();
 	// Build the remote asset name from the destination filename.
@@ -74,13 +75,13 @@ pub(super) fn Fn(DestName:&str, Dest:&Path) -> Result<(), String> {
 			// matching download.sh/download.ps1's in-tree sums doctrine.
 			if let Err(e) = Checksum::Fn(&ReleaseDirectory, Triple, &RemoteName, Dest) {
 				let _ = fs::remove_file(Dest);
-				return Err(e);
+				return Err(e.context(format!("verify the checksum of {RemoteName}")));
 			}
 			#[cfg(unix)]
-			SecurePerms(Dest, 0o755).map_err(|e| e.to_string())?;
+			SecurePerms(Dest, 0o755)?;
 			Ok(())
 		},
-		Ok(s) => Err(format!("download failed with exit code {}", s.code().unwrap_or(-1))),
-		Err(e) => Err(format!("could not run download command: {e}")),
+		Ok(s) => anyhow::bail!("download failed with exit code {}", s.code().unwrap_or(-1)),
+		Err(e) => Err(anyhow::Error::new(e).context(format!("run the download command for {RemoteName}"))),
 	}
 }

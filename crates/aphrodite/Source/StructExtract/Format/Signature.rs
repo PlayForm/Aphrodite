@@ -13,9 +13,8 @@ use crate::StructExtract::{Format::Floor::Fn as Floor, MaximumSignatureLength::C
 /// model the line was shortened.
 pub(crate) fn Fn(Kind:&str, Text:&str) -> String {
 	let s = format!("{} {}", Kind, Text).trim().to_string();
-	if s.len() > MaximumSigLength {
-		Floor(&s, MaximumSigLength - 3).to_string() + "..."
-	} else {
-		s
+	match s.len() > MaximumSigLength {
+		true => Floor(&s, MaximumSigLength - 3).to_string() + "...",
+		false => s,
 	}
 }

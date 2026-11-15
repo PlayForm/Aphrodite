@@ -22,9 +22,9 @@ fn TestInsertBgTaskDedup() {
 #[test]
 fn TestInsertBgTaskEvictionAtCapacity() {
 	let mut State = AphroditeState::default();
-	for i in 0..MaximumBgTasks + 1 {
+	(0..MaximumBgTasks + 1).for_each(|i| {
 		InsertBgTask(&mut State, format!("task{i}"), "terminal".into(), format!("cmd{i}"), i);
-	}
+	});
 	assert_eq!(State.BgTasks.len(), MaximumBgTasks, "must not exceed MAX_BG_TASKS");
 }
 
@@ -44,9 +44,9 @@ fn TestBgTaskDedupPreventsDuplicateRunningTasks() {
 fn TestBgTaskEvictionPrefersStaleThenDoneThenOldestRunning() {
 	let mut State = AphroditeState::default();
 	// Fill to capacity (4) with running tasks.
-	for i in 0..4 {
+	(0..4).for_each(|i| {
 		InsertBgTask(&mut State, format!("t{}", i), "terminal".into(), format!("cmd{}", i), i);
-	}
+	});
 	// Mark t1 as stale.
 	State.BgTasks[1].Status = BgStatus::Stale;
 

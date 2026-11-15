@@ -24,16 +24,17 @@ pub(crate) fn Fn<'a>(Content:&'a str, Classify:Option<(&'a str, &'a str)>, Termi
 		Some((c, t)) => (t.to_string(), c),
 		None => {
 			let Ct = transforms::content_detector::detect_content_type(Content).content_type;
-			let t = if TerminalHint && (Content.contains("exit code:") || Content.contains("Error:")) {
-				"terminal".to_string()
-			} else {
-				// Terminal output is very often a git status / ls / test / grep
-				// dump; upgrade a generic classification via Aphrodite's detector
-				// so the preview is high-signal on the terminal path too.
-				let Base = Ct.as_str().to_string();
-				let Inp = crate::Preview::Input::Struct::Struct::new(Content)
-					.unwrap_or_else(|| crate::Preview::Input::Struct::Struct::Empty(Content));
-				crate::Preview::Type::Fn::Fn(&Base, &Inp).into_owned()
+			let t = match TerminalHint && (Content.contains("exit code:") || Content.contains("Error:")) {
+				true => "terminal".to_string(),
+				false => {
+					// Terminal output is very often a git status / ls / test / grep
+					// dump; upgrade a generic classification via Aphrodite's detector
+					// so the preview is high-signal on the terminal path too.
+					let Base = Ct.as_str().to_string();
+					let Inp = crate::Preview::Input::Struct::Struct::new(Content)
+						.unwrap_or_else(|| crate::Preview::Input::Struct::Struct::Empty(Content));
+					crate::Preview::Type::Fn::Fn(&Base, &Inp).into_owned()
+				},
 			};
 			(t, Content)
 		},

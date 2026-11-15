@@ -13,17 +13,28 @@ use crate::State::Struct::AphroditeState;
 pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	// Poll-worker checkpoint: push nudges for running/completed/failed tasks
 	// (only when the master flag is enabled).
-	if State.PollWorkerEnabled {
-		crate::PollWorker::Check::Fn::CheckBgTasks(State);
+	match State.PollWorkerEnabled {
+		true => {
+			crate::PollWorker::Check::Fn::CheckBgTasks(State);
+		},
+		false => {},
 	}
 	let Directives = crate::Directive::Build::Fn(&State.Directives, &State.ActiveDirectives);
 	// catalog_summary is now called inside build_turn_context - don't call
 	// it separately (04-F3: double call skipped delta tracking every other turn).
 	let Context = crate::Flow::TurnContext::Fn::BuildTurnContext(State, None);
+	let DirectivesField = match Directives.is_empty() {
+		true => None,
+		false => Some(Directives),
+	};
+	let ContextField = match Context.is_empty() {
+		true => None,
+		false => Some(Context),
+	};
 	serde_json::json!({
 		"status": "ok",
 		"compressed_count": State.RecentMarkers.len(),
-		"directives": if Directives.is_empty() { None } else { Some(Directives) },
-		"context": if Context.is_empty() { None } else { Some(Context) },
+		"directives": DirectivesField,
+		"context": ContextField,
 	})
 }

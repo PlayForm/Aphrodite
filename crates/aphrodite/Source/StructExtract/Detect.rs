@@ -49,19 +49,16 @@ pub(crate) fn Fn(Content:&str) -> String {
 		.collect::<Vec<_>>()
 		.join("\n");
 	let Head = Sample.as_str();
-	if Head.contains("fn ") && Head.contains("->") {
-		"rust".into()
-	} else if Head.contains("def ") && Head.contains(":") {
-		"python".into()
-	} else if Head.contains("func ") && Head.contains("{") {
-		"go".into()
-	} else if Head.contains("function ") || Head.contains("=>") || Head.contains("interface ") {
-		"js".into()
-	} else if Content.trim_start().starts_with("#!/")
-		|| (Head.len() > 200 && FloorBoundary(Head, 200).contains("echo "))
-	{
-		"sh".into()
-	} else {
-		String::new()
+	match () {
+		_ if Head.contains("fn ") && Head.contains("->") => "rust".into(),
+		_ if Head.contains("def ") && Head.contains(":") => "python".into(),
+		_ if Head.contains("func ") && Head.contains("{") => "go".into(),
+		_ if Head.contains("function ") || Head.contains("=>") || Head.contains("interface ") => "js".into(),
+		_ if Content.trim_start().starts_with("#!/")
+			|| (Head.len() > 200 && FloorBoundary(Head, 200).contains("echo ")) =>
+		{
+			"sh".into()
+		},
+		_ => String::new(),
 	}
 }

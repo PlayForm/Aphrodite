@@ -9,10 +9,11 @@ use crate::Schema::{All, Get};
 /// Every documented tool must resolve by name, and unknown names must not.
 #[test]
 fn test_get_schema_round_trip() {
-	for s in All::Fn::Fn() {
+	All::Fn::Fn().into_iter().for_each(|s| {
 		let name = s["name"].as_str().unwrap().to_string();
 		assert_eq!(Get::Fn::Fn(&name).unwrap(), s, "{name}: get_schema returned a different record");
-	}
+	});
+
 	assert!(Get::Fn::Fn("aphrodite_not_a_tool").is_none());
 }
 
@@ -25,7 +26,7 @@ fn test_get_schema_round_trip() {
 #[test]
 fn test_every_schema_has_a_handler() {
 	let _g = crate::Session::Guard::Fn::test_guard();
-	for s in All::Fn::Fn() {
+	All::Fn::Fn().into_iter().for_each(|s| {
 		let name = s["name"].as_str().unwrap();
 		let result = crate::Tool::Dispatch::Fn::Fn(name, "{}");
 		let err = result.get("error").and_then(|e| e.as_str()).unwrap_or_default();
@@ -33,5 +34,5 @@ fn test_every_schema_has_a_handler() {
 			!err.starts_with("unknown tool"),
 			"{name}: schema advertises a tool with no handler"
 		);
-	}
+	});
 }

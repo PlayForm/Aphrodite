@@ -36,11 +36,11 @@ fn TestAutoDetectUnknown() {
 #[test]
 fn TestAutoDetectRustSurvivesLongLeadingDocumentComment() {
 	let mut Content = String::new();
-	for i in 0..40 {
+	(0..40).for_each(|i| {
 		Content.push_str(&format!(
 			"//! This is a long module doc comment line number {i} padding it out.\n"
 		));
-	}
+	});
 	Content.push_str("fn real_function() -> i32 { 42 }\n");
 	assert_eq!(AutoDetect(&Content), "rust");
 }

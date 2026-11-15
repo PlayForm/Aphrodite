@@ -15,35 +15,50 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	// Collect `commit <hash>` entries and, if present, the following subject.
 	let all:Vec<&str> = Inp.raw.lines().collect();
 	let mut Commits:Vec<(String, String)> = Vec::new();
-	for (i, Line) in all.iter().enumerate() {
-		if let Some(Rest) = Line.strip_prefix("commit ") {
-			let hash:String = Rest.trim().chars().take(7).collect();
-			// Subject: first non-empty, non-header line after the commit line.
-			let Subject = all[i + 1..]
-				.iter()
-				.map(|l| l.trim())
-				.find(|l| {
-					!l.is_empty()
-						&& !l.starts_with("Author:")
-						&& !l.starts_with("Date:")
-						&& !l.starts_with("Merge:")
-						&& !l.starts_with("commit ")
-				})
-				.unwrap_or("")
-				.chars()
-				.take(32)
-				.collect::<String>();
-			Commits.push((hash, Subject));
+
+	all.iter().enumerate().for_each(|(i, Line)| {
+		match Line.strip_prefix("commit ") {
+			Some(Rest) => {
+				let hash:String = Rest.trim().chars().take(7).collect();
+				// Subject: first non-empty, non-header line after the commit line.
+				let Subject = all[i + 1..]
+					.iter()
+					.map(|l| l.trim())
+					.find(|l| {
+						!l.is_empty()
+							&& !l.starts_with("Author:")
+							&& !l.starts_with("Date:")
+							&& !l.starts_with("Merge:")
+							&& !l.starts_with("commit ")
+					})
+					.unwrap_or("")
+					.chars()
+					.take(32)
+					.collect::<String>();
+
+				Commits.push((hash, Subject));
+			},
+			None => {},
 		}
+	});
+
+	match Commits.is_empty() {
+		true => {
+			return format!("[gitlog:{}L]", Inp.Total);
+		},
+		false => {},
 	}
-	if Commits.is_empty() {
-		return format!("[gitlog:{}L]", Inp.Total);
-	}
+
 	let n = Commits.len();
 	let First = &Commits[0];
-	if n == 1 {
-		return format!("[gitlog:1 commit | {} {}]", First.0, First.1);
+
+	match n == 1 {
+		true => {
+			return format!("[gitlog:1 commit | {} {}]", First.0, First.1);
+		},
+		false => {},
 	}
+
 	let Last = &Commits[n - 1];
 	format!("[gitlog:{} commits | {} {} → {} {}]", n, First.0, First.1, Last.0, Last.1)
 }

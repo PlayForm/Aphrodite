@@ -6,13 +6,15 @@
 /// the round-trip content-addressing contract: `retrieve(hash)` must return
 /// the exact original bytes, which then hash back to the marker's own hash.
 /// Any explicit `Limit` (including one above 10_000) is clamped to a
-/// 10,000-line server cap (02-F5). Returns `Err(message)` when `Offset` is
-/// at or past the end of the document (mirrors the previous inline
-/// `BAD_REQUEST` behavior in [`crate::Retrieve::Handle::Fn::Fn`]). Returns
+/// 10,000-line server cap (02-F5). Returns an error when `Offset` is at or
+/// past the end of the document (mirrors the previous inline `BAD_REQUEST`
+/// behavior in [`crate::Retrieve::Handle::Fn::Fn`]); the message states the
+/// offset and the document's line count, because the caller renders it straight
+/// into a 400 body and those are the two numbers the reader needs. Returns
 /// `(content, truncated)`: a `[lines a-b/total]` header is prepended to
 /// `Content`, and `Truncated` is `true`, whenever the window doesn't cover
 /// the whole document.
-pub fn Fn(Content:&str, Offset:usize, Limit:usize) -> Result<(String, bool), String> {
+pub fn Fn(Content:&str, Offset:usize, Limit:usize) -> anyhow::Result<(String, bool)> {
 	// Clamp explicit limits: 0 = full document (round-trip contract), any
 	// nonzero limit capped at 10_000 lines for safety (02-F5).
 	let Limit = if Limit == 0 { usize::MAX } else { Limit.min(10_000) };
@@ -26,7 +28,7 @@ pub fn Fn(Content:&str, Offset:usize, Limit:usize) -> Result<(String, bool), Str
 		return Ok((String::new(), false));
 	}
 	if Offset >= Total {
-		return Err(format!("[offset {} out of range; document has {} lines]", Offset, Total));
+		anyhow::bail!("[offset {} out of range; document has {} lines]", Offset, Total);
 	}
 	let Start = Offset.min(Total);
 	// `limit: 0` maps to `usize::MAX` (full document) - saturating add so a

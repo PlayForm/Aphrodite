@@ -21,8 +21,8 @@ pub(crate) async fn Fn(
 	url:&str,
 	Headers:&axum::http::HeaderMap,
 	BodyVec:Vec<u8>,
-) -> (Result<reqwest::Response, String>, bool) {
-	let mut UpstreamResult = Err("unreachable".to_string());
+) -> (anyhow::Result<reqwest::Response>, bool) {
+	let mut UpstreamResult:anyhow::Result<reqwest::Response> = Err(anyhow::anyhow!("unreachable"));
 	// F17: which counter the final error increments - `UpstreamTimeouts`
 	// used to count every kind of transport failure (connection refused,
 	// DNS failure, TLS error) as a "timeout", which is a real metrics lie
@@ -47,8 +47,7 @@ pub(crate) async fn Fn(
 			.header("Content-Type", "application/json; charset=utf-8")
 			.header("Accept", "application/json")
 			.header("Authorization", format!("Bearer {}", State.APIKey.Expose()));
-		let mut Request = Request;
-		for (Key, Value) in Headers.iter() {
+		let Request = Headers.iter().fold(Request, |Request, (Key, Value)| {
 			let k = Key.as_str().to_lowercase();
 			// Strip (F5/F18): `content-type`/`accept` are forced above already -
 			// forwarding the client's own values too would append duplicate
@@ -61,7 +60,7 @@ pub(crate) async fn Fn(
 			// proxy can't decode, fails to JSON-parse (compression silently
 			// skipped), and returns to the caller as binary garbage labeled
 			// `application/json`.
-			if k != "host"
+			match k != "host"
 				&& k != "authorization"
 				&& k != "content-length"
 				&& k != "content-type"
@@ -69,9 +68,10 @@ pub(crate) async fn Fn(
 				&& k != "accept-encoding"
 				&& !k.starts_with("x-aphrodite-")
 			{
-				Request = Request.header(Key, Value);
+				true => Request.header(Key, Value),
+				false => Request,
 			}
-		}
+		});
 		// `BodyBytes` is the `Bytes` built once before the loop (see
 		// above); clone per attempt is O(1) refcount, never a full copy.
 		match Request.body(BodyBytes.clone()).send().await {
@@ -89,16 +89,20 @@ pub(crate) async fn Fn(
 				// timeout, up to 3 attempts (at most 2 retries) could hold a
 				// client for ~15 minutes. Non-connect errors now fail fast on
 				// the first attempt instead.
-				if Attempt < 3 && e.is_connect() {
-					let BaseMs = 100 * 2u64.pow(Attempt - 1);
-					let Jitter = rand::random::<f64>() * 0.5 + 0.75; // 0.75x to 1.25x
-					let Ms = (BaseMs as f64 * Jitter) as u64;
-					tracing::warn!(Attempt, BackoffMs = Ms, "upstream retry after connect error: {}", e);
-					tokio::time::sleep(std::time::Duration::from_millis(Ms)).await;
-				} else {
-					FinalErrorWasTimeout = e.is_timeout();
-					UpstreamResult = Err(format!("{}", e));
-					break;
+				match Attempt < 3 && e.is_connect() {
+					true => {
+						let BaseMs = 100 * 2u64.pow(Attempt - 1);
+						let Jitter = rand::random::<f64>() * 0.5 + 0.75; // 0.75x to 1.25x
+						let Ms = (BaseMs as f64 * Jitter) as u64;
+						tracing::warn!(Attempt, BackoffMs = Ms, "upstream retry after connect error: {}", e);
+						tokio::time::sleep(std::time::Duration::from_millis(Ms)).await;
+					},
+					false => {
+						FinalErrorWasTimeout = e.is_timeout();
+						UpstreamResult =
+							Err(anyhow::Error::new(e).context(format!("send the upstream request to {url}")));
+						break;
+					},
 				}
 			},
 		}

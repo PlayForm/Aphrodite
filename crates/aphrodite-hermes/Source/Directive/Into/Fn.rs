@@ -18,14 +18,17 @@ use crate::Directive::{Materialize, Resolve};
 /// additive.
 pub(crate) fn Fn(home_param:&str) -> serde_json::Value {
 	let (dir, warnings) = Resolve::Fn::Fn(home_param);
-	for w in &warnings {
-		eprintln!("aphrodite-hermes: {w}");
-	}
+	warnings.iter().for_each(|w| eprintln!("aphrodite-hermes: {w}"));
+
 	let mut result = Materialize::Fn::Fn(&dir);
-	if let Some(arr) = result.get_mut("warnings").and_then(|v| v.as_array_mut()) {
-		for w in warnings {
-			arr.push(serde_json::Value::String(w));
-		}
-	}
+
+	// `Option::iter_mut` is the zero-or-one loop: a report with no
+	// `warnings` array simply takes no extra entries.
+	result
+		.get_mut("warnings")
+		.and_then(|v| v.as_array_mut())
+		.iter_mut()
+		.for_each(|arr| arr.extend(warnings.iter().map(|w| serde_json::Value::String(w.clone()))));
+
 	result
 }

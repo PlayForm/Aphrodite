@@ -76,6 +76,6 @@ pub extern "C" fn AphroditeReload(Handle:*const c_char, path:*const c_char) -> *
 		serde_json::json!({"status":"ok", "config_error":ParseError})
 	}) {
 		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&e),
+		Err(e) => ToJSONError(&format!("{e:#}")),
 	}
 }

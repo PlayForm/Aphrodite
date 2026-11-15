@@ -43,7 +43,7 @@ fn TestShouldBackgroundNoCommandVeryLargeOutput() {
 
 #[test]
 fn TestShouldBackgroundVariousSlowPrefixes() {
-	for Prefix in SlowCommandPrefixes.iter().take(5) {
+	SlowCommandPrefixes.iter().take(5).for_each(|Prefix| {
 		let Command = format!("{} --some-flag", Prefix);
 		let Result = ShouldBackground(&"x".repeat(5000), Some(&Command));
 		assert!(
@@ -52,7 +52,7 @@ fn TestShouldBackgroundVariousSlowPrefixes() {
 			Prefix,
 			Command
 		);
-	}
+	});
 }
 
 #[test]

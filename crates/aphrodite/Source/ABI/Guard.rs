@@ -84,15 +84,20 @@ pub(crate) unsafe fn Cstr(Ptr:*const c_char) -> Option<String> {
 /// Reject a payload no export can serve: empty, over the 16 MB cap, or
 /// carrying an interior NUL that would silently truncate the C string handed
 /// back to the caller.
-pub(crate) fn CheckContent(Content:&str) -> Result<(), &'static str> {
+///
+/// The three refusals are distinct messages on purpose - a host marshalling its
+/// own buffers needs to tell "sent nothing" from "sent too much" from "sent a
+/// NUL". The caller renders them through `format!("{e:#}")` into the JSON error
+/// payload, so the message is the whole diagnosis the C side gets.
+pub(crate) fn CheckContent(Content:&str) -> anyhow::Result<()> {
 	if Content.is_empty() {
-		return Err("empty content");
+		anyhow::bail!("empty content");
 	}
 	if Content.len() > MaximumContent {
-		return Err("content exceeds 16MB limit");
+		anyhow::bail!("content exceeds 16MB limit");
 	}
 	if Content.contains('\0') {
-		return Err("content contains null bytes");
+		anyhow::bail!("content contains null bytes");
 	}
 	Ok(())
 }

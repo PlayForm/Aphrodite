@@ -24,9 +24,15 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
 					.all(|&c| matches!(c, b'r' | b'w' | b'x' | b'-' | b's' | b't' | b'S' | b'T'))
 		})
 		.count();
-	if LsLong >= 2 {
-		return true;
+
+	match LsLong >= 2 {
+		true => {
+			return true;
+		},
+		false => {},
 	}
+
 	let PathLines = Inp.NonEmpty.iter().filter(|l| Path::Fn(l)).count();
+
 	PathLines >= 3 && PathLines * 2 >= Inp.NonEmpty.len()
 }

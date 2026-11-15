@@ -22,7 +22,8 @@ fn materialize_writes_all_embedded_files() {
 	assert_eq!(v["written"].as_array().unwrap().len(), expected.len());
 	assert_eq!(v["skipped"].as_array().unwrap().len(), 0);
 	assert_eq!(v["warnings"].as_array().unwrap().len(), 0);
-	for (file_name, content) in &expected {
+
+	expected.iter().for_each(|(file_name, content)| {
 		let p = dir.join(file_name);
 		assert!(p.is_file(), "{file_name} must be materialized");
 		assert_eq!(
@@ -30,7 +31,8 @@ fn materialize_writes_all_embedded_files() {
 			content.as_bytes(),
 			"{file_name} must match the embedded bytes"
 		);
-	}
+	});
+
 	fs::remove_dir_all(&home).ok();
 }
 
@@ -48,9 +50,10 @@ fn materialize_is_idempotent() {
 	assert_eq!(second["skipped"].as_array().unwrap().len(), expected.len());
 	assert_eq!(second["warnings"].as_array().unwrap().len(), 0);
 
-	for (file_name, content) in &expected {
+	expected.iter().for_each(|(file_name, content)| {
 		assert_eq!(fs::read(dir.join(file_name)).unwrap(), content.as_bytes());
-	}
+	});
+
 	fs::remove_dir_all(&home).ok();
 }
 
@@ -85,10 +88,12 @@ fn materialize_never_overwrites_user_modified_file() {
 		"user-modified file must be left untouched"
 	);
 
-	for (file_name, content) in &expected {
-		if file_name != "focus.md" {
-			assert_eq!(fs::read(dir.join(file_name)).unwrap(), content.as_bytes());
+	expected.iter().for_each(|(file_name, content)| {
+		match file_name.as_str() {
+			"focus.md" => {},
+			_ => assert_eq!(fs::read(dir.join(file_name)).unwrap(), content.as_bytes()),
 		}
-	}
+	});
+
 	fs::remove_dir_all(&home).ok();
 }

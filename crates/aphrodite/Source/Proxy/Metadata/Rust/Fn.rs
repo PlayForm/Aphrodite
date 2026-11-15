@@ -19,8 +19,11 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			AfterFn.split(['(', ' ', '<']).next().filter(|s| !s.is_empty())
 		})
 		.collect();
-	if !Fns.is_empty() {
-		Parts.push(format!("fns={}", Fns.join(",")));
+	match !Fns.is_empty() {
+		true => {
+			Parts.push(format!("fns={}", Fns.join(",")));
+		},
+		false => {},
 	}
 
 	let Structs:Vec<&str> = Content
@@ -37,8 +40,11 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			After.split(['(', ' ', '<', '{']).next().filter(|s| !s.is_empty())
 		})
 		.collect();
-	if !Structs.is_empty() {
-		Parts.push(format!("structs={}", Structs.join(",")));
+	match !Structs.is_empty() {
+		true => {
+			Parts.push(format!("structs={}", Structs.join(",")));
+		},
+		false => {},
 	}
 
 	// impl blocks: impl TypeName or impl Trait for TypeName
@@ -56,8 +62,11 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			After.split_whitespace().next().map(|w| w.trim_end_matches('<'))
 		})
 		.collect();
-	if !Impls.is_empty() {
-		Parts.push(format!("impls={}", Impls.join(",")));
+	match !Impls.is_empty() {
+		true => {
+			Parts.push(format!("impls={}", Impls.join(",")));
+		},
+		false => {},
 	}
 
 	let Traits:Vec<&str> = Content
@@ -74,8 +83,11 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			After.split([' ', '<', '{']).next().filter(|s| !s.is_empty())
 		})
 		.collect();
-	if !Traits.is_empty() {
-		Parts.push(format!("traits={}", Traits.join(",")));
+	match !Traits.is_empty() {
+		true => {
+			Parts.push(format!("traits={}", Traits.join(",")));
+		},
+		false => {},
 	}
 
 	Parts.push(format!("ln={}", LineCount));

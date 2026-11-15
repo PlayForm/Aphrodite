@@ -10,18 +10,25 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 		})
 		.filter_map(|l| {
 			let t = l.trim_start();
-			if let Some(Rest) = t.strip_prefix("function ") {
-				Rest.split(['(', ' ']).next().filter(|s| !s.is_empty())
-			} else {
-				t.strip_prefix("const ")?
-					.split([' ', '=', ':'])
-					.next()
-					.filter(|s| !s.is_empty())
+
+			match t.strip_prefix("function ") {
+				Some(Rest) => Rest.split(['(', ' ']).next().filter(|s| !s.is_empty()),
+				None => {
+					t.strip_prefix("const ")?
+						.split([' ', '=', ':'])
+						.next()
+						.filter(|s| !s.is_empty())
+				},
 			}
 		})
 		.collect();
-	if !Fns.is_empty() {
-		Parts.push(format!("fns={}", Fns.join(",")));
+
+	match !Fns.is_empty() {
+		true => {
+			Parts.push(format!("fns={}", Fns.join(",")));
+		},
+		false => {},
 	}
+
 	Parts.push(format!("ln={}", LineCount));
 }

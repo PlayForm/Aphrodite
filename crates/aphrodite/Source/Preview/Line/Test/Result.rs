@@ -12,20 +12,25 @@ pub(crate) fn Fn(t:&str) -> bool {
 		None => return false,
 	};
 	let NameLength = Rest.chars().take_while(|c| !c.is_whitespace()).count();
-	if NameLength == 0 {
-		return false;
+
+	match NameLength == 0 {
+		true => {
+			return false;
+		},
+		false => {},
 	}
+
 	let After = Rest[NameLength..].trim_start();
 	let After = match After.strip_prefix("...") {
 		Some(a) => a,
 		None => return false,
 	};
 	let After = After.trim_start();
-	for Kw in ["ok", "FAILED", "ignored"] {
-		if let Some(r) = After.strip_prefix(Kw) {
+	match ["ok", "FAILED", "ignored"].into_iter().find_map(|Kw| After.strip_prefix(Kw)) {
+		Some(r) => {
 			// word boundary: next char is end or non-word.
-			return r.chars().next().map(|c| !(c.is_alphanumeric() || c == '_')).unwrap_or(true);
-		}
+			r.chars().next().map(|c| !(c.is_alphanumeric() || c == '_')).unwrap_or(true)
+		},
+		None => false,
 	}
-	false
 }

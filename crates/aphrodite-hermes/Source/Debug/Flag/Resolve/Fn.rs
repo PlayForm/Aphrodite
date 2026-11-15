@@ -22,20 +22,20 @@ use crate::Debug::{Chain, Flag};
 /// not free - callers that need it repeatedly should hoist it, as
 /// `effective_level` does.
 pub(crate) fn Fn(session:&str) -> bool {
-	if session.is_empty() {
+	match session.is_empty() {
 		// No session context: the plain `debug` flag applies (non-Hermes
 		// hosts, standalone tool paths, tests without a session).
-		return Flag::Read::Fn::Fn(&Flag::Global::Fn::Fn());
+		true => Flag::Read::Fn::Fn(&Flag::Global::Fn::Fn()),
+		// Root-most first: the top-level session's scoped flag governs the
+		// whole tree. Walk root -> leaf and take the first scoped flag that
+		// EXISTS (its value decides; absence falls through to OFF).
+		false => {
+			Chain::Fn::Fn(session)
+				.iter()
+				.rev()
+				.map(|sid| Flag::Scoped::Fn::Fn(sid))
+				.find(|p| p.exists())
+				.is_some_and(|p| Flag::Read::Fn::Fn(&p))
+		},
 	}
-	let chain = Chain::Fn::Fn(session);
-	// Root-most first: the top-level session's scoped flag governs the
-	// whole tree. Walk root -> leaf and take the first scoped flag that
-	// EXISTS (its value decides; absence falls through to OFF).
-	for sid in chain.iter().rev() {
-		let p = Flag::Scoped::Fn::Fn(sid);
-		if p.exists() {
-			return Flag::Read::Fn::Fn(&p);
-		}
-	}
-	false
 }

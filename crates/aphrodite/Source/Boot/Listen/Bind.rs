@@ -5,6 +5,7 @@ use aphrodite::Configuration::{
 	CLI::Struct::Struct as CLI,
 	Proxy::Compression::Struct::Struct as CompressionConfiguration,
 };
+use futures::{StreamExt, TryStreamExt};
 
 use crate::Boot::{State, State::Listener::Bound};
 
@@ -30,35 +31,45 @@ pub async fn Bind(
 	// F4/T15) - the config-file watcher below needs every listener's
 	// `Arc<AppState>` up front so a file change can actually apply new
 	// compression thresholds to the live proxies, not just re-parse and log.
-	let mut Bound = Vec::with_capacity(Proxies.len());
-	for (name, mut CLI) in Proxies {
-		// Resolve relative ccr_db_path against the binary directory, not CWD.
-		// This way the database path is stable regardless of where the
-		// process is launched from. (Moved here from `run_single` so
-		// `build_state` can run before spawning.)
-		if let Some(ref DatabasePath) = CLI.CCRDatabasePath {
-			if !DatabasePath.as_os_str().is_empty()
-				&& !DatabasePath.is_absolute()
-				&& let Ok(ExePath) = std::env::current_exe()
-				&& let Some(ExeDirectory) = ExePath.parent()
-			{
-				let Old = DatabasePath.display().to_string();
-				CLI.CCRDatabasePath = Some(ExeDirectory.join(DatabasePath));
-				tracing::info!(
-					"resolved relative ccr_db_path from {} to {}",
-					Old,
-					CLI.CCRDatabasePath.as_ref().unwrap().display()
-				);
+	let Bound:Vec<Bound> = futures::stream::iter(Proxies)
+		.then(|(name, mut CLI)| {
+			async move {
+				// Resolve relative ccr_db_path against the binary directory, not CWD.
+				// This way the database path is stable regardless of where the
+				// process is launched from. (Moved here from `run_single` so
+				// `build_state` can run before spawning.)
+				match CLI.CCRDatabasePath.as_ref() {
+					Some(DatabasePath) => {
+						if !DatabasePath.as_os_str().is_empty()
+							&& !DatabasePath.is_absolute()
+							&& let Ok(ExePath) = std::env::current_exe()
+							&& let Some(ExeDirectory) = ExePath.parent()
+						{
+							let Old = DatabasePath.display().to_string();
+							CLI.CCRDatabasePath = Some(ExeDirectory.join(DatabasePath));
+							tracing::info!(
+								"resolved relative ccr_db_path from {} to {}",
+								Old,
+								CLI.CCRDatabasePath.as_ref().unwrap().display()
+							);
+						}
+						match CLI.CCRDatabasePath.as_ref().and_then(|p| p.parent()) {
+							Some(Parent) => {
+								std::fs::create_dir_all(Parent)?;
+							},
+							None => {},
+						}
+					},
+					None => {},
+				}
+				let Listener = tokio::net::TcpListener::bind(CLI.Listen)
+					.await
+					.with_context(|| format!("failed to bind listener \"{name}\" on {}", CLI.Listen))?;
+				let State = State::Build::Build(&CLI, Compression).await?;
+				Ok::<Bound, anyhow::Error>(Bound { name, CLI, Listener, State })
 			}
-			if let Some(Parent) = CLI.CCRDatabasePath.as_ref().and_then(|p| p.parent()) {
-				std::fs::create_dir_all(Parent)?;
-			}
-		}
-		let Listener = tokio::net::TcpListener::bind(CLI.Listen)
-			.await
-			.with_context(|| format!("failed to bind listener \"{name}\" on {}", CLI.Listen))?;
-		let State = State::Build::Build(&CLI, Compression).await?;
-		Bound.push(Bound { name, CLI, Listener, State });
-	}
+		})
+		.try_collect()
+		.await?;
 	Ok(Bound)
 }

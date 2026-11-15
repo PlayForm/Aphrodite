@@ -34,11 +34,17 @@ pub(crate) fn Fn(
 	// phase detector and error-loop breaker care about ALL calls, not only the
 	// ones that produced a compressible marker. Skip only genuinely empty
 	// content (no signal at all).
-	if !Content.is_empty() {
-		Record::Fn::Fn(State, ToolName, Content, meta);
+	match !Content.is_empty() {
+		true => {
+			Record::Fn::Fn(State, ToolName, Content, meta);
+		},
+		false => {},
 	}
-	if Content.is_empty() {
-		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
+	match Content.is_empty() {
+		true => {
+			return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
+		},
+		false => {},
 	}
 
 	// Track file references BEFORE the essential-tool early return (F10):
@@ -50,29 +56,44 @@ pub(crate) fn Fn(
 	// never recorded. Skipping compression and recording a reference are
 	// independent decisions; do both regardless of which tools land in
 	// which list.
-	if State.FileTools.iter().any(|t| t == ToolName)
-		&& let Some(path) = ExtractFilePath(Content, ToolName)
-	{
-		State.RecordFile(path, ToolName.to_string());
+	match State.FileTools.iter().any(|t| t == ToolName) {
+		true => {
+			match ExtractFilePath(Content, ToolName) {
+				Some(path) => {
+					State.RecordFile(path, ToolName.to_string());
+				},
+				None => {},
+			}
+		},
+		false => {},
 	}
 
 	// Skip essential tools
-	if EssentialTools.contains(&ToolName) {
-		return serde_json::json!({"status": "ok", "compressed": false, "reason": "essential_tool"});
+	match EssentialTools.contains(&ToolName) {
+		true => {
+			return serde_json::json!({"status": "ok", "compressed": false, "reason": "essential_tool"});
+		},
+		false => {},
 	}
 
 	// Skip aphrodite's own tools (and headroom helpers): their output is already
 	// compact metadata, and compressing aphrodite_retrieve would replace the
 	// resolved content with another CCR marker - an infinite preview loop.
-	if ToolName.starts_with("aphrodite_") || ToolName.starts_with("headroom") {
-		return serde_json::json!({"status": "ok", "compressed": false, "reason": "self_tool"});
+	match ToolName.starts_with("aphrodite_") || ToolName.starts_with("headroom") {
+		true => {
+			return serde_json::json!({"status": "ok", "compressed": false, "reason": "self_tool"});
+		},
+		false => {},
 	}
 
 	// Skip below threshold (0 = always compress). Auto-expand bypasses this
 	// gate: under auto-expand every non-essential tool result within the
 	// limit goes through the store+expand path so no marker can leak.
-	if !Applies::Fn::Fn(State, Content) && State.ToolThreshold > 0 && Content.len() < State.ToolThreshold {
-		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
+	match !Applies::Fn::Fn(State, Content) && State.ToolThreshold > 0 && Content.len() < State.ToolThreshold {
+		true => {
+			return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
+		},
+		false => {},
 	}
 
 	// ── Live container (pre-Rust port of _hooks/live.py) ──
@@ -82,9 +103,12 @@ pub(crate) fn Fn(
 	// auto-expand applies it wins (it guarantees no marker reaches the
 	// model, so the container path is skipped and the expanded content is
 	// returned inline exactly as today).
-	if State.LiveContainer && !Applies::Fn::Fn(State, Content) {
-		let (TypeStr, _ClassifyContent) = Classify::Fn::Fn(Content, Classify, false);
-		return Container::Fn::Fn(State, Content, &TypeStr);
+	match State.LiveContainer && !Applies::Fn::Fn(State, Content) {
+		true => {
+			let (TypeStr, _ClassifyContent) = Classify::Fn::Fn(Content, Classify, false);
+			return Container::Fn::Fn(State, Content, &TypeStr);
+		},
+		false => {},
 	}
 
 	let (TypeStr, ClassifyContent) = Classify::Fn::Fn(Content, Classify, false);
@@ -109,10 +133,9 @@ pub(crate) fn Fn(
 	// return the RESOLVED content inline instead of the marker so no
 	// `<<<CCR:...>>>` reaches the model. Over the limit or disabled, the
 	// payload below is byte-identical to the pre-auto-expand shape.
-	let Expanded = if Applies::Fn::Fn(State, Content) {
-		Some(Content::Fn::Fn(State, &hash, Content))
-	} else {
-		None
+	let Expanded = match Applies::Fn::Fn(State, Content) {
+		true => Some(Content::Fn::Fn(State, &hash, Content)),
+		false => None,
 	};
 	// DEV-ONLY debug metrics (crate::debug): count the compress decision.
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Compressions);
@@ -125,10 +148,13 @@ pub(crate) fn Fn(
 		"preview": Preview,
 		"marker": Marker,
 	});
-	if let Some(Expanded) = Expanded {
-		Payload["auto_expanded"] = serde_json::Value::Bool(true);
-		Payload["expanded"] = serde_json::Value::String(Expanded);
-		crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::AutoExpansions);
+	match Expanded {
+		Some(Expanded) => {
+			Payload["auto_expanded"] = serde_json::Value::Bool(true);
+			Payload["expanded"] = serde_json::Value::String(Expanded);
+			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::AutoExpansions);
+		},
+		None => {},
 	}
 	Payload
 }

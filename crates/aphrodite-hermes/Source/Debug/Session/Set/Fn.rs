@@ -4,6 +4,8 @@
 //! cache by hand: a write within the same filesystem timestamp granularity would
 //! otherwise leave the reader returning the previous value.
 
+use anyhow::Context;
+
 use crate::Debug::{
 	Flag,
 	Flag::Cache::FLAG_CACHE,
@@ -25,19 +27,35 @@ use crate::Debug::{
 ///
 /// It does not create the runtime home - a missing home surfaces as the write
 /// error, which is the honest answer to "the toggle did not stick".
-pub(crate) fn Fn(on:bool) -> Result<(String, String), String> {
+pub(crate) fn Fn(on:bool) -> anyhow::Result<(String, String)> {
 	let root = Root::Fn::Fn();
-	let root = if root.is_empty() { Last::Fn::Fn() } else { root };
-	if root.is_empty() {
-		return Err("no session context yet - hooks have not fired in this process".to_string());
+	let root = match root.is_empty() {
+		true => Last::Fn::Fn(),
+		false => root,
+	};
+
+	match root.as_str() {
+		"" => anyhow::bail!("no session context yet - hooks have not fired in this process"),
+		_ => {},
 	}
+
 	let flag = Flag::Scoped::Fn::Fn(&root);
-	std::fs::write(&flag, if on { "on" } else { "off" }).map_err(|e| format!("write {}: {}", flag.display(), e))?;
+	let flag_text = match on {
+		true => "on",
+		false => "off",
+	};
+
+	std::fs::write(&flag, flag_text).with_context(|| format!("write the debug flag {}", flag.display()))?;
+
 	// Invalidate the mtime cache so the next read picks up the new value.
 	let key = flag.to_string_lossy().into_owned();
-	if let Some(cache) = FLAG_CACHE.get() {
+
+	// `Option::iter` is the zero-or-one loop: a cache that was never
+	// initialised simply does not run the body.
+	FLAG_CACHE.get().iter().for_each(|cache| {
 		let mut guard = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 		guard.remove(&key);
-	}
+	});
+
 	Ok((root, flag.to_string_lossy().into_owned()))
 }

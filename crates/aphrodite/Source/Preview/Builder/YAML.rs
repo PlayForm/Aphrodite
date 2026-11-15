@@ -19,10 +19,10 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 		.filter_map(|l| l.find(':').map(|i| &l[..i]))
 		.collect();
 	let Shown:Vec<&str> = Keys.iter().take(5).copied().collect();
-	let More = if Keys.len() > Shown.len() {
-		format!(" +{} more", Keys.len() - Shown.len())
-	} else {
-		String::new()
+	let More = match Keys.len() > Shown.len() {
+		true => format!(" +{} more", Keys.len() - Shown.len()),
+		false => String::new(),
 	};
+
 	format!("[yaml:{} keys {}L | {}{}]", Keys.len(), Inp.Total, Shown.join(", "), More)
 }

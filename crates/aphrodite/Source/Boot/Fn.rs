@@ -22,40 +22,56 @@ use clap::Parser;
 pub fn Fn() -> anyhow::Result<()> {
 	// Handle --version / --help early to avoid starting the runtime.
 	let Args:Vec<String> = std::env::args().collect();
-	if Args.iter().any(|a| a == "--version" || a == "-V") {
-		println!(
-			"aphrodite v{}",
-			option_env!("APHRODITE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
-		);
-		return Ok(());
+	match Args.iter().any(|a| a == "--version" || a == "-V") {
+		true => {
+			println!(
+				"aphrodite v{}",
+				option_env!("APHRODITE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+			);
+			return Ok(());
+		},
+		false => {},
 	}
-	if Args.get(1).map(String::as_str) == Some("--help") || Args.get(1).map(String::as_str) == Some("-h") {
-		// CLI::parse() prints help/errors and exits the process internally.
-		CLI::parse();
-		return Ok(());
+	match Args.get(1).map(String::as_str) == Some("--help") || Args.get(1).map(String::as_str) == Some("-h") {
+		true => {
+			// CLI::parse() prints help/errors and exits the process internally.
+			CLI::parse();
+			return Ok(());
+		},
+		false => {},
 	}
 
 	// ── Handle `aphrodite setup` subcommand ──
 	// Parse early to check for setup before building the tokio runtime.
-	if Args.get(1).map(String::as_str) == Some("setup") {
-		let CLI = CLI::parse();
-		if let Some(Command::Setup { APIKey, APIURL, Model, CachePort, TokenPort, NoLaunch, Force }) = CLI.command {
-			let SetupArgs = SetupArgs { APIKey, APIURL, Model, CachePort, TokenPort, NoLaunch, Force };
-			match Setup::Run::Entry::Fn(&SetupArgs) {
-				Ok(()) => {
-					if SetupArgs.NoLaunch {
-						// --no-launch: setup done, don't start proxy.
-						return Ok(());
+	match Args.get(1).map(String::as_str) == Some("setup") {
+		true => {
+			let CLI = CLI::parse();
+			match CLI.command {
+				Some(Command::Setup { APIKey, APIURL, Model, CachePort, TokenPort, NoLaunch, Force }) => {
+					let SetupArgs = SetupArgs { APIKey, APIURL, Model, CachePort, TokenPort, NoLaunch, Force };
+					match Setup::Run::Entry::Fn(&SetupArgs) {
+						Ok(()) => {
+							match SetupArgs.NoLaunch {
+								true => {
+									// --no-launch: setup done, don't start proxy.
+									return Ok(());
+								},
+								false => {},
+							}
+							// Default: setup complete, drop through to start proxy
+							println!("setup complete, starting proxy...");
+						},
+						Err(e) => {
+							eprintln!("setup failed: {e:#}");
+							std::process::exit(1);
+						},
 					}
-					// Default: setup complete, drop through to start proxy
-					println!("setup complete, starting proxy...");
 				},
-				Err(e) => {
-					eprintln!("setup failed: {e}");
-					std::process::exit(1);
-				},
+				Some(Command::Run) => {},
+				None => {},
 			}
-		}
+		},
+		false => {},
 	}
 
 	// Worker thread count - I/O-bound proxy needs more than CPU cores.

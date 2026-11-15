@@ -17,13 +17,10 @@
 /// line has to be a real one. Returns `None` when every line is noise, and the
 /// caller must then fall back rather than invent content.
 pub(crate) fn Fn(Content:&str) -> Option<String> {
-	Content.lines().find_map(|l| {
-		let t = l.trim();
-		if t.is_empty() {
-			return None;
-		}
+	Content.lines().map(str::trim).filter(|t| !t.is_empty()).find_map(|t| {
 		let core = t.trim_end_matches([',', ';']).trim();
 		let mut It = core.chars();
+
 		match (It.next(), It.next()) {
 			(Some('{' | '}' | '[' | ']' | '(' | ')'), None) => None,
 			_ => Some(t.to_string()),

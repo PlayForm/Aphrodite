@@ -19,35 +19,49 @@ pub fn ReduceBuild(Content:&str) -> Option<String> {
 
 	let SummaryKw = ["compiling", "finished", "running", "test result", "passed", "failed"];
 
-	for Line in Content.lines() {
+	Content.lines().filter(|Line| !Line.trim().is_empty()).for_each(|Line| {
 		let Stripped = Line.trim();
-		if Stripped.is_empty() {
-			continue;
-		}
 		let Lower = Stripped.to_lowercase();
 
-		if Lower.contains("error") && !Lower.starts_with("error:") {
-			Errors.push(Stripped.chars().take(200).collect());
-		} else if Lower.contains("warning") && !Lower.starts_with("warning:") {
-			Warnings.push(Stripped.chars().take(200).collect());
-		} else if SummaryKw.iter().any(|Kw| Lower.contains(Kw)) {
-			SummaryLines.push(Stripped.chars().take(200).collect());
+		match () {
+			_ if Lower.contains("error") && !Lower.starts_with("error:") => {
+				Errors.push(Stripped.chars().take(200).collect());
+			},
+			_ if Lower.contains("warning") && !Lower.starts_with("warning:") => {
+				Warnings.push(Stripped.chars().take(200).collect());
+			},
+			_ if SummaryKw.iter().any(|Kw| Lower.contains(Kw)) => {
+				SummaryLines.push(Stripped.chars().take(200).collect());
+			},
+			_ => {},
 		}
-	}
+	});
 
 	let mut Parts:Vec<String> = Vec::new();
-	if !SummaryLines.is_empty() {
-		Parts.push("[build summary]".into());
-		Parts.extend(SummaryLines.into_iter().take(10));
+	match !SummaryLines.is_empty() {
+		true => {
+			Parts.push("[build summary]".into());
+			Parts.extend(SummaryLines.into_iter().take(10));
+		},
+		false => {},
 	}
-	if !Errors.is_empty() {
-		Parts.push(format!("[{} errors]", Errors.len()));
-		Parts.extend(Errors.into_iter().take(20));
+	match !Errors.is_empty() {
+		true => {
+			Parts.push(format!("[{} errors]", Errors.len()));
+			Parts.extend(Errors.into_iter().take(20));
+		},
+		false => {},
 	}
-	if !Warnings.is_empty() {
-		Parts.push(format!("[{} warnings]", Warnings.len()));
-		Parts.extend(Warnings.into_iter().take(10));
+	match !Warnings.is_empty() {
+		true => {
+			Parts.push(format!("[{} warnings]", Warnings.len()));
+			Parts.extend(Warnings.into_iter().take(10));
+		},
+		false => {},
 	}
 
-	if Parts.is_empty() { None } else { Some(Parts.join("\n")) }
+	match Parts.is_empty() {
+		true => None,
+		false => Some(Parts.join("\n")),
+	}
 }

@@ -16,40 +16,71 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	use std::collections::BTreeMap;
 	let mut Tally:BTreeMap<char, usize> = BTreeMap::new();
 	let mut Paths:Vec<String> = Vec::new();
-	for Line in Inp.raw.lines() {
-		if let Some(Code) = GitStatus::Fn(Line) {
-			// Collapse the two columns to the most significant status char
-			// (first non-space, non-`?` preferred, else the raw char).
-			let Character = Code.chars().find(|c| *c != ' ').unwrap_or('?');
-			*Tally.entry(Character).or_insert(0) += 1;
-			if Paths.len() < 3 {
-				let p = Line.get(3..).unwrap_or("").trim();
-				if !p.is_empty() {
-					// `R old -> new` renames: keep the new path.
-					let p = p.rsplit(" -> ").next().unwrap_or(p);
-					Paths.push(p.chars().take(40).collect());
+
+	Inp.raw.lines().for_each(|Line| {
+		match GitStatus::Fn(Line) {
+			Some(Code) => {
+				// Collapse the two columns to the most significant status char
+				// (first non-space, non-`?` preferred, else the raw char).
+				let Character = Code.chars().find(|c| *c != ' ').unwrap_or('?');
+
+				*Tally.entry(Character).or_insert(0) += 1;
+
+				match Paths.len() < 3 {
+					true => {
+						let p = Line.get(3..).unwrap_or("").trim();
+
+						match !p.is_empty() {
+							true => {
+								// `R old -> new` renames: keep the new path.
+								let p = p.rsplit(" -> ").next().unwrap_or(p);
+
+								Paths.push(p.chars().take(40).collect());
+							},
+							false => {},
+						}
+					},
+					false => {},
 				}
-			}
+			},
+			None => {},
 		}
+	});
+
+	match Tally.is_empty() {
+		true => {
+			return format!("[git:{}L]", Inp.Total);
+		},
+		false => {},
 	}
-	if Tally.is_empty() {
-		return format!("[git:{}L]", Inp.Total);
-	}
+
 	// Emit tallies in a stable, readable order.
 	let Order = ['M', 'A', 'D', 'R', 'C', 'U', 'T', '?', '!'];
 	let mut Counts:Vec<String> = Vec::new();
-	for c in Order {
-		if let Some(n) = Tally.get(&c) {
-			let Label = if c == '?' { "??".to_string() } else { c.to_string() };
-			Counts.push(format!("{}{}", n, Label));
+
+	Order.into_iter().for_each(|c| {
+		match Tally.get(&c) {
+			Some(n) => {
+				let Label = match c == '?' {
+					true => "??".to_string(),
+					false => c.to_string(),
+				};
+
+				Counts.push(format!("{}{}", n, Label));
+			},
+			None => {},
 		}
-	}
+	});
+
 	let Total:usize = Tally.values().sum();
 	let Shown = Paths.len();
-	let More = if Total > Shown { format!(" +{} more", Total - Shown) } else { String::new() };
-	if Paths.is_empty() {
-		format!("[git:{}]", Counts.join(" "))
-	} else {
-		format!("[git:{} | {}{}]", Counts.join(" "), Paths.join(" "), More)
+	let More = match Total > Shown {
+		true => format!(" +{} more", Total - Shown),
+		false => String::new(),
+	};
+
+	match Paths.is_empty() {
+		true => format!("[git:{}]", Counts.join(" ")),
+		false => format!("[git:{} | {}{}]", Counts.join(" "), Paths.join(" "), More),
 	}
 }

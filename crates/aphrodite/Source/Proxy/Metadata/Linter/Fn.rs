@@ -8,15 +8,25 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 				&& (l.contains("error") || l.contains("warning"))
 		})
 		.count();
-	if FilesLinted > 0 {
-		Parts.push(format!("files={}", FilesLinted));
+
+	match FilesLinted > 0 {
+		true => {
+			Parts.push(format!("files={}", FilesLinted));
+		},
+		false => {},
 	}
+
 	let FirstError = Content
 		.lines()
 		.find(|l| l.contains("error[") || l.contains("Error:") || l.starts_with("error: "))
 		.map(|l| l.trim().chars().take(80).collect::<String>().replace('|', "/"));
-	if let Some(e) = FirstError {
-		Parts.push(format!("first_err={}", e));
+
+	match FirstError {
+		Some(e) => {
+			Parts.push(format!("first_err={}", e));
+		},
+		None => {},
 	}
+
 	Parts.push(format!("ln={}", LineCount));
 }

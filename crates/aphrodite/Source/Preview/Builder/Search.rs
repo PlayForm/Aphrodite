@@ -18,25 +18,37 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let mut Hits = 0usize;
 	let mut Files:BTreeSet<String> = BTreeSet::new();
 	let mut First:Option<String> = None;
-	for Line in Inp.raw.lines() {
-		if Line.trim().is_empty() {
-			continue;
-		}
-		if !Grep::Search::Fn(Line) {
-			continue;
-		}
-		Hits += 1;
-		if let Some((path, Rest)) = Line.split_once(':') {
-			Files.insert(path.to_string());
-			if First.is_none() {
-				let Lno = Rest.split(':').next().unwrap_or("");
-				First = Some(format!("{}:{}", path, Lno).chars().take(48).collect());
+
+	Inp.raw
+		.lines()
+		.filter(|Line| !Line.trim().is_empty() && Grep::Search::Fn(Line))
+		.for_each(|Line| {
+			Hits += 1;
+
+			match Line.split_once(':') {
+				Some((path, Rest)) => {
+					Files.insert(path.to_string());
+
+					match First.is_none() {
+						true => {
+							let Lno = Rest.split(':').next().unwrap_or("");
+
+							First = Some(format!("{}:{}", path, Lno).chars().take(48).collect());
+						},
+						false => {},
+					}
+				},
+				None => {},
 			}
-		}
+		});
+
+	match Hits == 0 {
+		true => {
+			return format!("[search:{}L]", Inp.Total);
+		},
+		false => {},
 	}
-	if Hits == 0 {
-		return format!("[search:{}L]", Inp.Total);
-	}
+
 	match First {
 		Some(Loc) => format!("[search:{} hits in {} files | {} ...]", Hits, Files.len(), Loc),
 		None => format!("[search:{} hits in {} files]", Hits, Files.len()),

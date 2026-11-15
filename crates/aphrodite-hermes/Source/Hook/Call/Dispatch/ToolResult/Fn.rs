@@ -21,7 +21,9 @@ pub(crate) fn transform_tool_result(state:&mut AphroditeState, input:&HookInput)
 	// Poll-result tracking: update running BgTasks from
 	// process(action='poll') results. Only active when poll_worker is enabled.
 	match (state.PollWorkerEnabled, tool) {
-		(true, "process") => aphrodite::PollWorker::Update::Fn::UpdateFromPoll(state, tool, tool_content),
+		(true, "process") => {
+			aphrodite::PollWorker::Update::Fn::UpdateFromPoll(state, tool, tool_content);
+		},
 		_ => {},
 	};
 

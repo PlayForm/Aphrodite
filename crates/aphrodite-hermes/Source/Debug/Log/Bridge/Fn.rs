@@ -15,7 +15,9 @@ use crate::Debug::Log::Level;
 /// line, so callers pass sizes and hashes rather than payloads.
 pub(crate) fn Fn(state:&aphrodite::State::Struct::AphroditeState, session:&str, event:&str, kv:&[(&str, String)]) {
 	let lvl = Level::Fn::Fn(state, session);
-	if lvl > 0 {
-		aphrodite::Debug::Log::At::Fn::Fn(lvl, event, kv);
+
+	match lvl {
+		0 => {},
+		_ => aphrodite::Debug::Log::At::Fn::Fn(lvl, event, kv),
 	}
 }

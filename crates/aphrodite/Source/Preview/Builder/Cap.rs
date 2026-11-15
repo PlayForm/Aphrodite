@@ -14,13 +14,22 @@
 /// double-wrap bug class, which is why the bracket is kept rather than the last
 /// character. `0` means no cap - not "truncate to nothing".
 pub(crate) fn Fn(Preview:&str, MaximumChars:usize) -> String {
-	if MaximumChars == 0 || Preview.chars().count() <= MaximumChars {
-		return Preview.to_string();
+	match MaximumChars == 0 || Preview.chars().count() <= MaximumChars {
+		true => {
+			return Preview.to_string();
+		},
+		false => {},
 	}
+
 	let KeepClose = Preview.trim_end().ends_with(']');
-	if !KeepClose || MaximumChars <= 3 {
-		return Preview.chars().take(MaximumChars).collect();
+
+	match !KeepClose || MaximumChars <= 3 {
+		true => {
+			return Preview.chars().take(MaximumChars).collect();
+		},
+		false => {},
 	}
+
 	let mut Out:String = Preview.chars().take(MaximumChars - 4).collect();
 	Out.push_str("...");
 	Out.push(']');

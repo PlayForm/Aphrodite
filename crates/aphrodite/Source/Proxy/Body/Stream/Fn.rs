@@ -24,11 +24,16 @@
 /// stays the authority for every other spelling and falls through to it
 /// on any non-match.
 pub(crate) fn Fn(body:&[u8]) -> bool {
-	if body.windows(13).any(|w| w == b"\"stream\":true") || body.windows(14).any(|w| w == b"\"stream\": true") {
-		return true;
+	let Direct =
+		body.windows(13).any(|w| w == b"\"stream\":true") || body.windows(14).any(|w| w == b"\"stream\": true");
+
+	match Direct {
+		true => true,
+		false => {
+			serde_json::from_slice::<serde_json::Value>(body)
+				.ok()
+				.and_then(|v| v.get("stream").and_then(|s| s.as_bool()))
+				.unwrap_or(false)
+		},
 	}
-	serde_json::from_slice::<serde_json::Value>(body)
-		.ok()
-		.and_then(|v| v.get("stream").and_then(|s| s.as_bool()))
-		.unwrap_or(false)
 }

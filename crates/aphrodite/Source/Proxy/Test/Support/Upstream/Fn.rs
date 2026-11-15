@@ -23,8 +23,12 @@ pub(crate) async fn SpawnMockUpstream(response:&'static str) -> std::net::Socket
 		// Drain (don't need to parse) the request up to the header terminator.
 		loop {
 			let n = Socket.read(&mut Buffer).await.unwrap_or(0);
-			if n == 0 || Buffer[..n].windows(4).any(|w| w == b"\r\n\r\n") {
-				break;
+
+			match n == 0 || Buffer[..n].windows(4).any(|w| w == b"\r\n\r\n") {
+				true => {
+					break;
+				},
+				false => {},
 			}
 		}
 		let _ = Socket.write_all(response.as_bytes()).await;

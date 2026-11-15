@@ -21,8 +21,11 @@ use crate::Stage2::{Const::MinimumStage2Size, Registry::Fn::ReducerRegistry};
 /// or `None` if the content is too small, no reducer exists for the type,
 /// or the reducer produced no savings.
 pub fn CompressStage2(Content:&str, CCRType:&str) -> Option<String> {
-	if Content.len() < MinimumStage2Size {
-		return None;
+	match Content.len() < MinimumStage2Size {
+		true => {
+			return None;
+		},
+		false => {},
 	}
 
 	let Registry = ReducerRegistry();
@@ -31,8 +34,11 @@ pub fn CompressStage2(Content:&str, CCRType:&str) -> Option<String> {
 	let Reduced = Reducer(Content)?;
 
 	// Guard: don't return if reduction didn't help
-	if Reduced == Content || Reduced.len() >= Content.len() {
-		return None;
+	match Reduced == Content || Reduced.len() >= Content.len() {
+		true => {
+			return None;
+		},
+		false => {},
 	}
 
 	Some(Reduced)

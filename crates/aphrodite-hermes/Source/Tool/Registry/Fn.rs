@@ -38,7 +38,8 @@ use super::Debug;
 /// excludes it by name for that reason.
 pub(crate) fn Fn() -> HashMap<&'static str, ToolHandler> {
 	let mut m:HashMap<&'static str, ToolHandler> = HashMap::new();
-	for (name, handler) in [
+
+	[
 		Compress::Fn::Fn(),
 		Retrieve::Fn::Fn(),
 		Stats::Fn::Fn(),
@@ -53,13 +54,17 @@ pub(crate) fn Fn() -> HashMap<&'static str, ToolHandler> {
 		Test::Fn::Fn(),
 		Rebuild::Fn::Fn(),
 		ContextEngine::Fn::Fn(),
-	] {
+	]
+	.into_iter()
+	.for_each(|(name, handler)| {
 		m.insert(name, handler);
-	}
+	});
+
 	#[cfg(debug_assertions)]
 	{
 		let (name, handler) = Debug::Fn::Fn();
 		m.insert(name, handler);
 	}
+
 	m
 }

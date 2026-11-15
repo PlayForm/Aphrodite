@@ -7,13 +7,15 @@
 //! succeeded, and a step that runs early leaves an installed layout the later
 //! steps never completed.
 
-use std::{fs, io};
+use std::fs;
+
+use anyhow::Context;
 
 use crate::{
 	Configuration::CLI::Setup::Struct::Struct as SetupArgs,
 	Setup::{
 		Dylib::Copy::Fn as CopyDylibs,
-		Run::{Context::Struct as SetupContext, Error::Enum as SetupError},
+		Run::Context::Struct as SetupContext,
 		Verify::{Hermes::Fn as VerifyHermes, SelfHash::Fn as SelfHash},
 		Write::{
 			BinaryName::Fn as BinaryName,
@@ -49,27 +51,19 @@ use crate::Setup::MacOS::Fn as InstallMacOSArtifact;
 /// homes the plugin will: under a non-default Hermes home (Docker, profile
 /// gateways) setup writing to a second `~/.hermes/aphrodite` produces an install
 /// that looks complete and never loads.
-pub fn Fn(Args:&SetupArgs) -> Result<(), SetupError> {
-	let HermesHome = crate::Home::Hermes::Opt::Fn::Fn().ok_or_else(|| {
-		SetupError::Io(io::Error::new(
-			io::ErrorKind::NotFound,
-			"no Hermes home resolvable (set HERMES_HOME or HOME)",
-		))
-	})?;
+pub fn Fn(Args:&SetupArgs) -> anyhow::Result<()> {
+	let HermesHome =
+		crate::Home::Hermes::Opt::Fn::Fn().context("no Hermes home resolvable (set HERMES_HOME or HOME)")?;
 	// Runtime home is a single shared decision (Home::Runtime::Fn::Fn:
 	// $APHRODITE_HOME -> $HERMES_HOME -> $HOME -> platform default) so
 	// `aphrodite setup` bootstraps exactly the home the plugin shim and the
 	// running binary will use - under a non-default Hermes home (Docker,
 	// profile gateways) that is <hermes-home>/aphrodite, never a second
 	// ~/.hermes/aphrodite (issue 40).
-	let RuntimeHome = crate::Home::Runtime::Opt::Fn::Fn().ok_or_else(|| {
-		SetupError::Io(io::Error::new(
-			io::ErrorKind::NotFound,
-			"no runtime home resolvable (set APHRODITE_HOME, HERMES_HOME, or HOME)",
-		))
-	})?;
+	let RuntimeHome = crate::Home::Runtime::Opt::Fn::Fn()
+		.context("no runtime home resolvable (set APHRODITE_HOME, HERMES_HOME, or HOME)")?;
 
-	let OwnPath = std::env::current_exe().map_err(SetupError::Io)?;
+	let OwnPath = std::env::current_exe().context("resolve the path of this executable")?;
 	let OwnHash = SelfHash(&OwnPath);
 
 	let Context = SetupContext {
@@ -87,8 +81,10 @@ pub fn Fn(Args:&SetupArgs) -> Result<(), SetupError> {
 	VerifyHermes()?;
 
 	// ── Step 2: Create directory structure ──
-	fs::create_dir_all(&Context.BinariesDirectory)?;
-	fs::create_dir_all(&Context.AphroditeDirectory)?;
+	fs::create_dir_all(&Context.BinariesDirectory)
+		.with_context(|| format!("create the binaries directory {}", Context.BinariesDirectory.display()))?;
+	fs::create_dir_all(&Context.AphroditeDirectory)
+		.with_context(|| format!("create the runtime home {}", Context.AphroditeDirectory.display()))?;
 
 	// ── Step 2b: Prepare the Hermes plugin dir (hooks-only) ──
 	// The plugin dir holds ONLY the loader (plugin.yaml + __init__.py) that
@@ -134,9 +130,11 @@ pub fn Fn(Args:&SetupArgs) -> Result<(), SetupError> {
 			.unwrap_or(false)
 		{
 			println!("removing stale plugin symlink -> {}", Context.PluginDirectory.display());
-			fs::remove_file(&Context.PluginDirectory)?;
+			fs::remove_file(&Context.PluginDirectory)
+				.with_context(|| format!("remove the stale plugin symlink {}", Context.PluginDirectory.display()))?;
 		}
-		fs::create_dir_all(&Context.PluginDirectory)?;
+		fs::create_dir_all(&Context.PluginDirectory)
+			.with_context(|| format!("create the plugin directory {}", Context.PluginDirectory.display()))?;
 	}
 
 	// ── Step 3: Copy self to binaries dir (always overwrite - the binary
@@ -151,7 +149,8 @@ pub fn Fn(Args:&SetupArgs) -> Result<(), SetupError> {
 	InstallMacOSArtifact(&Context.OwnPath, &TargetBinary, None, 0o700)?;
 	#[cfg(not(target_os = "macos"))]
 	{
-		fs::copy(&Context.OwnPath, &TargetBinary)?;
+		fs::copy(&Context.OwnPath, &TargetBinary)
+			.with_context(|| format!("copy this executable to {}", TargetBinary.display()))?;
 		SecurePerms(&TargetBinary, 0o700)?;
 	}
 
@@ -167,7 +166,8 @@ pub fn Fn(Args:&SetupArgs) -> Result<(), SetupError> {
 			.replace("{cache_port}", &Args.CachePort.to_string())
 			.replace("{token_port}", &Args.TokenPort.to_string());
 		println!("writing config -> {}", ConfigurationPath.display());
-		fs::write(&ConfigurationPath, &Configuration)?;
+		fs::write(&ConfigurationPath, &Configuration)
+			.with_context(|| format!("write the configuration {}", ConfigurationPath.display()))?;
 		SecurePerms(&ConfigurationPath, 0o600)?;
 	}
 

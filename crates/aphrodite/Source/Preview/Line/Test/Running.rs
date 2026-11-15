@@ -12,9 +12,14 @@ pub(crate) fn Fn(t:&str) -> bool {
 		None => return false,
 	};
 	let Digits = Rest.chars().take_while(|c| c.is_ascii_digit()).count();
-	if Digits == 0 {
-		return false;
+
+	match Digits == 0 {
+		true => {
+			return false;
+		},
+		false => {},
 	}
+
 	let After = Rest[Digits..].trim_start();
 	let After = match After.strip_prefix("test") {
 		Some(a) => a,

@@ -25,11 +25,17 @@ pub(crate) fn Fn(
 ) -> serde_json::Value {
 	// Telemetry (P2/T6): record before threshold/empty gating - a failing
 	// command with tiny output is exactly what the error-loop breaker needs.
-	if !Content.is_empty() {
-		Record::Fn::Fn(State, Content, command, Returncode);
+	match !Content.is_empty() {
+		true => {
+			Record::Fn::Fn(State, Content, command, Returncode);
+		},
+		false => {},
 	}
-	if Content.is_empty() {
-		return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
+	match Content.is_empty() {
+		true => {
+			return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
+		},
+		false => {},
 	}
 
 	// ── Auto-expand gate (pre-Rust port) ──
@@ -48,15 +54,21 @@ pub(crate) fn Fn(
 	// marked content is unconditional when the feature is enabled - except
 	// under auto-expand (within the limit), where the whole content is
 	// returned expanded instead.
-	if let Some(Payload) = ChainSplit::Fn::Fn(State, Content, DoAutoExpand) {
-		return Payload;
+	match ChainSplit::Fn::Fn(State, Content, DoAutoExpand) {
+		Some(Payload) => {
+			return Payload;
+		},
+		None => {},
 	}
 
 	// Threshold gate for UNMARKED output only: below-threshold content
 	// passes through untouched (no markers to leak, nothing worth
 	// splitting). Auto-expand bypasses the gate (store+expand path).
-	if !DoAutoExpand && State.TerminalThreshold > 0 && Content.len() < State.TerminalThreshold {
-		return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
+	match !DoAutoExpand && State.TerminalThreshold > 0 && Content.len() < State.TerminalThreshold {
+		true => {
+			return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
+		},
+		false => {},
 	}
 
 	// ── Live container (pre-Rust port of _hooks/live.py) ──
@@ -64,9 +76,12 @@ pub(crate) fn Fn(
 	// threshold → chunked container store + INSTANT marker with a progress
 	// annotation. Chain-split (above) already handled marked output, and
 	// auto-expand wins when it applies.
-	if State.LiveContainer && !DoAutoExpand {
-		let (TypeStr, _ClassifyContent) = Classify::Fn::Fn(Content, Classify, true);
-		return Container::Fn::Fn(State, Content, &TypeStr);
+	match State.LiveContainer && !DoAutoExpand {
+		true => {
+			let (TypeStr, _ClassifyContent) = Classify::Fn::Fn(Content, Classify, true);
+			return Container::Fn::Fn(State, Content, &TypeStr);
+		},
+		false => {},
 	}
 
 	Emit::Fn::Fn(State, Content, Classify, DoAutoExpand)

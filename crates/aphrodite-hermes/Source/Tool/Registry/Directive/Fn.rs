@@ -14,7 +14,11 @@ use crate::Tool::{Arg, Dispatch::Fn::ToolHandler};
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_directive", |args| {
 		let action = Arg::Fn::Fn(args, "action");
-		let action = if action.is_empty() { "list" } else { action };
+		let action = match action {
+			"" => "list",
+			action => action,
+		};
+
 		let name = Arg::Fn::Fn(args, "name");
 		crate::Session::With::Fn::with_shared(|state| aphrodite::Directive::Action::Fn(state, action, name))
 	})

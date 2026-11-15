@@ -17,9 +17,13 @@ pub(crate) fn Fn(body:&[u8], APIKey:&str) -> Option<u64> {
 	// F3: never cache a streamed request - the cached entry is a single
 	// buffered JSON body, replayed with `Content-Type: application/json`,
 	// which is nothing like an SSE stream a `"stream": true` client expects.
-	if v.get("stream").and_then(|s| s.as_bool()).unwrap_or(false) {
-		return None;
+	match v.get("stream").and_then(|s| s.as_bool()).unwrap_or(false) {
+		true => {
+			return None;
+		},
+		false => {},
 	}
+
 	// `Model`/`messages` must both be present for this to be a valid,
 	// cacheable chat-completion request.
 	v.get("model")?.as_str()?;
@@ -32,7 +36,8 @@ pub(crate) fn Fn(body:&[u8], APIKey:&str) -> Option<u64> {
 	// `v` itself is not guaranteed stable across equivalent requests).
 	let mut Parts:Vec<u8> = Vec::new();
 	Parts.extend_from_slice(APIKey.as_bytes());
-	for (Label, Value) in [
+
+	[
 		("model", v.get("model")),
 		("messages", v.get("messages")),
 		("tools", v.get("tools")),
@@ -41,14 +46,23 @@ pub(crate) fn Fn(body:&[u8], APIKey:&str) -> Option<u64> {
 		("top_p", v.get("top_p")),
 		("n", v.get("n")),
 		("response_format", v.get("response_format")),
-	] {
+	]
+	.into_iter()
+	.try_for_each(|(Label, Value)| -> Option<()> {
 		Parts.push(b':');
 		Parts.extend_from_slice(Label.as_bytes());
 		Parts.push(b'=');
-		if let Some(Value) = Value {
-			Parts.extend_from_slice(serde_json::to_string(Value).ok()?.as_bytes());
+
+		match Value {
+			Some(Value) => {
+				Parts.extend_from_slice(serde_json::to_string(Value).ok()?.as_bytes());
+			},
+			None => {},
 		}
-	}
+
+		Some(())
+	})?;
+
 	// FNV-1a 64-bit hash - deterministic across process restarts
 	Some(Fnv1a64(&Parts))
 }

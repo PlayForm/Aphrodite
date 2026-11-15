@@ -32,9 +32,9 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> serde
 	// Container entries: per-chunk content + the metadata envelope.
 	// `BytesArrived` starts at 0 - the marker is instant, delivery happens
 	// through the retrieve path, which advances the counter.
-	for (i, Chunk) in Chunks.iter().enumerate() {
+	Chunks.iter().enumerate().for_each(|(i, Chunk)| {
 		State.InlineStorePut(LiveChunkKey(&hash, i), (*Chunk).to_string());
-	}
+	});
 	let meta = serde_json::json!({
 		"live": true,
 		"type": TypeStr,

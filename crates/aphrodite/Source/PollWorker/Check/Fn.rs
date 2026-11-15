@@ -18,17 +18,19 @@ pub fn CheckBgTasks(State:&mut AphroditeState) {
 	// Collect indices to nudge (iterate in insertion order = oldest first,
 	// nudging newest active tasks within the 2-nudge cap).
 	let TaskCount = State.BgTasks.len();
-	for i in (0..TaskCount).rev() {
-		if Nudged >= 2 {
-			break;
+	let _ = (0..TaskCount).rev().try_for_each(|i| -> Result<(), ()> {
+		match Nudged >= 2 {
+			true => {
+				return Err(());
+			},
+			false => {},
 		}
 		let task = &State.BgTasks[i];
 		match &task.Status {
 			BgStatus::Running => {
-				let Last = if task.PollCount > 0 {
-					format!(" (polled {}×, last turn {})", task.PollCount, task.LastPollTurn)
-				} else {
-					String::from(" (not polled yet)")
+				let Last = match task.PollCount > 0 {
+					true => format!(" (polled {}×, last turn {})", task.PollCount, task.LastPollTurn),
+					false => String::from(" (not polled yet)"),
 				};
 				crate::Flow::Nudge::Push::Fn::PushNudge(
 					State,
@@ -74,5 +76,6 @@ pub fn CheckBgTasks(State:&mut AphroditeState) {
 				// Don't nudge about stale tasks - they're abandoned.
 			},
 		}
-	}
+		Ok(())
+	});
 }

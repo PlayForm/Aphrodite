@@ -22,8 +22,11 @@ use crate::PollWorker::Should::Command::Fn::ShouldBackgroundByCommand;
 pub fn ShouldBackground(Content:&str, command:Option<&str>) -> Option<(String, String)> {
 	// Short output: pass through normally - the agent doesn't need
 	// to poll for a 200-byte `Ls`.
-	if Content.len() < 2048 {
-		return None;
+	match Content.len() < 2048 {
+		true => {
+			return None;
+		},
+		false => {},
 	}
 	ShouldBackgroundByCommand(command)
 }

@@ -18,16 +18,10 @@ use crate::Preview::{Input::Struct::Struct as Input, Text::EnvelopeJSON};
 /// key listing would be a regression. It is not a validator of the payload's
 /// meaning, only of its syntax.
 pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
-	if let Ok(v) = serde_json::from_str::<JSONValue>(Inp.raw) {
-		match v {
-			JSONValue::Object(Obj) => {
-				if !EnvelopeJSON::Fn(&Obj) {
-					return true;
-				}
-			},
-			JSONValue::Array(_) => return true,
-			_ => {},
-		}
+	match serde_json::from_str::<JSONValue>(Inp.raw) {
+		Ok(JSONValue::Object(Obj)) => !EnvelopeJSON::Fn(&Obj),
+		Ok(JSONValue::Array(_)) => true,
+		Ok(_) => false,
+		Err(_) => false,
 	}
-	false
 }

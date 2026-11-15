@@ -16,29 +16,36 @@ pub fn Assemble(
 	MultiConfiguration:Option<MultiConfiguration>,
 	CLIFallback:Option<CLI>,
 ) -> anyhow::Result<Vec<(String, CLI)>> {
-	let Proxies:Vec<(String, CLI)> = if let Some(Configuration) = MultiConfiguration {
-		Configuration
-			.Proxies
-			.iter()
-			.map(|p| {
-				let CLI = Configuration.Resolve(p)?;
-				let name = p.name.clone().unwrap_or_else(|| format!("{}", CLI.Listen));
-				Ok((name, CLI))
-			})
-			.collect::<anyhow::Result<Vec<_>>>()?
-	} else {
-		let CLI = CLIFallback.expect("cli_fallback set when use_multi_config is false");
-		// A standalone (no aphrodite.toml) proxy launch needs an upstream key.
-		// `APIKey` is optional at parse time so `setup`/keyless invocations
-		// don't require it; enforce it here for the proxy path specifically,
-		// with a clear error instead of silently forwarding an empty Bearer.
-		if CLI.APIKey.trim().is_empty() {
-			anyhow::bail!(
-				"no API key configured - set APHRODITE_API_KEY env var or pass --api-key, or run `aphrodite setup`"
-			);
-		}
-		let name = format!("{}", CLI.Listen);
-		vec![(name, CLI)]
+	let Proxies:Vec<(String, CLI)> = match MultiConfiguration {
+		Some(Configuration) => {
+			Configuration
+				.Proxies
+				.iter()
+				.map(|p| {
+					let CLI = Configuration.Resolve(p)?;
+					let name = p.name.clone().unwrap_or_else(|| format!("{}", CLI.Listen));
+					Ok((name, CLI))
+				})
+				.collect::<anyhow::Result<Vec<_>>>()?
+		},
+		None => {
+			let CLI = CLIFallback.expect("cli_fallback set when use_multi_config is false");
+			// A standalone (no aphrodite.toml) proxy launch needs an upstream key.
+			// `APIKey` is optional at parse time so `setup`/keyless invocations
+			// don't require it; enforce it here for the proxy path specifically,
+			// with a clear error instead of silently forwarding an empty Bearer.
+			match CLI.APIKey.trim().is_empty() {
+				true => {
+					anyhow::bail!(
+						"no API key configured - set APHRODITE_API_KEY env var or pass --api-key, or run `aphrodite \
+						 setup`"
+					);
+				},
+				false => {},
+			}
+			let name = format!("{}", CLI.Listen);
+			vec![(name, CLI)]
+		},
 	};
 
 	Ok(Proxies)

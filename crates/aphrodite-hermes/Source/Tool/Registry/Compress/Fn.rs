@@ -10,9 +10,12 @@ use crate::Tool::{Arg, Compress, Dispatch::Fn::ToolHandler};
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_compress", |args| {
 		let content = Arg::Fn::Fn(args, "content");
-		if content.is_empty() {
-			return serde_json::json!({"error": "content is required"});
+
+		match content.is_empty() {
+			true => return serde_json::json!({ "error": "content is required" }),
+			false => {},
 		}
+
 		let hint = Arg::Fn::Fn(args, "type");
 		let center = args.get("_ccr_center").and_then(|v| v.as_str());
 		crate::Session::With::Fn::with_shared(|state| Compress::Fn::Fn(state, content, hint, center))

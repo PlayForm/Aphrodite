@@ -9,7 +9,9 @@
 
 use std::{fs, path::Path, process::Command};
 
-use crate::Setup::{Run::Error::Enum as SetupError, Write::Permissions::Fn as SecurePerms};
+use anyhow::Context;
+
+use crate::Setup::Write::Permissions::Fn as SecurePerms;
 
 /// Copy `Src` to `Dest` with the full macOS treatment, then harden permissions.
 ///
@@ -27,7 +29,7 @@ use crate::Setup::{Run::Error::Enum as SetupError, Write::Permissions::Fn as Sec
 /// source builds. Getting this wrong leaves an artifact at the install path that
 /// macOS refuses to load, and the only symptom is a plugin that never starts.
 #[cfg(target_os = "macos")]
-pub(crate) fn Fn(Src:&Path, Dest:&Path, DylibIDName:Option<&str>, Mode:u32) -> Result<(), SetupError> {
+pub(crate) fn Fn(Src:&Path, Dest:&Path, DylibIDName:Option<&str>, Mode:u32) -> anyhow::Result<()> {
 	let _ = std::fs::remove_file(Dest);
 	let DittoOk = Command::new("ditto")
 		.args([Src.to_str().unwrap_or(""), Dest.to_str().unwrap_or("")])
@@ -35,7 +37,7 @@ pub(crate) fn Fn(Src:&Path, Dest:&Path, DylibIDName:Option<&str>, Mode:u32) -> R
 		.map(|s| s.success())
 		.unwrap_or(false);
 	if !DittoOk {
-		fs::copy(Src, Dest)?;
+		fs::copy(Src, Dest).with_context(|| format!("copy {} to {}", Src.display(), Dest.display()))?;
 		match Command::new("xattr").args(["-c", Dest.to_str().unwrap_or("")]).output() {
 			Ok(Out) if Out.status.success() => {},
 			_ => {

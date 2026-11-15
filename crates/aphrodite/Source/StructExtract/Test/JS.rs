@@ -9,11 +9,14 @@ use crate::StructExtract::Extract::Fn as ExtractCodeStructure;
 fn TestExtractJSArrowFnGuardIgnoresCommentOnlyArrow() {
 	let Code = "const x = 5; // map => y\n";
 	let r = ExtractCodeStructure(Code, "js");
-	if let Some(Fns) = r.get("fns") {
-		assert!(
-			!Fns.iter().any(|s| s.contains('x')),
-			"trailing-comment `=>` must not be mistaken for an arrow fn: {Fns:?}"
-		);
+	match r.get("fns") {
+		Some(Fns) => {
+			assert!(
+				!Fns.iter().any(|s| s.contains('x')),
+				"trailing-comment `=>` must not be mistaken for an arrow fn: {Fns:?}"
+			);
+		},
+		None => {},
 	}
 }
 

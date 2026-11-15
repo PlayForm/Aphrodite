@@ -31,10 +31,13 @@ pub(crate) fn Fn() -> String {
 			.get_or_init(|| Mutex::new(String::new()))
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
-		if !last.is_empty() {
-			return last.clone();
+
+		match last.as_str() {
+			"" => {},
+			session => return session.to_string(),
 		}
 	}
+
 	// Reload fallback: read the persisted session id from the runtime home.
 	std::fs::read_to_string(Runtime::Fn::Fn().join("session.current"))
 		.ok()

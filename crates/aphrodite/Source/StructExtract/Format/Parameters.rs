@@ -12,9 +12,8 @@ use crate::StructExtract::{Format::Floor::Fn as Floor, MaximumParametersLength::
 /// not drift is the cap, because the parameter list is most of a signature's
 /// width and the line cap is measured after it.
 pub(crate) fn Fn(Params:&str) -> String {
-	if Params.len() > MaximumParamsLength {
-		Floor(Params, MaximumParamsLength - 3).to_string() + "..."
-	} else {
-		Params.to_string()
+	match Params.len() > MaximumParamsLength {
+		true => Floor(Params, MaximumParamsLength - 3).to_string() + "...",
+		false => Params.to_string(),
 	}
 }

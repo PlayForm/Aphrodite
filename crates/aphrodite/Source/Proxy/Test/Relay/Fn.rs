@@ -39,7 +39,8 @@ fn TestExecuteToolRelayRetrieveMissingHashParameter() {
 		"aphrodite_retrieve",
 		&serde_json::json!({}),
 	));
-	assert_eq!(Result, Err("missing hash".to_string()));
+	let Error = format!("{:#}", Result.expect_err("a retrieve with no hash argument must be an error"));
+	assert!(Error.contains("missing hash"), "unexpected error: {Error}");
 }
 
 #[test]
@@ -140,20 +141,22 @@ fn TestExecuteToolRelayRetrieveNormalizesPipeSuffixedAndWhitespaceHash() {
 		.unwrap();
 	let hash = Compressed["hash"].as_str().unwrap().to_string();
 
-	for HashArgument in [hash.clone(), format!("{hash}|tool|1024"), format!("  {hash}  ")] {
-		let Retrieved = Rt
-			.block_on(ExecuteToolRelay(
-				&State,
-				"aphrodite_retrieve",
-				&serde_json::json!({"hash": HashArgument}),
-			))
-			.unwrap();
-		assert_eq!(
-			Retrieved["found"], true,
-			"hash arg {HashArgument:?} must resolve: {Retrieved:?}"
-		);
-		assert_eq!(Retrieved["content"], Content);
-	}
+	[hash.clone(), format!("{hash}|tool|1024"), format!("  {hash}  ")]
+		.into_iter()
+		.for_each(|HashArgument| {
+			let Retrieved = Rt
+				.block_on(ExecuteToolRelay(
+					&State,
+					"aphrodite_retrieve",
+					&serde_json::json!({"hash": HashArgument}),
+				))
+				.unwrap();
+			assert_eq!(
+				Retrieved["found"], true,
+				"hash arg {HashArgument:?} must resolve: {Retrieved:?}"
+			);
+			assert_eq!(Retrieved["content"], Content);
+		});
 }
 
 // ── T15 (F2): regression tests for the historical corpus examples ────

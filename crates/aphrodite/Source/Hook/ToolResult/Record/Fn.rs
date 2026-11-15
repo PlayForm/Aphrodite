@@ -16,13 +16,15 @@ use crate::{
 pub(crate) fn Fn(State:&mut AphroditeState, ToolName:&str, Content:&str, meta:&ToolCallMeta) {
 	let Okay = meta.Status.map(|s| s != "error").unwrap_or(true);
 	// DEV-ONLY debug metrics (crate::debug): count tool-reported errors.
-	if !Okay {
-		crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::ToolErrors);
+	match !Okay {
+		true => {
+			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::ToolErrors);
+		},
+		false => {},
 	}
-	let ErrorSig = if Okay {
-		None
-	} else {
-		Some(crate::Flow::Signature::Error::Fn::ErrorSig(meta.ErrorType, meta.ErrorMessage))
+	let ErrorSig = match Okay {
+		true => None,
+		false => Some(crate::Flow::Signature::Error::Fn::ErrorSig(meta.ErrorType, meta.ErrorMessage)),
 	};
 	let WrotePath = WrotePathFrom(ToolName, meta.ArgsJSON, Content);
 	let Sig = crate::Flow::Signature::Normalize::Fn::NormalizeArgsSig(ToolName, meta.ArgsJSON);

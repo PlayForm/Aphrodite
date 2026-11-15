@@ -12,7 +12,10 @@
 /// should resolve before continuing.
 pub(crate) fn Fn(hash:&str, Total:usize, Chunks:usize, Preview:&str) -> String {
 	let Safe = Preview.replace(['\n', '\r'], " ").trim().to_string();
-	let ChunkNote = if Chunks == 1 { "1 chunk".to_string() } else { format!("{Chunks} chunks") };
+	let ChunkNote = match Chunks == 1 {
+		true => "1 chunk".to_string(),
+		false => format!("{Chunks} chunks"),
+	};
 	format!(
 		"<<<CCR:{}|live|{}>>>\nLive container: {} · {} · {} bytes · 0 bytes arrived. Use aphrodite_retrieve({}) to \
 		 fetch when needed. Continue reasoning without waiting.",

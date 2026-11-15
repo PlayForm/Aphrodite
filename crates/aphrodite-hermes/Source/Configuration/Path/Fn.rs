@@ -23,23 +23,27 @@ pub(crate) fn expected_path(state:&AphroditeState, tool:&str, parsed:&serde_json
 		"read_file",
 		"read_terminal",
 	];
-	if ESSENTIAL.contains(&tool) {
-		return "passthrough_essential".into();
+
+	let chained = tool == "terminal"
+		&& state.ChainSplitEnabled
+		&& parsed
+			.get("args")
+			.and_then(|a| a.get("command"))
+			.and_then(|v| v.as_str())
+			.is_some_and(|c| c.contains("&&"));
+
+	match (
+		ESSENTIAL.contains(&tool),
+		tool.starts_with("aphrodite_") || tool.starts_with("headroom"),
+		state.AutoExpand,
+		chained,
+		state.LiveContainer,
+	) {
+		(true, ..) => "passthrough_essential".into(),
+		(_, true, ..) => "passthrough_self".into(),
+		(_, _, true, ..) => "auto_expand".into(),
+		(_, _, _, true, _) => "chain_split".into(),
+		(_, _, _, _, true) => "live_container".into(),
+		_ => "compress_or_passthrough".into(),
 	}
-	if tool.starts_with("aphrodite_") || tool.starts_with("headroom") {
-		return "passthrough_self".into();
-	}
-	if state.AutoExpand {
-		return "auto_expand".into();
-	}
-	if tool == "terminal" && state.ChainSplitEnabled {
-		let command = parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str());
-		if command.is_some_and(|c| c.contains("&&")) {
-			return "chain_split".into();
-		}
-	}
-	if state.LiveContainer {
-		return "live_container".into();
-	}
-	"compress_or_passthrough".into()
 }

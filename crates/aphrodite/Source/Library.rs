@@ -34,6 +34,14 @@
 // opposite of `non_upper_case_globals`' default, so the lint is switched off
 // crate-wide rather than silenced file by file at every declaration.
 #![allow(non_upper_case_globals)]
+// House style §4.3: every branch is a `match`, so `if Cond { ... }` reads
+// `match Cond { true => ..., false => ... }` and `if let Some(X) = E` reads
+// `match E { Some(X) => ..., None => ... }`. `match_bool` and `single_match`
+// exist to argue for the `if`/`if let` spelling the house style replaces, so
+// they are switched off crate-wide; leaving them on would make the style and
+// the CI clippy gate contradict each other.
+#![allow(clippy::match_bool)]
+#![allow(clippy::single_match)]
 
 pub mod ABI;
 pub mod Catalog;

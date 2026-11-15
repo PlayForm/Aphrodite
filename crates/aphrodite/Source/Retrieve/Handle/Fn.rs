@@ -156,7 +156,7 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRe
 				StatusCode::BAD_REQUEST,
 				Json(RetrieveResponse {
 					Found:false,
-					Content:Some(Error),
+					Content:Some(format!("{Error:#}")),
 					Source:"ccr".into(),
 					error:None,
 					Truncated:false,

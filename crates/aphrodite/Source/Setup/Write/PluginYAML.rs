@@ -7,12 +7,11 @@
 
 use std::fs;
 
+use anyhow::Context;
+
 use crate::{
 	Configuration::CLI::Setup::Struct::Struct as SetupArgs,
-	Setup::{
-		Run::{Context::Struct as SetupContext, Error::Enum as SetupError},
-		Write::Permissions::Fn as SecurePerms,
-	},
+	Setup::{Run::Context::Struct as SetupContext, Write::Permissions::Fn as SecurePerms},
 };
 
 /// Write `plugin.yaml` into the plugin directory.
@@ -26,9 +25,10 @@ use crate::{
 /// is. Leaving a stale manifest behind means Hermes advertises tools the installed
 /// dylib does not export, and the plugin fails at registration with a missing-tool
 /// error instead of at install with a version mismatch.
-pub(crate) fn Fn(Context:&SetupContext, Args:&SetupArgs) -> Result<(), SetupError> {
+pub(crate) fn Fn(Context:&SetupContext, Args:&SetupArgs) -> anyhow::Result<()> {
 	let path = Context.PluginDirectory.join("plugin.yaml");
-	fs::create_dir_all(&Context.PluginDirectory)?;
+	fs::create_dir_all(&Context.PluginDirectory)
+		.with_context(|| format!("create the plugin directory {}", Context.PluginDirectory.display()))?;
 
 	let YAML = format!(
 		r#"name: aphrodite
@@ -68,7 +68,7 @@ install_message: |
 		CachePort = Args.CachePort,
 	);
 	println!("writing plugin manifest -> {}", path.display());
-	fs::write(&path, &YAML)?;
+	fs::write(&path, &YAML).with_context(|| format!("write the plugin manifest {}", path.display()))?;
 	SecurePerms(&path, 0o644)?;
 	Ok(())
 }

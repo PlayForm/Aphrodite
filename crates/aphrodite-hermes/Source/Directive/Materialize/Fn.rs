@@ -28,22 +28,27 @@ pub(crate) fn Fn(dir:&Path) -> serde_json::Value {
 	let mut skipped:Vec<String> = Vec::new();
 	let mut warnings:Vec<String> = Vec::new();
 
-	if let Err(e) = fs::create_dir_all(dir) {
-		let msg = format!("could not create directives dir {}: {}; nothing materialized", dir.display(), e);
-		warnings.push(msg.clone());
-		eprintln!("aphrodite-hermes: {msg}");
-		return json!({
-			"status": "ok",
-			"dir": dir.to_string_lossy(),
-			"written": written,
-			"skipped": skipped,
-			"warnings": warnings,
-		});
+	match fs::create_dir_all(dir) {
+		Err(e) => {
+			let msg = format!("could not create directives dir {}: {}; nothing materialized", dir.display(), e);
+			warnings.push(msg.clone());
+			eprintln!("aphrodite-hermes: {msg}");
+
+			return json!({
+				"status": "ok",
+				"dir": dir.to_string_lossy(),
+				"written": written,
+				"skipped": skipped,
+				"warnings": warnings,
+			});
+		},
+		Ok(()) => {},
 	}
 
-	for (name, content) in Builtin::Fn::Fn() {
+	Builtin::Fn::Fn().into_iter().for_each(|(name, content)| {
 		let file_name = format!("{name}.md");
 		let dest = dir.join(&file_name);
+
 		match fs::read(&dest) {
 			Ok(existing) if existing == content.as_bytes() => skipped.push(file_name),
 			Ok(_) => {
@@ -67,7 +72,7 @@ pub(crate) fn Fn(dir:&Path) -> serde_json::Value {
 				skipped.push(file_name);
 			},
 		}
-	}
+	});
 
 	written.sort();
 	skipped.sort();

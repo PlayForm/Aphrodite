@@ -11,7 +11,7 @@
 /// afterward win if there's a name collision (axum keeps both; callers add
 /// their own explicit `content-type` after calling this).
 pub(crate) fn Fn(
-	mut Builder:axum::http::response::Builder,
+	Builder:axum::http::response::Builder,
 	UpstreamHeaders:&reqwest::header::HeaderMap,
 ) -> axum::http::response::Builder {
 	const Skip:&[&str] = &[
@@ -21,13 +21,14 @@ pub(crate) fn Fn(
 		"connection",
 		"keep-alive",
 	];
-	for (name, Value) in UpstreamHeaders.iter() {
-		if Skip.contains(&name.as_str()) {
-			continue;
-		}
-		if let Ok(v) = axum::http::HeaderValue::from_bytes(Value.as_bytes()) {
-			Builder = Builder.header(name.as_str(), v);
-		}
-	}
-	Builder
+
+	UpstreamHeaders
+		.iter()
+		.filter(|(name, _)| !Skip.contains(&name.as_str()))
+		.fold(Builder, |Builder, (name, Value)| {
+			match axum::http::HeaderValue::from_bytes(Value.as_bytes()) {
+				Ok(v) => Builder.header(name.as_str(), v),
+				Err(_) => Builder,
+			}
+		})
 }

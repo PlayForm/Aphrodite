@@ -22,26 +22,29 @@ pub(crate) fn Fn(state:&mut AphroditeState, content:&str, hint:&str, center:Opti
 	// exactly what was passed in, including wrapper metadata like
 	// `exit_code`/`error`, and legitimate caller JSON that merely matches a
 	// wrapper shape (e.g. `{"content":"hi","id":42}`) must round-trip intact.
-	let (classify_content, eff_type) = if let Some((c, t)) = Unwrap::Fn::Fn(content) {
-		// ISSUE-11 WS1 (caller-hint-wins): the caller's explicit `type`
-		// hint is intent, the unwrap is a guess - when a non-default hint
-		// is present it must win. For JSON payloads the preview is built
-		// from the FULL content: an unwrap fragment ("ok") produces a
-		// wrong `[text:1L 2B | ok]` that counts the fragment, not the
-		// stored payload, and drops the shape signal entirely.
-		if !hint.is_empty() && hint != "text" {
-			if content.trim_start().starts_with('{') {
-				(content.to_string(), hint.to_string())
-			} else {
-				(c, hint.to_string())
+	let (classify_content, eff_type) = match Unwrap::Fn::Fn(content) {
+		Some((c, t)) => {
+			// ISSUE-11 WS1 (caller-hint-wins): the caller's explicit `type`
+			// hint is intent, the unwrap is a guess - when a non-default hint
+			// is present it must win. For JSON payloads the preview is built
+			// from the FULL content: an unwrap fragment ("ok") produces a
+			// wrong `[text:1L 2B | ok]` that counts the fragment, not the
+			// stored payload, and drops the shape signal entirely.
+			match (!hint.is_empty() && hint != "text", content.trim_start().starts_with('{')) {
+				(true, true) => (content.to_string(), hint.to_string()),
+				(true, false) => (c, hint.to_string()),
+				(false, _) => (c, t),
 			}
-		} else {
-			(c, t)
-		}
-	} else {
-		let detected = aphrodite::Preview::Detect::Type::Fn(content);
-		let ccr_type = if hint.is_empty() || hint == "text" { detected } else { hint.to_string() };
-		(content.to_string(), ccr_type)
+		},
+		None => {
+			let detected = aphrodite::Preview::Detect::Type::Fn(content);
+			let ccr_type = match hint.is_empty() || hint == "text" {
+				true => detected,
+				false => hint.to_string(),
+			};
+
+			(content.to_string(), ccr_type)
+		},
 	};
 
 	let hash = aphrodite::Hook::Hash::Fn::Fn(content);

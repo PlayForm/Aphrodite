@@ -15,43 +15,69 @@ pub fn RegexMatch(Line:&str, Lower:&str, Pattern:&str) -> Option<Vec<String>> {
 	// `Lower` is `line.to_lowercase()` computed once by the caller (per line),
 	// not per pattern, to avoid N allocations per line.
 
-	if Pattern.contains(r"fn\s+(\w+)") {
-		// Rust/Go function: "pub fn name" or "fn name" or "async fn name"
-		if Lower.starts_with("fn ")
+	// Rust/Go function: "pub fn name" or "fn name" or "async fn name"
+	match Pattern.contains(r"fn\s+(\w+)")
+		&& (Lower.starts_with("fn ")
 			|| Lower.starts_with("pub fn ")
 			|| Lower.starts_with("async fn ")
-			|| Lower.starts_with("pub async fn ")
-		{
+			|| Lower.starts_with("pub async fn "))
+	{
+		true => {
 			return Some(vec![Line.to_string()]);
-		}
+		},
+		false => {},
 	}
-	if Pattern.contains(r"struct\s+(\w+)") && (Lower.starts_with("struct ") || Lower.starts_with("pub struct ")) {
-		return Some(vec![Line.to_string()]);
+	match Pattern.contains(r"struct\s+(\w+)") && (Lower.starts_with("struct ") || Lower.starts_with("pub struct ")) {
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
-	if Pattern.contains(r"enum\s+(\w+)") && (Lower.starts_with("enum ") || Lower.starts_with("pub enum ")) {
-		return Some(vec![Line.to_string()]);
+	match Pattern.contains(r"enum\s+(\w+)") && (Lower.starts_with("enum ") || Lower.starts_with("pub enum ")) {
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
-	if Pattern.contains(r"trait\s+(\w+)") && (Lower.starts_with("trait ") || Lower.starts_with("pub trait ")) {
-		return Some(vec![Line.to_string()]);
+	match Pattern.contains(r"trait\s+(\w+)") && (Lower.starts_with("trait ") || Lower.starts_with("pub trait ")) {
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
-	if Pattern.contains(r"impl\b") && (Lower.starts_with("impl ") || Lower.starts_with("impl<")) {
-		return Some(vec![Line.to_string()]);
+	match Pattern.contains(r"impl\b") && (Lower.starts_with("impl ") || Lower.starts_with("impl<")) {
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
-	if Pattern.contains(r"def\s+(\w+)\s*\(") && Lower.starts_with("def ") {
-		return Some(vec![Line.to_string()]);
+	match Pattern.contains(r"def\s+(\w+)\s*\(") && Lower.starts_with("def ") {
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
-	if Pattern.contains(r"class\s+(\w+)") && Lower.starts_with("class ") {
-		return Some(vec![Line.to_string()]);
+	match Pattern.contains(r"class\s+(\w+)") && Lower.starts_with("class ") {
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
-	if Pattern.contains(r"func\s+(\w+)\s*\(") && Lower.starts_with("func ") {
-		return Some(vec![Line.to_string()]);
+	match Pattern.contains(r"func\s+(\w+)\s*\(") && Lower.starts_with("func ") {
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
-	if Pattern.contains(r"function\s+(\w+)")
+	match Pattern.contains(r"function\s+(\w+)")
 		&& (Lower.starts_with("export function ")
 			|| Lower.starts_with("export async function ")
 			|| Lower.starts_with("function "))
 	{
-		return Some(vec![Line.to_string()]);
+		true => {
+			return Some(vec![Line.to_string()]);
+		},
+		false => {},
 	}
 
 	None

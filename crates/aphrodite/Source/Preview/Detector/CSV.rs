@@ -14,12 +14,14 @@ use crate::Preview::Input::Struct::Struct as Input;
 /// real CSV.
 pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
 	let CSVRows:Vec<&str> = Inp.NonEmpty.iter().map(|l| l.trim()).collect();
-	if CSVRows.len() >= 2 && !Inp.raw.contains(", ") {
-		let Counts:Vec<usize> = CSVRows.iter().map(|r| r.split(',').count()).collect();
-		let First = Counts[0];
-		if First >= 2 && Counts.iter().all(|&c| c == First) {
-			return true;
-		}
+
+	match CSVRows.len() >= 2 && !Inp.raw.contains(", ") {
+		true => {
+			let Counts:Vec<usize> = CSVRows.iter().map(|r| r.split(',').count()).collect();
+			let First = Counts[0];
+
+			First >= 2 && Counts.iter().all(|&c| c == First)
+		},
+		false => false,
 	}
-	false
 }

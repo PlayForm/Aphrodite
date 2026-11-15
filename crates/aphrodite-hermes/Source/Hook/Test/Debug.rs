@@ -46,7 +46,10 @@ fn test_debug_file_write_smoke() {
 	let _ = std::fs::remove_file(&path);
 	aphrodite::Debug::Level::Set::Fn::Fn(0);
 	unsafe { std::env::remove_var(HOME_KEY) };
-	if let Some(v) = backup {
-		unsafe { std::env::set_var(HOME_KEY, v) };
+	match backup {
+		Some(v) => {
+			unsafe { std::env::set_var(HOME_KEY, v) };
+		},
+		None => {},
 	}
 }

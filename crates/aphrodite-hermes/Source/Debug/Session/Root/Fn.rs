@@ -21,8 +21,8 @@ pub(crate) fn Fn() -> String {
 		.get_or_init(|| Mutex::new(String::new()))
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	if last.is_empty() {
-		return String::new();
+	match last.is_empty() {
+		true => String::new(),
+		false => Chain::Fn::Fn(&last).last().cloned().unwrap_or_else(|| last.clone()),
 	}
-	Chain::Fn::Fn(&last).last().cloned().unwrap_or_else(|| last.clone())
 }

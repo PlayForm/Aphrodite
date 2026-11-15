@@ -24,14 +24,18 @@ use super::{Cap, Dispatch};
 /// the final, honest representation of the stored payload, so a wrong string here
 /// is a defect even when the stored bytes are intact.
 pub fn Fn(TypeStr:&str, Content:&str) -> String {
-	if let Some(Rendered) = crate::Template::Render::Fn::Fn(TypeStr, Content)
-		&& !Rendered.is_empty()
-	{
-		return Cap::Fn(
-			&Rendered,
-			PreviewMaximumChars.load(std::sync::atomic::Ordering::Relaxed) as usize,
-		);
+	let Rendered = crate::Template::Render::Fn::Fn(TypeStr, Content).filter(|R| !R.is_empty());
+
+	match Rendered {
+		Some(Rendered) => {
+			return Cap::Fn(
+				&Rendered,
+				PreviewMaximumChars.load(std::sync::atomic::Ordering::Relaxed) as usize,
+			);
+		},
+		None => {},
 	}
+
 	let Inp = Input::Struct::Struct::new(Content).unwrap_or_else(|| Input::Struct::Struct::Empty(Content));
 	let Effective = Type::Fn::Fn(TypeStr, &Inp);
 	let Preview = Dispatch::Fn(Effective.as_ref(), &Inp);

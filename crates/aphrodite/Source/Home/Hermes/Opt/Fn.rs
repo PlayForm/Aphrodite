@@ -13,8 +13,12 @@ use crate::Home::{Environment::Path::Fn::Fn as EnvironmentPath, Tilde::Fn::Fn as
 /// with the shim's is exactly the issue-40 failure this module exists to
 /// prevent.
 pub fn Fn() -> Option<PathBuf> {
-	if let Some(h) = EnvironmentPath("HERMES_HOME") {
-		return Some(ExpandTilde(h));
+	match EnvironmentPath("HERMES_HOME") {
+		Some(h) => {
+			return Some(ExpandTilde(h));
+		},
+		None => {},
 	}
+
 	dirs::home_dir().map(|h| h.join(".hermes"))
 }

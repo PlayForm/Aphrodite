@@ -47,9 +47,9 @@ fn TestCheckBgTasksRespects2NudgeCap() {
 	let mut State = AphroditeState::default();
 	State.TurnCounter = 5;
 	// Insert 4 running tasks - only 2 should get nudges.
-	for i in 0..4 {
+	(0..4).for_each(|i| {
 		InsertBgTask(&mut State, format!("t{}", i), "terminal".into(), format!("cmd{}", i), i);
-	}
+	});
 
 	// Count nudges pushed BEFORE check_bg_tasks.
 	let Before = State.EphemeralDirectives.len();

@@ -45,88 +45,128 @@ pub(crate) async fn Fn(State:&AppState, ResponseBody:&[u8], HeadroomBudget:Optio
 		let Message = Choice.get_mut("message")?;
 
 		// Compress text content with smart markers
-		if let Some(ContentValue) = Message.get_mut("content")
-			&& let Some(Content) = ContentValue.as_str()
-		{
-			let Ct = ProxyDetectContentType(Content);
-			let Threshold = (State.ThresholdFor(Ct).max(BaseThreshold) as f64 * BudgetMult) as usize;
-			if Content.len() > Threshold {
-				if let Some(ccr) = &State.ccr {
-					let hash = compute_key(Content.as_bytes());
-					// F4: only replace `Content` with a marker if the content is
-					// actually retrievable under `hash` - either it was already
-					// there (cache hit) or this `Put` succeeded. A failed put
-					// (store full/locked/panicked) must NOT be followed by
-					// swapping the response for an unresolvable marker - that
-					// would permanently destroy content that never reached the
-					// client any other way.
-					let Stored = if CCRGet(ccr, &hash).await.is_some() {
-						State.CCRHits.fetch_add(1, Ordering::Relaxed);
-						true
-					} else {
-						State.CCRMisses.fetch_add(1, Ordering::Relaxed);
-						let Okay = CCRPut(ccr, &hash, Content).await;
-						if Okay {
-							State.CCRCreated.fetch_add(1, Ordering::Relaxed);
-						} else {
-							tracing::error!(hash = %hash, "ccr_put failed - leaving content uncompressed to avoid data loss");
-						}
-						Okay
-					};
-					if Stored {
-						// Auto-expand (pre-Rust port): when enabled and the
-						// just-stored content fits within `AutoExpandLimit`,
-						// return it INLINE instead of emitting a marker - the
-						// response carries the original bytes (still stored
-						// under `hash`, so later retrievals keep working), and
-						// nothing is counted as compressed because nothing was
-						// removed from the wire. Over-limit content falls
-						// through to the marker path below. Default (flag
-						// false) is byte-identical current behavior.
-						if State.AutoExpand.load(Ordering::Relaxed)
-							&& Content.len() <= State.AutoExpandLimit.load(Ordering::Relaxed)
-						{
-							*ContentValue = serde_json::Value::String(Content.to_string());
-							continue;
-						}
-						let (Compressed, OrigLength) = {
-							let Compressed = match State.Mode {
-								ProxyMode::Cache => CacheMarker(&hash, Content, Ct, None),
-								ProxyMode::Token => SmartMarker(&hash, Content, Ct, None),
-							};
-							let len = Content.len();
-							State.RecordCompression(Ct);
-							(Compressed, len)
+		let ContentValue = match Message.get_mut("content") {
+			Some(ContentValue) => ContentValue,
+			None => continue,
+		};
+
+		let Content = match ContentValue.as_str() {
+			Some(Content) => Content,
+			None => continue,
+		};
+
+		let Ct = ProxyDetectContentType(Content);
+		let Threshold = (State.ThresholdFor(Ct).max(BaseThreshold) as f64 * BudgetMult) as usize;
+
+		match () {
+			_ if Content.len() > Threshold => {
+				match &State.ccr {
+					Some(ccr) => {
+						let hash = compute_key(Content.as_bytes());
+						// F4: only replace `Content` with a marker if the content is
+						// actually retrievable under `hash` - either it was already
+						// there (cache hit) or this `Put` succeeded. A failed put
+						// (store full/locked/panicked) must NOT be followed by
+						// swapping the response for an unresolvable marker - that
+						// would permanently destroy content that never reached the
+						// client any other way.
+						let Stored = match CCRGet(ccr, &hash).await.is_some() {
+							true => {
+								State.CCRHits.fetch_add(1, Ordering::Relaxed);
+
+								true
+							},
+							false => {
+								State.CCRMisses.fetch_add(1, Ordering::Relaxed);
+
+								let Okay = CCRPut(ccr, &hash, Content).await;
+
+								match Okay {
+									true => {
+										State.CCRCreated.fetch_add(1, Ordering::Relaxed);
+									},
+									false => {
+										tracing::error!(hash = %hash, "ccr_put failed - leaving content uncompressed to avoid data loss");
+									},
+								}
+
+								Okay
+							},
 						};
-						let MarkerLength = Compressed.len();
-						// Savings = bytes actually removed from the response
-						// (original content minus the rendered marker that
-						// replaces it), not the bare hash length - the marker
-						// is hundreds of chars longer than the 40-char hash,
-						// so subtracting only `hash.len()` overstated savings
-						// (report 05 F5). Unit is bytes throughout - see
-						// `TokensSaved`'s field doc for the naming caveat.
-						State
-							.TokensSaved
-							.fetch_add(OrigLength.saturating_sub(MarkerLength) as u64, Ordering::Relaxed);
-						*ContentValue = serde_json::Value::String(Compressed);
-						DidCompress = true;
-						State.UpdateCompressionRatio(OrigLength, MarkerLength);
-					}
+
+						match Stored {
+							true => {
+								// Auto-expand (pre-Rust port): when enabled and the
+								// just-stored content fits within `AutoExpandLimit`,
+								// return it INLINE instead of emitting a marker - the
+								// response carries the original bytes (still stored
+								// under `hash`, so later retrievals keep working), and
+								// nothing is counted as compressed because nothing was
+								// removed from the wire. Over-limit content falls
+								// through to the marker path below. Default (flag
+								// false) is byte-identical current behavior.
+								match State.AutoExpand.load(Ordering::Relaxed)
+									&& Content.len() <= State.AutoExpandLimit.load(Ordering::Relaxed)
+								{
+									true => {
+										*ContentValue = serde_json::Value::String(Content.to_string());
+										continue;
+									},
+									false => {
+										let (Compressed, OrigLength) = {
+											let Compressed = match State.Mode {
+												ProxyMode::Cache => CacheMarker(&hash, Content, Ct, None),
+												ProxyMode::Token => SmartMarker(&hash, Content, Ct, None),
+											};
+											let len = Content.len();
+											State.RecordCompression(Ct);
+											(Compressed, len)
+										};
+										let MarkerLength = Compressed.len();
+										// Savings = bytes actually removed from the response
+										// (original content minus the rendered marker that
+										// replaces it), not the bare hash length - the marker
+										// is hundreds of chars longer than the 40-char hash,
+										// so subtracting only `hash.len()` overstated savings
+										// (report 05 F5). Unit is bytes throughout - see
+										// `TokensSaved`'s field doc for the naming caveat.
+										State.TokensSaved.fetch_add(
+											OrigLength.saturating_sub(MarkerLength) as u64,
+											Ordering::Relaxed,
+										);
+										*ContentValue = serde_json::Value::String(Compressed);
+										DidCompress = true;
+										State.UpdateCompressionRatio(OrigLength, MarkerLength);
+									},
+								}
+							},
+							false => {},
+						}
+					},
+					None => {},
 				}
-			} else if Content.len() > State.InlineCCRThreshold() {
+			},
+			_ if Content.len() > State.InlineCCRThreshold() => {
 				// Below compression threshold but above inline threshold: store in inline_ccr
 				// so later retrievals can find tiny entries without a backend round-trip.
 				let hash = compute_key(Content.as_bytes());
-				if let Ok(mut Map) = State.InlineCCR.lock() {
-					if Map.contains(&hash) {
-						State.InlineCCRHits.fetch_add(1, Ordering::Relaxed);
-					} else {
-						State.InlineCCRMisses.fetch_add(1, Ordering::Relaxed);
-						Map.put(hash, Content.to_string());
-					}
+
+				match State.InlineCCR.lock() {
+					Ok(mut Map) => {
+						match Map.contains(&hash) {
+							true => {
+								State.InlineCCRHits.fetch_add(1, Ordering::Relaxed);
+							},
+							false => {
+								State.InlineCCRMisses.fetch_add(1, Ordering::Relaxed);
+								Map.put(hash, Content.to_string());
+							},
+						}
+					},
+					Err(_) => {},
 				}
-			}
+			},
+			_ => {},
 		}
 
 		// 02-F3: `tool_calls[].function.arguments` is JSON the CLIENT feeds
@@ -140,7 +180,10 @@ pub(crate) async fn Fn(State:&AppState, ResponseBody:&[u8], HeadroomBudget:Optio
 		// handled above) is a legitimate compression target here.
 	}
 
-	if DidCompress { Some(response) } else { None }
+	match DidCompress {
+		true => Some(response),
+		false => None,
+	}
 }
 
 // ── Tool relay handler ───────────────────────────────────────────────

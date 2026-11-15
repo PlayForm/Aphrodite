@@ -105,9 +105,9 @@ fn TestLiveContainerToolOverThresholdInstantMarkerWithProgress() {
 	);
 	// Container store: meta envelope + per-chunk entries + round-trip hash.
 	assert!(s.InlineStore.contains_key(&LiveMetaKey(hash)), "meta envelope must be stored");
-	for i in 0..Chunks.len() {
+	(0..Chunks.len()).for_each(|i| {
 		assert!(s.InlineStore.contains_key(&LiveChunkKey(hash, i)), "chunk {i} must be stored");
-	}
+	});
 	assert_eq!(crate::Resolve::Expand::Fn(&mut s, hash), Some(Content.clone()));
 	assert!(
 		s.RecentMarkers.iter().any(|m| m.hash == hash && m.CCRType == "live"),

@@ -45,15 +45,11 @@ pub async fn Drain(ShutdownTx:Sender<bool>, Handles:Vec<JoinHandle<()>>) {
 		}
 		_ = &mut DrainTimeout => {
 			tracing::info!("drain timeout (5s) reached, aborting remaining tasks");
-			for h in &AbortHandles {
-				h.abort();
-			}
+			AbortHandles.iter().for_each(|h| h.abort());
 		}
 		_ = &mut SecondSignal => {
 			tracing::info!("force shutdown on second signal, aborting remaining tasks");
-			for h in &AbortHandles {
-				h.abort();
-			}
+			AbortHandles.iter().for_each(|h| h.abort());
 		}
 	}
 }

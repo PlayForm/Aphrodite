@@ -97,9 +97,13 @@ pub async fn Fn(CLI:&CLI, Compression:Option<&CompressionConfiguration>) -> anyh
 			// the token proxy to fail silently at startup while the cache
 			// proxy continues running - a partial-failure that's invisible
 			// to the plugin because stderr is piped to DEVNULL.
-			if let Some(Parent) = DatabasePath.parent() {
-				std::fs::create_dir_all(Parent)
-					.map_err(|e| anyhow::anyhow!("SQLite CCR: cannot create directory {}: {}", Parent.display(), e))?;
+			match DatabasePath.parent() {
+				Some(Parent) => {
+					std::fs::create_dir_all(Parent).map_err(|e| {
+						anyhow::anyhow!("SQLite CCR: cannot create directory {}: {}", Parent.display(), e)
+					})?;
+				},
+				None => {},
 			}
 			let Store = SqliteCcrStore::open_with_limits(
 				&DatabasePath,

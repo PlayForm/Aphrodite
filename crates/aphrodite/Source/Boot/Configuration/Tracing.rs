@@ -16,12 +16,15 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 pub fn Subscribe(LogCompact:bool) -> anyhow::Result<()> {
 	let Filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 	let Subscriber = tracing_subscriber::registry().with(Filter);
-	if LogCompact {
-		Subscriber
-			.with(tracing_subscriber::fmt::layer().compact().with_target(false).without_time())
-			.try_init()?;
-	} else {
-		Subscriber.with(tracing_subscriber::fmt::layer()).try_init()?;
+	match LogCompact {
+		true => {
+			Subscriber
+				.with(tracing_subscriber::fmt::layer().compact().with_target(false).without_time())
+				.try_init()?;
+		},
+		false => {
+			Subscriber.with(tracing_subscriber::fmt::layer()).try_init()?;
+		},
 	}
 	Ok(())
 }

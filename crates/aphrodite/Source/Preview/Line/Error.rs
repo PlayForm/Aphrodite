@@ -35,19 +35,15 @@ pub(crate) fn Fn(Line:&str) -> bool {
 /// enumerated still matches.
 fn ErrorWordBeforeColon(t:&str) -> bool {
 	let bytes = t.as_bytes();
-	let mut Index = 0;
-	while let Some(Rel) = t[Index..].find(':') {
-		let i = Index + Rel;
+
+	t.match_indices(':').any(|(i, _)| {
 		// Walk back over the word run (ASCII alnum + `_`).
-		let mut j = i;
-		while j > 0 && (bytes[j - 1].is_ascii_alphanumeric() || bytes[j - 1] == b'_') {
-			j -= 1;
-		}
+		let j = bytes[..i]
+			.iter()
+			.rposition(|b| !(b.is_ascii_alphanumeric() || *b == b'_'))
+			.map_or(0, |p| p + 1);
 		let Word = &t[j..i];
-		if Word.ends_with("Error") || Word == "Exception" {
-			return true;
-		}
-		Index = i + 1;
-	}
-	false
+
+		Word.ends_with("Error") || Word == "Exception"
+	})
 }

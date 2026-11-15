@@ -23,11 +23,17 @@ pub fn ReduceJSON(Content:&str) -> Option<String> {
 		},
 		serde_json::Value::Array(Arr) => {
 			let mut s = format!("[json_list:{} items]", Arr.len());
-			if let Some(First) = Arr.first()
-				&& let Some(Obj) = First.as_object()
-			{
-				let Keys:Vec<&str> = Obj.keys().map(|k| k.as_str()).take(10).collect();
-				s.push_str(&format!(" schema: {}", Keys.join(", ")));
+			match Arr.first() {
+				Some(First) => {
+					match First.as_object() {
+						Some(Obj) => {
+							let Keys:Vec<&str> = Obj.keys().map(|k| k.as_str()).take(10).collect();
+							s.push_str(&format!(" schema: {}", Keys.join(", ")));
+						},
+						None => {},
+					}
+				},
+				None => {},
 			}
 			s
 		},

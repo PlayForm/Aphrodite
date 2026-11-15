@@ -18,44 +18,45 @@
 /// It is not a parser and it is not a tie-break: the first language whose rule
 /// matches wins, and the order of the rules is the order of precedence.
 pub(crate) fn Fn(Content:&str) -> Option<&'static str> {
-	if Content.lines().count() <= 3 {
-		return None;
+	match () {
+		_ if Content.lines().count() <= 3 => None,
+		// Rust - require fn keyword PLUS one of arrow, borrow, or use to
+		// distinguish from Python/JavaScript that happens to contain "fn ".
+		_ if Content.lines().any(|l| {
+			let t = l.trim_start();
+
+			t.starts_with("fn ")
+				|| t.starts_with("pub fn ")
+				|| t.starts_with("async fn ")
+				|| t.starts_with("pub async fn ")
+				|| t.starts_with("impl ")
+				|| t.starts_with("struct ")
+				|| t.starts_with("pub struct ")
+				|| t.starts_with("enum ")
+				|| t.starts_with("pub enum ")
+		}) && (Content.contains("-> ") || Content.contains('&') || Content.contains("use ")) =>
+		{
+			Some("code_rust")
+		},
+		// Python
+		_ if Content.contains("def ")
+			&& (Content.contains("import ")
+				|| Content.contains("class ")
+				|| Content.contains("from ")
+				|| Content.contains("self.")) =>
+		{
+			Some("code_python")
+		},
+		// Go
+		_ if (Content.contains("func ") || Content.contains("package ")) && Content.contains("import (") => {
+			Some("code_go")
+		},
+		// JS/TS
+		_ if (Content.contains("function ") || Content.contains("const ") || Content.contains("=> "))
+			&& (Content.contains("import ") || Content.contains("export ")) =>
+		{
+			Some("code_js")
+		},
+		_ => None,
 	}
-	// Rust - require fn keyword PLUS one of arrow, borrow, or use to
-	// distinguish from Python/JavaScript that happens to contain "fn ".
-	if Content.lines().any(|l| {
-		let t = l.trim_start();
-		t.starts_with("fn ")
-			|| t.starts_with("pub fn ")
-			|| t.starts_with("async fn ")
-			|| t.starts_with("pub async fn ")
-			|| t.starts_with("impl ")
-			|| t.starts_with("struct ")
-			|| t.starts_with("pub struct ")
-			|| t.starts_with("enum ")
-			|| t.starts_with("pub enum ")
-	}) && (Content.contains("-> ") || Content.contains('&') || Content.contains("use "))
-	{
-		return Some("code_rust");
-	}
-	// Python
-	if Content.contains("def ")
-		&& (Content.contains("import ")
-			|| Content.contains("class ")
-			|| Content.contains("from ")
-			|| Content.contains("self."))
-	{
-		return Some("code_python");
-	}
-	// Go
-	if (Content.contains("func ") || Content.contains("package ")) && Content.contains("import (") {
-		return Some("code_go");
-	}
-	// JS/TS
-	if (Content.contains("function ") || Content.contains("const ") || Content.contains("=> "))
-		&& (Content.contains("import ") || Content.contains("export "))
-	{
-		return Some("code_js");
-	}
-	None
 }

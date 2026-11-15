@@ -30,10 +30,10 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let Cells:Vec<&str> = Header.split('|').map(|c| c.trim()).filter(|c| !c.is_empty()).collect();
 	let Cols = Cells.len();
 	let Shown:Vec<&str> = Cells.iter().take(5).copied().collect();
-	let More = if Cols > Shown.len() {
-		format!(" +{} more", Cols - Shown.len())
-	} else {
-		String::new()
+	let More = match Cols > Shown.len() {
+		true => format!(" +{} more", Cols - Shown.len()),
+		false => String::new(),
 	};
+
 	format!("[table:{} cols {} rows | {}{}]", Cols, Rows.len(), Shown.join(", "), More)
 }

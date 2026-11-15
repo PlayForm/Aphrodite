@@ -11,12 +11,14 @@
 /// always at most `Maximum` bytes and always a valid `&str`, and `s` itself when it
 /// already fits.
 pub(crate) fn Fn(s:&str, Maximum:usize) -> &str {
-	if s.len() <= Maximum {
-		return s;
+	match s.len() <= Maximum {
+		true => {
+			return s;
+		},
+		false => {},
 	}
-	let mut i = Maximum;
-	while !s.is_char_boundary(i) {
-		i -= 1;
-	}
+	// The walk back to the nearest boundary: index 0 is always a boundary, so the
+	// search always terminates.
+	let i = (0..=Maximum).rev().find(|&Boundary| s.is_char_boundary(Boundary)).unwrap_or(0);
 	&s[..i]
 }

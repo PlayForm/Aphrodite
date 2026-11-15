@@ -11,17 +11,22 @@ use crate::Hook::Path::Fn::Fn as ExtractFilePath;
 /// file the agent asked to touch. It returns `None` for every other tool - a
 /// guessed write path would pollute the very signal it feeds.
 pub(crate) fn Fn(ToolName:&str, Args:Option<&serde_json::Value>, Content:&str) -> Option<String> {
-	if !matches!(ToolName, "write_file" | "patch") {
-		return None;
+	match !matches!(ToolName, "write_file" | "patch") {
+		true => {
+			return None;
+		},
+		false => {},
 	}
-	if let Some(v) = Args {
-		for Key in ["path", "file", "file_path", "filename"] {
-			if let Some(p) = v.get(Key).and_then(|x| x.as_str())
-				&& !p.is_empty()
-			{
-				return Some(p.to_string());
-			}
-		}
+	let ArgPath = Args.and_then(|v| {
+		["path", "file", "file_path", "filename"].into_iter().find_map(|Key| {
+			v.get(Key)
+				.and_then(|x| x.as_str())
+				.filter(|p| !p.is_empty())
+				.map(|p| p.to_string())
+		})
+	});
+	match ArgPath {
+		Some(Path) => Some(Path),
+		None => ExtractFilePath(Content, ToolName),
 	}
-	ExtractFilePath(Content, ToolName)
 }

@@ -17,10 +17,10 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("context_engine_pre_llm", |_args| {
 		crate::Session::With::Fn::with_shared(|state| {
 			let context = aphrodite::Flow::TurnContext::Fn::BuildTurnContext(state, None);
-			if context.is_empty() {
-				serde_json::Value::Null
-			} else {
-				serde_json::json!({"context": context})
+
+			match context.is_empty() {
+				true => serde_json::Value::Null,
+				false => serde_json::json!({ "context": context }),
 			}
 		})
 	})

@@ -31,6 +31,6 @@ pub extern "C" fn AphroditeResolve(Handle:*const c_char, hash:*const c_char) -> 
 		}
 	}) {
 		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&e),
+		Err(e) => ToJSONError(&format!("{e:#}")),
 	}
 }

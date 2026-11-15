@@ -30,18 +30,19 @@ fn schema_registry_names_match_tool_registry_keys() {
 		.map(|s| s["name"].as_str().unwrap().to_string())
 		.collect();
 
-	for name in &registry_names {
+	registry_names.iter().for_each(|name| {
 		assert!(
 			schema_names.contains(*name),
 			"tool {name:?} is dispatchable but has no schema in Schema::All::Fn::Fn()"
 		);
-	}
-	for name in &schema_names {
+	});
+
+	schema_names.iter().for_each(|name| {
 		assert!(
 			registry_names.contains(name.as_str()),
 			"schema {name:?} exists but is not dispatchable via tool_registry()"
 		);
-	}
+	});
 }
 
 #[test]

@@ -27,14 +27,14 @@ fn TestProxyAndHookPreviewsAreIdenticalForSemanticShapes() {
 	let CargoTest = "test result: ok. 220 passed; 0 failed; 1 ignored; finished in 0.31s";
 	let Ripgrep = "src/a.rs:12:hit one\nsrc/a.rs:20:hit two\nsrc/b.rs:5:hit three";
 	let Ls = "-rw-r--r-- 1 u g 10 x a.rs\n-rw-r--r-- 1 u g 10 x b.rs\ndrwxr-xr-x 2 u g 64 x sub";
-	for Content in [GitStatus, CargoTest, Ripgrep, Ls] {
+	[GitStatus, CargoTest, Ripgrep, Ls].into_iter().for_each(|Content| {
 		// Classify via the proxy path, build via the single core builder -
 		// the same call `SmartMarker` makes.
 		let Ct = ProxyDetectContentType(Content);
 		let Preview = crate::Preview::Builder::Entry::Fn(Ct, Content);
 		assert!(Preview.starts_with('['), "expected enriched preview, got {Preview}");
 		assert!(Preview.contains(Ct), "preview must be self-describing for ct={Ct}: {Preview}");
-	}
+	});
 }
 
 #[test]

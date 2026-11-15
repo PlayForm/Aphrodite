@@ -53,18 +53,20 @@ pub(crate) const SlowCommandPrefixes:&[&str] = &[
 /// could never be matched back to a poll.
 pub(crate) fn ShouldBackgroundByCommand(command:Option<&str>) -> Option<(String, String)> {
 	let Command = command.unwrap_or("").trim();
-	if Command.is_empty() {
-		return None;
+	match Command.is_empty() {
+		true => {
+			return None;
+		},
+		false => {},
 	}
 
 	let CommandLower = Command.to_lowercase();
-	for Prefix in SlowCommandPrefixes {
-		if CommandLower.starts_with(Prefix) {
+	match SlowCommandPrefixes.iter().any(|Prefix| CommandLower.starts_with(Prefix)) {
+		true => {
 			let TaskID = headroom_core::ccr::compute_key(Command.as_bytes());
 			let Summary = Command.chars().take(60).collect::<String>();
-			return Some((TaskID, Summary));
-		}
+			Some((TaskID, Summary))
+		},
+		false => None,
 	}
-
-	None
 }

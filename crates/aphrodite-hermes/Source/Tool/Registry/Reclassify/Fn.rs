@@ -22,17 +22,26 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 				.collect();
 
 			let mut updated = 0usize;
-			for hash in targets {
-				if let Some(content) = state.InlineStoreGet(&hash) {
-					let detected = aphrodite::Preview::Detect::Type::Fn(&content);
-					let preview = aphrodite::Preview::Builder::Entry::Fn(&detected, &content);
-					if let Some(mk) = state.RecentMarkers.iter_mut().find(|m| m.hash == hash) {
-						mk.CCRType = detected;
-						mk.Preview = preview;
-						updated += 1;
-					}
+
+			targets.into_iter().for_each(|hash| {
+				match state.InlineStoreGet(&hash) {
+					Some(content) => {
+						let detected = aphrodite::Preview::Detect::Type::Fn(&content);
+						let preview = aphrodite::Preview::Builder::Entry::Fn(&detected, &content);
+
+						match state.RecentMarkers.iter_mut().find(|m| m.hash == hash) {
+							Some(mk) => {
+								mk.CCRType = detected;
+								mk.Preview = preview;
+								updated += 1;
+							},
+							None => {},
+						}
+					},
+					None => {},
 				}
-			}
+			});
+
 			serde_json::json!({"status": "ok", "reclassified": updated})
 		})
 	})

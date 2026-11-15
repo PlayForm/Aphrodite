@@ -18,7 +18,7 @@ use std::{path::Path, process::Command};
 /// makes setup exit non-zero. The rule is deliberate - an asset that cannot be
 /// validated must never be installed, and a silently skipped check is
 /// indistinguishable from a passing one at every later step.
-pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path) -> Result<(), String> {
+pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path) -> anyhow::Result<()> {
 	let SumsURL = format!("{ReleaseDirectory}/SHA256SUMS-{Triple}.txt");
 	let SumsText = if cfg!(windows) {
 		Command::new("powershell")
@@ -37,10 +37,10 @@ pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path)
 			// missing file is a HARD REFUSAL, never a skipped check (a
 			// release without its sums cannot be validated, so the
 			// download must not proceed).
-			return Err(format!(
+			anyhow::bail!(
 				"SHA256SUMS-{Triple}.txt not found at {SumsURL} - refusing to install without the mandatory checksum \
 				 list"
-			));
+			);
 		},
 	};
 	let Expected = SumsText.lines().find_map(|Line| {
@@ -53,9 +53,9 @@ pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path)
 		// PR 118488 catalog review: an asset without a sums entry is a HARD
 		// REFUSAL, never a skipped check - an unverifiable asset must not
 		// be installed.
-		return Err(format!(
+		anyhow::bail!(
 			"{AssetName} has no entry in SHA256SUMS-{Triple}.txt - refusing to install an unverifiable asset"
-		));
+		);
 	};
 
 	let HashOutput = if cfg!(windows) {
@@ -78,11 +78,11 @@ pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path)
 				.unwrap_or("")
 				.to_lowercase()
 		},
-		_ => return Err("no shasum/sha256sum/Get-FileHash available to verify checksum".to_string()),
+		_ => anyhow::bail!("no shasum/sha256sum/Get-FileHash available to verify checksum"),
 	};
 
 	if Actual != Expected {
-		return Err(format!("checksum mismatch for {AssetName}: expected {Expected}, got {Actual}"));
+		anyhow::bail!("checksum mismatch for {AssetName}: expected {Expected}, got {Actual}");
 	}
 	println!("  checksum verified");
 	Ok(())

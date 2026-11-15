@@ -12,7 +12,7 @@ use crate::Schema::All;
 /// rather than per tool.
 #[test]
 fn test_all_schemas_are_well_formed() {
-	for s in All::Fn::Fn() {
+	All::Fn::Fn().into_iter().for_each(|s| {
 		let name = s["name"].as_str().expect("name must be a string");
 		assert!(name.starts_with("aphrodite_"), "{name}: unexpected tool name prefix");
 
@@ -21,6 +21,7 @@ fn test_all_schemas_are_well_formed() {
 
 		let params = &s["parameters"];
 		assert_eq!(params["type"], "object", "{name}: parameters.type must be object");
+
 		let props = params["properties"]
 			.as_object()
 			.unwrap_or_else(|| panic!("{name}: parameters.properties must be an object"));
@@ -34,16 +35,16 @@ fn test_all_schemas_are_well_formed() {
 		// anything else is dead weight that strict providers may reject
 		// once `get_definitions` splices the schema into `function`.
 		let top = s.as_object().expect("schema must be an object");
-		for key in top.keys() {
+		top.keys().for_each(|key| {
 			assert!(
 				matches!(key.as_str(), "name" | "description" | "parameters"),
 				"{name}: unsupported top-level schema key {key:?}"
 			);
-		}
+		});
 
 		// Every parameter needs a description - an undocumented parameter is
 		// exactly the hole that makes `tool_describe` useless.
-		for (pname, pschema) in props {
+		props.iter().for_each(|(pname, pschema)| {
 			assert!(
 				pschema.get("type").and_then(|t| t.as_str()).is_some(),
 				"{name}.{pname}: parameter needs a single string `type`"
@@ -55,22 +56,27 @@ fn test_all_schemas_are_well_formed() {
 					.is_some_and(|d| !d.is_empty()),
 				"{name}.{pname}: parameter needs a non-empty description"
 			);
-			if let Some(default) = pschema.get("default") {
-				if let Some(variants) = pschema.get("enum").and_then(|e| e.as_array()) {
+
+			match (pschema.get("default"), pschema.get("enum").and_then(|e| e.as_array())) {
+				(Some(default), Some(variants)) => {
 					assert!(variants.contains(default), "{name}.{pname}: default is not one of enum");
-				}
+				},
+				_ => {},
 			}
-		}
+		});
 
 		// Gemini rejects a `required` entry with no matching property, and
 		// Hermes' sanitizer would silently drop it - catch the drift here.
-		if let Some(required) = params.get("required").and_then(|r| r.as_array()) {
-			for entry in required {
-				let key = entry.as_str().expect("required entries must be strings");
-				assert!(props.contains_key(key), "{name}: required lists unknown property {key:?}");
-			}
+		match params.get("required").and_then(|r| r.as_array()) {
+			Some(required) => {
+				required.iter().for_each(|entry| {
+					let key = entry.as_str().expect("required entries must be strings");
+					assert!(props.contains_key(key), "{name}: required lists unknown property {key:?}");
+				})
+			},
+			None => {},
 		}
-	}
+	});
 }
 
 /// The deferred-catalog listing shows only the first sentence, clipped to
@@ -78,7 +84,7 @@ fn test_all_schemas_are_well_formed() {
 /// truncated with an ellipsis, so the lead sentence has to stand alone.
 #[test]
 fn test_first_sentence_fits_catalog_listing() {
-	for s in All::Fn::Fn() {
+	All::Fn::Fn().into_iter().for_each(|s| {
 		let name = s["name"].as_str().unwrap_or_default();
 		let desc = s["description"].as_str().unwrap_or_default();
 		let first = desc.split(['.', '!', '?', '\n']).next().unwrap_or_default();
@@ -88,5 +94,5 @@ fn test_first_sentence_fits_catalog_listing() {
 			first.chars().count()
 		);
 		assert!(!first.trim().is_empty(), "{name}: first sentence must not be empty");
-	}
+	});
 }

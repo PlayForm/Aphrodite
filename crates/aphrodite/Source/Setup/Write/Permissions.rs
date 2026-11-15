@@ -27,8 +27,7 @@ pub(crate) fn Fn(path:&Path, Mode:u32) -> anyhow::Result<()> {
 			.with_context(|| format!("read the permissions of {}", path.display()))?
 			.permissions();
 		Perms.set_mode(Mode);
-		fs::set_permissions(path, Perms)
-			.with_context(|| format!("set mode {Mode:o} on {}", path.display()))?;
+		fs::set_permissions(path, Perms).with_context(|| format!("set mode {Mode:o} on {}", path.display()))?;
 	}
 	#[cfg(not(unix))]
 	let _ = (path, Mode);

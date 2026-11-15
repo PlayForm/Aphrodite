@@ -24,11 +24,11 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 				.and_then(|v| v.as_object())
 				.map(|Obj| {
 					let Ks:Vec<&str> = Obj.keys().map(|k| k.as_str()).take(8).collect();
-					let More = if Ks.len() < Obj.len() {
-						format!(" +{} more", Obj.len() - Ks.len())
-					} else {
-						String::new()
+					let More = match Ks.len() < Obj.len() {
+						true => format!(" +{} more", Obj.len() - Ks.len()),
+						false => String::new(),
 					};
+
 					format!(" | keys: {}{}", Ks.join(", "), More)
 				})
 				.unwrap_or_default();
@@ -36,11 +36,11 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 		},
 		Ok(JSONValue::Object(Obj)) => {
 			let Ks:Vec<&str> = Obj.keys().map(|k| k.as_str()).take(8).collect();
-			let More = if Ks.len() < Obj.len() {
-				format!(" +{} more", Obj.len() - Ks.len())
-			} else {
-				String::new()
+			let More = match Ks.len() < Obj.len() {
+				true => format!(" +{} more", Obj.len() - Ks.len()),
+				false => String::new(),
 			};
+
 			format!("[json:{}keys {}L | {}{}]", Obj.len(), Inp.Total, Ks.join(", "), More)
 		},
 		_ => {

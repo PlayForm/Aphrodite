@@ -26,24 +26,37 @@ pub fn Route(State:&Arc<AppState>) -> Router<Arc<AppState>> {
 			move |ConnectInfo(Addr):ConnectInfo<SocketAddr>| {
 				let s = s.clone();
 				async move {
-					if !Addr.ip().is_loopback() {
-						return (
-							StatusCode::FORBIDDEN,
-							Json(serde_json::json!({
-								"error": "only loopback clients allowed"
-							})),
-						)
-							.into_response();
+					match Addr.ip().is_loopback() {
+						false => {
+							return (
+								StatusCode::FORBIDDEN,
+								Json(serde_json::json!({
+									"error": "only loopback clients allowed"
+								})),
+							)
+								.into_response();
+						},
+						true => {},
 					}
 					// F19: 60s TTL cache - see `UpstreamHealthCache`'s doc
 					// comment for why an uncached probe here is the same
 					// rate-limit-quota-burning cost class as the health
 					// check this endpoint's sibling `/health` already fixed.
 					const Ttl:std::time::Duration = std::time::Duration::from_secs(60);
-					if let Some((Okay, At)) = *s.UpstreamHealthCache.lock().unwrap_or_else(|e| e.into_inner())
-						&& At.elapsed() < Ttl
-					{
-						return Json(serde_json::json!({"upstream": Okay, "cached": true})).into_response();
+					// The lock guard is dropped before the arms run, so the
+					// cache write below re-locks a free mutex instead of
+					// deadlocking on one held by the scrutinee.
+					let Cached = *s.UpstreamHealthCache.lock().unwrap_or_else(|e| e.into_inner());
+					match Cached {
+						Some((Okay, At)) => {
+							match At.elapsed() < Ttl {
+								true => {
+									return Json(serde_json::json!({"upstream": Okay, "cached": true})).into_response();
+								},
+								false => {},
+							}
+						},
+						None => {},
 					}
 					let Okay = s
 						.Client
@@ -54,8 +67,11 @@ pub fn Route(State:&Arc<AppState>) -> Router<Arc<AppState>> {
 						.await
 						.map(|r| r.status().is_success())
 						.unwrap_or(false);
-					if let Ok(mut Cache) = s.UpstreamHealthCache.lock() {
-						*Cache = Some((Okay, std::time::Instant::now()));
+					match s.UpstreamHealthCache.lock() {
+						Ok(mut Cache) => {
+							*Cache = Some((Okay, std::time::Instant::now()));
+						},
+						Err(_) => {},
 					}
 					Json(serde_json::json!({"upstream": Okay, "cached": false})).into_response()
 				}

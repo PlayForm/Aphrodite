@@ -31,10 +31,9 @@ pub fn watch(ConfigurationPath:&str, Bound:&[Bound]) {
 	// startup, so there was nothing live for it to write into).
 	let WatchPath = {
 		let p = std::path::PathBuf::from(ConfigurationPath);
-		if p.is_relative() {
-			std::env::current_dir().unwrap_or_default().join(&p)
-		} else {
-			p
+		match p.is_relative() {
+			true => std::env::current_dir().unwrap_or_default().join(&p),
+			false => p,
 		}
 	};
 	let WatchPathStr = WatchPath.to_string_lossy().to_string();
@@ -43,11 +42,17 @@ pub fn watch(ConfigurationPath:&str, Bound:&[Bound]) {
 		use notify::{Event, EventKind, RecursiveMode, Watcher};
 		let (Tx, mut Rx) = tokio::sync::mpsc::channel(16);
 		let mut Watcher = match notify::recommended_watcher(move |Res:Result<Event, notify::Error>| {
-			if let Ok(Event) = Res {
-				let IsModify = matches!(Event.kind, EventKind::Modify(_));
-				if IsModify && Event.paths.iter().any(|p| p.to_string_lossy().contains("aphrodite.toml")) {
-					let _ = Tx.try_send(());
-				}
+			match Res {
+				Ok(Event) => {
+					let IsModify = matches!(Event.kind, EventKind::Modify(_));
+					match IsModify && Event.paths.iter().any(|p| p.to_string_lossy().contains("aphrodite.toml")) {
+						true => {
+							let _ = Tx.try_send(());
+						},
+						false => {},
+					}
+				},
+				Err(_) => {},
 			}
 		}) {
 			Ok(w) => w,
@@ -57,42 +62,54 @@ pub fn watch(ConfigurationPath:&str, Bound:&[Bound]) {
 			},
 		};
 		let WatchDirectory = std::path::Path::new(&WatchPath).parent().unwrap_or(std::path::Path::new("."));
-		if let Err(e) = Watcher.watch(WatchDirectory, RecursiveMode::NonRecursive) {
-			tracing::warn!("failed to start config watcher: {e}");
-			return;
+		match Watcher.watch(WatchDirectory, RecursiveMode::NonRecursive) {
+			Err(e) => {
+				tracing::warn!("failed to start config watcher: {e}");
+				return;
+			},
+			Ok(_) => {},
 		}
 		tracing::info!(path = %WatchPathStr, "config file watcher active");
 		loop {
-			if Rx.recv().await.is_some() {
-				// Debounce: wait 500ms for writes to settle
-				tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-				// Drain any additional events accumulated during debounce
-				while Rx.try_recv().is_ok() {}
-				match MultiConfiguration::Load(&WatchPathStr) {
-					Ok(Configuration) => {
-						let Thresholds = Proxy::Threshold::Resolve::Fn::Fn(Configuration.Compression.as_ref());
-						for State in &StatesForWatcher {
-							State.CacheCompressThreshold.store(Thresholds.Cache, Ordering::Relaxed);
-							State.TokenCompressThreshold.store(Thresholds.Token, Ordering::Relaxed);
-							State.InlineCCRThreshold.store(Thresholds.inline, Ordering::Relaxed);
-							State
-								.CodeMultiplierX100
-								.store((Thresholds.CodeMultiplier * 100.0) as u64, Ordering::Relaxed);
+			let Received = Rx.recv().await.is_some();
+			match Received {
+				true => {
+					// Debounce: wait 500ms for writes to settle
+					tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+					// Drain any additional events accumulated during debounce
+					loop {
+						match Rx.try_recv().is_ok() {
+							true => {},
+							false => break,
 						}
-						tracing::info!(
-							path = %WatchPathStr,
-							CacheThreshold = Thresholds.Cache,
-							TokenThreshold = Thresholds.Token,
-							InlineThreshold = Thresholds.inline,
-							CodeMultiplier = Thresholds.CodeMultiplier,
-							Listeners = StatesForWatcher.len(),
-							"config reloaded - compression thresholds applied to all live listeners"
-						);
-					},
-					Err(e) => {
-						tracing::warn!(error = %e, "failed to reload config on file change");
-					},
-				}
+					}
+					match MultiConfiguration::Load(&WatchPathStr) {
+						Ok(Configuration) => {
+							let Thresholds = Proxy::Threshold::Resolve::Fn::Fn(Configuration.Compression.as_ref());
+							StatesForWatcher.iter().for_each(|State| {
+								State.CacheCompressThreshold.store(Thresholds.Cache, Ordering::Relaxed);
+								State.TokenCompressThreshold.store(Thresholds.Token, Ordering::Relaxed);
+								State.InlineCCRThreshold.store(Thresholds.inline, Ordering::Relaxed);
+								State
+									.CodeMultiplierX100
+									.store((Thresholds.CodeMultiplier * 100.0) as u64, Ordering::Relaxed);
+							});
+							tracing::info!(
+								path = %WatchPathStr,
+								CacheThreshold = Thresholds.Cache,
+								TokenThreshold = Thresholds.Token,
+								InlineThreshold = Thresholds.inline,
+								CodeMultiplier = Thresholds.CodeMultiplier,
+								Listeners = StatesForWatcher.len(),
+								"config reloaded - compression thresholds applied to all live listeners"
+							);
+						},
+						Err(e) => {
+							tracing::warn!(error = %e, "failed to reload config on file change");
+						},
+					}
+				},
+				false => {},
 			}
 		}
 	});

@@ -45,6 +45,6 @@ pub extern "C" fn AphroditeConfigurationSet(
 		serde_json::json!({"status":"ok"})
 	}) {
 		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&e),
+		Err(e) => ToJSONError(&format!("{e:#}")),
 	}
 }

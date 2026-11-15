@@ -17,7 +17,7 @@ fn TestDetectTypeNeverPanicsOnInteriorNul() {
 fn TestBuildPreviewNeverPanicsOnInteriorNulAcrossTypeBranches() {
 	let _G = CapGuard();
 	let Content = "line one\0line two\0\0error: boom\nwarning: also this";
-	for ty in [
+	[
 		"build",
 		"diff",
 		"code_rust",
@@ -30,9 +30,11 @@ fn TestBuildPreviewNeverPanicsOnInteriorNulAcrossTypeBranches() {
 		"json_list",
 		"terminal",
 		"text",
-	] {
+	]
+	.into_iter()
+	.for_each(|ty| {
 		let _ = crate::Preview::Builder::Entry::Fn(ty, Content); // must not panic for any branch
-	}
+	});
 }
 
 #[test]
@@ -54,7 +56,7 @@ fn TestBuildPreviewCodeRustTruncatesSignatureOnCharBoundary() {
 fn TestBuildPreviewNeverPanicsOnMultibyteUtf8EveryType() {
 	let _G = CapGuard();
 	let Content = "a\u{00e9}\u{4e2d}\u{1f600}b".repeat(30);
-	for ty in [
+	[
 		"build",
 		"diff",
 		"code_rust",
@@ -67,9 +69,11 @@ fn TestBuildPreviewNeverPanicsOnMultibyteUtf8EveryType() {
 		"json_list",
 		"terminal",
 		"text",
-	] {
+	]
+	.into_iter()
+	.for_each(|ty| {
 		let _ = crate::Preview::Builder::Entry::Fn(ty, &Content);
-	}
+	});
 }
 
 #[test]
@@ -80,7 +84,7 @@ fn TestBuildPreviewHandlesLiteralMarkerShapedContent() {
 	// panic in any branch - build_preview only ever summarizes, it never
 	// re-parses content as a marker.
 	let Content = "before <<<CCR:fake000|text|1>>> after\nerror: boom";
-	for ty in [
+	[
 		"build",
 		"diff",
 		"code_rust",
@@ -93,10 +97,13 @@ fn TestBuildPreviewHandlesLiteralMarkerShapedContent() {
 		"json_list",
 		"terminal",
 		"text",
-	] {
+	]
+	.into_iter()
+	.for_each(|ty| {
 		let Out = crate::Preview::Builder::Entry::Fn(ty, Content);
+
 		assert!(!Out.is_empty());
-	}
+	});
 }
 
 #[test]
@@ -110,10 +117,10 @@ fn TestDetectTypeNeverPanicsOnMultibyteUtf8() {
 fn TestNewArmsNeverPanicOnPathologicalInput() {
 	let Multibyte = "a\u{00e9}\u{4e2d}\u{1f600}".repeat(20);
 	let Inputs = ["", "\0\0\0", Multibyte.as_str()];
-	for ty in ["git", "gitlog", "ls", "test", "grep"] {
-		for c in Inputs {
+	["git", "gitlog", "ls", "test", "grep"].into_iter().for_each(|ty| {
+		Inputs.into_iter().for_each(|c| {
 			let _ = crate::Preview::Builder::Entry::Fn(ty, c);
 			let _ = crate::Preview::Detect::SemanticType::Fn(c);
-		}
-	}
+		});
+	});
 }

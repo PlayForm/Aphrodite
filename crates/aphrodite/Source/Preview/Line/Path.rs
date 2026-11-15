@@ -12,8 +12,13 @@
 /// text the tool produced, not the disk.
 pub(crate) fn Fn(Line:&str) -> bool {
 	let t = Line.trim();
-	if t.is_empty() || t.contains(char::is_whitespace) {
-		return false;
+
+	match t.is_empty() || t.contains(char::is_whitespace) {
+		true => {
+			return false;
+		},
+		false => {},
 	}
+
 	t.contains('/') || (t.rfind('.').map(|i| i > 0 && i < t.len() - 1).unwrap_or(false))
 }

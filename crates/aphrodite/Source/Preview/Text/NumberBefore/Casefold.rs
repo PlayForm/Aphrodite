@@ -11,20 +11,21 @@
 pub(crate) fn Fn(Line:&str, Keyword:&str) -> usize {
 	let bytes = Line.as_bytes();
 	let k = Keyword.as_bytes();
-	let mut i = 0;
-	while i + k.len() <= bytes.len() {
-		let Matches = bytes[i..i + k.len()]
-			.iter()
-			.zip(k.iter())
-			.all(|(b, &Kb)| b.eq_ignore_ascii_case(&Kb));
-		if Matches {
-			let mut j = i;
-			while j > 0 && bytes[j - 1].is_ascii_digit() {
-				j -= 1;
-			}
-			return Line[j..i].parse().unwrap_or(0);
-		}
-		i += 1;
+	let Hit = bytes.len().checked_sub(k.len()).and_then(|Last| {
+		(0..=Last).find(|&i| {
+			bytes[i..i + k.len()]
+				.iter()
+				.zip(k.iter())
+				.all(|(b, &Kb)| b.eq_ignore_ascii_case(&Kb))
+		})
+	});
+
+	match Hit {
+		Some(i) => {
+			let j = bytes[..i].iter().rposition(|b| !b.is_ascii_digit()).map_or(0, |p| p + 1);
+
+			Line[j..i].parse().unwrap_or(0)
+		},
+		None => 0,
 	}
-	0
 }

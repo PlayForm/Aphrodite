@@ -17,25 +17,20 @@ use crate::Preview::Input::Struct::Struct as Input;
 /// a floor, not a census.
 pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let St = crate::StructExtract::Extract::Fn(Inp.raw, "");
-	let mut Parts:Vec<String> = Vec::new();
-	for (Key, Label) in [
+	let Parts:Vec<String> = [
 		("fns", "fns"),
 		("structs", "structs"),
 		("traits", "traits"),
 		("impls", "impls"),
 		("classes", "classes"),
 		("types", "types"),
-	] {
-		if let Some(v) = St.get(Key)
-			&& !v.is_empty()
-		{
-			Parts.push(format!("{}{}", v.len(), Label));
-		}
-	}
-	let Summary = if Parts.is_empty() {
-		format!("{}fns", Inp.raw.matches("fn ").count() + Inp.raw.matches("def ").count())
-	} else {
-		Parts.join("|")
+	]
+	.into_iter()
+	.filter_map(|(Key, Label)| St.get(Key).filter(|v| !v.is_empty()).map(|v| format!("{}{}", v.len(), Label)))
+	.collect();
+	let Summary = match Parts.is_empty() {
+		true => format!("{}fns", Inp.raw.matches("fn ").count() + Inp.raw.matches("def ").count()),
+		false => Parts.join("|"),
 	};
 	let Sig = St
 		.get("fns")

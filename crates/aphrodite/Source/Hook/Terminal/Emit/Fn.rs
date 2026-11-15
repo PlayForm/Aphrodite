@@ -42,7 +42,10 @@ pub(crate) fn Fn(
 	// return the RESOLVED content inline instead of the marker so no
 	// `<<<CCR:...>>>` reaches the model. Over the limit or disabled, the
 	// payload below is byte-identical to the pre-auto-expand shape.
-	let Expanded = if DoAutoExpand { Some(Content::Fn::Fn(State, &hash, Content)) } else { None };
+	let Expanded = match DoAutoExpand {
+		true => Some(Content::Fn::Fn(State, &hash, Content)),
+		false => None,
+	};
 	// DEV-ONLY debug metrics (crate::debug): count the compress decision.
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Compressions);
 	let mut Payload = serde_json::json!({
@@ -54,10 +57,13 @@ pub(crate) fn Fn(
 		"preview": Preview,
 		"marker": Marker,
 	});
-	if let Some(Expanded) = Expanded {
-		Payload["auto_expanded"] = serde_json::Value::Bool(true);
-		Payload["expanded"] = serde_json::Value::String(Expanded);
-		crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::AutoExpansions);
+	match Expanded {
+		Some(Expanded) => {
+			Payload["auto_expanded"] = serde_json::Value::Bool(true);
+			Payload["expanded"] = serde_json::Value::String(Expanded);
+			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::AutoExpansions);
+		},
+		None => {},
 	}
 	Payload
 }

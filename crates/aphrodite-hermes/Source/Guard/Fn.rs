@@ -16,13 +16,14 @@ use std::{
 /// contract). Every caller in this crate passes pointers received directly
 /// from Hermes's C ABI call, which are expected to uphold that contract.
 pub(crate) unsafe fn cstr_to_string(ptr:*const c_char) -> String {
-	if ptr.is_null() {
-		String::new()
-	} else {
-		// SAFETY: `ptr` is non-null here, and per the safety contract of this
-		// function it points to a valid, NUL-terminated C string that stays
-		// valid for the duration of this call.
-		unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned()
+	match ptr.is_null() {
+		true => String::new(),
+		false => {
+			// SAFETY: `ptr` is non-null here, and per the safety contract of this
+			// function it points to a valid, NUL-terminated C string that stays
+			// valid for the duration of this call.
+			unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned()
+		},
 	}
 }
 

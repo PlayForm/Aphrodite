@@ -24,18 +24,24 @@ use crate::{
 /// telemetry/metrics ONLY and must never be returned to the LLM - it
 /// announces the mechanism.
 pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, DoAutoExpand:bool) -> Option<serde_json::Value> {
-	if !(State.ChainSplitEnabled && !DoAutoExpand && Content.contains(SegMarker)) {
-		return None;
+	match !(State.ChainSplitEnabled && !DoAutoExpand && Content.contains(SegMarker)) {
+		true => {
+			return None;
+		},
+		false => {},
 	}
 	let Parts = SplitMarkedOutput(Content);
-	if Parts.len() < 2 {
-		return None;
+	match Parts.len() < 2 {
+		true => {
+			return None;
+		},
+		false => {},
 	}
 	let mut Segments = Vec::with_capacity(Parts.len());
 	let mut TotalOrig = 0usize;
 	let mut TotalMarker = 0usize;
 	let mut SegHashes = Vec::with_capacity(Parts.len());
-	for (Index, SegText) in &Parts {
+	Parts.iter().for_each(|(Index, SegText)| {
 		TotalOrig += SegText.len();
 		let Ct = headroom_core::transforms::content_detector::detect_content_type(SegText).content_type;
 		let TypeStr = Ct.as_str().to_string();
@@ -51,11 +57,17 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, DoAutoExpand:bool) -> 
 		// message, so skip the hint there (no duplication). The hint
 		// is merged INSIDE the preview's brackets: `[text:2L 63B |
 		// scanning... ⚠ grep: ...]`, never appended after the `]`.
-		if !Preview.contains("error[")
-			&& let Some(Hint) = SegmentErrorHint(SegText)
-		{
-			let Inner = Preview.trim_end_matches(']');
-			Preview = format!("{} ⚠ {}]", Inner, Hint);
+		match !Preview.contains("error[") {
+			true => {
+				match SegmentErrorHint(SegText) {
+					Some(Hint) => {
+						let Inner = Preview.trim_end_matches(']');
+						Preview = format!("{} ⚠ {}]", Inner, Hint);
+					},
+					None => {},
+				}
+			},
+			false => {},
 		}
 		let Marker = CCRMarker(&SegHash, &TypeStr, SegText.len(), &Preview, None, None, None);
 		TotalMarker += Marker.len();
@@ -76,7 +88,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, DoAutoExpand:bool) -> 
 			"preview": Preview,
 			"marker": Marker,
 		}));
-	}
+	});
 	// Tier 1 teaching loop: record the split event so segment
 	// retrievals can be attributed and the split threshold adapted.
 	State.RecordChainSplit(SegHashes);

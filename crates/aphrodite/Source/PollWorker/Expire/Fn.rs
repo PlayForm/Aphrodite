@@ -16,11 +16,14 @@ use crate::{
 /// Called from `PostLLMCall` after turn advancement.
 pub fn ExpireStaleTasks(State:&mut AphroditeState) {
 	let Turn = State.TurnCounter;
-	for task in State.BgTasks.iter_mut() {
-		if task.Status == BgStatus::Running && Turn.saturating_sub(task.LastPollTurn) > StaleTurnAge {
-			task.Status = BgStatus::Stale;
+	State.BgTasks.iter_mut().for_each(|task| {
+		match task.Status == BgStatus::Running && Turn.saturating_sub(task.LastPollTurn) > StaleTurnAge {
+			true => {
+				task.Status = BgStatus::Stale;
+			},
+			false => {},
 		}
-	}
+	});
 
 	// Drop completed/failed/stale tasks older than 16 turns.
 	State.BgTasks.retain(|task| {

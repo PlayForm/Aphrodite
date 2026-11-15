@@ -88,7 +88,7 @@ fn TestMultipleRapidPollsAccumulateOutput() {
 	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "long-running".into(), 1);
 
 	// Rapid successive polls - each should accumulate.
-	for i in 0..5 {
+	(0..5).for_each(|i| {
 		let PollJSON = serde_json::json!({
 			"output": format!("line {}", i),
 			"exit_code": serde_json::Value::Null,
@@ -96,7 +96,7 @@ fn TestMultipleRapidPollsAccumulateOutput() {
 		.to_string();
 		let Consumed = UpdateFromPoll(&mut State, "process", &PollJSON);
 		assert!(Consumed, "poll {} should be consumed", i);
-	}
+	});
 
 	assert_eq!(State.BgTasks[0].PollCount, 5);
 	assert!(State.BgTasks[0].AccumulatedOutput.contains("line 0"));
@@ -150,14 +150,14 @@ fn TestAccumulatedOutputCappedAt256kb() {
 
 	// Push 300KB of output across multiple polls.
 	let Chunk = "x".repeat(65536); // 64KB
-	for _ in 0..5 {
+	(0..5).for_each(|_| {
 		let Poll = serde_json::json!({
 			"output": Chunk.clone(),
 			"exit_code": serde_json::Value::Null,
 		})
 		.to_string();
 		UpdateFromPoll(&mut State, "process", &Poll);
-	}
+	});
 
 	// Should be capped at ~256KB (256 * 1024).
 	assert!(

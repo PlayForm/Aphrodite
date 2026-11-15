@@ -7,10 +7,9 @@
 
 use std::fs;
 
-use crate::Setup::{
-	Run::{Context::Struct as SetupContext, Error::Enum as SetupError},
-	Write::Permissions::Fn as SecurePerms,
-};
+use anyhow::Context;
+
+use crate::Setup::{Run::Context::Struct as SetupContext, Write::Permissions::Fn as SecurePerms};
 
 /// Write `BINARY_VERSION` into the runtime home.
 ///
@@ -22,10 +21,11 @@ use crate::Setup::{
 /// version handshake at plugin start. Writing it into the plugin directory instead
 /// of the runtime home puts runtime data in a Hermes-owned directory and breaks
 /// the catalog-install boundary.
-pub(crate) fn Fn(Context:&SetupContext) -> Result<(), SetupError> {
+pub(crate) fn Fn(Context:&SetupContext) -> anyhow::Result<()> {
 	let path = Context.AphroditeDirectory.join("BINARY_VERSION");
 	println!("writing BINARY_VERSION -> {}", path.display());
-	fs::write(&path, format!("{}\n", env!("CARGO_PKG_VERSION")))?;
+	fs::write(&path, format!("{}\n", env!("CARGO_PKG_VERSION")))
+		.with_context(|| format!("write the version pin {}", path.display()))?;
 	SecurePerms(&path, 0o644)?;
 	Ok(())
 }

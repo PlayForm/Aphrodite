@@ -12,13 +12,25 @@ use std::path::PathBuf;
 /// process cannot write.
 pub(crate) fn Fn(p:PathBuf) -> PathBuf {
 	let s = p.to_string_lossy();
-	if s == "~" {
-		return dirs::home_dir().unwrap_or(p);
+
+	match s == "~" {
+		true => {
+			return dirs::home_dir().unwrap_or(p);
+		},
+		false => {},
 	}
-	if let Some(Rest) = s.strip_prefix("~/")
-		&& let Some(Home) = dirs::home_dir()
-	{
-		return Home.join(Rest);
+
+	match s.strip_prefix("~/") {
+		Some(Rest) => {
+			match dirs::home_dir() {
+				Some(Home) => {
+					return Home.join(Rest);
+				},
+				None => {},
+			}
+		},
+		None => {},
 	}
+
 	p
 }

@@ -9,10 +9,8 @@
 pub(crate) fn Fn(bytes:&[u8]) -> u64 {
 	const FnvOffset:u64 = 14695981039346656037;
 	const FnvPrime:u64 = 1099511628211;
-	let mut hash = FnvOffset;
-	for &b in bytes {
-		hash ^= b as u64;
-		hash = hash.wrapping_mul(FnvPrime);
-	}
-	hash
+
+	bytes
+		.iter()
+		.fold(FnvOffset, |hash, &b| (hash ^ b as u64).wrapping_mul(FnvPrime))
 }

@@ -32,7 +32,11 @@ pub(crate) const DEFAULT_SESSION:&str = "default";
 /// Returns an owned `Arc` clone so the registry lock is dropped before the
 /// caller contends on the session's state mutex.
 pub(crate) fn session_state(sid:&str) -> Arc<Mutex<AphroditeState>> {
-	let key = if sid.is_empty() { DEFAULT_SESSION } else { sid };
+	let key = match sid {
+		"" => DEFAULT_SESSION,
+		sid => sid,
+	};
+
 	let mut map = SESSIONS
 		.get_or_init(|| Mutex::new(HashMap::new()))
 		.lock()

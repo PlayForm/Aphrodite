@@ -30,17 +30,21 @@ pub(crate) fn Fn(Content:&str) -> usize {
 
 	let bytes = Content.as_bytes();
 	let Sample = if bytes.len() <= 4096 { bytes } else { &bytes[..4096] };
-	if Sample.len() < 3 {
-		// Too short for trigrams - just return a minimal size so the
-		// ratio is reasonable but not inflated.
-		return Sample.len().max(40);
+	match Sample.len() < 3 {
+		true => {
+			// Too short for trigrams - just return a minimal size so the
+			// ratio is reasonable but not inflated.
+			return Sample.len().max(40);
+		},
+		false => {},
 	}
 
 	// Collect unique 3-byte trigrams.
 	let mut Trigrams:HashSet<[u8; 3]> = HashSet::with_capacity(Sample.len().min(4096));
-	for Window in Sample.windows(3) {
+
+	Sample.windows(3).for_each(|Window| {
 		Trigrams.insert([Window[0], Window[1], Window[2]]);
-	}
+	});
 
 	let Unique = Trigrams.len().max(1);
 	let Total = Sample.len().saturating_sub(2).max(1);

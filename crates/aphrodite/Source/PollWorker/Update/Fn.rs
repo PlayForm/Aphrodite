@@ -20,8 +20,11 @@ use crate::{
 /// Returns `true` if the poll result was consumed (matched a bg task),
 /// `false` if it should pass through to normal compression.
 pub fn UpdateFromPoll(State:&mut AphroditeState, ToolName:&str, Content:&str) -> bool {
-	if ToolName != "process" {
-		return false;
+	match ToolName != "process" {
+		true => {
+			return false;
+		},
+		false => {},
 	}
 
 	// Try to parse the poll result as JSON (Hermes wraps it).
@@ -48,51 +51,58 @@ pub fn UpdateFromPoll(State:&mut AphroditeState, ToolName:&str, Content:&str) ->
 	let mut Matched = false;
 
 	// Phase 1: update task metadata and accumulate output (borrowing bg_tasks).
-	for task in State.BgTasks.iter_mut() {
-		if task.Status != BgStatus::Running {
-			continue;
-		}
+	State
+		.BgTasks
+		.iter_mut()
+		.filter(|task| task.Status == BgStatus::Running)
+		.for_each(|task| {
+			task.LastPollTurn = State.TurnCounter;
+			task.PollCount += 1;
 
-		task.LastPollTurn = State.TurnCounter;
-		task.PollCount += 1;
-
-		// Accumulate output (cap at 256KB to avoid unbounded growth).
-		if task.AccumulatedOutput.len() < 256 * 1024 {
-			if !task.AccumulatedOutput.is_empty() {
-				task.AccumulatedOutput.push('\n');
+			// Accumulate output (cap at 256KB to avoid unbounded growth).
+			match task.AccumulatedOutput.len() < 256 * 1024 {
+				true => {
+					match !task.AccumulatedOutput.is_empty() {
+						true => {
+							task.AccumulatedOutput.push('\n');
+						},
+						false => {},
+					}
+					task.AccumulatedOutput.push_str(Output);
+				},
+				false => {},
 			}
-			task.AccumulatedOutput.push_str(Output);
-		}
 
-		// Live-container progress (pre-Rust `_hooks/live.py` container
-		// semantics): bytes-so-far is the accumulated output; while still
-		// running, the ETA is the elapsed-so-far heuristic (no output
-		// total is known for a backgrounded command).
-		task.LiveBytesArrived = task.AccumulatedOutput.len();
-		let Elapsed = crate::Prefetch::Clock::Fn::UnixNow().saturating_sub(task.LiveArrivedAtUnix) as f32;
-		task.LiveEtaS = Elapsed;
+			// Live-container progress (pre-Rust `_hooks/live.py` container
+			// semantics): bytes-so-far is the accumulated output; while still
+			// running, the ETA is the elapsed-so-far heuristic (no output
+			// total is known for a backgrounded command).
+			task.LiveBytesArrived = task.AccumulatedOutput.len();
+			let Elapsed = crate::Prefetch::Clock::Fn::UnixNow().saturating_sub(task.LiveArrivedAtUnix) as f32;
+			task.LiveEtaS = Elapsed;
 
-		Matched = true;
-	}
+			Matched = true;
+		});
 
-	if !Matched {
-		return false;
+	match !Matched {
+		true => {
+			return false;
+		},
+		false => {},
 	}
 
 	// Phase 2: check for completions and record CCR markers.
 	// Run AFTER the iter_mut() loop to avoid double-borrowing `State`.
 	// Collect task indices that need completion recording.
-	let mut Completions:Vec<(usize, i32, String)> = Vec::new(); // (idx, exit_code, accumulated_output)
-	for (i, task) in State.BgTasks.iter().enumerate() {
-		if task.Status != BgStatus::Running {
-			continue;
-		}
-		if let Some(Ec) = EffectiveExit {
-			Completions.push((i, Ec, task.AccumulatedOutput.clone()));
-		}
-	}
+	let Completions:Vec<(usize, i32, String)> = State
+		.BgTasks
+		.iter()
+		.enumerate()
+		.filter(|(_, task)| task.Status == BgStatus::Running)
+		.filter_map(|(i, task)| EffectiveExit.map(|Ec| (i, Ec, task.AccumulatedOutput.clone())))
+		.collect(); // (idx, exit_code, accumulated_output)
 
-	for (i, ExitCodeValue, AccOutput) in Completions {
+	Completions.into_iter().for_each(|(i, ExitCodeValue, AccOutput)| {
 		let hash = headroom_core::ccr::compute_key(AccOutput.as_bytes());
 		let Preview = crate::Preview::Builder::Entry::Fn("terminal", &AccOutput);
 		State.InlineStorePut(hash.clone(), AccOutput);
@@ -126,7 +136,7 @@ pub fn UpdateFromPoll(State:&mut AphroditeState, ToolName:&str, Content:&str) ->
 			Center:Some(format!("poll:{}", command)),
 			meta:None,
 		});
-	}
+	});
 
 	true
 }

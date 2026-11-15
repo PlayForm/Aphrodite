@@ -22,26 +22,35 @@ use super::Format::Signature::Fn as Signature;
 /// stored here are already cut to the signature cap.
 pub(super) fn Fn(Content:&str, Result:&mut HashMap<String, Vec<String>>, Budget:&mut isize) {
 	let mut Fns:Vec<String> = Vec::new();
-	for Line in Content.lines() {
-		if *Budget <= 0 {
-			break;
+	// `Err(())` is the spent-budget sentinel: it stops the scan exactly where the
+	// `break` did, and the result is discarded because the budget, not the walk,
+	// is the outcome.
+	let _ = Content.lines().try_for_each(|Line| -> Result<(), ()> {
+		match *Budget <= 0 {
+			true => {
+				return Err(());
+			},
+			false => {},
 		}
 		let Trimmed = Line.trim();
 		// function name(...) or export function name(...) or async function name(...)
-		if Trimmed.starts_with("function ")
+		match Trimmed.starts_with("function ")
 			|| Trimmed.starts_with("export function ")
 			|| Trimmed.starts_with("async function ")
 			|| Trimmed.starts_with("export async function ")
 		{
-			let After = Trimmed
-				.trim_start_matches("export ")
-				.trim_start_matches("async ")
-				.trim_start_matches("function ");
-			let name = After.split('(').next().unwrap_or("?").trim();
-			let s = Signature("function", name);
-			let Slen = s.len();
-			Fns.push(s);
-			*Budget -= Slen as isize + 1;
+			true => {
+				let After = Trimmed
+					.trim_start_matches("export ")
+					.trim_start_matches("async ")
+					.trim_start_matches("function ");
+				let name = After.split('(').next().unwrap_or("?").trim();
+				let s = Signature("function", name);
+				let Slen = s.len();
+				Fns.push(s);
+				*Budget -= Slen as isize + 1;
+			},
+			false => {},
 		}
 		// Arrow functions: const name = (...) => { ... }
 		//
@@ -56,49 +65,77 @@ pub(super) fn Fn(Content:&str, Result:&mut HashMap<String, Vec<String>>, Budget:
 		// trailing `// ...` after real code) would still miss this exact
 		// case, since the line as a whole does not start with `//`.
 		let CodePart = Trimmed.split("//").next().unwrap_or(Trimmed);
-		if !CodePart.trim().is_empty()
-			&& let Some((BeforeEq, AfterEq)) = CodePart.split_once('=')
-		{
-			let BeforeEq = BeforeEq.trim();
-			if AfterEq.contains("=>")
-				&& (BeforeEq.starts_with("const ") || BeforeEq.starts_with("let ") || BeforeEq.starts_with("var "))
-			{
-				let name = BeforeEq
-					.trim_start_matches("const ")
-					.trim_start_matches("let ")
-					.trim_start_matches("var ")
-					.trim();
-				if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-					let s = Signature("=>", name);
-					let Slen = s.len();
-					Fns.push(s);
-					*Budget -= Slen as isize + 1;
+		let Split = match CodePart.trim().is_empty() {
+			true => None,
+			false => CodePart.split_once('='),
+		};
+		match Split {
+			Some((BeforeEq, AfterEq)) => {
+				let BeforeEq = BeforeEq.trim();
+				match AfterEq.contains("=>")
+					&& (BeforeEq.starts_with("const ") || BeforeEq.starts_with("let ") || BeforeEq.starts_with("var "))
+				{
+					true => {
+						let name = BeforeEq
+							.trim_start_matches("const ")
+							.trim_start_matches("let ")
+							.trim_start_matches("var ")
+							.trim();
+						match !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+							true => {
+								let s = Signature("=>", name);
+								let Slen = s.len();
+								Fns.push(s);
+								*Budget -= Slen as isize + 1;
+							},
+							false => {},
+						}
+					},
+					false => {},
 				}
-			}
+			},
+			None => {},
 		}
+		Ok(())
+	});
+	match Fns.is_empty() {
+		false => {
+			Result.insert("fns".into(), Fns);
+		},
+		true => {},
 	}
-	if !Fns.is_empty() {
-		Result.insert("fns".into(), Fns);
-	}
-	if *Budget <= 0 {
-		return;
+	match *Budget <= 0 {
+		true => {
+			return;
+		},
+		false => {},
 	}
 
 	let mut Classes:Vec<String> = Vec::new();
-	for Line in Content.lines() {
-		if *Budget <= 0 {
-			break;
+	let _ = Content.lines().try_for_each(|Line| -> Result<(), ()> {
+		match *Budget <= 0 {
+			true => {
+				return Err(());
+			},
+			false => {},
 		}
 		let Trimmed = Line.trim();
-		if let Some(Rest) = Trimmed.strip_prefix("class ") {
-			let name = Rest.split(['{', ' ', ':']).next().unwrap_or("?");
-			let s = Signature("class", name);
-			let Slen = s.len();
-			Classes.push(s);
-			*Budget -= Slen as isize + 1;
+		match Trimmed.strip_prefix("class ") {
+			Some(Rest) => {
+				let name = Rest.split(['{', ' ', ':']).next().unwrap_or("?");
+				let s = Signature("class", name);
+				let Slen = s.len();
+				Classes.push(s);
+				*Budget -= Slen as isize + 1;
+			},
+			None => {},
 		}
-	}
-	if !Classes.is_empty() {
-		Result.insert("classes".into(), Classes);
+		Ok(())
+	});
+	match Classes.is_empty() {
+		false => {
+			Result.insert("classes".into(), Classes);
+		},
+		true => {},
 	}
 }

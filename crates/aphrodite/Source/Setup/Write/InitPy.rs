@@ -7,10 +7,9 @@
 
 use std::fs;
 
-use crate::Setup::{
-	Run::{Context::Struct as SetupContext, Error::Enum as SetupError},
-	Write::Permissions::Fn as SecurePerms,
-};
+use anyhow::Context;
+
+use crate::Setup::{Run::Context::Struct as SetupContext, Write::Permissions::Fn as SecurePerms};
 use super::PluginShim;
 
 /// Write `__init__.py` into the plugin directory.
@@ -24,7 +23,7 @@ use super::PluginShim;
 /// the runtime home. A shim left in place after an upgrade is the failure mode:
 /// Hermes loads it, the first hook raises on a missing symbol, and the plugin
 /// appears to be installed but silent.
-pub(crate) fn Fn(Context:&SetupContext) -> Result<(), SetupError> {
+pub(crate) fn Fn(Context:&SetupContext) -> anyhow::Result<()> {
 	let path = Context.PluginDirectory.join("__init__.py");
 
 	// Always overwritten (03-F8): the shim is code, not config - its FFI symbol
@@ -33,7 +32,7 @@ pub(crate) fn Fn(Context:&SetupContext) -> Result<(), SetupError> {
 	// preserve it. It is the hooks-only loader in the Hermes plugin dir; the
 	// runtime home carries binaries/config/state, never the loader.
 	println!("writing __init__.py -> {}", path.display());
-	fs::write(&path, PluginShim::Const)?;
+	fs::write(&path, PluginShim::Const).with_context(|| format!("write the plugin loader {}", path.display()))?;
 	SecurePerms(&path, 0o644)?;
 	Ok(())
 }

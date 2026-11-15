@@ -30,7 +30,7 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 					"flag": flag,
 				})
 			},
-			Err(e) => serde_json::json!({"error": e}),
+			Err(e) => serde_json::json!({"error": format!("{e:#}")}),
 		}
 	})
 }

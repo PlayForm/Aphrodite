@@ -18,7 +18,11 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_test", |args| {
 		let mode = {
 			let m = Arg::Fn::Fn(args, "mode");
-			if m.is_empty() { "quick" } else { m }
+
+			match m.is_empty() {
+				true => "quick",
+				false => m,
+			}
 		};
 		let samples:&[(&str, &str)] = match mode {
 			"quick" => &[("fn main() { println!(\"hi\"); }\n", "source_code")],
@@ -33,23 +37,32 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 		let mut checks = Vec::new();
 		let mut passed = 0usize;
 		crate::Session::With::Fn::with_shared(|state| {
-			for (content, hint) in samples {
+			samples.iter().for_each(|(content, hint)| {
 				let info = Compress::Fn::Fn(state, content, hint, None);
 				let hash = info["hash"].as_str().unwrap_or("");
 				let round = aphrodite::Resolve::Expand::Fn(state, hash);
 				let ok = round.as_deref() == Some(*content);
-				if ok {
-					passed += 1;
+
+				match ok {
+					true => passed += 1,
+					false => {},
 				}
+
 				checks.push(serde_json::json!({
 					"type": hint, "hash": hash,
 					"roundtrip": ok,
 				}));
-			}
+			});
 		});
+
+		let status = match passed == checks.len() {
+			true => "ok",
+			false => "fail",
+		};
+
 		serde_json::json!({
 			"mode": mode,
-			"status": if passed == checks.len() { "ok" } else { "fail" },
+			"status": status,
 			"passed": passed,
 			"total": checks.len(),
 			"checks": checks,

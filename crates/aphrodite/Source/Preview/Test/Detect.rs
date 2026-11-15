@@ -159,17 +159,19 @@ fn TestBareTestLogWithoutSummaryGetsTestArm() {
 #[test]
 fn TestEnvelopeJSONObjectsAreNotHijackedToJSONArm() {
 	let _G = CapGuard();
-	for c in [
+	[
 		"{\"success\": true}",
 		"{\"output\": \"running 10 tests\\n\\nte\", \"exit_code\": 0}",
 		"{\"error\": \"file not found: foo.rs\"}",
-	] {
+	]
+	.into_iter()
+	.for_each(|c| {
 		assert_ne!(
 			crate::Preview::Detect::SemanticType::Fn(c),
 			Some("json"),
 			"envelope must be excluded: {c}"
 		);
-	}
+	});
 	let p = crate::Preview::Builder::Entry::Fn("tool_result", "{\"success\": true}");
 	assert!(p.starts_with("[tool_result:"), "envelope keeps its hinted arm: {p}");
 }

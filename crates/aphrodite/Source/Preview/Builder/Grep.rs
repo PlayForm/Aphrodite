@@ -18,22 +18,30 @@ pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let mut Hits = 0usize;
 	let mut Files:BTreeSet<String> = BTreeSet::new();
 	let mut First:Option<String> = None;
-	for Line in Inp.raw.lines() {
-		if !Grep::Hit::Fn(Line) {
-			continue;
-		}
+
+	Inp.raw.lines().filter(|Line| Grep::Hit::Fn(Line)).for_each(|Line| {
 		Hits += 1;
 		let mut It = Line.splitn(3, ':');
 		let path = It.next().unwrap_or("");
 		let Lno = It.next().unwrap_or("");
+
 		Files.insert(path.to_string());
-		if First.is_none() {
-			First = Some(format!("{}:{}", path, Lno).chars().take(48).collect());
+
+		match First.is_none() {
+			true => {
+				First = Some(format!("{}:{}", path, Lno).chars().take(48).collect());
+			},
+			false => {},
 		}
+	});
+
+	match Hits == 0 {
+		true => {
+			return format!("[grep:{}L]", Inp.Total);
+		},
+		false => {},
 	}
-	if Hits == 0 {
-		return format!("[grep:{}L]", Inp.Total);
-	}
+
 	match First {
 		Some(Loc) => format!("[grep:{} hits in {} files | {} ...]", Hits, Files.len(), Loc),
 		None => format!("[grep:{} hits in {} files]", Hits, Files.len()),

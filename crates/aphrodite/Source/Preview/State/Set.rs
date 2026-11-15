@@ -16,5 +16,9 @@ use super::Maximum::PreviewMaximumChars;
 /// in force with no signal that configuration was ignored.
 pub fn Fn(Maximum:Option<u32>) -> Option<u32> {
 	let Previous = PreviewMaximumChars.swap(Maximum.unwrap_or(0), Ordering::Relaxed);
-	if Previous == 0 { None } else { Some(Previous) }
+
+	match Previous == 0 {
+		true => None,
+		false => Some(Previous),
+	}
 }

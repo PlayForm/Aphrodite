@@ -31,9 +31,14 @@ impl<'a> Struct<'a> {
 	/// classification of empty content is meaningless.
 	pub(crate) fn new(Content:&'a str) -> Option<Self> {
 		let NonEmpty:Vec<&'a str> = Content.lines().map(|l| l.trim_end()).filter(|l| !l.trim().is_empty()).collect();
-		if NonEmpty.is_empty() {
-			return None;
+
+		match NonEmpty.is_empty() {
+			true => {
+				return None;
+			},
+			false => {},
 		}
+
 		let Total = Content.lines().count();
 		let bytes = Content.len();
 		let n = NonEmpty.len();

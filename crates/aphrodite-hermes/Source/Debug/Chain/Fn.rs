@@ -23,14 +23,20 @@ pub(crate) fn Fn(session:&str) -> Vec<String> {
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
 	let mut chain = vec![session.to_string()];
 	let mut cur = session.to_string();
-	for _ in 0..16 {
+
+	// `try_for_each` IS the depth cap: the first hop with no parent (or a
+	// self-reference) ends the walk, and 16 hops is the ceiling.
+	let _ = (0..16).try_for_each(|_| {
 		match map.get(&cur) {
 			Some(p) if p != &cur => {
 				chain.push(p.clone());
 				cur = p.clone();
+
+				Ok::<(), ()>(())
 			},
-			_ => break,
+			_ => Err(()),
 		}
-	}
+	});
+
 	chain
 }

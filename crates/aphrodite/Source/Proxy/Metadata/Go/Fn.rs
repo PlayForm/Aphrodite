@@ -14,8 +14,13 @@ pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
 			After.split(['(', ' ']).next().filter(|s| !s.is_empty())
 		})
 		.collect();
-	if !Fns.is_empty() {
-		Parts.push(format!("fns={}", Fns.join(",")));
+
+	match !Fns.is_empty() {
+		true => {
+			Parts.push(format!("fns={}", Fns.join(",")));
+		},
+		false => {},
 	}
+
 	Parts.push(format!("ln={}", LineCount));
 }
