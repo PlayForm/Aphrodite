@@ -2,7 +2,7 @@
 
 use std::os::raw::c_char;
 
-use super::Guard::ToJSONError;
+use crate::ABI::Boundary::Run::Fn::Fn as Run;
 
 /// Deprecated (report 01-T5): stateless, creates a throwaway AphroditeState
 /// per call. Use `AphroditeInit` + `AphroditeDispatch` (stateful, handle-based)
@@ -12,7 +12,14 @@ use super::Guard::ToJSONError;
 /// It always answers with that deprecation message. It is not a silent fallback
 /// to the stateless path: a caller that ignores the error would otherwise get
 /// hook results computed against an empty session and believe them.
+///
+/// The refusal is an `anyhow::Error` rather than a pre-rendered envelope, so the
+/// message has one spelling and the boundary owns its rendering.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeCallHook(_Hook:*const c_char, _Args:*const c_char) -> *mut c_char {
-	ToJSONError("aphrodite_call_hook is stateless and deprecated; use aphrodite_init + aphrodite_dispatch")
+	Run(|| {
+		Err(anyhow::anyhow!(
+			"aphrodite_call_hook is stateless and deprecated; use aphrodite_init + aphrodite_dispatch"
+		))
+	})
 }

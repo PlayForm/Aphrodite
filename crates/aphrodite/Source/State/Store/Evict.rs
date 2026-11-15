@@ -16,11 +16,8 @@ impl AphroditeState {
 				true => {
 					match self.InlineOrder.pop_lru() {
 						Some((lru, _)) => {
-							match self.InlineStore.remove(&lru) {
-								Some(c) => {
-									self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(c.len());
-								},
-								None => (),
+							if let Some(c) = self.InlineStore.remove(&lru) {
+								self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(c.len());
 							}
 						},
 						None => break,

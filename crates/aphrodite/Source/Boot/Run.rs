@@ -6,7 +6,11 @@
 //! instead - the value of this file is that the whole startup sequence reads in
 //! one screen.
 
-use crate::Boot::{Banner::Announce, Configuration, Listen};
+use crate::Boot::{
+	Banner::Announce,
+	Configuration::{self, Source},
+	Listen,
+};
 
 /// Start every configured proxy and block until the process is asked to stop.
 ///
@@ -15,31 +19,42 @@ use crate::Boot::{Banner::Announce, Configuration, Listen};
 /// built. A listener that fails *after* binding is logged by its own task and
 /// does not fail this function - which is exactly why a bind failure is fatal
 /// here but a serve failure is not.
+///
+/// The configuration is loaded once and carried as one value. Nothing below the
+/// load asks "is there a file?" again: `Source` is either the document or the
+/// command line, and each consumer matches the arm it cares about.
 pub async fn Run() -> anyhow::Result<()> {
-	let (ConfigurationPath, UseMultiConfiguration) = Configuration::Path::Resolve();
-	let (MultiConfiguration, CLIFallback, LogCompact) =
-		Configuration::Load::Load(&ConfigurationPath, UseMultiConfiguration)?;
+	let Resolved = Configuration::Path::Fn::Fn();
+	let Loaded = Configuration::Load::Fn::Fn(&Resolved)?;
+
 	// The configured level: `--dev` is the one knob that names a verbosity
 	// ("verbose request/response logging"), so it is the configured `debug`.
 	// Everything else defers to `APHRODITE_LOG`, then `RUST_LOG`, then `info` -
-	// see `Logging::Level`.
-	let ConfiguredLevel = match CLIFallback.as_ref().map(|CLI| CLI.Dev) {
-		Some(true) => Some(tracing::Level::DEBUG),
-		_ => None,
+	// see `Logging::Level`. It is a command-line knob, so it has no meaning when
+	// the document is the configuration.
+	let ConfiguredLevel = match &Loaded.Source {
+		Source::Enum::Enum::Standalone(CLI) => CLI.Dev.then_some(tracing::Level::DEBUG),
+		Source::Enum::Enum::Multi(_) => None,
 	};
-	aphrodite::Logging::Fn::Fn(LogCompact, ConfiguredLevel)?;
-	let Compression = Configuration::Compression::Compression(MultiConfiguration.as_ref());
-	let Proxies = Configuration::Proxies::Assemble(MultiConfiguration, CLIFallback)?;
+
+	aphrodite::Logging::Fn::Fn(Loaded.LogCompact, ConfiguredLevel)?;
+
+	let Compression = Configuration::Compression::Fn::Fn(&Loaded.Source);
+	let Proxies = Configuration::Proxies::Fn::Fn(Loaded.Source)?;
+
 	Announce(Proxies.len());
 
 	// ── Shared shutdown watch channel ────────────────────────────────
 	// Initial value false; main() sets true on first Ctrl+C/SIGTERM,
-	// each run_single() task waits on the receiver for graceful_shutdown.
+	// each serving task waits on the receiver for graceful_shutdown.
 	let (ShutdownTx, ShutdownRx) = tokio::sync::watch::channel(false);
 
-	let Bound = Listen::Bind::Bind(Proxies, Compression.as_ref()).await?;
-	Listen::Watcher::watch(&ConfigurationPath, &Bound);
+	let Bound = Listen::Bind::All::Fn::Fn(Proxies, Compression.as_ref()).await?;
+
+	Listen::Watcher::Fn::Fn(&Resolved.Path, &Bound);
+
 	let Handles = Listen::Spawn::Spawn(Bound, ShutdownRx);
+
 	Listen::Drain::Drain(ShutdownTx, Handles).await;
 
 	Ok(())

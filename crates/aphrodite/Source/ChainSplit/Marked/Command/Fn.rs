@@ -6,28 +6,23 @@ use crate::ChainSplit::{Const::SegMarker, Segment::Struct::Struct as Segment};
 /// STDERR (not stdout). Markers on stderr never pollute stdout (files, pipes,
 /// captured tool output stay clean); Hermes merges stderr into the terminal
 /// result, so the transform hook still sees them and splits per segment.
+///
+/// Every segment but the first is prefixed, which is a property of the index
+/// rather than a boolean the body has to test - the first segment is the one
+/// whose output needs no boundary in front of it.
 pub fn Fn(Segments:&[Segment]) -> String {
-	let mut Out = String::new();
+	let Parts:Vec<String> = Segments
+		.iter()
+		.enumerate()
+		.map(|(Index, Seg)| {
+			let Prefix = match Index {
+				0 => String::new(),
+				_ => format!("echo {} 1>&2 ; ", SegMarker),
+			};
 
-	Segments.iter().enumerate().for_each(|(i, Seg)| {
-		match i > 0 {
-			true => {
-				Out.push_str(&format!("echo {} 1>&2 ; ", SegMarker));
-			},
-			false => (),
-		}
+			format!("{Prefix}{}", Seg.command)
+		})
+		.collect();
 
-		Out.push_str(&Seg.command);
-		Out.push_str(" ; ");
-	});
-
-	// Strip the trailing " ; ".
-	match Out.ends_with(" ; ") {
-		true => {
-			Out.truncate(Out.len() - 3);
-		},
-		false => (),
-	}
-
-	Out
+	Parts.join(" ; ")
 }

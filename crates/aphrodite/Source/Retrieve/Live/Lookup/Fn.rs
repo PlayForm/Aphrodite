@@ -4,54 +4,60 @@ use crate::{Proxy::State::Struct::Struct as AppState, Retrieve::Live::Container:
 
 /// Look up a live container's metadata envelope and reassemble its content.
 ///
-/// Returns `None` (the caller then serves the plain resolved content) when
-/// the entry is not a live container or its envelope is missing/malformed -
-/// warn + degrade, never panic. When the entry IS a live container, the
-/// content is reassembled from the container's own chunks (its
-/// authoritative store); a missing chunk degrades to the assembled prefix
-/// so far.
+/// Returns `None` (the caller then serves the plain resolved content) when the
+/// entry is not a live container or its envelope is missing/malformed - warn +
+/// degrade, never panic. When the entry IS a live container, the content is
+/// reassembled from the container's own chunks (its authoritative store); a
+/// missing chunk degrades to the assembled prefix so far.
+///
+/// The "is this a container" question is a value, not a pair of tests at the call
+/// site: `Live` is the envelope's own verdict and `Chunks` is what there is to
+/// reassemble, so a degenerate envelope (a container claiming no chunks) answers
+/// `None` here instead of running a loop over nothing and then substituting the
+/// plain entry.
 pub(crate) fn Fn(State:&AppState, hash:&str, Resolved:&str) -> Option<(LiveContainerMeta, String)> {
 	let MetaKey = crate::Hook::Live::Key::Fn::LiveMetaKey(hash);
-	// `get` is `&mut self` on LruCache (get promotes recency) - the same
-	// reason the handler's inline_ccr lookup binds `mut map`.
+	// `get` is `&mut self` on the cache (a hit promotes recency) - the same reason
+	// the handler's inline lookup binds a mutable guard.
 	let mut Map = match State.InlineCCR.lock() {
-		Ok(m) => m,
+		Ok(Map) => Map,
 		Err(Poisoned) => Poisoned.into_inner(),
 	};
 	let MetaJSON = Map.get(&MetaKey)?.clone();
-	let meta:LiveContainerMeta = match serde_json::from_str(&MetaJSON) {
-		Ok(meta) => meta,
+	let Meta:LiveContainerMeta = match serde_json::from_str(&MetaJSON) {
+		Ok(Meta) => Meta,
 		Err(Error) => {
-			tracing::warn!(
-				hash,
-				error = %Error,
-				"retrieve: live container envelope unparseable; serving as plain entry"
-			);
+			tracing::warn!(hash, error = %Error, "retrieve: live container envelope unparseable; serving as plain entry");
+
 			return None;
 		},
 	};
-	// Not a live container (or a degenerate envelope) - serve plainly.
-	match !meta.Live || meta.Chunks == 0 {
-		true => return None,
-		false => (),
-	}
+
+	// Not a live container, or a degenerate envelope - serve plainly.
+	let Chunks = (Meta.Live && Meta.Chunks > 0).then_some(Meta.Chunks)?;
+
 	let mut Assembled = String::new();
-	for i in 0..meta.Chunks {
-		match Map.get(&crate::Hook::Live::Key::Fn::LiveChunkKey(hash, i)) {
-			Some(Chunk) => Assembled.push_str(Chunk),
-			None => {
-				tracing::warn!(
-					hash,
-					Chunk = i,
-					"retrieve: live container chunk missing; serving assembled prefix"
-				);
-				break;
-			},
-		}
+
+	for Index in 0..Chunks {
+		let Some(Chunk) = Map.get(&crate::Hook::Live::Key::Fn::LiveChunkKey(hash, Index)) else {
+			tracing::warn!(
+				hash,
+				Chunk = Index,
+				"retrieve: live container chunk missing; serving assembled prefix"
+			);
+
+			break;
+		};
+
+		Assembled.push_str(Chunk);
 	}
-	let Content = match Assembled.is_empty() {
-		true => Resolved.to_string(),
-		false => Assembled,
-	};
-	Some((meta, Content))
+
+	// An empty reassembly means the container held nothing usable, so the plain
+	// resolved entry is the honest answer - `filter` + `unwrap_or_else` rather
+	// than a test, so the fallback allocates only when it is chosen.
+	let Content = Some(Assembled)
+		.filter(|Assembled| !Assembled.is_empty())
+		.unwrap_or_else(|| Resolved.to_string());
+
+	Some((Meta, Content))
 }

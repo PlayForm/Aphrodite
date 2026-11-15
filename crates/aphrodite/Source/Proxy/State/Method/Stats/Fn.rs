@@ -77,6 +77,10 @@ impl AppState {
 				"connect_errors": self.UpstreamConnectErrors.load(Ordering::Relaxed),
 				// 02-F9: mid-stream chunk errors on the SSE relay path.
 				"sse_stream_errors": self.SSEStreamErrors.load(Ordering::Relaxed),
+				// Transport failures that are neither a timeout nor a connect
+				// error - split out of `connect_errors`, which used to absorb
+				// them.
+				"other": self.UpstreamOtherErrors.load(Ordering::Relaxed),
 			},
 			"ccr_store": {
 				// Live store values, not counters: these two fields used to

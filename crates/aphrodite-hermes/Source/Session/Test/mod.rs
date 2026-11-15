@@ -5,5 +5,7 @@
 //! and fail-open degrade (a wedged session returns within the bounded-lock
 //! window instead of blocking). Do not weaken either.
 
+mod Apply;
+mod Debounce;
 mod Isolation;
 mod Wedged;

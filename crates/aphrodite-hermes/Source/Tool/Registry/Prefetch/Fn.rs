@@ -19,10 +19,9 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 			.and_then(|v| v.as_array())
 			.map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
 			.unwrap_or_default();
-		match paths.is_empty() {
-			true => return serde_json::json!({ "error": "paths is required" }),
-			false => {},
-		}
+		let Some(paths) = (!paths.is_empty()).then_some(paths) else {
+			return serde_json::json!({ "error": "paths is required" });
+		};
 
 		let outcomes = aphrodite::Prefetch::Read::Entry::Fn::ReadPaths(&paths);
 		crate::Session::With::Fn::with_shared(|state| aphrodite::Prefetch::Insert::Fn::InsertOutcomes(state, outcomes))

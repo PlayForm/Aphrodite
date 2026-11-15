@@ -21,11 +21,13 @@ pub fn Fn() -> serde_json::Value {
 	let c = |Index:usize| Counters[Index].load(Ordering::Relaxed);
 	let Avg = |Sum:&AtomicU64, n:&AtomicU64| -> f64 {
 		let n = n.load(Ordering::Relaxed);
-		match n == 0 {
-			true => 0.0,
-			false => Sum.load(Ordering::Relaxed) as f64 / n as f64,
-		}
+
+		// A sample count of zero is "no data", not a number: dividing by it would
+		// report NaN for a category nothing has timed. `NonZeroU64` carries that
+		// distinction as a value, so the division cannot run for it at all.
+		std::num::NonZeroU64::new(n).map_or(0.0, |n| Sum.load(Ordering::Relaxed) as f64 / n.get() as f64)
 	};
+
 	serde_json::json!({
 		"markers_created": c(Counter::MarkersCreated as usize),
 		"compressions": c(Counter::Compressions as usize),

@@ -4,7 +4,11 @@ use std::collections::HashMap;
 
 use crate::Directive::{
 	Build::Fn as BuildDirectiveContext,
-	Model::{MaximumCombinedChars, MaximumDirectiveChars, Struct as Directive},
+	Cap::{
+		MaximumCombinedChars::Const::Const as MaximumCombinedChars,
+		MaximumDirectiveChars::Const::Const as MaximumDirectiveChars,
+	},
+	Model::Struct as Directive,
 };
 
 fn Active(name:&str, Content:&str) -> (HashMap<String, Directive>, Vec<String>) {

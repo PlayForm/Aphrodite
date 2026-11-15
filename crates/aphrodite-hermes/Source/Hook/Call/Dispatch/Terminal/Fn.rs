@@ -42,13 +42,10 @@ pub(crate) fn transform_terminal_output(state:&mut AphroditeState, input:&HookIn
 	// elapsed microseconds for the terminal path.
 	let t0 = crate::Debug::Log::Any::Fn::Fn(state, &sid).then(std::time::Instant::now);
 
-	match t0 {
-		Some(t0) => {
-			let us = t0.elapsed().as_micros() as u64;
-			aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, us);
-			post_tool_log(state, &sid, &r, term_content.len(), us);
-		},
-		None => {},
+	if let Some(t0) = t0 {
+		let us = t0.elapsed().as_micros() as u64;
+		aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, us);
+		post_tool_log(state, &sid, &r, term_content.len(), us);
 	}
 
 	replacement_from(&r, &sid)

@@ -17,29 +17,20 @@ pub fn TurnWindow(State:&AphroditeState, n:usize) -> WindowStats {
 	State.ToolEvents.iter().filter(|e| e.Turn > Floor).for_each(|Event| {
 		Stats.TotalCalls += 1;
 
-		match !Event.Okay {
-			true => {
-				Stats.Errors += 1;
+		if !Event.Okay {
+			Stats.Errors += 1;
 
-				match Event.ErrorSig {
-					Some(Sig) => {
-						ErrorSigs.insert(Sig);
-					},
-					None => (),
-				}
-			},
-			false => (),
+			if let Some(Sig) = Event.ErrorSig {
+				ErrorSigs.insert(Sig);
+			}
 		}
 
 		match &Event.WrotePath {
 			Some(path) => {
 				Stats.Writes += 1;
 
-				match SeenPaths.insert(path.clone()) {
-					true => {
-						Stats.NewFiles += 1;
-					},
-					false => (),
+				if SeenPaths.insert(path.clone()) {
+					Stats.NewFiles += 1;
 				}
 			},
 			None => {

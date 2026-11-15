@@ -12,12 +12,7 @@ use crate::Debug::{
 ///
 /// The gate comes FIRST: with the logger off this must cost one atomic load,
 /// never a `fetch_add` on a cache line every thread contends for. That ordering
-/// is the whole reason the counters are safe to leave in a release build.
-pub fn Fn(Counter:Counter) {
-	match !Enabled() {
-		true => return,
-		false => (),
-	}
-
-	Counters[Counter as usize].fetch_add(1, Ordering::Relaxed);
-}
+/// is the whole reason the counters are safe to leave in a release build, and
+/// `then` is what keeps it: the increment lives in a closure the disabled path
+/// never calls.
+pub fn Fn(Counter:Counter) { let _ = Enabled().then(|| Counters[Counter as usize].fetch_add(1, Ordering::Relaxed)); }

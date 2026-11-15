@@ -2,10 +2,7 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::{
-	Guard::{Cstr, ToJSONError, ToJSONOk},
-	Handle::Lookup::WithState,
-};
+use crate::ABI::Boundary::{Answer::Enum::Enum as Answer, State::Fn::Fn as State};
 
 /// Run the `OnSessionStart` hook body and answer with its JSON result.
 ///
@@ -20,12 +17,5 @@ use crate::ABI::{
 /// field this hook forgets to clear leaks one conversation into the next.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeSessionStart(Handle:*const c_char) -> *mut c_char {
-	let Hid = match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Ok(ID) => ID,
-		Err(_) => return ToJSONError("invalid handle"),
-	};
-	match WithState(Hid, crate::Session::Start::Fn::OnSessionStart) {
-		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&format!("{e:#}")),
-	}
+	State(Handle, |s| Ok(Answer::Envelope(crate::Session::Start::Fn::OnSessionStart(s))))
 }

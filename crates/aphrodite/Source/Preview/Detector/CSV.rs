@@ -1,27 +1,29 @@
 //! CSV shape detector.
 //!
-//! Two rows with an identical field count is the strongest available signal for
-//! CSV, and it is weak enough to need a second test. This detector applies both.
-//! It is not a CSV parser: it only decides whether the shape is a grid.
+//! Two rows with an identical field count is the strongest available signal for CSV, and it is weak
+//! enough to need a second test. This detector applies both. It is not a CSV parser: it only decides
+//! whether the shape is a grid.
 
 use crate::Preview::Input::Struct::Struct as Input;
 
+/// Fewest rows a grid must have.
+const RowsMinimum:usize = 2;
+
+/// Fewest columns a grid must have.
+const ColumnsMinimum:usize = 2;
+
 /// True when the content looks like CSV.
 ///
-/// Two or more rows sharing a field count of at least two, with no `, `
-/// (comma-space) anywhere - prose with commas is excluded by both tests. It is
-/// not a quoting-aware check, so a quoted field containing a comma can hide a
-/// real CSV.
+/// Two or more rows sharing a field count of at least two, with no `, ` (comma-space) anywhere - prose
+/// with commas is excluded by both tests. It is not a quoting-aware check, so a quoted field containing
+/// a comma can hide a real CSV.
 pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
-	let CSVRows:Vec<&str> = Inp.NonEmpty.iter().map(|l| l.trim()).collect();
+	let Rows:Vec<&str> = Inp.NonEmpty.iter().map(|Line| Line.trim()).collect();
+	let Counts:Vec<usize> = Rows.iter().map(|Row| Row.split(',').count()).collect();
+	let First = Counts.first().copied().unwrap_or(0);
 
-	match CSVRows.len() >= 2 && !Inp.raw.contains(", ") {
-		true => {
-			let Counts:Vec<usize> = CSVRows.iter().map(|r| r.split(',').count()).collect();
-			let First = Counts[0];
-
-			First >= 2 && Counts.iter().all(|&c| c == First)
-		},
-		false => false,
-	}
+	Rows.len() >= RowsMinimum
+		&& !Inp.raw.contains(", ")
+		&& First >= ColumnsMinimum
+		&& Counts.iter().all(|Count| *Count == First)
 }

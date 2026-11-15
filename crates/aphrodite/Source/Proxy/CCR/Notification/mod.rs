@@ -1,5 +1,12 @@
-//! `Notification` - Webhook payload POSTed to `NotifyURL` when a CCR entry is created.
+//! The webhook that announces a new CCR entry.
 //!
-//! The item lives in `Struct.rs`; this facade only declares it.
+//! Four stages, because each one can fail differently: `Event` is the wire
+//! payload, `Build` decides whether this create announces itself at all,
+//! `Schedule` puts the delivery on the task tracker so shutdown waits for it, and
+//! `Deliver` performs the POST and reports one of two outcomes.
 
-pub mod Struct;
+pub mod Build;
+pub mod Deliver;
+pub mod Event;
+pub mod Outcome;
+pub mod Schedule;

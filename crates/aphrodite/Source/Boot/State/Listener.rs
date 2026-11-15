@@ -13,7 +13,7 @@ use tokio::net::TcpListener;
 /// leaving a listener silently dead while its sibling keeps answering.
 pub struct Bound {
 	/// The listener's configured name, or its listen address when unnamed.
-	pub name:String,
+	pub Name:String,
 	/// The resolved per-listener configuration.
 	pub CLI:CLI,
 	/// The socket, already bound so a conflict surfaces before anything serves.

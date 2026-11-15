@@ -1,7 +1,7 @@
 //! Backgrounding decisions: the size floor, the prefix table and its
 //! boundaries.
 
-use crate::PollWorker::Should::{Command::Fn::SlowCommandPrefixes, Entry::Fn::ShouldBackground};
+use crate::PollWorker::Should::{Command::Prefix::Const::SlowCommandPrefixes, Entry::Fn::ShouldBackground};
 
 #[test]
 fn TestShouldBackgroundSlowCommand() {

@@ -15,7 +15,7 @@
 
 use crate::{
 	Flow::{
-		Section::Label::Fn::JoinSections,
+		Section::Join::Fn::Fn as JoinSections,
 		TurnContext::{Budget::Fn::DropToBudget, Collect::Fn::CollectSections, Log::Fn::LogPreTurn},
 	},
 	State::Struct::AphroditeState,

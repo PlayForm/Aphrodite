@@ -5,7 +5,7 @@ use std::os::raw::c_char;
 
 use headroom_core::transforms;
 
-use super::Guard::MaximumContent;
+use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::MaximumContent};
 
 stateful!(
 	/// Compress `Content` into the session's inline store and answer with its
@@ -20,27 +20,34 @@ stateful!(
 	/// Content above the 16 MB cap is rejected for the same reason a copy is
 	/// refused - the caller already holds the bytes, so the engine does not
 	/// need a second copy it cannot serve.
+	///
+	/// Two refusals, not `Guard::Content`'s three: a stored payload's interior
+	/// NUL is neutralised on the way back out by the boundary's `Transfer`, so
+	/// it is not a reason to refuse the store here, and adding that check would
+	/// reject content this export has always accepted.
 	AphroditeCompress,
 	|s, Content:*const c_char, Hint:*const c_char| {
-		match Content.is_empty() {
-			true => return serde_json::json!({"error":"empty"}),
-			false => (),
-		}
-
-		match Content.len() > MaximumContent {
-			true => return serde_json::json!({"error":"content exceeds 16MB limit"}),
-			false => (),
-		}
+		crate::ABI::Guard::Reject::Fn::Fn(Content.is_empty(), || anyhow::anyhow!("empty"))?;
+		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {
+			anyhow::anyhow!("content exceeds 16MB limit")
+		})?;
 
 		let Ct = transforms::content_detector::detect_content_type(&Content).content_type;
-		let t = match Hint.is_empty() || Hint == "text" {
-			true => Ct.as_str().to_string(),
-			false => Hint.to_string(),
-		};
+		// The hint is usable only when the caller actually supplied a label of
+		// its own: an empty hint and the literal "text" both defer to the
+		// detector. `filter` is what turns that predicate into the value the
+		// choice is made on, and `unwrap_or_else` keeps the detector's string -
+		// the allocating arm - off the path where the hint wins.
+		let t = Some(Hint)
+			.filter(|Hint| !Hint.is_empty() && Hint.as_str() != "text")
+			.unwrap_or_else(|| Ct.as_str().to_string());
 		let hash = headroom_core::ccr::compute_key(Content.as_bytes());
+
 		s.InlineStorePut(hash.clone(), Content.to_string());
+
 		let Preview = crate::Preview::Builder::Entry::Fn(&t, &Content);
 		let Marker = crate::Marker::Format::Entry::CCRMarker(&hash, &t, Content.len(), &Preview, None, None, None);
+
 		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:hash.clone(),
 			CCRType:t.clone(),
@@ -50,6 +57,9 @@ stateful!(
 			Center:None,
 			meta:None,
 		});
-		serde_json::json!({"hash":hash,"type":t,"size":Content.len(),"preview":Preview,"marker":Marker})
+
+		Ok(Answer::Envelope(
+			serde_json::json!({"hash":hash,"type":t,"size":Content.len(),"preview":Preview,"marker":Marker}),
+		))
 	}
 );

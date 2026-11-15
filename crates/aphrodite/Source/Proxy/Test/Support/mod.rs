@@ -3,7 +3,9 @@
 //! One file per fixture family; the facade re-exports each fixture under the
 //! name the tests call it by.
 
+pub mod Analysis;
 pub mod Chat;
+pub mod Context;
 pub mod Lock;
 pub mod State;
 pub mod Store;

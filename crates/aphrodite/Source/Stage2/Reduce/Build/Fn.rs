@@ -1,67 +1,68 @@
 //! The build/log reducer.
 //!
-//! Build and log output is mostly repetition: the same "Compiling ..." /
-//! "Finished ..." chatter around a handful of lines that matter. The reduction
-//! classifies each line once (error, warning, summary keyword) and emits the
-//! three groups with their counts, capped per group so a pathological log
-//! cannot produce a "reduced" output longer than the input.
-//!
-//! A line that *starts* with `error:` / `warning:` is deliberately not
-//! classified as an error/warning: those prefixes are structured and are
-//! picked up by the summary arm, and counting them twice would double the
-//! headline numbers the caller reads.
+//! Build and log output is mostly repetition: the same "Compiling ..." / "Finished ..." chatter
+//! around a handful of lines that matter. The reduction classifies each line once and emits the
+//! three groups with their counts, each group bounded so a pathological log cannot produce a
+//! "reduced" output longer than the input.
+
+use crate::Stage2::Reduce::{
+	Build::Classify::{Enum::Enum as Class, Fn::Fn as Classify},
+	Sample::Struct::Struct as Sample,
+};
+
+/// Summary lines the reduction shows: ten.
+const SummariesShown:usize = 10;
+
+/// Error lines the reduction shows: twenty.
+const ErrorsShown:usize = 20;
+
+/// Warning lines the reduction shows: ten.
+const WarningsShown:usize = 10;
+
+/// Characters of one retained line: two hundred.
+const LineShown:usize = 200;
 
 /// Reduce build/log output: extract errors, warnings, summaries.
+///
+/// Each group keeps an exact total and the first N of its lines, so `[100 errors]` stays true
+/// while the body carries twenty - the previous implementation collected all hundred and then cut
+/// the list, which made a long log cost memory proportional to its own length for no extra output.
+///
+/// It is not a compiler: nothing is resolved, and a line that starts with `error:` is counted by
+/// the summary group rather than the error group.
 pub fn ReduceBuild(Content:&str) -> Option<String> {
-	let mut Errors:Vec<String> = Vec::new();
-	let mut Warnings:Vec<String> = Vec::new();
-	let mut SummaryLines:Vec<String> = Vec::new();
-
-	let SummaryKw = ["compiling", "finished", "running", "test result", "passed", "failed"];
+	let mut Summaries = Sample::<String, SummariesShown>::new();
+	let mut Errors = Sample::<String, ErrorsShown>::new();
+	let mut Warnings = Sample::<String, WarningsShown>::new();
 
 	Content.lines().filter(|Line| !Line.trim().is_empty()).for_each(|Line| {
-		let Stripped = Line.trim();
-		let Lower = Stripped.to_lowercase();
+		let Retained = || Line.trim().chars().take(LineShown).collect::<String>();
 
-		match () {
-			_ if Lower.contains("error") && !Lower.starts_with("error:") => {
-				Errors.push(Stripped.chars().take(200).collect());
-			},
-			_ if Lower.contains("warning") && !Lower.starts_with("warning:") => {
-				Warnings.push(Stripped.chars().take(200).collect());
-			},
-			_ if SummaryKw.iter().any(|Kw| Lower.contains(Kw)) => {
-				SummaryLines.push(Stripped.chars().take(200).collect());
-			},
-			_ => {},
+		match Classify(Line) {
+			Class::Error => Errors.Push(Retained()),
+			Class::Warning => Warnings.Push(Retained()),
+			Class::Summary => Summaries.Push(Retained()),
+			Class::Ignore => {},
 		}
 	});
 
 	let mut Parts:Vec<String> = Vec::new();
-	match !SummaryLines.is_empty() {
-		true => {
-			Parts.push("[build summary]".into());
-			Parts.extend(SummaryLines.into_iter().take(10));
-		},
-		false => {},
-	}
-	match !Errors.is_empty() {
-		true => {
-			Parts.push(format!("[{} errors]", Errors.len()));
-			Parts.extend(Errors.into_iter().take(20));
-		},
-		false => {},
-	}
-	match !Warnings.is_empty() {
-		true => {
-			Parts.push(format!("[{} warnings]", Warnings.len()));
-			Parts.extend(Warnings.into_iter().take(10));
-		},
-		false => {},
-	}
 
-	match Parts.is_empty() {
-		true => None,
-		false => Some(Parts.join("\n")),
+	let _ = (!Summaries.IsEmpty()).then(|| {
+		Parts.push("[build summary]".into());
+		Parts.extend(Summaries.IntoSample());
+	});
+	let _ = (!Errors.IsEmpty()).then(|| {
+		Parts.push(format!("[{} errors]", Errors.Total()));
+		Parts.extend(Errors.IntoSample());
+	});
+	let _ = (!Warnings.IsEmpty()).then(|| {
+		Parts.push(format!("[{} warnings]", Warnings.Total()));
+		Parts.extend(Warnings.IntoSample());
+	});
+
+	match Parts.as_slice() {
+		[] => None,
+		_ => Some(Parts.join("\n")),
 	}
 }

@@ -2,7 +2,10 @@
 
 use std::os::raw::c_char;
 
-use super::Guard::{Cstr, Guarded, ToJSONError, ToJSONOk};
+use crate::ABI::{
+	Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
+	Guard::Cstr::Fn::Fn as Cstr,
+};
 
 /// Code structure extraction - port of _core/struct.py
 ///
@@ -12,13 +15,14 @@ use super::Guard::{Cstr, Guarded, ToJSONError, ToJSONOk};
 /// the result is a structure (names, kinds, line spans), not text to splice.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeStructExtract(Content:*const c_char, Language:*const c_char) -> *mut c_char {
-	let c = match unsafe { Cstr(Content) } {
-		Some(s) => s,
-		None => return ToJSONError("null content"),
-	};
-	let LanguageTag = unsafe { Cstr(Language) }.unwrap_or_default();
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		let Result = crate::StructExtract::Extract::Fn(&c, &LanguageTag);
-		ToJSONOk(&serde_json::json!(Result))
-	}))
+	let Content = unsafe { Cstr(Content) };
+	let Language = unsafe { Cstr(Language) }.unwrap_or_default();
+
+	Run(move || {
+		let Content = Content.ok_or_else(|| anyhow::anyhow!("null content"))?;
+
+		Ok(Answer::Envelope(serde_json::json!(crate::StructExtract::Extract::Fn(
+			&Content, &Language,
+		))))
+	})
 }

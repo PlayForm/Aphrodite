@@ -12,13 +12,11 @@ use crate::Home::{Environment::Path::Fn::Fn as EnvironmentPath, Tilde::Fn::Fn as
 /// to `$HOME/.hermes` while it is set, because a Hermes home that disagrees
 /// with the shim's is exactly the issue-40 failure this module exists to
 /// prevent.
+///
+/// Two alternatives, chained with `or_else`: the platform home is asked only when the
+/// environment named nothing, which is the whole content of "wins outright".
 pub fn Fn() -> Option<PathBuf> {
-	match EnvironmentPath("HERMES_HOME") {
-		Some(h) => {
-			return Some(ExpandTilde(h));
-		},
-		None => {},
-	}
-
-	dirs::home_dir().map(|h| h.join(".hermes"))
+	EnvironmentPath("HERMES_HOME")
+		.map(ExpandTilde)
+		.or_else(|| dirs::home_dir().map(|Home| Home.join(".hermes")))
 }

@@ -1,107 +1,115 @@
-//! Body handling: the stream flag's byte-exact fast path, the configured size
-//! cap, and char-safe truncation.
+//! Body handling: the request interpretation's delivery mode, the configured
+//! size cap, and char-safe truncation.
+//!
+//! The delivery tests used to pin a byte-exact fast path that scanned for
+//! `"stream":true` anywhere in the body. That scan was D3 - it could disagree
+//! with the cache key's top-level parse - so the tests now pin the single
+//! interpretation both consumers read, including the two bodies the old pair of
+//! predicates classified differently.
 
 use std::sync::Arc;
 
 use axum::{body::Body, extract::FromRequest, http::StatusCode, response::IntoResponse};
 
 use crate::Proxy::{
-	Body::{
-		Capped::Struct::Struct as CappedBody,
-		Stream::Fn::Fn as BodyWantsStream,
-		Truncate::Fn::Fn as TruncateCharSafe,
-	},
+	Body::{Capped::Struct::Struct as CappedBody, Truncate::Fn::Fn as TruncateCharSafe},
+	Request::{Delivery::Enum::Enum as RequestDelivery, Semantics::Fn::Fn as InterpretRequest},
 	Test::Support::State::Fn::{TestState, TestStateWithMaximumBody},
 	Threshold::Const::ChatCompletionsPath,
 };
 
-// ── 02-F2: `BodyWantsStream` decides which client (bounded vs
-// no-total-timeout) a request goes out on - must match on the exact
-// field real clients send, and fail closed (bounded client) on anything
-// unparseable rather than accidentally going timeout-free for garbage
-// input. ──
+/// The delivery mode one request body asks for.
+fn Delivery(Body:&[u8]) -> RequestDelivery { InterpretRequest(ChatCompletionsPath, Body, "test-key").Delivery }
+
+// ── 02-F2: the delivery mode decides which client (bounded vs
+// no-total-timeout) a request goes out on - must read the top-level field real
+// clients send, and fail closed (bounded client) on anything unparseable rather
+// than accidentally going timeout-free for garbage input. ──
 #[test]
-fn TestBodyWantsStreamTrueWhenSet() {
-	assert!(BodyWantsStream(br#"{"model":"gpt-4o","stream":true}"#));
+fn TestDeliveryStreamingWhenTopLevelFlagSet() {
+	assert!(matches!(
+		Delivery(br#"{"model":"gpt-4o","stream":true}"#),
+		RequestDelivery::Streaming
+	));
 }
 
 #[test]
-fn TestBodyWantsStreamFalseWhenAbsentOrFalse() {
-	assert!(!BodyWantsStream(br#"{"model":"gpt-4o"}"#));
-	assert!(!BodyWantsStream(br#"{"model":"gpt-4o","stream":false}"#));
+fn TestDeliveryBufferedWhenAbsentOrFalse() {
+	assert!(matches!(Delivery(br#"{"model":"gpt-4o"}"#), RequestDelivery::Buffered));
+	assert!(matches!(
+		Delivery(br#"{"model":"gpt-4o","stream":false}"#),
+		RequestDelivery::Buffered
+	));
 }
 
 #[test]
-fn TestBodyWantsStreamFalseOnInvalidJSON() {
-	assert!(!BodyWantsStream(b"not json"));
+fn TestDeliveryBufferedOnInvalidJSON() {
+	assert!(matches!(Delivery(b"not json"), RequestDelivery::Buffered));
 }
 
 #[test]
-fn TestBodyWantsStreamLargeBodyFlagAtEnd() {
-	// W2-4 fast path: the flag sits after a large messages array, so a
-	// byte scan (not the full serde parse) must find it.
+fn TestDeliveryStreamingWithLargeBody() {
+	// The flag sits after a large messages array; the parse is the authority, so
+	// position in the body must not matter.
 	let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
-	(0..500).for_each(|i| {
-		match i > 0 {
-			true => {
-				body.push(',');
-			},
-			false => {},
-		}
 
+	(0..500).for_each(|i| {
+		(i > 0).then(|| body.push(','));
 		body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
 	});
 	body.push_str("],\"stream\":true}");
-	assert!(BodyWantsStream(body.as_bytes()));
+
+	assert!(matches!(Delivery(body.as_bytes()), RequestDelivery::Streaming));
 }
 
 #[test]
-fn TestBodyWantsStreamFlagInMessageStringEscapedQuotes() {
-	// W2-4: the pattern inside a message string has escaped quotes
-	// (`\"stream\": true`), which insert backslash bytes and break the
-	// contiguous byte pattern - the fast path must not fire, and the
-	// parse (authority) returns false since `Stream` is not a key.
+fn TestDeliveryIgnoresFlagInsideAStringValue() {
+	// The bytes `"stream": true` inside a message string must not decide
+	// anything - only the parsed top-level field does.
 	let body = br#"{"messages":[{"role":"user","content":"the docs say \"stream\": true"}]}"#;
-	assert!(!BodyWantsStream(body));
+
+	assert!(matches!(Delivery(body), RequestDelivery::Buffered));
+}
+
+// ── D3: one body, one classification. The old pair of predicates disagreed on
+// both of these, so a request could be forwarded on the streaming client (no
+// total timeout) AND be cached. ──
+#[test]
+fn TestDeliveryNestedStreamFlagDoesNotMakeRequestStreaming() {
+	// `stream` at the top level is false; a nested object carries a true one.
+	let body = br#"{"model":"m","stream":false,"meta":{"stream": true}}"#;
+
+	assert!(matches!(Delivery(body), RequestDelivery::Buffered));
 }
 
 #[test]
-fn TestBodyWantsStreamLargeBodyWithoutFlag() {
-	// W2-4: large body with no `Stream` key anywhere - fast path misses
-	// and the parse agrees.
-	let mut body = String::from("{\"model\":\"gpt-4o\",\"messages\":[");
-	(0..500).for_each(|i| {
-		match i > 0 {
-			true => {
-				body.push(',');
-			},
-			false => {},
-		}
+fn TestDeliveryStreamOptionsIsNotTheStreamFlag() {
+	// `stream_options` is a different field; its nested `"stream":true` is not
+	// the top-level flag.
+	let body = br#"{"model":"m","messages":[],"stream_options":{"stream":true}}"#;
 
-		body.push_str(&format!("{{\"role\":\"user\",\"content\":\"message {i}\"}}"));
-	});
-	body.push_str("]}");
-	assert!(!BodyWantsStream(body.as_bytes()));
+	assert!(matches!(Delivery(body), RequestDelivery::Buffered));
 }
 
-// ── Issue #38 class: `&s[..80]` on a header value panics when byte 80
-// splits a UTF-8 char (multibyte header values in the dev-mode request
-// log) - the char-boundary panic class the reporter saw in the binary's
-// string table. ──
+// ── Issue #38 class: `&s[..80]` on a header value panics when byte 80 splits a
+// UTF-8 char (multibyte header values in the dev-mode request log) - the
+// char-boundary panic class the reporter saw in the binary's string table. ──
 #[test]
 fn TestTruncateCharSafeNeverSplitsMultibyte() {
 	// All-2-byte chars: 100 bytes, byte 80 lands exactly on a boundary
 	// (char 40) - must truncate to exactly 80 bytes.
 	let Multibyte = "é".repeat(50);
 	let t = TruncateCharSafe(&Multibyte, 80);
+
 	assert_eq!(t.len(), 80);
 	assert!(Multibyte.starts_with(t), "truncation must be a prefix");
 	assert!(t.is_char_boundary(t.len()));
 
-	// Mixed 1+2-byte chars so byte 80 lands INSIDE a char: property
-	// holds regardless of where the walk lands.
+	// Mixed 1+2-byte chars so byte 80 lands INSIDE a char: property holds
+	// regardless of where the walk lands.
 	let Mixed = "aé".repeat(40); // 120 bytes, 3-byte units
 	let T2 = TruncateCharSafe(&Mixed, 80);
+
 	assert!(T2.len() <= 80, "must never exceed the budget: {}", T2.len());
 	assert!(T2.len() >= 77, "must not over-truncate (max 3-byte walk): {}", T2.len());
 	assert!(Mixed.starts_with(T2), "truncation must be a prefix");
@@ -122,6 +130,7 @@ async fn TestBodyCapRejectsOverLimitWith413() {
 		.unwrap();
 	let Rejection = CappedBody::from_request(Request, &State).await.unwrap_err();
 	let response = Rejection.into_response();
+
 	assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
 }
 
@@ -135,13 +144,14 @@ async fn TestBodyCapAcceptsBodyAtOrUnderLimit() {
 		.body(Body::from(body.clone()))
 		.unwrap();
 	let Extracted = CappedBody::from_request(Request, &State).await.unwrap();
+
 	assert_eq!(Extracted.0.as_ref(), body.as_slice());
 }
 
 #[tokio::test]
 async fn TestBodyCapNoneIsNoCap() {
-	// `max_request_body_size: None` (the default) must read the whole
-	// body - byte-identical current behavior.
+	// `max_request_body_size: None` (the default) must read the whole body -
+	// byte-identical current behavior.
 	let State = Arc::new(TestState());
 	let body = vec![b'x'; 8192];
 	let Request = axum::extract::Request::builder()
@@ -150,5 +160,6 @@ async fn TestBodyCapNoneIsNoCap() {
 		.body(Body::from(body.clone()))
 		.unwrap();
 	let Extracted = CappedBody::from_request(Request, &State).await.unwrap();
+
 	assert_eq!(Extracted.0.as_ref(), body.as_slice());
 }

@@ -7,16 +7,19 @@
 //! turn, and the live-container path emits an instant marker for content the
 //! agent should not wait on.
 //!
-//! The tree is grouped by WHAT is being transformed, not by call order:
+//! Both transform paths have the same three steps, which is the shape of the
+//! whole tree:
 //!
-//! - `ToolResult/` - tool-result compression: entry points, the gate sequence,
-//!   telemetry recording, written-path inference, type resolution.
-//! - `Terminal/` - terminal-output compression, including the chain-split path
-//!   for output that already carries segment markers.
-//! - `Live/` - the live-container store: chunking, keys, the instant marker.
-//! - `AutoExpand/` - the `[compression] auto_expand` consumer.
-//! - `Meta/`, `Hash/`, `Tool/`, `Path/` - the small shared pieces.
-//! - `Session/`, `LLM/` - the session lifecycle and the per-call hooks.
+//! 1. `Observation/` - what the call did, as a value, applied before any
+//!    decision so no gate can drop it.
+//! 2. `Classification/`, `Path/`, `Policy/`, `Select/`, `Plan/` - what to do
+//!    about it, decided from values with no session mutation.
+//! 3. `Apply/`, `Emit/`, `Live/` - doing it.
+//!
+//! `Reason/` is the vocabulary a passthrough reports and `Passthrough/` is the
+//! one payload shape it emits; `AutoExpand/`, `Meta/`, `Hash/` and `Tool/` are
+//! the small shared pieces; `Session/` and `LLM/` are the session lifecycle and
+//! the per-call hooks.
 //!
 //! Behaviour is the contract: the compression thresholds, the live-chunking
 //! byte arithmetic, the essential-tools bypass list and the exact JSON handed
@@ -27,12 +30,16 @@
 //! place it is defined and there is exactly one way to spell it.
 
 pub mod AutoExpand;
+pub mod Classification;
 pub mod Hash;
 pub mod LLM;
 pub mod Live;
 pub mod Meta;
+pub mod Observation;
 pub mod Outcome;
+pub mod Passthrough;
 pub mod Path;
+pub mod Reason;
 pub mod Session;
 pub mod Terminal;
 pub mod Tool;
@@ -40,6 +47,3 @@ pub mod ToolResult;
 
 #[cfg(test)]
 pub mod Test;
-
-// ── Public surface (called from `Library.rs`, `Proxy/`, `Retrieve/` and the
-// `aphrodite-hermes` bridge) ───────────────────────────────────────────────

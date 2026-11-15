@@ -371,7 +371,7 @@ pub(crate) fn Fn<E>(Reject:Option<E>) -> Result<(), E> {
 
 - Consumer: `crates/aphrodite/Source/ABI/Guard.rs`, inside `CheckContent`, which writes
   `crate::ABI::Guard::Reject::Fn::Fn(Content.is_empty().then(|| anyhow::anyhow!("empty content")))?`
-  - the crate-rooted path because the consumer's own module is also named `Guard`.
+    - the crate-rooted path because the consumer's own module is also named `Guard`.
 
 The predicate survives exactly once, here: `bool::then` turns the condition into an `Option` and
 `map_or` turns its absence into `Ok`. `then` and not `then_some`, because `then_some(anyhow!("..."))`
@@ -382,13 +382,13 @@ statements in the original order, each constructing its error only when it rejec
 `clippy::all`, so it fails a `-D warnings` gate - rejects that form, and `then_some(A).unwrap_or(B)`
 likewise. The lint-clean shapes that still remove the `if`:
 
-| Shape | Lint-clean replacement |
-| --- | --- |
-| nullable or zero test | `Option` / `NonZeroU64` + `map_or` (the guarded work cannot run) |
-| absence with a default | `Option::filter` + `unwrap_or_else` |
-| a choice between two domain values | a domain enum matched structurally |
+| Shape                              | Lint-clean replacement                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| nullable or zero test              | `Option` / `NonZeroU64` + `map_or` (the guarded work cannot run)        |
+| absence with a default             | `Option::filter` + `unwrap_or_else`                                     |
+| a choice between two domain values | a domain enum matched structurally                                      |
 | a boolean gate in front of a block | `let _ = Cond.then(\|\| { ... });` - no `unwrap_or` follows, so no lint |
-| a ternary over an `Option` | `match Opt { Some(_) => a, None => b }` |
+| a ternary over an `Option`         | `match Opt { Some(_) => a, None => b }`                                 |
 
 `clippy::match_bool` is still allowed crate-wide, so `match Cond { true => ..., false => ... }` compiles
 today - it is not a durable choice, because the allow is scheduled for removal.

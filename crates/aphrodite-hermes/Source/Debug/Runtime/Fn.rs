@@ -6,6 +6,8 @@
 
 use std::path::PathBuf;
 
+use crate::Debug::Runtime::Fallback;
+
 /// Resolve the runtime home for debug artifacts.
 ///
 /// `$APHRODITE_DEBUG_HOME` (dev-only override, set by tests so the flag reader
@@ -22,24 +24,11 @@ use std::path::PathBuf;
 /// It does not create the home - callers that write are responsible for the
 /// directory existing, and a failed write degrades to "no persistence".
 pub(crate) fn Fn() -> PathBuf {
-	match std::env::var("APHRODITE_DEBUG_HOME") {
-		Ok(home) if !home.is_empty() => return PathBuf::from(home),
-		_ => {},
-	}
-
-	#[cfg(test)]
-	{
-		// Hermetic tests: route debug flags / session persistence away from
-		// the real runtime home so the live session's toggle and
-		// `session.current` can never leak into (or be polluted by) the
-		// test process.
-		let scratch = std::env::temp_dir().join("aphrodite-hermes-test-home");
-		let _ = std::fs::create_dir_all(&scratch);
-		scratch
-	}
-	#[cfg(not(test))]
-	{
-		aphrodite::Home::Runtime::Opt::Fn::Fn()
-			.unwrap_or_else(|| std::env::temp_dir().join(".hermes").join("aphrodite"))
-	}
+	// The override is a value, not a branch: an unset or empty
+	// `$APHRODITE_DEBUG_HOME` is `None`, and the fallback only runs for it.
+	std::env::var("APHRODITE_DEBUG_HOME")
+		.ok()
+		.filter(|Home| !Home.is_empty())
+		.map(PathBuf::from)
+		.unwrap_or_else(Fallback::Fn::Fn)
 }

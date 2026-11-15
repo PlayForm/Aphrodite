@@ -1,46 +1,29 @@
 //! Git porcelain / short-status code predicate.
 //!
-//! `git status --porcelain` writes a two-column code, a space, then a path.
-//! The git arm tallies staged against unstaged by reading those two columns,
-//! so the reader has to be strict: indented prose is not a status line, and a
-//! two-space prefix is not a code.
+//! `git status --porcelain` writes a two-column code, a space, then a path. The git arm tallies staged
+//! against unstaged by reading those two columns, so the reader has to be strict: indented prose is not
+//! a status line, and a two-space prefix is not a code.
+
+/// The bytes a status column may carry.
+const Codes:&[u8] = b"MADRCU?! T";
 
 /// Git porcelain / short-status code for a line, or `None`.
 ///
-/// Returns the two-character code (`M `, ` M`, `A `, `D `, `R `, `??`, `UU`)
-/// when the line is shaped `<col><col> <path>`. It is not a parser of the
-/// index: the code is returned verbatim and the caller decides what it means,
-/// so an unusual-but-real status is reported rather than dropped.
+/// Returns the two-character code (`M `, ` M`, `A `, `D `, `R `, `??`, `UU`) when the line is shaped
+/// `<col><col> <path>`. It is not a parser of the index: the code is returned verbatim and the caller
+/// decides what it means, so an unusual-but-real status is reported rather than dropped.
+///
+/// The four-byte minimum is a slice pattern rather than a length test, so the three columns this reads
+/// are proved present before they are read - and a line that is too short is the same `None` as a line
+/// whose columns are wrong.
 pub(crate) fn Fn(Line:&str) -> Option<&str> {
-	let b = Line.as_bytes();
+	let &[First, Second, Separator, ..] = Line.as_bytes() else { return None };
 
-	match b.len() < 4 {
-		true => {
-			return None;
-		},
-		false => {},
-	}
+	let Shaped = (First != b' ' || Second != b' ')
+		&& Codes.contains(&First)
+		&& Codes.contains(&Second)
+		&& Separator == b' '
+		&& !Line.get(3..).unwrap_or("").trim().is_empty();
 
-	let Codes = *b"MADRCU?! T";
-	let C0 = b[0];
-	let C1 = b[1];
-
-	// Reject an all-space prefix (that's just indented prose).
-	match (C0 == b' ' && C1 == b' ') || !Codes.contains(&C0) || !Codes.contains(&C1) {
-		true => {
-			return None;
-		},
-		false => {},
-	}
-
-	// Column 3 must be a space separating code from path, and a path follows.
-	match b[2] != b' ' || Line[3..].trim().is_empty() {
-		true => {
-			return None;
-		},
-		false => {},
-	}
-
-	// A two-char code of at least one real status letter (not `  `).
-	Line.get(..2)
+	Shaped.then_some(Line.get(..2)).flatten()
 }

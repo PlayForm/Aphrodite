@@ -49,24 +49,14 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	//   3. binary-relative (portable install: shipped directives/ next to
 	//      the executable, e.g. the Hermes plugin dir).
 	let mut dirs:Vec<std::path::PathBuf> = Vec::new();
-	match std::env::var("APHRODITE_DIRECTIVES_DIR") {
-		Ok(EnvironmentDirectory) => {
-			match !EnvironmentDirectory.trim().is_empty() {
-				true => {
-					dirs.push(std::path::PathBuf::from(EnvironmentDirectory));
-				},
-				false => {},
-			}
-		},
-		Err(_) => {},
-	}
+	let _ = std::env::var("APHRODITE_DIRECTIVES_DIR")
+		.ok()
+		.filter(|EnvironmentDirectory| !EnvironmentDirectory.trim().is_empty())
+		.map(|EnvironmentDirectory| dirs.push(std::path::PathBuf::from(EnvironmentDirectory)));
 
 	dirs.push(std::path::PathBuf::from("directives"));
 	dirs.push(HomeAphrodite.join("directives"));
-	match BinRelative {
-		Some(BinDirectory) => dirs.push(BinDirectory),
-		None => {},
-	}
+	let _ = BinRelative.map(|BinDirectory| dirs.push(BinDirectory));
 	// Candidates that were probed but unusable, kept for the builtin
 	// fallback's warn log - the old path failed silently.
 	let mut ProbedUnusable:Vec<String> = Vec::new();
@@ -101,22 +91,19 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 			false => ProbedUnusable.push(Directory.display().to_string()),
 		}
 	}
-	match Selected.is_none() {
-		true => {
-			// No usable directives/ directory found on disk - use baked-in defaults.
-			// This is the defensive path: a missing `~/.hermes/aphrodite/directives`
-			// (or an unreadable one) never breaks startup. Warns instead of failing
-			// silently so a setup that expected a custom set learns it got defaults.
-			tracing::warn!(
-				DirectiveSource = "builtins",
-				Probed = ?ProbedUnusable,
-				"no usable directives directory found (probed: {}); falling back to built-in directives",
-				ProbedUnusable.join(", ")
-			);
-			State.Directives = crate::Directive::Builtin::Fn();
-		},
-		false => {},
-	}
+	let _ = Selected.is_none().then(|| {
+		// No usable directives/ directory found on disk - use baked-in defaults.
+		// This is the defensive path: a missing `~/.hermes/aphrodite/directives`
+		// (or an unreadable one) never breaks startup. Warns instead of failing
+		// silently so a setup that expected a custom set learns it got defaults.
+		tracing::warn!(
+			DirectiveSource = "builtins",
+			Probed = ?ProbedUnusable,
+			"no usable directives directory found (probed: {}); falling back to built-in directives",
+			ProbedUnusable.join(", ")
+		);
+		State.Directives = crate::Directive::Builtin::Fn();
+	});
 	// Seed active directives: from TOML [directives] active list, filtered
 	// to those that actually loaded. If the TOML list resolves empty while
 	// directives ARE loaded (from builtins or disk), default to the
@@ -125,15 +112,12 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// turn proves it needs focus/explore/foresight/cleanup).
 	let Active = Configuration.GetStringList("directives", "active");
 	State.ActiveDirectives = Active.into_iter().filter(|name| State.Directives.contains_key(name)).collect();
-	match State.ActiveDirectives.is_empty() && !State.Directives.is_empty() {
-		true => {
-			State.ActiveDirectives.extend(
-				["focus", "foresight", "lazy"]
-					.into_iter()
-					.filter(|name| State.Directives.contains_key(*name))
-					.map(str::to_string),
-			);
-		},
-		false => {},
-	}
+	let _ = (State.ActiveDirectives.is_empty() && !State.Directives.is_empty()).then(|| {
+		State.ActiveDirectives.extend(
+			["focus", "foresight", "lazy"]
+				.into_iter()
+				.filter(|name| State.Directives.contains_key(*name))
+				.map(str::to_string),
+		);
+	});
 }

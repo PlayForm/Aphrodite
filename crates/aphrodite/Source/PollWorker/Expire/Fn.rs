@@ -1,37 +1,19 @@
-//! The `PostLLMCall` expiry pass: write off tasks nobody is polling.
+//! The `PostLLMCall` expiry entry point.
 //!
-//! Two separate clocks live here and they are not the same number. A running
-//! task goes stale when the agent has not polled it for `StaleTurnAge`
-//! turns; a finished task is dropped 16 turns after it started, so the agent
-//! has a window to retrieve output the nudge already announced. Collapsing
-//! the two into one threshold either kills a live build or forgets a
-//! completion the agent was told about.
+//! Called from `Hook::LLM::Post` after the turn counter advances, so the age
+//! comparisons see the turn the agent is about to be told about. The report is
+//! available to the caller that wants it; this entry point does not consume it,
+//! because nothing on the turn path acts on an expiry beyond the removal itself.
 
 use crate::{
-	PollWorker::Task::{Const::StaleTurnAge, Status::Enum::BgStatus},
+	PollWorker::{Expire::Apply::Fn::Fn as Apply, Registry::From::Fn::Fn as Registry},
 	State::Struct::AphroditeState,
 };
 
 /// Expire background tasks that the agent has stopped polling.
-/// Called from `PostLLMCall` after turn advancement.
 pub fn ExpireStaleTasks(State:&mut AphroditeState) {
 	let Turn = State.TurnCounter;
-	State.BgTasks.iter_mut().for_each(|task| {
-		match task.Status == BgStatus::Running && Turn.saturating_sub(task.LastPollTurn) > StaleTurnAge {
-			true => {
-				task.Status = BgStatus::Stale;
-			},
-			false => {},
-		}
-	});
+	let mut Tasks = Registry(&mut State.BgTasks);
 
-	// Drop completed/failed/stale tasks older than 16 turns.
-	State.BgTasks.retain(|task| {
-		match task.Status {
-			BgStatus::Running => true, // keep running tasks
-			BgStatus::Done { .. } | BgStatus::Failed { .. } | BgStatus::Stale => {
-				Turn.saturating_sub(task.StartedTurn) <= 16
-			},
-		}
-	});
+	let _Report = Apply(&mut Tasks, Turn);
 }

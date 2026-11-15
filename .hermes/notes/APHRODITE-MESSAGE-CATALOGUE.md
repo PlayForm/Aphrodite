@@ -16,14 +16,14 @@ replaces it, on its own board (`errors`), after the functional rewrite and the p
 
 Measured surface at the audit HEAD:
 
-| Shape | Count |
-| --- | --- |
-| `anyhow!(...)` | 29 |
-| `bail!(...)` | 20 |
-| `.context(..)` / `.with_context(..)` | 34 |
-| `#[error("...")]` (thiserror) | 0 |
-| `eprintln!` | 2 |
-| **total message sites** | **~83** (75 in `aphrodite`, 8 in `aphrodite-hermes`) |
+| Shape                                | Count                                                |
+| ------------------------------------ | ---------------------------------------------------- |
+| `anyhow!(...)`                       | 29                                                   |
+| `bail!(...)`                         | 20                                                   |
+| `.context(..)` / `.with_context(..)` | 34                                                   |
+| `#[error("...")]` (thiserror)        | 0                                                    |
+| `eprintln!`                          | 2                                                    |
+| **total message sites**              | **~83** (75 in `aphrodite`, 8 in `aphrodite-hermes`) |
 
 Small enough to catalogue exhaustively, large enough that the same six-word phrase is currently
 written four times in three modules.
@@ -33,19 +33,19 @@ written four times in three modules.
 Not every message may be reworded at runtime. Three classes, and the class is a property of the
 **consumer**, not of the text.
 
-| Class | Consumer | Example | Rewordable? |
-| --- | --- | --- | --- |
-| **Diagnostic** | a human reading a log, a CLI failure, or the model reading a tool result | `no API key configured - set APHRODITE_API_KEY ...` | **yes**, hot-reloadable |
-| **Contract** | a program that matches on the text | the three `CheckContent` refusals, the `{"error": ...}` JSON the C ABI returns to the plugin | **keyed and stable**; the wording may be versioned, never silently changed |
-| **Internal** | nobody; it is a debug breadcrumb | `tracing::debug!` fields | not in the catalogue |
+| Class          | Consumer                                                                 | Example                                                                                      | Rewordable?                                                                |
+| -------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Diagnostic** | a human reading a log, a CLI failure, or the model reading a tool result | `no API key configured - set APHRODITE_API_KEY ...`                                          | **yes**, hot-reloadable                                                    |
+| **Contract**   | a program that matches on the text                                       | the three `CheckContent` refusals, the `{"error": ...}` JSON the C ABI returns to the plugin | **keyed and stable**; the wording may be versioned, never silently changed |
+| **Internal**   | nobody; it is a debug breadcrumb                                         | `tracing::debug!` fields                                                                     | not in the catalogue                                                       |
 
-The test for **Contract**: *does any code, test, script or client outside this function depend on
-these bytes?* `Guard::CheckContent`'s three refusals are documented as "the whole diagnosis the C
+The test for **Contract**: _does any code, test, script or client outside this function depend on
+these bytes?_ `Guard::CheckContent`'s three refusals are documented as "the whole diagnosis the C
 side gets" - a host marshalling its own buffers distinguishes "sent nothing" from "sent too much"
 from "sent a NUL" **by that string**. Rewording it silently breaks a consumer that cannot see the
 source.
 
-So a Contract message keeps a stable key *and* a stable text; it participates in the catalogue for
+So a Contract message keeps a stable key _and_ a stable text; it participates in the catalogue for
 provenance and discovery, but the overlay refuses to change it unless the caller opts in with an
 explicit version bump. A Diagnostic message is free to change between runs.
 
@@ -79,7 +79,7 @@ The reason to prefer this over raw `format!` strings is that the compiler can ch
 Error::Raise!(Boot::Credential::MissingAPIKey, Variable = "APHRODITE_API_KEY")
 ```
 
-The macro - generated from the catalogue - expands to a constructor whose argument list *is* the
+The macro - generated from the catalogue - expands to a constructor whose argument list _is_ the
 catalogue's `fields` table. Consequences:
 
 - a missing field is a **compile error**, not a runtime `{}`-count panic;
@@ -134,32 +134,32 @@ text is part of an ABI, named one by one in the doc).
 
 ## 7. Migration phases
 
-| Phase | Deliverable | Acceptance |
-| --- | --- | --- |
-| **M1** | Exhaustive inventory: every site classified Diagnostic / Contract / Internal, with its proposed key | the counts in §0 match the tree; every site has a key |
-| **M2** | `messages.toml` + generated key enum + `Error::Raise!` macro | a call site cannot name a key that does not exist, and cannot omit a field |
-| **M3** | Overlay + provenance + hot reload, via the shared asset loader | editing the user overlay changes a Diagnostic message without a rebuild; `messages show` names the layer |
-| **M4** | Migrate all ~83 sites | probe from §6 returns only the named residue; every message at defaults is byte-identical to pre-migration |
-| **M5** | Wording benchmark: two catalogues, one corpus, compare preview/diagnosis fidelity | the harness reports a difference rather than a preference |
+| Phase  | Deliverable                                                                                         | Acceptance                                                                                                 |
+| ------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **M1** | Exhaustive inventory: every site classified Diagnostic / Contract / Internal, with its proposed key | the counts in §0 match the tree; every site has a key                                                      |
+| **M2** | `messages.toml` + generated key enum + `Error::Raise!` macro                                        | a call site cannot name a key that does not exist, and cannot omit a field                                 |
+| **M3** | Overlay + provenance + hot reload, via the shared asset loader                                      | editing the user overlay changes a Diagnostic message without a rebuild; `messages show` names the layer   |
+| **M4** | Migrate all ~83 sites                                                                               | probe from §6 returns only the named residue; every message at defaults is byte-identical to pre-migration |
+| **M5** | Wording benchmark: two catalogues, one corpus, compare preview/diagnosis fidelity                   | the harness reports a difference rather than a preference                                                  |
 
 M4 is where the risk lives, so its acceptance is byte-identity at defaults: a migration that changes
 a single message at the default catalogue has changed behaviour, not wording.
 
 ## 8. What this cannot do - the honest boundary
 
-The request behind this epic is broader than messages: *everything reduced to helpers, macros and
-code-generation, supporting hot-reload and plug-and-play pipelines*. That is achievable for **data**
+The request behind this epic is broader than messages: _everything reduced to helpers, macros and
+code-generation, supporting hot-reload and plug-and-play pipelines_. That is achievable for **data**
 and not for **behaviour**, and the distinction is worth stating plainly so the ambition lands
 somewhere real:
 
-| Layer | Hot-reloadable? | Why |
-| --- | --- | --- |
-| scalars, thresholds, caps (parameter spec) | **yes** | read once into an immutable value; a reload swaps it |
-| vocabularies, prompts, messages (this spec, §4.4) | **yes** | same mechanism, different parser |
-| pipeline **shape** - which stage runs, in what order | **no** | it is control flow in compiled code; a reload would mean an interpreter |
-| ABI symbols, wire keys, marker grammar | **never** | another process or stored data depends on the bytes |
+| Layer                                                | Hot-reloadable? | Why                                                                     |
+| ---------------------------------------------------- | --------------- | ----------------------------------------------------------------------- |
+| scalars, thresholds, caps (parameter spec)           | **yes**         | read once into an immutable value; a reload swaps it                    |
+| vocabularies, prompts, messages (this spec, §4.4)    | **yes**         | same mechanism, different parser                                        |
+| pipeline **shape** - which stage runs, in what order | **no**          | it is control flow in compiled code; a reload would mean an interpreter |
+| ABI symbols, wire keys, marker grammar               | **never**       | another process or stored data depends on the bytes                     |
 
-A genuinely plug-and-play pipeline would need the stages to be *named and composed* rather than
+A genuinely plug-and-play pipeline would need the stages to be _named and composed_ rather than
 called - an interpreter over a stage table. That is a different product with a different performance
 profile, and it is not required to get 90% of the value: with parameters, assets and messages all
 overlaid, everything an operator would want to tune is tunable, and the only thing requiring a
@@ -170,12 +170,12 @@ document's job is to make sure the three data layers are already uniform when it
 
 ## Claim-to-test
 
-| Claim | Probe | Pass condition |
-| --- | --- | --- |
-| Every message site is catalogued | `grep -rnE 'anyhow!\(\|bail!\(\|\.(with_)?context\(' crates/*/Source` | each hit resolves to a catalogue key, or is a named Protocol residue |
-| No message text remains in source | the same probe, counting literal-argument forms | zero outside the residue list |
-| A missing placeholder field does not compile | remove a field from one call site | compile error naming the key and the field |
-| A Diagnostic message reloads | edit the user overlay, re-read | new text without a rebuild; `messages show` reports layer `user` |
-| A Contract message does not reload silently | edit a Contract entry in the overlay | refused with a warning naming the missing `version` bump |
-| Defaults are byte-identical after migration | compare every message at the default catalogue against the pre-migration build | no difference |
-| A bad overlay degrades | write invalid TOML to the overlay | one warning with the line; compiled text still used |
+| Claim                                        | Probe                                                                          | Pass condition                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Every message site is catalogued             | `grep -rnE 'anyhow!\(\|bail!\(\|\.(with_)?context\(' crates/*/Source`          | each hit resolves to a catalogue key, or is a named Protocol residue |
+| No message text remains in source            | the same probe, counting literal-argument forms                                | zero outside the residue list                                        |
+| A missing placeholder field does not compile | remove a field from one call site                                              | compile error naming the key and the field                           |
+| A Diagnostic message reloads                 | edit the user overlay, re-read                                                 | new text without a rebuild; `messages show` reports layer `user`     |
+| A Contract message does not reload silently  | edit a Contract entry in the overlay                                           | refused with a warning naming the missing `version` bump             |
+| Defaults are byte-identical after migration  | compare every message at the default catalogue against the pre-migration build | no difference                                                        |
+| A bad overlay degrades                       | write invalid TOML to the overlay                                              | one warning with the line; compiled text still used                  |

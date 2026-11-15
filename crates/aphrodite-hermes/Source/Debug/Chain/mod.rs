@@ -6,4 +6,5 @@
 //! bounded walk over them.
 
 pub mod Fn;
+pub mod In;
 pub mod State;

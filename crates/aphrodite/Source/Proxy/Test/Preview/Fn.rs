@@ -1,7 +1,7 @@
 //! Proxy previews must equal the hook's: the same semantic shape has to
 //! produce the same preview through both paths.
 
-use crate::Proxy::Detect::Fn::Fn as ProxyDetectContentType;
+use crate::Proxy::Analysis::Classify::Fn::Fn as ProxyDetectContentType;
 
 // ── T3: build_preview ────────────────────────────────────────
 // 1.5.0 (REFACTOR-PLAN §7): `proxy_build_preview` is GONE - the proxy

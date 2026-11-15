@@ -1,51 +1,44 @@
 //! Stage 2 compression - semantic reduction of CCR-stored content.
-//! Port of plugins/aphrodite/_stage2.py
 //!
-//! Produces a denser version of a piece of content on demand via the
-//! stateless `aphrodite_stage2(content, ccr_type)` ABI (see
-//! `Library.rs::aphrodite_stage2`) - it takes content directly and returns the
-//! reduced string, with no interaction with the CCR store or the session's
-//! inline store.
+//! Produces a denser version of a piece of content on demand via the stateless
+//! `aphrodite_stage2(content, ccr_type)` ABI (see `Library.rs::aphrodite_stage2`) - it takes
+//! content directly and returns the reduced string, with no interaction with the CCR store or
+//! the session's inline store.
 //!
-//! There is currently no depth-aware retrieval: no `AphroditeRetrieve` /
-//! `ResolveOne` / `Resolve::Expand::Fn` entry point accepts a `Depth` parameter,
-//! and nothing in this crate writes a stage-2-reduced value back into the
-//! store under a `{hash}#stage2` key for a later plain retrieval to pick up
-//! (report 05 F6 - a version of this docstring used to claim
-//! `aphrodite_retrieve(hash, depth=2)` returns the reduced version; that
-//! entry point does not exist). Wiring depth-aware retrieval up for real is
-//! a deliberate feature decision - see `.plans/05-compression-pipeline.md`
-//! §5 - not something this module does today.
+//! There is no depth-aware retrieval: no `AphroditeRetrieve` / `ResolveOne` /
+//! `Resolve::Expand::Fn` entry point accepts a `Depth` parameter, and nothing in this crate
+//! writes a stage-2-reduced value back into the store under a `{hash}#stage2` key for a later
+//! plain retrieval to pick up. Wiring depth-aware retrieval up for real is a deliberate feature
+//! decision, not something this module does today.
 //!
-//! Reducers per content type:
-//! - JSON: whitespace minification + key extraction
-//! - Build/log: error/warning/summary extraction
-//! - Diff: file-level summary with hunk counts
-//! - Code: function/struct/class signature extraction
-//! - Other: pass through (return None = no reduction)
+//! The reduction is an OUTCOME, not an `Option`: "too small to bother", "no reducer registered
+//! for this type", "the reducer did not apply" and "it applied but saved nothing" are four
+//! different answers and only one of them is the caller's business. `Outcome` names all five
+//! (including the accepted reduction), and `Reduction` is a type only a strictly-shorter
+//! candidate can become - so "a reduction exists implies it is shorter" is a fact about the
+//! type rather than a check every caller has to remember.
 //!
-//! The tree is one file per item, so a new content type is a new reducer plus
-//! one registry line instead of an edit inside a monolith:
+//! Tree:
 //!
 //! - `Const.rs` - the size floor below which no reduction is attempted.
 //! - `Reducer/Type.rs` - the `fn(&str) -> Option<String>` shape of a reducer.
-//! - `Reduce/JSON|Build|Diff|Code/Fn.rs` - the four reducers.
-//! - `Name/Fn.rs` - the JSON value-kind label the JSON header prints.
-//! - `Regex/Fn.rs` - the prefix matcher the code reducer uses instead of a
-//!   regex crate dependency.
-//! - `Registry/Fn.rs` - CCR type string → reducer.
-//! - `Compress/Fn.rs` - the public entry point.
+//! - `Reduce/<Family>/` - one directory per content family, each with its own recognisers.
+//! - `Reduce/Sample/Struct.rs` - the bounded sample that keeps an exact total.
+//! - `Outcome/Enum.rs` - the five answers the entry point can give.
+//! - `Reduction/Struct.rs` - an accepted, strictly shorter replacement.
+//! - `Registry/Fn.rs` - CCR type string to reducer.
+//! - `Compress/Decide/Fn.rs` - the gates, as a value.
+//! - `Compress/Fn.rs` - the public `Option<String>` adapter.
 //!
-//! This facade declares the tree and re-exports the entry point under the name
-//! the rest of the crate and `aphrodite-hermes` already call it by. Nothing
-//! else belongs in this file.
+//! This facade declares the tree. Nothing else belongs in this file.
 
 pub mod Compress;
 pub mod Const;
 pub mod Name;
+pub mod Outcome;
 pub mod Reduce;
 pub mod Reducer;
-pub mod Regex;
+pub mod Reduction;
 pub mod Registry;
 
 #[cfg(test)]

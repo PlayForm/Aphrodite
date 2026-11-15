@@ -6,9 +6,12 @@
 //! (which writes `debug.<root>`), and the session id is mirrored to a file so a
 //! fresh process can recover it.
 
-use std::{collections::HashMap, sync::Mutex};
+use std::sync::Mutex;
 
-use crate::Debug::{Chain, Chain::State::SESSION_PARENTS, Runtime, Session::State::LAST_SESSION};
+use crate::Debug::{
+	Runtime,
+	Session::{Record::Resolve, State::LAST_SESSION},
+};
 
 /// Record session -> parent from a `pre_llm_call` invocation. Empty or
 /// self-referential pairs are ignored (a root session has no parent).
@@ -17,46 +20,28 @@ use crate::Debug::{Chain, Chain::State::SESSION_PARENTS, Runtime, Session::State
 /// `session.current`, because the point of that file is to track the CURRENT
 /// turn, not to be a one-time record. The parent edge, by contrast, is inserted
 /// once (`or_insert_with`) so a later contradictory edge cannot rewrite history.
-pub(crate) fn Fn(session:&str, parent:&str) {
-	match session {
-		"" => return,
-		_ => {},
-	}
+pub(crate) fn Fn(Session:&str, Parent:&str) {
+	// `Option::iter` is the zero-or-one loop: a call with no session id has no
+	// edge to record and no scope to publish, so nothing below runs for it.
+	(!Session.is_empty())
+		.then(|| {
+			{
+				let mut Last = LAST_SESSION
+					.get_or_init(|| Mutex::new(String::new()))
+					.lock()
+					.unwrap_or_else(std::sync::PoisonError::into_inner);
+				*Last = Session.to_string();
+			}
 
-	{
-		let mut last = LAST_SESSION
-			.get_or_init(|| Mutex::new(String::new()))
-			.lock()
-			.unwrap_or_else(std::sync::PoisonError::into_inner);
-		*last = session.to_string();
-	}
+			// Persist across process restarts: a fresh Hermes process (and every
+			// separate shim exec) starts with empty Rust statics, so the session
+			// id is mirrored to a tiny file that `Last::Fn::Fn` reads back.
+			// Best-effort - a failed write degrades to "no persistence", never
+			// an error.
+			let _ = std::fs::write(Runtime::Fn::Fn().join("session.current"), Session);
 
-	// Persist across process restarts: a fresh Hermes process (and every
-	// separate shim exec) starts with empty Rust statics, so the session id
-	// is mirrored to a tiny file that `last_session()` reads back.
-	// Best-effort - a failed
-	// write degrades to "no persistence", never an error.
-	let _ = std::fs::write(Runtime::Fn::Fn().join("session.current"), session);
-
-	match parent {
-		// Root session (no parent): publish it directly so the env-gated
-		// logger targets `debug.<root>` (crate::debug).
-		p if p.is_empty() || p == session => {
-			aphrodite::Debug::Root::Note::Fn::Fn(session);
-
-			return;
-		},
-		_ => {},
-	}
-
-	let mut map = SESSION_PARENTS
-		.get_or_init(|| Mutex::new(HashMap::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	map.entry(session.to_string()).or_insert_with(|| parent.to_string());
-
-	// Publish the ROOT of this session tree (root-most ancestor) so the
-	// env-gated logger targets `debug.<root>` for the whole tree.
-	let root = Chain::Fn::Fn(session).last().cloned().unwrap_or_else(|| session.to_string());
-	aphrodite::Debug::Root::Note::Fn::Fn(&root);
+			Resolve::Fn::Fn(Session, Parent)
+		})
+		.iter()
+		.for_each(|Root| aphrodite::Debug::Root::Note::Fn::Fn(Root));
 }

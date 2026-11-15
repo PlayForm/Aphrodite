@@ -31,17 +31,17 @@ It does **not** own: the style rules (`RUST-STYLE-FUNCTIONAL.md`), the naming ru
 The single most important rule here, because the alternative is a configurable binary that cannot
 read its own stored data.
 
-| Class | Meaning | Examples | Configurable? |
-| --- | --- | --- | --- |
-| **Tunable** | A policy choice. Two values are both correct; one scores better. | thresholds, caps, marker-group word lists, sampling widths, reducer limits, retry counts | **yes** |
-| **Protocol** | Bytes that cross a boundary another process or a stored payload depends on. | the marker grammar `<<<CCR ` / `>>>`, `SegMarker`, ABI symbol names, the cache-key field list, JSON keys on the wire | **no** |
-| **Internal** | Implementation detail with no observable policy meaning. | FNV offset/prime, atomic counter widths, `OnceLock` statics, test fixtures | **no** |
+| Class        | Meaning                                                                     | Examples                                                                                                             | Configurable? |
+| ------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **Tunable**  | A policy choice. Two values are both correct; one scores better.            | thresholds, caps, marker-group word lists, sampling widths, reducer limits, retry counts                             | **yes**       |
+| **Protocol** | Bytes that cross a boundary another process or a stored payload depends on. | the marker grammar `<<<CCR ` / `>>>`, `SegMarker`, ABI symbol names, the cache-key field list, JSON keys on the wire | **no**        |
+| **Internal** | Implementation detail with no observable policy meaning.                    | FNV offset/prime, atomic counter widths, `OnceLock` statics, test fixtures                                           | **no**        |
 
-The test for **Tunable**: *if two deployments could legitimately want different values, and no
-stored or in-flight data breaks when it changes, it is tunable.*
+The test for **Tunable**: _if two deployments could legitimately want different values, and no
+stored or in-flight data breaks when it changes, it is tunable._
 
-The test for **Protocol**: *if changing it invalidates data already written, or breaks a client
-already compiled against it, it is protocol - and it stays a constant with a comment saying why.*
+The test for **Protocol**: _if changing it invalidates data already written, or breaks a client
+already compiled against it, it is protocol - and it stays a constant with a comment saying why._
 
 `SegMarker` (`__APHRODITE_SEG__`) is the sharpest example: it looks like a tunable string and is not.
 Chain-split output containing it is already stored; changing the value makes old segments
@@ -49,7 +49,7 @@ unrecognisable. Same for the marker prefix - retrieval of every existing entry d
 
 ## 3. The resolution model
 
-Four layers, highest precedence last, each **optional** and each defaulting to *inherit*:
+Four layers, highest precedence last, each **optional** and each defaulting to _inherit_:
 
 ```
 1. compiled default      crates/aphrodite/templates/parameters.toml, include_str!'d
@@ -162,7 +162,7 @@ connect_attempts = 3
 ```
 
 Every key carries a comment stating the unit and what changes when it moves. A key without a stated
-unit is a defect: `8192` means nothing until the file says *bytes*.
+unit is a defect: `8192` means nothing until the file says _bytes_.
 
 ### 4.3 Typed access
 
@@ -231,15 +231,15 @@ and becomes one macro invocation plus its doc comment.
 `Fn()` resolves in the same four layers as a scalar parameter, and returns a borrowed slice when the
 compiled default wins:
 
-| Layer | Source |
-| --- | --- |
-| compiled | the `include_str!` default, parsed once |
-| user | `~/.hermes/aphrodite/assets/<name>.txt` |
-| config | `[assets]` in `aphrodite.toml` (inline text or a path) |
-| override | the ABI / MCP surface, for benchmarks |
+| Layer    | Source                                                 |
+| -------- | ------------------------------------------------------ |
+| compiled | the `include_str!` default, parsed once                |
+| user     | `~/.hermes/aphrodite/assets/<name>.txt`                |
+| config   | `[assets]` in `aphrodite.toml` (inline text or a path) |
+| override | the ABI / MCP surface, for benchmarks                  |
 
 - **Provenance is part of the answer.** `aphrodite assets show signals` prints the resolved value
-  *and* which layer supplied it. A tuning loop where you cannot tell whether your edit took effect is
+  _and_ which layer supplied it. A tuning loop where you cannot tell whether your edit took effect is
   not a loop.
 - **Hot reload reuses the existing watcher.** `Boot/Listen/Watcher` already watches `aphrodite.toml`
   for threshold changes; it gains the assets directory rather than a second watcher being added. A
@@ -253,11 +253,11 @@ compiled default wins:
 
 ### Two families, one loader
 
-| Parser | Used for | Example |
-| --- | --- | --- |
-| `Lines` | a vocabulary or list, one entry per line | `Signals` |
-| `Text` | prose consumed whole | the built-in directives, retrieval guidance |
-| `Toml` / `Json` | structured assets | `parameters.toml`, prompt sets |
+| Parser          | Used for                                 | Example                                     |
+| --------------- | ---------------------------------------- | ------------------------------------------- |
+| `Lines`         | a vocabulary or list, one entry per line | `Signals`                                   |
+| `Text`          | prose consumed whole                     | the built-in directives, retrieval guidance |
+| `Toml` / `Json` | structured assets                        | `parameters.toml`, prompt sets              |
 
 **Class still governs overridability.** A `Text` asset holding a prompt is tunable. An asset holding
 the marker grammar is `Protocol` and the macro refuses `class: Tunable` for it at compile time - the
@@ -265,12 +265,12 @@ same boundary as §2, enforced in one place instead of by convention.
 
 ### What this replaces
 
-| Today | After |
-| --- | --- |
-| `const Signals:&[&str] = &[ ... ];` | `Embedded::Declare!` + `Signals::Fn::Fn()` |
-| `("focus", include_str!("../BuiltinDirective/focus.md"))` × 7 | one `Text` asset per directive, overridable, provenance-tracked |
-| `Setup/Write/PluginShim.rs` `include_str!` | **stays** - it is the plugin shim, a `Protocol` asset copied verbatim |
-| `Setup/Write/ConfigurationTemplate.rs` `include_str!` | **stays** - the toml template, same reason |
+| Today                                                         | After                                                                 |
+| ------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `const Signals:&[&str] = &[ ... ];`                           | `Embedded::Declare!` + `Signals::Fn::Fn()`                            |
+| `("focus", include_str!("../BuiltinDirective/focus.md"))` × 7 | one `Text` asset per directive, overridable, provenance-tracked       |
+| `Setup/Write/PluginShim.rs` `include_str!`                    | **stays** - it is the plugin shim, a `Protocol` asset copied verbatim |
+| `Setup/Write/ConfigurationTemplate.rs` `include_str!`         | **stays** - the toml template, same reason                            |
 
 The last two are why the class exists: an override on the shim would let a user break their own
 install.
@@ -282,65 +282,65 @@ implementing. **T** = tunable, **P** = protocol, **I** = internal.
 
 ### 5.1 Classification tables (the shape the request named)
 
-| Current path | Const | Value | Class |
-| --- | --- | --- | --- |
-| `Tool/Unwrap/Matcher/Terminal/Classify/Resolve/Fn.rs` | `FAILURE` | `["exit code:", "Error:"]` | **T** |
-| same | `BUILD` | `["   Compiling", "    Finished", "   Running", "test result:", "   Building", "   Installing", "warning:", "error["]` | **T** |
-| same | `BUILD_ERROR` | `["error[", "error: could not"]` | **T** |
-| `ChainSplit/ErrorHint/Signals/Const.rs` | `Signals` | `["error", "failed", "failure", "panic", "traceback", "fatal", "cannot", "not found", "no such file", "permission denied", "unresolved import", "undefined"]` | **T** - a content-level vocabulary, not a grammar; it must keep saying what a segment said, never name a mechanism |
-| `Tool/Unwrap/Matcher/Single/Fn.rs` | `PRIORITY` | `["description", "summary", "result", "message", "preview", "found"]` | **T** |
-| `Configuration/Path/Classify/Fn.rs` | `ESSENTIAL` | tool-name list | **T** |
-| `Hook/Tool/Const.rs` | `EssentialTools` | tool-name list | **T** |
-| `PollWorker/Should/Command/Fn.rs` | `SlowCommandPrefixes` | command prefixes | **T** |
-| `Proxy/Analysis/Classify/FirstLine/Fn.rs` | `Rules` | 3 first-line rules | **T** |
-| `Proxy/Upstream/Headers/Fn.rs` | `Skip` | forwarded-header skip list | **T** |
-| `Flow/Signature/Const.rs` | `VolatileKeys` | signature-volatile keys | **T** |
-| `Preview/Text/EnvelopeJSON.rs` | `Guard` | envelope guard words | **T** |
-| `Guard/Loopback/Fn.rs` | `AllowedLoopbackHosts` | `["localhost", "127.0.0.1", ...]` | **P** (security) |
-| `Resolve/Parse/Prefix.rs` · `Suffix.rs` | `Const` | `"<<<CCR "` · `">>>"` | **P** |
-| `ChainSplit/Const.rs` | `SegMarker` | `"__APHRODITE_SEG__"` | **P** |
-| `Hook/Live/Const.rs` | `LiveMetaSuffix` · `LiveChunkSuffix` | `" live meta"` · `" live chunk "` | **P** |
+| Current path                                          | Const                                | Value                                                                                                                                                         | Class                                                                                                              |
+| ----------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `Tool/Unwrap/Matcher/Terminal/Classify/Resolve/Fn.rs` | `FAILURE`                            | `["exit code:", "Error:"]`                                                                                                                                    | **T**                                                                                                              |
+| same                                                  | `BUILD`                              | `["   Compiling", "    Finished", "   Running", "test result:", "   Building", "   Installing", "warning:", "error["]`                                        | **T**                                                                                                              |
+| same                                                  | `BUILD_ERROR`                        | `["error[", "error: could not"]`                                                                                                                              | **T**                                                                                                              |
+| `ChainSplit/ErrorHint/Signals/Const.rs`               | `Signals`                            | `["error", "failed", "failure", "panic", "traceback", "fatal", "cannot", "not found", "no such file", "permission denied", "unresolved import", "undefined"]` | **T** - a content-level vocabulary, not a grammar; it must keep saying what a segment said, never name a mechanism |
+| `Tool/Unwrap/Matcher/Single/Fn.rs`                    | `PRIORITY`                           | `["description", "summary", "result", "message", "preview", "found"]`                                                                                         | **T**                                                                                                              |
+| `Configuration/Path/Classify/Fn.rs`                   | `ESSENTIAL`                          | tool-name list                                                                                                                                                | **T**                                                                                                              |
+| `Hook/Tool/Const.rs`                                  | `EssentialTools`                     | tool-name list                                                                                                                                                | **T**                                                                                                              |
+| `PollWorker/Should/Command/Fn.rs`                     | `SlowCommandPrefixes`                | command prefixes                                                                                                                                              | **T**                                                                                                              |
+| `Proxy/Analysis/Classify/FirstLine/Fn.rs`             | `Rules`                              | 3 first-line rules                                                                                                                                            | **T**                                                                                                              |
+| `Proxy/Upstream/Headers/Fn.rs`                        | `Skip`                               | forwarded-header skip list                                                                                                                                    | **T**                                                                                                              |
+| `Flow/Signature/Const.rs`                             | `VolatileKeys`                       | signature-volatile keys                                                                                                                                       | **T**                                                                                                              |
+| `Preview/Text/EnvelopeJSON.rs`                        | `Guard`                              | envelope guard words                                                                                                                                          | **T**                                                                                                              |
+| `Guard/Loopback/Fn.rs`                                | `AllowedLoopbackHosts`               | `["localhost", "127.0.0.1", ...]`                                                                                                                             | **P** (security)                                                                                                   |
+| `Resolve/Parse/Prefix.rs` · `Suffix.rs`               | `Const`                              | `"<<<CCR "` · `">>>"`                                                                                                                                         | **P**                                                                                                              |
+| `ChainSplit/Const.rs`                                 | `SegMarker`                          | `"__APHRODITE_SEG__"`                                                                                                                                         | **P**                                                                                                              |
+| `Hook/Live/Const.rs`                                  | `LiveMetaSuffix` · `LiveChunkSuffix` | `" live meta"` · `" live chunk "`                                                                                                                             | **P**                                                                                                              |
 
 ### 5.2 Thresholds
 
-| Path | Const | Value | Class |
-| --- | --- | --- | --- |
-| `Proxy/Threshold/Const.rs` | `CacheCompressThreshold` | `8192` bytes | **T** |
-| same | `TokenCompressThreshold` | `1024` bytes | **T** |
-| same | `AutoExpandLimitDefault` | `102400` bytes | **T** |
-| same | `InlineCCRThreshold` | `256` bytes | **T** |
-| same | `InitialRatioEma` | `200` | **T** |
-| `Stage2/Const.rs` | `MinimumStage2Size` | `80` bytes | **T** |
+| Path                       | Const                    | Value          | Class |
+| -------------------------- | ------------------------ | -------------- | ----- |
+| `Proxy/Threshold/Const.rs` | `CacheCompressThreshold` | `8192` bytes   | **T** |
+| same                       | `TokenCompressThreshold` | `1024` bytes   | **T** |
+| same                       | `AutoExpandLimitDefault` | `102400` bytes | **T** |
+| same                       | `InlineCCRThreshold`     | `256` bytes    | **T** |
+| same                       | `InitialRatioEma`        | `200`          | **T** |
+| `Stage2/Const.rs`          | `MinimumStage2Size`      | `80` bytes     | **T** |
 
 ### 5.3 Caps and buffers
 
-| Path | Const | Value | Class |
-| --- | --- | --- | --- |
-| `ABI/Guard/Content/Const.rs` | `MaximumContent` | `16 * 1024 * 1024` | **T** |
-| `Proxy/Threshold/Const.rs` | `ResponseMaximumBodyBytes` | `64 MB` | **T** |
-| same | `ResponseCacheMaximumBodyBytes` | `1 MB` | **T** |
-| `Prefetch/Read/Const.rs` | `MaximumPrefetchSize` | `10 MB` | **T** |
-| `Tool/Read/Const.rs` | `MAX_PATH_READ` | `10 MB` | **T** |
-| `State/Const.rs` | `InlineMaximum` | `500` | **T** |
-| same | `DefaultInlineByteBudget` | `256 MB` | **T** |
-| same | `SplitEventCap` · `ToolEventCap` · `RecentMarkersCap` · `ReferencedFilesCap` | `16` · `200` · `200` · `100` | **T** |
-| same | `SplitAdaptMinimumEvents` | `4` | **T** |
-| `PollWorker/Task/Const.rs` | `MaximumBgTasks` · `StaleTurnAge` | `4` · `8` | **T** |
-| `Session/Turn/Fn.rs` | `ConvIndexCap` | `50` | **T** |
-| `Proxy/Metadata/JSON/Fn.rs` | `KeysLimit` | `10` | **T** |
-| `Hook/Live/Const.rs` | `LiveChunkSize` | `1024` | **T** |
-| `Proxy/State/Method/Record/Fn.rs` | `BucketLimits` | `[1e3, 1e4, 1e5, 1e6]` | **T** |
+| Path                              | Const                                                                        | Value                        | Class |
+| --------------------------------- | ---------------------------------------------------------------------------- | ---------------------------- | ----- |
+| `ABI/Guard/Content/Const.rs`      | `MaximumContent`                                                             | `16 * 1024 * 1024`           | **T** |
+| `Proxy/Threshold/Const.rs`        | `ResponseMaximumBodyBytes`                                                   | `64 MB`                      | **T** |
+| same                              | `ResponseCacheMaximumBodyBytes`                                              | `1 MB`                       | **T** |
+| `Prefetch/Read/Const.rs`          | `MaximumPrefetchSize`                                                        | `10 MB`                      | **T** |
+| `Tool/Read/Const.rs`              | `MAX_PATH_READ`                                                              | `10 MB`                      | **T** |
+| `State/Const.rs`                  | `InlineMaximum`                                                              | `500`                        | **T** |
+| same                              | `DefaultInlineByteBudget`                                                    | `256 MB`                     | **T** |
+| same                              | `SplitEventCap` · `ToolEventCap` · `RecentMarkersCap` · `ReferencedFilesCap` | `16` · `200` · `200` · `100` | **T** |
+| same                              | `SplitAdaptMinimumEvents`                                                    | `4`                          | **T** |
+| `PollWorker/Task/Const.rs`        | `MaximumBgTasks` · `StaleTurnAge`                                            | `4` · `8`                    | **T** |
+| `Session/Turn/Fn.rs`              | `ConvIndexCap`                                                               | `50`                         | **T** |
+| `Proxy/Metadata/JSON/Fn.rs`       | `KeysLimit`                                                                  | `10`                         | **T** |
+| `Hook/Live/Const.rs`              | `LiveChunkSize`                                                              | `1024`                       | **T** |
+| `Proxy/State/Method/Record/Fn.rs` | `BucketLimits`                                                               | `[1e3, 1e4, 1e5, 1e6]`       | **T** |
 
 ### 5.4 Preview and extraction
 
-| Path | Const | Value | Class |
-| --- | --- | --- | --- |
-| `Preview/State/Maximum.rs` | `PreviewMaximumChars` | runtime atomic, default `120` | **T** |
-| `StructExtract/MaximumSignatureLength.rs` | `Const` | `60` | **T** |
-| `StructExtract/MaximumParametersLength.rs` | `Const` | `35` | **T** |
-| `StructExtract/Budget.rs` | `Const` | `300` | **T** |
-| `StructExtract/Detect.rs` | `AutoDetectScanLines` | `60` | **T** |
-| `Directive/Model.rs` | `MaximumDirectiveChars` · `MaximumCombinedChars` | `2000` · `4000` | **T** |
+| Path                                       | Const                                            | Value                         | Class |
+| ------------------------------------------ | ------------------------------------------------ | ----------------------------- | ----- |
+| `Preview/State/Maximum.rs`                 | `PreviewMaximumChars`                            | runtime atomic, default `120` | **T** |
+| `StructExtract/MaximumSignatureLength.rs`  | `Const`                                          | `60`                          | **T** |
+| `StructExtract/MaximumParametersLength.rs` | `Const`                                          | `35`                          | **T** |
+| `StructExtract/Budget.rs`                  | `Const`                                          | `300`                         | **T** |
+| `StructExtract/Detect.rs`                  | `AutoDetectScanLines`                            | `60`                          | **T** |
+| `Directive/Model.rs`                       | `MaximumDirectiveChars` · `MaximumCombinedChars` | `2000` · `4000`               | **T** |
 
 ### 5.5 Internal (stays constant)
 
@@ -406,21 +406,21 @@ aphrodite bench generate --space parameters.space.toml --strategy pairwise --out
 ```
 
 where the space file names each parameter's candidate values. Each generated case is a directory:
-the parameters, the input, and the expected *fidelity predicates* (not expected bytes).
+the parameters, the input, and the expected _fidelity predicates_ (not expected bytes).
 
 ## 8. Migration phases
 
 Each phase is independently shippable and independently revertable.
 
-| Phase | Deliverable | Acceptance |
-| --- | --- | --- |
-| **P1** | `parameters.toml` + typed `Parameters` struct + generator; every value still compiled in, nothing reads the file yet | binary behaviour byte-identical; the struct's fields equal the constants they replace |
-| **P2** | Layer 1 wired: boot parses the embedded TOML into `Parameters`, stages receive it | same outputs as P1 on the corpus |
-| **P3** | Layer 2 wired: `[parameters]` in `aphrodite.toml` overrides, with per-key warnings on bad values | a benchmark run at defaults and at an overridden value differs only in the overridden behaviour |
-| **P4** | Layer 3 (env) + Layer 4 (ABI/MCP override) | an override via each layer changes the same observable |
-| **P5** | Benchmark harness + corpus + score | two runs on the same parameters score identically |
-| **P6** | Pairwise case generator | N cases generated from the space file; each runs and reports |
-| **P7** | `Embedded::Declare!` + overlay + provenance (`assets list\|show\|diff`) | `Signals` reads through the accessor; a file in `~/.hermes/aphrodite/assets/` overrides it without a rebuild; `assets show signals` names the layer that supplied it |
+| Phase  | Deliverable                                                                                                          | Acceptance                                                                                                                                                           |
+| ------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P1** | `parameters.toml` + typed `Parameters` struct + generator; every value still compiled in, nothing reads the file yet | binary behaviour byte-identical; the struct's fields equal the constants they replace                                                                                |
+| **P2** | Layer 1 wired: boot parses the embedded TOML into `Parameters`, stages receive it                                    | same outputs as P1 on the corpus                                                                                                                                     |
+| **P3** | Layer 2 wired: `[parameters]` in `aphrodite.toml` overrides, with per-key warnings on bad values                     | a benchmark run at defaults and at an overridden value differs only in the overridden behaviour                                                                      |
+| **P4** | Layer 3 (env) + Layer 4 (ABI/MCP override)                                                                           | an override via each layer changes the same observable                                                                                                               |
+| **P5** | Benchmark harness + corpus + score                                                                                   | two runs on the same parameters score identically                                                                                                                    |
+| **P6** | Pairwise case generator                                                                                              | N cases generated from the space file; each runs and reports                                                                                                         |
+| **P7** | `Embedded::Declare!` + overlay + provenance (`assets list\|show\|diff`)                                              | `Signals` reads through the accessor; a file in `~/.hermes/aphrodite/assets/` overrides it without a rebuild; `assets show signals` names the layer that supplied it |
 
 A phase that changes an output at default parameters is a bug in that phase, not a finding.
 
@@ -436,12 +436,12 @@ A phase that changes an output at default parameters is a bug in that phase, not
 
 ## Claim-to-test
 
-| Claim | Probe | Pass condition |
-| --- | --- | --- |
-| No tuning constant remains hardcoded | `grep -rnE 'const [A-Z][A-Za-z]*\s*:\s*(usize\|u64\|&\[&str\])' crates/*/Source` | every hit is classed **P** or **I** in this document |
-| The catalogue matches the defaults | the generator's `--check` mode | exit 0 |
-| Protocol values are not configurable | a test that the parameters struct has no field feeding the marker grammar | compile error if one is added |
-| A bad override degrades | set `threshold.cache.compress = "abc"` in the user toml, boot | one warning naming the key; pipeline runs at the default |
-| Absent is not zero | remove a limit key, boot | the limit takes the embedded default, not `0` |
-| A parameter change is measurable | two `bench` runs differing in one key | scores differ; the run prints the resolved parameters |
-| Pairwise generation is bounded | `bench generate` on a 10×5 space | tens of cases, not millions; every pair covered |
+| Claim                                | Probe                                                                            | Pass condition                                           |
+| ------------------------------------ | -------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| No tuning constant remains hardcoded | `grep -rnE 'const [A-Z][A-Za-z]*\s*:\s*(usize\|u64\|&\[&str\])' crates/*/Source` | every hit is classed **P** or **I** in this document     |
+| The catalogue matches the defaults   | the generator's `--check` mode                                                   | exit 0                                                   |
+| Protocol values are not configurable | a test that the parameters struct has no field feeding the marker grammar        | compile error if one is added                            |
+| A bad override degrades              | set `threshold.cache.compress = "abc"` in the user toml, boot                    | one warning naming the key; pipeline runs at the default |
+| Absent is not zero                   | remove a limit key, boot                                                         | the limit takes the embedded default, not `0`            |
+| A parameter change is measurable     | two `bench` runs differing in one key                                            | scores differ; the run prints the resolved parameters    |
+| Pairwise generation is bounded       | `bench generate` on a 10×5 space                                                 | tens of cases, not millions; every pair covered          |

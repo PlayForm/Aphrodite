@@ -22,24 +22,29 @@ use super::{
 	Stats,
 	Test,
 };
-use crate::Tool::Dispatch::Fn::ToolHandler;
 #[cfg(debug_assertions)]
 use super::Debug;
+use crate::Tool::Dispatch::Fn::ToolHandler;
 
 /// Build the name -> handler table for every registered tool.
 ///
-/// The dev-only `aphrodite_debug` family is added under `debug_assertions` only: a
-/// release dylib that registered it fails `hermes plugins validate` rule 6 as an
-/// undeclared tool, because the manifest declares exactly 13.
+/// The table is the COLLECTION's result, never an externally mutated map: the
+/// families are an iterator, the dev-only family is chained onto it, and the
+/// `collect` is the whole body. A loop that inserted into a `HashMap` the caller
+/// also held would make "one handler per name" a convention rather than a
+/// property of the expression.
+///
+/// The dev-only `aphrodite_debug` family is chained LAST and only under
+/// `debug_assertions`: a release dylib that registered it fails
+/// `hermes plugins validate` rule 6 as an undeclared tool, because the manifest
+/// declares exactly 13.
 ///
 /// `context_engine_pre_llm` is in this table despite not being a model-visible
 /// tool - it is an internal hook handler registered via
 /// `ctx.register_context_engine`, and the schema/registry consistency test
 /// excludes it by name for that reason.
 pub(crate) fn Fn() -> HashMap<&'static str, ToolHandler> {
-	let mut m:HashMap<&'static str, ToolHandler> = HashMap::new();
-
-	[
+	let Production = [
 		Compress::Fn::Fn(),
 		Retrieve::Fn::Fn(),
 		Stats::Fn::Fn(),
@@ -55,16 +60,13 @@ pub(crate) fn Fn() -> HashMap<&'static str, ToolHandler> {
 		Rebuild::Fn::Fn(),
 		ContextEngine::Fn::Fn(),
 	]
-	.into_iter()
-	.for_each(|(name, handler)| {
-		m.insert(name, handler);
-	});
+	.into_iter();
 
 	#[cfg(debug_assertions)]
-	{
-		let (name, handler) = Debug::Fn::Fn();
-		m.insert(name, handler);
-	}
+	let DebugOnly = std::iter::once(Debug::Fn::Fn());
 
-	m
+	#[cfg(not(debug_assertions))]
+	let DebugOnly = std::iter::empty::<(&'static str, ToolHandler)>();
+
+	Production.chain(DebugOnly).collect()
 }

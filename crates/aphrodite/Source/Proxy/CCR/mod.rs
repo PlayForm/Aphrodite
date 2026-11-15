@@ -1,8 +1,10 @@
-//! The `/ccr/*` management surface.
+//! The CCR management surface: create, list, delete, reload, and the webhook
+//! that announces a new entry.
 //!
-//! Create, list, delete and reload are the operations an external client (the
-//! Hermes plugin, an operator's curl) uses to drive the store the proxy owns.
-//! They share the store but not a transaction, so each verb is its own leaf.
+//! `/ccr/create` is split the way its own stage comments named it: decode the
+//! body, build the store command, execute it, then render the outcome or the
+//! rejection. Each stage is a value in and a value out, so the handler is a
+//! sequence of decisions rather than a nest of early returns.
 
 pub mod Create;
 pub mod Delete;

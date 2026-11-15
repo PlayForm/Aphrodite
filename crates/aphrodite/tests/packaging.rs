@@ -35,7 +35,7 @@ fn CollectIncludeStrPaths(Source:&str) -> Vec<String> {
 				let Inner = &AfterKw[Open + 1..];
 				if let Some(Close) = Inner.find('"') {
 					let path = &Inner[..Close];
-					let Normalized = path.strip_prefix("../").unwrap_or(path);
+					let Normalized = path.trim_start_matches("../");
 					let Normalized = Normalized.strip_prefix("Source/").unwrap_or(Normalized);
 					if Normalized.starts_with("BuiltinDirective/") {
 						Out.push(format!("Source/{}", Normalized));
@@ -55,13 +55,13 @@ fn PackagedTarballContainsAllBuiltinDirectives() {
 	let CrateDirectory = env!("CARGO_MANIFEST_DIR");
 
 	// 1. Read Builtin.rs (where the include_str! targets live) and find them.
-	let DirectivesPath = Path::new(CrateDirectory).join("Source/Directive/Builtin.rs");
-	let Source =
-		std::fs::read_to_string(&DirectivesPath).expect("Source/Directive/Builtin.rs must be readable in the checkout");
+	let DirectivesPath = Path::new(CrateDirectory).join("Source/Directive/Embedded/Const.rs");
+	let Source = std::fs::read_to_string(&DirectivesPath)
+		.expect("Source/Directive/Embedded/Const.rs must be readable in the checkout");
 	let Targets = CollectIncludeStrPaths(&Source);
 	assert!(
 		!Targets.is_empty(),
-		"expected at least one include_str! target in Source/Directive/Builtin.rs"
+		"expected at least one include_str! target in Source/Directive/Embedded/Const.rs"
 	);
 
 	// 2. List the real packaged tarball contents.

@@ -1,71 +1,59 @@
-//! An error payload: the trace location, the first message and the error
-//! count. The trace slice walks back to a char boundary - a CJK comment before
-//! `.rs:` used to panic the byte slice.
+//! An error payload: the trace location, the first message and the error count.
+//!
+//! The trace slice walks back to a char boundary - a CJK comment before `.rs:`
+//! used to panic the byte slice. `Pos` itself is a valid boundary (`.find` on
+//! ASCII patterns), but the offsets around it are arbitrary byte positions and
+//! can land mid-codepoint on non-ASCII lines.
 
-pub(crate) fn Fn(Content:&str, Parts:&mut Vec<String>) {
-	let mut Trace = String::new();
+use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
 
-	let _ = Content.lines().try_for_each(|l| -> Result<(), ()> {
-		let t = l.trim();
-		let ExtPos = t.find(".rs:").or_else(|| t.find(".py:")).or_else(|| t.find(".go:"));
+/// Where it happened, what it said, and how many of them there are.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
+	let Content = Analysis.Content;
+	let Trace = Content.lines().find_map(|Line| {
+		let Trimmed = Line.trim();
+		let Position = Trimmed
+			.find(".rs:")
+			.or_else(|| Trimmed.find(".py:"))
+			.or_else(|| Trimmed.find(".go:"))?;
+		let Start = (0..=Position.saturating_sub(12))
+			.rev()
+			.find(|Offset| Trimmed.is_char_boundary(*Offset))
+			.unwrap_or(0);
+		let End = (Position + 40).min(Trimmed.len());
+		let End = (End..=Trimmed.len())
+			.find(|Offset| Trimmed.is_char_boundary(*Offset))
+			.unwrap_or(Trimmed.len());
 
-		match ExtPos {
-			Some(Pos) => {
-				// `Pos` itself is a valid boundary (`.find` on ASCII
-				// patterns), but `Start`/`End` are arbitrary byte offsets
-				// from it and can land mid-codepoint on non-ASCII lines
-				// (e.g. a CJK comment before ".rs:") - snap both to the
-				// nearest valid boundary rather than panicking on `t[..]`.
-				let Start = (0..=Pos.saturating_sub(12)).rev().find(|&b| t.is_char_boundary(b)).unwrap_or(0);
-				let End = (Pos + 40).min(t.len());
-				let End = (End..=t.len()).find(|&b| t.is_char_boundary(b)).unwrap_or(t.len());
-
-				Trace = t[Start..End].to_string();
-
-				Err(())
-			},
-			None => Ok(()),
-		}
+		Some(Trimmed[Start..End].to_owned())
 	});
+	let Message = Content
+		.lines()
+		.find(|Line| Line.contains("Error:") || Line.contains("error["))
+		.map(|Line| {
+			let Trimmed = Line.trim();
+			let Index = Trimmed.find("Error:").or_else(|| Trimmed.find("error[")).unwrap_or(0);
 
-	match !Trace.is_empty() {
-		true => {
-			Parts.push(format!("trace={}", Trace.replace('|', "/")));
-		},
-		false => {},
-	}
+			Trimmed[Index..].chars().take(80).collect::<String>().replace('|', "/")
+		})
+		.or_else(|| {
+			let FirstLine = Content.lines().next().unwrap_or("").trim();
 
-	let Message = Content.lines().find(|l| l.contains("Error:") || l.contains("error[")).map(|l| {
-		let t = l.trim();
-		let Index = t.find("Error:").or_else(|| t.find("error[")).unwrap_or(0);
-		t[Index..].chars().take(80).collect::<String>().replace('|', "/")
-	});
-
-	match Message {
-		Some(m) => {
-			Parts.push(format!("msg={}", m));
-		},
-		None => {
-			let Fl = Content.lines().next().unwrap_or("").trim();
-
-			match !Fl.is_empty() {
-				true => {
-					Parts.push(format!("msg={}", Fl.chars().take(80).collect::<String>().replace('|', "/")));
-				},
-				false => {},
-			}
-		},
-	}
-
+			(!FirstLine.is_empty()).then(|| FirstLine.chars().take(80).collect::<String>().replace('|', "/"))
+		});
 	let ErrorCount = Content
 		.lines()
-		.filter(|l| l.contains("error") || l.starts_with("thread '"))
+		.filter(|Line| Line.contains("error") || Line.starts_with("thread '"))
 		.count();
 
-	match ErrorCount > 0 {
-		true => {
-			Parts.push(format!("N_errors={}", ErrorCount));
-		},
-		false => {},
-	}
+	[
+		Trace
+			.filter(|Trace| !Trace.is_empty())
+			.map(|Trace| MetadataField::New("trace", Trace.replace('|', "/"))),
+		Message.map(|Message| MetadataField::New("msg", Message)),
+		(ErrorCount > 0).then(|| MetadataField::New("N_errors", ErrorCount.to_string())),
+	]
+	.into_iter()
+	.flatten()
+	.collect()
 }

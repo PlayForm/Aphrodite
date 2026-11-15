@@ -20,12 +20,9 @@ pub(crate) fn transform_tool_result(state:&mut AphroditeState, input:&HookInput)
 
 	// Poll-result tracking: update running BgTasks from
 	// process(action='poll') results. Only active when poll_worker is enabled.
-	match (state.PollWorkerEnabled, tool) {
-		(true, "process") => {
-			aphrodite::PollWorker::Update::Fn::UpdateFromPoll(state, tool, tool_content);
-		},
-		_ => {},
-	};
+	if state.PollWorkerEnabled && tool == "process" {
+		aphrodite::PollWorker::Update::Fn::UpdateFromPoll(state, tool, tool_content);
+	}
 
 	// Hermes wraps every tool result in JSON (`{"output":...,
 	// "exit_code":...}`, `{"total_count":...,"matches":[...]}`,
@@ -55,13 +52,10 @@ pub(crate) fn transform_tool_result(state:&mut AphroditeState, input:&HookInput)
 		classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),
 		&meta,
 	);
-	match t0 {
-		Some(t0) => {
-			let us = t0.elapsed().as_micros() as u64;
-			aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, us);
-			post_tool_log(state, sid, &r, tool_content.len(), us);
-		},
-		None => {},
+	if let Some(t0) = t0 {
+		let us = t0.elapsed().as_micros() as u64;
+		aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, us);
+		post_tool_log(state, sid, &r, tool_content.len(), us);
 	}
 
 	// Per-session debug: the caller's session_id rides in the

@@ -43,10 +43,9 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 				let round = aphrodite::Resolve::Expand::Fn(state, hash);
 				let ok = round.as_deref() == Some(*content);
 
-				match ok {
-					true => passed += 1,
-					false => {},
-				}
+				// A round trip that matched is one more pass: the count is a
+				// value, not a branch.
+				passed += usize::from(ok);
 
 				checks.push(serde_json::json!({
 					"type": hint, "hash": hash,

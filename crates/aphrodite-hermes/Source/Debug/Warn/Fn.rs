@@ -16,8 +16,7 @@ use crate::Debug::Init::Const::TARGET;
 pub(crate) fn Fn(Message:&str) {
 	tracing::warn!(target: TARGET, "{}", Message);
 
-	match !tracing::dispatcher::has_been_set() {
-		true => eprintln!("aphrodite-hermes: {Message}"),
-		false => (),
-	}
+	// `eprintln!` is the fallback for a host that installed no subscriber, so it
+	// must not also fire when one exists: `then` keeps it off that path.
+	let _ = (!tracing::dispatcher::has_been_set()).then(|| eprintln!("aphrodite-hermes: {Message}"));
 }

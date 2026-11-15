@@ -7,6 +7,7 @@
 //! `SplitAdaptMinimumEvents` floor keeps a one-off split from being read as a
 //! trend at all.
 
+use super::Trend::{Decide::Fn::Fn as Decide, Enum::Enum as Trend};
 use crate::State::{Const::SplitAdaptMinimumEvents, Struct::AphroditeState};
 
 impl AphroditeState {
@@ -17,32 +18,35 @@ impl AphroditeState {
 	/// eagerly); agents that ignore them (< 25%) raise it (only split long
 	/// chains), capped by `ChainSplitMaximumSegments`. The threshold is
 	/// internal machinery - never rendered to the LLM.
+	///
+	/// The two early returns of the original are the two `Option` stages below:
+	/// too few events means no window at all, and a window that produced nothing
+	/// has no ratio. Both collapse to `Hold`, which is the honest answer for
+	/// "there is nothing to adapt from" - and `then`/`filter` keep the fold from
+	/// running when either condition already failed.
 	pub(super) fn AdaptChainSplitThreshold(&mut self) {
-		match self.SplitEvents.len() < SplitAdaptMinimumEvents {
-			true => return,
-			false => (),
-		}
+		let Trend = (self.SplitEvents.len() >= SplitAdaptMinimumEvents)
+			.then(|| {
+				self.SplitEvents.iter().fold((0usize, 0usize), |(Produced, Retrieved), Event| {
+					(Produced + Event.Produced, Retrieved + Event.Retrieved)
+				})
+			})
+			.filter(|(Produced, _)| *Produced > 0)
+			.map(|(Produced, Retrieved)| Retrieved as f64 / Produced as f64)
+			.map(|Ratio| {
+				Decide(
+					Ratio,
+					self.ChainSplitMinimumSegments,
+					self.ChainSplitFloor,
+					self.ChainSplitMaximumSegments,
+				)
+			})
+			.unwrap_or(Trend::Hold);
 
-		let Produced:usize = self.SplitEvents.iter().map(|e| e.Produced).sum();
-		let Retrieved:usize = self.SplitEvents.iter().map(|e| e.Retrieved).sum();
-
-		match Produced == 0 {
-			true => return,
-			false => (),
-		}
-
-		let Ratio = Retrieved as f64 / Produced as f64;
-
-		match () {
-			_ if Ratio >= 0.5 && self.ChainSplitMinimumSegments > self.ChainSplitFloor => {
-				// Segments are used - split more eagerly.
-				self.ChainSplitMinimumSegments -= 1;
-			},
-			_ if Ratio < 0.25 && self.ChainSplitMinimumSegments < self.ChainSplitMaximumSegments => {
-				// Segments are ignored - only split very long chains.
-				self.ChainSplitMinimumSegments += 1;
-			},
-			_ => (),
+		match Trend {
+			Trend::Decrease => self.ChainSplitMinimumSegments -= 1,
+			Trend::Increase => self.ChainSplitMinimumSegments += 1,
+			Trend::Hold => (),
 		}
 	}
 }

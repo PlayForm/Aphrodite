@@ -19,20 +19,29 @@
 //! looking for the threshold arithmetic lands on `State::Method::Threshold`
 //! instead of scrolling a monolith. Consumers name the leaf path directly, so
 //! the file that defines an item is the only place it is defined.
+//!
+//! The request path reads top to bottom: `Request::Semantics` interprets the
+//! inbound body once, `Cache::Lookup` answers it from the response cache when
+//! it may, `Handle::Proxy::Forward` sends it, and `Handle::Proxy::Respond`
+//! renders what came back.
 
+pub mod Analysis;
 pub mod Body;
 pub mod CCR;
 pub mod Cache;
 pub mod Compress;
-pub mod Detect;
+pub mod ContentType;
 pub mod Format;
 pub mod Handle;
+pub mod Log;
 pub mod Marker;
+pub mod Measurement;
 pub mod Metadata;
 pub mod Relay;
+pub mod Request;
 pub mod Secret;
 pub mod State;
-pub mod Stream;
+pub mod Storage;
 pub mod Threshold;
 pub mod Upstream;
 

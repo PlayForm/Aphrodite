@@ -13,7 +13,9 @@
 //! - `One/` - one hash, one store lookup, no unpacking.
 //! - `Recursive/` - the cycle-safe walk over nested markers, and its size-bounded
 //!   auto-expand variant.
-//! - `Filter/` - narrowing resolved content to the lines a query asked for.
+//! - `Filter/` - narrowing resolved content to the lines a query asked for, with
+//!   `Match/` as the line scan and `Fold/` as the case fold it applies (the
+//!   retrieve endpoint filters through the same scan).
 //! - `Parse/` - the marker grammar: the two delimiters, hash extraction, and the
 //!   scanner that finds markers in arbitrary text.
 //! - `Test/` - the battery, split by area.
@@ -26,6 +28,7 @@ pub mod Expand;
 pub mod Filter;
 pub mod One;
 pub mod Parse;
+pub mod Query;
 pub mod Recursive;
 
 #[cfg(test)]

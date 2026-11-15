@@ -1,27 +1,62 @@
-//! `BuildVars`: the complete template variable set.
+//! The complete template variable set.
 
 use std::collections::HashMap;
 
-use crate::Template::Vars::{Base::Fn::Fn as Base, Code::Fn::Fn as Code, Computed::Fn::Fn as Computed};
+use super::{
+	Code::Fn::Fn as Code,
+	Computed::Fn::Fn as Computed,
+	Default::Fn::Fn as Defaults,
+	Derive::Fn::Fn as Derive,
+};
 
 /// Build the template variable set from content, mirroring the pre-Rust
-/// `_make_ccr_preview` vars dict (plus its `fx`/`Cmx`/`sig1` computed vars).
-/// Every extraction is defensive: a value that cannot be derived from the
-/// content degrades to its pre-Rust default (`"?"`/`""`/`"0"`), never panics.
+/// `_make_ccr_preview` vars dict (plus its `fx`/`cmx`/`sig1` variables).
 ///
-/// The code branch is gated on the TYPE, not on the content: running the
-/// structure extractor over a log would cost a parse and could invent `Fns`
-/// counts for content that has no functions, and the pre-Rust engine only
-/// enriched code types. `Code` itself is included with an empty language,
-/// exactly as the Python side did.
+/// Four passes, in an order that is part of the contract: the flat defaults, then the
+/// content-derived values, then the structure map, then the variables derived from
+/// other variables. Every extraction is defensive - a value that cannot be derived
+/// from the content renders its pre-Rust default (`"?"`/`""`/`"0"`), never panics.
+///
+/// The three passes that produce values return TYPED RECORDS and this function
+/// renders them. That is the point of the split: a reader of `Derive::Fn::Fn` cannot
+/// invent a placeholder, and the namespace's defaults are visible in one place rather
+/// than spread over four scanners.
 pub(crate) fn Fn(TypeStr:&str, Content:&str) -> HashMap<String, String> {
-	let mut Vars = Base(TypeStr, Content);
-	match TypeStr {
-		"code" | "source_code" | "code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" => {
-			Code(&mut Vars, TypeStr, Content);
-		},
-		_ => (),
-	}
-	Computed(&mut Vars);
+	let Lines:Vec<&str> = Content.lines().collect();
+	let Lower:Vec<String> = Lines.iter().map(|Line| Line.to_ascii_lowercase()).collect();
+
+	let mut Vars = Defaults(TypeStr, Lines.len(), Content.len());
+
+	Derive(&mut Vars, Content, &Lines, &Lower);
+
+	// The empty record is the non-code answer, so the "is this code" gate is the
+	// record's own content rather than a branch here.
+	let Structure = Code(TypeStr, Content);
+
+	Vars.insert(
+		"fns".into(),
+		Structure.Fns.map_or_else(|| "?".to_string(), |Fns| Fns.to_string()),
+	);
+	Vars.insert("structs".into(), Structure.Structs.to_string());
+	Vars.insert("impls".into(), Structure.Impls.to_string());
+	Vars.insert("classes".into(), Structure.Classes.to_string());
+	// `sig1` is the first signature of the `sigs` string, so it is derived from the
+	// same value rather than computed twice.
+	Vars.insert(
+		"sig1".into(),
+		Structure
+			.Sigs
+			.split(';')
+			.next()
+			.map(|Signature| Signature.trim().to_string())
+			.unwrap_or_default(),
+	);
+	Vars.insert("sigs".into(), Structure.Sigs);
+
+	// `cmx` reads `cmd`, so it runs last. `get` rather than indexing: a missing key
+	// must read as "no command", not panic.
+	let Computed = Computed(Vars.get("cmd").map_or("", String::as_str));
+	Vars.insert("cmx".into(), Computed.Cmx);
+
 	Vars
 }

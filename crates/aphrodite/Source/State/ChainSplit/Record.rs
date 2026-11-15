@@ -12,30 +12,32 @@ impl AphroditeState {
 	/// was split into `Produced` segment markers whose hashes are registered
 	/// for retrieval attribution. Bounded ring (cap `SplitEventCap`), then
 	/// re-adapts the split threshold from the retrieval ratio.
+	///
+	/// An empty batch records nothing: `then` is what expresses that, and it
+	/// keeps the event id from advancing for a split that produced no segments.
+	///
+	/// The ring bound is `drain` over the excess rather than a pop loop: the
+	/// length is known, so the number to drop is arithmetic, and the eviction
+	/// happens in one call at the front where the oldest events sit.
 	pub fn RecordChainSplit(&mut self, Hashes:Vec<String>) {
-		match Hashes.is_empty() {
-			true => return,
-			false => (),
-		}
+		let _ = (!Hashes.is_empty()).then(|| {
+			self.SplitNextEventID += 1;
 
-		self.SplitNextEventID += 1;
-		let ID = self.SplitNextEventID;
-		let Produced = Hashes.len();
-		Hashes.iter().for_each(|h| {
-			self.SplitSegmentMap.insert(h.clone(), ID);
+			let ID = self.SplitNextEventID;
+			let Produced = Hashes.len();
+
+			Hashes.iter().for_each(|h| {
+				self.SplitSegmentMap.insert(h.clone(), ID);
+			});
+
+			self.SplitEvents
+				.push_back(SplitEvent { ID, Turn:self.TurnCounter, Produced, Retrieved:0 });
+
+			let Excess = self.SplitEvents.len().saturating_sub(SplitEventCap);
+
+			let _ = self.SplitEvents.drain(..Excess);
+
+			self.AdaptChainSplitThreshold();
 		});
-		self.SplitEvents
-			.push_back(SplitEvent { ID, Turn:self.TurnCounter, Produced, Retrieved:0 });
-
-		loop {
-			match self.SplitEvents.len() > SplitEventCap {
-				true => {
-					self.SplitEvents.pop_front();
-				},
-				false => break,
-			}
-		}
-
-		self.AdaptChainSplitThreshold();
 	}
 }

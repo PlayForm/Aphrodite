@@ -20,6 +20,10 @@ use super::{Hash, Prefix, Suffix};
 /// markers by literal text: the same hash may appear several times and only the
 /// exact marker string can be substituted in place. It is not a de-duplicator -
 /// a marker appearing twice is returned twice, and the caller replaces both.
+///
+/// A marker whose body carries no hash contributes nothing, and `extend` says so
+/// without an arm: the hash extractor's `Option` is already the answer to "is this
+/// a marker worth substituting", so there is no second test to keep in step.
 pub(crate) fn Fn(Content:&str) -> Vec<(String, String)> {
 	let mut Markers = Vec::new();
 	let mut SearchFrom = 0;
@@ -28,22 +32,20 @@ pub(crate) fn Fn(Content:&str) -> Vec<(String, String)> {
 		let AbsStart = SearchFrom + Start;
 		let AfterPrefix = AbsStart + Prefix::Const.len();
 
-		match Content[AfterPrefix..].find(Suffix::Const) {
-			Some(End) => {
-				let AbsEnd = AfterPrefix + End + Suffix::Const.len();
-				let FullMarker = Content[AbsStart..AbsEnd].to_string();
-				match Hash::Fn(&FullMarker) {
-					Some(hash) => Markers.push((FullMarker, hash)),
-					None => (),
-				}
+		// An unclosed prefix is stepped over, not treated as the end of the text:
+		// guessing at it would resolve a marker the writer never finished emitting.
+		let Some(End) = Content[AfterPrefix..].find(Suffix::Const) else {
+			SearchFrom = AfterPrefix;
 
-				SearchFrom = AbsEnd;
-			},
-			None => {
-				// Unclosed marker - skip past this prefix
-				SearchFrom = AfterPrefix;
-			},
-		}
+			continue;
+		};
+
+		let AbsEnd = AfterPrefix + End + Suffix::Const.len();
+		let FullMarker = Content[AbsStart..AbsEnd].to_string();
+
+		Markers.extend(Hash::Fn(&FullMarker).map(|hash| (FullMarker, hash)));
+
+		SearchFrom = AbsEnd;
 	}
 
 	Markers

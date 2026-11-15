@@ -8,11 +8,9 @@ use crate::{Debug::Log::At::Fn::Fn as LogAt, State::Struct::AphroditeState};
 /// The level comes from the STATE, not the process mirror: the engine runs on
 /// the session that owns it, and a skip reason recorded under another
 /// session's level would be the one line an investigation cannot trust.
+///
+/// The level-0 gate is a fast path in front of `LogAt`'s own gate: a quiet
+/// session formats nothing and touches no path.
 pub fn Fn(State:&AphroditeState, Reason:&str) {
-	match State.DebugLevel == 0 {
-		true => return,
-		false => (),
-	}
-
-	LogAt(State.DebugLevel, "engine_skip", &[("reason", Reason.to_string())]);
+	let _ = (State.DebugLevel != 0).then(|| LogAt(State.DebugLevel, "engine_skip", &[("reason", Reason.to_string())]));
 }

@@ -1,31 +1,39 @@
 //! Conversational Directives - lightweight behavioral context for the LLM.
 //!
-//! Directives are short `.md` files that inject behavioral instructions into
-//! the LLM's context via `PreLLMCall`. Unlike file content (which gets
-//! compressed into CCR markers), directives are **always inline** - they're
-//! compact enough to never need compression, and the engine injects them
-//! directly into the LLM's context without any file-system round-trip or
-//! retrieval step.
+//! Directives are short `.md` files that inject behavioral instructions into the LLM's
+//! context via `PreLLMCall`. Unlike file content (which gets compressed into CCR markers),
+//! directives are **always inline** - they are compact enough to never need compression,
+//! and the engine injects them directly into the LLM's context without any file-system
+//! round-trip or retrieval step.
 //!
-//! Per profile, per user: `directives/*.md` files are swappable at runtime
-//! via `aphrodite_directive("swap", "name")`.
+//! Per profile, per user: `directives/*.md` files are swappable at runtime via
+//! `aphrodite_directive("swap", "name")`.
 //!
-//! Atomized into a reverse-taxonomy tree: `Builtin.rs` (baked-in include_str!
-//! defaults), `Model.rs` (the directive struct + size caps), `Load.rs` (disk
-//! loading), `Build.rs` (context injection), `Action.rs` (runtime actions),
-//! `Test/` (the battery, split by area). Each leaf owns exactly one item and
-//! names it by kind, so the file says what the item is and the directory says
-//! what it is for.
+//! The tree follows the data's own path: `Model.rs` is the directive type, `Embedded/` is
+//! the baked-in `include_str!` table, `Builtin.rs` loads it, `Entry/` reads one directory
+//! entry, `Load.rs` walks the directory, `Cap/` holds the two size caps and the one
+//! function that applies the per-file one, `Build.rs` renders the injected context and
+//! `Action.rs` dispatches the runtime verbs (`Verb/`). `Test/` is the battery, split by
+//! area.
+//!
+//! A module that owns exactly one item stays a FILE (`Model.rs`, `Build.rs`, `Load.rs`,
+//! `Builtin.rs`, `Action.rs`), because its public path is the item's path: turning it into
+//! a directory would insert a segment and break every consumer. Only a module that
+//! genuinely holds several leaves becomes a directory.
 //!
 //! This facade declares the tree and nothing else. A consumer names the leaf
-//! (`Directive::Model::Struct::Struct`), so the file that defines an item is
-//! the only place it is defined and there is exactly one way to spell it.
+//! (`Directive::Model::Struct`), so the file that defines an item is the only place it is
+//! defined and there is exactly one way to spell it.
 
 pub mod Action;
 pub mod Build;
 pub mod Builtin;
+pub mod Cap;
+pub mod Embedded;
+pub mod Entry;
 pub mod Load;
 pub mod Model;
+pub mod Verb;
 
 #[cfg(test)]
 mod Test;

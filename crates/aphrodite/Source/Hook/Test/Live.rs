@@ -147,7 +147,7 @@ fn TestLiveContainerTerminalOverThresholdInstantMarker() {
 #[test]
 fn TestLiveContainerDefaultStateUnchanged() {
 	let s = AphroditeState::default();
-	assert_eq!(s.LiveContainer, false, "default state must keep live_container off");
+	assert!(!s.LiveContainer, "default state must keep live_container off");
 }
 
 // Auto-expand wins over the container path: under auto-expand (within

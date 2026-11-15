@@ -9,41 +9,14 @@
 
 use aphrodite::State::Struct::AphroditeState;
 
+use crate::Configuration::Path::{Classify, Render};
+
 /// Predict the compression path for a tool call (best-effort label for the
-/// pre_tool debug line; the transform arms log the actual outcome).
-pub(crate) fn expected_path(state:&AphroditeState, tool:&str, parsed:&serde_json::Value) -> String {
-	// Mirror of `Hook::ESSENTIAL_TOOLS` (dev-only log; kept in sync
-	// deliberately - drift here only mislabels a debug line).
-	const ESSENTIAL:&[&str] = &[
-		"skill_view",
-		"skills_list",
-		"skill_manage",
-		"memory",
-		"session_search",
-		"read_file",
-		"read_terminal",
-	];
-
-	let chained = tool == "terminal"
-		&& state.ChainSplitEnabled
-		&& parsed
-			.get("args")
-			.and_then(|a| a.get("command"))
-			.and_then(|v| v.as_str())
-			.is_some_and(|c| c.contains("&&"));
-
-	match (
-		ESSENTIAL.contains(&tool),
-		tool.starts_with("aphrodite_") || tool.starts_with("headroom"),
-		state.AutoExpand,
-		chained,
-		state.LiveContainer,
-	) {
-		(true, ..) => "passthrough_essential".into(),
-		(_, true, ..) => "passthrough_self".into(),
-		(_, _, true, ..) => "auto_expand".into(),
-		(_, _, _, true, _) => "chain_split".into(),
-		(_, _, _, _, true) => "live_container".into(),
-		_ => "compress_or_passthrough".into(),
-	}
+/// `pre_tool` debug line; the transform arms log the actual outcome).
+///
+/// Classification and rendering are separate leaves on purpose: the decision is
+/// a value (`Route::Enum`), and the label is a total function of that value, so
+/// a new route cannot reach the log without a match arm naming it.
+pub(crate) fn Fn(State:&AphroditeState, Tool:&str, Parsed:&serde_json::Value) -> String {
+	Render::Fn::Fn(Classify::Fn::Fn(State, Tool, Parsed)).to_string()
 }

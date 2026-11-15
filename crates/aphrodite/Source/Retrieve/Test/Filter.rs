@@ -1,20 +1,24 @@
-//! The query filter: pass-through, case-insensitive matching, the
-//! no-match notice and the 512-char query cap.
+//! The query filter: pass-through, case-insensitive matching, the no-match notice and the
+//! 512-char query cap.
+//!
+//! The filter answers a `Cow`, so the pass-through case is asserted through `as_ref()`:
+//! comparing the `Cow` itself would leave the comparison to a blanket `PartialEq` and hide
+//! which arm produced the value.
 
 use crate::Retrieve::Filter::Fn::Fn as FilterContent;
 
 // ── T9: filter_content ────────────────────────────────────────
 #[test]
 fn TestFilterContentNoQueryReturnsUnchanged() {
-	assert_eq!(FilterContent("a\nb\nc", None), "a\nb\nc");
-	assert_eq!(FilterContent("a\nb\nc", Some("")), "a\nb\nc");
+	assert_eq!(FilterContent("a\nb\nc", None).as_ref(), "a\nb\nc");
+	assert_eq!(FilterContent("a\nb\nc", Some("")).as_ref(), "a\nb\nc");
 }
 
 #[test]
 fn TestFilterContentMatch() {
 	let Content = "alpha\nbeta error\ngamma\n";
 	let Result = FilterContent(Content, Some("error"));
-	assert_eq!(Result, "beta error");
+	assert_eq!(Result.as_ref(), "beta error");
 }
 
 #[test]
@@ -29,7 +33,7 @@ fn TestFilterContentNoMatchMessage() {
 fn TestFilterContentCaseInsensitive() {
 	let Content = "ALPHA line\nbeta line\n";
 	let Result = FilterContent(Content, Some("alpha"));
-	assert_eq!(Result, "ALPHA line");
+	assert_eq!(Result.as_ref(), "ALPHA line");
 }
 
 #[test]

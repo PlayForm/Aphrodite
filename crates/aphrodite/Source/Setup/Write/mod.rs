@@ -12,6 +12,9 @@
 //! binary is always replaced, and only `aphrodite.toml` is preserved unless
 //! `--force`. Getting that backwards either freezes a stale loader against a new
 //! dylib or silently discards the user's configuration.
+//!
+//! Registration is not here: it is an outcome rather than a file write, so it lives
+//! in `Setup::Register`.
 
 pub mod BinaryName;
 pub mod BinaryVersion;
@@ -20,4 +23,3 @@ pub mod InitPy;
 pub mod Permissions;
 pub mod PluginShim;
 pub mod PluginYAML;
-pub mod Register;

@@ -1,10 +1,10 @@
-//! The catch-all proxy handler and its three stages.
+//! The catch-all proxy handler and its stages.
 //!
-//! `Fn` is the entry point and `Route` is its body; `Lookup`, `Forward` and
-//! `Respond` are the stages it delegates to, one failure mode each.
+//! `Fn` opens the span and `Route` is its body; the request half of what those
+//! stages read lives in `Request::Context`, and the forward and respond stages
+//! each own one failure mode.
 
 pub mod Fn;
-pub mod Lookup;
+pub mod Forward;
 pub mod Respond;
 pub mod Route;
-pub mod Forward;

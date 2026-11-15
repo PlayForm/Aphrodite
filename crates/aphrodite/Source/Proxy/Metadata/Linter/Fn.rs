@@ -1,32 +1,28 @@
 //! Linter output: files with findings, the first error, the line count.
 
-pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
+use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
+
+/// How many files complained, the first complaint, then the line count.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
+	let Content = Analysis.Content;
 	let FilesLinted = Content
 		.lines()
-		.filter(|l| {
-			(l.contains(".rs:") || l.contains(".py:") || l.contains(".go:") || l.contains(".ts:"))
-				&& (l.contains("error") || l.contains("warning"))
+		.filter(|Line| {
+			(Line.contains(".rs:") || Line.contains(".py:") || Line.contains(".go:") || Line.contains(".ts:"))
+				&& (Line.contains("error") || Line.contains("warning"))
 		})
 		.count();
-
-	match FilesLinted > 0 {
-		true => {
-			Parts.push(format!("files={}", FilesLinted));
-		},
-		false => {},
-	}
-
 	let FirstError = Content
 		.lines()
-		.find(|l| l.contains("error[") || l.contains("Error:") || l.starts_with("error: "))
-		.map(|l| l.trim().chars().take(80).collect::<String>().replace('|', "/"));
+		.find(|Line| Line.contains("error[") || Line.contains("Error:") || Line.starts_with("error: "))
+		.map(|Line| Line.trim().chars().take(80).collect::<String>().replace('|', "/"));
 
-	match FirstError {
-		Some(e) => {
-			Parts.push(format!("first_err={}", e));
-		},
-		None => {},
-	}
-
-	Parts.push(format!("ln={}", LineCount));
+	[
+		(FilesLinted > 0).then(|| MetadataField::New("files", FilesLinted.to_string())),
+		FirstError.map(|Error| MetadataField::New("first_err", Error)),
+		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+	]
+	.into_iter()
+	.flatten()
+	.collect()
 }

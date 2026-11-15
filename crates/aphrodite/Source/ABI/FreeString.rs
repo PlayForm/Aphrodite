@@ -14,10 +14,13 @@ use std::{ffi::CString, os::raw::c_char};
 /// unconditional.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeFreeString(s:*mut c_char) {
-	match !s.is_null() {
-		true => unsafe {
-			let _ = CString::from_raw(s);
-		},
-		false => (),
-	}
+	// `NonNull` turns "the caller may pass null" into a value, so the `unsafe`
+	// block below has one reason to exist and one contract to state.
+	let Some(s) = std::ptr::NonNull::new(s) else { return };
+
+	// SAFETY: `s` was allocated by `CString::into_raw` inside this ABI, and this
+	// is the only place that reclaims it - a caller that frees the same pointer
+	// twice, or with `free`, has already broken the contract this function
+	// documents. The null case never reaches here.
+	let _ = unsafe { CString::from_raw(s.as_ptr()) };
 }

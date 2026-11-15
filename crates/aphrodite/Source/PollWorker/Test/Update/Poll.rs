@@ -76,7 +76,7 @@ fn TestUpdateFromPollNoExitCodeStillRunning() {
 	assert!(Consumed);
 	assert_eq!(State.BgTasks[0].Status, BgStatus::Running);
 	assert_eq!(State.BgTasks[0].PollCount, 1);
-	assert!(State.BgTasks[0].AccumulatedOutput.contains("still compiling"));
+	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("still compiling"));
 }
 
 // ── Repetition & edge-case tests ──────────────────────────
@@ -99,8 +99,8 @@ fn TestMultipleRapidPollsAccumulateOutput() {
 	});
 
 	assert_eq!(State.BgTasks[0].PollCount, 5);
-	assert!(State.BgTasks[0].AccumulatedOutput.contains("line 0"));
-	assert!(State.BgTasks[0].AccumulatedOutput.contains("line 4"));
+	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("line 0"));
+	assert!(State.BgTasks[0].AccumulatedOutput.AsStr().contains("line 4"));
 	assert_eq!(State.BgTasks[0].Status, BgStatus::Running);
 }
 
@@ -161,8 +161,8 @@ fn TestAccumulatedOutputCappedAt256kb() {
 
 	// Should be capped at ~256KB (256 * 1024).
 	assert!(
-		State.BgTasks[0].AccumulatedOutput.len() <= 256 * 1024 + 100,
+		State.BgTasks[0].AccumulatedOutput.Len() <= 256 * 1024 + 100,
 		"accumulated output must be capped near 256KB, got {}",
-		State.BgTasks[0].AccumulatedOutput.len()
+		State.BgTasks[0].AccumulatedOutput.Len()
 	);
 }

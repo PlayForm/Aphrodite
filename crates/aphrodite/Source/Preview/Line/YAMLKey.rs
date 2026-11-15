@@ -1,50 +1,32 @@
 //! Top-level YAML key-line predicate.
 //!
-//! YAML is recognised by unindented `key: value` lines. The trap is a compiler
-//! log, which also prints `error: ...` at column zero - so the predicate has to
-//! exclude the log-marker keys or every rustc run would preview as YAML.
+//! YAML is recognised by unindented `key: value` lines. The trap is a compiler log, which also
+//! prints `error: ...` at column zero - so the predicate has to exclude the log-marker keys or
+//! every rustc run would preview as YAML.
+
+/// Longest key a top-level YAML key line may carry: sixty-four characters.
+const KeyMaximum:usize = 64;
+
+/// Keys a compiler log prints at column zero, which are not YAML keys.
+const LogMarkers:[&str; 5] = ["error", "warning", "note", "info", "warn"];
 
 /// True for a top-level YAML key line (`name: webapp`).
 ///
-/// A lowercase identifier key at column zero, with or without a value. The
-/// log-marker keys `error`, `warning`, `Note`, `info` and `warn` are excluded
-/// so a compiler log is never mis-tagged as YAML; `debug:` and `trace:` are
-/// legitimate YAML keys and stay accepted. It is not a YAML parser and nested
-/// keys are deliberately ignored - only top-level keys vote.
+/// A lowercase identifier key at column zero, with or without a value. The log-marker keys
+/// `error`, `warning`, `note`, `info` and `warn` are excluded so a compiler log is never
+/// mis-tagged as YAML; `debug:` and `trace:` are legitimate YAML keys and stay accepted. It is
+/// not a YAML parser and nested keys are deliberately ignored - only top-level keys vote.
 pub(crate) fn Fn(Line:&str) -> bool {
-	match Line.starts_with(' ') || Line.as_bytes().first() == Some(&9) {
-		true => {
-			return false;
-		},
-		false => {},
-	}
+	let Indented = Line.starts_with(' ') || Line.as_bytes().first() == Some(&9);
+	let Trimmed = Line.trim_end();
+	let Colon = Trimmed.find(':').unwrap_or(0);
+	let Key = Trimmed.get(..Colon).unwrap_or("");
+	let Shaped = Colon > 0
+		&& Colon <= KeyMaximum
+		&& !Key.is_empty()
+		&& Key.chars().all(|Character| {
+			Character.is_ascii_lowercase() || Character.is_ascii_digit() || Character == '-' || Character == '_'
+		});
 
-	let t = Line.trim_end();
-	let Index = match t.find(':') {
-		Some(i) => i,
-		None => return false,
-	};
-
-	match Index == 0 || Index > 64 {
-		true => {
-			return false;
-		},
-		false => {},
-	}
-
-	let Key = &t[..Index];
-
-	match !Key
-		.chars()
-		.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
-	{
-		true => {
-			return false;
-		},
-		false => {},
-	}
-
-	// Exclude log-marker keys (`error:`/`warning:`/...) so a compiler log is
-	// never mis-tagged as yaml. `debug:`/`trace:` are legitimate yaml keys.
-	!matches!(Key, "error" | "warning" | "note" | "info" | "warn")
+	!Indented && Shaped && !LogMarkers.contains(&Key)
 }

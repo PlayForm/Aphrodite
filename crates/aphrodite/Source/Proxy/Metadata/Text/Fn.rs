@@ -1,3 +1,8 @@
 //! Plain text: the line count, and the fallback for every unclassified type.
 
-pub(crate) fn Fn(_Content:&str, LineCount:usize, Parts:&mut Vec<String>) { Parts.push(format!("ln={}", LineCount)); }
+use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
+
+/// The one fact every text payload has.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
+	vec![MetadataField::New("ln", Analysis.Lines.to_string())]
+}

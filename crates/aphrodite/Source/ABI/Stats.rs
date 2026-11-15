@@ -3,10 +3,7 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::{
-	Guard::{Cstr, Guarded, ToJSONError, ToJSONOk},
-	Handle::Lookup::GetHandle,
-};
+use crate::ABI::Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as Bare};
 
 /// Answer with the session's counters and the configuration actually in
 /// effect.
@@ -17,26 +14,16 @@ use crate::ABI::{
 /// only logs the counters loses the one signal that explains them.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeStats(Handle:*const c_char) -> *mut c_char {
-	let Hid = match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Ok(ID) => ID,
-		Err(_) => return ToJSONError("invalid handle"),
-	};
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		match GetHandle(Hid) {
-			Some(Session) => {
-				let s = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-				ToJSONOk(&serde_json::json!({
-					"version":env!("CARGO_PKG_VERSION"),"inline_entries":s.InlineStore.len(),
-					"markers":s.RecentMarkers.len(),"turn":s.TurnCounter,
-					"engine_enabled":s.ContextEngineEnabled,"threshold_pct":s.EngineThresholdPct,
-					"tool_threshold":s.ToolThreshold,"terminal_threshold":s.TerminalThreshold,
-					"auto_reload":s.AutoReload,
-					// Config self-diagnosis: present when aphrodite.toml was
-					// found but failed to parse - defaults are in effect.
-					"config_error":s.ConfigurationError,
-				}))
-			},
-			None => ToJSONError(&format!("invalid handle: {}", Hid)),
-		}
-	}))
+	Bare(Handle, |s| {
+		Ok(Answer::Envelope(serde_json::json!({
+			"version":env!("CARGO_PKG_VERSION"),"inline_entries":s.InlineStore.len(),
+			"markers":s.RecentMarkers.len(),"turn":s.TurnCounter,
+			"engine_enabled":s.ContextEngineEnabled,"threshold_pct":s.EngineThresholdPct,
+			"tool_threshold":s.ToolThreshold,"terminal_threshold":s.TerminalThreshold,
+			"auto_reload":s.AutoReload,
+			// Config self-diagnosis: present when aphrodite.toml was
+			// found but failed to parse - defaults are in effect.
+			"config_error":s.ConfigurationError,
+		})))
+	})
 }

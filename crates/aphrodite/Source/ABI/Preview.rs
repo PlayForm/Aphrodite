@@ -1,8 +1,11 @@
 //! `AphroditePreview` - build the honest preview string for content.
 
-use std::{ffi::CString, os::raw::c_char};
+use std::os::raw::c_char;
 
-use super::Guard::{Cstr, Guarded, ToJSONError};
+use crate::ABI::{
+	Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
+	Guard::Cstr::Fn::Fn as Cstr,
+};
 
 /// Generate preview for content - port of _marker/preview.py
 ///
@@ -11,13 +14,12 @@ use super::Guard::{Cstr, Guarded, ToJSONError};
 /// something the store does not contain. The answer is the preview text itself.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditePreview(Content:*const c_char, CCRType:*const c_char) -> *mut c_char {
-	let c = match unsafe { Cstr(Content) } {
-		Some(s) => s,
-		None => return ToJSONError("null content"),
-	};
-	let t = unsafe { Cstr(CCRType) }.unwrap_or_default();
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		let Preview = crate::Preview::Builder::Entry::Fn(&t, &c);
-		CString::new(Preview.replace('\0', "")).unwrap().into_raw()
-	}))
+	let Content = unsafe { Cstr(Content) };
+	let CCRType = unsafe { Cstr(CCRType) }.unwrap_or_default();
+
+	Run(move || {
+		let Content = Content.ok_or_else(|| anyhow::anyhow!("null content"))?;
+
+		Ok(Answer::Text(crate::Preview::Builder::Entry::Fn(&CCRType, &Content)))
+	})
 }

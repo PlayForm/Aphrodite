@@ -23,11 +23,8 @@ pub(crate) async fn Fn(response:reqwest::Response, MaximumBytes:usize) -> anyhow
 	while let Some(Chunk) = Stream.next().await {
 		let Chunk = Chunk.with_context(|| format!("read the upstream body ({} bytes so far)", Buffer.len()))?;
 
-		match Buffer.len() + Chunk.len() > MaximumBytes {
-			true => {
-				anyhow::bail!("response body exceeded {} MB limit", MaximumBytes / (1024 * 1024));
-			},
-			false => {},
+		if Buffer.len() + Chunk.len() > MaximumBytes {
+			anyhow::bail!("response body exceeded {} MB limit", MaximumBytes / (1024 * 1024));
 		}
 
 		Buffer.extend_from_slice(&Chunk);

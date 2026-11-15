@@ -4,7 +4,11 @@
 //! so these are hermetic tempdir tests - no cwd mutation risk, unlike
 //! `ApplyCompression`'s own directory search (04-T7).
 
-use crate::Directive::{Builtin::Fn as LoadedBuiltins, Load::Fn as LoadDirectives, Model::MaximumDirectiveChars};
+use crate::Directive::{
+	Builtin::Fn as LoadedBuiltins,
+	Cap::MaximumDirectiveChars::Const::Const as MaximumDirectiveChars,
+	Load::Fn as LoadDirectives,
+};
 
 /// A unique scratch directory per test, auto-removed on drop.
 struct TempDirectory(std::path::PathBuf);

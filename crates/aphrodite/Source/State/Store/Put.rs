@@ -12,11 +12,8 @@ impl AphroditeState {
 		// in sync, then re-insert at the most-recent position. `LruCache::put`
 		// promotes an existing key in O(1) - the old O(n) `VecDeque::retain`
 		// scan is gone (fix 1).
-		match self.InlineStore.remove(&hash) {
-			Some(Old) => {
-				self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(Old.len());
-			},
-			None => (),
+		if let Some(Old) = self.InlineStore.remove(&hash) {
+			self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(Old.len());
 		}
 		self.InlineStoreBytes += Content.len();
 		self.InlineStore.insert(hash.clone(), Content);

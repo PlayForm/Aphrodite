@@ -6,6 +6,8 @@
 //! the caller do all the I/O before taking the lock.
 
 pub mod Const;
+pub mod Content;
 pub mod Entry;
 pub mod Guard;
+pub mod One;
 pub mod Refuse;

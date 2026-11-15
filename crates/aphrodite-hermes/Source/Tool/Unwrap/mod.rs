@@ -11,4 +11,6 @@
 //! here.
 
 pub mod Fn;
+pub mod Fragment;
+pub mod Matcher;
 pub mod Search;

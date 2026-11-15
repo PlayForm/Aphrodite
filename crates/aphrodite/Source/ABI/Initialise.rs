@@ -1,12 +1,12 @@
 //! `AphroditeInit` - allocate a session handle, optionally seeded from a
 //! configuration file.
 
-use std::{ffi::CString, os::raw::c_char};
+use std::os::raw::c_char;
 
 use crate::{
 	ABI::{
-		Guard::{Cstr, Guarded},
-		Handle::Allocate::AllocHandle,
+		Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
+		Guard::Cstr::Fn::Fn as Cstr,
 	},
 	State::Struct::AphroditeState,
 };
@@ -29,20 +29,22 @@ pub extern "C" fn AphroditeInit(ConfigurationPath:*const c_char) -> *mut c_char 
 	// and keeps the host's). A failure here must not fail the session - a
 	// process without a subscriber still compresses; it just says less.
 	let _ = crate::Logging::Fn::Fn(false, None);
-	let path = unsafe { Cstr(ConfigurationPath) }.unwrap_or_default();
-	Guarded(std::panic::AssertUnwindSafe(move || {
+	let Path = unsafe { Cstr(ConfigurationPath) }.unwrap_or_default();
+
+	Run(move || {
 		let mut State = AphroditeState::default();
+
 		// 01-F4/F9: delegate to `ConfigurationLoader::Configuration::Struct::Struct` instead of hand-parsing
 		// four `[compression]` keys here - this hand-rolled copy had already
 		// drifted from `ApplyCompression`'s own key names (e.g. `ToolThreshold`
 		// vs `ToolThresholdToken`) and never honored env var overrides, unlike
 		// every other init path in the crate.
-		match !path.is_empty() {
-			true => {
-				crate::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(&path).ApplyCompression(&mut State);
-			},
-			false => (),
-		}
-		CString::new(AllocHandle(State).to_string()).unwrap().into_raw()
-	}))
+		(!Path.is_empty()).then(|| {
+			crate::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(&Path).ApplyCompression(&mut State);
+		});
+
+		Ok(Answer::Text(
+			crate::ABI::Handle::Registry::Const::Handles.Allocate(State).to_string(),
+		))
+	})
 }

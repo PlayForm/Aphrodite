@@ -34,9 +34,8 @@ pub(crate) fn Fn(on:bool) -> anyhow::Result<(String, String)> {
 		false => root,
 	};
 
-	match root.as_str() {
-		"" => anyhow::bail!("no session context yet - hooks have not fired in this process"),
-		_ => {},
+	if root.is_empty() {
+		anyhow::bail!("no session context yet - hooks have not fired in this process");
 	}
 
 	let flag = Flag::Scoped::Fn::Fn(&root);

@@ -1,52 +1,31 @@
 //! Built-in directives baked into the binary via `include_str!`.
-//!
-//! These ship with every installation and are the fallback when no
-//! `directives/` directory exists on disk - a fresh install gets `focus`,
-//! `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy` and `lazy-eval`
-//! without any filesystem setup. The filenames under `BuiltinDirective/` are
-//! the directive identifiers surfaced to the model, so they stay lowercase.
 
 use std::collections::HashMap;
 
-use super::Model::{MaximumDirectiveChars, Struct};
+use super::{Cap, Embedded, Model::Struct};
 
-/// The embedded directive set: identifier and body, in the order they are
-/// advertised.
-fn BuiltinDirectives() -> Vec<(&'static str, &'static str)> {
-	vec![
-		("focus", include_str!("../BuiltinDirective/focus.md")),
-		("foresight", include_str!("../BuiltinDirective/foresight.md")),
-		("ccr-handling", include_str!("../BuiltinDirective/ccr-handling.md")),
-		("cleanup", include_str!("../BuiltinDirective/cleanup.md")),
-		("explore", include_str!("../BuiltinDirective/explore.md")),
-		("lazy", include_str!("../BuiltinDirective/lazy.md")),
-		("lazy-eval", include_str!("../BuiltinDirective/lazy-eval.md")),
-	]
-}
-
-/// Load built-in directives from the binary (via `include_str!`), applying the
-/// same `MaximumDirectiveChars` cap as `LoadDirectives` does for disk-loaded
-/// directives. Returns a `HashMap` ready for `state.directives`.
+/// Load the built-in directives from the binary, applying the same per-file cap the disk
+/// loader applies. Returns a map ready for `state.Directives`.
 ///
-/// The on-disk `directives/*.md` files (if any) take precedence: if the
-/// directory exists, its `.md` files replace these defaults entirely. Users
-/// can also `aphrodite_directive("add", "ccr-handling")` to activate the
-/// shipped defaults discovered from the embedded set.
+/// These ship with every installation and are the fallback when no `directives/`
+/// directory exists on disk - a fresh install gets `focus`, `foresight`, `ccr-handling`,
+/// `cleanup`, `explore`, `lazy` and `lazy-eval` without any filesystem setup.
+///
+/// The on-disk `directives/*.md` files (if any) take precedence: if the directory exists,
+/// its `.md` files replace these defaults entirely. Users can also
+/// `aphrodite_directive("add", "ccr-handling")` to activate a shipped default discovered
+/// from this set.
+///
+/// The cap goes through the same [`Cap::Fn::Fn`] as the disk loader, so a shipped
+/// directive and a user's copy of it are cut by the same rule at the same place.
 pub fn Fn() -> HashMap<String, Struct> {
-	let mut Directives = HashMap::new();
-
-	BuiltinDirectives().into_iter().for_each(|(name, Content)| {
-		let Content = match Content.len() > MaximumDirectiveChars {
-			true => {
-				let Trunc:String = Content.chars().take(MaximumDirectiveChars).collect();
-
-				format!("{}...", Trunc)
-			},
-			false => Content.to_string(),
-		};
-
-		Directives.insert(name.to_string(), Struct { name:name.to_string(), Content });
-	});
-
-	Directives
+	Embedded::Const::Const
+		.iter()
+		.map(|(name, Content)| {
+			(
+				(*name).to_string(),
+				Struct { name:(*name).to_string(), Content:Cap::Fn::Fn(Content).into_owned() },
+			)
+		})
+		.collect()
 }

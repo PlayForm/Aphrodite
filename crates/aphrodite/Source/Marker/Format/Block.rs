@@ -45,19 +45,16 @@ pub(super) fn RenderMarkerBlock(
 		None => RenderMarkerFallback(Preview, CCRType, meta, Center, hash, Size, &Hint),
 	};
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::TemplateRenders);
-	match T0 {
-		Some(T0) => {
-			crate::Debug::Log::Verbose::Fn::Fn(
-				"marker_render",
-				&[
-					("hash", hash.to_string()),
-					("type", CCRType.to_string()),
-					("size", Size.to_string()),
-					("elapsed_us", T0.elapsed().as_micros().to_string()),
-				],
-			)
-		},
-		None => (),
+	if let Some(T0) = T0 {
+		crate::Debug::Log::Verbose::Fn::Fn(
+			"marker_render",
+			&[
+				("hash", hash.to_string()),
+				("type", CCRType.to_string()),
+				("size", Size.to_string()),
+				("elapsed_us", T0.elapsed().as_micros().to_string()),
+			],
+		);
 	}
 	Out
 }

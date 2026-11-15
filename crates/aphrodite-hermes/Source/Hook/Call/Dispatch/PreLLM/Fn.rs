@@ -33,13 +33,12 @@ pub(crate) fn pre_llm_call(state:&mut AphroditeState, input:&HookInput) -> serde
 	// Per-session debug: pre_llm_call is the ONE hook Hermes threads
 	// `parent_session_id` through, so record session -> parent here to build
 	// the tree the debug flag resolves against.
-	match (
+	if let (Some(sid), Some(pid)) = (
 		parsed.get("session_id").and_then(|v| v.as_str()),
 		parsed.get("parent_session_id").and_then(|v| v.as_str()),
 	) {
-		(Some(sid), Some(pid)) => Debug::Session::Record::Fn::Fn(sid, pid),
-		_ => {},
-	};
+		Debug::Session::Record::Fn::Fn(sid, pid);
+	}
 
 	// DEV-ONLY debug logger (crate::Debug): pre-turn bridge line
 	// (turn/session/request-size); the per-section sizes and the cumulative

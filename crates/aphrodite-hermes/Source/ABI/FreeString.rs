@@ -12,10 +12,9 @@ use std::{ffi::CString, os::raw::c_char};
 /// Free a string returned by any aphrodite_hermes_* function.
 #[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_free_string(s:*mut c_char) {
-	match s.is_null() {
-		true => {},
-		false => unsafe {
-			let _ = CString::from_raw(s);
-		},
-	}
+	// A null pointer is the one value that carries nothing to free; every other
+	// value came from a `CString` this crate handed out.
+	let _ = (!s.is_null()).then(|| unsafe {
+		let _ = CString::from_raw(s);
+	});
 }

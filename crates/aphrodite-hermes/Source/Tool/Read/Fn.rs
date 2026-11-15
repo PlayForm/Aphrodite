@@ -32,17 +32,15 @@ pub(crate) fn Fn(path:&str) -> anyhow::Result<String> {
 		.canonicalize()
 		.with_context(|| format!("resolve the path {path}"))?;
 
-	match canon.starts_with(&root) {
-		false => anyhow::bail!("path is outside the workspace ({}): {path}", root.display()),
-		true => {},
-	}
+	let Some(()) = canon.starts_with(&root).then_some(()) else {
+		anyhow::bail!("path is outside the workspace ({}): {path}", root.display());
+	};
 
 	let size = std::fs::metadata(&canon).map(|m| m.len()).unwrap_or(0);
 
-	match size > MAX_PATH_READ {
-		true => anyhow::bail!("file exceeds {MAX_PATH_READ}-byte read cap: {path}"),
-		false => {},
-	}
+	let Some(()) = (size <= MAX_PATH_READ).then_some(()) else {
+		anyhow::bail!("file exceeds {MAX_PATH_READ}-byte read cap: {path}");
+	};
 
 	std::fs::read_to_string(&canon).with_context(|| format!("read {path}"))
 }

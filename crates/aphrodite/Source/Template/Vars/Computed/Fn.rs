@@ -1,25 +1,19 @@
-//! `Computed::Fn`: the variables derived from the rest of the set.
+//! The variables derived from the rest of the set.
 
-use std::collections::HashMap;
+use super::Struct::Struct;
 
-/// Add `fx`, `Cmx` and the `sig1` default.
+/// Derive `cmx` from the command line.
 ///
-/// Runs LAST, after the code enrichment, because `sig1` may already have been
-/// set from the structure map and must not be overwritten with an empty string.
-/// `fx` stays empty on purpose: `fn` is never derivable from content alone, and
-/// the pre-Rust engine left it blank rather than guessing.
-pub(crate) fn Fn(Vars:&mut HashMap<String, String>) {
-	let Command = Vars.get("cmd").cloned().unwrap_or_default();
-	let Cmx = match Command.is_empty() {
-		true => "?".to_string(),
-		false => Command.chars().take(40).collect(),
-	};
-	Vars.insert("fx".into(), String::new());
-	Vars.insert("cmx".into(), Cmx);
-	match !Vars.contains_key("sig1") {
-		true => {
-			Vars.insert("sig1".into(), String::new());
-		},
-		false => (),
+/// Runs LAST, because it reads a value an earlier pass wrote. `fx` is not derived
+/// here - it is never derivable from content alone, so it is one of the flat defaults
+/// rather than a computation that always answers the same thing.
+///
+/// An absent command renders `"?"` rather than an empty cell: a template printing
+/// `{cmx}` must show that there was no command, which is what the pre-Rust engine did.
+pub(crate) fn Fn(Command:&str) -> Struct {
+	Struct {
+		Cmx:Some(Command)
+			.filter(|Command| !Command.is_empty())
+			.map_or_else(|| "?".to_string(), |Command| Command.chars().take(40).collect()),
 	}
 }

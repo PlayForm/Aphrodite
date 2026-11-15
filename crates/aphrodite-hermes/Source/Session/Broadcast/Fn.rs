@@ -12,25 +12,30 @@ use crate::Session::{Lock::Fn::lock_bounded, Registry::Struct::SESSIONS};
 ///
 /// Returns true when any session still has `auto_reload` on after the pass
 /// (the watcher keeps running only while at least one session wants it).
-pub(crate) fn for_each_session(f:impl Fn(&mut AphroditeState)) -> bool {
-	let map = SESSIONS
-		.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	// Clone the Arcs so the registry lock is released before contending on
-	// any session state mutex.
-	let sessions:Vec<Arc<Mutex<AphroditeState>>> = map.values().cloned().collect();
-	drop(map);
+///
+/// The Arcs are cloned inside the registry guard's SCOPE so the registry lock is
+/// released before contending on any session state mutex. A scope ends it, not a
+/// `drop` call: `MutexGuard` is a `Drop` type that lives to the end of its scope,
+/// so the scope is the thing that has to be right.
+pub(crate) fn Fn(f:impl Fn(&mut AphroditeState)) -> bool {
+	let Sessions:Vec<Arc<Mutex<AphroditeState>>> = {
+		let Map = SESSIONS
+			.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner);
 
-	sessions.into_iter().fold(false, |any_reload, state| {
-		match lock_bounded(&state) {
-			Some(mut guard) => {
-				f(&mut guard);
+		Map.values().cloned().collect()
+	};
 
-				any_reload || guard.AutoReload
+	Sessions.into_iter().fold(false, |AnyReload, State| {
+		match lock_bounded(&State) {
+			Some(mut Guard) => {
+				f(&mut Guard);
+
+				AnyReload || Guard.AutoReload
 			},
 			// Wedged session: skip (fail-open - it stays degraded, never blocks).
-			None => any_reload,
+			None => AnyReload,
 		}
 	})
 }

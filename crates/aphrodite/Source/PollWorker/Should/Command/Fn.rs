@@ -1,72 +1,21 @@
-//! The command-prefix table and the matcher that consults it.
+//! Match a command against the known-slow table and mint its identity.
 //!
-//! This is the only place that knows which commands are presumed slow. It
-//! is a denylist of known-slow prefixes, not a timer: an unknown command is
-//! never backgrounded however large its output, because backgrounding
-//! something that already finished would hand the agent a marker to poll for
-//! work that is done. The match is case-insensitive against the trimmed
-//! command line.
+//! `None` for an empty or absent command - a command the poll worker cannot see is
+//! a command it must not background, since the resulting task could never be
+//! matched back to a poll. The empty case needs no test of its own: an empty string
+//! cannot start with a non-empty prefix.
 
-/// Command patterns that strongly suggest long-running work.
-/// Matched case-insensitively against the first whitespace-delimited
-/// token of the command line (or the full args if no token boundary).
-pub(crate) const SlowCommandPrefixes:&[&str] = &[
-	"cargo",
-	"npm",
-	"yarn",
-	"pnpm",
-	"pip",
-	"pip3",
-	"make",
-	"cmake",
-	"docker",
-	"podman",
-	"kubectl",
-	"terraform",
-	"ansible",
-	"curl",
-	"wget",
-	"rsync",
-	"git clone",
-	"git push",
-	"git fetch",
-	"brew",
-	"apt-get",
-	"apt",
-	"dnf",
-	"pacman",
-	"go build",
-	"go test",
-	"go install",
-	"rustup",
-	"nix",
-	"bazel",
-	"gradle",
-	"mvn",
-];
+use crate::PollWorker::Should::{Command::Prefix::Const::SlowCommandPrefixes, Plan::Struct::BackgroundPlan};
 
-/// Match `command` against `SlowCommandPrefixes` and mint the task
-/// identity when it hits.
-///
-/// Returns `None` for an empty or absent command - a command the poll worker
-/// cannot see is a command it must not background, since the resulting task
-/// could never be matched back to a poll.
-pub(crate) fn ShouldBackgroundByCommand(command:Option<&str>) -> Option<(String, String)> {
-	let Command = command.unwrap_or("").trim();
-	match Command.is_empty() {
-		true => {
-			return None;
-		},
-		false => {},
-	}
+/// The identity and label for `command`, when it is a known-slow one.
+pub(crate) fn Fn(command:Option<&str>) -> Option<BackgroundPlan> {
+	let Command = command?.trim();
+	let Lower = Command.to_lowercase();
 
-	let CommandLower = Command.to_lowercase();
-	match SlowCommandPrefixes.iter().any(|Prefix| CommandLower.starts_with(Prefix)) {
-		true => {
-			let TaskID = headroom_core::ccr::compute_key(Command.as_bytes());
-			let Summary = Command.chars().take(60).collect::<String>();
-			Some((TaskID, Summary))
-		},
-		false => None,
-	}
+	SlowCommandPrefixes.iter().find(|Prefix| Lower.starts_with(**Prefix))?;
+
+	Some(BackgroundPlan {
+		Identity:headroom_core::ccr::compute_key(Command.as_bytes()),
+		Label:Command.chars().take(60).collect(),
+	})
 }

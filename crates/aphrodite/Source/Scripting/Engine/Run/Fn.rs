@@ -1,73 +1,37 @@
 //! `Run`: evaluate every script's hook function.
 
-use rhai::{Engine as Rhai, Scope};
-
-use crate::Scripting::{Engine::Struct::Struct, Payload::Struct::Struct as HookPayload};
+use crate::Scripting::{
+	Engine::{
+		Run::Chain::{Finish, Step, Struct as Chain},
+		Struct::Struct,
+	},
+	Payload::Struct::Struct as HookPayload,
+};
 
 impl Struct {
-	/// Evaluate every loaded script's `fn <hook>()` against `Payload`,
-	/// chaining each script's output into the next script's `Content`.
+	/// Evaluate every loaded script's `fn <hook>()` against `Payload`, chaining each
+	/// script's output into the next script's `Content`.
 	///
-	/// Returns `Some(transformed)` when at least one script modified the
-	/// payload, `None` when nothing changed. A script that errors (throws,
-	/// returns the wrong type, panics) is warned and skipped - its input
-	/// passes through unchanged; a script that does not define the hook
-	/// function is skipped silently (missing function is not an error). All
-	/// lock/compile/call sites degrade; this method never panics.
+	/// Returns `Some(transformed)` when at least one script modified the payload, `None`
+	/// when nothing changed. A script that errors (throws, returns the wrong type,
+	/// panics) is warned and skipped - its input passes through unchanged; a script that
+	/// does not define the hook function is skipped silently (a missing function is not
+	/// an error). All lock/compile/call sites degrade; this method never panics.
 	///
-	/// `None` and `Some(unchanged)` are deliberately different answers: the
-	/// caller uses `None` to mean "no script touched this", so a script that
-	/// returns its input verbatim still counts as a modification. Collapsing the
-	/// two would let a chain of no-op scripts look like no scripting at all.
+	/// The fold IS the chain: each step consumes the accumulator and returns the next
+	/// one, so "the content the next script sees" and "whether anything ran" cannot fall
+	/// out of step, and there is no early `return` inside a `for_each` for a reader to
+	/// trace. `Finish` is the one place the accumulator becomes the hook's answer.
 	pub fn Run(&self, Hook:&str, Payload:&HookPayload) -> Option<String> {
 		self.CheckReload();
-		let Scripts = self.Scripts.lock().unwrap_or_else(|e| e.into_inner());
-		let mut Current = Payload.Content.clone().unwrap_or_default();
-		let mut Changed = false;
 
-		Scripts.iter().for_each(|Script| {
-			let Engine = Rhai::new();
-			// Compiled per call - no AST storage, avoids Send issues. Source
-			// was compile-validated at reload, so a failure here means the
-			// script was injected directly - skip silently.
-			let Ok(Ast) = Engine.compile(&Script.Source) else { return };
-			// Scripts that don't define the hook function opt out - a
-			// zero-parameter `fn <hook>()` reading the seeded scope (missing
-			// function is not an error).
-			let HasHook = Ast.iter_functions().any(|f| f.name == Hook && f.Params.is_empty());
+		let Scripts = self.Scripts.lock().unwrap_or_else(|Error| Error.into_inner());
 
-			match HasHook {
-				true => (),
-				false => return,
-			}
+		let Chained = Scripts.iter().fold(
+			Chain { Content:Payload.Content.clone().unwrap_or_default(), Touched:false },
+			|Chained, Script| Step::Fn::Fn(Chained, Script, Hook, Payload),
+		);
 
-			let mut Scope = Scope::new();
-			// `push` only fails on duplicate names - the names below are
-			// distinct, so the Result is deliberately ignored.
-			let _ = Scope.push("content", Current.clone());
-			let _ = Scope.push("hook", Hook.to_string());
-			let _ = Scope.push("content_type", Payload.ContentType.clone().unwrap_or_default());
-			let _ = Scope.push("size", Payload.Size.map(|s| s as i64).unwrap_or(0));
-			let _ = Scope.push("hash", Payload.hash.clone().unwrap_or_default());
-			let _ = Scope.push("metadata", Payload.Metadata.clone().unwrap_or_default());
-			let _ = Scope.push("preview", Current.clone());
-
-			match Engine.call_fn::<String>(&mut Scope, &Ast, Hook, ()) {
-				Ok(Transformed) => {
-					Current = Transformed;
-					Changed = true;
-				},
-				Err(e) => {
-					tracing::warn!(
-						Script = %Script.path.display(),
-						Hook,
-						error = %e,
-						"script hook failed - degraded to previous value"
-					);
-				},
-			}
-		});
-
-		Changed.then_some(Current)
+		Finish::Fn::Fn(Chained)
 	}
 }

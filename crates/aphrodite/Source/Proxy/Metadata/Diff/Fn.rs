@@ -1,30 +1,26 @@
 //! A unified diff: file count, added lines, deleted lines.
 
-pub(crate) fn Fn(Content:&str, Parts:&mut Vec<String>) {
-	let Files = Content.lines().filter(|l| l.starts_with("diff --git ")).count();
+use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
 
-	match Files > 0 {
-		true => {
-			Parts.push(format!("files={}", Files));
-		},
-		false => {},
-	}
+/// How wide the change is, and in which direction.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
+	let Content = Analysis.Content;
+	let Files = Content.lines().filter(|Line| Line.starts_with("diff --git ")).count();
+	let Adds = Content
+		.lines()
+		.filter(|Line| Line.starts_with('+') && !Line.starts_with("+++"))
+		.count();
+	let Dels = Content
+		.lines()
+		.filter(|Line| Line.starts_with('-') && !Line.starts_with("---"))
+		.count();
 
-	let Adds = Content.lines().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count();
-
-	let Dels = Content.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
-
-	match Adds > 0 {
-		true => {
-			Parts.push(format!("adds={}", Adds));
-		},
-		false => {},
-	}
-
-	match Dels > 0 {
-		true => {
-			Parts.push(format!("dels={}", Dels));
-		},
-		false => {},
-	}
+	[
+		(Files > 0).then(|| MetadataField::New("files", Files.to_string())),
+		(Adds > 0).then(|| MetadataField::New("adds", Adds.to_string())),
+		(Dels > 0).then(|| MetadataField::New("dels", Dels.to_string())),
+	]
+	.into_iter()
+	.flatten()
+	.collect()
 }

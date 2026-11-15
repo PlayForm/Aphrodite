@@ -3,8 +3,8 @@
 use std::os::raw::c_char;
 
 use crate::ABI::{
-	Guard::{Cstr, ToJSONError, ToJSONOk},
-	Handle::Lookup::WithState,
+	Boundary::{Answer::Enum::Enum as Answer, State::Fn::Fn as State},
+	Guard::Cstr::Fn::Fn as Cstr,
 };
 
 /// Resolve hash with full recursive expansion - port of _resolve.py
@@ -19,18 +19,12 @@ use crate::ABI::{
 /// the result may be far larger than the entry that was asked for.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeResolve(Handle:*const c_char, hash:*const c_char) -> *mut c_char {
-	let Hid = match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Ok(ID) => ID,
-		Err(_) => return ToJSONError("invalid handle"),
-	};
-	let h = unsafe { Cstr(hash) }.unwrap_or_default();
-	match WithState(Hid, |s| {
-		match crate::Resolve::Expand::Fn(s, &h) {
-			Some(Content) => serde_json::json!({"found":true,"content":Content}),
-			None => serde_json::json!({"found":false}),
-		}
-	}) {
-		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&format!("{e:#}")),
-	}
+	let hash = unsafe { Cstr(hash) }.unwrap_or_default();
+
+	State(Handle, move |s| {
+		Ok(Answer::Envelope(crate::Resolve::Expand::Fn(s, &hash).map_or_else(
+			|| serde_json::json!({"found":false}),
+			|Content| serde_json::json!({"found":true,"content":Content}),
+		)))
+	})
 }

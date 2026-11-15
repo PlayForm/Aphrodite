@@ -40,7 +40,7 @@ fn TestEngineArchiveBelowThresholdNoneNoMutation() {
 #[test]
 fn TestEngineArchiveDisabledNoneNoMutation() {
 	let mut s = EngineState(12);
-	s.EngineThresholdPct = 20; // well over threshold if enabled
+	s.EngineThresholdPct = 20; // well over the fill threshold when enabled
 	s.ContextEngineEnabled = false;
 	let Before = s.ConvIndex.clone();
 	assert!(EngineMaybeArchive(&mut s).is_none());

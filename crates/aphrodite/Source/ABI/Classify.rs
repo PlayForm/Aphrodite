@@ -4,7 +4,10 @@ use std::os::raw::c_char;
 
 use headroom_core::transforms;
 
-use super::Guard::{CheckContent, Cstr, Guarded, ToJSONError, ToJSONOk};
+use crate::ABI::{
+	Boundary::{Answer::Enum::Enum as Answer, Run::Fn::Fn as Run},
+	Guard::{Content::Fn::Fn as CheckContent, Cstr::Fn::Fn as Cstr},
+};
 
 /// Classify `Content` and answer with its CCR type, line count and byte size.
 ///
@@ -17,17 +20,17 @@ use super::Guard::{CheckContent, Cstr, Guarded, ToJSONError, ToJSONOk};
 /// and a host debugging its own marshalling needs to tell them apart.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeClassify(Content:*const c_char) -> *mut c_char {
-	let c = match unsafe { Cstr(Content) } {
-		Some(s) => s,
-		None => return ToJSONError("null content"),
-	};
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		match CheckContent(&c) {
-			Ok(()) => (),
-			Err(e) => return ToJSONError(&format!("{e:#}")),
-		}
+	let Content = unsafe { Cstr(Content) };
 
-		let Ct = transforms::content_detector::detect_content_type(&c).content_type;
-		ToJSONOk(&serde_json::json!({"type":Ct.as_str(),"lines":c.lines().count(),"bytes":c.len()}))
-	}))
+	Run(move || {
+		let Content = Content.ok_or_else(|| anyhow::anyhow!("null content"))?;
+
+		CheckContent(&Content)?;
+
+		let Ct = transforms::content_detector::detect_content_type(&Content).content_type;
+
+		Ok(Answer::Envelope(
+			serde_json::json!({"type":Ct.as_str(),"lines":Content.lines().count(),"bytes":Content.len()}),
+		))
+	})
 }

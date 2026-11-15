@@ -7,6 +7,17 @@ use crate::{
 };
 
 #[test]
+fn TestRenderBgTaskStatusHonoursTheFeatureFlag() {
+	// A disabled poll worker renders no section even with a running task: the flag is
+	// the renderer's contract, so the two ways of having nothing to say agree.
+	let mut State = AphroditeState::default();
+	InsertBgTask(&mut State, "t1".into(), "terminal".into(), "cargo build".into(), 1);
+	State.PollWorkerEnabled = false;
+
+	assert_eq!(RenderBgTaskStatus(&State), "");
+}
+
+#[test]
 fn TestRenderBgTaskStatusEmpty() {
 	let State = AphroditeState::default();
 	assert_eq!(RenderBgTaskStatus(&State), "");

@@ -1,92 +1,70 @@
 //! Python source: functions, classes, imports and decorators.
 
-pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
-	Parts.push("lang=py".to_string());
+use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
+
+/// Language, the definitions, then the line count.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
+	let Content = Analysis.Content;
 	let Fns:Vec<&str> = Content
 		.lines()
-		.filter(|l| {
-			let t = l.trim_start();
-			t.starts_with("def ") || t.starts_with("async def ")
+		.filter(|Line| {
+			let Trimmed = Line.trim_start();
+
+			Trimmed.starts_with("def ") || Trimmed.starts_with("async def ")
 		})
-		.filter_map(|l| {
-			let t = l.trim_start();
-			let After = t
-				.strip_prefix("async def ")
-				.unwrap_or_else(|| t.strip_prefix("def ").unwrap_or(t));
-			After.split(['(', ' ', ':']).next().filter(|s| !s.is_empty())
+		.filter_map(|Line| {
+			let Trimmed = Line.trim_start();
+			let After = Trimmed.strip_prefix("async def ").or_else(|| Trimmed.strip_prefix("def "))?;
+
+			After.split(['(', ' ', ':']).next().filter(|Name| !Name.is_empty())
 		})
 		.collect();
-
-	match !Fns.is_empty() {
-		true => {
-			Parts.push(format!("fns={}", Fns.join(",")));
-		},
-		false => {},
-	}
-
 	let Classes:Vec<&str> = Content
 		.lines()
-		.filter(|l| {
-			let t = l.trim_start();
-			t.starts_with("class ")
-		})
-		.filter_map(|l| {
-			let t = l.trim_start();
-			let After = t.strip_prefix("class ")?;
-			After.split(['(', ' ', ':']).next().filter(|s| !s.is_empty())
+		.filter(|Line| Line.trim_start().starts_with("class "))
+		.filter_map(|Line| {
+			let After = Line.trim_start().strip_prefix("class ")?;
+
+			After.split(['(', ' ', ':']).next().filter(|Name| !Name.is_empty())
 		})
 		.collect();
-
-	match !Classes.is_empty() {
-		true => {
-			Parts.push(format!("classes={}", Classes.join(",")));
-		},
-		false => {},
-	}
-
 	let Imports:Vec<&str> = Content
 		.lines()
-		.filter(|l| {
-			let t = l.trim_start();
-			t.starts_with("import ") || t.starts_with("from ")
-		})
-		.filter_map(|l| {
-			let t = l.trim_start();
+		.filter(|Line| {
+			let Trimmed = Line.trim_start();
 
-			match t.strip_prefix("import ") {
-				Some(Rest) => Rest.split([' ', ',', ';']).next().filter(|s| !s.is_empty()),
-				None => t.strip_prefix("from ")?.split(' ').next().filter(|s| !s.is_empty()),
-			}
+			Trimmed.starts_with("import ") || Trimmed.starts_with("from ")
+		})
+		.filter_map(|Line| {
+			let Trimmed = Line.trim_start();
+
+			let After = Trimmed.strip_prefix("import ").or_else(|| Trimmed.strip_prefix("from "))?;
+
+			After.split([' ', ',', ';']).next().filter(|Name| !Name.is_empty())
 		})
 		.collect();
-
-	match !Imports.is_empty() {
-		true => {
-			Parts.push(format!("imports={}", Imports.join(",")));
-		},
-		false => {},
-	}
-
-	// Decorators: @route, @dataclass, @staticmethod, etc.
 	let Decorators:Vec<&str> = Content
 		.lines()
-		.filter(|l| {
-			let t = l.trim_start();
-			t.starts_with('@')
-		})
-		.filter_map(|l| {
-			let t = l.trim_start();
-			let name = &t[1..];
-			name.split(['(', ' ']).next().filter(|s| !s.is_empty())
+		.filter(|Line| Line.trim_start().starts_with('@'))
+		.filter_map(|Line| {
+			let Trimmed = Line.trim_start();
+
+			Trimmed
+				.strip_prefix('@')
+				.and_then(|Name| Name.split(['(', ' ']).next())
+				.filter(|Name| !Name.is_empty())
 		})
 		.collect();
 
-	match !Decorators.is_empty() {
-		true => {
-			Parts.push(format!("decorators={}", Decorators.join(",")));
-		},
-		false => {},
-	}
-
-	Parts.push(format!("ln={}", LineCount));
+	[
+		Some(MetadataField::New("lang", "py")),
+		(!Fns.is_empty()).then(|| MetadataField::New("fns", Fns.join(","))),
+		(!Classes.is_empty()).then(|| MetadataField::New("classes", Classes.join(","))),
+		(!Imports.is_empty()).then(|| MetadataField::New("imports", Imports.join(","))),
+		(!Decorators.is_empty()).then(|| MetadataField::New("decorators", Decorators.join(","))),
+		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+	]
+	.into_iter()
+	.flatten()
+	.collect()
 }

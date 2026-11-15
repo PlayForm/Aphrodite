@@ -3,22 +3,24 @@
 //! "Smart" is only about which slice of the content is worth showing - the
 //! marker grammar itself is fixed. The centre excerpt exists because the useful
 //! part of a long output is rarely its first line.
+//!
+//! The preview and the metadata are rendered from ONE analysis value, so the
+//! marker cannot show a preview arm for one content family and a metadata block
+//! for another.
 
-use crate::Proxy::{Format::Fn::Fn as ProxyFormatCCROutput, Metadata::Fn::Fn as GenerateMetadata};
+use crate::Proxy::{
+	Analysis::Struct::Struct as ContentAnalysis,
+	Format::Fn::Fn as ProxyFormatCCROutput,
+	Metadata::Fn::Fn as GenerateMetadata,
+};
 
-/// Create a CCR marker with preview and structure for the LLM.
-///
-/// Uses [`format_ccr_output`] for the output layout. The LLM reads the
-/// preview + structure first, then decides whether to call
-/// aphrodite_retrieve for the full content.
-///
-/// 1.5.0 (REFACTOR-PLAN §7): the parallel `proxy_build_preview` is GONE -
-/// ALL types route through the single core builder (`crate::Preview::build_preview`),
-/// the same one the Hermes hook/FFI path uses, so proxy and hook previews
-/// can never drift. LLM-visible marker text converged on core formats.
-pub(crate) fn Fn(hash:&str, Content:&str, Ct:&str, Center:Option<&str>) -> String {
-	let Size = Content.len();
-	let Metadata = GenerateMetadata(Content, Ct);
-	let Preview = crate::Preview::Builder::Entry::Fn(Ct, Content);
-	ProxyFormatCCROutput(&Preview, Ct, &Metadata, Center, hash, Size)
+/// Render the marker the model reads.
+pub(crate) fn Fn(hash:&str, Analysis:&ContentAnalysis<'_>, Center:Option<&str>) -> String {
+	let Metadata = GenerateMetadata(Analysis);
+	// 1.5.0 (REFACTOR-PLAN §7): ALL types route through the single core builder
+	// (`crate::Preview::Builder::Entry`), the same one the Hermes hook/FFI path
+	// uses, so proxy and hook previews can never drift.
+	let Preview = crate::Preview::Builder::Entry::Fn(Analysis.Ct, Analysis.Content);
+
+	ProxyFormatCCROutput(&Preview, Analysis.Ct, &Metadata, Center, hash, Analysis.Content.len())
 }

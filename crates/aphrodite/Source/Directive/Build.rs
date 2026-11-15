@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 
-use super::Model::{MaximumCombinedChars, Struct};
+use super::{Cap::MaximumCombinedChars::Const::Const as MaximumCombinedChars, Model::Struct};
 
 /// Build the context string injected into `PreLLMCall`.
-/// Format:
+///
 /// ```text
 /// [directives: focus]
 /// focus:
@@ -14,56 +14,50 @@ use super::Model::{MaximumCombinedChars, Struct};
 ///   - One primary action per turn
 ///   - ...
 /// ```
-/// Returns empty string if no directives are active.
 ///
-/// 01-F5: previously injected only each directive's first line (a markdown
-/// title, e.g. `# focus - stay targeted, minimal tool usage`) - the bullets
-/// with the actual behavioral instructions never traveled. Now injects the
-/// full (per-file `MaximumDirectiveChars`-capped) body, stripped of leading `#`
-/// markers, under a combined-output cap so several active directives can't
-/// blow past the context budget this feature is supposed to respect.
+/// Returns the empty string when no directive is active - not a header with no bodies
+/// under it, which would spend context saying nothing.
 ///
-/// T19: the cap is compared as a CHAR count, not a byte count. `out.len()`
-/// would trip the truncation on multibyte content (em-dashes etc.) that never
-/// exceeded the char budget, silently cutting directive text that fit.
+/// 01-F5: this used to inject only each directive's first line (a markdown title, e.g.
+/// `# focus - stay targeted, minimal tool usage`), so the bullets carrying the actual
+/// behavioural instructions never travelled. It now injects the full (per-file-capped)
+/// body, stripped of leading `#` markers, under a combined-output cap so several active
+/// directives cannot blow past the context budget this feature exists to respect.
+///
+/// The active list is the ORDER: directives render in the order they were activated, and
+/// an active name with no loaded directive contributes nothing rather than a placeholder
+/// header. That is a `filter_map`, not a lookup that has to be tested afterwards.
 pub fn Fn(all:&HashMap<String, Struct>, Active:&[String]) -> String {
-	match Active.is_empty() {
-		true => return String::new(),
-		false => (),
-	}
+	// `then` rather than a pre-built vector: with no active directive there is no name
+	// list to build and no header to render.
+	let Some(Names) = (!Active.is_empty()).then(|| Active.iter().map(String::as_str).collect::<Vec<_>>()) else {
+		return String::new();
+	};
 
-	let Names:Vec<&str> = Active.iter().map(|s| s.as_str()).collect();
 	let mut Out = format!("[directives: {}]\n", Names.join(", "));
 
-	Active.iter().filter_map(|name| all.get(name)).for_each(|d| {
-		Out.push_str(&format!("{}:\n", d.name));
+	Active.iter().filter_map(|name| all.get(name)).for_each(|Directive| {
+		Out.push_str(&Directive.name);
+		Out.push_str(":\n");
 
-		d.Content.lines().for_each(|Line| {
+		Directive.Content.lines().for_each(|Line| {
 			let Line = Line.trim_start_matches('#').trim();
 
-			match Line.is_empty() {
-				true => (),
-				false => {
-					Out.push_str("  ");
-					Out.push_str(Line);
-					Out.push('\n');
-				},
-			}
+			// A blank line contributes nothing; `then` is the gate and nothing follows
+			// it, so the accepted path allocates no fallback.
+			let _ = (!Line.is_empty()).then(|| {
+				Out.push_str("  ");
+				Out.push_str(Line);
+				Out.push('\n');
+			});
 		});
 	});
 
-	// T19: the gate must compare CHAR count against MAX_COMBINED_CHARS -
-	// `out.len()` is a byte length, so multibyte content (em-dashes etc.)
-	// tripped the truncation even when it fit the char cap, silently
-	// cutting directive text that never exceeded the budget.
-	match Out.chars().count() > MaximumCombinedChars {
-		true => {
-			let Trunc:String = Out.chars().take(MaximumCombinedChars).collect();
-
-			Out = format!("{}...\n", Trunc);
-		},
-		false => (),
+	// T19: the cap is compared as a CHARACTER count. `Out.len()` is a byte length, so
+	// multibyte content (em-dashes etc.) tripped the truncation on text that never
+	// exceeded the char budget, silently cutting directives that fit.
+	match Out.char_indices().nth(MaximumCombinedChars) {
+		Some((Offset, _Char)) => format!("{}...\n", &Out[..Offset]),
+		None => Out,
 	}
-
-	Out
 }

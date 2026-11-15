@@ -11,10 +11,9 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_compress", |args| {
 		let content = Arg::Fn::Fn(args, "content");
 
-		match content.is_empty() {
-			true => return serde_json::json!({ "error": "content is required" }),
-			false => {},
-		}
+		let Some(content) = (!content.is_empty()).then_some(content) else {
+			return serde_json::json!({ "error": "content is required" });
+		};
 
 		let hint = Arg::Fn::Fn(args, "type");
 		let center = args.get("_ccr_center").and_then(|v| v.as_str());

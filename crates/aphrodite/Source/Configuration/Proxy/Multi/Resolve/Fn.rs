@@ -32,10 +32,12 @@ impl Struct {
 			.or_else(|| d.and_then(|d| d.APIKey.clone()))
 			.or_else(|| std::env::var("APHRODITE_API_KEY").ok())
 			.unwrap_or_default();
-		match APIKey.is_empty() {
-			true => anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml"),
-			false => (),
-		}
+		APIKey
+			.is_empty()
+			.then(|| {
+				anyhow::anyhow!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml")
+			})
+			.map_or(Ok(()), Err)?;
 		// Resolve listen: must parse or fail (no silent default when listen is
 		// explicitly set).  After parsing, override with env var if set - this
 		// lets multiple concurrent Hermes Agent instances each point at their
@@ -52,10 +54,9 @@ impl Struct {
 		// Validate max_output < max_context
 		let MaximumContext = cfg.MaximumContext.unwrap_or(1_000_000);
 		let MaximumOutput = cfg.MaximumOutput.unwrap_or(384_000);
-		match MaximumOutput >= MaximumContext {
-			true => anyhow::bail!("max_output ({MaximumOutput}) must be less than max_context ({MaximumContext})"),
-			false => (),
-		}
+		(MaximumOutput >= MaximumContext)
+			.then(|| anyhow::anyhow!("max_output ({MaximumOutput}) must be less than max_context ({MaximumContext})"))
+			.map_or(Ok(()), Err)?;
 		Ok(CLI {
 			command:None,
 			Mode:match cfg.Mode.as_deref() {
@@ -123,14 +124,13 @@ impl Struct {
 			Dev:cfg.Dev.unwrap_or(false),
 			LogCompact:false,
 			Timeout:{
-				let t = cfg.Timeout.unwrap_or(300);
-				match t > 600 {
-					true => {
-						tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
-						600
-					},
-					false => t,
-				}
+				let Configured = cfg.Timeout.unwrap_or(300);
+				let Clamped = Configured.min(600);
+
+				let _ = (Clamped != Configured)
+					.then(|| tracing::warn!("timeout {}s exceeds maximum 600s, clamping", Configured));
+
+				Clamped
 			},
 		})
 	}

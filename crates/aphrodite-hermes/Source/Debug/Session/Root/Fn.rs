@@ -13,16 +13,25 @@ use crate::Debug::{Chain, Session::State::LAST_SESSION};
 ///
 /// Returns an empty string when no session has been recorded yet, which the
 /// toggle reports as "no session context" rather than inventing a root.
+///
+/// The `LAST_SESSION` guard is scoped to the clone, not held across the walk:
+/// the walk takes `SESSION_PARENTS`, and holding one process-global guard while
+/// acquiring another is how a lock-order inversion is born.
+///
 /// Dev-only: the only caller is the `aphrodite_debug` tool, gated behind
 /// `debug_assertions` so release dylibs register exactly the 13 production
 /// tools.
 pub(crate) fn Fn() -> String {
-	let last = LAST_SESSION
-		.get_or_init(|| Mutex::new(String::new()))
-		.lock()
-		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	match last.is_empty() {
-		true => String::new(),
-		false => Chain::Fn::Fn(&last).last().cloned().unwrap_or_else(|| last.clone()),
-	}
+	let Last = {
+		let Guard = LAST_SESSION
+			.get_or_init(|| Mutex::new(String::new()))
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner);
+
+		Guard.clone()
+	};
+
+	Last.is_empty()
+		.then(String::new)
+		.unwrap_or_else(|| Chain::Fn::Fn(&Last).last().cloned().unwrap_or_else(|| Last.clone()))
 }

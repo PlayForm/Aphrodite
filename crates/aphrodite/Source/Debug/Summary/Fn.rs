@@ -26,10 +26,14 @@ pub fn Fn(State:&AphroditeState) -> Vec<(&'static str, String)> {
 		("directives", State.ActiveDirectives.join(",")),
 		(
 			"templates",
-			match State.Templates.is_some() {
-				true => "registered".to_string(),
-				false => "builtin".to_string(),
-			},
+			// `Some`/`None` is the decision, not a boolean derived from it: a
+			// registered template set renders its own families, and an absent one
+			// means the hardcoded builders are in use.
+			match State.Templates {
+				Some(_) => "registered",
+				None => "builtin",
+			}
+			.to_string(),
 		),
 		("debug_level", State.DebugLevel.to_string()),
 	]

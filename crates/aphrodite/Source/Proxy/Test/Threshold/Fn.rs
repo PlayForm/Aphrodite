@@ -84,6 +84,7 @@ fn TestCompressThresholdCache() {
 		UpstreamErrors5xx:AtomicU64::new(0),
 		UpstreamTimeouts:AtomicU64::new(0),
 		UpstreamConnectErrors:AtomicU64::new(0),
+		UpstreamOtherErrors:AtomicU64::new(0),
 		SSEStreamErrors:AtomicU64::new(0),
 		RequestBodyBytes:AtomicU64::new(0),
 		ResponseBodyBytes:AtomicU64::new(0),

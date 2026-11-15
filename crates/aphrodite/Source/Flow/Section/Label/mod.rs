@@ -1,3 +1,4 @@
-//! Label, join and presence helpers for one injected section.
+//! The debug label of an injected section.
 
 pub mod Fn;
+pub mod Table;

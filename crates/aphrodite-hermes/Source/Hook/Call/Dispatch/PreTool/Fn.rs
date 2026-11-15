@@ -14,7 +14,7 @@
 
 use aphrodite::State::Struct::AphroditeState;
 
-use crate::{Configuration::Path::Fn::expected_path, Hook::Call::Input::Struct::HookInput};
+use crate::Hook::Call::Input::Struct::HookInput;
 
 /// Handle `pre_tool_call`: emit the dev-only pre-tool line, then apply at most
 /// one rewrite (backgrounding, then chain splitting) or pass through.
@@ -24,7 +24,7 @@ pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serd
 	// (the transform arms log the actual outcome).
 	let call_tool = input.parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 	let args_bytes = input.parsed.get("args").map(|a| a.to_string().len()).unwrap_or(0);
-	let expected = expected_path(state, call_tool, &input.parsed);
+	let expected = crate::Configuration::Path::Fn::Fn(state, call_tool, &input.parsed);
 	crate::Debug::Log::Bridge::Fn::Fn(
 		state,
 		&crate::Debug::Session::Last::Fn::Fn(),

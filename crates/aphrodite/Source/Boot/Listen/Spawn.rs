@@ -18,12 +18,10 @@ pub fn Spawn(Bound:Vec<Bound>, ShutdownRx:Receiver<bool>) -> Vec<JoinHandle<()>>
 		.map(|b| {
 			let Rx = ShutdownRx.clone();
 			tokio::spawn(async move {
-				match Serve(b, Rx).await {
-					Err(e) => {
-						tracing::error!(%e, "proxy listener failed");
-					},
-					Ok(_) => {},
-				}
+				// A serve failure is logged by the task itself and does not
+				// propagate: one dead listener must not take the process down
+				// while its siblings are still answering.
+				let _ = Serve(b, Rx).await.map_err(|e| tracing::error!(%e, "proxy listener failed"));
 			})
 		})
 		.collect();

@@ -1,26 +1,27 @@
 //! Go source: `func` names and the line count.
 
-pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
-	Parts.push("lang=go".to_string());
-	let Fns:Vec<&str> = Content
+use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
+
+/// Language, the function names, then the line count.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
+	let Fns:Vec<&str> = Analysis
+		.Content
 		.lines()
-		.filter(|l| {
-			let t = l.trim_start();
-			t.starts_with("func ")
-		})
-		.filter_map(|l| {
-			let t = l.trim_start();
-			let After = t.strip_prefix("func ")?;
-			After.split(['(', ' ']).next().filter(|s| !s.is_empty())
+		.filter(|Line| Line.trim_start().starts_with("func "))
+		.filter_map(|Line| {
+			let Trimmed = Line.trim_start();
+			let After = Trimmed.strip_prefix("func ")?;
+
+			After.split(['(', ' ']).next().filter(|Name| !Name.is_empty())
 		})
 		.collect();
 
-	match !Fns.is_empty() {
-		true => {
-			Parts.push(format!("fns={}", Fns.join(",")));
-		},
-		false => {},
-	}
-
-	Parts.push(format!("ln={}", LineCount));
+	[
+		Some(MetadataField::New("lang", "go")),
+		(!Fns.is_empty()).then(|| MetadataField::New("fns", Fns.join(","))),
+		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+	]
+	.into_iter()
+	.flatten()
+	.collect()
 }

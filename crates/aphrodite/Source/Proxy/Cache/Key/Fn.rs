@@ -1,51 +1,47 @@
-//! Derive the response-cache key from a request body.
+//! Derive the response-cache key from an already-parsed request body.
 //!
 //! The key must be stable across processes and cheap to compute, and must
 //! include the API key so two credentials never share a cached completion.
-//! Returns `None` when the body cannot be keyed (unparseable, or a shape the
-//! cache must not collapse) - a false key would serve one user's answer to
-//! another.
+//! Returns `None` when the body cannot be keyed (a shape the cache must not
+//! collapse) - a false key would serve one user's answer to another.
+//!
+//! The parsed value is an argument rather than being parsed here: the request
+//! is interpreted once (`Request::Semantics::Fn`), and re-parsing the same
+//! bytes to answer a second question is exactly how one body came to be
+//! classified two ways. The bytes fed to the digest are unchanged.
 
 use crate::Proxy::Cache::Hash::Fn::Fn as Fnv1a64;
 
-/// Compute a cache key from a Chat Completions request body: hash(api_key +
-/// model + messages). Uses FNV-1a (deterministic across restarts, unlike
-/// DefaultHasher). Includes api_key to prevent cross-user cache collision.
-/// Returns None if the body can't be parsed as JSON or lacks model/messages.
-pub(crate) fn Fn(body:&[u8], APIKey:&str) -> Option<u64> {
-	let v:serde_json::Value = serde_json::from_slice(body).ok()?;
-	// F3: never cache a streamed request - the cached entry is a single
-	// buffered JSON body, replayed with `Content-Type: application/json`,
-	// which is nothing like an SSE stream a `"stream": true` client expects.
-	match v.get("stream").and_then(|s| s.as_bool()).unwrap_or(false) {
-		true => {
-			return None;
-		},
-		false => {},
-	}
-
+/// Compute a cache key from a parsed Chat Completions request body:
+/// hash(api_key + model + messages + every field that changes the answer).
+///
+/// FNV-1a, deterministic across restarts (unlike `DefaultHasher`). The field
+/// list is the cache format: adding a field invalidates nothing, removing or
+/// reordering one aliases every entry already stored.
+pub(crate) fn Fn(Body:&serde_json::Value, APIKey:&str) -> Option<u64> {
 	// `Model`/`messages` must both be present for this to be a valid,
 	// cacheable chat-completion request.
-	v.get("model")?.as_str()?;
-	v.get("messages")?;
+	Body.get("model")?.as_str()?;
+	Body.get("messages")?;
+
 	// F3: the key used to hash only api_key+model+messages, so two requests
 	// differing solely in `tools`, `tool_choice`, `temperature`, `top_p`,
 	// `n`, or `response_format` collided and got served each other's cached
-	// response. Include every field that changes what a valid response can
-	// look like, in a fixed, canonical order (serde_json's key order from
-	// `v` itself is not guaranteed stable across equivalent requests).
+	// response. Every field that changes what a valid response can look like
+	// is included, in a fixed, canonical order (serde_json's key order from
+	// `Body` itself is not guaranteed stable across equivalent requests).
 	let mut Parts:Vec<u8> = Vec::new();
 	Parts.extend_from_slice(APIKey.as_bytes());
 
 	[
-		("model", v.get("model")),
-		("messages", v.get("messages")),
-		("tools", v.get("tools")),
-		("tool_choice", v.get("tool_choice")),
-		("temperature", v.get("temperature")),
-		("top_p", v.get("top_p")),
-		("n", v.get("n")),
-		("response_format", v.get("response_format")),
+		("model", Body.get("model")),
+		("messages", Body.get("messages")),
+		("tools", Body.get("tools")),
+		("tool_choice", Body.get("tool_choice")),
+		("temperature", Body.get("temperature")),
+		("top_p", Body.get("top_p")),
+		("n", Body.get("n")),
+		("response_format", Body.get("response_format")),
 	]
 	.into_iter()
 	.try_for_each(|(Label, Value)| -> Option<()> {
@@ -53,12 +49,12 @@ pub(crate) fn Fn(body:&[u8], APIKey:&str) -> Option<u64> {
 		Parts.extend_from_slice(Label.as_bytes());
 		Parts.push(b'=');
 
-		match Value {
-			Some(Value) => {
-				Parts.extend_from_slice(serde_json::to_string(Value).ok()?.as_bytes());
-			},
-			None => {},
-		}
+		// `transpose` keeps the fail-closed semantics: a value that cannot be
+		// serialised yields no key at all rather than a key that silently omits
+		// the field it failed on.
+		let Text = Value.map(serde_json::to_string).transpose().ok()?;
+
+		let _ = Text.inspect(|Text| Parts.extend_from_slice(Text.as_bytes()));
 
 		Some(())
 	})?;

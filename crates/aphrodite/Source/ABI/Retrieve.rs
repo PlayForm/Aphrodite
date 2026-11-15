@@ -1,10 +1,10 @@
 //! `AphroditeRetrieve` - hand back the stored payload behind a hash.
 
-use std::{ffi::CString, os::raw::c_char};
+use std::os::raw::c_char;
 
 use crate::ABI::{
-	Guard::{Cstr, Guarded, ToJSONError},
-	Handle::Lookup::GetHandle,
+	Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as Bare},
+	Guard::Cstr::Fn::Fn as Cstr,
 };
 
 /// Return the raw content stored under `hash` - not a JSON envelope.
@@ -21,25 +21,18 @@ use crate::ABI::{
 /// learn which markers are actually worth keeping.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeRetrieve(Handle:*const c_char, hash:*const c_char) -> *mut c_char {
-	let Hid = match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Ok(ID) => ID,
-		Err(_) => return ToJSONError("invalid handle"),
-	};
 	let hash = unsafe { Cstr(hash) }.unwrap_or_default();
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		let Session = match GetHandle(Hid) {
-			Some(s) => s,
-			None => return ToJSONError(&format!("invalid handle: {}", Hid)),
-		};
-		let mut s = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+
+	Bare(Handle, move |s| {
 		match s.InlineStoreGet(&hash) {
 			Some(Content) => {
 				// Tier 1 teaching loop: the FFI retrieve path bypasses
 				// resolve_one, so attribute the consequence here too.
 				s.NoteSplitRetrieval(&hash);
-				CString::new(Content.replace('\0', "")).unwrap().into_raw()
+
+				Ok(Answer::Text(Content))
 			},
-			None => ToJSONError(&format!("hash not found: {}", hash)),
+			None => anyhow::bail!("hash not found: {}", hash),
 		}
-	}))
+	})
 }

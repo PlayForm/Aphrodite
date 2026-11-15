@@ -1,21 +1,30 @@
-//! The terminal-output gate sequence.
+//! The terminal-output pipeline: observe, select, apply.
 
-use super::super::{ChainSplit, Emit, Record};
 use crate::{
-	Hook::{AutoExpand::Applies, Live::Container, ToolResult::Classify},
+	Hook::{
+		Observation::{Apply::Fn::Fn as ApplyObservation, Terminal::Fn::Fn as Observe},
+		Terminal::{
+			Apply::Fn::Fn as Apply,
+			Input::Struct::Struct as Input,
+			Policy::Resolve::Fn::Fn as ResolvePolicy,
+			Select::Fn::Fn as Select,
+		},
+	},
 	State::Struct::AphroditeState,
 };
 
-/// The terminal-output pipeline: telemetry, the auto-expand gate, chain
-/// splitting, the threshold gate, the live container, then store + marker.
+/// The terminal-output pipeline, in three steps that cannot be reordered.
 ///
-/// Gate ORDER is the contract. Telemetry runs before every early return (a
-/// failing command with tiny output is exactly what the error-loop breaker
-/// needs); `DoAutoExpand` is computed once before the chain-split and
-/// threshold gates so no marker-emitting path can run under it; chain-split
-/// runs before the threshold gate because below-threshold marked output would
-/// otherwise pass through with segment markers still in it, polluting what the
-/// model sees. Reordering any of these changes what the model reads.
+/// 1. OBSERVE. The call happened; that is a fact, and it is recorded before any
+///    decision. Telemetry used to be a statement at the top of this function with
+///    a comment telling the next author not to move it below a gate; now the
+///    observation is a value applied first, so a new early return cannot drop it.
+/// 2. SELECT. A pure function of the snapshotted policy and the input, producing
+///    a plan. Nothing here touches the session.
+/// 3. APPLY. A narrow interpreter that performs the plan's effects.
+///
+/// Empty content is the one case with nothing to observe: no bytes, and a
+/// command whose output is empty is not a signal the error-loop breaker can use.
 pub(crate) fn Fn(
 	State:&mut AphroditeState,
 	Content:&str,
@@ -23,66 +32,12 @@ pub(crate) fn Fn(
 	command:Option<&str>,
 	Returncode:Option<i64>,
 ) -> serde_json::Value {
-	// Telemetry (P2/T6): record before threshold/empty gating - a failing
-	// command with tiny output is exactly what the error-loop breaker needs.
-	match !Content.is_empty() {
-		true => {
-			Record::Fn::Fn(State, Content, command, Returncode);
-		},
-		false => {},
-	}
-	match Content.is_empty() {
-		true => {
-			return serde_json::json!({"status": "ok", "compressed": false, "reason": "empty"});
-		},
-		false => {},
-	}
+	let Observation = (!Content.is_empty()).then(|| Observe(Content, command, Returncode));
+	let _ = Observation.as_ref().map(|Observation| ApplyObservation(State, Observation));
 
-	// ── Auto-expand gate (pre-Rust port) ──
-	// Computed once, BEFORE the chain-split / threshold gates: when enabled
-	// and the content fits the limit, no marker-emitting path may run at
-	// all - the content goes straight to the store+expand single path so
-	// no `<<<CCR:...>>>` (and no chain-split segment marker) reaches the
-	// model. Over the limit or disabled, every gate below behaves exactly
-	// as before.
-	let DoAutoExpand = Applies::Fn::Fn(State, Content);
+	let Input = Input { Content, Classify };
+	let Policy = ResolvePolicy(State, Content);
+	let Plan = Select(&Policy, &Input);
 
-	// ── Fine-grained chain splitting ──
-	// Runs BEFORE the threshold gate: marked output must never leak raw
-	// (below-threshold chained output would otherwise pass through with the
-	// segment markers still in it, polluting what the LLM sees). Splitting
-	// marked content is unconditional when the feature is enabled - except
-	// under auto-expand (within the limit), where the whole content is
-	// returned expanded instead.
-	match ChainSplit::Fn::Fn(State, Content, DoAutoExpand) {
-		Some(Payload) => {
-			return Payload;
-		},
-		None => {},
-	}
-
-	// Threshold gate for UNMARKED output only: below-threshold content
-	// passes through untouched (no markers to leak, nothing worth
-	// splitting). Auto-expand bypasses the gate (store+expand path).
-	match !DoAutoExpand && State.TerminalThreshold > 0 && Content.len() < State.TerminalThreshold {
-		true => {
-			return serde_json::json!({"status": "ok", "compressed": false, "reason": "below_threshold"});
-		},
-		false => {},
-	}
-
-	// ── Live container (pre-Rust port of _hooks/live.py) ──
-	// Same contract as the tool path: enabled AND above the compress
-	// threshold → chunked container store + INSTANT marker with a progress
-	// annotation. Chain-split (above) already handled marked output, and
-	// auto-expand wins when it applies.
-	match State.LiveContainer && !DoAutoExpand {
-		true => {
-			let (TypeStr, _ClassifyContent) = Classify::Fn::Fn(Content, Classify, true);
-			return Container::Fn::Fn(State, Content, &TypeStr);
-		},
-		false => {},
-	}
-
-	Emit::Fn::Fn(State, Content, Classify, DoAutoExpand)
+	Apply(State, &Input, &Policy, Plan)
 }

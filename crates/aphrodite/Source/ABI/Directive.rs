@@ -3,8 +3,8 @@
 use std::os::raw::c_char;
 
 use crate::ABI::{
-	Guard::{Cstr, Guarded, ToJSONError, ToJSONOk},
-	Handle::Lookup::GetHandle,
+	Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as Bare},
+	Guard::Cstr::Fn::Fn as Cstr,
 };
 
 /// Apply a directive `Action` named by `name` and answer with the action's JSON
@@ -21,19 +21,10 @@ use crate::ABI::{
 /// call on this handle and to no other.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeDirective(Handle:*const c_char, Action:*const c_char, name:*const c_char) -> *mut c_char {
-	let Hid = match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Ok(ID) => ID,
-		Err(_) => return ToJSONError("invalid handle"),
-	};
-	let Act = unsafe { Cstr(Action) }.unwrap_or_default();
-	let Nm = unsafe { Cstr(name) }.unwrap_or_default();
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		match GetHandle(Hid) {
-			Some(Session) => {
-				let mut s = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-				ToJSONOk(&crate::Directive::Action::Fn(&mut s, &Act, &Nm))
-			},
-			None => ToJSONError(&format!("invalid handle: {}", Hid)),
-		}
-	}))
+	let Action = unsafe { Cstr(Action) }.unwrap_or_default();
+	let name = unsafe { Cstr(name) }.unwrap_or_default();
+
+	Bare(Handle, move |s| {
+		Ok(Answer::Envelope(crate::Directive::Action::Fn(s, &Action, &name)))
+	})
 }

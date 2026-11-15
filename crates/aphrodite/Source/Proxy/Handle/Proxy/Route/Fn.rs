@@ -2,20 +2,29 @@
 //!
 //! Split from `Fn` only so the request span can be entered with `Instrument`
 //! (an async fn cannot hold an `Entered` guard across its awaits). The sequence
-//! itself is unchanged: count the request, log it in dev mode, build the
-//! upstream URL and the cache key, then `Lookup`, `Forward`, `Respond`.
+//! is: count the request, interpret the body once, log it in dev mode, answer it
+//! from the cache when it may be, otherwise forward and respond.
+//!
+//! The interpretation happens before anything branches, and the cache decision
+//! and the upstream client both read it - so a request can no longer be
+//! streaming to one and cacheable to the other (D3).
+//!
+//! The cache lookup and the forward are the two arms of one `match`, not a
+//! lookup followed by an early return: a hit IS the response and a bypass or a
+//! miss both take the upstream road, so there is no third state to fall through.
 
 use std::sync::{Arc, atomic::Ordering};
 
-use axum::{http::Method, response::IntoResponse};
+use axum::http::Method;
 use bytes::Bytes;
 
-use super::super::{Forward, Lookup, Respond};
 use crate::Proxy::{
 	Body::Truncate::Fn::Fn as TruncateCharSafe,
-	Cache::Key::Fn::Fn as CacheKeyFromBody,
+	Cache::Lookup::{Enum::Enum as CacheLookup, Fn::Fn as LookupCache},
+	Handle::Proxy::Route::Send::Fn::Fn as SendUpstream,
+	Log::Dev::Fn::Fn as DevLog,
+	Request::{Context::Struct::Struct as RequestContext, Semantics::Fn::Fn as InterpretRequest},
 	State::Struct::Struct as AppState,
-	Threshold::Const::ChatCompletionsPath,
 };
 
 pub(crate) async fn Fn(
@@ -24,88 +33,61 @@ pub(crate) async fn Fn(
 	path:axum::extract::OriginalUri,
 	Headers:axum::http::HeaderMap,
 	body:Bytes,
-) -> impl IntoResponse {
+) -> axum::response::Response {
 	state.RequestsTotal.fetch_add(1, Ordering::Relaxed);
 	state.RequestBodyBytes.fetch_add(body.len() as u64, Ordering::Relaxed);
-	let T0 = std::time::Instant::now();
+	let Started = std::time::Instant::now();
 	let RequestID = uuid::Uuid::new_v4().to_string();
-	let RequestIDShort = &RequestID[..8];
+	let ID = RequestID.get(..8).unwrap_or(&RequestID);
 
-	match state.Dev {
-		true => {
-			// Log incoming headers
-			let mut HdrLog = String::new();
+	// One interpretation of the body, produced before anything branches on it.
+	let Semantics = InterpretRequest(path.path(), &body, state.APIKey.Expose());
 
-			Headers.iter().for_each(|(k, v)| {
-				let Value = v.to_str().unwrap_or("?");
+	DevLog(state.Dev, || {
+		let mut HdrLog = String::new();
 
-				match k.as_str().to_lowercase() != "authorization" {
-					true => {
-						HdrLog.push_str(&format!("  {}: {}", k.as_str(), TruncateCharSafe(Value, 80)));
-					},
-					false => {
-						HdrLog.push_str("  authorization: ***");
-					},
-				}
+		Headers.iter().for_each(|(Name, Value)| {
+			let Rendered = if Name.as_str() != "authorization" {
+				format!("  {}: {}", Name.as_str(), TruncateCharSafe(Value.to_str().unwrap_or("?"), 80))
+			} else {
+				"  authorization: ***".to_string()
+			};
 
-				HdrLog.push('\n');
-			});
+			HdrLog.push_str(&Rendered);
+			HdrLog.push('\n');
+		});
 
-			tracing::info!(
-				ID = %RequestIDShort,
-				Method = %Method,
-				path = %path.path(),
-				BodyLength = body.len(),
-				Headers = %HdrLog,
-				">>> REQ"
-			);
-		},
-		false => {},
-	}
+		tracing::info!(
+			ID = %ID,
+			Method = %Method,
+			path = %path.path(),
+			BodyLength = body.len(),
+			BodyKind = Semantics.Body.Kind(),
+			Headers = %HdrLog,
+			">>> REQ"
+		);
+	});
 
-	// F10: forward the query string too - `path.path()` excludes it, so any
-	// OpenAI-compatible endpoint using query params (e.g. `GET
-	// /v1/models?limit=5`) had it silently dropped by this catch-all.
-	let DeepseekPathAndQuery = path
-		.0
-		.path_and_query()
-		.map(|Pq| Pq.as_str())
-		.unwrap_or_else(|| path.path())
-		.trim_start_matches('/');
-	let url = format!("{}/{}", state.APIURL.trim_end_matches('/'), DeepseekPathAndQuery);
-
-	let IsChatCompletion = path.path().trim_start_matches('/') == ChatCompletionsPath.trim_start_matches('/');
-
-	let BodyVec = body.to_vec();
-	let CacheKey = match IsChatCompletion {
-		true => CacheKeyFromBody(&BodyVec, state.APIKey.Expose()),
-		false => None,
+	let Context = RequestContext {
+		State:&state,
+		Method:&Method,
+		Path:path.path(),
+		ID,
+		Started,
+		Headers:&Headers,
+		Semantics,
 	};
-	match CacheKey {
-		Some(Ck) => {
-			match Lookup::Fn::Fn(&state, Some(Ck), RequestIDShort, &Method, path.path(), T0) {
-				Some(Cached) => {
-					return Cached;
-				},
-				None => {},
-			}
+
+	match LookupCache(&Context, std::time::Instant::now()) {
+		CacheLookup::Hit(Cached) => Cached,
+		// A miss names the key it looked under; a bypass has no key to name.
+		// Both take the upstream road - the difference is already recorded by the
+		// lookup itself.
+		CacheLookup::Miss { Key } => {
+			DevLog(state.Dev, || tracing::info!(ID = %ID, CacheKey = Key, "<<< CACHE MISS"));
+
+			SendUpstream(&Context, &path, body).await
 		},
-		None => {},
+		CacheLookup::Bypassed => SendUpstream(&Context, &path, body).await,
 	}
-	// 02-F2: a `"stream": true` request goes out on `StreamClient` (no total
-	// timeout), not the bounded `Client` - see `Forward`'s doc comment.
-	let (UpstreamResult, FinalErrorWasTimeout) = Forward::Fn::Fn(&state, &Method, &url, &Headers, BodyVec).await;
-	Respond::Fn::Fn(
-		&state,
-		&Method,
-		path.path(),
-		RequestIDShort,
-		T0,
-		&Headers,
-		CacheKey,
-		IsChatCompletion,
-		UpstreamResult,
-		FinalErrorWasTimeout,
-	)
-	.await
 }

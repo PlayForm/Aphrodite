@@ -5,8 +5,12 @@
 //! registered session, so a config change applies to the parent and all
 //! subagent sessions alike - each under its own bounded lock, wedged ones
 //! skipped, because a reload must never block the gateway.
+//!
+//! This leaf is the composition and nothing else: `Debounce/` owns the settle
+//! window, `Apply/` owns the per-session application, and both are compiled in
+//! the test build because neither needs a thread.
 
-use crate::{Configuration::Reload::Fn::apply_config_reload, Session::Broadcast::Fn::for_each_session};
+use crate::Session::Watcher::{Apply, Debounce};
 
 /// Spawn the opt-in config auto-reload watcher. Mirrors the engine binary's
 /// watcher (`Main.rs`): watch the config search dirs (cwd, then the user
@@ -35,17 +39,14 @@ pub(crate) fn spawn_config_watcher() {
 			// a non-default Hermes home it must watch <hermes-home>/aphrodite,
 			// never $HOME/.hermes/aphrodite (issue 40).
 			watch_dirs.push(aphrodite::Home::Runtime::Fn::Fn());
-			let (tx, rx) = std::sync::mpsc::channel::<()>();
-			let mut watcher = match notify::recommended_watcher(move |res:Result<notify::Event, notify::Error>| {
-				match res {
-					Ok(ev)
-						if matches!(ev.kind, notify::EventKind::Modify(_))
-							&& ev.paths.iter().any(|p| p.to_string_lossy().contains("aphrodite.toml")) =>
-					{
-						let _ = tx.send(());
-					},
-					_ => {},
-				}
+			let (Sender, Receiver) = std::sync::mpsc::channel::<()>();
+			let mut watcher = match notify::recommended_watcher(move |Result:Result<notify::Event, notify::Error>| {
+				let Wanted = Result.is_ok_and(|Event| {
+					matches!(Event.kind, notify::EventKind::Modify(_))
+						&& Event.paths.iter().any(|Path| Path.to_string_lossy().contains("aphrodite.toml"))
+				});
+
+				let _ = Wanted.then(|| Sender.send(()));
 			}) {
 				Ok(w) => w,
 				Err(e) => {
@@ -64,34 +65,14 @@ pub(crate) fn spawn_config_watcher() {
 				}
 			});
 
-			// One blocking receive per event, until the channel closes: the
-			// iterator IS the "wait for the next change" step, and the sweep
-			// stops early (`Err`) when `auto_reload` turned off in the file.
-			let _ = rx.iter().try_for_each(|()| {
-				// Debounce: let the editor's write settle (same as the engine
-				// watcher's 500ms), and drain events accumulated meanwhile.
-				std::thread::sleep(std::time::Duration::from_millis(500));
-				rx.try_iter().for_each(drop);
+			// One blocking tick per burst, then one apply. `Debounce` returns
+			// false when the channel closed and `Apply` returns false when no
+			// session still wants a reload (`auto_reload` turned off in the
+			// file), so either one ends the watch.
+			let mut Watching = true;
 
-				let cfg = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Load();
-				let keep_watching = match cfg.ParseFailure.clone() {
-					// Broken file: keep the previous values, surface the
-					// failure on EVERY session (the loader's warn already
-					// fired); wedged sessions are skipped.
-					Some(failure) => {
-						for_each_session(|s| s.ConfigurationError = Some(failure.clone()));
-
-						true
-					},
-					None => for_each_session(|s| apply_config_reload(&cfg, s)),
-				};
-
-				// `auto_reload` turned off in the file - stop watching
-				// (takes effect on the next successful reload).
-				match keep_watching {
-					true => Ok(()),
-					false => Err(()),
-				}
-			});
+			while Watching && Debounce::Fn::Fn(&Receiver) {
+				Watching = Apply::Fn::Fn(&aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Load());
+			}
 		});
 }

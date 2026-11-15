@@ -2,22 +2,18 @@
 
 /// Split a `path:line:...` candidate into its path and line fields.
 ///
-/// Returns `None` when the path is missing, whitespace-containing or empty, or
-/// when the middle field is not a line number, or when nothing follows it. It
-/// is not a path validator: the path is returned as written, so a Windows drive
-/// letter or a URL scheme would split wrongly - neither appears in the tool
-/// output this reads.
+/// Returns `None` when the path is missing, whitespace-containing or empty, or when the middle
+/// field is not a line number, or when nothing follows it. It is not a path validator: the path
+/// is returned as written (untrimmed), so a Windows drive letter or a URL scheme would split
+/// wrongly - neither appears in the tool output this reads.
 pub(super) fn Fn(Line:&str) -> Option<(&str, &str)> {
-	let mut It = Line.splitn(3, ':');
-	let path = match It.next() {
-		Some(p) if !p.trim().is_empty() && !p.contains(' ') => p,
-		_ => return None,
-	};
-	match It.next() {
-		// `path:line:...` - middle is a line number, third segment exists.
-		Some(Mid) if Mid.chars().all(|c| c.is_ascii_digit()) && !Mid.is_empty() && It.next().is_some() => {
-			Some((path, Mid))
-		},
-		_ => None,
-	}
+	let mut Fields = Line.splitn(3, ':');
+	let Path = Fields.next().filter(|Path| !Path.trim().is_empty() && !Path.contains(' '))?;
+	let LineNumber = Fields
+		.next()
+		.filter(|Field| !Field.is_empty() && Field.chars().all(|Character| Character.is_ascii_digit()))?;
+
+	Fields.next()?;
+
+	Some((Path, LineNumber))
 }

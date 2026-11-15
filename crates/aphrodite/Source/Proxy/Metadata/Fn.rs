@@ -1,42 +1,45 @@
 //! Generate the metadata block that accompanies a compressed marker.
 //!
 //! Metadata is the model's map of what it is no longer holding: the content
-//! family, its size, its shape and the reason it was compressed. It is built
-//! per content family because the useful facts differ - a build log's value is
-//! its error lines, a JSON payload's is its key structure. A misleading block
-//! is a bug, not cosmetic.
+//! family, its size, its shape and the reason it was compressed. It is built per
+//! content family because the useful facts differ - a build log's value is its
+//! error lines, a JSON payload's is its key structure. A misleading block is a
+//! bug, not cosmetic.
+//!
+//! Every producer returns typed fields in the order the model should read them;
+//! the family is a `ContentType::Family` value, not a string comparison, so the
+//! threshold scaler and this renderer cannot disagree about what a name means.
 
+use crate::Proxy::{
+	Analysis::Struct::Struct as ContentAnalysis,
+	ContentType::Family::{Classify::Fn::Fn as ClassifyFamily, Enum::Enum as ContentFamily},
+	Metadata::Field::Struct::Struct as MetadataField,
+};
 use super::{Build, Code, Diff, Error, Git, Go, JS, JSON, Linter, Log, Python, Rust, Text};
 
-/// Generate structured metadata for CCR markers based on content type.
-/// Returns pipe-safe key=value pairs (max 200 chars, | escaped to /).
-pub(crate) fn Fn(Content:&str, Ct:&str) -> String {
-	let LineCount = Content.lines().count();
-	let mut Parts:Vec<String> = Vec::new();
+/// The marker's metadata block: `;`-separated `key=value`, at most 400 chars.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> String {
+	let Parts:Vec<MetadataField> = match ClassifyFamily(Analysis.Ct) {
+		ContentFamily::CodeRust => Rust::Fn::Fn(Analysis),
+		ContentFamily::CodePython => Python::Fn::Fn(Analysis),
+		ContentFamily::CodeGo => Go::Fn::Fn(Analysis),
+		ContentFamily::CodeJS => JS::Fn::Fn(Analysis),
+		ContentFamily::Code => Code::Fn::Fn(Analysis),
+		ContentFamily::Error => Error::Fn::Fn(Analysis),
+		ContentFamily::Diff => Diff::Fn::Fn(Analysis),
+		ContentFamily::Git => Git::Fn::Fn(Analysis),
+		ContentFamily::BuildOutput => Build::Fn::Fn(Analysis),
+		ContentFamily::Log => Log::Fn::Fn(Analysis),
+		ContentFamily::Linter => Linter::Fn::Fn(Analysis),
+		ContentFamily::Json | ContentFamily::ToolOutput => JSON::Fn::Fn(Analysis),
+		ContentFamily::Text | ContentFamily::Other => Text::Fn::Fn(Analysis),
+	};
 
-	match Ct {
-		"code_rust" => Rust::Fn::Fn(Content, LineCount, &mut Parts),
-		"code_python" => Python::Fn::Fn(Content, LineCount, &mut Parts),
-		"code_go" => Go::Fn::Fn(Content, LineCount, &mut Parts),
-		"code_js" => JS::Fn::Fn(Content, LineCount, &mut Parts),
-		"code" => Code::Fn::Fn(Content, LineCount, &mut Parts),
-		"error" => Error::Fn::Fn(Content, &mut Parts),
-		"diff" => Diff::Fn::Fn(Content, &mut Parts),
-		"git" => Git::Fn::Fn(Content, &mut Parts),
-		"build_output" => Build::Fn::Fn(Content, &mut Parts),
-		"log" => Log::Fn::Fn(Content, LineCount, &mut Parts),
-		"linter" => Linter::Fn::Fn(Content, LineCount, &mut Parts),
-		"json" | "tool_output" => JSON::Fn::Fn(Content, &mut Parts),
-		"text" => Text::Fn::Fn(Content, LineCount, &mut Parts),
-		_ => Text::Fn::Fn(Content, LineCount, &mut Parts),
-	}
+	// `;` separates fields and is safe inside the marker's `|` delimiters;
+	// commas separate list items within a value. 400 chars is coding-tuned:
+	// enough for ~25 function names.
+	let Joined = Parts.iter().map(MetadataField::Render).collect::<Vec<_>>().join(";");
+	let Truncated:String = Joined.replace('\n', " ").replace('\r', "").chars().take(400).collect();
 
-	// Build final string: ;-separated key=value pairs (; safe within CCR marker's |
-	// delimiters). Comma separates list items within values. Max 400 chars
-	// (coding-tuned: enough for ~25 functions).
-	let Result = Parts.join(";").replace('\n', " ").replace('\r', "");
-	let Truncated:String = Result.chars().take(400).collect();
 	Truncated.trim_end_matches([';', ' ', ',']).to_string()
 }
-
-// ── CCR output template (editable) ────────────────────────────────

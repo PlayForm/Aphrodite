@@ -1,23 +1,17 @@
-//! The directive data model - the loaded directive and the size caps applied
-//! to directive content.
+//! The directive data model.
 //!
-//! Two caps, not one, because they bound different failures: the per-file cap
-//! stops a single runaway `.md` from dominating the context, and the combined
-//! cap stops several individually-acceptable directives from stacking past the
-//! budget this feature is supposed to respect.
+//! One item, one file, and the file is named for the kind: `Directive::Model::Struct` is
+//! the type, which is the path every consumer already spells. The size caps are leaves
+//! under `Cap/` instead, because they belong to the cutting rule rather than to the data
+//! model.
 
 /// A loaded directive - name and content.
+///
+/// `name` is the identifier the model sees and the key `aphrodite_directive` addresses,
+/// so it is data, not a display string: the file it came from is lowercase (`focus.md`)
+/// and the name is that stem unchanged.
 #[derive(Debug, Clone)]
 pub struct Struct {
 	pub name:String,
 	pub Content:String,
 }
-
-/// Per-file cap applied when a directive `.md` is loaded from disk.
-pub const MaximumDirectiveChars:usize = 2000;
-
-/// Cap on the combined injected text across all active directives (01-F5) -
-/// `MaximumDirectiveChars` alone doesn't bound this: with several directives
-/// active at once, each already-capped body still stacks up in
-/// `BuildDirectiveContext`'s output.
-pub const MaximumCombinedChars:usize = 4000;

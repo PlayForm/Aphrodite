@@ -17,13 +17,11 @@ use tracing_subscriber::EnvFilter;
 /// at the default level - but a span or event the filter rejects never reaches
 /// the fmt layer, so nothing is formatted for it either.
 pub(crate) fn Fn(Configured:Option<Level>) -> EnvFilter {
-	match EnvFilter::try_from_env("APHRODITE_LOG") {
-		Ok(Filter) => return Filter,
-		Err(_) => (),
+	if let Ok(Filter) = EnvFilter::try_from_env("APHRODITE_LOG") {
+		return Filter;
 	}
-	match EnvFilter::try_from_default_env() {
-		Ok(Filter) => return Filter,
-		Err(_) => (),
+	if let Ok(Filter) = EnvFilter::try_from_default_env() {
+		return Filter;
 	}
 	EnvFilter::new(Configured.unwrap_or(Level::INFO).as_str())
 }

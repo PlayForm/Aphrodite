@@ -1,9 +1,8 @@
 //! Apply a closure to every registered session.
 //!
-//! Runtime-only: the only caller is the config auto-reload watcher
-//! (`Session::Watcher`), which is itself compiled out of the test harness. A
-//! sweep that is never reachable in a test build is dead code there, so it
-//! leaves with the watcher instead of failing `-D warnings`.
+//! Compiled in every build, not just production: the sweep is the apply half of
+//! the config watcher (`Session::Watcher::Apply`), and a sweep that only exists
+//! in the runtime build cannot be exercised by a test. The watcher's own thread
+//! spawn stays runtime-only; this leaf does not.
 
-#[cfg(not(test))]
 pub mod Fn;

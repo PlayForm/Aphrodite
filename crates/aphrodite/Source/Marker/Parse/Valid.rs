@@ -8,9 +8,8 @@
 /// Check if a string is a valid CCR hash (>=24 hex chars, or `i:` prefix with
 /// >=6 hex chars).
 pub fn IsValidCCRHash(h:&str) -> bool {
-	match h.len() < 8 {
-		true => return false,
-		false => (),
+	if h.len() < 8 {
+		return false;
 	}
 
 	let h = h.to_lowercase();

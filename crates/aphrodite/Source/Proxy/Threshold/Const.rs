@@ -50,13 +50,12 @@ pub(crate) const InitialRatioEma:u64 = 200;
 /// a const fn so the manual 9000/200 sync can never drift (W2-8).
 pub(crate) const fn InitialFillPct() -> u64 {
 	// compute_fill_pct's `ratio_ema == 0` → 99 branch is unreachable here:
-	// the initial EMA is always non-zero. `clamp` is not const-stable on
-	// this toolchain, so mirror the [1, 99] clamp with plain comparisons.
+	// the initial EMA is always non-zero. `Ord::clamp`/`max`/`min` are not const
+	// on this toolchain, so the [1, 99] bound is expressed with `saturating_sub`:
+	// the first line is `min(raw, 99)`, the second raises a zero to 1. Both are
+	// `const fn`, so the value is a bound and not a branch.
 	let raw = 100u64.saturating_sub(InitialRatioEma / 20);
-	let Pct = match () {
-		_ if raw < 1 => 1,
-		_ if raw > 99 => 99,
-		_ => raw,
-	};
-	Pct * 100
+	let Capped = raw - raw.saturating_sub(99);
+
+	(Capped + 1u64.saturating_sub(Capped)) * 100
 }

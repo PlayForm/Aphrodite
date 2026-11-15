@@ -15,16 +15,14 @@ use crate::{Flow::Prompt::Render::Fn::RenderPrompt, State::Struct::AphroditeStat
 /// wins, the compiled-in fallback otherwise. Disabled (default) = no
 /// guidance, current behavior; an unknown/empty template renders nothing.
 pub(crate) fn AutoExpandGuidanceBlock(State:&AphroditeState) -> String {
-	match !State.AutoExpand {
-		true => return String::new(),
-		false => (),
+	if !State.AutoExpand {
+		return String::new();
 	}
 
 	let Text = RenderPrompt(State, "auto_expand_guidance", &[]);
 
-	match Text.is_empty() {
-		true => return String::new(),
-		false => (),
+	if Text.is_empty() {
+		return String::new();
 	}
 
 	format!("[auto-expand: {}]", Text)

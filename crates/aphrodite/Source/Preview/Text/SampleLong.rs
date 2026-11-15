@@ -1,28 +1,44 @@
 //! Head+tail sampling for very long single-line payloads.
 //!
-//! A tool result can be one 10 KB line (a minified JSON blob, a single-line
-//! log). A bare head truncation of such a line hides the end, and the end is
-//! often the part that says what happened. This module samples both ends. It
-//! is not a line splitter and it never invents an ellipsis position: the
-//! budget is fixed, so two callers sampling the same line get the same string.
+//! A tool result can be one 10 KB line (a minified JSON blob, a single-line log). A bare head
+//! truncation of such a line hides the end, and the end is often the part that says what
+//! happened. This module samples both ends. It is not a line splitter and it never invents an
+//! ellipsis position: the budget is fixed, so two callers sampling the same line get the same
+//! string.
+
+/// Longest line that is shown as a plain head: one hundred characters.
+const LongLineMaximum:usize = 100;
+
+/// Characters kept from each end of a long line: twenty-eight.
+const HeadTailLength:usize = 28;
+
+/// Characters a short line is cut to: sixty.
+const ShortLineMaximum:usize = 60;
 
 /// Render a content hint line, sampling head+tail when the line is very long.
 ///
-/// Lines up to 100 characters are shown as-is under a 60-character cap. A
-/// longer line keeps its first and last 28 characters joined by `...`, so both
-/// ends are visible instead of a bare 60-character head. The result is what
-/// the model sees, so a change here changes the contract - the numbers are not
-/// tunable cosmetics.
+/// Lines up to 100 characters are shown as-is under a 60-character cap. A longer line keeps
+/// its first and last 28 characters joined by `...`, so both ends are visible instead of a
+/// bare 60-character head - and the 61-to-100-character band is still cut to 60, which is what
+/// keeps the hint compact. The result is what the model sees, so a change here changes the
+/// contract - the numbers are not tunable cosmetics.
+///
+/// It is not a `Vec<char>` collector: the count is a counter and each end is a `take`/`skip`
+/// over the char iterator, so a 10 MB single line costs no allocation beyond the two 28-char
+/// samples. Collecting the line first (which this used to do) made the sampling itself the
+/// memory the bound was supposed to protect.
 pub(crate) fn Fn(Line:&str) -> String {
-	let Chars:Vec<char> = Line.chars().collect();
+	let Total = Line.chars().count();
 
-	match Chars.len() > 100 {
-		true => {
-			let Head:String = Chars[..28].iter().collect();
-			let Tail:String = Chars[Chars.len() - 28..].iter().collect();
+	// `checked_sub` makes "it is a long line" a `None` rather than a boolean to branch on;
+	// the `+ 1` is what keeps the 100-character boundary on the short side.
+	match Total.checked_sub(LongLineMaximum + 1) {
+		Some(_) => {
+			let Head:String = Line.chars().take(HeadTailLength).collect();
+			let Tail:String = Line.chars().skip(Total - HeadTailLength).collect();
 
 			format!("{Head}...{Tail}")
 		},
-		false => Line.chars().take(60).collect(),
+		None => Line.chars().take(ShortLineMaximum).collect(),
 	}
 }

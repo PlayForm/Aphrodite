@@ -141,10 +141,9 @@ fn TestTableSortsByTurnAndCapsTwenty() {
 			CCRType:"text".into(),
 			Size:100,
 			Preview:format!("[text] entry {}", i),
-			Turn:match i == 24 {
-				true => 1,
-				false => i,
-			},
+			// The last marker (i == 24) is the one carrying the OLDEST turn, so a
+			// reverse-insertion-order table would wrongly put it in the newest window.
+			Turn:Some(1).filter(|_| i == 24).unwrap_or(i),
 			Center:None,
 			meta:None,
 		});

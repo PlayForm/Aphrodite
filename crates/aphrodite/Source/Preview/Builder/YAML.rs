@@ -1,28 +1,33 @@
 //! YAML preview arm.
 //!
-//! A YAML document is described by its top-level keys - how many and which. This
-//! arm renders those. It is not a YAML parser: anchors, aliases and multi-line
-//! scalars are not resolved, and nested keys are deliberately not reported.
+//! A YAML document is described by its top-level keys - how many and which. This arm
+//! renders those. It is not a YAML parser: anchors, aliases and multi-line scalars are not
+//! resolved, and nested keys are deliberately not reported.
 
 use crate::Preview::{Input::Struct::Struct as Input, Line::YAMLKey};
 
+/// Keys the preview names: five.
+const KeysShown:usize = 5;
+
 /// Build a preview of YAML content.
 ///
-/// Promises the top-level key count and the first few key names. It is not a
-/// value reader: values are never shown, so a config file previews as its key
-/// list - which is what the model needs to know which knob to retrieve.
+/// Promises the top-level key count and the first few key names. It is not a value reader:
+/// values are never shown, so a config file previews as its key list - which is what the
+/// model needs to know which knob to retrieve.
 pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	let Keys:Vec<&str> = Inp
 		.raw
 		.lines()
-		.filter(|l| YAMLKey::Fn(l))
-		.filter_map(|l| l.find(':').map(|i| &l[..i]))
+		.filter(|Line| YAMLKey::Fn(Line))
+		.filter_map(|Line| Line.find(':').map(|Index| &Line[..Index]))
 		.collect();
-	let Shown:Vec<&str> = Keys.iter().take(5).copied().collect();
-	let More = match Keys.len() > Shown.len() {
-		true => format!(" +{} more", Keys.len() - Shown.len()),
-		false => String::new(),
-	};
+	let Shown:Vec<&str> = Keys.iter().take(KeysShown).copied().collect();
+	let More = Keys
+		.len()
+		.checked_sub(Shown.len())
+		.filter(|More| *More > 0)
+		.map(|More| format!(" +{More} more"))
+		.unwrap_or_default();
 
-	format!("[yaml:{} keys {}L | {}{}]", Keys.len(), Inp.Total, Shown.join(", "), More)
+	format!("[yaml:{} keys {}L | {}{More}]", Keys.len(), Inp.Total, Shown.join(", "))
 }

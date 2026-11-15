@@ -1,38 +1,42 @@
 //! Code of unknown language: any signature-looking line, labelled `gen`.
 
-pub(crate) fn Fn(Content:&str, LineCount:usize, Parts:&mut Vec<String>) {
-	Parts.push("lang=gen".to_string());
-	// Try to extract function-like signatures from unknown code
-	let Sigs:Vec<&str> = Content
+use crate::Proxy::{Analysis::Struct::Struct as ContentAnalysis, Metadata::Field::Struct::Struct as MetadataField};
+
+/// Language, then the signatures found, then the line count.
+pub(crate) fn Fn(Analysis:&ContentAnalysis<'_>) -> Vec<MetadataField> {
+	let Sigs:Vec<&str> = Analysis
+		.Content
 		.lines()
-		.filter(|l| {
-			let t = l.trim_start();
-			t.starts_with("fn ")
-				|| t.starts_with("def ")
-				|| t.starts_with("func ")
-				|| t.starts_with("function ")
-				|| t.starts_with("class ")
-				|| t.starts_with("struct ")
+		.filter(|Line| {
+			let Trimmed = Line.trim_start();
+
+			Trimmed.starts_with("fn ")
+				|| Trimmed.starts_with("def ")
+				|| Trimmed.starts_with("func ")
+				|| Trimmed.starts_with("function ")
+				|| Trimmed.starts_with("class ")
+				|| Trimmed.starts_with("struct ")
 		})
-		.filter_map(|l| {
-			let t = l.trim_start();
-			let After = t
+		.filter_map(|Line| {
+			let Trimmed = Line.trim_start();
+			let After = Trimmed
 				.strip_prefix("fn ")
-				.or_else(|| t.strip_prefix("def "))
-				.or_else(|| t.strip_prefix("func "))
-				.or_else(|| t.strip_prefix("function "))
-				.or_else(|| t.strip_prefix("class "))
-				.or_else(|| t.strip_prefix("struct "))?;
+				.or_else(|| Trimmed.strip_prefix("def "))
+				.or_else(|| Trimmed.strip_prefix("func "))
+				.or_else(|| Trimmed.strip_prefix("function "))
+				.or_else(|| Trimmed.strip_prefix("class "))
+				.or_else(|| Trimmed.strip_prefix("struct "))?;
+
 			After.split(['(', ' ']).next()
 		})
 		.collect();
 
-	match !Sigs.is_empty() {
-		true => {
-			Parts.push(format!("sigs={}", Sigs.join(",")));
-		},
-		false => {},
-	}
-
-	Parts.push(format!("ln={}", LineCount));
+	[
+		Some(MetadataField::New("lang", "gen")),
+		(!Sigs.is_empty()).then(|| MetadataField::New("sigs", Sigs.join(","))),
+		Some(MetadataField::New("ln", Analysis.Lines.to_string())),
+	]
+	.into_iter()
+	.flatten()
+	.collect()
 }

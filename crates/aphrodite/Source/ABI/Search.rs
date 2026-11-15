@@ -3,8 +3,8 @@
 use std::os::raw::c_char;
 
 use crate::ABI::{
-	Guard::{Cstr, Guarded, ToJSONError, ToJSONOk},
-	Handle::Lookup::GetHandle,
+	Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as Bare},
+	Guard::Cstr::Fn::Fn as Cstr,
 };
 
 /// Answer with up to twenty stored entries whose preview or type contains
@@ -17,25 +17,26 @@ use crate::ABI::{
 /// match.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeSearch(Handle:*const c_char, Query:*const c_char) -> *mut c_char {
-	let Hid = match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Ok(ID) => ID,
-		Err(_) => return ToJSONError("invalid handle"),
-	};
-	let q = unsafe { Cstr(Query) }.unwrap_or_default().to_lowercase();
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		match GetHandle(Hid) {
-			Some(Session) => {
-				let s = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-				let Results:Vec<serde_json::Value> = s
-					.RecentMarkers
-					.iter()
-					.filter(|m| m.Preview.to_lowercase().contains(&q) || m.CCRType.to_lowercase().contains(&q))
-					.take(20)
-					.map(|m| serde_json::json!({"hash":&m.hash,"type":m.CCRType,"size":m.Size,"preview":m.Preview}))
-					.collect();
-				ToJSONOk(&serde_json::json!({"total":Results.len(),"results":Results}))
-			},
-			None => ToJSONError(&format!("invalid handle: {}", Hid)),
-		}
-	}))
+	let Query = unsafe { Cstr(Query) }.unwrap_or_default().to_lowercase();
+
+	Bare(Handle, move |s| {
+		let Results:Vec<serde_json::Value> = s
+			.RecentMarkers
+			.iter()
+			.filter(|Marker| {
+				Marker.Preview.to_lowercase().contains(&Query) || Marker.CCRType.to_lowercase().contains(&Query)
+			})
+			.take(20)
+			.map(|Marker| {
+				serde_json::json!({
+					"hash":&Marker.hash,
+					"type":Marker.CCRType,
+					"size":Marker.Size,
+					"preview":Marker.Preview,
+				})
+			})
+			.collect();
+
+		Ok(Answer::Envelope(serde_json::json!({"total":Results.len(),"results":Results})))
+	})
 }

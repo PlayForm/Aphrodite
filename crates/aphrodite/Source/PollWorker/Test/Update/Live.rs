@@ -50,6 +50,9 @@ fn TestPollLiveProgressBytesSoFarAndEta() {
 
 #[test]
 fn TestPollInstantMarkerHashAvailableBeforeContent() {
+	// The marker template registry is process-global and the `Marker` template
+	// tests register into it; rendering a marker without this guard races them.
+	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
 	let mut State = AphroditeState::default();
 	State.LiveContainer = true;
 	State.TurnCounter = 3;

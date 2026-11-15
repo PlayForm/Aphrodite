@@ -23,10 +23,11 @@ static INIT_EMITTED:AtomicBool = AtomicBool::new(false);
 /// templates), the proxy-side code_multiplier env override, and proxy
 /// health.
 pub(crate) fn log_session_init(state:&AphroditeState, session:&str) {
-	match session.is_empty() || INIT_EMITTED.swap(true, Ordering::Relaxed) {
-		true => return,
-		false => {},
-	}
+	// `swap` still runs only for a real session (the `||` short-circuits), and
+	// the line is emitted at most once per process.
+	let Some(()) = (!(session.is_empty() || INIT_EMITTED.swap(true, Ordering::Relaxed))).then_some(()) else {
+		return;
+	};
 
 	let mut kv = vec![
 		("version", env!("CARGO_PKG_VERSION").to_string()),
@@ -36,9 +37,8 @@ pub(crate) fn log_session_init(state:&AphroditeState, session:&str) {
 
 	// code_multiplier is proxy-side config; surface the env override only
 	// (the dylib has no proxy thresholds loaded).
-	match std::env::var("APHRODITE_CODE_MULTIPLIER") {
-		Ok(cm) => kv.push(("code_multiplier", cm)),
-		Err(_) => {},
+	if let Ok(cm) = std::env::var("APHRODITE_CODE_MULTIPLIER") {
+		kv.push(("code_multiplier", cm));
 	}
 
 	kv.push(("proxy", proxy_health().to_string()));

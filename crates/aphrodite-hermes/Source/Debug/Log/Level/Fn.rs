@@ -13,14 +13,13 @@ use crate::Debug::Flag::Resolve::Fn::Fn as enabled_for;
 /// It does not add the two: an operator who asked for level 2 keeps level 2
 /// even with the flag on, because the flag can only ever mean "verbose", never
 /// "more verbose than the operator asked for".
-pub(crate) fn Fn(state:&aphrodite::State::Struct::AphroditeState, session:&str) -> u8 {
-	match state.DebugLevel {
-		level if level > 0 => level,
-		_ => {
-			match enabled_for(session) {
-				true => 1,
-				false => 0,
-			}
-		},
+///
+/// Level zero is therefore the ONLY value that consults the flag, so the flag
+/// read (a stat plus a possible file read) stays off the operator's path: only
+/// the zero arm calls it.
+pub(crate) fn Fn(State:&aphrodite::State::Struct::AphroditeState, Session:&str) -> u8 {
+	match State.DebugLevel {
+		0 => u8::from(enabled_for(Session)),
+		Level => Level,
 	}
 }

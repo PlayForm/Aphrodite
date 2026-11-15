@@ -9,30 +9,33 @@ impl Struct {
 	/// `true` in the file, which is the whole point of an override. A TOML
 	/// value that is not a boolean (`enabled = "yes"`) is not a parse error -
 	/// it is skipped and the default applies.
+	///
+	/// Fix 21 (inspection): values are matched case-insensitively -
+	/// `TRUE`/`True`/`tRuE` previously resolved to false because the exact
+	/// lowercase comparison missed them. Only `true`/`1` (after ASCII-lowercasing)
+	/// still count as true; `YES`/`on` stay false.
+	///
+	/// The chain is `or_else`, so the environment is read only when no override was
+	/// set and the document is read only when neither was present. The earlier shape
+	/// was three `match` statements with an early `return` and an empty `None` arm,
+	/// which made the precedence a property of the statement order rather than of the
+	/// value.
 	pub fn GetBool(&self, EnvironmentKey:&str, Section:&str, Key:&str, default:bool) -> bool {
-		// Fix 21 (inspection): values are matched case-insensitively -
-		// `TRUE`/`True`/`tRuE` previously resolved to false because the
-		// exact lowercase comparison missed them. Only `true`/`1` (after
-		// ASCII-lowercasing) still count as true; `YES`/`on` stay false.
-		match self.Overrides.get(EnvironmentKey) {
-			Some(v) => {
-				let v = v.to_ascii_lowercase();
-				return v == "true" || v == "1";
-			},
-			None => (),
-		}
+		let AsBool = |Raw:&str| {
+			let Lowered = Raw.to_ascii_lowercase();
 
-		match std::env::var(EnvironmentKey) {
-			Ok(v) => {
-				let v = v.to_ascii_lowercase();
-				return v == "true" || v == "1";
-			},
-			Err(_) => (),
-		}
+			Lowered == "true" || Lowered == "1"
+		};
 
-		self.Section(Section)
-			.and_then(|s| s.get(Key))
-			.and_then(|v| v.as_bool())
-			.unwrap_or(default)
+		self.Overrides
+			.get(EnvironmentKey)
+			.map(|Raw| AsBool(Raw))
+			.or_else(|| std::env::var(EnvironmentKey).ok().map(|Raw| AsBool(&Raw)))
+			.unwrap_or_else(|| {
+				self.Section(Section)
+					.and_then(|s| s.get(Key))
+					.and_then(|v| v.as_bool())
+					.unwrap_or(default)
+			})
 	}
 }

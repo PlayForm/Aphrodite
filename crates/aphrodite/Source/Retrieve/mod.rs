@@ -7,11 +7,12 @@
 //! returned body has to hash back to the marker's own hash.
 //!
 //! The tree follows the request's own path: `Request/` and `Response/` are the
-//! wire shapes, `Live/` reassembles a live container (envelope in
-//! `Container/`, reassembly in `Lookup/`), `Filter/` narrows by query,
-//! `Page/` slices the window, `Progress/` is the live-container progress
-//! carried back on the response, and `Handle/` is the one function that runs
-//! them in order.
+//! wire shapes, `Source/` is where the content is read from, `Live/` reassembles
+//! a live container (envelope in `Container/`, reassembly in `Lookup/`, progress
+//! in `Advance/`), `Filter/` narrows by query, `Page/` turns the requested mode
+//! into a window and renders it, `Progress/` is the live-container progress
+//! carried back on the response, and `Handle/` is the one function that runs them
+//! in order.
 //!
 //! This facade declares the tree and nothing else. A consumer names the leaf
 //! (`Retrieve::Handle::Fn::Fn`), so the file that defines an item is the only
@@ -24,6 +25,7 @@ pub mod Page;
 pub mod Progress;
 pub mod Request;
 pub mod Response;
+pub mod Source;
 
 #[cfg(test)]
 mod Test;

@@ -35,17 +35,18 @@ impl LiveArrival {
 		LiveArrival { ArrivedAtUnix:UnixNow(), BytesArrived:Size, Size, EtaS:0.0 }
 	}
 
-	/// Chunked-arrival ETA estimate for a partial record: scale the elapsed
-	/// time by the bytes still outstanding relative to what already arrived
-	/// (linear arrival-rate model). Zero when nothing has arrived (no rate
-	/// to extrapolate) or everything has.
+	/// Chunked-arrival ETA estimate for a partial record: scale the elapsed time
+	/// by the bytes still outstanding relative to what already arrived (linear
+	/// arrival-rate model). Zero when nothing has arrived (no rate to
+	/// extrapolate) or everything has.
+	///
+	/// The two zero cases are one predicate - "there is no outstanding ratio to
+	/// compute" - so they answer through the same `None`, and the multiplication
+	/// only runs when a rate exists.
 	pub fn EtaEstimate(BytesArrived:u64, Size:u64, ElapsedS:f32) -> f32 {
-		match BytesArrived == 0 || BytesArrived >= Size {
-			true => return 0.0,
-			false => (),
-		}
+		let Outstanding =
+			(BytesArrived != 0 && BytesArrived < Size).then(|| (Size - BytesArrived) as f32 / BytesArrived as f32);
 
-		let OutstandingRatio = (Size - BytesArrived) as f32 / BytesArrived as f32;
-		ElapsedS * OutstandingRatio
+		Outstanding.map_or(0.0, |Ratio| ElapsedS * Ratio)
 	}
 }

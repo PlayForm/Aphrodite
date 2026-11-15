@@ -2,7 +2,7 @@
 //! that used to misclassify (a comment mentioning `error`, an invalid JSON
 //! payload, an empty body).
 
-use crate::Proxy::Detect::Fn::Fn as ProxyDetectContentType;
+use crate::Proxy::Analysis::Classify::Fn::Fn as ProxyDetectContentType;
 
 // ── T3: detect_content_type ─────────────────────────────────
 #[test]

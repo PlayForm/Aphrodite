@@ -40,13 +40,6 @@
 // so the snake_case module lint is switched off crate-wide rather than
 // renamed away at every declaration.
 #![allow(non_snake_case)]
-// House style §4.3: branching is a `match` on the decision value, never an
-// `if`/`if let` chain. Two clippy style lints encode the opposite convention -
-// `single_match` wants `if let` for a match with one meaningful arm, and
-// `match_bool` wants `if` when the decision value is a bool - so the house
-// style and `-D warnings` are mutually exclusive without this gate. Both are
-// allowed crate-wide rather than annotated at each of the dozens of sites.
-#![allow(clippy::match_bool, clippy::single_match)]
 
 pub mod ABI;
 pub mod Configuration;

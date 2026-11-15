@@ -1,10 +1,10 @@
 //! `AphroditeConfigurationGet` - read one configuration value from the session.
 
-use std::{ffi::CString, os::raw::c_char};
+use std::os::raw::c_char;
 
 use crate::ABI::{
-	Guard::{Cstr, Guarded, ToJSONError},
-	Handle::Lookup::GetHandle,
+	Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as Bare},
+	Guard::Cstr::Fn::Fn as Cstr,
 };
 
 /// Answer with one configuration value as a bare C string.
@@ -16,28 +16,27 @@ use crate::ABI::{
 ///
 /// Like `AphroditeRetrieve`, success is the value itself - there is no JSON
 /// envelope to unwrap.
+///
+/// The key match stays a key match: it is one dispatch that projects one field,
+/// and turning it into an enum would only move the same match one call deeper.
+/// The settable side is different and does have an enum
+/// (`Configuration::Update`), because there the value has to be parsed for its
+/// field's type before the session lock is taken, and that parse is what the
+/// type carries.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeConfigurationGet(Handle:*const c_char, Key:*const c_char) -> *mut c_char {
-	let Hid = match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Ok(ID) => ID,
-		Err(_) => return ToJSONError("invalid handle"),
-	};
-	let k = unsafe { Cstr(Key) }.unwrap_or_default();
-	Guarded(std::panic::AssertUnwindSafe(move || {
-		match GetHandle(Hid) {
-			Some(Session) => {
-				let s = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-				let v = match k.as_ref() {
-					"model" => s.Model.clone(),
-					"api_url" => s.APIURL.clone(),
-					"engine_threshold_pct" => s.EngineThresholdPct.to_string(),
-					"tool_threshold" => s.ToolThreshold.to_string(),
-					"context_engine_enabled" => s.ContextEngineEnabled.to_string(),
-					_ => return ToJSONError(&format!("unknown key: {}", k)),
-				};
-				CString::new(v.replace('\0', "")).unwrap().into_raw()
-			},
-			None => ToJSONError(&format!("invalid handle: {}", Hid)),
-		}
-	}))
+	let Key = unsafe { Cstr(Key) }.unwrap_or_default();
+
+	Bare(Handle, move |s| {
+		let Value = match Key.as_str() {
+			"model" => s.Model.clone(),
+			"api_url" => s.APIURL.clone(),
+			"engine_threshold_pct" => s.EngineThresholdPct.to_string(),
+			"tool_threshold" => s.ToolThreshold.to_string(),
+			"context_engine_enabled" => s.ContextEngineEnabled.to_string(),
+			_ => anyhow::bail!("unknown key: {}", Key),
+		};
+
+		Ok(Answer::Text(Value))
+	})
 }

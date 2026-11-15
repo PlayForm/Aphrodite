@@ -11,15 +11,20 @@ impl Struct {
 	/// (an empty or unset variable is indistinguishable from a typo). Callers
 	/// that want an env override read the variable themselves and only fall
 	/// back to this chain.
+	///
+	/// An override that is present but unparseable answers `None` and does **not**
+	/// fall through to the document, which is why the override is `Option<Option<_>>`
+	/// and unwrapped rather than flattened: a flatten would turn the operator's typo
+	/// into whatever the file happens to say.
 	pub fn GetOptUsize(&self, EnvironmentKey:&str, Section:&str, Key:&str) -> Option<usize> {
-		match self.Overrides.get(EnvironmentKey) {
-			Some(v) => return v.parse().ok(),
-			None => (),
-		}
-
-		self.Section(Section)
-			.and_then(|s| s.get(Key))
-			.and_then(|v| v.as_integer())
-			.map(|v| v as usize)
+		self.Overrides
+			.get(EnvironmentKey)
+			.map(|Raw| Raw.parse().ok())
+			.unwrap_or_else(|| {
+				self.Section(Section)
+					.and_then(|s| s.get(Key))
+					.and_then(|v| v.as_integer())
+					.map(|v| v as usize)
+			})
 	}
 }

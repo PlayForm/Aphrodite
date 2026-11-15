@@ -1,17 +1,26 @@
-//! `Extract::Diff::Fn`: the `+`/`-` line tallies.
+//! The `+`/`-` line tallies.
 
-/// `+`/`-` line tallies for diff content (excluding `+++`/`---` hunk
-/// headers); `("?", "?")` when the content has no diff lines at all.
+use super::Struct::Struct;
+
+/// `+`/`-` line tallies for diff content, or `None` when the content has no diff
+/// lines at all.
 ///
-/// The `+++`/`---` exclusion is not cosmetic: a unified diff carries exactly
-/// one of each as its file headers, so counting them adds a phantom added and
-/// removed line to every single diff. The `("?", "?")` default distinguishes
-/// "not a diff" from "an empty diff" (`0`/`0`).
-pub(crate) fn Fn(Lines:&[&str]) -> (String, String) {
-	let Plus = Lines.iter().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count();
-	let Minus = Lines.iter().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
-	match Plus == 0 && Minus == 0 {
-		true => ("?".into(), "?".into()),
-		false => (Plus.to_string(), Minus.to_string()),
-	}
+/// The `+++`/`---` exclusion is not cosmetic: a unified diff carries exactly one of
+/// each as its file headers, so counting them adds a phantom added and removed line
+/// to every single diff.
+///
+/// The absence answer is `None` rather than `0`/`0`, because "not a diff" and "a
+/// diff that changed nothing" are different facts and the renderer spells them
+/// differently (`?`/`?` versus `0`/`0`).
+pub(crate) fn Fn(Lines:&[&str]) -> Option<Struct> {
+	let Plus = Lines
+		.iter()
+		.filter(|Line| Line.starts_with('+') && !Line.starts_with("+++"))
+		.count();
+	let Minus = Lines
+		.iter()
+		.filter(|Line| Line.starts_with('-') && !Line.starts_with("---"))
+		.count();
+
+	(Plus + Minus > 0).then_some(Struct { Plus, Minus })
 }

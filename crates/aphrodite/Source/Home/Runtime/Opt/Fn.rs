@@ -21,27 +21,16 @@ use crate::Home::{Environment::Path::Fn::Fn as EnvironmentPath, Tilde::Fn::Fn as
 /// Getting this order wrong is the issue-40 bug: an `$APHRODITE_HOME` that
 /// lost to `$HERMES_HOME`, or a `$HOME` that won over a set `$HERMES_HOME`,
 /// silently splits the binary and the plugin across two directories.
+///
+/// The chain is `or_else`, so each environment read happens only when every
+/// higher-priority one was absent - which is what a precedence chain means. It used
+/// to be four `match` statements with an early `return` in the `Some` arm and an
+/// empty `None` arm, which read as four independent decisions and made the order a
+/// property of the statement sequence rather than of the value.
 pub fn Fn() -> Option<PathBuf> {
-	match EnvironmentPath("APHRODITE_HOME") {
-		Some(h) => {
-			return Some(ExpandTilde(h));
-		},
-		None => {},
-	}
-
-	match EnvironmentPath("HERMES_HOME") {
-		Some(h) => {
-			return Some(ExpandTilde(h).join("aphrodite"));
-		},
-		None => {},
-	}
-
-	match EnvironmentPath("HOME") {
-		Some(h) => {
-			return Some(ExpandTilde(h).join(".hermes").join("aphrodite"));
-		},
-		None => {},
-	}
-
-	dirs::home_dir().map(|h| h.join(".hermes").join("aphrodite"))
+	EnvironmentPath("APHRODITE_HOME")
+		.map(ExpandTilde)
+		.or_else(|| EnvironmentPath("HERMES_HOME").map(|Home| ExpandTilde(Home).join("aphrodite")))
+		.or_else(|| EnvironmentPath("HOME").map(|Home| ExpandTilde(Home).join(".hermes").join("aphrodite")))
+		.or_else(|| dirs::home_dir().map(|Home| Home.join(".hermes").join("aphrodite")))
 }

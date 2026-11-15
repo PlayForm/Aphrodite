@@ -1,20 +1,33 @@
 //! Handle lookup and the stateful-call wrapper.
 //!
-//! Two layers, deliberately separate: `GetHandle` resolves an ID to a session
-//! and drops the map lock before returning, `WithState` takes that session's
-//! own lock and runs a closure under the panic boundary. Every export that
-//! mutates session state goes through both.
+//! Two entry points, deliberately separate: `Locked` resolves an ID to a
+//! session, takes that session's own lock and runs a fallible closure under it;
+//! `WithState` is `Locked` plus the panic boundary. Every export that touches
+//! session state goes through one of them, and neither ever holds the table
+//! lock.
 
-use std::sync::{Arc, Mutex};
-
-use super::Table::Handles;
 use crate::State::Struct::AphroditeState;
 
-/// Look up a session's handle and clone its `Arc` out from under the map
+/// Look up a session's handle and clone its `Arc` out from under the table
 /// lock, which is dropped before returning - callers lock the per-session
-/// mutex separately so the map lock is never held across state access.
-pub(crate) fn GetHandle(Hid:usize) -> Option<Arc<Mutex<AphroditeState>>> {
-	Handles().as_ref().and_then(|m| m.get(&Hid)).cloned()
+/// mutex separately so the table lock is never held across state access.
+pub(crate) fn GetHandle(Hid:usize) -> Option<crate::ABI::Handle::Registry::Struct::Session> {
+	crate::ABI::Handle::Registry::Const::Handles.Resolve(Hid)
+}
+
+/// Resolve `Hid` and run `f` under its session lock, without a panic guard.
+///
+/// An unknown handle is an error, not a default: silently inventing a session
+/// would answer with plausible JSON for a session that never existed.
+///
+/// This is the half `WithState` is built from, and it exists as its own entry
+/// point because the read-shaped exports answer a different panic string - see
+/// `ABI::Boundary::State::Bare`.
+pub(crate) fn Locked<T>(Hid:usize, f:impl FnOnce(&mut AphroditeState) -> anyhow::Result<T>) -> anyhow::Result<T> {
+	let Session = GetHandle(Hid).ok_or_else(|| anyhow::anyhow!("invalid handle: {Hid}"))?;
+	let mut State = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+
+	f(&mut State)
 }
 
 /// Torn-state contract (report 06 F12): `f` runs under `catch_unwind`, so a
@@ -28,9 +41,13 @@ pub(crate) fn GetHandle(Hid:usize) -> Option<Arc<Mutex<AphroditeState>>> {
 ///
 /// An unknown handle is an error, not a default: silently inventing a session
 /// would answer with plausible JSON for a session that never existed.
-pub(crate) fn WithState<T>(Hid:usize, f:impl FnOnce(&mut AphroditeState) -> T) -> anyhow::Result<T> {
-	let Session = GetHandle(Hid).ok_or_else(|| anyhow::anyhow!("invalid handle: {Hid}"))?;
-	let mut State = Session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-	std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut State)))
+///
+/// The catch encloses the resolution and the lock as well as `f`. Nothing in
+/// those two steps can panic - the poison case is recovered, not unwrapped - so
+/// the widened scope is not observable, and it is what lets `Locked` be the one
+/// resolution path instead of a second copy of it.
+pub(crate) fn WithState<T>(Hid:usize, f:impl FnOnce(&mut AphroditeState) -> anyhow::Result<T>) -> anyhow::Result<T> {
+	std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| Locked(Hid, f)))
 		.map_err(|_| anyhow::anyhow!("internal error: hook panicked"))
+		.and_then(|Inner| Inner)
 }

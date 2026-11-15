@@ -10,8 +10,18 @@
 //! taking the house-style `Fn` name.
 //!
 //! Shared machinery sits beside the exports and is not exported itself:
-//! `Guard` (the panic boundary, the JSON builders, the 16 MB cap), `Handle` (the
-//! session table and `WithState`), and `Macro` (the `stateful!` shape).
+//!
+//! - `Boundary` - the one adapter: panic interception, error conversion,
+//!   serialisation and ownership transfer. An export body is one fallible
+//!   operation and the boundary owns everything else.
+//! - `Guard` - the caller-string reader, the payload validator, and the
+//!   rejection primitive the validator is built from.
+//! - `Handle` - the session registry and the per-session lock.
+//! - `Configuration` - the settable keys and the reload assessment, both
+//!   parsed outside the session lock and applied inside it.
+//! - `Route` - the dispatch routing table, decoded and prepared before the
+//!   session lock is taken.
+//! - `Macro` - the `stateful!` shape.
 
 // `macro_rules!` is textually scoped: this declaration must stay above the
 // modules that expand the macro (`Compress`, `Transform`, `Terminal`), or their
@@ -19,10 +29,12 @@
 #[macro_use]
 pub(crate) mod Macro;
 
+pub mod Boundary;
 pub mod CallHook;
 pub mod Catalog;
 pub mod Classify;
 pub mod Compress;
+pub mod Configuration;
 pub mod ConfigurationGet;
 pub mod ConfigurationSet;
 pub mod Destroy;
@@ -38,6 +50,7 @@ pub mod Preview;
 pub mod Reload;
 pub mod Resolve;
 pub mod Retrieve;
+pub mod Route;
 pub mod Search;
 pub mod SessionStart;
 pub mod Stage2;

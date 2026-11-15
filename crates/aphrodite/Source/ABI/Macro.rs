@@ -13,12 +13,12 @@
 /// Expand to a `#[unsafe(no_mangle)] pub extern "C"` export taking a session
 /// handle followed by N C-string arguments.
 ///
-/// The expansion parses the handle, reads every argument as a C string, and
-/// runs the body under `Handle::Lookup::with_state`, which is where the
-/// torn-state contract and the panic boundary come from. A body therefore
-/// returns a `serde_json::Value` and never a pointer: the macro owns both the
-/// success and the error envelope, so no call site can disagree about the
-/// response shape.
+/// The expansion reads every argument as a C string and hands the handle plus a
+/// closure to `ABI::Boundary::State`, which decodes the handle, runs the closure
+/// under the session lock and owns the envelope, the panic and the ownership
+/// transfer. A body therefore returns
+/// `anyhow::Result<ABI::Boundary::Answer::Enum>` and never a pointer: no call
+/// site can disagree about the response shape or forget the panic boundary.
 ///
 /// Doc attributes written before the identifier are forwarded to the generated
 /// function, which is the only way an expansion can carry `///` docs of its
@@ -28,15 +28,8 @@ macro_rules! stateful {
 		$(#[$meta])*
 		#[unsafe(no_mangle)]
 		pub extern "C" fn $name(Handle:*const c_char, $($arg:*const c_char),*) -> *mut c_char {
-			let Hid = match unsafe { $crate::ABI::Guard::Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-				Ok(ID) => ID,
-				Err(_) => return $crate::ABI::Guard::ToJSONError("invalid handle"),
-			};
-			$(let $arg = unsafe { $crate::ABI::Guard::Cstr($arg) }.unwrap_or_default();)*
-			match $crate::ABI::Handle::Lookup::WithState(Hid, |$s| $body) {
-				Ok(v) => $crate::ABI::Guard::ToJSONOk(&v),
-				Err(e) => $crate::ABI::Guard::ToJSONError(&format!("{e:#}")),
-			}
+			$(let $arg = unsafe { $crate::ABI::Guard::Cstr::Fn::Fn($arg) }.unwrap_or_default();)*
+			$crate::ABI::Boundary::State::Fn::Fn(Handle, move |$s| $body)
 		}
 	};
 }

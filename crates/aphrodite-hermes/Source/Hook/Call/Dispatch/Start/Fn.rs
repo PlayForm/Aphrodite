@@ -15,9 +15,8 @@ pub(crate) fn start(state:&mut AphroditeState, input:&HookInput) -> serde_json::
 	let r = aphrodite::Session::Start::Fn::OnSessionStart(state);
 	// DEV-ONLY debug logger (crate::Debug): session-init / config-summary
 	// line, emitted once per process.
-	match input.parsed.get("session_id").and_then(|v| v.as_str()) {
-		Some(sid) => log_session_init(state, sid),
-		None => {},
+	if let Some(sid) = input.parsed.get("session_id").and_then(|v| v.as_str()) {
+		log_session_init(state, sid);
 	}
 
 	r

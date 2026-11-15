@@ -1,45 +1,11 @@
-//! The Stage-2 entry point.
-//!
-//! Three gates, in this order, and the order matters:
-//!
-//! 1. **Size.** Content under `MinimumStage2Size` is never reduced - the marker
-//!    and header overhead would outweigh any saving.
-//! 2. **Type.** A CCR type with no registered reducer is not an error; it is
-//!    the answer "this content family is already dense" (previews, listings).
-//! 3. **Savings.** The reducer's output is compared against the input and
-//!    discarded unless it is strictly smaller. Without this gate a reducer that
-//!    finds nothing would still hand back a header, which is the one outcome
-//!    that could make the model's context *larger* than the original.
-//!
-//! Returns `Some(reduced_string)` only when all three gates pass.
+//! The public Stage-2 entry point.
 
-use crate::Stage2::{Const::MinimumStage2Size, Registry::Fn::ReducerRegistry};
+use crate::Stage2::{Compress::Decide::Fn::Fn as Decide, Outcome::Option::Fn::Fn as AsOption};
 
 /// Produce a semantically reduced version of content.
 ///
-/// Returns `Some(reduced_string)` if reduction was beneficial,
-/// or `None` if the content is too small, no reducer exists for the type,
-/// or the reducer produced no savings.
-pub fn CompressStage2(Content:&str, CCRType:&str) -> Option<String> {
-	match Content.len() < MinimumStage2Size {
-		true => {
-			return None;
-		},
-		false => {},
-	}
-
-	let Registry = ReducerRegistry();
-	let Reducer = Registry.get(CCRType)?;
-
-	let Reduced = Reducer(Content)?;
-
-	// Guard: don't return if reduction didn't help
-	match Reduced == Content || Reduced.len() >= Content.len() {
-		true => {
-			return None;
-		},
-		false => {},
-	}
-
-	Some(Reduced)
-}
+/// Returns `Some(reduced_string)` when reduction was beneficial, or `None` when the content is
+/// too small, no reducer exists for the type, the reducer did not apply, or it produced no
+/// savings. The four reasons are distinguished internally by `Outcome`; this signature is the
+/// public contract and its callers only ever need the replacement-or-not answer.
+pub fn CompressStage2(Content:&str, CCRType:&str) -> Option<String> { AsOption(Decide(Content, CCRType)) }

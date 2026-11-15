@@ -13,6 +13,7 @@ use std::{
 
 use crate::{
 	ABI::{
+		Boundary::Run::Fn::Fn as Run,
 		Catalog::AphroditeCatalog,
 		Classify::AphroditeClassify,
 		Compress::AphroditeCompress,
@@ -21,8 +22,8 @@ use crate::{
 		Destroy::AphroditeDestroy,
 		Dispatch::AphroditeDispatch,
 		FreeString::AphroditeFreeString,
-		Guard::{Guarded, MaximumContent},
-		Handle::{Lookup::WithState, Table::Handles},
+		Guard::Content::Const::MaximumContent,
+		Handle::{Lookup::WithState, Registry::Const::Handles},
 		Initialise::AphroditeInit,
 		Reload::AphroditeReload,
 		Retrieve::AphroditeRetrieve,
@@ -102,18 +103,20 @@ fn WithStateDoesNotSerializeAcrossDifferentHandles() {
 		WithState(H1, |_S| {
 			B1.wait();
 			std::thread::sleep(std::time::Duration::from_millis(300));
+
+			Ok(())
 		})
 		.unwrap();
 	});
 
 	Barrier.wait();
 	let Start = std::time::Instant::now();
-	WithState(H2, |_S| {}).unwrap();
+	WithState(H2, |_S| Ok(())).unwrap();
 	let Elapsed = Start.elapsed();
 
 	T1.join().unwrap();
-	Handles().as_mut().and_then(|m| m.remove(&H1));
-	Handles().as_mut().and_then(|m| m.remove(&H2));
+	Handles.Remove(H1);
+	Handles.Remove(H2);
 
 	assert!(
 		Elapsed < std::time::Duration::from_millis(150),
@@ -239,11 +242,11 @@ fn OversizeContentIsRejected() {
 }
 
 // ── T3 (F5): the seven previously-unguarded extern fns must survive a
-// panic without aborting - a deliberately panicking classify call must
-// come back as error JSON, not crash the test process. ──
+// panic without aborting - a deliberately panicking call must come back
+// as error JSON, not crash the test process. ──
 #[test]
 fn GuardedHelperConvertsPanicToErrorJSON() {
-	let Ptr = Guarded(|| panic!("deliberate test panic"));
+	let Ptr = Run(|| panic!("deliberate test panic"));
 	let Out = unsafe { Take(Ptr) };
 	let v:serde_json::Value = serde_json::from_str(&Out).unwrap();
 	assert!(v["error"].as_str().unwrap().contains("panicked"));

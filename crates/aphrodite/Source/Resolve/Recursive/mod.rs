@@ -6,13 +6,17 @@
 //! limit, which stops a chain from expanding forever. Both are parameters rather
 //! than module state, so one retrieval's guard can never leak into the next.
 //!
-//! - `Recursive.rs` - the walk itself: resolve, scan, substitute, recurse.
-//! - `Inline.rs` - the auto-expand question: is the resolved content small
-//!   enough to inline in place of the marker?
+//! - `Prior/` - what the walk already knows about a hash: cycle, depth cap, cache.
+//! - `Walk/` - the fresh case: resolve, scan, substitute, recurse.
+//! - `Recursive.rs` - the dispatch that turns `Prior/` into one of the three
+//!   answers or hands the hash to `Walk/`.
+//! - `Inline/` - the auto-expand question: is the resolved content small enough
+//!   to inline in place of the marker?
 //!
-//! The split exists because the two have different contracts: the walk always
-//! returns what it could resolve, while the auto-expand variant must return
-//! nothing at all when the result is too large, so the caller keeps the marker.
+//! The last split exists because the two entry points have different contracts:
+//! the walk always returns what it could resolve, while the auto-expand variant
+//! must return nothing at all when the result is too large, so the caller keeps
+//! the marker.
 //!
 //! `clippy::module_inception` is allowed here on purpose: the walk IS the
 //! recursive resolver, and `Recursive/Recursive.rs` names the domain the same way
@@ -21,4 +25,6 @@
 #![allow(clippy::module_inception)]
 
 pub mod Inline;
+pub mod Prior;
 pub mod Recursive;
+pub mod Walk;

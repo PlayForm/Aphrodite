@@ -17,7 +17,10 @@ use reqwest::Client as HttpClient;
 use headroom_core::ccr::CcrStore;
 use tokio_util::task::TaskTracker;
 
-use crate::{Configuration::Proxy::Mode::Enum::Enum as ProxyMode, Proxy::Secret::Struct::Struct as Secret};
+use crate::{
+	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
+	Proxy::{Cache::Entry::Struct::Struct as CacheEntry, Secret::Struct::Struct as Secret},
+};
 
 /// Shared proxy state: upstream client config, CCR backend, and all
 /// counters/caches used by request handlers. Wrapped in `Arc` and cloned
@@ -137,7 +140,7 @@ pub struct Struct {
 	/// std::sync::Mutex rule: a held guard makes the future non-Send, so this
 	/// lock is NEVER held across an `.await`; any future code that must hold
 	/// it across one switches this field to `tokio::sync::Mutex`.
-	pub ResponseCache:std::sync::Mutex<lru::LruCache<u64, (std::time::Instant, Vec<u8>)>>,
+	pub ResponseCache:std::sync::Mutex<lru::LruCache<u64, CacheEntry>>,
 	/// TTL applied to `ResponseCache` entries - reuses `cli.ccr_ttl_seconds`
 	/// so cached LLM responses don't outlive the CCR content they were
 	/// derived from by a different, uncoordinated lifetime.
@@ -169,6 +172,11 @@ pub struct Struct {
 	/// from `UpstreamTimeouts` (F17), which previously counted every kind
 	/// of transport error as a "timeout".
 	pub UpstreamConnectErrors:AtomicU64,
+	/// Transport failures that are neither a timeout nor a connect error -
+	/// a body error, a malformed URL, a TLS handshake that got past connect.
+	/// Split out of `UpstreamConnectErrors`, which used to absorb all of them,
+	/// so `connect_errors` means what it says.
+	pub UpstreamOtherErrors:AtomicU64,
 	/// 02-F9: mid-stream chunk errors on the SSE relay path - distinct from
 	/// `UpstreamConnectErrors`/`UpstreamTimeouts`, which only ever see
 	/// failures before the response status/headers arrive. Once

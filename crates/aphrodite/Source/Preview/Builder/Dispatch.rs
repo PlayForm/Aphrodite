@@ -1,9 +1,9 @@
 //! The type-string to preview-arm dispatch table.
 //!
-//! Every content type the engine can classify has exactly one arm, and this match
-//! is the only place that mapping exists. It is not a classifier and it holds no
-//! rendering: an arm is chosen here and the arm itself decides what to show, so
-//! adding a type is one line and reordering a priority is moving one line.
+//! Every content type the engine can classify has exactly one arm, and this match is the only
+//! place that mapping exists. It is not a classifier and it holds no rendering: an arm is chosen
+//! here and the arm itself decides what to show, so adding a type is one line and reordering a
+//! priority is moving one line.
 
 use crate::Preview::Input::Struct::Struct;
 use super::{
@@ -32,11 +32,10 @@ use super::{
 
 /// Render the preview for an already-resolved effective type.
 ///
-/// The caller has run type resolution, so `Effective` is trusted here - a type
-/// that does not match any arm falls through to the generic arm rather than being
-/// treated as an error, because an unknown type is a classification gap and not a
-/// reason to render nothing. It is not responsible for the length cap: the entry
-/// point applies that to every path.
+/// The caller has run type resolution, so `Effective` is trusted here - a type that does not
+/// match any arm falls through to the generic arm rather than being treated as an error, because
+/// an unknown type is a classification gap and not a reason to render nothing. It is not
+/// responsible for the length budget: the entry point applies that to every path.
 pub(crate) fn Fn(Effective:&str, Inp:&Struct<'_>) -> String {
 	match Effective {
 		"build" | "build_output" | "build_error" => Build::Fn(Inp),
@@ -48,7 +47,7 @@ pub(crate) fn Fn(Effective:&str, Inp:&Struct<'_>) -> String {
 		// directory listing: file/dir counts + top extensions.
 		"ls" | "dir" | "directory" => Ls::Fn(Inp),
 		// test output: pass/fail/ignored tallies + first failing test.
-		"test" | "test_output" => Test::Fn(Inp),
+		"test" | "test_output" => Test::Entry::Fn::Fn(Inp),
 		// grep/ripgrep: hit count, files touched, first location.
 		"grep" | "ripgrep" => Grep::Fn(Inp),
 		"source_code" | "code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" | "code" => {
@@ -56,17 +55,16 @@ pub(crate) fn Fn(Effective:&str, Inp:&Struct<'_>) -> String {
 		},
 		"search" => Search::Fn(Inp),
 		"html" => HTML::Fn(Inp),
-		// Structured shapes that used to land on the generic first-line arm
-		// (SHALLOW): markdown tables, markdown docs, yaml, xml, csv - each gets a
-		// semantic arm with counts plus a sample.
+		// Structured shapes that used to land on the generic first-line arm: markdown tables,
+		// markdown docs, yaml, xml, csv - each gets a semantic arm with counts plus a sample.
 		"table" | "markdown_table" | "md_table" => Table::Fn(Inp),
 		"markdown" | "md" => Markdown::Fn(Inp),
 		"yaml" => YAML::Fn(Inp),
 		"xml" => XML::Fn(Inp),
 		"csv" => CSV::Fn(Inp),
 		"json_array" | "json" | "json_list" | "tool_output" => JSON::Fn(Inp),
-		// `Hook::transform_terminal_output` overrides the classified type to
-		// "terminal" when the content looks like a shell/exit-code trace.
+		// `Hook::transform_terminal_output` overrides the classified type to "terminal" when
+		// the content looks like a shell/exit-code trace.
 		"terminal" => Terminal::Fn(Inp),
 		// Error output: surface the FIRST real error line.
 		"error" => Error::Fn(Inp),

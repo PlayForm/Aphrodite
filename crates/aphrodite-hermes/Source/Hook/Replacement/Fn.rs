@@ -70,12 +70,9 @@ pub(crate) fn replacement_from(r:&serde_json::Value, session:&str) -> serde_json
 			// path (flag off) costs one stat() and returns the marker unchanged.
 			let mut out = String::with_capacity(marker.len() + 128);
 
-			match Debug::Log::Line::Fn::Fn(r, session) {
-				Some(line) => {
-					out.push_str(&line);
-					out.push('\n');
-				},
-				None => {},
+			if let Some(line) = Debug::Log::Line::Fn::Fn(r, session) {
+				out.push_str(&line);
+				out.push('\n');
 			}
 
 			out.push_str(marker);

@@ -7,13 +7,17 @@
 //! until a shutdown signal drains them. Those steps live in `Configuration`,
 //! `Listen`, `Route` and `State`; [`Fn`] is the entry the binary calls.
 //!
-//! Nothing here is a second copy of `crate::Proxy` - that module is the
-//! request-handling engine, and this tree only decides when and where it runs.
+//! `Request` is the command line read once as a value, and `Worker` is the
+//! runtime those two paths share. Nothing here is a second copy of `crate::Proxy`
+//! - that module is the request-handling engine, and this tree only decides when
+//!   and where it runs.
 
 pub mod Banner;
 pub mod Configuration;
 pub mod Fn;
 pub mod Listen;
+pub mod Request;
 pub mod Route;
 pub mod Run;
 pub mod State;
+pub mod Worker;

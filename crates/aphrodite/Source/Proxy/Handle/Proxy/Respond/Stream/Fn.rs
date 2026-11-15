@@ -1,0 +1,70 @@
+//! Relay an SSE body without buffering it.
+//!
+//! T10 (F6): a `text/event-stream` response must be forwarded chunk by chunk -
+//! buffering it into one JSON blob produces something an SSE client cannot
+//! parse. Compression and caching are skipped entirely on this path: there is no
+//! single body to store, and a cached entry replayed as `application/json` is
+//! nothing like the stream the caller asked for.
+//!
+//! 02-F9: bytes are counted and mid-stream errors observed as chunks flow
+//! through. Once `Body::from_stream` owns the raw `bytes_stream()`, a later
+//! chunk `Err` (F2's failure mode) and every SSE byte were otherwise invisible
+//! to `/stats`.
+//!
+//! Accounting is deliberately unchanged: the latency recorded here is
+//! time-to-headers, not the duration of the stream, because the stream outlives
+//! this function. Reinterpreting it would be a metrics-contract change.
+
+use std::sync::atomic::Ordering;
+
+use axum::{body::Body, response::Response};
+use futures::StreamExt;
+
+use crate::Proxy::{
+	Log::Dev::Fn::Fn as DevLog,
+	Request::Context::Struct::Struct as RequestContext,
+	Upstream::{Head::Struct::Struct as UpstreamHead, Headers::Fn::Fn as CopyUpstreamHeaders},
+};
+
+/// Relay the upstream stream to the client.
+pub(crate) fn Fn(Context:&RequestContext<'_>, Head:UpstreamHead, Response:reqwest::Response) -> Response {
+	let StateForStream = Context.State.clone();
+	let Stream = Response.bytes_stream().inspect(move |Chunk| {
+		match Chunk {
+			Ok(bytes) => {
+				StateForStream
+					.ResponseBodyBytes
+					.fetch_add(bytes.len() as u64, Ordering::Relaxed);
+			},
+			Err(_) => {
+				StateForStream.SSEStreamErrors.fetch_add(1, Ordering::Relaxed);
+			},
+		}
+	});
+
+	DevLog(
+		Context.State.Dev,
+		|| tracing::info!(ID = %Context.ID, Status = %Head.Status, "<<< STREAM (SSE)"),
+	);
+
+	Context.State.RecordLatency(Context.Started.elapsed());
+	Context.State.RecordRequest(
+		Context.ID,
+		Context.Method.as_str(),
+		Context.Path,
+		Head.Status.as_u16(),
+		false,
+		Context.Started.elapsed().as_millis(),
+	);
+
+	let Builder = CopyUpstreamHeaders(Response::builder().status(Head.Status), &Head.Headers);
+	let Builder = match Head.ContentType.clone() {
+		Some(Ct) => Builder.header("Content-Type", Ct),
+		None => Builder,
+	};
+
+	Builder
+		.header("X-Aphrodite-Streamed", "true")
+		.body(Body::from_stream(Stream))
+		.unwrap()
+}

@@ -2,7 +2,7 @@
 
 use std::os::raw::c_char;
 
-use super::Guard::MaximumContent;
+use crate::ABI::{Boundary::Answer::Enum::Enum as Answer, Guard::Content::Const::MaximumContent};
 
 stateful!(
 	/// Transform a tool result through the live hook pipeline and answer with
@@ -14,11 +14,12 @@ stateful!(
 	/// whose store is full of something unretrievable.
 	AphroditeTransform,
 	|s, Content:*const c_char, Tool:*const c_char| {
-		match Content.len() > MaximumContent {
-			true => return serde_json::json!({"error":"content exceeds 16MB limit"}),
-			false => (),
-		}
+		crate::ABI::Guard::Reject::Fn::Fn(Content.len() > MaximumContent, || {
+			anyhow::anyhow!("content exceeds 16MB limit")
+		})?;
 
-		crate::Hook::ToolResult::Entry::Fn::TransformToolResult(s, &Content, &Tool)
+		Ok(Answer::Envelope(crate::Hook::ToolResult::Entry::Fn::TransformToolResult(
+			s, &Content, &Tool,
+		)))
 	}
 );

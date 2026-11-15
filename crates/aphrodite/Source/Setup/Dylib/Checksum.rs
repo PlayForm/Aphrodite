@@ -20,16 +20,21 @@ use std::{path::Path, process::Command};
 /// indistinguishable from a passing one at every later step.
 pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path) -> anyhow::Result<()> {
 	let SumsURL = format!("{ReleaseDirectory}/SHA256SUMS-{Triple}.txt");
-	let SumsText = if cfg!(windows) {
-		Command::new("powershell")
-			.args([
-				"-Command",
-				&format!("(Invoke-WebRequest -Uri '{SumsURL}' -UseBasicParsing).Content"),
-			])
-			.output()
-	} else {
-		Command::new("curl").args(["-fsSL", &SumsURL]).output()
-	};
+
+	// Windows has no `curl` guarantee, so it uses PowerShell; every other target
+	// uses `curl`, which both macOS and Linux ship. `#[cfg]` on the statement is
+	// compile-time selection - only one of these lines exists in a given build.
+	#[cfg(windows)]
+	let SumsText = Command::new("powershell")
+		.args([
+			"-Command",
+			&format!("(Invoke-WebRequest -Uri '{SumsURL}' -UseBasicParsing).Content"),
+		])
+		.output();
+
+	#[cfg(not(windows))]
+	let SumsText = Command::new("curl").args(["-fsSL", &SumsURL]).output();
+
 	let SumsText = match SumsText {
 		Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
 		_ => {
@@ -58,18 +63,24 @@ pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path)
 		);
 	};
 
-	let HashOutput = if cfg!(windows) {
-		Command::new("powershell")
-			.args([
-				"-Command",
-				&format!("(Get-FileHash '{}' -Algorithm SHA256).Hash", Dest.display()),
-			])
-			.output()
-	} else if Command::new("shasum").arg("--version").output().is_ok() {
-		Command::new("shasum").args(["-a", "256", Dest.to_str().unwrap_or("")]).output()
-	} else {
-		Command::new("sha256sum").arg(Dest.to_str().unwrap_or("")).output()
+	#[cfg(windows)]
+	let HashOutput = Command::new("powershell")
+		.args([
+			"-Command",
+			&format!("(Get-FileHash '{}' -Algorithm SHA256).Hash", Dest.display()),
+		])
+		.output();
+
+	// `shasum` is the macOS default and `sha256sum` the Linux one; neither is
+	// guaranteed everywhere, so the first that answers `--version` is used. The
+	// probe result is matched, not reduced to a boolean: a spawn failure is the
+	// only thing that sends this to the other tool.
+	#[cfg(not(windows))]
+	let HashOutput = match Command::new("shasum").arg("--version").output() {
+		Ok(_) => Command::new("shasum").args(["-a", "256", Dest.to_str().unwrap_or("")]).output(),
+		Err(_) => Command::new("sha256sum").arg(Dest.to_str().unwrap_or("")).output(),
 	};
+
 	let Actual = match HashOutput {
 		Ok(o) if o.status.success() => {
 			String::from_utf8_lossy(&o.stdout)
@@ -81,11 +92,8 @@ pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path)
 		_ => anyhow::bail!("no shasum/sha256sum/Get-FileHash available to verify checksum"),
 	};
 
-	match Actual != Expected {
-		true => {
-			anyhow::bail!("checksum mismatch for {AssetName}: expected {Expected}, got {Actual}");
-		},
-		false => (),
+	if Actual != Expected {
+		anyhow::bail!("checksum mismatch for {AssetName}: expected {Expected}, got {Actual}");
 	}
 	println!("  checksum verified");
 	Ok(())

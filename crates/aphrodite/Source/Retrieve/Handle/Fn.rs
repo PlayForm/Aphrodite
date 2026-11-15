@@ -4,220 +4,76 @@ use std::sync::Arc;
 
 use axum::{
 	extract::State,
-	http::StatusCode,
 	response::{IntoResponse, Json},
 };
 
 use crate::{
-	Proxy::State::{CCR::Get::Fn::Fn as CCRGet, Struct::Struct as AppState},
+	Proxy::State::Struct::Struct as AppState,
 	Retrieve::{
 		Filter::Fn::Fn as FilterContent,
-		Live::Lookup::Fn::Fn as LookupLiveContainer,
-		Page::Fn::Fn as Paginate,
-		Progress::Struct::Struct as LiveProgress,
+		Handle::{Failure, Lookup, Reply},
+		Live::{Advance, Lookup::Fn::Fn as LookupLiveContainer},
+		Page::{Mode, Render, Slice},
 		Request::Struct::Struct as RetrieveRequest,
 		Response::Struct::Struct as RetrieveResponse,
+		Source,
 	},
 };
 
-/// Resolve a CCR marker hash back to its original content, optionally
-/// filtered by `Query` and paged by `Offset`/`Limit`. Checks the inline_ccr
-/// store first, then falls back to the CCR backend.
+/// Resolve a CCR marker hash back to its original content, optionally filtered by
+/// `query` and paged by `offset`/`limit`.
+///
+/// The handler is a sequence of decisions, and every one of them is a value:
+/// where to read from ([`Source::Parse::Fn::Fn`]), what the lookup answered
+/// ([`Lookup::Fn::Fn`]), what the window asked for ([`Mode::Parse::Fn::Fn`]) and
+/// what slicing produced ([`Slice::Fn::Fn`]). It owns the ORDER and nothing else -
+/// the two stores, the filter, the window and the progress each live in a leaf,
+/// so a change to any one of them does not have to be read out of a 200-line
+/// function.
+///
+/// The order is the contract and does not move: resolve, reassemble a live
+/// container, narrow by query, cut the window, then advance the container's
+/// progress with the byte count this response actually served.
 pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRequest>) -> impl IntoResponse {
-	let hash = match &Request.hash {
-		// Strip a `|type|size` marker-body suffix and surrounding whitespace
-		// (report 05 F3) - an LLM sometimes echoes the full marker body back
-		// as the hash argument instead of the bare hash, and this endpoint's
-		// lookups (inline_ccr, CCR backend) are exact-match only.
-		Some(h) => crate::Marker::Parse::Normalize::NormalizeHash(h).to_string(),
-		None => {
-			return (
-				StatusCode::BAD_REQUEST,
-				Json(RetrieveResponse {
-					Found:false,
-					Content:None,
-					Source:"none".into(),
-					error:Some("`hash` required".into()),
-					Truncated:false,
-					Live:None,
-				}),
-			)
-				.into_response();
-		},
+	let Source::Enum::Enum::Hash(hash) = Source::Parse::Fn::Fn(Request.hash.as_deref()) else {
+		return Reply::Fn::Fn(&Failure::Enum::Enum::MissingHash);
 	};
 
-	// Check inline_ccr first (lock dropped before any .await to avoid !Send
-	// MutexGuard)
-	let Content = {
-		// Fix 20 (inspection): the old `.lock().ok().and_then(...)` silently
-		// converted a poisoned mutex into a cache miss, so every request fell
-		// through to the CCR backend and callers saw confusing 404s. A
-		// poisoned lock is a broken-process condition - surface it as an
-		// explicit 500 instead of a miss. The guard is still dropped before
-		// any `.await` (the `Ok` arm's closure ends before the fallback
-		// backend path below).
-		let InlineHit = match state.InlineCCR.lock() {
-			Ok(mut Map) => Map.get(&hash).cloned(),
-			Err(_) => {
-				return (
-					StatusCode::INTERNAL_SERVER_ERROR,
-					Json(RetrieveResponse {
-						Found:false,
-						Content:None,
-						Source:"none".into(),
-						error:Some("inline_ccr lock poisoned; cannot serve /retrieve".into()),
-						Truncated:false,
-						Live:None,
-					}),
-				)
-					.into_response();
-			},
-		};
-		match InlineHit {
-			Some(Cached) => {
-				state.InlineCCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-				state.CCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-				Cached
-			},
-			None => {
-				state.InlineCCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-				// Fallback to CCR backend
-				match &state.ccr {
-					Some(ccr) => {
-						match CCRGet(ccr, &hash).await {
-							Some(c) => {
-								state.CCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-								c
-							},
-							None => {
-								state.CCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-								return (
-									StatusCode::NOT_FOUND,
-									Json(RetrieveResponse {
-										Found:false,
-										Content:None,
-										Source:"none".into(),
-										error:Some(format!("CCR entry not found: {}", hash)),
-										Truncated:false,
-										Live:None,
-									}),
-								)
-									.into_response();
-							},
-						}
-					},
-					None => {
-						state.CCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-						return (
-							StatusCode::NOT_FOUND,
-							Json(RetrieveResponse {
-								Found:false,
-								Content:None,
-								Source:"none".into(),
-								error:Some(format!("CCR entry not found: {}", hash)),
-								Truncated:false,
-								Live:None,
-							}),
-						)
-							.into_response();
-					},
-				}
-			},
-		}
+	let Resolved = match Lookup::Fn::Fn(&state, &hash).await {
+		Ok(Content) => Content,
+		Err(Failure) => return Reply::Fn::Fn(&Failure),
 	};
 
-	// NOTE (report 05 F12): a zstd-magic-byte decompression branch used to
-	// live here. It was unreachable dead code: `CcrStore::get` returns
-	// `Option<String>` (vendor/headroom/crates/headroom-core/src/ccr/mod.rs)
-	// and every backend implementation (in-memory, SQLite, Redis) stores and
-	// returns the exact `String`/`&str` payload verbatim - none of them ever
-	// zstd-encodes content. Since a Rust `String` is guaranteed valid UTF-8,
-	// and a real zstd frame is essentially never valid UTF-8, `Content` here
-	// could never legally contain the zstd magic bytes this branch checked
-	// for. Removed rather than "fixed" - see `.plans/05-compression-pipeline.md`
-	// T12 and `docs/ccr/lifecycle.md`'s retrieve-flow section.
-
-	// ── Live container progression (pre-Rust port of _hooks/live.py) ──
-	// When the resolved entry is a live container (its metadata envelope
-	// sits in the inline store), serve the content from the container's own
-	// chunks and surface progress: chunk count / bytes arrived on partial
-	// retrieves, full content + complete status on the final resolve
-	// (limit: 0). A missing or malformed envelope degrades to the plain
-	// entry (warn + degrade, never panic).
-	let LiveContainer = LookupLiveContainer(&state, &hash, &Content);
-	let mut Content = LiveContainer
+	// A live container's chunks are its authoritative store, so a container entry
+	// is served from its own reassembly and a missing or malformed envelope
+	// degrades to the plain entry (warn + degrade, never panic).
+	let LiveContainer = LookupLiveContainer(&state, &hash, &Resolved);
+	let Assembled = LiveContainer
 		.as_ref()
 		.map(|(_Meta, Assembled)| Assembled.clone())
-		.unwrap_or(Content);
+		.unwrap_or(Resolved);
 
-	// Apply query filter, then pagination
-	Content = FilterContent(&Content, Request.Query.as_deref());
-	let (Content, Truncated) = match Paginate(&Content, Request.Offset, Request.Limit) {
-		Ok(Paged) => Paged,
-		Err(Error) => {
-			return (
-				StatusCode::BAD_REQUEST,
-				Json(RetrieveResponse {
-					Found:false,
-					Content:Some(format!("{Error:#}")),
-					Source:"ccr".into(),
-					error:None,
-					Truncated:false,
-					Live:None,
-				}),
-			)
-				.into_response();
-		},
+	let Mode = Mode::Parse::Fn::Fn(Request.Offset, Request.Limit);
+	let Filtered = FilterContent(&Assembled, Request.Query.as_deref());
+	let Outcome = match Slice::Fn::Fn(Filtered.as_ref(), &Mode) {
+		Ok(Outcome) => Outcome,
+		Err(Error) => return Reply::Fn::Fn(&Failure::Enum::Enum::Refused(Error)),
 	};
 
-	// Advance + surface the container progress after pagination, so the
-	// served window's byte count is known. A final resolve (limit: 0)
-	// marks the container complete; a partial window advances
-	// `BytesArrived` by the bytes served in this response. The envelope is
-	// written back so later retrieves observe the accumulated progress.
-	let Live = match LiveContainer {
-		Some((meta, _)) => {
-			let FinalResolve = Request.Limit == 0;
-			let Served = match FinalResolve {
-				true => meta.Size,
-				false => Content.len().min(meta.Size),
-			};
-			let BytesArrived = meta.BytesArrived.saturating_add(Served).min(meta.Size);
-			let Complete = FinalResolve || BytesArrived >= meta.Size;
-			let Progress = LiveProgress {
-				Chunks:meta.Chunks,
-				ChunkSize:meta.ChunkSize,
-				BytesTotal:meta.Size,
-				BytesArrived,
-				Complete,
-			};
-			// Best-effort write-back: a poisoned lock or serialization
-			// hiccup degrades to no-writeback (progress stays as-is).
-			match state.InlineCCR.lock() {
-				Ok(mut Map) => {
-					let mut Updated = meta;
-					Updated.BytesArrived = BytesArrived;
-					match serde_json::to_string(&Updated) {
-						Ok(Encoded) => {
-							Map.put(crate::Hook::Live::Key::Fn::LiveMetaKey(&hash), Encoded);
-						},
-						Err(_) => (),
-					}
-				},
-				Err(_) => (),
-			}
-			Some(Progress)
-		},
-		None => None,
-	};
+	let Body = Render::Text::Fn::Fn(Filtered.as_ref(), &Outcome);
+	let Truncated = Render::Truncated::Fn::Fn(&Outcome);
+	let BytesServed = Body.len();
 
-	Json(RetrieveResponse {
-		Found:true,
-		Content:Some(Content),
-		Source:"ccr".into(),
-		error:None,
-		Truncated,
-		Live,
-	})
-	.into_response()
+	// Progress is advanced after slicing so the served window's byte count is
+	// known, and written back so a later retrieve observes the accumulation.
+	let Live = LiveContainer.map(|(Meta, _Assembled)| {
+		let Progress = Advance::Fn::Fn(&Mode, &Meta, BytesServed);
+
+		Advance::Write::Fn::Fn(&state, &hash, &Meta, Progress.BytesArrived);
+
+		Progress
+	});
+
+	Json(RetrieveResponse { Found:true, Content:Some(Body), Source:"ccr".into(), error:None, Truncated, Live })
+		.into_response()
 }

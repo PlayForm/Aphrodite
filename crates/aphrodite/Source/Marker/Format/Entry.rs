@@ -45,16 +45,13 @@ pub fn CCRMarker(
 	Safe = Safe.chars().filter(|c| *c >= ' ').collect();
 
 	// Headroom budget truncation
-	match HeadroomBudget {
-		Some(Budget) => {
-			Safe = match () {
-				_ if Budget < 25 => Safe.chars().take(30).collect(),
-				_ if Budget < 50 => Safe.chars().take(60).collect(),
-				_ if Budget < 75 => Safe.chars().take(100).collect(),
-				_ => Safe,
-			};
-		},
-		None => (),
+	if let Some(Budget) = HeadroomBudget {
+		Safe = match Budget {
+			0..=24 => Safe.chars().take(30).collect(),
+			25..=49 => Safe.chars().take(60).collect(),
+			50..=74 => Safe.chars().take(100).collect(),
+			_ => Safe,
+		};
 	}
 
 	// Metadata string
@@ -71,9 +68,8 @@ pub fn CCRMarker(
 				})
 				.collect();
 			let mut s = Parts.join(";");
-			match s.len() > 300 {
-				true => s = format!("{}...", crate::StructExtract::Format::Floor::Fn(&s, 297)),
-				false => (),
+			if s.len() > 300 {
+				s = format!("{}...", crate::StructExtract::Format::Floor::Fn(&s, 297));
 			}
 			s
 		},

@@ -20,7 +20,7 @@ use crate::{
 /// it, and reporting the serve error first would exit with those tasks still
 /// holding the store open.
 pub async fn Serve(Bound:Bound, mut ShutdownRx:tokio::sync::watch::Receiver<bool>) -> anyhow::Result<()> {
-	let Bound { name, CLI, Listener, State } = Bound;
+	let Bound { Name, CLI, Listener, State } = Bound;
 	let TaskTracker = State.TaskTracker.clone();
 
 	let ModeStr = match CLI.Mode {
@@ -29,7 +29,7 @@ pub async fn Serve(Bound:Bound, mut ShutdownRx:tokio::sync::watch::Receiver<bool
 	};
 
 	tracing::info!(
-		name = %name,
+		name = %Name,
 		Listen = %CLI.Listen,
 		Mode = %ModeStr,
 		APIURL = %CLI.APIURL,
@@ -41,15 +41,12 @@ pub async fn Serve(Bound:Bound, mut ShutdownRx:tokio::sync::watch::Receiver<bool
 	// 02-F1: one-time notice, not per-request - management routes
 	// (/stats, /retrieve, /ccr/*, /reload, /tool/relay, ...) accept any
 	// loopback caller with no credential until APHRODITE_MGMT_TOKEN is set.
-	match MgmtToken().is_none() {
-		true => {
-			tracing::warn!(
-				name = %name,
-				"APHRODITE_MGMT_TOKEN not set - management routes (/stats, /retrieve, /ccr/*, /reload, /tool/relay, ...) accept any loopback caller with no credential"
-			);
-		},
-		false => {},
-	}
+	let _ = MgmtToken().is_none().then(|| {
+		tracing::warn!(
+			name = %Name,
+			"APHRODITE_MGMT_TOKEN not set - management routes (/stats, /retrieve, /ccr/*, /reload, /tool/relay, ...) accept any loopback caller with no credential"
+		);
+	});
 
 	let App = Route::Build::Build(State);
 

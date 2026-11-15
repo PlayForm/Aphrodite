@@ -25,13 +25,10 @@ pub(crate) fn SubstituteVars(Tmpl:&str, Vars:&[(&str, &str)]) -> String {
 	loop {
 		match Chars.get(i).copied() {
 			Some('{') => {
-				match Chars.get(i + 1) {
-					Some('{') => {
-						Out.push('{');
-						i += 2;
-						continue;
-					},
-					_ => (),
+				if let Some('{') = Chars.get(i + 1) {
+					Out.push('{');
+					i += 2;
+					continue;
 				}
 				// Try to parse `{name}` with a clean [A-Za-z0-9_] name.
 				let mut j = i + 1;
@@ -45,18 +42,13 @@ pub(crate) fn SubstituteVars(Tmpl:&str, Vars:&[(&str, &str)]) -> String {
 						_ => break,
 					}
 				}
-				match !name.is_empty() && Chars.get(j) == Some(&'}') {
-					true => {
-						match Vars.iter().find(|(k, _)| *k == name.as_str()) {
-							Some((_, v)) => {
-								Out.push_str(v);
-								i = j + 1;
-								continue;
-							},
-							None => (),
-						}
-					},
-					false => (),
+				if !name.is_empty()
+					&& Chars.get(j) == Some(&'}')
+					&& let Some((_, v)) = Vars.iter().find(|(k, _)| *k == name.as_str())
+				{
+					Out.push_str(v);
+					i = j + 1;
+					continue;
 				}
 				// Unknown var or malformed group: emit the opening brace
 				// verbatim and keep scanning - the rest of the group text is
