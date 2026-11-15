@@ -183,6 +183,98 @@ per file, per the house style), so:
   struct through six modules;
 - the generator's output is committed, so a build without the generator still works.
 
+## 4.4 One embedding mechanism - assets, not scattered `include_str!`
+
+Twenty-two `include_str!` mentions exist today; nine are real call sites, seven of them inside
+`Directive/Builtin.rs`. That is already the smell the request names: the same trick repeated by hand,
+with no override, no provenance and no reload.
+
+**The rule: no hand-written `include_str!` outside the macro that implements it.** One declaration
+form, one implementation, one place to change.
+
+### The declaration
+
+Each asset is declared once, in **its own leaf file**, beside the code that uses it:
+
+```rust
+// crates/aphrodite/Source/ChainSplit/ErrorHint/Signals/Const.rs
+Embedded::Declare! {
+	Signals,
+	path: "templates/signals.txt",
+	parse: Lines,
+	class: Tunable,
+}
+```
+
+The macro is the only thing that expands to `include_str!`. What it emits in that file:
+
+- a private `static` holding the compiled bytes (`include_str!` of `path`), so the binary ships its
+  default and needs no file at runtime;
+- a private parse-once cell for the parsed form;
+- the public accessor.
+
+**Files stay separate.** An asset directory keeps its per-item leaves and its `mod.rs` facade exactly
+as the house style requires - the mechanism never collapses assets into one generated module:
+
+```
+ChainSplit/ErrorHint/Signals/
+	mod.rs      declares Const; and Fn;
+	Const.rs    Embedded::Declare! - the compiled default, private to the asset
+	Fn.rs       pub(crate) fn Fn() -> &'static [&'static str] - the overlay-aware accessor
+```
+
+`Signals/Const.rs` remains the file that owns that table. It stops being a hand-written slice literal
+and becomes one macro invocation plus its doc comment.
+
+### The runtime side
+
+`Fn()` resolves in the same four layers as a scalar parameter, and returns a borrowed slice when the
+compiled default wins:
+
+| Layer | Source |
+| --- | --- |
+| compiled | the `include_str!` default, parsed once |
+| user | `~/.hermes/aphrodite/assets/<name>.txt` |
+| config | `[assets]` in `aphrodite.toml` (inline text or a path) |
+| override | the ABI / MCP surface, for benchmarks |
+
+- **Provenance is part of the answer.** `aphrodite assets show signals` prints the resolved value
+  *and* which layer supplied it. A tuning loop where you cannot tell whether your edit took effect is
+  not a loop.
+- **Hot reload reuses the existing watcher.** `Boot/Listen/Watcher` already watches `aphrodite.toml`
+  for threshold changes; it gains the assets directory rather than a second watcher being added. A
+  reload swaps the parsed value **per asset, atomically** - never per key, and never leaving a parsed
+  form newer than the bytes it came from.
+- **A bad overlay warns and falls back**, naming the asset, the line and the compiled default used.
+  Same policy as a malformed parameter.
+- **Parse once, read cheap.** The default is parsed into a `OnceLock`; an overlay swap bumps a
+  generation counter and replaces an `Arc`. The per-hook path takes a generation check, not a lock
+  held across a call. If a bench shows the check, measure it before optimising further.
+
+### Two families, one loader
+
+| Parser | Used for | Example |
+| --- | --- | --- |
+| `Lines` | a vocabulary or list, one entry per line | `Signals` |
+| `Text` | prose consumed whole | the built-in directives, retrieval guidance |
+| `Toml` / `Json` | structured assets | `parameters.toml`, prompt sets |
+
+**Class still governs overridability.** A `Text` asset holding a prompt is tunable. An asset holding
+the marker grammar is `Protocol` and the macro refuses `class: Tunable` for it at compile time - the
+same boundary as §2, enforced in one place instead of by convention.
+
+### What this replaces
+
+| Today | After |
+| --- | --- |
+| `const Signals:&[&str] = &[ ... ];` | `Embedded::Declare!` + `Signals::Fn::Fn()` |
+| `("focus", include_str!("../BuiltinDirective/focus.md"))` × 7 | one `Text` asset per directive, overridable, provenance-tracked |
+| `Setup/Write/PluginShim.rs` `include_str!` | **stays** - it is the plugin shim, a `Protocol` asset copied verbatim |
+| `Setup/Write/ConfigurationTemplate.rs` `include_str!` | **stays** - the toml template, same reason |
+
+The last two are why the class exists: an override on the shim would let a user break their own
+install.
+
 ## 5. The catalogue
 
 Measured at the audit HEAD. The rewrite in progress moves some paths; the card re-measures before
@@ -195,6 +287,7 @@ implementing. **T** = tunable, **P** = protocol, **I** = internal.
 | `Tool/Unwrap/Matcher/Terminal/Classify/Resolve/Fn.rs` | `FAILURE` | `["exit code:", "Error:"]` | **T** |
 | same | `BUILD` | `["   Compiling", "    Finished", "   Running", "test result:", "   Building", "   Installing", "warning:", "error["]` | **T** |
 | same | `BUILD_ERROR` | `["error[", "error: could not"]` | **T** |
+| `ChainSplit/ErrorHint/Signals/Const.rs` | `Signals` | `["error", "failed", "failure", "panic", "traceback", "fatal", "cannot", "not found", "no such file", "permission denied", "unresolved import", "undefined"]` | **T** - a content-level vocabulary, not a grammar; it must keep saying what a segment said, never name a mechanism |
 | `Tool/Unwrap/Matcher/Single/Fn.rs` | `PRIORITY` | `["description", "summary", "result", "message", "preview", "found"]` | **T** |
 | `Configuration/Path/Classify/Fn.rs` | `ESSENTIAL` | tool-name list | **T** |
 | `Hook/Tool/Const.rs` | `EssentialTools` | tool-name list | **T** |
@@ -327,6 +420,7 @@ Each phase is independently shippable and independently revertable.
 | **P4** | Layer 3 (env) + Layer 4 (ABI/MCP override) | an override via each layer changes the same observable |
 | **P5** | Benchmark harness + corpus + score | two runs on the same parameters score identically |
 | **P6** | Pairwise case generator | N cases generated from the space file; each runs and reports |
+| **P7** | `Embedded::Declare!` + overlay + provenance (`assets list\|show\|diff`) | `Signals` reads through the accessor; a file in `~/.hermes/aphrodite/assets/` overrides it without a rebuild; `assets show signals` names the layer that supplied it |
 
 A phase that changes an output at default parameters is a bug in that phase, not a finding.
 
