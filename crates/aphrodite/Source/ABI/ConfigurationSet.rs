@@ -37,6 +37,6 @@ pub extern "C" fn AphroditeConfigurationSet(
 	State(Handle, move |s| {
 		let _Outcome = ApplyUpdate(s, Parsed);
 
-		Ok(Answer::Envelope(serde_json::json!({"status":"ok"})))
+		Ok(Answer::JSON(serde_json::json!({"status":"ok"})))
 	})
 }

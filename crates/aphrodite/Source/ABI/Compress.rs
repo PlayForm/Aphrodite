@@ -58,7 +58,7 @@ stateful!(
 			meta:None,
 		});
 
-		Ok(Answer::Envelope(
+		Ok(Answer::JSON(
 			serde_json::json!({"hash":hash,"type":t,"size":Content.len(),"preview":Preview,"marker":Marker}),
 		))
 	}

@@ -27,7 +27,7 @@ pub(crate) fn Fn(Src:&Path, Dest:&Path, Name:&str) -> anyhow::Result<()> {
 
 	#[cfg(not(target_os = "macos"))]
 	{
-		fs::copy(Src, Dest).with_context(|| format!("copy {} to {}", Src.display(), Dest.display()))?;
+		fs::copy(Src, Dest).with_context(|| format!("copy {Name} from {} to {}", Src.display(), Dest.display()))?;
 		SecurePerms(Dest, 0o755)?;
 	}
 

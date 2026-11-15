@@ -21,7 +21,7 @@ pub extern "C" fn AphroditeStructExtract(Content:*const c_char, Language:*const 
 	Run(move || {
 		let Content = Content.ok_or_else(|| anyhow::anyhow!("null content"))?;
 
-		Ok(Answer::Envelope(serde_json::json!(crate::StructExtract::Extract::Fn(
+		Ok(Answer::JSON(serde_json::json!(crate::StructExtract::Extract::Fn(
 			&Content, &Language,
 		))))
 	})

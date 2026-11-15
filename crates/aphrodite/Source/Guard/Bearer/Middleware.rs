@@ -25,11 +25,8 @@ pub async fn RequireMgmtToken(
 	next:Next,
 ) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
 	let IsMetrics = Request.uri().path() == "/metrics";
-	match IsMetrics {
-		true => {
-			return Ok(next.run(Request).await);
-		},
-		false => {},
+	if IsMetrics {
+		return Ok(next.run(Request).await);
 	}
 	let Token = MgmtToken();
 	let Auth = Request
@@ -37,14 +34,11 @@ pub async fn RequireMgmtToken(
 		.get(axum::http::header::AUTHORIZATION)
 		.and_then(|v| v.to_str().ok())
 		.unwrap_or("");
-	match CheckBearerToken(Token.as_deref(), Auth) {
-		Err(Message) => {
-			return Err((
-				StatusCode::UNAUTHORIZED,
-				Json(serde_json::json!({"error": format!("{Message:#}")})),
-			));
-		},
-		Ok(_) => {},
+	if let Err(Message) = CheckBearerToken(Token.as_deref(), Auth) {
+		return Err((
+			StatusCode::UNAUTHORIZED,
+			Json(serde_json::json!({"error": format!("{Message:#}")})),
+		));
 	}
 	Ok(next.run(Request).await)
 }

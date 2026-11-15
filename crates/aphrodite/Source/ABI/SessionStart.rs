@@ -17,5 +17,5 @@ use crate::ABI::Boundary::{Answer::Enum::Enum as Answer, State::Fn::Fn as State}
 /// field this hook forgets to clear leaks one conversation into the next.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeSessionStart(Handle:*const c_char) -> *mut c_char {
-	State(Handle, |s| Ok(Answer::Envelope(crate::Session::Start::Fn::OnSessionStart(s))))
+	State(Handle, |s| Ok(Answer::JSON(crate::Session::Start::Fn::OnSessionStart(s))))
 }

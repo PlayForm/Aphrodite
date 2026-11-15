@@ -12,11 +12,8 @@ pub async fn Signal() {
 	};
 	#[cfg(unix)]
 	let Terminate = async {
-		match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-			Ok(mut s) => {
-				s.recv().await;
-			},
-			Err(_) => {},
+		if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+			s.recv().await;
 		}
 	};
 	#[cfg(not(unix))]

@@ -37,6 +37,6 @@ pub extern "C" fn AphroditeSearch(Handle:*const c_char, Query:*const c_char) -> 
 			})
 			.collect();
 
-		Ok(Answer::Envelope(serde_json::json!({"total":Results.len(),"results":Results})))
+		Ok(Answer::JSON(serde_json::json!({"total":Results.len(),"results":Results})))
 	})
 }

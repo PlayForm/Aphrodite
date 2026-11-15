@@ -11,7 +11,7 @@ exclude = ["Maintain/dynamic_hooks", "vendor/headroom"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.100.0"
 license = "CC0-1.0"
 repository = "https://github.com/PlayForm/Aphrodite"
 

@@ -22,11 +22,8 @@ pub const AllowedLoopbackHosts:&[&str] = &["localhost", "127.0.0.1", "[::1]", ":
 /// real axum `Request`/`Next` - the middleware below is a thin wrapper that
 /// only translates this `Result` into an HTTP response.
 pub fn CheckLoopbackRequest(Addr:SocketAddr, HostHeader:&str) -> anyhow::Result<()> {
-	match !Addr.ip().is_loopback() {
-		true => {
-			anyhow::bail!("only loopback clients allowed");
-		},
-		false => {},
+	if !Addr.ip().is_loopback() {
+		anyhow::bail!("only loopback clients allowed");
 	}
 	// A missing/unparseable Host is rejected, not waved through: peer-IP
 	// loopback is the first layer, but this second layer exists specifically
@@ -35,11 +32,8 @@ pub fn CheckLoopbackRequest(Addr:SocketAddr, HostHeader:&str) -> anyhow::Result<
 	// mandates Host, and every real caller here (curl, the Hermes plugin)
 	// sends it, so there's no legitimate case to exempt (02-F6).
 	let Hostname = HostHeaderToHostname(HostHeader);
-	match !AllowedLoopbackHosts.contains(&Hostname.as_str()) {
-		true => {
-			anyhow::bail!("Host header does not name a loopback address");
-		},
-		false => {},
+	if !AllowedLoopbackHosts.contains(&Hostname.as_str()) {
+		anyhow::bail!("Host header does not name a loopback address");
 	}
 	Ok(())
 }

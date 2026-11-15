@@ -17,7 +17,7 @@
 //!                                           ├─ Resolution (resolve, stage2, struct)
 //!                                           └─ Catalog, session, prefetch, config, chain_split
 //!
-//! This file is the crate root and nothing else: crate docs, the two crate-wide
+//! This file is the crate root and nothing else: crate docs, the three crate-wide
 //! lint gates, the module list, and the re-exports that keep every caller's
 //! existing path working while the tree is atomized.
 //!
@@ -40,6 +40,11 @@
 // so the snake_case module lint is switched off crate-wide rather than
 // renamed away at every declaration.
 #![allow(non_snake_case)]
+// House style: acronyms stay uppercase inside identifiers (`JSON`, `ID`, `URL`,
+// `ABI`) - `JSON` is the name, `Json` is a spelling of it. That is the opposite
+// of `upper_case_acronyms`' default, so the lint is switched off crate-wide
+// rather than spelling acronyms down at every declaration.
+#![allow(clippy::upper_case_acronyms)]
 
 pub mod ABI;
 pub mod Configuration;

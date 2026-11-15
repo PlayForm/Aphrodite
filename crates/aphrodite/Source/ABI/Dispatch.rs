@@ -76,6 +76,6 @@ pub extern "C" fn AphroditeDispatch(
 
 		Span.record("ok", Outcome.is_ok());
 
-		Outcome.map(Answer::Envelope)
+		Outcome.map(Answer::JSON)
 	})
 }

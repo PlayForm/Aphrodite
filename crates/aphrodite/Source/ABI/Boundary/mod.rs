@@ -24,7 +24,7 @@
 //!   interior NUL is neutralised before it can truncate the C string.
 //!
 //! An export body is therefore one fallible operation: it names what it needs
-//! and returns `Ok(Answer::Enum::Envelope(..))`, with no envelope, no pointer and
+//! and returns `Ok(Answer::Enum::JSON(..))`, with no envelope, no pointer and
 //! no panic handling of its own.
 
 pub mod Answer;

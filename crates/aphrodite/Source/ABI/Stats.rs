@@ -15,7 +15,7 @@ use crate::ABI::Boundary::{Answer::Enum::Enum as Answer, State::Bare::Fn::Fn as 
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeStats(Handle:*const c_char) -> *mut c_char {
 	Bare(Handle, |s| {
-		Ok(Answer::Envelope(serde_json::json!({
+		Ok(Answer::JSON(serde_json::json!({
 			"version":env!("CARGO_PKG_VERSION"),"inline_entries":s.InlineStore.len(),
 			"markers":s.RecentMarkers.len(),"turn":s.TurnCounter,
 			"engine_enabled":s.ContextEngineEnabled,"threshold_pct":s.EngineThresholdPct,

@@ -18,5 +18,5 @@ use crate::ABI::{
 pub extern "C" fn AphroditeCatalog(Handle:*const c_char, Mode:*const c_char) -> *mut c_char {
 	let Mode = unsafe { Cstr(Mode) }.unwrap_or_default();
 
-	Bare(Handle, move |s| Ok(Answer::Envelope(crate::Catalog::Build::Fn::Fn(s, &Mode))))
+	Bare(Handle, move |s| Ok(Answer::JSON(crate::Catalog::Build::Fn::Fn(s, &Mode))))
 }

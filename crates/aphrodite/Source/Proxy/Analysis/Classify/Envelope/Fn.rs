@@ -14,9 +14,11 @@
 pub(crate) fn Fn(Content:&str) -> Option<&'static str> {
 	(Content.starts_with('{') || Content.starts_with('['))
 		.then(|| serde_json::from_str::<serde_json::Value>(Content).ok())
-		.map(|Parsed| match Parsed {
-			None => "text",
-			Some(_) if Content.contains("exit_code") || Content.contains("\"status\"") => "tool_output",
-			Some(_) => "json",
+		.map(|Parsed| {
+			match Parsed {
+				None => "text",
+				Some(_) if Content.contains("exit_code") || Content.contains("\"status\"") => "tool_output",
+				Some(_) => "json",
+			}
 		})
 }

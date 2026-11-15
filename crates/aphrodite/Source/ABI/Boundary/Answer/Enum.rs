@@ -12,7 +12,7 @@
 /// the difference is carried here rather than erased.
 pub(crate) enum Enum {
 	/// A JSON envelope, rendered as `Value::to_string()`.
-	Envelope(serde_json::Value),
+	JSON(serde_json::Value),
 	/// Raw text, rendered as-is (an interior NUL is stripped by `Transfer`).
 	Text(String),
 }

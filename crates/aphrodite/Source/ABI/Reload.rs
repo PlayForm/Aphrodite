@@ -32,6 +32,6 @@ pub extern "C" fn AphroditeReload(Handle:*const c_char, path:*const c_char) -> *
 	State(Handle, move |s| {
 		let Diagnostic = Apply(s, &Assessment);
 
-		Ok(Answer::Envelope(serde_json::json!({"status":"ok", "config_error":Diagnostic})))
+		Ok(Answer::JSON(serde_json::json!({"status":"ok", "config_error":Diagnostic})))
 	})
 }

@@ -11,6 +11,4 @@ use super::super::Answer::Enum::Enum as Answer;
 /// This is the whole of the ABI's error vocabulary: `extern "C"` never returns
 /// an `anyhow::Error`, and every export's failure leaves here as the same
 /// envelope so a host has one branch to write.
-pub(crate) fn Fn(Error:&anyhow::Error) -> Answer {
-	Answer::Envelope(serde_json::json!({"error": format!("{Error:#}")}))
-}
+pub(crate) fn Fn(Error:&anyhow::Error) -> Answer { Answer::JSON(serde_json::json!({"error": format!("{Error:#}")})) }

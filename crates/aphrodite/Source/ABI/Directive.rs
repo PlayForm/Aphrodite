@@ -25,6 +25,6 @@ pub extern "C" fn AphroditeDirective(Handle:*const c_char, Action:*const c_char,
 	let name = unsafe { Cstr(name) }.unwrap_or_default();
 
 	Bare(Handle, move |s| {
-		Ok(Answer::Envelope(crate::Directive::Action::Fn(s, &Action, &name)))
+		Ok(Answer::JSON(crate::Directive::Action::Fn(s, &Action, &name)))
 	})
 }

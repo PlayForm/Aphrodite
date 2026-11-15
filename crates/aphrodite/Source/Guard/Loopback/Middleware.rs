@@ -27,14 +27,11 @@ pub async fn LoopbackOnly(
 		.get(axum::http::header::HOST)
 		.and_then(|v| v.to_str().ok())
 		.unwrap_or("");
-	match CheckLoopbackRequest(Addr, Host) {
-		Err(Message) => {
-			return Err((
-				StatusCode::FORBIDDEN,
-				Json(serde_json::json!({"error": format!("{Message:#}")})),
-			));
-		},
-		Ok(_) => {},
+	if let Err(Message) = CheckLoopbackRequest(Addr, Host) {
+		return Err((
+			StatusCode::FORBIDDEN,
+			Json(serde_json::json!({"error": format!("{Message:#}")})),
+		));
 	}
 	Ok(next.run(Request).await)
 }

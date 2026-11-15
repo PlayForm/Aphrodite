@@ -8,7 +8,7 @@
 //! and `AphroditeDestroy` frees it. The Hermes plugin uses the higher-level,
 //! process-global `aphrodite_hermes_*` ABI in the `aphrodite-hermes` crate.
 //!
-//! This file is the crate root and nothing else: crate docs, the two lint gates
+//! This file is the crate root and nothing else: crate docs, the three lint gates
 //! the house style needs, the module declarations, and the `Preview`
 //! re-exports. Every `aphrodite_*` export lives in its own file under `ABI/`,
 //! one symbol per file, because the symbol name is the contract that cbindgen,
@@ -34,6 +34,11 @@
 // opposite of `non_upper_case_globals`' default, so the lint is switched off
 // crate-wide rather than silenced file by file at every declaration.
 #![allow(non_upper_case_globals)]
+// House style: acronyms stay uppercase inside identifiers (`JSON`, `ID`, `URL`,
+// `ABI`) - `JSON` is the name, `Json` is a spelling of it. That is the opposite
+// of `upper_case_acronyms`' default, so the lint is switched off crate-wide
+// rather than spelling acronyms down at every declaration.
+#![allow(clippy::upper_case_acronyms)]
 
 pub mod ABI;
 pub mod Catalog;

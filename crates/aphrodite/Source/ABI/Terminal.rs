@@ -18,7 +18,7 @@ stateful!(
 			anyhow::anyhow!("content exceeds 16MB limit")
 		})?;
 
-		Ok(Answer::Envelope(crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(
+		Ok(Answer::JSON(crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(
 			s, &Content,
 		)))
 	}

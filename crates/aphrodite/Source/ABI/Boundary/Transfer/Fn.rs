@@ -16,7 +16,7 @@ use super::super::Answer::Enum::Enum as Answer;
 /// `Value::to_string()` escapes a NUL as `\u0000` and never emits a raw one.
 pub(crate) fn Fn(Answer:Answer) -> *mut c_char {
 	match Answer {
-		Answer::Envelope(Value) => CString::new(Value.to_string()).map_or(std::ptr::null_mut(), CString::into_raw),
+		Answer::JSON(Value) => CString::new(Value.to_string()).map_or(std::ptr::null_mut(), CString::into_raw),
 		Answer::Text(Text) => CString::new(Text.replace('\0', "")).map_or(std::ptr::null_mut(), CString::into_raw),
 	}
 }

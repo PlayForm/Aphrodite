@@ -29,7 +29,7 @@ pub extern "C" fn AphroditeClassify(Content:*const c_char) -> *mut c_char {
 
 		let Ct = transforms::content_detector::detect_content_type(&Content).content_type;
 
-		Ok(Answer::Envelope(
+		Ok(Answer::JSON(
 			serde_json::json!({"type":Ct.as_str(),"lines":Content.lines().count(),"bytes":Content.len()}),
 		))
 	})

@@ -22,7 +22,7 @@ pub extern "C" fn AphroditeResolve(Handle:*const c_char, hash:*const c_char) -> 
 	let hash = unsafe { Cstr(hash) }.unwrap_or_default();
 
 	State(Handle, move |s| {
-		Ok(Answer::Envelope(crate::Resolve::Expand::Fn(s, &hash).map_or_else(
+		Ok(Answer::JSON(crate::Resolve::Expand::Fn(s, &hash).map_or_else(
 			|| serde_json::json!({"found":false}),
 			|Content| serde_json::json!({"found":true,"content":Content}),
 		)))
