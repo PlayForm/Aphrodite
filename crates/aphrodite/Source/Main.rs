@@ -13,6 +13,11 @@
 #![allow(non_snake_case)]
 // Constants and statics are PascalCase house-wide; see `Library.rs`.
 #![allow(non_upper_case_globals)]
+// Phase 4.3 rewrites every `if`/`if let` into a `match` on the decision value,
+// which is the house rule; these two lints argue the opposite, so they are
+// allowed here exactly as they already are in `Library.rs`.
+#![allow(clippy::match_bool)]
+#![allow(clippy::single_match)]
 
 mod Boot;
 mod Guard;
