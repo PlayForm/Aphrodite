@@ -15,7 +15,7 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 			// Collect (hash, fresh content) for markers we will touch, then
 			// recompute type + preview from the stored content.
 			let targets:Vec<String> = state
-				.recent_markers
+				.RecentMarkers
 				.iter()
 				.filter(|mk| only_hash.is_none_or(|h| mk.hash == h))
 				.map(|mk| mk.hash.clone())
@@ -23,12 +23,12 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 
 			let mut updated = 0usize;
 			for hash in targets {
-				if let Some(content) = state.inline_store_get(&hash) {
-					let detected = aphrodite::detect_type(&content);
-					let preview = aphrodite::build_preview(&detected, &content);
-					if let Some(mk) = state.recent_markers.iter_mut().find(|m| m.hash == hash) {
-						mk.ccr_type = detected;
-						mk.preview = preview;
+				if let Some(content) = state.InlineStoreGet(&hash) {
+					let detected = aphrodite::DetectType(&content);
+					let preview = aphrodite::BuildPreview(&detected, &content);
+					if let Some(mk) = state.RecentMarkers.iter_mut().find(|m| m.hash == hash) {
+						mk.CCRType = detected;
+						mk.Preview = preview;
 						updated += 1;
 					}
 				}

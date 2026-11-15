@@ -12,7 +12,7 @@ use crate::Hook::{Call::Input::Struct::HookInput, Log::Fn::log_session_init};
 /// append the init line to the WRONG debug file. The `pre_llm_call` arm emits
 /// the init for the real session.
 pub(crate) fn start(state:&mut AphroditeState, input:&HookInput) -> serde_json::Value {
-	let r = aphrodite::Session::on_session_start(state);
+	let r = aphrodite::Session::OnSessionStart(state);
 	// DEV-ONLY debug logger (crate::Debug): session-init / config-summary
 	// line, emitted once per process.
 	if let Some(sid) = input.parsed.get("session_id").and_then(|v| v.as_str()) {

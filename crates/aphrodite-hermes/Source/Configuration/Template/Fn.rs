@@ -34,25 +34,25 @@ pub(crate) fn config_template() -> &'static AphroditeState {
 		#[cfg(not(test))]
 		let state = {
 			let mut s = AphroditeState::default();
-			let cfg = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::load();
-			cfg.apply_compression(&mut s);
+			let cfg = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Load();
+			cfg.ApplyCompression(&mut s);
 			// Issue #11 WS4: also push `[previews] preview_max_chars` into
 			// the process-global preview builder so the dylib path caps
 			// previews exactly like the proxy path (the key was
 			// declared-but-unread dead config). Precedence is
 			// $APHRODITE_PREVIEW_MAX_CHARS > TOML > default 120; an absent
 			// key means unlimited.
-			cfg.apply_previews();
+			cfg.ApplyPreviews();
 			// Pre-Rust port: register `[templates]` + `[previews]
 			// model_family` so the dylib path renders TOML preview
 			// templates exactly like the engine/proxy paths.
-			cfg.apply_templates(&s);
+			cfg.ApplyTemplates(&s);
 			// Opt-in config auto-reload (`[compression] auto_reload = true`,
 			// default off): watch aphrodite.toml and re-apply config fields
 			// on change. Only config fields are mutated - session CCR state,
 			// directive selection, and telemetry survive a reload (the
 			// dropped dylib-binary hot-reload wiped them; fa85dfa).
-			if s.auto_reload {
+			if s.AutoReload {
 				spawn_config_watcher();
 			}
 			s

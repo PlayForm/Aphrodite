@@ -13,21 +13,21 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 		let type_filter = args.get("type").and_then(|v| v.as_str());
 		crate::with_shared(|state| {
 			let results:Vec<serde_json::Value> = state
-				.recent_markers
+				.RecentMarkers
 				.iter()
 				.rev()
 				.filter(|mk| {
 					let q_ok = query.is_empty()
-						|| mk.preview.to_lowercase().contains(&query)
-						|| mk.ccr_type.to_lowercase().contains(&query);
-					let t_ok = type_filter.is_none_or(|t| mk.ccr_type == t);
+						|| mk.Preview.to_lowercase().contains(&query)
+						|| mk.CCRType.to_lowercase().contains(&query);
+					let t_ok = type_filter.is_none_or(|t| mk.CCRType == t);
 					q_ok && t_ok
 				})
 				.take(20)
 				.map(|mk| {
 					serde_json::json!({
 						"hash": &mk.hash,
-						"type": mk.ccr_type, "size": mk.size, "preview": mk.preview,
+						"type": mk.CCRType, "size": mk.Size, "preview": mk.Preview,
 					})
 				})
 				.collect();

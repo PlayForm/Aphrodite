@@ -10,7 +10,7 @@ use crate::Tool::Dispatch::ToolHandler;
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_diff", |_args| {
 		crate::with_shared(|state| {
-			let turns = aphrodite::Session::get_conv_index(state);
+			let turns = aphrodite::Session::GetConvIndex(state);
 			serde_json::json!({"total": turns.len(), "turns": turns})
 		})
 	})

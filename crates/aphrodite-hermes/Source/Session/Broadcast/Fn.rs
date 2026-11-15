@@ -25,7 +25,7 @@ pub(crate) fn for_each_session(f:impl Fn(&mut AphroditeState)) -> bool {
 	for state in sessions {
 		if let Some(mut guard) = lock_bounded(&state) {
 			f(&mut guard);
-			if guard.auto_reload {
+			if guard.AutoReload {
 				any_reload = true;
 			}
 		}

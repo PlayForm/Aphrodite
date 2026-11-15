@@ -13,7 +13,7 @@ fn test_pre_tool_call_auto_backgrounds_terminal() {
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
 	);
-	with_shared(|state| state.poll_worker_enabled = true);
+	with_shared(|state| state.PollWorkerEnabled = true);
 
 	let args = serde_json::json!({
 		"tool_name": "terminal",
@@ -40,7 +40,7 @@ fn test_pre_tool_call_does_not_background_poll_action() {
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
 	);
-	with_shared(|state| state.poll_worker_enabled = true);
+	with_shared(|state| state.PollWorkerEnabled = true);
 
 	let args = serde_json::json!({
 		"tool_name": "process",
@@ -64,7 +64,7 @@ fn test_pre_tool_call_disabled_passes_through() {
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
 	);
-	with_shared(|state| state.poll_worker_enabled = false);
+	with_shared(|state| state.PollWorkerEnabled = false);
 
 	let args = serde_json::json!({
 		"tool_name": "terminal",
@@ -92,10 +92,10 @@ fn test_pre_tool_call_chain_split_respects_adaptive_threshold() {
 		CString::new("{}").unwrap().as_ptr(),
 	);
 	with_shared(|state| {
-		state.poll_worker_enabled = false;
-		state.chain_split_enabled = true;
+		state.PollWorkerEnabled = false;
+		state.ChainSplitEnabled = true;
 		// Threshold raised to 3: a 2-segment chain must NOT be split.
-		state.chain_split_min_segments = 3;
+		state.ChainSplitMinimumSegments = 3;
 	});
 
 	// Below threshold: 2 segments → pass through (null).

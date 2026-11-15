@@ -16,7 +16,7 @@ use crate::Tool::Dispatch::ToolHandler;
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("context_engine_pre_llm", |_args| {
 		crate::with_shared(|state| {
-			let context = aphrodite::Flow::build_turn_context(state, None);
+			let context = aphrodite::Flow::BuildTurnContext(state, None);
 			if context.is_empty() {
 				serde_json::Value::Null
 			} else {

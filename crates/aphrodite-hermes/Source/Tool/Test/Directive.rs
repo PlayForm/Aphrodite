@@ -14,10 +14,10 @@ fn test_aphrodite_directive_tool_list_and_swap() {
 		// tests (deliberately - directives persist across a session
 		// reset just like the inline store); start from a known-empty
 		// state rather than assuming one.
-		state.active_directives.clear();
-		state.directives.insert(
+		state.ActiveDirectives.clear();
+		state.Directives.insert(
 			"focus".into(),
-			aphrodite::Directive::Model::Struct { name:"focus".into(), content:"stay focused".into() },
+			aphrodite::Directive::Model::Struct { name:"focus".into(), Content:"stay focused".into() },
 		);
 	});
 

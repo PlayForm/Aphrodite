@@ -49,15 +49,15 @@ pub(crate) fn pre_llm_call(state:&mut AphroditeState, input:&HookInput) -> serde
 			sid,
 			"pre_turn",
 			&[
-				("turn", state.turn_counter.to_string()),
+				("turn", state.TurnCounter.to_string()),
 				("session", sid.to_string()),
 				("est_request_bytes", args_len.to_string()),
-				("pending_markers", state.recent_markers.len().to_string()),
+				("pending_markers", state.RecentMarkers.len().to_string()),
 			],
 		);
 		log_session_init(state, sid);
 	}
-	let context = aphrodite::Flow::build_turn_context(state, Some(args_len));
+	let context = aphrodite::Flow::BuildTurnContext(state, Some(args_len));
 	if context.is_empty() {
 		serde_json::Value::Null
 	} else {

@@ -18,11 +18,11 @@ pub(crate) fn apply_config_reload(
 	cfg:&aphrodite::ConfigurationLoader::Configuration::Struct::Struct,
 	state:&mut AphroditeState,
 ) {
-	let saved_directives = std::mem::take(&mut state.directives);
-	let saved_active = std::mem::take(&mut state.active_directives);
-	cfg.apply_compression(state);
-	state.directives = saved_directives;
-	state.active_directives = saved_active;
-	cfg.apply_previews();
-	cfg.apply_templates(state);
+	let saved_directives = std::mem::take(&mut state.Directives);
+	let saved_active = std::mem::take(&mut state.ActiveDirectives);
+	cfg.ApplyCompression(state);
+	state.Directives = saved_directives;
+	state.ActiveDirectives = saved_active;
+	cfg.ApplyPreviews();
+	cfg.ApplyTemplates(state);
 }

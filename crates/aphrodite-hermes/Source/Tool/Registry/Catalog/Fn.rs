@@ -15,24 +15,24 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 		};
 		crate::with_shared(|state| {
 			let items:Vec<serde_json::Value> = state
-				.recent_markers
+				.RecentMarkers
 				.iter()
 				.rev()
 				.map(|e| {
 					if mode == "toc" {
 						serde_json::json!({
 							"hash": &e.hash,
-							"type": e.ccr_type, "size": e.size, "preview": e.preview,
+							"type": e.CCRType, "size": e.Size, "preview": e.Preview,
 						})
 					} else {
 						serde_json::json!({
-							"hash": e.hash, "type": e.ccr_type, "size": e.size,
-							"preview": e.preview, "turn": e.turn, "center": e.center,
+							"hash": e.hash, "type": e.CCRType, "size": e.Size,
+							"preview": e.Preview, "turn": e.Turn, "center": e.Center,
 						})
 					}
 				})
 				.collect();
-			serde_json::json!({"mode": mode, "total": items.len(), "items": items, "turn": state.turn_counter})
+			serde_json::json!({"mode": mode, "total": items.len(), "items": items, "turn": state.TurnCounter})
 		})
 	})
 }

@@ -60,7 +60,7 @@ pub(crate) fn Fn(content:&str) -> Option<(String, String)> {
 				"build_output".into()
 			}
 		} else {
-			aphrodite::detect_type(output)
+			aphrodite::DetectType(output)
 		};
 		return Some((output.to_string(), ct));
 	}
@@ -69,7 +69,7 @@ pub(crate) fn Fn(content:&str) -> Option<(String, String)> {
 	if let Some(diff) = obj.get("diff").and_then(|d| d.as_str())
 		&& !diff.is_empty()
 	{
-		return Some((diff.to_string(), aphrodite::detect_type(diff)));
+		return Some((diff.to_string(), aphrodite::DetectType(diff)));
 	}
 	if let Some(msg) = obj.get("error").and_then(|m| m.as_str()) {
 		if msg.starts_with("Found") && msg.contains("matches") {
@@ -110,7 +110,7 @@ pub(crate) fn Fn(content:&str) -> Option<(String, String)> {
 	// ── File read: {"content":"...","total_lines":N} ──
 	// (read_file is usually essential-skipped, but handle it anyway.)
 	if let Some(text) = obj.get("content").and_then(|c| c.as_str()) {
-		return Some((text.to_string(), aphrodite::detect_type(text)));
+		return Some((text.to_string(), aphrodite::DetectType(text)));
 	}
 
 	// ── Other Hermes tools: extract first meaningful string field ──

@@ -22,7 +22,7 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 		if paths.is_empty() {
 			return serde_json::json!({"error": "paths is required"});
 		}
-		let outcomes = aphrodite::Prefetch::Read::Entry::Fn::read_paths(&paths);
-		crate::with_shared(|state| aphrodite::Prefetch::Insert::Fn::insert_outcomes(state, outcomes))
+		let outcomes = aphrodite::Prefetch::Read::Entry::Fn::ReadPaths(&paths);
+		crate::with_shared(|state| aphrodite::Prefetch::Insert::Fn::InsertOutcomes(state, outcomes))
 	})
 }

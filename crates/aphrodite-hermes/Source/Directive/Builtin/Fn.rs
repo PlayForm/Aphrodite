@@ -20,7 +20,7 @@
 pub(crate) fn Fn() -> Vec<(String, String)> {
 	let mut set:Vec<(String, String)> = aphrodite::Directive::Builtin::Fn()
 		.into_iter()
-		.map(|(name, d)| (name, d.content))
+		.map(|(name, d)| (name, d.Content))
 		.collect();
 	set.sort_by(|a, b| a.0.cmp(&b.0));
 	set

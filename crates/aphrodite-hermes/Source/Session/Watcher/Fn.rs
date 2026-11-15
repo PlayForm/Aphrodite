@@ -60,12 +60,12 @@ pub(crate) fn spawn_config_watcher() {
 				// watcher's 500ms), and drain events accumulated meanwhile.
 				std::thread::sleep(std::time::Duration::from_millis(500));
 				while rx.try_recv().is_ok() {}
-				let cfg = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::load();
-				if cfg.parse_failure.is_some() {
+				let cfg = aphrodite::ConfigurationLoader::Configuration::Struct::Struct::Load();
+				if cfg.ParseFailure.is_some() {
 					// Broken file: keep the previous values, surface the
 					// failure on EVERY session (the loader's warn already
 					// fired); wedged sessions are skipped.
-					for_each_session(|s| s.config_error = cfg.parse_failure.clone());
+					for_each_session(|s| s.ConfigurationError = cfg.ParseFailure.clone());
 					continue;
 				}
 				let keep_watching = for_each_session(|s| apply_config_reload(&cfg, s));

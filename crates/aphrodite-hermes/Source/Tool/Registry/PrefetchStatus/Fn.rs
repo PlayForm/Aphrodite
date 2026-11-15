@@ -11,6 +11,6 @@ use crate::Tool::Dispatch::ToolHandler;
 /// The `aphrodite_prefetch_status` handler.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_prefetch_status", |_args| {
-		crate::with_shared(|state| aphrodite::Prefetch::Status::Fn::prefetch_status(state))
+		crate::with_shared(|state| aphrodite::Prefetch::Status::Fn::PrefetchStatus(state))
 	})
 }

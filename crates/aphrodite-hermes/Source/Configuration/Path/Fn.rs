@@ -29,16 +29,16 @@ pub(crate) fn expected_path(state:&AphroditeState, tool:&str, parsed:&serde_json
 	if tool.starts_with("aphrodite_") || tool.starts_with("headroom") {
 		return "passthrough_self".into();
 	}
-	if state.auto_expand {
+	if state.AutoExpand {
 		return "auto_expand".into();
 	}
-	if tool == "terminal" && state.chain_split_enabled {
+	if tool == "terminal" && state.ChainSplitEnabled {
 		let command = parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str());
 		if command.is_some_and(|c| c.contains("&&")) {
 			return "chain_split".into();
 		}
 	}
-	if state.live_container {
+	if state.LiveContainer {
 		return "live_container".into();
 	}
 	"compress_or_passthrough".into()

@@ -14,8 +14,8 @@ use crate::Debug::Flag::Resolve::Fn as enabled_for;
 /// even with the flag on, because the flag can only ever mean "verbose", never
 /// "more verbose than the operator asked for".
 pub(crate) fn Fn(state:&aphrodite::State::AphroditeState, session:&str) -> u8 {
-	if state.debug_level > 0 {
-		state.debug_level
+	if state.DebugLevel > 0 {
+		state.DebugLevel
 	} else if enabled_for(session) {
 		1
 	} else {

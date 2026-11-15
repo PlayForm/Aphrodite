@@ -19,11 +19,11 @@ fn test_call_hook_pre_llm_call_injects_active_directive_context() {
 		CString::new("{}").unwrap().as_ptr(),
 	);
 	with_shared(|state| {
-		state.directives.insert(
+		state.Directives.insert(
 			"focus".into(),
-			aphrodite::Directive::Model::Struct { name:"focus".into(), content:"stay concise, 1-2 tools/turn".into() },
+			aphrodite::Directive::Model::Struct { name:"focus".into(), Content:"stay concise, 1-2 tools/turn".into() },
 		);
-		state.active_directives = vec!["focus".into()];
+		state.ActiveDirectives = vec!["focus".into()];
 	});
 
 	let hook_ptr = aphrodite_hermes_call_hook(
@@ -44,7 +44,7 @@ fn test_call_hook_pre_llm_call_injects_active_directive_context() {
 	// `active_directives` is process-global and not reset by
 	// session_start (deliberately) - clean up so this test doesn't leak
 	// an active directive into whichever test runs next.
-	with_shared(|state| state.active_directives.clear());
+	with_shared(|state| state.ActiveDirectives.clear());
 }
 
 // ── 05-T1 (P1): the end-to-end proof that directives inject through the
@@ -61,11 +61,11 @@ fn test_call_hook_pre_llm_includes_directives() {
 		CString::new("{}").unwrap().as_ptr(),
 	);
 	with_shared(|state| {
-		state.directives.insert(
+		state.Directives.insert(
 			"focus".into(),
-			aphrodite::Directive::Model::Struct { name:"focus".into(), content:"stay targeted, 1-2 tools".into() },
+			aphrodite::Directive::Model::Struct { name:"focus".into(), Content:"stay targeted, 1-2 tools".into() },
 		);
-		state.active_directives = vec!["focus".into()];
+		state.ActiveDirectives = vec!["focus".into()];
 	});
 
 	let hook_ptr = aphrodite_hermes_call_hook(
@@ -83,5 +83,5 @@ fn test_call_hook_pre_llm_includes_directives() {
 	);
 	assert!(context.contains("stay targeted"), "directive body missing: {context}");
 
-	with_shared(|state| state.active_directives.clear());
+	with_shared(|state| state.ActiveDirectives.clear());
 }

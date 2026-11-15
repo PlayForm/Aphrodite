@@ -17,7 +17,7 @@
     "FormatCheck": "prettier --check ."
   },
   "devDependencies": {
-    "prettier": "3.9.10",
+    "prettier": "3.10.1",
     "prettier-plugin-sh": "0.20.2"
   },
   "engines": {

@@ -22,7 +22,7 @@ pub(crate) fn transform_terminal_output(state:&mut AphroditeState, input:&HookIn
 	// detection.
 	let command = parsed.get("command").and_then(|v| v.as_str());
 	let returncode = parsed.get("returncode").and_then(|v| v.as_i64());
-	let r = aphrodite::Hook::transform_terminal_output_with_meta(
+	let r = aphrodite::Hook::TransformTerminalOutputWithMeta(
 		state,
 		term_content,
 		classify.as_ref().map(|(c, t)| (c.as_str(), t.as_str())),

@@ -32,16 +32,16 @@ pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serd
 		&[
 			("tool", call_tool.to_string()),
 			("args_bytes", args_bytes.to_string()),
-			("tool_threshold", state.tool_threshold.to_string()),
-			("terminal_threshold", state.terminal_threshold.to_string()),
-			("auto_expand_limit", state.auto_expand_limit.to_string()),
+			("tool_threshold", state.ToolThreshold.to_string()),
+			("terminal_threshold", state.TerminalThreshold.to_string()),
+			("auto_expand_limit", state.AutoExpandLimit.to_string()),
 			("expected", expected),
 		],
 	);
 	// ── Auto-backgrounding: intercept BEFORE execution ──
 	// Returns {"action":"modify","args":{"background":true,"notify_on_complete":true}}
 	// so Hermes runs the tool in background instead of blocking.
-	if state.poll_worker_enabled {
+	if state.PollWorkerEnabled {
 		let call_tool = input.parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 		if call_tool == "terminal" || call_tool == "process" {
 			let command = input.parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str());
@@ -56,7 +56,7 @@ pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serd
 					.unwrap_or(false);
 			if !is_poll
 				&& let Some((_task_id, cmd_summary)) =
-					aphrodite::PollWorker::Should::Entry::Fn::should_background_pre(command)
+					aphrodite::PollWorker::Should::Entry::Fn::ShouldBackgroundPre(command)
 			{
 				// We don't create a BgTask here - Hermes handles the
 				// process lifecycle. We'll track completion via
@@ -79,12 +79,12 @@ pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serd
 	// Tier 1 teaching loop: only chains with at least
 	// `chain_split_min_segments` segments are rewritten - the
 	// threshold adapts from retrieval consequences (invisible).
-	if state.chain_split_enabled {
+	if state.ChainSplitEnabled {
 		let call_tool = input.parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 		if call_tool == "terminal"
 			&& let Some(command) = input.parsed.get("args").and_then(|a| a.get("command")).and_then(|v| v.as_str())
 			&& let Some(segments) = aphrodite::ChainSplit::Split::Fn::Fn(command)
-			&& segments.len() >= state.chain_split_min_segments
+			&& segments.len() >= state.ChainSplitMinimumSegments
 		{
 			let rewritten = aphrodite::ChainSplit::Marked::Command::Fn::Fn(&segments);
 			if rewritten != command {
