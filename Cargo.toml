@@ -7,7 +7,7 @@ members = ["crates/aphrodite", "crates/aphrodite-hermes"]
 # excluded from this one - otherwise cargo resolves the nested crate's
 # `workspace = true` inheritance against THIS manifest and fails with
 # "`dependency.thiserror` was not found in `workspace.dependencies`".
-exclude = ["Maintain/dynamic_hooks", "vendor/headroom"]
+exclude = ["Maintain/dynamic_hooks", "vendor/headroom", "vendor/rtk"]
 
 [workspace.package]
 edition = "2024"

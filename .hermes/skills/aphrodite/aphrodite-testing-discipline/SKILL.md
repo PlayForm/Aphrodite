@@ -107,6 +107,15 @@ A stray exported env var is a SUITE-WIDE landmine. `APHRODITE_PREVIEW_MAX_CHARS`
 - Every env var named in docs carries consumer status: active, inactive, or removed (documentation lint L-7). Never assume a knob that has no consumer is functional because a knob without a consumer is a knob no code path reads.
 - `APHRODITE_API_KEY` is a fail-loud landmine: the proxy dies with `no API key configured - set APHRODITE_API_KEY env var` when the key is absent OR commented out in the private environment file. Verify the var is actually exported (`env | grep APHRODITE_API_KEY`). Presence in a file's contents is not proof the var is exported.
 
+## Rule 6 - CI lints Linux; a macOS-green gate proves nothing
+
+`.github/workflows/Check.yml` runs `cargo clippy -p aphrodite -p aphrodite-hermes -- -D warnings` on Linux, where every `#[cfg]`-gated name can be used on one side only and `-D warnings` turns the resulting `unused_variables` into a failure. Make the name earn its place on Linux; never rename it `_Name`. Prove a clippy fix with a Linux target (`x86_64-unknown-linux-musl` via Homebrew `musl-cross`, since the gnu target has no C cross-compiler here): the sweep, the env block and the `esaxx-rs` `-stdlib=libc++` shim are in references/ci-parity.md.
+
+**Contract:** the Linux-target clippy exit code, not the macOS one, is the evidence for a CI clippy fix.
+**Confidence:** source-derived.
+**Verify:** the `cargo clippy --target x86_64-unknown-linux-musl ... ; echo "EXIT:$?"` command in references/ci-parity.md.
+**If different:** fix the code for Linux first, then re-run both targets.
+
 ## Confidence labels
 
 Apply a compact label immediately after any claim that is likely to drift. Format:
@@ -226,3 +235,4 @@ The finish gate is in references/verification-checklist.md; run it before closin
 | Negative tests prevent recurrence        | references/negative-tests.md       | For each row, confirm the corresponding prevention test is defined in references/negative-tests.md | Prevention red on the old bug, green on the fix       | Add the missing test/lint before closing     |
 | Investigation workflow bounds repair     | This skill                         | Simulated failure: run Steps 1-6                                                                   | One bounded repair after smallest discriminating test | Re-run workflow with immutable evidence      |
 | Thresholds are live-read, not remembered | Active config / proxy              | Read threshold from config, test at T-1/T/T+1                                                      | Observed transition matches read value                | Update the skill's recorded threshold        |
+| CI clippy fix is Linux-verified          | `.github/workflows/Check.yml`      | `cargo clippy --target x86_64-unknown-linux-musl -p aphrodite -p aphrodite-hermes -- -D warnings`  | `EXIT:0` on the Linux target, not only on macOS       | Fix the code for Linux; never `_Name`        |
