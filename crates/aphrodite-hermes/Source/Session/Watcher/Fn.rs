@@ -61,12 +61,10 @@ pub(crate) fn spawn_config_watcher() {
 				}
 			});
 
-			loop {
-				match rx.recv() {
-					Ok(()) => {},
-					Err(_) => break,
-				}
-
+			// One blocking receive per event, until the channel closes: the
+			// iterator IS the "wait for the next change" step, and the sweep
+			// stops early (`Err`) when `auto_reload` turned off in the file.
+			let _ = rx.iter().try_for_each(|()| {
 				// Debounce: let the editor's write settle (same as the engine
 				// watcher's 500ms), and drain events accumulated meanwhile.
 				std::thread::sleep(std::time::Duration::from_millis(500));
@@ -88,9 +86,9 @@ pub(crate) fn spawn_config_watcher() {
 				// `auto_reload` turned off in the file - stop watching
 				// (takes effect on the next successful reload).
 				match keep_watching {
-					true => {},
-					false => return,
+					true => Ok(()),
+					false => Err(()),
 				}
-			}
+			});
 		});
 }

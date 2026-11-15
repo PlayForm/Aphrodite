@@ -73,53 +73,56 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRe
 					.into_response();
 			},
 		};
-		if let Some(Cached) = InlineHit {
-			state.InlineCCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-			state.CCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-			Cached
-		} else {
-			state.InlineCCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-			// Fallback to CCR backend
-			match &state.ccr {
-				Some(ccr) => {
-					match CCRGet(ccr, &hash).await {
-						Some(c) => {
-							state.CCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-							c
-						},
-						None => {
-							state.CCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-							return (
-								StatusCode::NOT_FOUND,
-								Json(RetrieveResponse {
-									Found:false,
-									Content:None,
-									Source:"none".into(),
-									error:Some(format!("CCR entry not found: {}", hash)),
-									Truncated:false,
-									Live:None,
-								}),
-							)
-								.into_response();
-						},
-					}
-				},
-				None => {
-					state.CCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-					return (
-						StatusCode::NOT_FOUND,
-						Json(RetrieveResponse {
-							Found:false,
-							Content:None,
-							Source:"none".into(),
-							error:Some(format!("CCR entry not found: {}", hash)),
-							Truncated:false,
-							Live:None,
-						}),
-					)
-						.into_response();
-				},
-			}
+		match InlineHit {
+			Some(Cached) => {
+				state.InlineCCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+				state.CCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+				Cached
+			},
+			None => {
+				state.InlineCCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+				// Fallback to CCR backend
+				match &state.ccr {
+					Some(ccr) => {
+						match CCRGet(ccr, &hash).await {
+							Some(c) => {
+								state.CCRHits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+								c
+							},
+							None => {
+								state.CCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+								return (
+									StatusCode::NOT_FOUND,
+									Json(RetrieveResponse {
+										Found:false,
+										Content:None,
+										Source:"none".into(),
+										error:Some(format!("CCR entry not found: {}", hash)),
+										Truncated:false,
+										Live:None,
+									}),
+								)
+									.into_response();
+							},
+						}
+					},
+					None => {
+						state.CCRMisses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+						return (
+							StatusCode::NOT_FOUND,
+							Json(RetrieveResponse {
+								Found:false,
+								Content:None,
+								Source:"none".into(),
+								error:Some(format!("CCR entry not found: {}", hash)),
+								Truncated:false,
+								Live:None,
+							}),
+						)
+							.into_response();
+					},
+				}
+			},
 		}
 	};
 
@@ -175,7 +178,10 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRe
 	let Live = match LiveContainer {
 		Some((meta, _)) => {
 			let FinalResolve = Request.Limit == 0;
-			let Served = if FinalResolve { meta.Size } else { Content.len().min(meta.Size) };
+			let Served = match FinalResolve {
+				true => meta.Size,
+				false => Content.len().min(meta.Size),
+			};
 			let BytesArrived = meta.BytesArrived.saturating_add(Served).min(meta.Size);
 			let Complete = FinalResolve || BytesArrived >= meta.Size;
 			let Progress = LiveProgress {
@@ -187,12 +193,18 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRe
 			};
 			// Best-effort write-back: a poisoned lock or serialization
 			// hiccup degrades to no-writeback (progress stays as-is).
-			if let Ok(mut Map) = state.InlineCCR.lock() {
-				let mut Updated = meta;
-				Updated.BytesArrived = BytesArrived;
-				if let Ok(Encoded) = serde_json::to_string(&Updated) {
-					Map.put(crate::Hook::Live::Key::Fn::LiveMetaKey(&hash), Encoded);
-				}
+			match state.InlineCCR.lock() {
+				Ok(mut Map) => {
+					let mut Updated = meta;
+					Updated.BytesArrived = BytesArrived;
+					match serde_json::to_string(&Updated) {
+						Ok(Encoded) => {
+							Map.put(crate::Hook::Live::Key::Fn::LiveMetaKey(&hash), Encoded);
+						},
+						Err(_) => (),
+					}
+				},
+				Err(_) => (),
 			}
 			Some(Progress)
 		},

@@ -45,34 +45,39 @@ pub fn CCRMarker(
 	Safe = Safe.chars().filter(|c| *c >= ' ').collect();
 
 	// Headroom budget truncation
-	if let Some(Budget) = HeadroomBudget {
-		Safe = if Budget < 25 {
-			Safe.chars().take(30).collect()
-		} else if Budget < 50 {
-			Safe.chars().take(60).collect()
-		} else if Budget < 75 {
-			Safe.chars().take(100).collect()
-		} else {
-			Safe
-		};
+	match HeadroomBudget {
+		Some(Budget) => {
+			Safe = match () {
+				_ if Budget < 25 => Safe.chars().take(30).collect(),
+				_ if Budget < 50 => Safe.chars().take(60).collect(),
+				_ if Budget < 75 => Safe.chars().take(100).collect(),
+				_ => Safe,
+			};
+		},
+		None => (),
 	}
 
 	// Metadata string
-	let MetaStr = if let Some(m) = meta {
-		let Parts:Vec<String> = m
-			.iter()
-			.filter_map(|(k, v)| {
-				let Sv = v.replace('|', "/").replace('\n', " ").trim().to_string();
-				if Sv.is_empty() { None } else { Some(format!("{}={}", k, Sv)) }
-			})
-			.collect();
-		let mut s = Parts.join(";");
-		if s.len() > 300 {
-			s = format!("{}...", crate::StructExtract::Format::Floor::Fn(&s, 297));
-		}
-		s
-	} else {
-		String::new()
+	let MetaStr = match meta {
+		Some(m) => {
+			let Parts:Vec<String> = m
+				.iter()
+				.filter_map(|(k, v)| {
+					let Sv = v.replace('|', "/").replace('\n', " ").trim().to_string();
+					match Sv.is_empty() {
+						true => None,
+						false => Some(format!("{}={}", k, Sv)),
+					}
+				})
+				.collect();
+			let mut s = Parts.join(";");
+			match s.len() > 300 {
+				true => s = format!("{}...", crate::StructExtract::Format::Floor::Fn(&s, 297)),
+				false => (),
+			}
+			s
+		},
+		None => String::new(),
 	};
 
 	RenderMarkerBlock(&Safe, CCRType, &MetaStr, Center, HashValue, Size)

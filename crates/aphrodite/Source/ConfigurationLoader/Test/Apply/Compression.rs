@@ -105,16 +105,19 @@ fn TestAphroditeDebugEnvironmentSetsStateLevel() {
 	assert_eq!(State.DebugLevel, 0, "absent APHRODITE_DEBUG must leave debug off");
 	assert!(!crate::Debug::Level::Enabled::Fn::Fn(), "process-global level must mirror 0");
 
-	for (Value, Expected) in [("1", 1u8), ("2", 2u8), ("3", 2u8)] {
+	[("1", 1u8), ("2", 2u8), ("3", 2u8)].into_iter().for_each(|(Value, Expected)| {
 		unsafe { std::env::set_var(Key, Value) };
 		let mut State = crate::State::Struct::AphroditeState::default();
 		GuardedApplyCompression(&Configuration::default(), &mut State);
 		assert_eq!(State.DebugLevel, Expected, "APHRODITE_DEBUG={Value:?}");
-	}
+	});
 
 	unsafe { std::env::remove_var(Key) };
-	if let Some(v) = Backup {
-		unsafe { std::env::set_var(Key, v) };
+	match Backup {
+		Some(v) => {
+			unsafe { std::env::set_var(Key, v) };
+		},
+		None => {},
 	}
 	// Leave the process-global logger off for the rest of the suite.
 	crate::Debug::Level::Set::Fn::Fn(0);

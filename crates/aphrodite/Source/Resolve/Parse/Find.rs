@@ -28,16 +28,21 @@ pub(crate) fn Fn(Content:&str) -> Vec<(String, String)> {
 		let AbsStart = SearchFrom + Start;
 		let AfterPrefix = AbsStart + Prefix::Const.len();
 
-		if let Some(End) = Content[AfterPrefix..].find(Suffix::Const) {
-			let AbsEnd = AfterPrefix + End + Suffix::Const.len();
-			let FullMarker = Content[AbsStart..AbsEnd].to_string();
-			if let Some(hash) = Hash::Fn(&FullMarker) {
-				Markers.push((FullMarker, hash));
-			}
-			SearchFrom = AbsEnd;
-		} else {
-			// Unclosed marker - skip past this prefix
-			SearchFrom = AfterPrefix;
+		match Content[AfterPrefix..].find(Suffix::Const) {
+			Some(End) => {
+				let AbsEnd = AfterPrefix + End + Suffix::Const.len();
+				let FullMarker = Content[AbsStart..AbsEnd].to_string();
+				match Hash::Fn(&FullMarker) {
+					Some(hash) => Markers.push((FullMarker, hash)),
+					None => (),
+				}
+
+				SearchFrom = AbsEnd;
+			},
+			None => {
+				// Unclosed marker - skip past this prefix
+				SearchFrom = AfterPrefix;
+			},
 		}
 	}
 

@@ -53,41 +53,73 @@ pub(crate) fn CollectSections(State:&mut AphroditeState) -> (Vec<String>, usize)
 	let Recall = crate::Session::Catalog::Fn::CatalogSummary(State);
 
 	// ── Poll-worker status (above recall, dropped after recall) ──
-	let BgStatus = if State.PollWorkerEnabled {
-		crate::PollWorker::Status::Fn::RenderBgTaskStatus(State)
-	} else {
-		String::new()
+	let BgStatus = match State.PollWorkerEnabled {
+		true => crate::PollWorker::Status::Fn::RenderBgTaskStatus(State),
+		false => String::new(),
 	};
 
 	// Assemble top-down, then drop from the bottom until within budget.
 	let mut Sections:Vec<String> = Vec::new();
-	if !SessionInject.is_empty() {
-		Sections.push(format!("[aphrodite: first-turn orientation]\n{}", SessionInject.trim_end()));
+
+	match !SessionInject.is_empty() {
+		true => {
+			Sections.push(format!("[aphrodite: first-turn orientation]\n{}", SessionInject.trim_end()));
+		},
+		false => (),
 	}
-	if !Directives.is_empty() {
-		Sections.push(Directives.trim_end().to_string());
+
+	match !Directives.is_empty() {
+		true => {
+			Sections.push(Directives.trim_end().to_string());
+		},
+		false => (),
 	}
-	if !Nudges.is_empty() {
-		Sections.push(Nudges);
+
+	match !Nudges.is_empty() {
+		true => {
+			Sections.push(Nudges);
+		},
+		false => (),
 	}
-	if EngineOffloadPresent {
-		Sections.push(EngineOffload);
+
+	match EngineOffloadPresent {
+		true => {
+			Sections.push(EngineOffload);
+		},
+		false => (),
 	}
-	if !Retrieve.is_empty() {
-		Sections.push(Retrieve);
+
+	match !Retrieve.is_empty() {
+		true => {
+			Sections.push(Retrieve);
+		},
+		false => (),
 	}
-	if !BgStatus.is_empty() {
-		Sections.push(BgStatus);
+
+	match !BgStatus.is_empty() {
+		true => {
+			Sections.push(BgStatus);
+		},
+		false => (),
 	}
-	if !AutoExpand.is_empty() {
-		Sections.push(AutoExpand);
+
+	match !AutoExpand.is_empty() {
+		true => {
+			Sections.push(AutoExpand);
+		},
+		false => (),
 	}
+
 	// The recall block - RETRIEVE_HINT removed per 04-F2 (tool schemas
 	// in the system prompt already teach retrieval; repeating it every
 	// turn was 56 chars of pure noise, ~2.8k chars over 50 turns).
-	if !Recall.is_empty() {
-		Sections.push(format!("[recall]\n{}\n", Recall.trim_end()));
+	match !Recall.is_empty() {
+		true => {
+			Sections.push(format!("[recall]\n{}\n", Recall.trim_end()));
+		},
+		false => (),
 	}
+
 	// Count only PRESENT always-survive sections (fix 11: the old
 	// `is_empty() as usize` casts were inverted - they counted ABSENT
 	// sections, so a turn with an inject + directive + nudge present could

@@ -15,9 +15,11 @@ use crate::Debug::{
 /// The caller measures the duration itself and only when `enabled()` - this
 /// function must never be the thing that makes a hot path call `Instant::now`.
 pub fn Fn(Cat:TimingCat, Us:u64) {
-	if !Enabled() {
-		return;
+	match !Enabled() {
+		true => return,
+		false => (),
 	}
+
 	let Index = Cat as usize;
 	TimingSum[Index].fetch_add(Us, Ordering::Relaxed);
 	TimingN[Index].fetch_add(1, Ordering::Relaxed);

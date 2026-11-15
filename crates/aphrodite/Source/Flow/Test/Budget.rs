@@ -16,10 +16,11 @@ use crate::{
 #[test]
 fn TestBudgetDropsCatalogBeforeDirectives() {
 	let mut s = StateWithDirective("focus", "stay targeted, minimal tool usage");
+
 	// 50 markers so the catalog_summary is large.
-	for i in 0..50 {
+	(0..50).for_each(|i| {
 		AddMarker(&mut s, &format!("hash{i:040}"), i);
-	}
+	});
 	// Budget large enough for the directive block but too small for the
 	// recall block to also fit, so the catalog must be dropped first.
 	s.FlowBudgetChars = 90;
@@ -43,9 +44,9 @@ fn TestBudgetKeepsAllAlwaysSurviveSectionsOnTurnZero() {
 	s.TurnCounter = 0;
 	PushNudge(&mut s, "check marker sizes before retrieving", 1);
 	// 50 markers so the recall catalog is large and must drop.
-	for i in 0..50 {
+	(0..50).for_each(|i| {
 		AddMarker(&mut s, &format!("hash{i:040}"), i);
-	}
+	});
 	// Budget well below the three always-survive sections combined, so
 	// only the recall catalog may drop.
 	s.FlowBudgetChars = 600;

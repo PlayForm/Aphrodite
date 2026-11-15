@@ -17,23 +17,38 @@ pub fn NormalizeArgsSig(Tool:&str, Args:Option<&serde_json::Value>) -> u64 {
 	let mut Buffer = String::new();
 	Buffer.push_str(Tool);
 	Buffer.push('\u{1}');
-	if let Some(v) = Args {
-		// Terminal-style calls: the command string is the whole identity.
-		if let Some(Command) = v.get("command").and_then(|c| c.as_str()) {
-			Buffer.push_str(Command.trim_end());
-		} else if let Some(Obj) = v.as_object() {
-			let mut Keys:Vec<&String> = Obj.keys().filter(|k| !VolatileKeys.contains(&k.as_str())).collect();
-			Keys.sort();
-			for k in Keys {
-				Buffer.push_str(k);
-				Buffer.push('=');
-				// Compact, stable string form of the value.
-				Buffer.push_str(&Obj[k].to_string());
-				Buffer.push('\u{1f}');
+
+	match Args {
+		Some(v) => {
+			// Terminal-style calls: the command string is the whole identity.
+			match v.get("command").and_then(|c| c.as_str()) {
+				Some(Command) => {
+					Buffer.push_str(Command.trim_end());
+				},
+				None => {
+					match v.as_object() {
+						Some(Obj) => {
+							let mut Keys:Vec<&String> =
+								Obj.keys().filter(|k| !VolatileKeys.contains(&k.as_str())).collect();
+							Keys.sort();
+
+							Keys.into_iter().for_each(|k| {
+								Buffer.push_str(k);
+								Buffer.push('=');
+								// Compact, stable string form of the value.
+								Buffer.push_str(&Obj[k].to_string());
+								Buffer.push('\u{1f}');
+							});
+						},
+						None => {
+							Buffer.push_str(&v.to_string());
+						},
+					}
+				},
 			}
-		} else {
-			Buffer.push_str(&v.to_string());
-		}
+		},
+		None => (),
 	}
+
 	Fnv1a(Buffer.as_bytes())
 }

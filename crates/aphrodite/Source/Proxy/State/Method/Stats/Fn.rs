@@ -17,7 +17,10 @@ impl AppState {
 				ProxyMode::Token => "token",
 			},
 			"proxy": "aphrodite",
-			"ccr_backend": if self.ccr.is_some() { "enabled" } else { "none" },
+			"ccr_backend": match self.ccr.is_some() {
+				true => "enabled",
+				false => "none",
+			},
 			// Renamed from "tool_relay" (F12): a duplicate "tool_relay" key
 			// further down (the stats object) silently won in
 			// `serde_json::json!`'s map construction, so this boolean -

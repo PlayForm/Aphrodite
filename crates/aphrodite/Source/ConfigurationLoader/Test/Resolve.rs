@@ -29,7 +29,7 @@ fn TestOverride() {
 #[test]
 fn TestGetBoolOverrideCaseInsensitive() {
 	let mut cfg = Configuration::default();
-	for (Value, Expected) in [
+	[
 		("TRUE", true),
 		("True", true),
 		("tRuE", true),
@@ -38,14 +38,16 @@ fn TestGetBoolOverrideCaseInsensitive() {
 		("on", false),
 		("0", false),
 		("FALSE", false),
-	] {
+	]
+	.into_iter()
+	.for_each(|(Value, Expected)| {
 		cfg.SetOverride("APHRODITE_TEST_BOOL_CASE", Value);
 		assert_eq!(
 			cfg.GetBool("APHRODITE_TEST_BOOL_CASE", "compression", "enabled", true),
 			Expected,
 			"override value {Value:?} must resolve to {Expected}"
 		);
-	}
+	});
 }
 
 #[test]
@@ -61,7 +63,7 @@ fn TestGetBoolEnvironmentCaseInsensitive() {
 	unsafe { std::env::remove_var(Key) };
 
 	let cfg = Configuration::default();
-	for (Value, Expected) in [
+	[
 		("TRUE", true),
 		("True", true),
 		("tRuE", true),
@@ -70,17 +72,22 @@ fn TestGetBoolEnvironmentCaseInsensitive() {
 		("on", false),
 		("0", false),
 		("FALSE", false),
-	] {
+	]
+	.into_iter()
+	.for_each(|(Value, Expected)| {
 		unsafe { std::env::set_var(Key, Value) };
 		assert_eq!(
 			cfg.GetBool(Key, "compression", "enabled", true),
 			Expected,
 			"env value {Value:?} must resolve to {Expected}"
 		);
-	}
+	});
 
 	unsafe { std::env::remove_var(Key) };
-	if let Some(v) = Backup {
-		unsafe { std::env::set_var(Key, v) };
+	match Backup {
+		Some(v) => {
+			unsafe { std::env::set_var(Key, v) };
+		},
+		None => {},
 	}
 }

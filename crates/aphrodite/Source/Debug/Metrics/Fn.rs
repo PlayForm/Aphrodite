@@ -21,7 +21,10 @@ pub fn Fn() -> serde_json::Value {
 	let c = |Index:usize| Counters[Index].load(Ordering::Relaxed);
 	let Avg = |Sum:&AtomicU64, n:&AtomicU64| -> f64 {
 		let n = n.load(Ordering::Relaxed);
-		if n == 0 { 0.0 } else { Sum.load(Ordering::Relaxed) as f64 / n as f64 }
+		match n == 0 {
+			true => 0.0,
+			false => Sum.load(Ordering::Relaxed) as f64 / n as f64,
+		}
 	};
 	serde_json::json!({
 		"markers_created": c(Counter::MarkersCreated as usize),

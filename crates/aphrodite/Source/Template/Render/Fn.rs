@@ -28,21 +28,26 @@ pub fn Fn(TypeStr:&str, Content:&str) -> Option<String> {
 		.get(TypeStr)
 		.or_else(|| Templates.Reverse.get(TypeStr).and_then(|Mapped| FamilyTemplates.get(Mapped)))
 		.or_else(|| FamilyTemplates.get("_default"))?;
-	if Tmpl.trim().is_empty() {
-		return None;
+	match Tmpl.trim().is_empty() {
+		true => return None,
+		false => (),
 	}
+
 	let Vars = BuildVars(TypeStr, Content);
 	let Out = Substitute(Tmpl, &Vars);
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::TemplateRenders);
-	if let Some(T0) = T0 {
-		crate::Debug::Log::Verbose::Fn::Fn(
-			"render_preview",
-			&[
-				("type", TypeStr.to_string()),
-				("bytes", Content.len().to_string()),
-				("elapsed_us", T0.elapsed().as_micros().to_string()),
-			],
-		);
+	match T0 {
+		Some(T0) => {
+			crate::Debug::Log::Verbose::Fn::Fn(
+				"render_preview",
+				&[
+					("type", TypeStr.to_string()),
+					("bytes", Content.len().to_string()),
+					("elapsed_us", T0.elapsed().as_micros().to_string()),
+				],
+			)
+		},
+		None => (),
 	}
 	Some(Out)
 }

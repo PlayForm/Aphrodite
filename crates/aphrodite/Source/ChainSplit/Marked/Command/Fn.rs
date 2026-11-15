@@ -8,16 +8,26 @@ use crate::ChainSplit::{Const::SegMarker, Segment::Struct::Struct as Segment};
 /// result, so the transform hook still sees them and splits per segment.
 pub fn Fn(Segments:&[Segment]) -> String {
 	let mut Out = String::new();
-	for (i, Seg) in Segments.iter().enumerate() {
-		if i > 0 {
-			Out.push_str(&format!("echo {} 1>&2 ; ", SegMarker));
+
+	Segments.iter().enumerate().for_each(|(i, Seg)| {
+		match i > 0 {
+			true => {
+				Out.push_str(&format!("echo {} 1>&2 ; ", SegMarker));
+			},
+			false => (),
 		}
+
 		Out.push_str(&Seg.command);
 		Out.push_str(" ; ");
-	}
+	});
+
 	// Strip the trailing " ; ".
-	if Out.ends_with(" ; ") {
-		Out.truncate(Out.len() - 3);
+	match Out.ends_with(" ; ") {
+		true => {
+			Out.truncate(Out.len() - 3);
+		},
+		false => (),
 	}
+
 	Out
 }

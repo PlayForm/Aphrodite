@@ -16,8 +16,13 @@ use crate::Flow::Section::Label::Fn::JoinSections;
 /// from one that legitimately dropped everything it could.
 pub(crate) fn DropToBudget(mut Sections:Vec<String>, AlwaysSurvive:usize, Budget:usize) -> (Vec<String>, usize) {
 	let AlwaysSurvive = AlwaysSurvive.min(Sections.len());
-	while JoinSections(&Sections).len() > Budget && Sections.len() > AlwaysSurvive {
-		Sections.pop();
+	loop {
+		match JoinSections(&Sections).len() > Budget && Sections.len() > AlwaysSurvive {
+			true => {
+				Sections.pop();
+			},
+			false => break,
+		}
 	}
 
 	(Sections, AlwaysSurvive)

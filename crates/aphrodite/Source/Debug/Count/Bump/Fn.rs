@@ -14,8 +14,10 @@ use crate::Debug::{
 /// never a `fetch_add` on a cache line every thread contends for. That ordering
 /// is the whole reason the counters are safe to leave in a release build.
 pub fn Fn(Counter:Counter) {
-	if !Enabled() {
-		return;
+	match !Enabled() {
+		true => return,
+		false => (),
 	}
+
 	Counters[Counter as usize].fetch_add(1, Ordering::Relaxed);
 }

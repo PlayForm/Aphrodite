@@ -41,14 +41,12 @@ impl AppState {
 		}
 		// Auto-tune: adjust thresholds based on historical compression ratios
 		let Ratio = self.CompressionRatioEma.load(Ordering::Relaxed) as f64 / 100.0;
-		let Tune = if Ratio > 20.0 {
+		let Tune = match () {
 			// Very aggressive - raise thresholds to preserve more content
-			2.0
-		} else if Ratio < 3.0 && Ratio > 0.0 {
+			_ if Ratio > 20.0 => 2.0,
 			// Very conservative - lower thresholds to compress more
-			0.5
-		} else {
-			1.0
+			_ if Ratio < 3.0 && Ratio > 0.0 => 0.5,
+			_ => 1.0,
 		};
 		let Base = (Base as f64 * Tune) as usize;
 		match Ct {

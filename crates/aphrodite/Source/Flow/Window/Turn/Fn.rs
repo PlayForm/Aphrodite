@@ -14,27 +14,45 @@ pub fn TurnWindow(State:&AphroditeState, n:usize) -> WindowStats {
 	let mut Stats = WindowStats::default();
 	let mut ErrorSigs = std::collections::HashSet::new();
 	let mut SeenPaths = std::collections::HashSet::new();
-	for Event in State.ToolEvents.iter().filter(|e| e.Turn > Floor) {
+	State.ToolEvents.iter().filter(|e| e.Turn > Floor).for_each(|Event| {
 		Stats.TotalCalls += 1;
-		if !Event.Okay {
-			Stats.Errors += 1;
-			if let Some(Sig) = Event.ErrorSig {
-				ErrorSigs.insert(Sig);
-			}
+
+		match !Event.Okay {
+			true => {
+				Stats.Errors += 1;
+
+				match Event.ErrorSig {
+					Some(Sig) => {
+						ErrorSigs.insert(Sig);
+					},
+					None => (),
+				}
+			},
+			false => (),
 		}
-		if let Some(path) = &Event.WrotePath {
-			Stats.Writes += 1;
-			if SeenPaths.insert(path.clone()) {
-				Stats.NewFiles += 1;
-			}
-		} else {
-			match Event.Tool.as_str() {
-				"read_file" => Stats.Reads += 1,
-				"search_files" => Stats.Searches += 1,
-				_ => {},
-			}
+
+		match &Event.WrotePath {
+			Some(path) => {
+				Stats.Writes += 1;
+
+				match SeenPaths.insert(path.clone()) {
+					true => {
+						Stats.NewFiles += 1;
+					},
+					false => (),
+				}
+			},
+			None => {
+				match Event.Tool.as_str() {
+					"read_file" => Stats.Reads += 1,
+					"search_files" => Stats.Searches += 1,
+					_ => {},
+				}
+			},
 		}
-	}
+	});
+
 	Stats.DistinctErrorSigs = ErrorSigs.len();
+
 	Stats
 }

@@ -17,19 +17,26 @@
 pub fn Fn(Content:&str, Offset:usize, Limit:usize) -> anyhow::Result<(String, bool)> {
 	// Clamp explicit limits: 0 = full document (round-trip contract), any
 	// nonzero limit capped at 10_000 lines for safety (02-F5).
-	let Limit = if Limit == 0 { usize::MAX } else { Limit.min(10_000) };
+	let Limit = match Limit == 0 {
+		true => usize::MAX,
+		false => Limit.min(10_000),
+	};
 	let Lines:Vec<&str> = Content.lines().collect();
 	let Total = Lines.len();
 	// F20: a zero-line (empty) document is a valid stored entry (e.g.
 	// `POST /ccr/create` with `content: ""`), not an out-of-range offset -
 	// `offset (0) >= total (0)` used to 400 on this, turning a legitimate
 	// create("") -> retrieve round-trip into an error.
-	if Total == 0 {
-		return Ok((String::new(), false));
+	match Total == 0 {
+		true => return Ok((String::new(), false)),
+		false => (),
 	}
-	if Offset >= Total {
-		anyhow::bail!("[offset {} out of range; document has {} lines]", Offset, Total);
+
+	match Offset >= Total {
+		true => anyhow::bail!("[offset {} out of range; document has {} lines]", Offset, Total),
+		false => (),
 	}
+
 	let Start = Offset.min(Total);
 	// `limit: 0` maps to `usize::MAX` (full document) - saturating add so a
 	// nonzero `Start` + `usize::MAX` never overflows (it saturates to MAX,
@@ -48,14 +55,17 @@ pub fn Fn(Content:&str, Offset:usize, Limit:usize) -> anyhow::Result<(String, bo
 	// body no longer hashes to the marker's own hash). When the window
 	// covers the whole document, skip the lossy lines()/join() round-trip
 	// entirely and return the original bytes verbatim.
-	if !Truncated {
-		return Ok((Content.to_string(), false));
+	match !Truncated {
+		true => return Ok((Content.to_string(), false)),
+		false => (),
 	}
+
 	let mut Windowed = Lines[Start..End].join("\n");
 	// A partial window that still reaches the document's end should keep a
 	// trailing newline if the original had one, for the same reason.
-	if End == Total && Content.ends_with('\n') {
-		Windowed.push('\n');
+	match End == Total && Content.ends_with('\n') {
+		true => Windowed.push('\n'),
+		false => (),
 	}
 	Windowed = format!("[lines {}-{}/{}]\n{}", Start + 1, End, Total, Windowed);
 	Ok((Windowed, Truncated))

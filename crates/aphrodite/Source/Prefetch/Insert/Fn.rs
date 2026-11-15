@@ -25,7 +25,7 @@ pub fn InsertOutcomes(State:&mut AphroditeState, Outcomes:Vec<(String, ReadOutco
 	let mut Refused = 0u32;
 	let mut Missing = 0u32;
 
-	for (PathStr, Outcome) in Outcomes {
+	Outcomes.into_iter().for_each(|(PathStr, Outcome)| {
 		match Outcome {
 			ReadOutcome::Missing | ReadOutcome::Error => {
 				Missing += 1;
@@ -74,12 +74,15 @@ pub fn InsertOutcomes(State:&mut AphroditeState, Outcomes:Vec<(String, ReadOutco
 						// prefetch_status surface can expose them. Off by
 						// default: meta keeps only `path` (byte-identical
 						// current behavior).
-						if State.LiveContainer {
-							let Arrival = LiveArrival::Arrived(Size);
-							m.insert("live".to_string(), "1".to_string());
-							m.insert("live_arrived_at".to_string(), Arrival.ArrivedAtUnix.to_string());
-							m.insert("live_bytes_arrived".to_string(), Arrival.BytesArrived.to_string());
-							m.insert("live_eta_s".to_string(), Arrival.EtaS.to_string());
+						match State.LiveContainer {
+							true => {
+								let Arrival = LiveArrival::Arrived(Size);
+								m.insert("live".to_string(), "1".to_string());
+								m.insert("live_arrived_at".to_string(), Arrival.ArrivedAtUnix.to_string());
+								m.insert("live_bytes_arrived".to_string(), Arrival.BytesArrived.to_string());
+								m.insert("live_eta_s".to_string(), Arrival.EtaS.to_string());
+							},
+							false => (),
 						}
 						m
 					}),
@@ -100,7 +103,7 @@ pub fn InsertOutcomes(State:&mut AphroditeState, Outcomes:Vec<(String, ReadOutco
 				}));
 			},
 		}
-	}
+	});
 
 	serde_json::json!({
 		"total": Total,

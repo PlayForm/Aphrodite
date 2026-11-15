@@ -7,8 +7,14 @@ impl AphroditeState {
 	pub fn RecordFile(&mut self, path:String, Tool:String) {
 		self.ReferencedFiles.retain(|(p, _)| p != &path);
 		self.ReferencedFiles.push_front((path, Tool));
-		while self.ReferencedFiles.len() > ReferencedFilesCap {
-			self.ReferencedFiles.pop_back();
+
+		loop {
+			match self.ReferencedFiles.len() > ReferencedFilesCap {
+				true => {
+					self.ReferencedFiles.pop_back();
+				},
+				false => break,
+			}
 		}
 	}
 }

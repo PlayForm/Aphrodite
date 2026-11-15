@@ -18,27 +18,36 @@ impl Struct {
 	pub fn Reload(&self) {
 		let mut Scripts = self.Scripts.lock().unwrap_or_else(|e| e.into_inner());
 		Scripts.clear();
-		for Directory in &self.dirs {
-			let Ok(Entries) = std::fs::read_dir(Directory) else { continue };
-			for Entry in Entries.flatten() {
+
+		self.dirs.iter().for_each(|Directory| {
+			let Ok(Entries) = std::fs::read_dir(Directory) else { return };
+
+			Entries.flatten().for_each(|Entry| {
 				let path = Entry.path();
-				if !path.extension().map(|e| e == "rhai").unwrap_or(false) {
-					continue;
+
+				match path.extension().map(|e| e == "rhai").unwrap_or(false) {
+					true => {
+						let Ok(Source) = std::fs::read_to_string(&path) else { return };
+						let Mtime = Entry
+							.Metadata()
+							.ok()
+							.and_then(|m| m.modified().ok())
+							.unwrap_or(SystemTime::UNIX_EPOCH);
+						let Engine = Rhai::new();
+
+						match Engine.compile(&Source) {
+							Ok(_) => {
+								tracing::info!(Script = %path.display(), "loaded");
+								Scripts.push(Script { path, Mtime, Source });
+							},
+							Err(e) => {
+								tracing::warn!(Script = %path.display(), error = %e, "script failed to compile - skipped");
+							},
+						}
+					},
+					false => return,
 				}
-				let Ok(Source) = std::fs::read_to_string(&path) else { continue };
-				let Mtime = Entry
-					.Metadata()
-					.ok()
-					.and_then(|m| m.modified().ok())
-					.unwrap_or(SystemTime::UNIX_EPOCH);
-				let Engine = Rhai::new();
-				if let Err(e) = Engine.compile(&Source) {
-					tracing::warn!(Script = %path.display(), error = %e, "script failed to compile - skipped");
-					continue;
-				}
-				tracing::info!(Script = %path.display(), "loaded");
-				Scripts.push(Script { path, Mtime, Source });
-			}
-		}
+			});
+		});
 	}
 }

@@ -9,16 +9,16 @@ use super::super::{Guard::EnvironmentGuard, MultiConfigurationFromToml};
 #[test]
 fn TestResolveEnvironmentOverridesTomlForAPIURLModelTtlDatabaseNotify() {
 	let _G = EnvironmentGuard();
-	for (k, v) in [
+	[
 		("APHRODITE_API_URL", "https://env-api.example.com"),
 		("APHRODITE_MODEL", "env-model"),
 		("APHRODITE_CCR_TTL", "42"),
 		("APHRODITE_DB", "/tmp/env-ccr.db"),
 		("APHRODITE_NOTIFY_URL", "https://env-notify.example.com"),
 		("APHRODITE_NOTIFY_KEY", "env-notify-key"),
-	] {
-		unsafe { std::env::set_var(k, v) };
-	}
+	]
+	.into_iter()
+	.for_each(|(k, v)| unsafe { std::env::set_var(k, v) });
 	let Mc = MultiConfigurationFromToml(
 		r#"
 		[[proxies]]
@@ -34,16 +34,16 @@ fn TestResolveEnvironmentOverridesTomlForAPIURLModelTtlDatabaseNotify() {
 		"#,
 	);
 	let CLI = Mc.Resolve(&Mc.Proxies[0]).unwrap();
-	for k in [
+	[
 		"APHRODITE_API_URL",
 		"APHRODITE_MODEL",
 		"APHRODITE_CCR_TTL",
 		"APHRODITE_DB",
 		"APHRODITE_NOTIFY_URL",
 		"APHRODITE_NOTIFY_KEY",
-	] {
-		unsafe { std::env::remove_var(k) };
-	}
+	]
+	.into_iter()
+	.for_each(|k| unsafe { std::env::remove_var(k) });
 	assert_eq!(CLI.APIURL, "https://env-api.example.com");
 	assert_eq!(CLI.Model, "env-model");
 	assert_eq!(CLI.CCRTtlSeconds, 42);
@@ -55,9 +55,9 @@ fn TestResolveEnvironmentOverridesTomlForAPIURLModelTtlDatabaseNotify() {
 #[test]
 fn TestResolveFallsBackToTomlWhenEnvironmentUnset() {
 	let _G = EnvironmentGuard();
-	for k in ["APHRODITE_API_URL", "APHRODITE_MODEL", "APHRODITE_CCR_TTL", "APHRODITE_DB"] {
-		unsafe { std::env::remove_var(k) };
-	}
+	["APHRODITE_API_URL", "APHRODITE_MODEL", "APHRODITE_CCR_TTL", "APHRODITE_DB"]
+		.into_iter()
+		.for_each(|k| unsafe { std::env::remove_var(k) });
 	let Mc = MultiConfigurationFromToml(
 		r#"
 		[[proxies]]
@@ -82,9 +82,9 @@ fn TestResolveFallsBackToTomlWhenEnvironmentUnset() {
 #[test]
 fn TestResolveStoreRetentionCapsEnvironmentTomlDefaults() {
 	let _G = EnvironmentGuard();
-	for k in ["APHRODITE_STORE_MAX_ENTRIES", "APHRODITE_STORE_MAX_BYTES"] {
-		unsafe { std::env::remove_var(k) };
-	}
+	["APHRODITE_STORE_MAX_ENTRIES", "APHRODITE_STORE_MAX_BYTES"]
+		.into_iter()
+		.for_each(|k| unsafe { std::env::remove_var(k) });
 
 	let toml = r#"
 		[compression]

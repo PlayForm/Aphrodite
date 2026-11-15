@@ -13,9 +13,9 @@ use crate::{Session::Engine::Fn::EngineMaybeArchive, State::Struct::AphroditeSta
 /// default engine config (enabled, threshold 45, min 8, protect 2/5).
 fn EngineState(Entries:usize) -> AphroditeState {
 	let mut s = AphroditeState::default();
-	for i in 1..=Entries {
+	(1..=Entries).for_each(|i| {
 		s.ConvIndex.insert(i, (format!("h{i:02}"), format!("summary {i}"), i * 10));
-	}
+	});
 	s
 }
 
@@ -77,12 +77,12 @@ fn TestEngineArchiveOverThresholdArchivesMiddleAndReturnsPrompt() {
 	);
 	// Middle replaced by the marker entry: keys 3..=7 gone, head (1,2)
 	// and tail (8..=12) kept, marker entry recorded at the current turn.
-	for t in 3..=7 {
+	(3..=7).for_each(|t| {
 		assert!(!s.ConvIndex.contains_key(&t), "middle turn {t} must be replaced");
-	}
-	for t in [1, 2, 8, 9, 10, 11, 12] {
+	});
+	[1, 2, 8, 9, 10, 11, 12].into_iter().for_each(|t| {
 		assert!(s.ConvIndex.contains_key(&t), "protected turn {t} must survive");
-	}
+	});
 	assert_eq!(s.ConvIndex.len(), 8, "12 - 5 middle + 1 marker entry");
 	let (MHash, MSummary, MSize) = s.ConvIndex.get(&0).expect("marker entry recorded");
 	assert_eq!(MHash, &hash);
@@ -132,7 +132,7 @@ fn TestEngineArchiveMinimumMsgsRespected() {
 #[test]
 fn TestEngineArchiveThreshold100Off() {
 	// 100+ = documented engine-off escape hatch; also 0 = never.
-	for Pct in [0u64, 100, 200] {
+	[0u64, 100, 200].into_iter().for_each(|Pct| {
 		let mut s = EngineState(12);
 		s.EngineThresholdPct = Pct;
 		let Before = s.ConvIndex.clone();
@@ -142,7 +142,7 @@ fn TestEngineArchiveThreshold100Off() {
 		);
 		assert_eq!(s.ConvIndex, Before);
 		AssertZeroMutation(&s);
-	}
+	});
 }
 
 #[test]

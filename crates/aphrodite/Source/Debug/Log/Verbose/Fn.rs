@@ -9,7 +9,8 @@ use crate::Debug::{Level::Get::Fn::Fn as Level, Log::At::Fn::Fn as LogAt};
 /// and the append are all skipped. That is what keeps a level-1 session paying
 /// one atomic load per verbose call site instead of a line per call.
 pub fn Fn(Event:&str, Kv:&[(&str, String)]) {
-	if Level() >= 2 {
-		LogAt(2, Event, Kv);
+	match Level() >= 2 {
+		true => LogAt(2, Event, Kv),
+		false => (),
 	}
 }

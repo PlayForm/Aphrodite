@@ -8,14 +8,16 @@
 /// qualifies. A wrong `{cmd}` would render as if the agent had run something it
 /// never ran, which is worse than an empty string.
 pub(crate) fn Fn(Lines:&[&str]) -> String {
-	for l in Lines {
-		let t = l.trim_start();
-		if let Some(Rest) = t.strip_prefix('$').or_else(|| t.strip_prefix('>')) {
+	Lines
+		.iter()
+		.find_map(|l| {
+			let t = l.trim_start();
+			let Rest = t.strip_prefix('$').or_else(|| t.strip_prefix('>'))?;
 			let Command = Rest.trim();
-			if !Command.is_empty() {
-				return Command.chars().take(200).collect();
+			match Command.is_empty() {
+				true => None,
+				false => Some(Command.chars().take(200).collect::<String>()),
 			}
-		}
-	}
-	String::new()
+		})
+		.unwrap_or_default()
 }

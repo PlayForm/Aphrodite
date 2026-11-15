@@ -29,7 +29,10 @@ pub(crate) fn Fn(Content:&str) -> usize {
 	use std::collections::HashSet;
 
 	let bytes = Content.as_bytes();
-	let Sample = if bytes.len() <= 4096 { bytes } else { &bytes[..4096] };
+	let Sample = match bytes.len() <= 4096 {
+		true => bytes,
+		false => &bytes[..4096],
+	};
 	match Sample.len() < 3 {
 		true => {
 			// Too short for trigrams - just return a minimal size so the

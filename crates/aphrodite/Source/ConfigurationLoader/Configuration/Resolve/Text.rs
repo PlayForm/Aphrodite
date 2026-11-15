@@ -10,12 +10,16 @@ impl Struct {
 	/// callback), so it must not be treated as "absent". A TOML value that is
 	/// not a string is skipped and the default applies.
 	pub fn GetString(&self, EnvironmentKey:&str, Section:&str, Key:&str, default:&str) -> String {
-		if let Some(v) = self.Overrides.get(EnvironmentKey) {
-			return v.clone();
+		match self.Overrides.get(EnvironmentKey) {
+			Some(v) => return v.clone(),
+			None => (),
 		}
-		if let Ok(v) = std::env::var(EnvironmentKey) {
-			return v;
+
+		match std::env::var(EnvironmentKey) {
+			Ok(v) => return v,
+			Err(_) => (),
 		}
+
 		self.Section(Section)
 			.and_then(|s| s.get(Key))
 			.and_then(|v| v.as_str())

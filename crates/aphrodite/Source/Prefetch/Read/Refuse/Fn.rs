@@ -30,24 +30,29 @@ use crate::Prefetch::Read::Guard::Fn::GuardAbsolute;
 pub(in crate::Prefetch) fn RefuseReason(path:&Path) -> Option<String> {
 	// File-name denylist first - checked on the raw path so a relative
 	// `.env` in the cwd is caught without any resolution.
-	if let Some(name) = path.file_name().and_then(|n| n.to_str())
-		&& (name == ".env" || name == "auth.json")
-	{
-		return Some(format!("refusing sensitive file name: {path:?}"));
+	match path.file_name().and_then(|n| n.to_str()) {
+		Some(name) if name == ".env" || name == "auth.json" => {
+			return Some(format!("refusing sensitive file name: {path:?}"));
+		},
+		_ => (),
 	}
 	let Canon = GuardAbsolute(path);
-	if let Some(Home) = dirs::home_dir()
-		&& Canon.starts_with(Home.join(".ssh"))
-	{
-		return Some(format!("refusing path under ~/.ssh: {path:?}"));
+	match dirs::home_dir() {
+		Some(Home) if Canon.starts_with(Home.join(".ssh")) => {
+			return Some(format!("refusing path under ~/.ssh: {path:?}"));
+		},
+		_ => (),
 	}
 	let Hh = crate::Home::Hermes::Fn::Fn();
 	let Hh = Hh.canonicalize().unwrap_or(Hh);
-	if Canon.starts_with(&Hh) {
-		return Some(format!("refusing path under Hermes home ({}): {path:?}", Hh.display()));
+	match Canon.starts_with(&Hh) {
+		true => return Some(format!("refusing path under Hermes home ({}): {path:?}", Hh.display())),
+		false => (),
 	}
-	if path.exists() && !path.is_file() {
-		return Some(format!("refusing non-file path: {path:?}"));
+
+	match path.exists() && !path.is_file() {
+		true => return Some(format!("refusing non-file path: {path:?}")),
+		false => (),
 	}
 	None
 }

@@ -40,9 +40,11 @@ impl LiveArrival {
 	/// (linear arrival-rate model). Zero when nothing has arrived (no rate
 	/// to extrapolate) or everything has.
 	pub fn EtaEstimate(BytesArrived:u64, Size:u64, ElapsedS:f32) -> f32 {
-		if BytesArrived == 0 || BytesArrived >= Size {
-			return 0.0;
+		match BytesArrived == 0 || BytesArrived >= Size {
+			true => return 0.0,
+			false => (),
 		}
+
 		let OutstandingRatio = (Size - BytesArrived) as f32 / BytesArrived as f32;
 		ElapsedS * OutstandingRatio
 	}

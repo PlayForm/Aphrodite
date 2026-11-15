@@ -165,9 +165,9 @@ fn RetrieveUnknownHashReturnsErrorJSON() {
 
 #[test]
 fn InvalidHandlesAreRejectedWithoutCrashing() {
-	for Bad in ["999999", "abc", ""] {
+	["999999", "abc", ""].into_iter().for_each(|Bad| {
 		let Handle = Cs(Bad);
-		for Out in [
+		[
 			unsafe { Take(AphroditeStats(Handle.as_ptr())) },
 			unsafe { Take(AphroditeCatalog(Handle.as_ptr(), Cs("full").as_ptr())) },
 			unsafe { Take(AphroditeSearch(Handle.as_ptr(), Cs("q").as_ptr())) },
@@ -175,17 +175,19 @@ fn InvalidHandlesAreRejectedWithoutCrashing() {
 			unsafe { Take(AphroditeSessionStart(Handle.as_ptr())) },
 			unsafe { Take(AphroditeCompress(Handle.as_ptr(), Cs("x").as_ptr(), Cs("text").as_ptr())) },
 			unsafe { Take(AphroditeRetrieve(Handle.as_ptr(), Cs("x").as_ptr())) },
-		] {
+		]
+		.into_iter()
+		.for_each(|Out| {
 			assert!(
 				Out.contains("invalid handle"),
 				"expected invalid-handle error for {:?}, got {:?}",
 				Bad,
 				Out
 			);
-		}
+		});
 		// Must not panic even though the handle is bogus.
 		AphroditeDestroy(Handle.as_ptr());
-	}
+	});
 }
 
 #[test]

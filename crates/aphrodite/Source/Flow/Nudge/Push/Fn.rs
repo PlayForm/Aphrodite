@@ -18,9 +18,14 @@ pub fn PushNudge(State:&mut AphroditeState, Text:&str, TtlTurns:usize) {
 		inline:Some(Text.to_string()),
 		ExpiresAfterTurn:Expires,
 	});
-	while State.EphemeralDirectives.len() > 4 {
-		// Evict the oldest (front). `drain(..1)` was chosen over a VecDeque
-		// type change to keep the field type stable for consumers (fix 12).
-		State.EphemeralDirectives.drain(..1);
+	loop {
+		match State.EphemeralDirectives.len() > 4 {
+			true => {
+				// Evict the oldest (front). `drain(..1)` was chosen over a VecDeque
+				// type change to keep the field type stable for consumers (fix 12).
+				State.EphemeralDirectives.drain(..1);
+			},
+			false => break,
+		}
 	}
 }

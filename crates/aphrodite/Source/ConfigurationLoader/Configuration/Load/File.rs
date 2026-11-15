@@ -17,23 +17,26 @@ impl Struct {
 	/// that exists but does not parse degrades to defaults immediately, with
 	/// the parse error warned about and recorded on `ParseFailure`.
 	pub fn LoadFrom(path:&str) -> Self {
-		if let Ok(Content) = std::fs::read_to_string(path) {
-			match Content.parse::<toml::Table>() {
-				Ok(Table) => return Self { raw:Table, Overrides:HashMap::new(), ParseFailure:None },
-				Err(Error) => {
-					// Fix 22 (inspection): same warn-on-parse-error treatment
-					// as `load()` - the explicit-path init used to silently
-					// fall back to defaults on a broken file. `ParseFailure`
-					// is recorded so `AphroditeStats` can self-diagnose.
-					WarnParseFailure(std::path::Path::new(path), &Error, "using defaults");
-					return Self {
-						raw:toml::Table::new(),
-						Overrides:HashMap::new(),
-						ParseFailure:Some(format!("{path}: {Error}")),
-					};
-				},
-			}
+		match std::fs::read_to_string(path) {
+			Ok(Content) => {
+				match Content.parse::<toml::Table>() {
+					Ok(Table) => Self { raw:Table, Overrides:HashMap::new(), ParseFailure:None },
+					Err(Error) => {
+						// Fix 22 (inspection): same warn-on-parse-error treatment
+						// as `load()` - the explicit-path init used to silently
+						// fall back to defaults on a broken file. `ParseFailure`
+						// is recorded so `AphroditeStats` can self-diagnose.
+						WarnParseFailure(std::path::Path::new(path), &Error, "using defaults");
+
+						Self {
+							raw:toml::Table::new(),
+							Overrides:HashMap::new(),
+							ParseFailure:Some(format!("{path}: {Error}")),
+						}
+					},
+				}
+			},
+			Err(_) => Self::default(),
 		}
-		Self::default()
 	}
 }

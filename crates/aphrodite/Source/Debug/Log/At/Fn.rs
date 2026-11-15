@@ -11,14 +11,16 @@ use crate::Debug::{Log::Sanitize::Fn::Fn as SanitizeKv, Path::Log::Fn::Fn as Log
 /// raw append would merge the first log line into the flag value and flip the
 /// toggle off. A debug logger must never change the behaviour it observes.
 pub fn Fn(Level:u8, Event:&str, Kv:&[(&str, String)]) {
-	if Level == 0 {
-		return;
+	match Level == 0 {
+		true => return,
+		false => (),
 	}
+
 	let Some(path) = LogPath() else { return };
 	let mut Line = format!("[{}] [aphrodite-debug] lvl={Level} event={Event}", IsoTimestamp());
-	for (Key, Value) in Kv {
+	Kv.iter().for_each(|(Key, Value)| {
 		Line.push_str(&format!(" {Key}={}", SanitizeKv(Value)));
-	}
+	});
 	Line.push('\n');
 	// Fresh-line guarantee: a legacy flag file may lack a trailing newline
 	// (the toggle writes "on"/"off" with no terminator), so a raw append
@@ -31,11 +33,17 @@ pub fn Fn(Level:u8, Event:&str, Kv:&[(&str, String)]) {
 		Err(_) => return,
 	};
 	use std::io::{Read, Seek, SeekFrom, Write};
-	if f.seek(SeekFrom::End(-1)).is_ok() {
-		let mut Last = [0u8; 1];
-		if f.read_exact(&mut Last).is_ok() && Last[0] != b'\n' {
-			let _ = f.write_all(b"\n");
-		}
+	match f.seek(SeekFrom::End(-1)).is_ok() {
+		true => {
+			let mut Last = [0u8; 1];
+			match f.read_exact(&mut Last).is_ok() && Last[0] != b'\n' {
+				true => {
+					let _ = f.write_all(b"\n");
+				},
+				false => (),
+			}
+		},
+		false => (),
 	}
 	let _ = f.write_all(Line.as_bytes());
 }

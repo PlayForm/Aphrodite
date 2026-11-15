@@ -9,9 +9,8 @@ pub fn ParsePreview(MarkerLine:&str) -> Option<String> {
 	let Start = MarkerLine.find('[')?;
 	let Colon = MarkerLine[Start..].find(':')?;
 	let End = MarkerLine.rfind(']')?;
-	if End > Start + Colon {
-		Some(MarkerLine[Start + Colon + 1..End].to_string())
-	} else {
-		None
+	match End > Start + Colon {
+		true => Some(MarkerLine[Start + Colon + 1..End].to_string()),
+		false => None,
 	}
 }

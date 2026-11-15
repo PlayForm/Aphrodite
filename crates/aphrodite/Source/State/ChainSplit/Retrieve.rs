@@ -19,8 +19,11 @@ impl AphroditeState {
 		// an extra index kept in sync on ring eviction for at most 16
 		// elements, so the scan is the simpler, equivalent choice. The
 		// adaptation behavior this feeds is intentionally untouched.
-		if let Some(Event) = self.SplitEvents.iter_mut().find(|e| e.ID == Eid) {
-			Event.Retrieved = Event.Retrieved.saturating_add(1);
+		match self.SplitEvents.iter_mut().find(|e| e.ID == Eid) {
+			Some(Event) => {
+				Event.Retrieved = Event.Retrieved.saturating_add(1);
+			},
+			None => (),
 		}
 		self.AdaptChainSplitThreshold();
 		Some(Eid)

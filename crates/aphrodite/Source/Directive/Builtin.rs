@@ -34,14 +34,19 @@ fn BuiltinDirectives() -> Vec<(&'static str, &'static str)> {
 /// shipped defaults discovered from the embedded set.
 pub fn Fn() -> HashMap<String, Struct> {
 	let mut Directives = HashMap::new();
-	for (name, Content) in BuiltinDirectives() {
-		let Content = if Content.len() > MaximumDirectiveChars {
-			let Trunc:String = Content.chars().take(MaximumDirectiveChars).collect();
-			format!("{}...", Trunc)
-		} else {
-			Content.to_string()
+
+	BuiltinDirectives().into_iter().for_each(|(name, Content)| {
+		let Content = match Content.len() > MaximumDirectiveChars {
+			true => {
+				let Trunc:String = Content.chars().take(MaximumDirectiveChars).collect();
+
+				format!("{}...", Trunc)
+			},
+			false => Content.to_string(),
 		};
+
 		Directives.insert(name.to_string(), Struct { name:name.to_string(), Content });
-	}
+	});
+
 	Directives
 }

@@ -28,83 +28,115 @@ pub fn CatalogSummary(State:&mut AphroditeState) -> String {
 
 	// ── Delta markers ──
 	let NewMarkers = CurrentMarkers.saturating_sub(PreviousMarkers);
-	if NewMarkers > 0 && CurrentMarkers > 0 {
-		let Previews:Vec<String> = State
-			.RecentMarkers
-			.iter()
-			.rev()
-			.take(NewMarkers)
-			.map(|m| m.Preview.clone())
-			.collect();
-		Parts.push(format!(
-			"[Aphrodite] +{} new compression{} this turn: {}. {} total.",
-			NewMarkers,
-			if NewMarkers == 1 { "" } else { "s" },
-			Previews.join(", "),
-			CurrentMarkers,
-		));
-	} else if CurrentMarkers > 0 {
-		Parts.push(format!("[Aphrodite] {} compressions (no change this turn).", CurrentMarkers));
+
+	match () {
+		_ if NewMarkers > 0 && CurrentMarkers > 0 => {
+			let Previews:Vec<String> = State
+				.RecentMarkers
+				.iter()
+				.rev()
+				.take(NewMarkers)
+				.map(|m| m.Preview.clone())
+				.collect();
+			Parts.push(format!(
+				"[Aphrodite] +{} new compression{} this turn: {}. {} total.",
+				NewMarkers,
+				match NewMarkers == 1 {
+					true => "",
+					false => "s",
+				},
+				Previews.join(", "),
+				CurrentMarkers,
+			));
+		},
+		_ if CurrentMarkers > 0 => {
+			Parts.push(format!("[Aphrodite] {} compressions (no change this turn).", CurrentMarkers));
+		},
+		_ => (),
 	}
 
 	// ── Archived turns ──
 	let ConvCount = State.ConvIndex.len();
-	if ConvCount > 0 {
-		Parts.push(format!("{} archived turns available for retrieval.", ConvCount));
+
+	match ConvCount > 0 {
+		true => {
+			Parts.push(format!("{} archived turns available for retrieval.", ConvCount));
+		},
+		false => (),
 	}
 
 	// ── Delta files (04-F4) ──
 	let CurrentFiles = State.ReferencedFiles.len();
 	let PreviousFiles = State.LastEmittedFileCount;
 
-	if CurrentFiles > 0 {
-		let NewFiles = CurrentFiles.saturating_sub(PreviousFiles);
-		if NewFiles > 0 {
-			// `RecordFile` pushes new entries to the FRONT of the deque,
-			// so the new ones sit at the front; take from the front, then
-			// reverse so names render in insertion order (oldest-of-new
-			// first). Reading from the back would select the OLDEST entries
-			// and misreport old files as new.
-			let Names:Vec<String> = State
-				.ReferencedFiles
-				.iter()
-				.take(NewFiles)
-				.map(|(p, t)| format!("{} ({})", p, t))
-				.collect::<Vec<_>>()
-				.into_iter()
-				.rev()
-				.collect();
-			Parts.push(format!(
-				"+{} new file{}: {}. {} total.",
-				NewFiles,
-				if NewFiles == 1 { "" } else { "s" },
-				Names.join(", "),
-				CurrentFiles
-			));
-		} else {
-			Parts.push(format!("{} referenced files (no change).", CurrentFiles));
-		}
+	match CurrentFiles > 0 {
+		true => {
+			let NewFiles = CurrentFiles.saturating_sub(PreviousFiles);
+
+			match NewFiles > 0 {
+				true => {
+					// `RecordFile` pushes new entries to the FRONT of the deque,
+					// so the new ones sit at the front; take from the front, then
+					// reverse so names render in insertion order (oldest-of-new
+					// first). Reading from the back would select the OLDEST entries
+					// and misreport old files as new.
+					let Names:Vec<String> = State
+						.ReferencedFiles
+						.iter()
+						.take(NewFiles)
+						.map(|(p, t)| format!("{} ({})", p, t))
+						.collect::<Vec<_>>()
+						.into_iter()
+						.rev()
+						.collect();
+					Parts.push(format!(
+						"+{} new file{}: {}. {} total.",
+						NewFiles,
+						match NewFiles == 1 {
+							true => "",
+							false => "s",
+						},
+						Names.join(", "),
+						CurrentFiles
+					));
+				},
+				false => {
+					Parts.push(format!("{} referenced files (no change).", CurrentFiles));
+				},
+			}
+		},
+		false => (),
 	}
 
 	// ── Poll workers ──
-	if State.PollWorkerEnabled {
-		let Active:Vec<_> = State
-			.BgTasks
-			.iter()
-			.filter(|t| t.Status == crate::PollWorker::Task::Status::Enum::BgStatus::Running)
-			.collect();
-		if !Active.is_empty() {
-			Parts.push(format!("{} active poll worker(s). Use process(action='poll').", Active.len()));
-		}
+	match State.PollWorkerEnabled {
+		true => {
+			let Active:Vec<_> = State
+				.BgTasks
+				.iter()
+				.filter(|t| t.Status == crate::PollWorker::Task::Status::Enum::BgStatus::Running)
+				.collect();
+
+			match !Active.is_empty() {
+				true => {
+					Parts.push(format!("{} active poll worker(s). Use process(action='poll').", Active.len()));
+				},
+				false => (),
+			}
+		},
+		false => (),
 	}
 
 	// ── Intent hints (prompt knob `[prompts] catalog_intent_hints`, opt-in) ──
 	// Pre-Rust port: `intent=read | recent CCRs: <last 3 hashes, 12 chars>`.
 	// Default off = current behavior.
-	if State.CatalogIntentHints && CurrentMarkers > 0 {
-		let Last3:Vec<_> = State.RecentMarkers.iter().rev().take(3).collect();
-		let Hashes:Vec<String> = Last3.iter().rev().map(|m| m.hash.chars().take(12).collect()).collect();
-		Parts.push(format!("intent=read | recent CCRs: {}", Hashes.join(" ")));
+	match State.CatalogIntentHints && CurrentMarkers > 0 {
+		true => {
+			let Last3:Vec<_> = State.RecentMarkers.iter().rev().take(3).collect();
+			let Hashes:Vec<String> = Last3.iter().rev().map(|m| m.hash.chars().take(12).collect()).collect();
+			Parts.push(format!("intent=read | recent CCRs: {}", Hashes.join(" ")));
+		},
+		false => (),
 	}
 
 	let Summary = Parts.join(" ");

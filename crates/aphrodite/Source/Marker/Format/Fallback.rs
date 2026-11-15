@@ -32,12 +32,14 @@ pub(super) fn RenderMarkerFallback(
 	Hint:&str,
 ) -> String {
 	let CenterStr = Center.unwrap_or(CCRType);
-	let MetaPart = if meta.is_empty() { String::new() } else { format!("\n[meta:{}]", meta) };
+	let MetaPart = match meta.is_empty() {
+		true => String::new(),
+		false => format!("\n[meta:{}]", meta),
+	};
 
-	let PreviewLine = if IsSelfBracketedPreview(Preview) {
-		Preview.to_string()
-	} else {
-		format!("[{}:{}]", CenterStr, Preview)
+	let PreviewLine = match IsSelfBracketedPreview(Preview) {
+		true => Preview.to_string(),
+		false => format!("[{}:{}]", CenterStr, Preview),
 	};
 
 	format!("<<<CCR:{}|{}|{}>>>\n{}{}{}", hash, CCRType, Size, PreviewLine, Hint, MetaPart)

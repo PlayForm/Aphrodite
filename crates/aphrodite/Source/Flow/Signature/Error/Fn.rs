@@ -14,8 +14,13 @@ pub fn ErrorSig(ErrorType:Option<&str>, ErrorMessage:Option<&str>) -> u64 {
 	let mut Buffer = String::new();
 	Buffer.push_str(ErrorType.unwrap_or(""));
 	Buffer.push('\u{1}');
-	if let Some(Message) = ErrorMessage {
-		Buffer.push_str(Message.lines().next().unwrap_or("").trim());
+
+	match ErrorMessage {
+		Some(Message) => {
+			Buffer.push_str(Message.lines().next().unwrap_or("").trim());
+		},
+		None => (),
 	}
+
 	Fnv1a(Buffer.as_bytes())
 }

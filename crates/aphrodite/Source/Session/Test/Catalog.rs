@@ -58,12 +58,14 @@ fn TestCatalogSummaryIntentHintsOffByDefault() {
 fn TestCatalogSummaryIntentHintsOnListsRecentHashes() {
 	let mut s = AphroditeState::default();
 	s.CatalogIntentHints = true;
-	for h in [
+	[
 		"aaaaaaaaaaaa111111111111",
 		"bbbbbbbbbbbb222222222222",
 		"cccccccccccc333333333333",
 		"dddddddddddd444444444444",
-	] {
+	]
+	.into_iter()
+	.for_each(|h| {
 		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:h.into(),
 			CCRType:"text".into(),
@@ -73,7 +75,7 @@ fn TestCatalogSummaryIntentHintsOnListsRecentHashes() {
 			Center:None,
 			meta:None,
 		});
-	}
+	});
 	let r = CatalogSummary(&mut s);
 	assert!(
 		r.contains("intent=read | recent CCRs: bbbbbbbbbbbb cccccccccccc dddddddddddd"),

@@ -37,7 +37,8 @@ pub(crate) fn WarnParseFailure(path:&std::path::Path, error:&toml::de::Error, Ac
 	// dispatcher - `with_default` does not set the global flag, so a caller
 	// holding one saw the warning routed to stderr and never reached its own
 	// subscriber.
-	if !tracing::dispatcher::has_been_set() {
-		eprintln!("[aphrodite] {}", Message);
+	match !tracing::dispatcher::has_been_set() {
+		true => eprintln!("[aphrodite] {}", Message),
+		false => (),
 	}
 }

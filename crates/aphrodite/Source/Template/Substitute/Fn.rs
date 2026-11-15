@@ -14,16 +14,16 @@ use std::collections::HashMap;
 pub(crate) fn Fn(Tmpl:&str, Vars:&HashMap<String, String>) -> String {
 	let mut Out = String::with_capacity(Tmpl.len());
 	let mut Rest = Tmpl;
+
 	while let Some(Open) = Rest.find('{') {
 		Out.push_str(&Rest[..Open]);
 		let After = &Rest[Open + 1..];
 		match After.find('}') {
 			Some(Close) => {
 				let name = &After[..Close];
-				if name.is_empty() {
-					Out.push_str("{}");
-				} else {
-					Out.push_str(Vars.get(name).map(String::as_str).unwrap_or(""));
+				match name.is_empty() {
+					true => Out.push_str("{}"),
+					false => Out.push_str(Vars.get(name).map(String::as_str).unwrap_or("")),
 				}
 				Rest = &After[Close + 1..];
 			},
@@ -34,6 +34,7 @@ pub(crate) fn Fn(Tmpl:&str, Vars:&HashMap<String, String>) -> String {
 			},
 		}
 	}
+
 	Out.push_str(Rest);
 	Out
 }

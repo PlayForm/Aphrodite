@@ -31,8 +31,9 @@ pub(crate) static HandleTable:Mutex<Option<HashMap<usize, Arc<Mutex<AphroditeSta
 /// panicking hook must not make every later call on every other handle fail.
 pub(crate) fn Handles() -> std::sync::MutexGuard<'static, Option<HashMap<usize, Arc<Mutex<AphroditeState>>>>> {
 	let mut g = HandleTable.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-	if g.is_none() {
-		*g = Some(HashMap::new());
+	match g.is_none() {
+		true => *g = Some(HashMap::new()),
+		false => (),
 	}
 	g
 }

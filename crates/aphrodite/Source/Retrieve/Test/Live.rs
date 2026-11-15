@@ -36,9 +36,9 @@ fn SeedLiveContainer(state:&AppState, hash:&str, Content:&str) -> usize {
 			"bytes_arrived": 0,
 		});
 		Map.put(crate::Hook::Live::Key::Fn::LiveMetaKey(hash), meta.to_string());
-		for (i, c) in Chunks.iter().enumerate() {
+		Chunks.iter().enumerate().for_each(|(i, c)| {
 			Map.put(crate::Hook::Live::Key::Fn::LiveChunkKey(hash, i), (*c).to_string());
-		}
+		});
 	}
 	Chunks.len()
 }

@@ -16,8 +16,9 @@ pub fn Fn() -> String {
 			.get_or_init(|| std::sync::Mutex::new(String::new()))
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner);
-		if !Guard.is_empty() {
-			return Guard.clone();
+		match !Guard.is_empty() {
+			true => return Guard.clone(),
+			false => (),
 		}
 	}
 	std::fs::read_to_string(DebugRuntimeHome().join("session.current"))

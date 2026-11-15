@@ -9,10 +9,9 @@ use crate::Flow::Hash::Const::{FnvOffset, FnvPrime};
 
 /// FNV-1a 64-bit hash of `bytes`.
 pub(crate) fn Fnv1a(bytes:&[u8]) -> u64 {
-	let mut hash = FnvOffset;
-	for &b in bytes {
+	bytes.iter().fold(FnvOffset, |mut hash, &b| {
 		hash ^= b as u64;
-		hash = hash.wrapping_mul(FnvPrime);
-	}
-	hash
+
+		hash.wrapping_mul(FnvPrime)
+	})
 }

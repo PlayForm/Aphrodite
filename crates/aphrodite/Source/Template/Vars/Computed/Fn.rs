@@ -10,14 +10,16 @@ use std::collections::HashMap;
 /// the pre-Rust engine left it blank rather than guessing.
 pub(crate) fn Fn(Vars:&mut HashMap<String, String>) {
 	let Command = Vars.get("cmd").cloned().unwrap_or_default();
-	let Cmx = if Command.is_empty() {
-		"?".to_string()
-	} else {
-		Command.chars().take(40).collect()
+	let Cmx = match Command.is_empty() {
+		true => "?".to_string(),
+		false => Command.chars().take(40).collect(),
 	};
 	Vars.insert("fx".into(), String::new());
 	Vars.insert("cmx".into(), Cmx);
-	if !Vars.contains_key("sig1") {
-		Vars.insert("sig1".into(), String::new());
+	match !Vars.contains_key("sig1") {
+		true => {
+			Vars.insert("sig1".into(), String::new());
+		},
+		false => (),
 	}
 }

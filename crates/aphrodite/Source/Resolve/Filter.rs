@@ -21,17 +21,18 @@
 /// It is not a tokenizer and not a regex engine: the query is matched literally,
 /// so a query containing regex syntax matches that literal text and nothing else.
 pub fn Fn(Content:&str, Query:&str) -> String {
-	if Query.is_empty() {
-		return Content.to_string();
+	match Query.is_empty() {
+		true => return Content.to_string(),
+		false => (),
 	}
+
 	let QueryLower = Query.to_lowercase();
 	let Matching:Vec<&str> = Content
 		.lines()
 		.filter(|Line| Line.to_lowercase().contains(&QueryLower))
 		.collect();
-	if Matching.is_empty() {
-		format!("[aphrodite: no lines matched {Query:?} - returning full content]\n{Content}")
-	} else {
-		Matching.join("\n")
+	match Matching.is_empty() {
+		true => format!("[aphrodite: no lines matched {Query:?} - returning full content]\n{Content}"),
+		false => Matching.join("\n"),
 	}
 }

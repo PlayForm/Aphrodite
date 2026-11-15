@@ -81,8 +81,11 @@ pub(crate) fn Fn(ReleaseDirectory:&str, Triple:&str, AssetName:&str, Dest:&Path)
 		_ => anyhow::bail!("no shasum/sha256sum/Get-FileHash available to verify checksum"),
 	};
 
-	if Actual != Expected {
-		anyhow::bail!("checksum mismatch for {AssetName}: expected {Expected}, got {Actual}");
+	match Actual != Expected {
+		true => {
+			anyhow::bail!("checksum mismatch for {AssetName}: expected {Expected}, got {Actual}");
+		},
+		false => (),
 	}
 	println!("  checksum verified");
 	Ok(())

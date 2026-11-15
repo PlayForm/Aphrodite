@@ -22,9 +22,11 @@ pub extern "C" fn AphroditeClassify(Content:*const c_char) -> *mut c_char {
 		None => return ToJSONError("null content"),
 	};
 	Guarded(std::panic::AssertUnwindSafe(move || {
-		if let Err(e) = CheckContent(&c) {
-			return ToJSONError(&format!("{e:#}"));
+		match CheckContent(&c) {
+			Ok(()) => (),
+			Err(e) => return ToJSONError(&format!("{e:#}")),
 		}
+
 		let Ct = transforms::content_detector::detect_content_type(&c).content_type;
 		ToJSONOk(&serde_json::json!({"type":Ct.as_str(),"lines":c.lines().count(),"bytes":c.len()}))
 	}))

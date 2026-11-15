@@ -10,25 +10,39 @@ pub fn Fn(Output:&str) -> Vec<(usize, String)> {
 	let mut Current = String::new();
 	let mut CurrentIndex = 0usize;
 
-	for Line in Output.lines() {
+	Output.lines().for_each(|Line| {
 		let Trimmed = Line.trim();
-		if Trimmed == SegMarker {
-			if !Current.trim().is_empty() {
-				Parts.push((CurrentIndex, Current.trim().to_string()));
-			}
-			CurrentIndex += 1;
-			// `clear()` rather than `cur = String::new()`: same observable
-			// behaviour, but the buffer is reused - clippy's
-			// `new_instead_of_clear` denies the reallocation under
-			// `-D warnings` on the CI toolchain.
-			Current.clear();
-		} else {
-			Current.push_str(Line);
-			Current.push('\n');
+
+		match Trimmed == SegMarker {
+			true => {
+				match Current.trim().is_empty() {
+					true => (),
+					false => {
+						Parts.push((CurrentIndex, Current.trim().to_string()));
+					},
+				}
+
+				CurrentIndex += 1;
+
+				// `clear()` rather than `cur = String::new()`: same observable
+				// behaviour, but the buffer is reused - clippy's
+				// `new_instead_of_clear` denies the reallocation under
+				// `-D warnings` on the CI toolchain.
+				Current.clear();
+			},
+			false => {
+				Current.push_str(Line);
+				Current.push('\n');
+			},
 		}
+	});
+
+	match Current.trim().is_empty() {
+		true => (),
+		false => {
+			Parts.push((CurrentIndex, Current.trim().to_string()));
+		},
 	}
-	if !Current.trim().is_empty() {
-		Parts.push((CurrentIndex, Current.trim().to_string()));
-	}
+
 	Parts
 }

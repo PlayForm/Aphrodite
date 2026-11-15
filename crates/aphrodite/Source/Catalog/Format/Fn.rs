@@ -9,8 +9,10 @@ use crate::{
 /// Format catalog as markdown table (for LLM consumption).
 pub fn Fn(State:&AphroditeState) -> String {
 	let Items = &State.RecentMarkers;
-	if Items.is_empty() {
-		return "No compressed items yet.".to_string();
+
+	match Items.is_empty() {
+		true => return "No compressed items yet.".to_string(),
+		false => (),
 	}
 
 	let mut Lines = vec![
@@ -34,21 +36,25 @@ pub fn Fn(State:&AphroditeState) -> String {
 	let mut Newest:Vec<&crate::State::Marker::Struct::MarkerEntry> = Items.iter().collect();
 	Newest.sort_by_key(|m| std::cmp::Reverse(m.Turn));
 
-	for m in Newest.iter().take(20) {
+	Newest.iter().take(20).for_each(|m| {
 		let hash = &m.hash[..10.min(m.hash.len())];
 		let Size = FmtSize(m.Size);
 		let Preview = m.Preview.replace('|', "\\|");
 		let Preview = FloorBoundary(&Preview, 80);
+
 		Lines.push(format!("| {} | {} | {} | {} |", hash, m.CCRType, Size, Preview));
-	}
+	});
 
 	// The header reports the full item count, but the table body caps at
 	// 20 rows - say how many entries are not shown and where to list them.
-	if Items.len() > 20 {
-		Lines.push(format!(
-			"{} more entries - use the aphrodite_catalog tool to list them all.",
-			Items.len() - 20
-		));
+	match Items.len() > 20 {
+		true => {
+			Lines.push(format!(
+				"{} more entries - use the aphrodite_catalog tool to list them all.",
+				Items.len() - 20
+			));
+		},
+		false => (),
 	}
 
 	Lines.join("\n")

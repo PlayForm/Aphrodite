@@ -10,12 +10,16 @@ impl Struct {
 	/// rather than failing the load: a typo in one knob must not take the
 	/// whole configuration down.
 	pub fn GetU64(&self, EnvironmentKey:&str, Section:&str, Key:&str, default:u64) -> u64 {
-		if let Some(v) = self.Overrides.get(EnvironmentKey) {
-			return v.parse().unwrap_or(default);
+		match self.Overrides.get(EnvironmentKey) {
+			Some(v) => return v.parse().unwrap_or(default),
+			None => (),
 		}
-		if let Ok(v) = std::env::var(EnvironmentKey) {
-			return v.parse().unwrap_or(default);
+
+		match std::env::var(EnvironmentKey) {
+			Ok(v) => return v.parse().unwrap_or(default),
+			Err(_) => (),
 		}
+
 		self.Section(Section)
 			.and_then(|s| s.get(Key))
 			.and_then(|v| v.as_integer())

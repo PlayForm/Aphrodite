@@ -63,13 +63,14 @@ pub(crate) fn Fn(Context:&SetupContext) -> anyhow::Result<()> {
 	];
 
 	let mut Copied = 0u32;
-	for &(name, Required) in DylibNames {
+	DylibNames.iter().try_for_each(|&(name, Required)| -> anyhow::Result<()> {
 		let Dest = Context.BinariesDirectory.join(name);
-
+		let Located = SearchPaths.iter().find(|SearchDirectory| SearchDirectory.join(name).exists());
 		let mut Found = false;
-		for SearchDirectory in &SearchPaths {
-			let Src = SearchDirectory.join(name);
-			if Src.exists() {
+
+		match Located {
+			Some(SearchDirectory) => {
+				let Src = SearchDirectory.join(name);
 				println!("copying dylib {} -> {}", name, Dest.display());
 				// Fix install name: `cargo build` embeds the target/deps/
 				// path as the dylib's ID. Loading a copied dylib whose ID
@@ -86,64 +87,86 @@ pub(crate) fn Fn(Context:&SetupContext) -> anyhow::Result<()> {
 				}
 				Found = true;
 				Copied += 1;
-				break;
-			}
+			},
+			None => (),
 		}
-		if !Found {
-			let TargetRelease = ExeDirectory
-				.parent()
-				.unwrap_or(Path::new("."))
-				.parent()
-				.unwrap_or(Path::new("."))
-				.join("target")
-				.join("release")
-				.join(name);
-			if TargetRelease.exists() {
-				println!("copying dylib {} -> {}", name, Dest.display());
-				// 03-F7: this fallback (dev builds where the dylib isn't
-				// co-located with the setup binary) used to skip the
-				// Gatekeeper treatment above entirely - same helper here too.
-				#[cfg(target_os = "macos")]
-				InstallMacOSArtifact(&TargetRelease, &Dest, Some(name), 0o755)?;
-				#[cfg(not(target_os = "macos"))]
-				{
-					fs::copy(&TargetRelease, &Dest)
-						.with_context(|| format!("copy {} to {}", TargetRelease.display(), Dest.display()))?;
-					SecurePerms(&Dest, 0o755)?;
+
+		match Found {
+			true => (),
+			false => {
+				let TargetRelease = ExeDirectory
+					.parent()
+					.unwrap_or(Path::new("."))
+					.parent()
+					.unwrap_or(Path::new("."))
+					.join("target")
+					.join("release")
+					.join(name);
+
+				match TargetRelease.exists() {
+					true => {
+						println!("copying dylib {} -> {}", name, Dest.display());
+						// 03-F7: this fallback (dev builds where the dylib isn't
+						// co-located with the setup binary) used to skip the
+						// Gatekeeper treatment above entirely - same helper here too.
+						#[cfg(target_os = "macos")]
+						InstallMacOSArtifact(&TargetRelease, &Dest, Some(name), 0o755)?;
+						#[cfg(not(target_os = "macos"))]
+						{
+							fs::copy(&TargetRelease, &Dest)
+								.with_context(|| format!("copy {} to {}", TargetRelease.display(), Dest.display()))?;
+							SecurePerms(&Dest, 0o755)?;
+						}
+						Found = true;
+						Copied += 1;
+					},
+					false => (),
 				}
-				Found = true;
-				Copied += 1;
-			}
+			},
 		}
-		if !Found {
-			// Local search exhausted - try downloading from the GitHub
-			// release matching this binary's version.  `cargo install`
-			// only delivers [[bin]] targets, never cdylib artifacts, so
-			// a `cargo install aphrodite && aphrodite setup` user will
-			// always land here.  This download path bridges that gap
-			// without requiring a full source checkout.
-			if let Err(e) = Download::Fn(name, &Dest) {
-				if Required {
-					return Err(e.context(format!(
-						"dylib '{name}' not found locally and download failed.  \
-						 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
-						 or download manually from \
-						 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",
-						version = env!("CARGO_PKG_VERSION"),
-					)));
+
+		match Found {
+			true => (),
+			false => {
+				// Local search exhausted - try downloading from the GitHub
+				// release matching this binary's version.  `cargo install`
+				// only delivers [[bin]] targets, never cdylib artifacts, so
+				// a `cargo install aphrodite && aphrodite setup` user will
+				// always land here.  This download path bridges that gap
+				// without requiring a full source checkout.
+				match Download::Fn(name, &Dest) {
+					Err(e) => {
+						match Required {
+							true => {
+								return Err(e.context(format!(
+								"dylib '{name}' not found locally and download failed.  \
+								 Build from source (cargo build --release -p aphrodite -p aphrodite-hermes) \
+								 or download manually from \
+								 https://github.com/PlayForm/Aphrodite/releases/tag/Aphrodite/v{version}",
+								version = env!("CARGO_PKG_VERSION"),
+							)));
+							},
+							false => {
+								// Optional core dylib: degrade gracefully (F9) - the
+								// Hermes plugin runtime never loads it, so setup can
+								// complete without it.
+								eprintln!(
+									"WARNING: optional dylib '{name}' could not be located or downloaded ({e}); \
+									 continuing without it - the Hermes plugin loads only the *_hermes dylib"
+								);
+								return Ok(());
+							},
+						}
+					},
+					Ok(()) => {
+						Copied += 1;
+					},
 				}
-				// Optional core dylib: degrade gracefully (F9) - the
-				// Hermes plugin runtime never loads it, so setup can
-				// complete without it.
-				eprintln!(
-					"WARNING: optional dylib '{name}' could not be located or downloaded ({e}); continuing without it \
-					 - the Hermes plugin loads only the *_hermes dylib"
-				);
-				continue;
-			}
-			Copied += 1;
+			},
 		}
-	}
+
+		Ok(())
+	})?;
 
 	println!("copied {Copied} dylib(s)");
 	Ok(())

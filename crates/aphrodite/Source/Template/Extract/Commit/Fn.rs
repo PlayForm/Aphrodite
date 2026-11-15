@@ -8,13 +8,16 @@
 /// as a commit would put a false `{hash}` in every such preview. The result is
 /// always truncated to 7, because every consumer compares short hashes.
 pub(crate) fn Fn(Lines:&[&str]) -> String {
-	for l in Lines {
-		let t = l.trim_start();
-		let Candidate = t.strip_prefix("commit ").map(str::trim).unwrap_or(t);
-		let Hex:String = Candidate.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
-		if Hex.len() >= 7 && Hex.len() <= 40 {
-			return Hex.chars().take(7).collect();
-		}
-	}
-	"???????".to_string()
+	Lines
+		.iter()
+		.find_map(|l| {
+			let t = l.trim_start();
+			let Candidate = t.strip_prefix("commit ").map(str::trim).unwrap_or(t);
+			let Hex:String = Candidate.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
+			match Hex.len() >= 7 && Hex.len() <= 40 {
+				true => Some(Hex.chars().take(7).collect::<String>()),
+				false => None,
+			}
+		})
+		.unwrap_or_else(|| "???????".to_string())
 }

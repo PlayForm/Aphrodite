@@ -8,8 +8,14 @@ impl AphroditeState {
 	/// eviction style as `RecentMarkers`.
 	pub fn RecordToolEvent(&mut self, Event:ToolEvent) {
 		self.ToolEvents.push_back(Event);
-		while self.ToolEvents.len() > ToolEventCap {
-			self.ToolEvents.pop_front();
+
+		loop {
+			match self.ToolEvents.len() > ToolEventCap {
+				true => {
+					self.ToolEvents.pop_front();
+				},
+				false => break,
+			}
 		}
 	}
 }

@@ -30,8 +30,9 @@ pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 	let HashValue = crate::Marker::Parse::Normalize::NormalizeHash(HashValue);
 
 	// i: prefix - inline-only hashes
-	if HashValue.starts_with("i:") {
-		return State.InlineStoreGet(HashValue);
+	match HashValue.starts_with("i:") {
+		true => return State.InlineStoreGet(HashValue),
+		false => (),
 	}
 
 	// NOTE (F6): this used to check a `{hash}#stage2` key first, "for
@@ -49,8 +50,12 @@ pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 	// Tier 1 teaching loop: a successful resolve of a chain-split segment
 	// hash is the consequence signal - attribute it to the split event that
 	// produced it (counts once per hash) and let the threshold adapt.
-	if Found.is_some() {
-		State.NoteSplitRetrieval(HashValue);
+	match Found.is_some() {
+		true => {
+			State.NoteSplitRetrieval(HashValue);
+		},
+		false => (),
 	}
+
 	Found
 }

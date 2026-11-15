@@ -28,9 +28,9 @@ fn TestRecordChainSplitRegistersHashesAndCountsRetrievalOnce() {
 #[test]
 fn TestSplitEventRingIsBounded() {
 	let mut s = AphroditeState::default();
-	for i in 0..40 {
+	(0..40).for_each(|i| {
 		s.RecordChainSplit(vec![format!("h{i}")]);
-	}
+	});
 	assert!(s.SplitEvents.len() <= SplitEventCap);
 	assert_eq!(s.SplitEvents.len(), SplitEventCap);
 }
@@ -44,9 +44,9 @@ fn TestAdaptRaisesThresholdWhenSegmentsIgnored() {
 		..Default::default()
 	};
 	// 4 splits, all segments ignored: ratio 0/8 = 0.0 < 0.25 → raise.
-	for i in 0..4 {
+	(0..4).for_each(|i| {
 		s.RecordChainSplit(vec![format!("a{i}"), format!("b{i}")]);
-	}
+	});
 	assert_eq!(s.ChainSplitMinimumSegments, 3);
 }
 
@@ -59,13 +59,13 @@ fn TestAdaptKeepsThresholdWhenSegmentsRetrieved() {
 		..Default::default()
 	};
 	// 4 splits, all segments retrieved: ratio 8/8 = 1.0 ≥ 0.5 → floor.
-	for i in 0..4 {
+	(0..4).for_each(|i| {
 		let Hashes = vec![format!("a{i}"), format!("b{i}")];
 		s.RecordChainSplit(Hashes.clone());
-		for h in Hashes {
+		Hashes.into_iter().for_each(|h| {
 			s.NoteSplitRetrieval(&h);
-		}
-	}
+		});
+	});
 	assert_eq!(s.ChainSplitMinimumSegments, 2);
 }
 
@@ -78,19 +78,19 @@ fn TestAdaptRespectsBounds() {
 		..Default::default()
 	};
 	// Ignored segments: threshold rises, but never past max.
-	for i in 0..20 {
+	(0..20).for_each(|i| {
 		s.RecordChainSplit(vec![format!("a{i}"), format!("b{i}")]);
-	}
+	});
 	assert_eq!(s.ChainSplitMinimumSegments, 6);
 
 	// Fully-retrieved segments: falls, but never below floor.
-	for i in 20..60 {
+	(20..60).for_each(|i| {
 		let Hashes = vec![format!("a{i}"), format!("b{i}")];
 		s.RecordChainSplit(Hashes.clone());
-		for h in Hashes {
+		Hashes.into_iter().for_each(|h| {
 			s.NoteSplitRetrieval(&h);
-		}
-	}
+		});
+	});
 	assert_eq!(s.ChainSplitMinimumSegments, 5);
 }
 
@@ -98,8 +98,8 @@ fn TestAdaptRespectsBounds() {
 fn TestAdaptRequiresMinimumEvents() {
 	let mut s = AphroditeState::default();
 	// Fewer than SPLIT_ADAPT_MIN_EVENTS: no adaptation.
-	for i in 0..(SplitAdaptMinimumEvents - 1) {
+	(0..(SplitAdaptMinimumEvents - 1)).for_each(|i| {
 		s.RecordChainSplit(vec![format!("a{i}"), format!("b{i}")]);
-	}
+	});
 	assert_eq!(s.ChainSplitMinimumSegments, 2);
 }

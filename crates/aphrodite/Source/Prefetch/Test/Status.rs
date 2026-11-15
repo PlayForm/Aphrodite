@@ -48,12 +48,12 @@ fn TestPrefetchStatusLiveOffByteIdentical() {
 	);
 	// No live-container keys anywhere on the surface.
 	assert!(Status.get("live_container").is_none());
-	for Entry in Status["ready"].as_array().unwrap() {
+	Status["ready"].as_array().unwrap().iter().for_each(|Entry| {
 		assert!(Entry.get("live").is_none());
 		assert!(Entry.get("arrived_at").is_none());
 		assert!(Entry.get("bytes_arrived").is_none());
 		assert!(Entry.get("eta_s").is_none());
-	}
+	});
 }
 
 #[test]

@@ -55,7 +55,7 @@ fn TestMarkerPreviewNeverDoublesBracketPrefix() {
 	let _G = crate::Preview::State::Guard::Fn();
 	let _G2 = MarkerTemplatesTestGuard();
 	let Re = regex::Regex::new(r"\[\w+:\[").unwrap();
-	for ty in [
+	[
 		"text",
 		"git",
 		"ls",
@@ -66,7 +66,9 @@ fn TestMarkerPreviewNeverDoublesBracketPrefix() {
 		"diff",
 		"code_rust",
 		"json_array",
-	] {
+	]
+	.into_iter()
+	.for_each(|ty| {
 		let Preview =
 			crate::Preview::Builder::Entry::Fn(ty, "M crates/aphrodite/src/preview.rs\nA src/new.rs\n?? tmp\n");
 		let m = CCRMarker("abc123def456abc123def456abc123def456", ty, 42, &Preview, None, None, None);
@@ -74,7 +76,7 @@ fn TestMarkerPreviewNeverDoublesBracketPrefix() {
 			!Re.is_match(&m),
 			"marker preview must not double the bracket prefix for type {ty:?}: {m:?}"
 		);
-	}
+	});
 }
 
 #[test]

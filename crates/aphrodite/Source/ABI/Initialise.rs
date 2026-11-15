@@ -31,8 +31,11 @@ pub extern "C" fn AphroditeInit(ConfigurationPath:*const c_char) -> *mut c_char 
 		// drifted from `ApplyCompression`'s own key names (e.g. `ToolThreshold`
 		// vs `ToolThresholdToken`) and never honored env var overrides, unlike
 		// every other init path in the crate.
-		if !path.is_empty() {
-			crate::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(&path).ApplyCompression(&mut State);
+		match !path.is_empty() {
+			true => {
+				crate::ConfigurationLoader::Configuration::Struct::Struct::LoadFrom(&path).ApplyCompression(&mut State);
+			},
+			false => (),
 		}
 		CString::new(AllocHandle(State).to_string()).unwrap().into_raw()
 	}))

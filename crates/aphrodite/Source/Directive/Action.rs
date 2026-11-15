@@ -50,18 +50,25 @@ pub fn Fn(State:&mut crate::State::Struct::AphroditeState, Action:&str, name:&st
 			})
 		},
 		"swap" => {
-			if State.Directives.contains_key(name) {
-				State.ActiveDirectives = vec![name.to_string()];
-				State.ManualDirectiveTurn = Some(State.TurnCounter);
-				serde_json::json!({"swapped": name, "active": &State.ActiveDirectives})
-			} else {
-				serde_json::json!({"error": format!("unknown directive: {}", name)})
+			match State.Directives.contains_key(name) {
+				true => {
+					State.ActiveDirectives = vec![name.to_string()];
+					State.ManualDirectiveTurn = Some(State.TurnCounter);
+					serde_json::json!({"swapped": name, "active": &State.ActiveDirectives})
+				},
+				false => {
+					serde_json::json!({"error": format!("unknown directive: {}", name)})
+				},
 			}
 		},
 		"add" => {
-			if State.Directives.contains_key(name) && !State.ActiveDirectives.iter().any(|d| d == name) {
-				State.ActiveDirectives.push(name.to_string());
+			match State.Directives.contains_key(name) && !State.ActiveDirectives.iter().any(|d| d == name) {
+				true => {
+					State.ActiveDirectives.push(name.to_string());
+				},
+				false => (),
 			}
+
 			State.ManualDirectiveTurn = Some(State.TurnCounter);
 			serde_json::json!({"active": &State.ActiveDirectives})
 		},
@@ -72,12 +79,18 @@ pub fn Fn(State:&mut crate::State::Struct::AphroditeState, Action:&str, name:&st
 		// lazy load is an explicit, intentional activation and a typo should
 		// surface rather than be swallowed. Idempotent if already active.
 		"load" => {
-			if !State.Directives.contains_key(name) {
-				return serde_json::json!({"error": format!("unknown directive: {}", name)});
+			match !State.Directives.contains_key(name) {
+				true => return serde_json::json!({"error": format!("unknown directive: {}", name)}),
+				false => (),
 			}
-			if !State.ActiveDirectives.iter().any(|d| d == name) {
-				State.ActiveDirectives.push(name.to_string());
+
+			match !State.ActiveDirectives.iter().any(|d| d == name) {
+				true => {
+					State.ActiveDirectives.push(name.to_string());
+				},
+				false => (),
 			}
+
 			State.ManualDirectiveTurn = Some(State.TurnCounter);
 			serde_json::json!({"loaded": name, "active": &State.ActiveDirectives})
 		},

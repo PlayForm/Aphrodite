@@ -30,9 +30,10 @@ pub(crate) fn Fn(State:&AppState, hash:&str, Resolved:&str) -> Option<(LiveConta
 			return None;
 		},
 	};
-	if !meta.Live || meta.Chunks == 0 {
-		// Not a live container (or a degenerate envelope) - serve plainly.
-		return None;
+	// Not a live container (or a degenerate envelope) - serve plainly.
+	match !meta.Live || meta.Chunks == 0 {
+		true => return None,
+		false => (),
 	}
 	let mut Assembled = String::new();
 	for i in 0..meta.Chunks {
@@ -48,6 +49,9 @@ pub(crate) fn Fn(State:&AppState, hash:&str, Resolved:&str) -> Option<(LiveConta
 			},
 		}
 	}
-	let Content = if Assembled.is_empty() { Resolved.to_string() } else { Assembled };
+	let Content = match Assembled.is_empty() {
+		true => Resolved.to_string(),
+		false => Assembled,
+	};
 	Some((meta, Content))
 }

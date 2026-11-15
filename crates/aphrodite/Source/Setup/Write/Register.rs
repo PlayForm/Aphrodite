@@ -27,11 +27,14 @@ pub(crate) fn Fn(_Context:&SetupContext) -> anyhow::Result<()> {
 		.output()
 		.map_err(|e| anyhow::Error::new(e).context("run `hermes plugins enable aphrodite`"))?;
 
-	if !Status.status.success() {
-		let Stderr = String::from_utf8_lossy(&Status.stderr);
-		eprintln!("warning: hermes plugins enable aphrodite: {Stderr}");
-	} else {
-		println!("plugin registered with hermes");
+	match !Status.status.success() {
+		true => {
+			let Stderr = String::from_utf8_lossy(&Status.stderr);
+			eprintln!("warning: hermes plugins enable aphrodite: {Stderr}");
+		},
+		false => {
+			println!("plugin registered with hermes");
+		},
 	}
 	Ok(())
 }

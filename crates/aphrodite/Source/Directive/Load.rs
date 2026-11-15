@@ -46,26 +46,36 @@ pub fn Fn(Directory:&PathBuf) -> HashMap<String, Struct> {
 	};
 
 	let mut Directives = HashMap::new();
-	for Entry in Entries.flatten() {
-		let path = Entry.path();
-		if path.extension().map(|e| e != "md").unwrap_or(true) {
-			continue;
-		}
-		let Some(name) = path.file_stem().and_then(|n| n.to_str()) else {
-			continue;
-		};
-		let Ok(Content) = std::fs::read_to_string(&path) else {
-			continue;
-		};
-		// Trim each directive to a reasonable size.
-		let Content = if Content.len() > MaximumDirectiveChars {
-			let Trunc:String = Content.chars().take(MaximumDirectiveChars).collect();
-			format!("{}...", Trunc)
-		} else {
-			Content
-		};
-		Directives.insert(name.to_string(), Struct { name:name.to_string(), Content });
-	}
+
+	Entries
+		.flatten()
+		.filter_map(|Entry| -> Option<(String, String)> {
+			let path = Entry.path();
+
+			match path.extension().map(|e| e != "md").unwrap_or(true) {
+				true => None,
+				false => {
+					let name = path.file_stem().and_then(|n| n.to_str())?;
+					let Content = std::fs::read_to_string(&path).ok()?;
+
+					Some((name.to_string(), Content))
+				},
+			}
+		})
+		.for_each(|(name, Content)| {
+			// Trim each directive to a reasonable size.
+			let Content = match Content.len() > MaximumDirectiveChars {
+				true => {
+					let Trunc:String = Content.chars().take(MaximumDirectiveChars).collect();
+
+					format!("{}...", Trunc)
+				},
+				false => Content,
+			};
+
+			Directives.insert(name.clone(), Struct { name, Content });
+		});
+
 	tracing::info!(
 		DirectiveSource = "disk",
 		path = %Directory.display(),
@@ -73,14 +83,19 @@ pub fn Fn(Directory:&PathBuf) -> HashMap<String, Struct> {
 		"loaded {} directive(s) from disk",
 		Directives.len()
 	);
-	if Directives.is_empty() {
-		// The directory exists but yields no readable `.md` files - this is an
-		// *intentional* empty directive set, NOT a builtin-fallback trigger.
-		tracing::info!(
-			DirectiveSource = "disk",
-			path = %Directory.display(),
-			"directives directory exists but contains no readable .md files - treating as intentionally empty"
-		);
+
+	match Directives.is_empty() {
+		true => {
+			// The directory exists but yields no readable `.md` files - this is an
+			// *intentional* empty directive set, NOT a builtin-fallback trigger.
+			tracing::info!(
+				DirectiveSource = "disk",
+				path = %Directory.display(),
+				"directives directory exists but contains no readable .md files - treating as intentionally empty"
+			);
+		},
+		false => (),
 	}
+
 	Directives
 }

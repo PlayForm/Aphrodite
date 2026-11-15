@@ -30,48 +30,51 @@ pub extern "C" fn AphroditeReload(Handle:*const c_char, path:*const c_char) -> *
 	};
 	let p = unsafe { Cstr(path) }.unwrap_or_default();
 	let mut ParseError:Option<String> = None;
-	let ContextEngineEnabled = if !p.is_empty() {
-		match std::fs::read_to_string(p.as_str()) {
-			Ok(Content) => {
-				match Content.parse::<toml::Table>() {
-					Ok(Tbl) => {
-						Tbl.get("compression")
-							.and_then(|v| v.as_table())
-							.cloned()
-							.and_then(|c| c.get("context_engine").and_then(|v| v.as_bool()))
-					},
-					Err(Error) => {
-						// Issue #38 class: a found-but-broken TOML on the reload
-						// path used to be discarded silently (`.parse().ok()`),
-						// indistinguishable from "config not set". Warn on a
-						// real log surface (stderr fallback when no tracing
-						// subscriber exists) and record the failure on the
-						// state + response so `AphroditeStats` can
-						// self-diagnose.
-						crate::ConfigurationLoader::Warn::Fn::WarnParseFailure(
-							std::path::Path::new(p.as_str()),
-							&Error,
-							"keeping previous value",
-						);
-						ParseError = Some(format!("{p}: {Error}"));
-						None
-					},
-				}
-			},
-			// Unreadable/missing is the normal search miss - keep silent.
-			Err(_) => None,
-		}
-	} else {
-		None
+	let ContextEngineEnabled = match !p.is_empty() {
+		true => {
+			match std::fs::read_to_string(p.as_str()) {
+				Ok(Content) => {
+					match Content.parse::<toml::Table>() {
+						Ok(Tbl) => {
+							Tbl.get("compression")
+								.and_then(|v| v.as_table())
+								.cloned()
+								.and_then(|c| c.get("context_engine").and_then(|v| v.as_bool()))
+						},
+						Err(Error) => {
+							// Issue #38 class: a found-but-broken TOML on the reload
+							// path used to be discarded silently (`.parse().ok()`),
+							// indistinguishable from "config not set". Warn on a
+							// real log surface (stderr fallback when no tracing
+							// subscriber exists) and record the failure on the
+							// state + response so `AphroditeStats` can
+							// self-diagnose.
+							crate::ConfigurationLoader::Warn::Fn::WarnParseFailure(
+								std::path::Path::new(p.as_str()),
+								&Error,
+								"keeping previous value",
+							);
+							ParseError = Some(format!("{p}: {Error}"));
+							None
+						},
+					}
+				},
+				// Unreadable/missing is the normal search miss - keep silent.
+				Err(_) => None,
+			}
+		},
+		false => None,
 	};
 	match WithState(Hid, |s| {
-		if let Some(v) = ContextEngineEnabled {
-			s.ContextEngineEnabled = v;
+		match ContextEngineEnabled {
+			Some(v) => s.ContextEngineEnabled = v,
+			None => (),
 		}
-		if let Some(e) = &ParseError {
+		match &ParseError {
 			// Surface "config: defaults/previous in effect (parse failed)"
 			// on the same self-diagnosis field the loader uses.
-			s.ConfigurationError = Some(e.clone());
+			Some(e) => s.ConfigurationError = Some(e.clone()),
+			None => (),
 		}
 		serde_json::json!({"status":"ok", "config_error":ParseError})
 	}) {

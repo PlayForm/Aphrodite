@@ -13,20 +13,29 @@ impl AphroditeState {
 	/// for retrieval attribution. Bounded ring (cap `SplitEventCap`), then
 	/// re-adapts the split threshold from the retrieval ratio.
 	pub fn RecordChainSplit(&mut self, Hashes:Vec<String>) {
-		if Hashes.is_empty() {
-			return;
+		match Hashes.is_empty() {
+			true => return,
+			false => (),
 		}
+
 		self.SplitNextEventID += 1;
 		let ID = self.SplitNextEventID;
 		let Produced = Hashes.len();
-		for h in &Hashes {
+		Hashes.iter().for_each(|h| {
 			self.SplitSegmentMap.insert(h.clone(), ID);
-		}
+		});
 		self.SplitEvents
 			.push_back(SplitEvent { ID, Turn:self.TurnCounter, Produced, Retrieved:0 });
-		while self.SplitEvents.len() > SplitEventCap {
-			self.SplitEvents.pop_front();
+
+		loop {
+			match self.SplitEvents.len() > SplitEventCap {
+				true => {
+					self.SplitEvents.pop_front();
+				},
+				false => break,
+			}
 		}
+
 		self.AdaptChainSplitThreshold();
 	}
 }

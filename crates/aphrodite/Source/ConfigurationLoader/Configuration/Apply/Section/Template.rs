@@ -45,18 +45,25 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// (legacy location) → compiled-in SHIPPED_SESSION_INJECT (so a
 	// bare/minimal config still gets a first-turn orientation). Empty string
 	// disables it entirely.
-	State.SessionInject = if let Some(v) = Configuration.Overrides.get("APHRODITE_SESSION_INJECT") {
-		v.clone()
-	} else if let Ok(v) = std::env::var("APHRODITE_SESSION_INJECT") {
-		v
-	} else if let Some(t) = Templates.as_ref().and_then(|t| t.Prompts.get("session_inject")) {
-		t.clone()
-	} else {
-		Configuration.GetString(
-			"APHRODITE_SESSION_INJECT",
-			"prompts",
-			"session_inject",
-			crate::Flow::Prompt::Const::ShippedSessionInject,
-		)
+	State.SessionInject = match Configuration.Overrides.get("APHRODITE_SESSION_INJECT") {
+		Some(v) => v.clone(),
+		None => {
+			match std::env::var("APHRODITE_SESSION_INJECT") {
+				Ok(v) => v,
+				Err(_) => {
+					match Templates.as_ref().and_then(|t| t.Prompts.get("session_inject")) {
+						Some(t) => t.clone(),
+						None => {
+							Configuration.GetString(
+								"APHRODITE_SESSION_INJECT",
+								"prompts",
+								"session_inject",
+								crate::Flow::Prompt::Const::ShippedSessionInject,
+							)
+						},
+					}
+				},
+			}
+		},
 	};
 }

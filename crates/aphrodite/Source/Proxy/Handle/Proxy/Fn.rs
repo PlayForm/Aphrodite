@@ -77,10 +77,9 @@ pub async fn Fn(
 	let IsChatCompletion = path.path().trim_start_matches('/') == ChatCompletionsPath.trim_start_matches('/');
 
 	let BodyVec = body.to_vec();
-	let CacheKey = if IsChatCompletion {
-		CacheKeyFromBody(&BodyVec, state.APIKey.Expose())
-	} else {
-		None
+	let CacheKey = match IsChatCompletion {
+		true => CacheKeyFromBody(&BodyVec, state.APIKey.Expose()),
+		false => None,
 	};
 	match CacheKey {
 		Some(Ck) => {

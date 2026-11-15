@@ -32,8 +32,9 @@ impl Struct {
 			.or_else(|| d.and_then(|d| d.APIKey.clone()))
 			.or_else(|| std::env::var("APHRODITE_API_KEY").ok())
 			.unwrap_or_default();
-		if APIKey.is_empty() {
-			anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml");
+		match APIKey.is_empty() {
+			true => anyhow::bail!("no API key configured - set APHRODITE_API_KEY env var or api_key in aphrodite.toml"),
+			false => (),
 		}
 		// Resolve listen: must parse or fail (no silent default when listen is
 		// explicitly set).  After parsing, override with env var if set - this
@@ -51,8 +52,9 @@ impl Struct {
 		// Validate max_output < max_context
 		let MaximumContext = cfg.MaximumContext.unwrap_or(1_000_000);
 		let MaximumOutput = cfg.MaximumOutput.unwrap_or(384_000);
-		if MaximumOutput >= MaximumContext {
-			anyhow::bail!("max_output ({MaximumOutput}) must be less than max_context ({MaximumContext})");
+		match MaximumOutput >= MaximumContext {
+			true => anyhow::bail!("max_output ({MaximumOutput}) must be less than max_context ({MaximumContext})"),
+			false => (),
 		}
 		Ok(CLI {
 			command:None,
@@ -122,11 +124,12 @@ impl Struct {
 			LogCompact:false,
 			Timeout:{
 				let t = cfg.Timeout.unwrap_or(300);
-				if t > 600 {
-					tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
-					600
-				} else {
-					t
+				match t > 600 {
+					true => {
+						tracing::warn!("timeout {}s exceeds maximum 600s, clamping", t);
+						600
+					},
+					false => t,
 				}
 			},
 		})

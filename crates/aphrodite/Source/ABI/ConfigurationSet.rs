@@ -30,13 +30,15 @@ pub extern "C" fn AphroditeConfigurationSet(
 		match k.as_ref() {
 			"model" => s.Model = v.to_string(),
 			"engine_threshold_pct" => {
-				if let Ok(n) = v.parse() {
-					s.EngineThresholdPct = n;
+				match v.parse() {
+					Ok(n) => s.EngineThresholdPct = n,
+					Err(_) => (),
 				}
 			},
 			"tool_threshold" => {
-				if let Ok(n) = v.parse() {
-					s.ToolThreshold = n;
+				match v.parse() {
+					Ok(n) => s.ToolThreshold = n,
+					Err(_) => (),
 				}
 			},
 			"context_engine_enabled" => s.ContextEngineEnabled = v == "true" || v == "1",

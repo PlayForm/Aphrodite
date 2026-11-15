@@ -18,21 +18,31 @@ impl AphroditeState {
 	/// chains), capped by `ChainSplitMaximumSegments`. The threshold is
 	/// internal machinery - never rendered to the LLM.
 	pub(super) fn AdaptChainSplitThreshold(&mut self) {
-		if self.SplitEvents.len() < SplitAdaptMinimumEvents {
-			return;
+		match self.SplitEvents.len() < SplitAdaptMinimumEvents {
+			true => return,
+			false => (),
 		}
+
 		let Produced:usize = self.SplitEvents.iter().map(|e| e.Produced).sum();
 		let Retrieved:usize = self.SplitEvents.iter().map(|e| e.Retrieved).sum();
-		if Produced == 0 {
-			return;
+
+		match Produced == 0 {
+			true => return,
+			false => (),
 		}
+
 		let Ratio = Retrieved as f64 / Produced as f64;
-		if Ratio >= 0.5 && self.ChainSplitMinimumSegments > self.ChainSplitFloor {
-			// Segments are used - split more eagerly.
-			self.ChainSplitMinimumSegments -= 1;
-		} else if Ratio < 0.25 && self.ChainSplitMinimumSegments < self.ChainSplitMaximumSegments {
-			// Segments are ignored - only split very long chains.
-			self.ChainSplitMinimumSegments += 1;
+
+		match () {
+			_ if Ratio >= 0.5 && self.ChainSplitMinimumSegments > self.ChainSplitFloor => {
+				// Segments are used - split more eagerly.
+				self.ChainSplitMinimumSegments -= 1;
+			},
+			_ if Ratio < 0.25 && self.ChainSplitMinimumSegments < self.ChainSplitMaximumSegments => {
+				// Segments are ignored - only split very long chains.
+				self.ChainSplitMinimumSegments += 1;
+			},
+			_ => (),
 		}
 	}
 }

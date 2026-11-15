@@ -37,9 +37,9 @@ fn TestInlineStoreLruPromotion() {
 fn TestInlineStoreEviction() {
 	let mut s = AphroditeState::default();
 	// Fill beyond INLINE_MAX (500)
-	for i in 0..505 {
+	(0..505).for_each(|i| {
 		s.InlineStorePut(format!("hash{}", i), format!("content{}", i));
-	}
+	});
 	assert!(s.InlineStore.len() <= 500);
 	// Oldest should be evicted
 	assert_eq!(s.InlineStoreGet("hash0"), None);
@@ -57,9 +57,9 @@ fn TestInlineStoreByteBudgetEvictsOldestFirst() {
 	// cap, so this specifically exercises the byte accounting rather
 	// than the pre-existing entry-count cap.
 	let FiveMb = "x".repeat(5 * 1024 * 1024);
-	for i in 0..100 {
+	(0..100).for_each(|i| {
 		s.InlineStorePut(format!("hash{i}"), FiveMb.clone());
-	}
+	});
 	assert!(
 		s.InlineStoreBytes() <= 10 * 1024 * 1024,
 		"stored bytes ({}) must stay within the 10MB budget",

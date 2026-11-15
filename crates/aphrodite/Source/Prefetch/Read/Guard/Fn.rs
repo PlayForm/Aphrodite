@@ -16,19 +16,25 @@ use std::path::{Path, PathBuf};
 /// mirrors `Home`'s `ExpandTilde`.
 pub(in crate::Prefetch) fn GuardAbsolute(path:&Path) -> PathBuf {
 	let s = path.to_string_lossy();
-	let Expanded:PathBuf = if s == "~" {
-		dirs::home_dir().unwrap_or_else(|| path.to_path_buf())
-	} else if let Some(Rest) = s.strip_prefix("~/")
-		&& let Some(Home) = dirs::home_dir()
-	{
-		Home.join(Rest)
-	} else {
-		path.to_path_buf()
+	let Expanded:PathBuf = match s == "~" {
+		true => dirs::home_dir().unwrap_or_else(|| path.to_path_buf()),
+		false => {
+			match s.strip_prefix("~/") {
+				Some(Rest) => {
+					match dirs::home_dir() {
+						Some(Home) => Home.join(Rest),
+						None => path.to_path_buf(),
+					}
+				},
+				None => path.to_path_buf(),
+			}
+		},
 	};
-	let Abs = if Expanded.is_absolute() {
-		Expanded
-	} else {
-		std::env::current_dir().map(|c| c.join(&Expanded)).unwrap_or(Expanded)
+
+	let Abs = match Expanded.is_absolute() {
+		true => Expanded,
+		false => std::env::current_dir().map(|c| c.join(&Expanded)).unwrap_or(Expanded),
 	};
+
 	Abs.canonicalize().unwrap_or(Abs)
 }

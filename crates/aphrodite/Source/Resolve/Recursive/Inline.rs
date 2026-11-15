@@ -33,5 +33,8 @@ pub fn Fn(
 	Visited:&mut Vec<String>,
 ) -> Option<String> {
 	let Content = Recursive::Fn(State, HashValue, 0, Resolved, Visited)?;
-	if Content.len() <= Limit { Some(Content) } else { None }
+	match Content.len() <= Limit {
+		true => Some(Content),
+		false => None,
+	}
 }

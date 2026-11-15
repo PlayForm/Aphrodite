@@ -42,30 +42,46 @@ use crate::{
 pub fn EngineMaybeArchive(State:&mut AphroditeState) -> Option<String> {
 	// Engine off (config), or threshold 0 (never) / 100+ (documented
 	// engine-off escape hatch). All gates run before any mutation.
-	if !State.ContextEngineEnabled || State.EngineThresholdPct == 0 || State.EngineThresholdPct >= 100 {
-		// DEV-ONLY debug instrumentation (crate::debug): engine decision.
-		crate::Debug::Engine::Skip::Fn::Fn(State, "engine_off_or_threshold_gate");
-		return None;
+	match !State.ContextEngineEnabled || State.EngineThresholdPct == 0 || State.EngineThresholdPct >= 100 {
+		true => {
+			// DEV-ONLY debug instrumentation (crate::debug): engine decision.
+			crate::Debug::Engine::Skip::Fn::Fn(State, "engine_off_or_threshold_gate");
+			return None;
+		},
+		false => (),
 	}
+
 	let Total = State.ConvIndex.len();
-	if Total < State.EngineMinimumMsgs {
-		crate::Debug::Engine::Skip::Fn::Fn(State, "below_min_msgs");
-		return None;
+
+	match Total < State.EngineMinimumMsgs {
+		true => {
+			crate::Debug::Engine::Skip::Fn::Fn(State, "below_min_msgs");
+			return None;
+		},
+		false => (),
 	}
 	// Fill ratio: archived-turn count against the index's own cap.
 	let FillPct = ((Total as u64 * 100) / ConvIndexCap as u64).min(100);
-	if FillPct < State.EngineThresholdPct {
-		crate::Debug::Engine::Skip::Fn::Fn(State, "fill_below_threshold");
-		return None;
+
+	match FillPct < State.EngineThresholdPct {
+		true => {
+			crate::Debug::Engine::Skip::Fn::Fn(State, "fill_below_threshold");
+			return None;
+		},
+		false => (),
 	}
 	// Middle slice: exactly protect_first from the start, protect_last from
 	// the end; pre-Rust `compress()` refuses a middle shorter than 3.
 	let HeadN = State.EngineProtectFirst;
 	let TailN = State.EngineProtectLast;
 	let MiddleN = Total.saturating_sub(HeadN).saturating_sub(TailN);
-	if MiddleN < 3 {
-		crate::Debug::Engine::Skip::Fn::Fn(State, "middle_too_small");
-		return None;
+
+	match MiddleN < 3 {
+		true => {
+			crate::Debug::Engine::Skip::Fn::Fn(State, "middle_too_small");
+			return None;
+		},
+		false => (),
 	}
 	// Sorted turns, oldest first (same ordering as `GetConvIndex`).
 	let mut Turns:Vec<usize> = State.ConvIndex.keys().copied().collect();
@@ -103,9 +119,9 @@ pub fn EngineMaybeArchive(State:&mut AphroditeState) -> Option<String> {
 
 	// Replace the archived middle with the marker entry: drop the middle
 	// turns from the index, then record the new archive at the current turn.
-	for t in &MiddleKeys {
+	MiddleKeys.iter().for_each(|t| {
 		State.ConvIndex.remove(t);
-	}
+	});
 	let Summary = format!("engine offload: {MiddleN} middle turns archived (keep {HeadN}/{TailN})");
 	ArchiveTurn(State, &hash, &Summary, Packed.len());
 	State.RecordMarker(crate::State::Marker::Struct::MarkerEntry {

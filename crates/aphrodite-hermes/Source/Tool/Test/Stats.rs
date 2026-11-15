@@ -18,7 +18,7 @@ fn test_stats_surfaces_config_error() {
 	let r = dispatch("aphrodite_stats", "{}");
 	assert_eq!(r["config_error"].as_str().unwrap(), format!("{broken_path}: TOML parse error"));
 	assert!(
-		r["auto_reload"].as_bool().unwrap_or(true) == false,
+		!r["auto_reload"].as_bool().unwrap_or(true),
 		"auto_reload must surface (default off): {:?}",
 		r["auto_reload"]
 	);

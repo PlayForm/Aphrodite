@@ -53,12 +53,10 @@ pub(crate) const fn InitialFillPct() -> u64 {
 	// the initial EMA is always non-zero. `clamp` is not const-stable on
 	// this toolchain, so mirror the [1, 99] clamp with plain comparisons.
 	let raw = 100u64.saturating_sub(InitialRatioEma / 20);
-	let Pct = if raw < 1 {
-		1
-	} else if raw > 99 {
-		99
-	} else {
-		raw
+	let Pct = match () {
+		_ if raw < 1 => 1,
+		_ if raw > 99 => 99,
+		_ => raw,
 	};
 	Pct * 100
 }

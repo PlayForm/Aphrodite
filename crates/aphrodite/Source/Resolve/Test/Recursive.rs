@@ -140,9 +140,9 @@ fn TestExpandRecursiveDepthHigherThanDefaultExpandsFurther() {
 	s.RecursiveDepth = 8;
 	// h7 -> DEEP; h6 -> marker(h7); ...; h0 -> marker(h1): an 8-deep chain.
 	s.InlineStorePut("h7".into(), "DEEP".into());
-	for i in (0..7).rev() {
+	(0..7).rev().for_each(|i| {
 		s.InlineStorePut(format!("h{i}"), format!("<<<CCR:h{}|t|1>>>", i + 1));
-	}
+	});
 	assert_eq!(Expand(&mut s, "h0"), Some("DEEP".to_string()));
 }
 
@@ -155,17 +155,19 @@ fn TestExpandRecursiveDepthFiveIsByteIdenticalToDefault() {
 	let mut SDefault = AphroditeState::default();
 	let mut SFive = AphroditeState::default();
 	SFive.RecursiveDepth = 5;
-	for (k, v) in [
+	[
 		("h0", "<<<CCR:h1|t|1>>>"),
 		("h1", "<<<CCR:h2|t|1>>>"),
 		("h2", "<<<CCR:h3|t|1>>>"),
 		("h3", "<<<CCR:h4|t|1>>>"),
 		("h4", "<<<CCR:h5|t|1>>>"),
 		("h5", "DEEP"),
-	] {
+	]
+	.into_iter()
+	.for_each(|(k, v)| {
 		SDefault.InlineStorePut(k.into(), v.into());
 		SFive.InlineStorePut(k.into(), v.into());
-	}
+	});
 	assert_eq!(Expand(&mut SDefault, "h0"), Expand(&mut SFive, "h0"));
 	assert_eq!(Expand(&mut SDefault, "h0"), Some("DEEP".to_string()));
 }

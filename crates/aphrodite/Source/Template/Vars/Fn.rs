@@ -16,11 +16,11 @@ use crate::Template::Vars::{Base::Fn::Fn as Base, Code::Fn::Fn as Code, Computed
 /// exactly as the Python side did.
 pub(crate) fn Fn(TypeStr:&str, Content:&str) -> HashMap<String, String> {
 	let mut Vars = Base(TypeStr, Content);
-	if matches!(
-		TypeStr,
-		"code" | "source_code" | "code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh"
-	) {
-		Code(&mut Vars, TypeStr, Content);
+	match TypeStr {
+		"code" | "source_code" | "code_rust" | "code_python" | "code_go" | "code_js" | "code_ts" | "code_sh" => {
+			Code(&mut Vars, TypeStr, Content);
+		},
+		_ => (),
 	}
 	Computed(&mut Vars);
 	Vars

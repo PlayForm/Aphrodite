@@ -101,7 +101,7 @@ fn TestByTypeJSONDeterministic() {
 	// would serialize differently across calls. BTreeMap must make them
 	// byte-identical and sorted.
 	let mut s = AphroditeState::default();
-	for (i, (hash, CCRType, Preview)) in [
+	[
 		("h1", "text", "[text] one"),
 		("h2", "code_rust", "[code:1 1L]"),
 		("h3", "diff", "[diff:1 +1/-0]"),
@@ -109,7 +109,7 @@ fn TestByTypeJSONDeterministic() {
 	]
 	.iter()
 	.enumerate()
-	{
+	.for_each(|(i, (hash, CCRType, Preview))| {
 		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:hash.to_string(),
 			CCRType:CCRType.to_string(),
@@ -119,7 +119,7 @@ fn TestByTypeJSONDeterministic() {
 			Center:None,
 			meta:None,
 		});
-	}
+	});
 
 	let First = BuildCatalog(&s, "full");
 	let Second = BuildCatalog(&s, "full");
@@ -135,17 +135,20 @@ fn TestTableSortsByTurnAndCapsTwenty() {
 	// The last-recorded marker carries the OLDEST turn: reverse
 	// insertion order would wrongly place it in the newest window.
 	let mut s = AphroditeState::default();
-	for i in 0..25 {
+	(0..25).for_each(|i| {
 		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:format!("h{:02}", i),
 			CCRType:"text".into(),
 			Size:100,
 			Preview:format!("[text] entry {}", i),
-			Turn:if i == 24 { 1 } else { i },
+			Turn:match i == 24 {
+				true => 1,
+				false => i,
+			},
 			Center:None,
 			meta:None,
 		});
-	}
+	});
 	let Table = FormatCatalogTable(&s);
 	let Rows:Vec<&str> = Table.lines().collect();
 	// Newest 20 by turn (23 down to 4): the first data row is h23.

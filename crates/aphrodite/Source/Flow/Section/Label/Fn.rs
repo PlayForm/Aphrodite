@@ -12,22 +12,15 @@ use crate::State::Struct::AphroditeState;
 /// DEV-ONLY: short label for an injected section, derived from its first
 /// line (the section order is fixed by [`BuildTurnContext`]).
 pub(crate) fn SectionLabel(s:&str) -> &'static str {
-	if s.starts_with("[directives") {
-		"directives"
-	} else if s.starts_with("[nudge") {
-		"nudges"
-	} else if s.starts_with("[engine-offload") {
-		"engine_offload"
-	} else if s.starts_with("[retrieval") {
-		"retrieval"
-	} else if s.starts_with("[auto-expand") {
-		"auto_expand"
-	} else if s.starts_with("[recall]") {
-		"recall"
-	} else if s.starts_with("[aphrodite: first-turn") {
-		"session_inject"
-	} else {
-		"other"
+	match () {
+		_ if s.starts_with("[directives") => "directives",
+		_ if s.starts_with("[nudge") => "nudges",
+		_ if s.starts_with("[engine-offload") => "engine_offload",
+		_ if s.starts_with("[retrieval") => "retrieval",
+		_ if s.starts_with("[auto-expand") => "auto_expand",
+		_ if s.starts_with("[recall]") => "recall",
+		_ if s.starts_with("[aphrodite: first-turn") => "session_inject",
+		_ => "other",
 	}
 }
 

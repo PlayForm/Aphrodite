@@ -23,19 +23,25 @@ pub fn ReadPaths(Paths:&[String]) -> Vec<(String, ReadOutcome)> {
 		.iter()
 		.map(|PathStr| {
 			let path = Path::new(PathStr);
-			if let Some(Reason) = RefuseReason(path) {
-				return (PathStr.clone(), ReadOutcome::Refused { Reason });
+			match RefuseReason(path) {
+				Some(Reason) => return (PathStr.clone(), ReadOutcome::Refused { Reason }),
+				None => (),
 			}
-			if !path.is_file() {
-				return (PathStr.clone(), ReadOutcome::Missing);
+
+			match !path.is_file() {
+				true => return (PathStr.clone(), ReadOutcome::Missing),
+				false => (),
 			}
+
 			let Size = match std::fs::metadata(path) {
 				Ok(m) => m.len(),
 				Err(_) => return (PathStr.clone(), ReadOutcome::Error),
 			};
-			if Size > MaximumPrefetchSize {
-				return (PathStr.clone(), ReadOutcome::SkippedSize { Size });
+			match Size > MaximumPrefetchSize {
+				true => return (PathStr.clone(), ReadOutcome::SkippedSize { Size }),
+				false => (),
 			}
+
 			match std::fs::read_to_string(path) {
 				Ok(Content) => (PathStr.clone(), ReadOutcome::Loaded { Content, Size }),
 				Err(_) => (PathStr.clone(), ReadOutcome::Error),

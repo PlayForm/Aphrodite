@@ -39,9 +39,11 @@ pub extern "C" fn AphroditeDispatch(
 	};
 
 	let Content = Args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-	if Content.len() > MaximumContent {
-		return ToJSONError("content exceeds 16MB limit");
+	match Content.len() > MaximumContent {
+		true => return ToJSONError("content exceeds 16MB limit"),
+		false => (),
 	}
+
 	let Tool = Args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 
 	// F9: read prefetch files from disk BEFORE taking the HANDLES lock, not
@@ -53,12 +55,13 @@ pub extern "C" fn AphroditeDispatch(
 	// `Args`/`Content`/`Tool` for the other match arms, so it can't also
 	// `move` this out of an owned `Option` - a `RefCell` lets the "prefetch"
 	// arm take it through a shared capture instead.
-	let PrefetchOutcomes = std::cell::RefCell::new(if name == "prefetch" {
-		let Paths = Args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-		let PathStrings:Vec<String> = Paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
-		Some(crate::Prefetch::Read::Entry::Fn::ReadPaths(&PathStrings))
-	} else {
-		None
+	let PrefetchOutcomes = std::cell::RefCell::new(match name == "prefetch" {
+		true => {
+			let Paths = Args.get("paths").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+			let PathStrings:Vec<String> = Paths.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+			Some(crate::Prefetch::Read::Entry::Fn::ReadPaths(&PathStrings))
+		},
+		false => None,
 	});
 
 	match WithState(Hid, |s| {

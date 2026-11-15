@@ -52,9 +52,11 @@ pub(crate) fn MarkerHintEnabled() -> bool { MarkerHintFlag.load(Ordering::Relaxe
 /// is enabled AND a hint string is registered (port of Python's
 /// `hint = hint_str if CCR_MARKER_HINT and hint_str else ""`).
 pub(super) fn CurrentHint() -> String {
-	if !MarkerHintEnabled() {
-		return String::new();
+	match !MarkerHintEnabled() {
+		true => return String::new(),
+		false => (),
 	}
+
 	MarkerHint.read().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
 }
 

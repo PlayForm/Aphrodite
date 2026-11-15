@@ -36,47 +36,54 @@ pub(crate) fn Fn(Src:&Path, Dest:&Path, DylibIDName:Option<&str>, Mode:u32) -> a
 		.status()
 		.map(|s| s.success())
 		.unwrap_or(false);
-	if !DittoOk {
-		fs::copy(Src, Dest).with_context(|| format!("copy {} to {}", Src.display(), Dest.display()))?;
-		match Command::new("xattr").args(["-c", Dest.to_str().unwrap_or("")]).output() {
-			Ok(Out) if Out.status.success() => {},
-			_ => {
-				eprintln!(
-					"warning: xattr -c failed or unavailable for {} - Gatekeeper may still kill this artifact",
-					Dest.display()
-				)
-			},
-		}
+
+	match !DittoOk {
+		true => {
+			fs::copy(Src, Dest).with_context(|| format!("copy {} to {}", Src.display(), Dest.display()))?;
+			match Command::new("xattr").args(["-c", Dest.to_str().unwrap_or("")]).output() {
+				Ok(Out) if Out.status.success() => {},
+				_ => {
+					eprintln!(
+						"warning: xattr -c failed or unavailable for {} - Gatekeeper may still kill this artifact",
+						Dest.display()
+					)
+				},
+			}
+		},
+		false => (),
 	}
-	if let Some(name) = DylibIDName {
-		let Rpath = format!("@rpath/{name}");
-		match Command::new("install_name_tool")
-			.args(["-id", &Rpath, Dest.to_str().unwrap_or("")])
-			.output()
-		{
-			Ok(Out) if Out.status.success() => {},
-			_ => {
-				eprintln!(
-					"warning: install_name_tool failed or unavailable for {} - Gatekeeper may kill Hermes when \
-					 loading this dylib; install Xcode Command Line Tools and re-run setup",
-					Dest.display()
-				)
-			},
-		}
-		// Ad-hoc re-sign: install_name_tool invalidates the dylib's embedded
-		// signature on arm64.
-		match Command::new("codesign")
-			.args(["-f", "-s", "-", Dest.to_str().unwrap_or("")])
-			.output()
-		{
-			Ok(Out) if Out.status.success() => {},
-			_ => {
-				eprintln!(
-					"warning: codesign failed or unavailable for {} - Gatekeeper may still kill this dylib",
-					Dest.display()
-				)
-			},
-		}
+	match DylibIDName {
+		Some(name) => {
+			let Rpath = format!("@rpath/{name}");
+			match Command::new("install_name_tool")
+				.args(["-id", &Rpath, Dest.to_str().unwrap_or("")])
+				.output()
+			{
+				Ok(Out) if Out.status.success() => {},
+				_ => {
+					eprintln!(
+						"warning: install_name_tool failed or unavailable for {} - Gatekeeper may kill Hermes when \
+						 loading this dylib; install Xcode Command Line Tools and re-run setup",
+						Dest.display()
+					)
+				},
+			}
+			// Ad-hoc re-sign: install_name_tool invalidates the dylib's embedded
+			// signature on arm64.
+			match Command::new("codesign")
+				.args(["-f", "-s", "-", Dest.to_str().unwrap_or("")])
+				.output()
+			{
+				Ok(Out) if Out.status.success() => {},
+				_ => {
+					eprintln!(
+						"warning: codesign failed or unavailable for {} - Gatekeeper may still kill this dylib",
+						Dest.display()
+					)
+				},
+			}
+		},
+		None => (),
 	}
 	SecurePerms(Dest, Mode)?;
 	Ok(())

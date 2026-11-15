@@ -16,9 +16,12 @@ proptest! {
 	#[test]
 	fn PropFindMarkersNeverPanicsAndRoundtrips(s in ".*") {
 		let Markers = FindMarkers(&s);
-		for (Marker, hash) in Markers {
-			let Parsed = ParseMarkerHash(&Marker);
-			prop_assert_eq!(Parsed, Some(hash));
-		}
+		Markers
+			.into_iter()
+			.try_for_each(|(Marker, hash)| -> Result<(), proptest::test_runner::TestCaseError> {
+				let Parsed = ParseMarkerHash(&Marker);
+				prop_assert_eq!(Parsed, Some(hash));
+				Ok(())
+			})?;
 	}
 }

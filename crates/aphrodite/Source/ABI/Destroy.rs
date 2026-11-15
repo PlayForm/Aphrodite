@@ -16,7 +16,10 @@ use crate::ABI::{Guard::Cstr, Handle::Table::Handles};
 /// "invalid handle" - it never revives the session.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeDestroy(Handle:*const c_char) {
-	if let Ok(Hid) = unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
-		Handles().as_mut().and_then(|m| m.remove(&Hid));
+	match unsafe { Cstr(Handle) }.unwrap_or_default().parse::<usize>() {
+		Ok(Hid) => {
+			Handles().as_mut().and_then(|m| m.remove(&Hid));
+		},
+		Err(_) => (),
 	}
 }

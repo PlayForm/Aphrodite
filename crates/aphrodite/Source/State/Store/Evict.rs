@@ -9,15 +9,24 @@ impl AphroditeState {
 	/// the order is empty (map and order are kept in sync, so this guards
 	/// against divergence rather than a reachable state).
 	pub(super) fn EvictOverBudget(&mut self) {
-		while self.InlineStore.len() > InlineMaximum
-			|| (self.InlineStoreBytes > self.InlineStoreByteBudget && !self.InlineStore.is_empty())
-		{
-			if let Some((lru, _)) = self.InlineOrder.pop_lru() {
-				if let Some(c) = self.InlineStore.remove(&lru) {
-					self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(c.len());
-				}
-			} else {
-				break;
+		loop {
+			match self.InlineStore.len() > InlineMaximum
+				|| (self.InlineStoreBytes > self.InlineStoreByteBudget && !self.InlineStore.is_empty())
+			{
+				true => {
+					match self.InlineOrder.pop_lru() {
+						Some((lru, _)) => {
+							match self.InlineStore.remove(&lru) {
+								Some(c) => {
+									self.InlineStoreBytes = self.InlineStoreBytes.saturating_sub(c.len());
+								},
+								None => (),
+							}
+						},
+						None => break,
+					}
+				},
+				false => break,
 			}
 		}
 	}

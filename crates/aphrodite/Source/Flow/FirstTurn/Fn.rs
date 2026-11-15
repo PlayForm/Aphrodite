@@ -11,8 +11,10 @@ use crate::State::Struct::AphroditeState;
 /// template. Returns empty string if `state.session_inject` is empty or the
 /// turn has advanced past 0 (first-turn only).
 pub fn BuildFirstTurnInjection(State:&AphroditeState) -> String {
-	if State.SessionInject.is_empty() || State.TurnCounter > 0 {
-		return String::new();
+	match State.SessionInject.is_empty() || State.TurnCounter > 0 {
+		true => return String::new(),
+		false => (),
 	}
+
 	State.SessionInject.replace("{VERSION}", env!("CARGO_PKG_VERSION"))
 }

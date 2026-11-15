@@ -8,10 +8,10 @@ use crate::{
 #[test]
 fn TestArchiveEviction() {
 	let mut s = AphroditeState::default();
-	for i in 0..55 {
+	(0..55).for_each(|i| {
 		ArchiveTurn(&mut s, &format!("hash{}", i), "summary", 100);
 		s.TurnCounter += 1;
-	}
+	});
 	assert!(s.ConvIndex.len() <= 50);
 	assert!(!s.ConvIndex.contains_key(&1));
 }

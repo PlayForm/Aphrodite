@@ -73,9 +73,12 @@ pub(super) fn Fn(DestName:&str, Dest:&Path) -> anyhow::Result<()> {
 			// MANDATORY - a missing file, a missing asset entry, or a mismatch is a
 			// hard refusal (Err -> setup exits non-zero), never a skipped check,
 			// matching download.sh/download.ps1's in-tree sums doctrine.
-			if let Err(e) = Checksum::Fn(&ReleaseDirectory, Triple, &RemoteName, Dest) {
-				let _ = fs::remove_file(Dest);
-				return Err(e.context(format!("verify the checksum of {RemoteName}")));
+			match Checksum::Fn(&ReleaseDirectory, Triple, &RemoteName, Dest) {
+				Err(e) => {
+					let _ = fs::remove_file(Dest);
+					return Err(e.context(format!("verify the checksum of {RemoteName}")));
+				},
+				Ok(()) => (),
 			}
 			#[cfg(unix)]
 			SecurePerms(Dest, 0o755)?;

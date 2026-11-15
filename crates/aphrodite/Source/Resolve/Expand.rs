@@ -38,24 +38,32 @@ pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 	let mut Resolved = HashMap::new();
 	let mut Visited = Vec::new();
 	let Out = Recursive::Fn(State, HashValue, 0, &mut Resolved, &mut Visited);
-	if let Some(T0) = T0 {
-		let Us = T0.elapsed().as_micros() as u64;
-		crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::Retrieve, Us);
-		crate::Debug::Log::At::Fn::Fn(
-			State.DebugLevel,
-			"retrieve",
-			&[
-				("hash", HashValue.to_string()),
-				("found", Out.is_some().to_string()),
-				("depth_cap", State.RecursiveDepth.to_string()),
-				("elapsed_us", Us.to_string()),
-			],
-		);
-		if Out.is_none() {
-			// A miss degrades to a warning (dev metrics).
-			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::RetrieveMisses);
-			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Warnings);
-		}
+	match T0 {
+		Some(T0) => {
+			let Us = T0.elapsed().as_micros() as u64;
+			crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::Retrieve, Us);
+			crate::Debug::Log::At::Fn::Fn(
+				State.DebugLevel,
+				"retrieve",
+				&[
+					("hash", HashValue.to_string()),
+					("found", Out.is_some().to_string()),
+					("depth_cap", State.RecursiveDepth.to_string()),
+					("elapsed_us", Us.to_string()),
+				],
+			);
+
+			match Out.is_none() {
+				true => {
+					// A miss degrades to a warning (dev metrics).
+					crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::RetrieveMisses);
+					crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Warnings);
+				},
+				false => (),
+			}
+		},
+		None => (),
 	}
+
 	Out
 }

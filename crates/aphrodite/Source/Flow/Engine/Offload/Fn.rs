@@ -30,9 +30,11 @@ pub(crate) fn EngineOffloadBlock(State:&mut AphroditeState) -> String {
 /// the context engine is enabled. Disabled => the engine is never consulted
 /// (this is the trigger's only call site) and nothing is injected.
 pub(crate) fn EngineArchivePrompt(State:&mut AphroditeState) -> Option<String> {
-	if !State.ContextEngineEnabled {
-		return None;
+	match !State.ContextEngineEnabled {
+		true => return None,
+		false => (),
 	}
+
 	crate::Session::Engine::Fn::EngineMaybeArchive(State)
 }
 

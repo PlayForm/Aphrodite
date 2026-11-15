@@ -33,7 +33,8 @@ fn TestApplyPreviewsWiresPreviewMaximumChars() {
 	// Absent/0 -> unlimited (legacy behavior), and restore the global.
 	Configuration::default().ApplyPreviews();
 	assert_eq!(crate::Preview::State::Get::Fn(), 0);
-	if let Some(v) = EnvironmentBackup {
-		unsafe { std::env::set_var("APHRODITE_PREVIEW_MAX_CHARS", v) }
+	match EnvironmentBackup {
+		Some(v) => unsafe { std::env::set_var("APHRODITE_PREVIEW_MAX_CHARS", v) },
+		None => {},
 	}
 }

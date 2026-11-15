@@ -30,7 +30,10 @@ pub(crate) async fn Fn(
 	let mut FinalErrorWasTimeout = false;
 	// 02-F2: a `"stream": true` request goes out on `StreamClient` (no
 	// total timeout), not the bounded `Client` - see its doc comment.
-	let HttpClient = if BodyWantsStream(&BodyVec) { &State.StreamClient } else { &State.Client };
+	let HttpClient = match BodyWantsStream(&BodyVec) {
+		true => &State.StreamClient,
+		false => &State.Client,
+	};
 	// F10 fix (above) builds `BodyVec` once (one Vec alloc). Convert to
 	// `Bytes` here - outside the retry loop - so each attempt clones in O(1)
 	// (refcount) instead of copying the whole payload. The no-retry common

@@ -20,10 +20,9 @@ pub fn Fn(Content:&str, Query:Option<&str>) -> String {
 				.lines()
 				.filter(|Line| Line.to_ascii_lowercase().contains(&QLower))
 				.collect();
-			if Filtered.is_empty() {
-				format!("[no lines matching {:?} in {} lines]", q, Content.lines().count())
-			} else {
-				Filtered.join("\n")
+			match Filtered.is_empty() {
+				true => format!("[no lines matching {:?} in {} lines]", q, Content.lines().count()),
+				false => Filtered.join("\n"),
 			}
 		},
 		_ => Content.to_string(),

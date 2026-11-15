@@ -8,13 +8,15 @@
 /// prose, and a preview that carried prose in `{exit}` would break every
 /// template that compares it.
 pub(crate) fn Fn(Lines:&[&str]) -> String {
-	for l in Lines {
-		if let Some((_, Rest)) = l.split_once("EXIT:") {
+	Lines
+		.iter()
+		.find_map(|l| {
+			let Rest = l.split_once("EXIT:").map(|(_, Rest)| Rest)?;
 			let Code:String = Rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-			if !Code.is_empty() {
-				return Code;
+			match Code.is_empty() {
+				true => None,
+				false => Some(Code),
 			}
-		}
-	}
-	"?".to_string()
+		})
+		.unwrap_or_else(|| "?".to_string())
 }

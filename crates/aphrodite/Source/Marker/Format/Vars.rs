@@ -21,48 +21,68 @@ pub(crate) fn SubstituteVars(Tmpl:&str, Vars:&[(&str, &str)]) -> String {
 	let Chars:Vec<char> = Tmpl.chars().collect();
 	let mut Out = String::with_capacity(Tmpl.len() + 16);
 	let mut i = 0;
-	while i < Chars.len() {
-		let c = Chars[i];
-		if c == '{' {
-			if i + 1 < Chars.len() && Chars[i + 1] == '{' {
-				Out.push('{');
-				i += 2;
-				continue;
-			}
-			// Try to parse `{name}` with a clean [A-Za-z0-9_] name.
-			let mut j = i + 1;
-			let mut name = String::new();
-			while j < Chars.len() && (Chars[j].is_ascii_alphanumeric() || Chars[j] == '_') {
-				name.push(Chars[j]);
-				j += 1;
-			}
-			if !name.is_empty() && j < Chars.len() && Chars[j] == '}' {
-				let Found = Vars.iter().find(|(k, _)| *k == name.as_str());
-				if let Some((_, v)) = Found {
-					Out.push_str(v);
-					i = j + 1;
-					continue;
+
+	loop {
+		match Chars.get(i).copied() {
+			Some('{') => {
+				match Chars.get(i + 1) {
+					Some('{') => {
+						Out.push('{');
+						i += 2;
+						continue;
+					},
+					_ => (),
 				}
-			}
-			// Unknown var or malformed group: emit the opening brace
-			// verbatim and keep scanning - the rest of the group text is
-			// then emitted literally.
-			Out.push('{');
-			i += 1;
-			continue;
+				// Try to parse `{name}` with a clean [A-Za-z0-9_] name.
+				let mut j = i + 1;
+				let mut name = String::new();
+				loop {
+					match Chars.get(j) {
+						Some(c) if c.is_ascii_alphanumeric() || *c == '_' => {
+							name.push(*c);
+							j += 1;
+						},
+						_ => break,
+					}
+				}
+				match !name.is_empty() && Chars.get(j) == Some(&'}') {
+					true => {
+						match Vars.iter().find(|(k, _)| *k == name.as_str()) {
+							Some((_, v)) => {
+								Out.push_str(v);
+								i = j + 1;
+								continue;
+							},
+							None => (),
+						}
+					},
+					false => (),
+				}
+				// Unknown var or malformed group: emit the opening brace
+				// verbatim and keep scanning - the rest of the group text is
+				// then emitted literally.
+				Out.push('{');
+				i += 1;
+			},
+			Some('}') => {
+				match Chars.get(i + 1) {
+					Some('}') => {
+						Out.push('}');
+						i += 2;
+					},
+					_ => {
+						Out.push('}');
+						i += 1;
+					},
+				}
+			},
+			Some(c) => {
+				Out.push(c);
+				i += 1;
+			},
+			None => break,
 		}
-		if c == '}' {
-			if i + 1 < Chars.len() && Chars[i + 1] == '}' {
-				Out.push('}');
-				i += 2;
-				continue;
-			}
-			Out.push('}');
-			i += 1;
-			continue;
-		}
-		Out.push(c);
-		i += 1;
 	}
+
 	Out
 }

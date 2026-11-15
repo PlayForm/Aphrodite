@@ -13,11 +13,16 @@ use std::path::PathBuf;
 /// sets it wants its own directory even in a test build, and the scratch dir is
 /// only the fallback for a test that forgot to.
 pub(crate) fn Fn() -> PathBuf {
-	if let Ok(Home) = std::env::var("APHRODITE_DEBUG_HOME")
-		&& !Home.is_empty()
-	{
-		return PathBuf::from(Home);
+	match std::env::var("APHRODITE_DEBUG_HOME") {
+		Ok(Home) => {
+			match !Home.is_empty() {
+				true => return PathBuf::from(Home),
+				false => (),
+			}
+		},
+		Err(_) => {},
 	}
+
 	#[cfg(test)]
 	{
 		let Scratch = std::env::temp_dir().join("aphrodite-test-debug-home");

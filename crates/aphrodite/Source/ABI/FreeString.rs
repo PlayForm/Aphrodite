@@ -14,9 +14,10 @@ use std::{ffi::CString, os::raw::c_char};
 /// unconditional.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeFreeString(s:*mut c_char) {
-	if !s.is_null() {
-		unsafe {
+	match !s.is_null() {
+		true => unsafe {
 			let _ = CString::from_raw(s);
-		}
+		},
+		false => (),
 	}
 }

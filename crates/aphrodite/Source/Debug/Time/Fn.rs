@@ -21,14 +21,23 @@ pub(crate) fn Fn() -> String {
 	// Howard Hinnant's civil_from_days: days -> (y, m, d) in the proleptic
 	// Gregorian calendar.
 	let z = Days as i64 + 719_468;
-	let Era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+	let Era = (match z >= 0 {
+		true => z,
+		false => z - 146_096,
+	}) / 146_097;
 	let Doe = z - Era * 146_097; // [0, 146096]
 	let Yoe = (Doe - Doe / 1_460 + Doe / 36_524 - Doe / 146_096) / 365; // [0, 399]
 	let y = Yoe + Era * 400;
 	let Doy = Doe - (365 * Yoe + Yoe / 4 - Yoe / 100); // [0, 365]
 	let Mp = (5 * Doy + 2) / 153; // [0, 11]
 	let d = (Doy - (153 * Mp + 2) / 5 + 1) as u32; // [1, 31]
-	let m = if Mp < 10 { Mp + 3 } else { Mp - 9 } as u32; // [1, 12]
-	let y = (if m <= 2 { y + 1 } else { y }) as u32;
+	let m = (match Mp < 10 {
+		true => Mp + 3,
+		false => Mp - 9,
+	}) as u32; // [1, 12]
+	let y = (match m <= 2 {
+		true => y + 1,
+		false => y,
+	}) as u32;
 	format!("{y:04}-{m:02}-{d:02}T{Hh:02}:{Mm:02}:{Ss:02}.{Micros:06}Z")
 }

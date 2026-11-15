@@ -17,6 +17,9 @@ impl Struct {
 	/// `None` rather than to a zero-length cap.
 	pub fn ApplyPreviews(&self) {
 		let Maximum = self.GetU64("APHRODITE_PREVIEW_MAX_CHARS", "previews", "preview_max_chars", 0);
-		crate::Preview::State::Set::Fn(if Maximum == 0 { None } else { Some(Maximum.min(u32::MAX as u64) as u32) });
+		crate::Preview::State::Set::Fn(match Maximum == 0 {
+			true => None,
+			false => Some(Maximum.min(u32::MAX as u64) as u32),
+		});
 	}
 }

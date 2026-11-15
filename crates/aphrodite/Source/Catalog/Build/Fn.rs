@@ -14,25 +14,28 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 		.RecentMarkers
 		.iter()
 		.map(|m| {
-			if Mode == "toc" {
-				serde_json::json!({
-					// Full 40-char hash: a truncated one is unresolvable via
-					// exact-match retrieval (F3). Truncation is reserved for the
-					// human-readable markdown table (format_catalog_table), not
-					// machine-consumed JSON.
-					"hash": &m.hash,
-					"type": m.CCRType,
-					"size": m.Size,
-					"preview": FloorBoundary(&m.Preview, 120),
-				})
-			} else {
-				serde_json::json!({
-					"hash": m.hash,
-					"type": m.CCRType,
-					"size": m.Size,
-					"preview": FloorBoundary(&m.Preview, 120),
-					"turn": m.Turn,
-				})
+			match Mode == "toc" {
+				true => {
+					serde_json::json!({
+						// Full 40-char hash: a truncated one is unresolvable via
+						// exact-match retrieval (F3). Truncation is reserved for the
+						// human-readable markdown table (format_catalog_table), not
+						// machine-consumed JSON.
+						"hash": &m.hash,
+						"type": m.CCRType,
+						"size": m.Size,
+						"preview": FloorBoundary(&m.Preview, 120),
+					})
+				},
+				false => {
+					serde_json::json!({
+						"hash": m.hash,
+						"type": m.CCRType,
+						"size": m.Size,
+						"preview": FloorBoundary(&m.Preview, 120),
+						"turn": m.Turn,
+					})
+				},
 			}
 		})
 		.collect();
@@ -43,9 +46,10 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 	// `ByType` object and identical states produce different JSON across
 	// calls.
 	let mut ByType:BTreeMap<String, Vec<String>> = BTreeMap::new();
-	for m in &State.RecentMarkers {
+
+	State.RecentMarkers.iter().for_each(|m| {
 		ByType.entry(m.CCRType.clone()).or_default().push(m.hash.clone());
-	}
+	});
 
 	let ByTypeJSON:serde_json::Map<String, serde_json::Value> = ByType
 		.iter()
@@ -82,17 +86,21 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 	});
 
 	// TOC mode adds retrieve recommendations
-	if Mode == "toc" && !Items.is_empty() {
-		let Recommendations:Vec<String> = State
-			.RecentMarkers
-			.iter()
-			.take(10)
-			.map(|m| format!("{} ({}B) - {}", m.CCRType, m.Size, FloorBoundary(&m.Preview, 60)))
-			.collect();
-		Result["recommendations"] = serde_json::json!(Recommendations);
-		// `[templates.prompts] search_hint` (pre-Rust port); falls back to
-		// the compiled-in string when the key is absent.
-		Result["hint"] = serde_json::json!(crate::Flow::Prompt::Render::Fn::RenderPrompt(State, "search_hint", &[]));
+	match Mode == "toc" && !Items.is_empty() {
+		true => {
+			let Recommendations:Vec<String> = State
+				.RecentMarkers
+				.iter()
+				.take(10)
+				.map(|m| format!("{} ({}B) - {}", m.CCRType, m.Size, FloorBoundary(&m.Preview, 60)))
+				.collect();
+			Result["recommendations"] = serde_json::json!(Recommendations);
+			// `[templates.prompts] search_hint` (pre-Rust port); falls back to
+			// the compiled-in string when the key is absent.
+			Result["hint"] =
+				serde_json::json!(crate::Flow::Prompt::Render::Fn::RenderPrompt(State, "search_hint", &[]));
+		},
+		false => (),
 	}
 
 	Result

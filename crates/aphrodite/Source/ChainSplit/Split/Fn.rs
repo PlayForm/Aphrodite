@@ -20,21 +20,29 @@ pub fn Fn(command:&str) -> Option<Vec<Segment>> {
 			'\\' => {
 				// Backslash continuation: swallow the next char (newline or
 				// escaped char) so a multi-line command stays one segment.
-				if let Some(n) = Chars.next() {
-					Current.push('\\');
-					Current.push(n);
+				match Chars.next() {
+					Some(n) => {
+						Current.push('\\');
+						Current.push(n);
+					},
+					None => (),
 				}
+
 				continue;
 			},
 			'&' if !InSingle && !InDouble => {
 				// `&&` separator; a lone `&` (async) is left alone.
-				if Chars.peek() == Some(&'&') {
-					Chars.next();
-					PushSegment(&mut Segments, &mut Current, SegIndex);
-					SegIndex += 1;
-					continue;
+				match Chars.peek() == Some(&'&') {
+					true => {
+						Chars.next();
+						PushSegment(&mut Segments, &mut Current, SegIndex);
+						SegIndex += 1;
+					},
+					false => {
+						Current.push(c);
+					},
 				}
-				Current.push(c);
+
 				continue;
 			},
 			';' if !InSingle && !InDouble => {
@@ -57,23 +65,31 @@ pub fn Fn(command:&str) -> Option<Vec<Segment>> {
 
 	// Require at least 2 non-empty segments to be worth rewriting.
 	let Segments:Vec<Segment> = Segments.into_iter().filter(|s| !s.command.trim().is_empty()).collect();
-	if Segments.len() < 2 {
-		return None;
+
+	match Segments.len() < 2 {
+		true => return None,
+		false => (),
 	}
+
 	// Refuse chains containing a heredoc marker or a `for`/`while` loop
 	// spanning segments - rewriting those would corrupt control flow.
-	for s in &Segments {
+	match Segments.iter().any(|s| {
 		let Lower = s.command.to_lowercase();
-		if Lower.contains("<<") || Lower.contains("for ") || Lower.contains("while ") {
-			return None;
-		}
+
+		Lower.contains("<<") || Lower.contains("for ") || Lower.contains("while ")
+	}) {
+		true => None,
+		false => Some(Segments),
 	}
-	Some(Segments)
 }
 
 fn PushSegment(Segments:&mut Vec<Segment>, Current:&mut String, Index:usize) {
-	if !Current.trim().is_empty() {
-		Segments.push(Segment { Index, command:Current.trim().to_string() });
+	match !Current.trim().is_empty() {
+		true => {
+			Segments.push(Segment { Index, command:Current.trim().to_string() });
+		},
+		false => (),
 	}
+
 	Current.clear();
 }

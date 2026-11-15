@@ -9,14 +9,17 @@ use crate::Debug::Root::Const::RootSession;
 /// make `LogPath` answer `None` for a session that HAS a root - the log would
 /// silently go nowhere.
 pub fn Fn(Root:&str) {
-	if Root.is_empty() {
-		return;
+	match Root.is_empty() {
+		true => return,
+		false => (),
 	}
+
 	let mut Guard = RootSession
 		.get_or_init(|| std::sync::Mutex::new(String::new()))
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
-	if Guard.is_empty() || *Guard != Root {
-		*Guard = Root.to_string();
+	match Guard.is_empty() || *Guard != Root {
+		true => *Guard = Root.to_string(),
+		false => (),
 	}
 }

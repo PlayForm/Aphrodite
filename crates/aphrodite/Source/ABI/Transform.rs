@@ -14,9 +14,11 @@ stateful!(
 	/// whose store is full of something unretrievable.
 	AphroditeTransform,
 	|s, Content:*const c_char, Tool:*const c_char| {
-		if Content.len() > MaximumContent {
-			return serde_json::json!({"error":"content exceeds 16MB limit"});
+		match Content.len() > MaximumContent {
+			true => return serde_json::json!({"error":"content exceeds 16MB limit"}),
+			false => (),
 		}
+
 		crate::Hook::ToolResult::Entry::Fn::TransformToolResult(s, &Content, &Tool)
 	}
 );

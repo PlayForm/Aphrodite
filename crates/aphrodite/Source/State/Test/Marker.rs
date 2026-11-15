@@ -6,7 +6,7 @@ use crate::State::{Const::RecentMarkersCap, Marker::Struct::MarkerEntry, Struct:
 fn TestRecordMarkerEviction() {
 	let mut s = AphroditeState::default();
 	const Recorded:usize = 250;
-	for i in 0..Recorded {
+	(0..Recorded).for_each(|i| {
 		s.RecordMarker(MarkerEntry {
 			hash:format!("h{}", i),
 			CCRType:"text".into(),
@@ -16,7 +16,7 @@ fn TestRecordMarkerEviction() {
 			Center:None,
 			meta:None,
 		});
-	}
+	});
 	assert!(s.RecentMarkers.len() <= RecentMarkersCap);
 	// Eviction arithmetic: RECORDED - cap = 250 - 200 = 50 dropped from the
 	// front; front eviction keeps index zero as the oldest survivor (h50).

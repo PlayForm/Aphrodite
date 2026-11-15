@@ -87,9 +87,10 @@ fn TestOneShotNudgeRendersOnceThenPurged() {
 #[test]
 fn TestNudgeCapDropsOldest() {
 	let mut s = crate::State::Struct::AphroditeState::default();
-	for i in 0..5 {
+
+	(0..5).for_each(|i| {
 		crate::Flow::Nudge::Push::Fn::PushNudge(&mut s, &format!("nudge number {i}"), 10);
-	}
+	});
 	assert_eq!(s.EphemeralDirectives.len(), 4, "cap must hold at 4 stored entries");
 	assert!(
 		!s.EphemeralDirectives

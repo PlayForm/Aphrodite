@@ -12,8 +12,10 @@ use crate::Debug::{Path::ForRoot::Fn::Fn as LogPathForRoot, Root::Current::Fn::F
 /// lives in the same place. Silence until a root is known is the honest answer.
 pub(crate) fn Fn() -> Option<PathBuf> {
 	let Root = CurrentRootSession();
-	if Root.is_empty() {
-		return None;
+	match Root.is_empty() {
+		true => return None,
+		false => (),
 	}
+
 	Some(LogPathForRoot(&Root))
 }

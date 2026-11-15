@@ -11,10 +11,18 @@ use crate::{Session::Turn::Fn::ConvIndexCap, State::Struct::AphroditeState};
 pub fn ArchiveTurn(State:&mut AphroditeState, hash:&str, Summary:&str, Size:usize) {
 	let Turn = State.TurnCounter;
 	State.ConvIndex.insert(Turn, (hash.to_string(), Summary.to_string(), Size));
-	if State.ConvIndex.len() > ConvIndexCap {
-		let Oldest = State.ConvIndex.keys().min().copied();
-		if let Some(Key) = Oldest {
-			State.ConvIndex.remove(&Key);
-		}
+
+	match State.ConvIndex.len() > ConvIndexCap {
+		true => {
+			let Oldest = State.ConvIndex.keys().min().copied();
+
+			match Oldest {
+				Some(Key) => {
+					State.ConvIndex.remove(&Key);
+				},
+				None => (),
+			}
+		},
+		false => (),
 	}
 }

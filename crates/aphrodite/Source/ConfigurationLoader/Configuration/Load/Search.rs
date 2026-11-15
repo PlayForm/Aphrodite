@@ -15,30 +15,38 @@ impl Struct {
 	/// one further down the search. Only when the search ends on defaults is
 	/// the failure recorded on `ParseFailure`.
 	pub fn Load() -> Self {
-		let SearchPaths = vec![PathBuf::from("aphrodite.toml"), crate::Home::Configuration::Fn::Fn()];
+		let SearchPaths = [PathBuf::from("aphrodite.toml"), crate::Home::Configuration::Fn::Fn()];
 
 		let mut ParseFailure:Option<String> = None;
-		for path in &SearchPaths {
-			if let Ok(Content) = std::fs::read_to_string(path) {
-				match Content.parse::<toml::Table>() {
-					Ok(Table) => return Self { raw:Table, Overrides:HashMap::new(), ParseFailure:None },
-					Err(Error) => {
-						// Fix 22 (inspection): a found-but-broken TOML file
-						// used to fall through silently to the next search
-						// path (or defaults) - warn so a broken local
-						// aphrodite.toml is not ignored without indication.
-						// `ParseFailure` is only recorded when the search
-						// ends on defaults (a later path may still yield a
-						// valid config).
-						WarnParseFailure(path, &Error, "skipping");
-						ParseFailure = Some(format!("{}: {Error}", path.display()));
-					},
-				}
-			}
-			// File not found/unreadable is the normal search miss - keep
-			// looking.
-		}
+		let Found = SearchPaths.iter().find_map(|path| {
+			match std::fs::read_to_string(path) {
+				Ok(Content) => {
+					match Content.parse::<toml::Table>() {
+						Ok(Table) => Some(Self { raw:Table, Overrides:HashMap::new(), ParseFailure:None }),
+						Err(Error) => {
+							// Fix 22 (inspection): a found-but-broken TOML file
+							// used to fall through silently to the next search
+							// path (or defaults) - warn so a broken local
+							// aphrodite.toml is not ignored without indication.
+							// `ParseFailure` is only recorded when the search
+							// ends on defaults (a later path may still yield a
+							// valid config).
+							WarnParseFailure(path, &Error, "skipping");
 
-		Self { raw:toml::Table::new(), Overrides:HashMap::new(), ParseFailure }
+							ParseFailure = Some(format!("{}: {Error}", path.display()));
+							None
+						},
+					}
+				},
+				// File not found/unreadable is the normal search miss - keep
+				// looking.
+				Err(_) => None,
+			}
+		});
+
+		match Found {
+			Some(Configuration) => Configuration,
+			None => Self { raw:toml::Table::new(), Overrides:HashMap::new(), ParseFailure },
+		}
 	}
 }

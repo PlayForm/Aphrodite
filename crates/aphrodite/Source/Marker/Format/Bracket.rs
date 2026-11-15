@@ -13,9 +13,11 @@
 /// mistaken for a preview.
 pub(super) fn IsSelfBracketedPreview(Preview:&str) -> bool {
 	let p = Preview.trim();
-	if !p.starts_with('[') || !p.ends_with(']') {
-		return false;
+	match !p.starts_with('[') || !p.ends_with(']') {
+		true => return false,
+		false => (),
 	}
+
 	let Inner = &p[1..];
 	match Inner.find(':') {
 		Some(Colon) => {

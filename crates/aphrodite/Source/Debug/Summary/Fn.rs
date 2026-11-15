@@ -26,10 +26,9 @@ pub fn Fn(State:&AphroditeState) -> Vec<(&'static str, String)> {
 		("directives", State.ActiveDirectives.join(",")),
 		(
 			"templates",
-			if State.Templates.is_some() {
-				"registered".to_string()
-			} else {
-				"builtin".to_string()
+			match State.Templates.is_some() {
+				true => "registered".to_string(),
+				false => "builtin".to_string(),
 			},
 		),
 		("debug_level", State.DebugLevel.to_string()),

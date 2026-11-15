@@ -8,13 +8,14 @@
 /// Check if a string is a valid CCR hash (>=24 hex chars, or `i:` prefix with
 /// >=6 hex chars).
 pub fn IsValidCCRHash(h:&str) -> bool {
-	if h.len() < 8 {
-		return false;
+	match h.len() < 8 {
+		true => return false,
+		false => (),
 	}
+
 	let h = h.to_lowercase();
-	if let Some(Stripped) = h.strip_prefix("i:") {
-		Stripped.len() >= 6 && Stripped.chars().all(|c| c.is_ascii_hexdigit())
-	} else {
-		h.len() >= 24 && h.chars().all(|c| c.is_ascii_hexdigit())
+	match h.strip_prefix("i:") {
+		Some(Stripped) => Stripped.len() >= 6 && Stripped.chars().all(|c| c.is_ascii_hexdigit()),
+		None => h.len() >= 24 && h.chars().all(|c| c.is_ascii_hexdigit()),
 	}
 }

@@ -38,9 +38,11 @@ pub fn Fn(
 	Visited:&mut Vec<String>,
 ) -> Option<String> {
 	// Cycle detection
-	if Visited.iter().any(|v| v == HashValue) {
-		return Resolved.get(HashValue).cloned();
+	match Visited.iter().any(|v| v == HashValue) {
+		true => return Resolved.get(HashValue).cloned(),
+		false => (),
 	}
+
 	Visited.push(HashValue.to_string());
 
 	// Depth limit (config-driven via `state.recursive_depth`,
@@ -50,11 +52,14 @@ pub fn Fn(
 	// back to the resolved cache (F9) - a hash that legitimately exists
 	// but simply hasn't been visited yet at this depth would otherwise
 	// incorrectly resolve to `None`.
-	if Depth >= State.RecursiveDepth {
-		return One::Fn(State, HashValue);
+	match Depth >= State.RecursiveDepth {
+		true => return One::Fn(State, HashValue),
+		false => (),
 	}
-	if let Some(Cached) = Resolved.get(HashValue) {
-		return Some(Cached.clone());
+
+	match Resolved.get(HashValue) {
+		Some(Cached) => return Some(Cached.clone()),
+		None => (),
 	}
 
 	// Resolve the top-level hash
@@ -63,34 +68,38 @@ pub fn Fn(
 
 	// Find nested CCR markers
 	let NestedMarkers = Find::Fn(&Content);
-	if NestedMarkers.is_empty() {
-		return Some(Content);
+	match NestedMarkers.is_empty() {
+		true => return Some(Content),
+		false => (),
 	}
 
 	// Resolve nested hashes and build replacements. A nested hash already
 	// in `Resolved` still needs a replacement pushed using the CACHED value
 	// (F4) - previously it was silently skipped, leaving the literal marker
 	// in the output (which F1's write-back would then have persisted).
-	let mut Replacements:Vec<(String, Option<String>)> = Vec::new();
-	for (Marker, NestedHash) in &NestedMarkers {
-		let NestedContent = if let Some(Cached) = Resolved.get(NestedHash) {
-			Some(Cached.clone())
-		} else {
-			Fn(State, NestedHash, Depth + 1, Resolved, Visited)
-		};
-		Replacements.push((Marker.clone(), NestedContent));
-	}
+	let Replacements:Vec<(String, Option<String>)> = NestedMarkers
+		.iter()
+		.map(|(Marker, NestedHash)| {
+			let NestedContent = match Resolved.get(NestedHash) {
+				Some(Cached) => Some(Cached.clone()),
+				None => Fn(State, NestedHash, Depth + 1, Resolved, Visited),
+			};
+
+			(Marker.clone(), NestedContent)
+		})
+		.collect();
 
 	// Apply replacements. An unresolved nested hash leaves the ORIGINAL
 	// marker text untouched (F1) - substituting `[CCR_UNRESOLVED:...]` here
 	// used to get permanently baked into the store below, so a merely
 	// evicted/late nested entry could never heal even after it reappeared.
 	let mut Result = Content;
-	for (Marker, Replacement) in &Replacements {
-		if let Some(Repl) = Replacement {
+	Replacements
+		.iter()
+		.filter_map(|(Marker, Replacement)| Replacement.as_ref().map(|Repl| (Marker, Repl)))
+		.for_each(|(Marker, Repl)| {
 			Result = Result.replace(Marker.as_str(), Repl.as_str());
-		}
-	}
+		});
 
 	// NOTE (F1): the expanded result is intentionally NOT written back over
 	// `HashValue` in the store. Doing so previously broke the content-address

@@ -14,9 +14,11 @@ stateful!(
 	/// to key on.
 	AphroditeTerminal,
 	|s, Content:*const c_char| {
-		if Content.len() > MaximumContent {
-			return serde_json::json!({"error":"content exceeds 16MB limit"});
+		match Content.len() > MaximumContent {
+			true => return serde_json::json!({"error":"content exceeds 16MB limit"}),
+			false => (),
 		}
+
 		crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(s, &Content)
 	}
 );

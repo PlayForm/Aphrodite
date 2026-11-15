@@ -17,8 +17,11 @@ impl Struct {
 				.map(|t| t > s.Mtime)
 				.unwrap_or(false)
 		});
-		if Needs {
-			self.Reload();
+		match Needs {
+			true => {
+				self.Reload();
+			},
+			false => (),
 		}
 	}
 }

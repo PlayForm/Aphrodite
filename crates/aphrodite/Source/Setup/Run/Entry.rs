@@ -110,31 +110,39 @@ pub fn Fn(Args:&SetupArgs) -> anyhow::Result<()> {
 		// nothing of a catalog install exists - dev path.
 		Err(_) => false,
 	};
-	if PluginIsCatalogInstall {
-		// Report-only: never remove symlinks, never create or write the
-		// plugin dir. A catalog install must be updated via
-		// download.sh/download.ps1, not `aphrodite setup`, and setup never
-		// deletes the plugin dir.
-		println!(
-			"NOTE: {} is the plugin's own install dir under the Hermes home (catalog install) - report-only, left \
-			 untouched",
-			Context.PluginDirectory.display()
-		);
-		println!("  a catalog install must use `bash download.sh` / `pwsh download.ps1`, not `aphrodite setup`");
-		println!("  `aphrodite setup` will not remove, create, or overwrite files there");
-	} else {
-		if Context
-			.PluginDirectory
-			.symlink_metadata()
-			.map(|m| m.file_type().is_symlink())
-			.unwrap_or(false)
-		{
-			println!("removing stale plugin symlink -> {}", Context.PluginDirectory.display());
-			fs::remove_file(&Context.PluginDirectory)
-				.with_context(|| format!("remove the stale plugin symlink {}", Context.PluginDirectory.display()))?;
-		}
-		fs::create_dir_all(&Context.PluginDirectory)
-			.with_context(|| format!("create the plugin directory {}", Context.PluginDirectory.display()))?;
+
+	match PluginIsCatalogInstall {
+		true => {
+			// Report-only: never remove symlinks, never create or write the
+			// plugin dir. A catalog install must be updated via
+			// download.sh/download.ps1, not `aphrodite setup`, and setup never
+			// deletes the plugin dir.
+			println!(
+				"NOTE: {} is the plugin's own install dir under the Hermes home (catalog install) - report-only, left \
+				 untouched",
+				Context.PluginDirectory.display()
+			);
+			println!("  a catalog install must use `bash download.sh` / `pwsh download.ps1`, not `aphrodite setup`");
+			println!("  `aphrodite setup` will not remove, create, or overwrite files there");
+		},
+		false => {
+			match Context
+				.PluginDirectory
+				.symlink_metadata()
+				.map(|m| m.file_type().is_symlink())
+				.unwrap_or(false)
+			{
+				true => {
+					println!("removing stale plugin symlink -> {}", Context.PluginDirectory.display());
+					fs::remove_file(&Context.PluginDirectory).with_context(|| {
+						format!("remove the stale plugin symlink {}", Context.PluginDirectory.display())
+					})?;
+				},
+				false => (),
+			}
+			fs::create_dir_all(&Context.PluginDirectory)
+				.with_context(|| format!("create the plugin directory {}", Context.PluginDirectory.display()))?;
+		},
 	}
 
 	// ── Step 3: Copy self to binaries dir (always overwrite - the binary
@@ -159,16 +167,20 @@ pub fn Fn(Args:&SetupArgs) -> anyhow::Result<()> {
 
 	// ── Step 6: Write aphrodite.toml from template ──
 	let ConfigurationPath = Context.AphroditeDirectory.join("aphrodite.toml");
-	if !ConfigurationPath.exists() || Args.Force {
-		let Configuration = ConfigurationTemplate
-			.replace("{api_url}", &Args.APIURL)
-			.replace("{model}", &Args.Model)
-			.replace("{cache_port}", &Args.CachePort.to_string())
-			.replace("{token_port}", &Args.TokenPort.to_string());
-		println!("writing config -> {}", ConfigurationPath.display());
-		fs::write(&ConfigurationPath, &Configuration)
-			.with_context(|| format!("write the configuration {}", ConfigurationPath.display()))?;
-		SecurePerms(&ConfigurationPath, 0o600)?;
+
+	match !ConfigurationPath.exists() || Args.Force {
+		true => {
+			let Configuration = ConfigurationTemplate
+				.replace("{api_url}", &Args.APIURL)
+				.replace("{model}", &Args.Model)
+				.replace("{cache_port}", &Args.CachePort.to_string())
+				.replace("{token_port}", &Args.TokenPort.to_string());
+			println!("writing config -> {}", ConfigurationPath.display());
+			fs::write(&ConfigurationPath, &Configuration)
+				.with_context(|| format!("write the configuration {}", ConfigurationPath.display()))?;
+			SecurePerms(&ConfigurationPath, 0o600)?;
+		},
+		false => (),
 	}
 
 	// ── Step 7: Write plugin.yaml ──
@@ -176,9 +188,12 @@ pub fn Fn(Args:&SetupArgs) -> anyhow::Result<()> {
 	// Both write the loader INTO the plugin dir - skipped in catalog-install
 	// mode (report-only, PR 118488); the Hermes-home plugin dir is the
 	// plugin's own install dir there and setup must not touch it.
-	if !PluginIsCatalogInstall {
-		WritePluginYAML(&Context, Args)?;
-		WriteInitPy(&Context)?;
+	match !PluginIsCatalogInstall {
+		true => {
+			WritePluginYAML(&Context, Args)?;
+			WriteInitPy(&Context)?;
+		},
+		false => (),
 	}
 
 	// ── Step 8b: Write the BINARY_VERSION pin into the runtime home ──
@@ -192,14 +207,18 @@ pub fn Fn(Args:&SetupArgs) -> anyhow::Result<()> {
 		"  binaries, config, and state: {} (everything the plugin manages)",
 		Context.AphroditeDirectory.display()
 	);
-	if PluginIsCatalogInstall {
-		println!(
-			"  plugin dir (catalog install, report-only): {} - loader NOT written by setup; use \
-			 download.sh/download.ps1",
-			Context.PluginDirectory.display()
-		);
-	} else {
-		println!("  hooks registered (loader only): {}", Context.PluginDirectory.display());
+
+	match PluginIsCatalogInstall {
+		true => {
+			println!(
+				"  plugin dir (catalog install, report-only): {} - loader NOT written by setup; use \
+				 download.sh/download.ps1",
+				Context.PluginDirectory.display()
+			);
+		},
+		false => {
+			println!("  hooks registered (loader only): {}", Context.PluginDirectory.display());
+		},
 	}
 
 	Ok(())

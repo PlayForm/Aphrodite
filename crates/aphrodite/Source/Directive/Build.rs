@@ -27,31 +27,43 @@ use super::Model::{MaximumCombinedChars, Struct};
 /// would trip the truncation on multibyte content (em-dashes etc.) that never
 /// exceeded the char budget, silently cutting directive text that fit.
 pub fn Fn(all:&HashMap<String, Struct>, Active:&[String]) -> String {
-	if Active.is_empty() {
-		return String::new();
+	match Active.is_empty() {
+		true => return String::new(),
+		false => (),
 	}
+
 	let Names:Vec<&str> = Active.iter().map(|s| s.as_str()).collect();
 	let mut Out = format!("[directives: {}]\n", Names.join(", "));
-	for name in Active {
-		if let Some(d) = all.get(name) {
-			Out.push_str(&format!("{}:\n", d.name));
-			for Line in d.Content.lines() {
-				let Line = Line.trim_start_matches('#').trim();
-				if !Line.is_empty() {
+
+	Active.iter().filter_map(|name| all.get(name)).for_each(|d| {
+		Out.push_str(&format!("{}:\n", d.name));
+
+		d.Content.lines().for_each(|Line| {
+			let Line = Line.trim_start_matches('#').trim();
+
+			match Line.is_empty() {
+				true => (),
+				false => {
 					Out.push_str("  ");
 					Out.push_str(Line);
 					Out.push('\n');
-				}
+				},
 			}
-		}
-	}
+		});
+	});
+
 	// T19: the gate must compare CHAR count against MAX_COMBINED_CHARS -
 	// `out.len()` is a byte length, so multibyte content (em-dashes etc.)
 	// tripped the truncation even when it fit the char cap, silently
 	// cutting directive text that never exceeded the budget.
-	if Out.chars().count() > MaximumCombinedChars {
-		let Trunc:String = Out.chars().take(MaximumCombinedChars).collect();
-		Out = format!("{}...\n", Trunc);
+	match Out.chars().count() > MaximumCombinedChars {
+		true => {
+			let Trunc:String = Out.chars().take(MaximumCombinedChars).collect();
+
+			Out = format!("{}...\n", Trunc);
+		},
+		false => (),
 	}
+
 	Out
 }

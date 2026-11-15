@@ -40,18 +40,25 @@ pub async fn Bind(
 				// `build_state` can run before spawning.)
 				match CLI.CCRDatabasePath.as_ref() {
 					Some(DatabasePath) => {
-						if !DatabasePath.as_os_str().is_empty()
-							&& !DatabasePath.is_absolute()
-							&& let Ok(ExePath) = std::env::current_exe()
-							&& let Some(ExeDirectory) = ExePath.parent()
-						{
-							let Old = DatabasePath.display().to_string();
-							CLI.CCRDatabasePath = Some(ExeDirectory.join(DatabasePath));
-							tracing::info!(
-								"resolved relative ccr_db_path from {} to {}",
-								Old,
-								CLI.CCRDatabasePath.as_ref().unwrap().display()
-							);
+						match !DatabasePath.as_os_str().is_empty() && !DatabasePath.is_absolute() {
+							true => {
+								match std::env::current_exe()
+									.ok()
+									.and_then(|ExePath| ExePath.parent().map(|Parent| Parent.to_path_buf()))
+								{
+									Some(ExeDirectory) => {
+										let Old = DatabasePath.display().to_string();
+										CLI.CCRDatabasePath = Some(ExeDirectory.join(DatabasePath));
+										tracing::info!(
+											"resolved relative ccr_db_path from {} to {}",
+											Old,
+											CLI.CCRDatabasePath.as_ref().unwrap().display()
+										);
+									},
+									None => {},
+								}
+							},
+							false => {},
 						}
 						match CLI.CCRDatabasePath.as_ref().and_then(|p| p.parent()) {
 							Some(Parent) => {

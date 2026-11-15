@@ -22,17 +22,20 @@ stateful!(
 	/// need a second copy it cannot serve.
 	AphroditeCompress,
 	|s, Content:*const c_char, Hint:*const c_char| {
-		if Content.is_empty() {
-			return serde_json::json!({"error":"empty"});
+		match Content.is_empty() {
+			true => return serde_json::json!({"error":"empty"}),
+			false => (),
 		}
-		if Content.len() > MaximumContent {
-			return serde_json::json!({"error":"content exceeds 16MB limit"});
+
+		match Content.len() > MaximumContent {
+			true => return serde_json::json!({"error":"content exceeds 16MB limit"}),
+			false => (),
 		}
+
 		let Ct = transforms::content_detector::detect_content_type(&Content).content_type;
-		let t = if Hint.is_empty() || Hint == "text" {
-			Ct.as_str().to_string()
-		} else {
-			Hint.to_string()
+		let t = match Hint.is_empty() || Hint == "text" {
+			true => Ct.as_str().to_string(),
+			false => Hint.to_string(),
 		};
 		let hash = headroom_core::ccr::compute_key(Content.as_bytes());
 		s.InlineStorePut(hash.clone(), Content.to_string());

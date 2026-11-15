@@ -72,9 +72,11 @@ pub(crate) fn Guarded(f:impl FnOnce() -> *mut c_char + std::panic::UnwindSafe) -
 /// contract). Every caller in this crate passes pointers received directly
 /// from the C ABI call, which are expected to uphold that contract.
 pub(crate) unsafe fn Cstr(Ptr:*const c_char) -> Option<String> {
-	if Ptr.is_null() {
-		return None;
+	match Ptr.is_null() {
+		true => return None,
+		false => (),
 	}
+
 	// SAFETY: `Ptr` is non-null here, and per the safety contract of this
 	// function it points to a valid, NUL-terminated C string that remains
 	// valid for the duration of this call.
@@ -90,14 +92,10 @@ pub(crate) unsafe fn Cstr(Ptr:*const c_char) -> Option<String> {
 /// NUL". The caller renders them through `format!("{e:#}")` into the JSON error
 /// payload, so the message is the whole diagnosis the C side gets.
 pub(crate) fn CheckContent(Content:&str) -> anyhow::Result<()> {
-	if Content.is_empty() {
-		anyhow::bail!("empty content");
+	match () {
+		_ if Content.is_empty() => anyhow::bail!("empty content"),
+		_ if Content.len() > MaximumContent => anyhow::bail!("content exceeds 16MB limit"),
+		_ if Content.contains('\0') => anyhow::bail!("content contains null bytes"),
+		_ => Ok(()),
 	}
-	if Content.len() > MaximumContent {
-		anyhow::bail!("content exceeds 16MB limit");
-	}
-	if Content.contains('\0') {
-		anyhow::bail!("content contains null bytes");
-	}
-	Ok(())
 }

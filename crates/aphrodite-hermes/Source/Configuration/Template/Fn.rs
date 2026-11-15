@@ -9,7 +9,9 @@ use std::sync::OnceLock;
 
 use aphrodite::State::Struct::AphroditeState;
 
+#[cfg(not(test))]
 use crate::Session::Watcher::Fn::spawn_config_watcher;
+
 /// Config-seeded template state, built once per process.
 ///
 /// Initializes from `aphrodite.toml` (report 07 F3/T16) via

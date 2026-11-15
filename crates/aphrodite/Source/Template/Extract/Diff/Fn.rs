@@ -10,9 +10,8 @@
 pub(crate) fn Fn(Lines:&[&str]) -> (String, String) {
 	let Plus = Lines.iter().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count();
 	let Minus = Lines.iter().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
-	if Plus == 0 && Minus == 0 {
-		("?".into(), "?".into())
-	} else {
-		(Plus.to_string(), Minus.to_string())
+	match Plus == 0 && Minus == 0 {
+		true => ("?".into(), "?".into()),
+		false => (Plus.to_string(), Minus.to_string()),
 	}
 }

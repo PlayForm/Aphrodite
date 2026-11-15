@@ -17,25 +17,28 @@ pub(crate) fn LogPreTurn(
 	AlwaysSurvive:usize,
 	Sections:&[String],
 ) {
-	if let Some(T0) = T0 {
-		let Us = T0.elapsed().as_micros() as u64;
-		crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::PreTurn, Us);
-		let Secs:Vec<serde_json::Value> = Sections
-			.iter()
-			.map(|s| serde_json::json!({"label": SectionLabel(s), "bytes": s.len()}))
-			.collect();
-		crate::Debug::Log::At::Fn::Fn(
-			State.DebugLevel,
-			"pre_turn_sections",
-			&[
-				("turn", State.TurnCounter.to_string()),
-				("budget", Budget.to_string()),
-				("always_survive", AlwaysSurvive.to_string()),
-				("sections", serde_json::to_string(&Secs).unwrap_or_default()),
-				("pending_markers", State.RecentMarkers.len().to_string()),
-				("metrics", crate::Debug::Metrics::Fn::Fn().to_string()),
-				("elapsed_us", Us.to_string()),
-			],
-		);
+	match T0 {
+		Some(T0) => {
+			let Us = T0.elapsed().as_micros() as u64;
+			crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::PreTurn, Us);
+			let Secs:Vec<serde_json::Value> = Sections
+				.iter()
+				.map(|s| serde_json::json!({"label": SectionLabel(s), "bytes": s.len()}))
+				.collect();
+			crate::Debug::Log::At::Fn::Fn(
+				State.DebugLevel,
+				"pre_turn_sections",
+				&[
+					("turn", State.TurnCounter.to_string()),
+					("budget", Budget.to_string()),
+					("always_survive", AlwaysSurvive.to_string()),
+					("sections", serde_json::to_string(&Secs).unwrap_or_default()),
+					("pending_markers", State.RecentMarkers.len().to_string()),
+					("metrics", crate::Debug::Metrics::Fn::Fn().to_string()),
+					("elapsed_us", Us.to_string()),
+				],
+			);
+		},
+		None => (),
 	}
 }
