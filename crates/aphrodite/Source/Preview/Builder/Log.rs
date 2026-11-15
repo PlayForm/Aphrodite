@@ -1,23 +1,31 @@
-//! log preview arm (error signal wins, else the tail).
+//! Log preview arm.
+//!
+//! A log's most recent state is its last line, and its most important state is
+//! whichever line reports an error. Those are usually different lines. This arm
+//! prefers the error and falls back to the tail. It is not a log parser: levels
+//! are not interpreted and nothing is aggregated.
 
 use crate::Preview::{
-	Input::Input,
-	Line::{Error::is_error_line, Failure::is_failure_line},
+	Input::Struct::Struct as Input,
+	Line::{Error, Failure},
 };
 
-/// Log output: the LAST non-empty line is the most recent state, and an
-/// error/failure line (if any) is the signal that matters - prefer it over
-/// the tail so a log ending in noise never hides the error.
-pub(crate) fn build_log_preview(inp:&Input<'_>) -> String {
-	let hint = inp
+/// Build a preview of log output.
+///
+/// Promises an error or failure line when one exists, otherwise the last
+/// non-empty line, which is the most recent state. It is not a tail dump: one
+/// line is shown, chosen so that a log ending in noise can never hide the error
+/// that caused it.
+pub(crate) fn Fn(Inp:&Input<'_>) -> String {
+	let Hint = Inp
 		.raw
 		.lines()
 		.map(|l| l.trim())
-		.find(|l| is_error_line(l) || is_failure_line(l))
-		.or_else(|| inp.raw.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim()))
+		.find(|l| Error::Fn(l) || Failure::Fn(l))
+		.or_else(|| Inp.raw.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.trim()))
 		.map(|l| l.chars().take(60).collect::<String>());
-	match hint {
-		Some(h) => format!("[log:{}L {}B | {}]", inp.total, inp.bytes, h),
-		None => format!("[log:{}L {}B]", inp.total, inp.bytes),
+	match Hint {
+		Some(h) => format!("[log:{}L {}B | {}]", Inp.Total, Inp.bytes, h),
+		None => format!("[log:{}L {}B]", Inp.Total, Inp.bytes),
 	}
 }

@@ -1,42 +1,52 @@
-//! Linter issue-line predicate (ruff/eslint/clippy/flake8 shapes).
+//! Linter issue-line predicate.
+//!
+//! ruff, flake8, eslint and clippy all print issues in recognisable shapes.
+//! The lint arm needs one predicate that covers them, and it must include
+//! genuine compiler errors and warnings because a clippy run interleaves them.
 
-use crate::Preview::Line::{Error::is_error_line, Warning::is_warning_line};
+use crate::Preview::Line::{Error, Warning};
 
-/// True for a linter issue line: `path:line:col:` prefix (ruff/flake8/eslint)
-/// or a `E###`/`W###`/`F###` issue code.
-pub(crate) fn is_lint_line(line:&str) -> bool {
-	let t = line.trim_start();
-	is_error_line(t) || is_warning_line(t) || lint_prefix(t) || lint_code(t)
+/// True for a linter issue line.
+///
+/// Matches a `path:line:col:` prefix (ruff/flake8/eslint) or an
+/// `E###`/`W###`/`F###` issue code, and also any line `Error::Fn` or
+/// `Warning::Fn` already accepts. It is not a diagnostic parser: the preview
+/// shows the first issue line verbatim, so this only has to find it.
+pub(crate) fn Fn(Line:&str) -> bool {
+	let t = Line.trim_start();
+	Error::Fn(t) || Warning::Fn(t) || LintPrefix(t) || LintCode(t)
 }
 
-/// `path:line:col:` prefix (ruff/flake8/eslint): `splitn(4, ':')` -> a
-/// non-empty path without spaces, then two all-digit fields, then a third
-/// segment (the trailing `:`). Replaces the `^[^\s:]+:\d+:\d+:` alternative
-/// of the old LINT_RE.
-fn lint_prefix(t:&str) -> bool {
-	let mut it = t.splitn(4, ':');
-	let path = match it.next() {
+/// `path:line:col:` prefix (ruff/flake8/eslint).
+///
+/// `splitn(4, ':')` must yield a non-empty path without spaces, then two
+/// all-digit fields, then a third segment. Replaces the `^[^\s:]+:\d+:\d+:`
+/// alternative of the old LINT_RE.
+fn LintPrefix(t:&str) -> bool {
+	let mut It = t.splitn(4, ':');
+	let path = match It.next() {
 		Some(p) if !p.is_empty() && !p.contains(' ') => p,
 		_ => return false,
 	};
-	let line_no = match it.next() {
+	let LineNo = match It.next() {
 		Some(l) if !l.is_empty() && l.chars().all(|c| c.is_ascii_digit()) => l,
 		_ => return false,
 	};
-	let col = match it.next() {
+	let Col = match It.next() {
 		Some(c) if !c.is_empty() && c.chars().all(|c| c.is_ascii_digit()) => c,
 		_ => return false,
 	};
-	let _ = (path, line_no, col);
-	it.next().is_some()
+	let _ = (path, LineNo, Col);
+	It.next().is_some()
 }
 
-/// `E###`/`W###`/`F###` issue code (3-4 digits after the letter) as a
-/// whitespace-delimited token. Replaces the `(?:^|\s)[EWF]\d{3,4}\b`
+/// `E###`/`W###`/`F###` issue code as a whitespace-delimited token.
+///
+/// Three to four digits after the letter. Replaces the `(?:^|\s)[EWF]\d{3,4}\b`
 /// alternative of the old LINT_RE.
-fn lint_code(t:&str) -> bool {
-	t.split_whitespace().any(|tok| {
-		let b = tok.as_bytes();
+fn LintCode(t:&str) -> bool {
+	t.split_whitespace().any(|Tok| {
+		let b = Tok.as_bytes();
 		b.len() >= 4 && b.len() <= 5 && matches!(b[0], b'E' | b'W' | b'F') && b[1..].iter().all(|c| c.is_ascii_digit())
 	})
 }

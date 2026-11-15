@@ -1,36 +1,61 @@
+//! Resolution entry point: a hash in, the content it names out.
+//!
+//! Every retrieval path in the crate funnels here - the ABI retrieve export, the
+//! proxy relay, the hooks, the Hermes retrieve tool - so this function owns the
+//! whole nesting contract: resolve the hash, resolve the markers inside it,
+//! resolve theirs, up to `AphroditeState::recursive_depth`. It is not a store
+//! lookup; `One/` is the lookup, and this wraps it.
+//!
+//! It is also the retrieval metric's only sampling point: the timing, the
+//! found/miss counter and the one structured line per request are recorded here,
+//! so a caller that bypasses this function is invisible to the metrics - which is
+//! why the ABI retrieve path, which resolves directly, has to attribute its own
+//! consequence signals.
+
 use std::collections::HashMap;
 
 use crate::State::AphroditeState;
-use super::Recursive::resolve_recursive;
+use super::Recursive::Recursive;
 
-/// Public entry point: expands a hash through all nesting levels.
-pub fn expand(state:&mut AphroditeState, hash_val:&str) -> Option<String> {
+/// Expand a hash through every nesting level.
+///
+/// Returns the fully expanded content, or `None` when the top-level hash is not
+/// in the store. A nested hash that cannot be resolved is left as its original
+/// marker text rather than replaced with a placeholder - that entry may only be
+/// evicted or late, and a placeholder baked into the output can never heal.
+///
+/// It is not a compressor and it never writes back: the stored bytes under a
+/// hash must stay byte-identical to what the hash names, so an expanded result is
+/// returned and forgotten. Writing it back breaks the content-address invariant
+/// and destroys the pristine original irrecoverably - including any marker-shaped
+/// text the original merely contained.
+pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
 	// DEV-ONLY debug instrumentation (crate::debug): retrieval metrics +
 	// one structured line per retrieval request (hash, found, depth cap,
 	// elapsed). Captured only when the logger is on.
-	let t0 = crate::Debug::enabled().then(std::time::Instant::now);
-	crate::Debug::bump(crate::Debug::Counter::Retrieves);
-	let mut resolved = HashMap::new();
-	let mut visited = Vec::new();
-	let out = resolve_recursive(state, hash_val, 0, &mut resolved, &mut visited);
-	if let Some(t0) = t0 {
-		let us = t0.elapsed().as_micros() as u64;
-		crate::Debug::add_timing(crate::Debug::TimingCat::Retrieve, us);
-		crate::Debug::log_at(
-			state.debug_level,
+	let T0 = crate::Debug::Level::Enabled::Fn::Fn().then(std::time::Instant::now);
+	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Retrieves);
+	let mut Resolved = HashMap::new();
+	let mut Visited = Vec::new();
+	let Out = Recursive::Fn(State, HashValue, 0, &mut Resolved, &mut Visited);
+	if let Some(T0) = T0 {
+		let Us = T0.elapsed().as_micros() as u64;
+		crate::Debug::Timing::Add::Fn::Fn(crate::Debug::Timing::Enum::Enum::Retrieve, Us);
+		crate::Debug::Log::At::Fn::Fn(
+			State.DebugLevel,
 			"retrieve",
 			&[
-				("hash", hash_val.to_string()),
-				("found", out.is_some().to_string()),
-				("depth_cap", state.recursive_depth.to_string()),
-				("elapsed_us", us.to_string()),
+				("hash", HashValue.to_string()),
+				("found", Out.is_some().to_string()),
+				("depth_cap", State.RecursiveDepth.to_string()),
+				("elapsed_us", Us.to_string()),
 			],
 		);
-		if out.is_none() {
+		if Out.is_none() {
 			// A miss degrades to a warning (dev metrics).
-			crate::Debug::bump(crate::Debug::Counter::RetrieveMisses);
-			crate::Debug::bump(crate::Debug::Counter::Warnings);
+			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::RetrieveMisses);
+			crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::Warnings);
 		}
 	}
-	out
+	Out
 }

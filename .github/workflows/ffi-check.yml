@@ -11,10 +11,10 @@ on:
   push:
     branches: [Development]
     paths:
-      - crates/aphrodite-hermes/src/lib.rs
+      - crates/aphrodite-hermes/Source/Library.rs
       # Generator inputs: build.rs/cbindgen.toml/codegen/** drive the committed
       # artifact, so a generator change must re-run the contract check even when
-      # lib.rs is untouched.
+      # the export tree is untouched.
       - crates/aphrodite-hermes/build.rs
       - crates/aphrodite-hermes/cbindgen.toml
       - crates/aphrodite-hermes/codegen/**
@@ -31,7 +31,7 @@ on:
   pull_request:
     branches: [Development]
     paths:
-      - crates/aphrodite-hermes/src/lib.rs
+      - crates/aphrodite-hermes/Source/Library.rs
       - crates/aphrodite-hermes/build.rs
       - crates/aphrodite-hermes/cbindgen.toml
       - crates/aphrodite-hermes/codegen/**

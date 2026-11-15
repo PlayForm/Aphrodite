@@ -2,16 +2,26 @@
 //!
 //! Generic LLM proxy - works with any OpenAI-compatible API.
 //! Cache and Token modes with CCR, tool relay, programmatic CCR.
+//!
+//! Two surfaces live here and must stay distinguishable: the **command line**
+//! (`CLI`) and the **file** (`Proxy`). They meet at exactly one place -
+//! `Proxy::Multi::Resolve::Fn::resolve`, which produces the CLI-shaped value
+//! from the TOML document - so a knob that exists in both has one documented
+//! precedence (env > TOML > default) instead of two.
+//!
+//! `Environment` holds the two env readers every resolution chain shares.
+//!
+//! This file declares only. A caller names the leaf
+//! (`Configuration::Proxy::Mode::Enum::Enum`), so the file that defines an
+//! item is the only place it is defined.
 
-mod CLI;
-mod Environment;
-mod Proxy;
+pub mod CLI;
+pub mod Environment;
+pub mod Proxy;
 
 #[cfg(test)]
 mod Test;
 
-pub use CLI::{Cli, Command, SetupArgs};
-pub use Environment::{env_bool, env_parse_warn};
-pub use Proxy::{CompressionConfig, Defaults, MultiConfig, PreviewsConfig, PromptsConfig, ProxyConfig, ProxyMode};
+pub use Environment::{Bool::Fn::EnvironmentBool, Warn::Fn::EnvironmentParseWarn};
 
-pub use crate::State::TemplatesConfig;
+pub use crate::State::TemplatesConfiguration;

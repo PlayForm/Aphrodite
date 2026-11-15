@@ -155,8 +155,129 @@ only its module dir. Procedure:
   old_string had escape drift (`\|` vs `|` in table cells): re-grep the line
   after patching before declaring it applied.
 
+## Kind-named leaves (the naming pass after atomization)
+
+Atomization gives one item per file; the naming pass then renames each item to
+its kind (`Fn`/`Struct`/`Enum`/`Const`) so the directory path carries the domain
+and the item carries the kind (`Preview::Builder::Code::Fn`). Five rules, each of
+which has broken a build:
+
+1. **A single-item leaf stays a FILE; a multi-item leaf becomes a DIRECTORY.**
+   `Code.rs` holding one fn becomes `Code.rs` holding `pub fn Fn` - do not turn
+   it into `Code/Fn.rs` + `Code/mod.rs`. A file holding several items cannot give
+   them all the name `Fn`, so it becomes a directory of one-item leaves whose
+   names are each item's _domain_ (`Line/Grep/{Hit,Search}.rs`, each holding
+   `pub fn Fn`).
+2. **The alias lives in the parent facade, not in the leaf - unless a caller
+   names the leaf path.** `Preview::build_preview` needs
+   `pub use Entry::Fn as build_preview;` in `Builder/mod.rs`, but
+   `crate::Preview::Language::detect_language` names `Language` explicitly, so
+   that alias must sit inside `Language/mod.rs`. Grep the call-site FORM
+   (`grep -rhoE '(crate::)?Module::[A-Za-z_]+'`) before choosing.
+3. **Never alias a name nothing uses.** `pub(crate) use X::Fn as old_name;` with
+   no caller is an `unused_imports` warning, and `cargo clippy -- -D warnings`
+   is usually a required gate. Alias only names with real out-of-scope callers;
+   report the ones you deliberately did not add.
+4. **`Domain::Struct` resolves to the MODULE, not the type.** After
+   `Input/Struct.rs` + `Input/mod.rs`, `use crate::Preview::Input::Struct;`
+   imports the module and `Struct<'_>` fails E0573 "expected type, found
+   module". Import `crate::Preview::Input::Struct::Struct`, and expect the
+   house-style stutter (`Type::Fn::Fn(...)`) wherever a facade module and its
+   single item share the kind name.
+5. **A doc line starting with `- ` becomes a clippy list item.** Prose wrapped so
+   the next line begins `- a false positive ...` trips
+   `clippy::doc_lazy_continuation` ("doc list item without indentation") under
+   `-D warnings`. Reword the sentence so no continuation line starts with a
+   bullet; do not indent it.
+
+Splitting the test battery alongside (`Test/<Area>.rs`) is proven by a sorted
+name-set diff, not by the suite: `grep -oE '^\s*fn (test_|prop_|regression_)\w+'
+<old file> | sort` against the same over `Test/` - the lists must be identical and
+the counts equal.
+
+## Phase 3: the alias sweep (deleting the compatibility re-exports)
+
+Atomization leaves `pub use Leaf::Fn as old_name;` in each facade. The sweep
+deletes every one and repoints the call sites. Seven rules, each of which
+produced a broken build or a silently wrong rewrite:
+
+1. **The compiler enumerates the call sites, not a text search.** A rename
+   regex cannot see a glob import (`use super::*;`), a path through the other
+   crate (`aphrodite::Debug::add_timing` from the binary), or a `cfg(test)`-only
+   use. Delete the alias lines first, then drive the repair from
+   `cargo check --all-targets` diagnostics; a green lib build alone hides the
+   test-target breakage.
+2. **A facade re-exporting a child facade's alias is itself a call site.** A
+   uniform `use Builder::build_preview;` inside `Preview/mod.rs` resolves
+   relative to that module, not the crate root - so the resolver must fall
+   back to "module-relative" for a bare head, and to the package name for
+   `aphrodite::`.
+3. **Every module on a leaf path must be visible.** A private `mod Log;` behind
+   a deleted alias turns `crate::Debug::Log::Bridge::Fn` into E0603. Flip the
+   ones the paths cross to `pub(crate) mod`, and to `pub mod` when the binary
+   target names them (a bin is a separate crate; `pub(crate)` is invisible).
+4. **Rebuild a use statement, do not patch an item inside it.** In
+   `use crate::Preview::{Input::Input, Line::Error}` the replacement's base is
+   the group's prefix, not the crate root; emitting one absolute
+   `use crate::...;` line per leaf is the only unambiguous rewrite.
+5. **Preserve the original path head.** `crate::` inside `Source/Boot/**` is the
+   BINARY's root, so `crate::Configuration` there names a module that does not
+   exist. Rewrite `aphrodite::Proxy::AppState` to `aphrodite::Proxy::State::Struct::Struct`,
+   never to `crate::...`.
+6. **Drop only the globs the explicit imports made redundant.** `clippy
+-D warnings` fails on the now-unused `use crate::Proxy::*;`, but rustc also
+   calls a `cfg(test)`-only import unused in the lib build - deleting that one
+   breaks the test target. Restrict the deletion to leaves whose name is `*`.
+7. **A deleted alias takes its doc block with it.** A `///` line or a
+   `#[cfg(test)]` attribute left above a removed `use` parses as "expected item
+   after attributes" and takes the whole module out of the tree.
+
+Worked mechanics (the parse, the rewrite, the three failure signatures) live in
+`references/alias-sweep.md`.
+
 ## Pitfalls
 
+- **A rename pass that rewrites module identifiers also hits four things that
+  are not module paths.** Each one has produced a broken build: (a) a
+  module whose item shares its name - `pub use expand::expand;` becomes
+  `pub use Expand::Expand;` and the item disappears; (b) method turbofish -
+  `s.parse::<u64>()` becomes `s.Parse::<u64>()`, so the path rule needs a
+  `(?<!\.)` guard; (c) `std` module names that collide with a module name -
+  `use std::env;` + `env::var` and `use std::{path::PathBuf}` become
+  `Environment::var` / `Path::PathBuf`, so the rule needs
+  `(?<!std::)(?<!core::)(?<!alloc::)` **and** a line-scoped repair for
+  multi-line `use std::{` groups (a guard only sees the token, not the
+  enclosing brace group); (d) an inline `mod tests {` block - the
+  declaration has no semicolon so the `mod name;` rule misses it while every
+  reference to it is rewritten. Verify a rename pass by compiling, not by
+  reading the diff.
+- **Grep the tree for the pre-move paths before declaring the layout done.**
+  Packaging guards, workflow `paths:` filters, a `--librs` default and an
+  integration test that normalises `include_str!` targets all hard-code the
+  old layout and fail silently later: `.github/workflows/Publish.yml`,
+  `.github/workflows/ffi-check.yml`, `Maintain/check_ffi_contract.py`,
+  `crates/*/tests/packaging.rs`. `include_str!` paths gain one `../` per
+  directory the embedding file moves down.
+- **A moved test module can stop compiling while the suite stays green.** After
+  a split, a `Test/` directory that no facade declares is never compiled: the
+  file exists, the test names exist in a text search, and `cargo test` passes
+  with two fewer tests. Audit every `Test/` directory against its parent
+  `mod.rs` (`find crates/*/Source -type d -name Test` then check the parent
+  declares `mod Test;`), and compare the per-binary `test result:` counts
+  before and after the wave, not just pass/fail.
+- **A test that captures a `tracing` event through `with_default` is flaky, not
+  wrong.** A callsite's interest is cached process-wide, so whichever test
+  reaches that callsite first under the no-op subscriber can cache it as
+  disabled and the capture never fires - measured at roughly one failing run in
+  six on an otherwise correct test. Split the message from its emission
+  (`parse_failure_message(path, action) -> String`, then a `tracing::warn!`
+  that emits it) and assert the message builder; the emission is one line that
+  cannot drift from it.
+- **`tracing::dispatcher::has_been_set()` reports only the GLOBAL dispatcher.**
+  A function that branches on it to choose `tracing::warn!` vs `eprintln!`
+  mis-routes for a thread-local `with_default` subscriber (`with_default` never
+  sets the global flag). Emit the event unconditionally and gate only the
+  stderr fallback on `!has_been_set()`.
 - `git mv` needs the target directory to exist - `mkdir -p` first, or the
   rename fails "No such file or directory".
 - `include_str!`/`include_bytes!`/`include!` paths resolve relative to the

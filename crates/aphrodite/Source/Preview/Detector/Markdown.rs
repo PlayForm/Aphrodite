@@ -1,21 +1,27 @@
-//! markdown document shape detector.
+//! Markdown document shape detector.
+//!
+//! Headings alone are not a document - a shell script full of `# comment` lines
+//! looks identical. This detector therefore requires structure or body prose
+//! alongside the headings. It is not a markdown renderer: nothing is formatted.
 
 use crate::Preview::{
-	Input::Input,
-	Line::{MarkdownHeading::is_md_heading, MarkdownStructure::is_md_structure},
+	Input::Struct::Struct as Input,
+	Line::{MarkdownHeading, MarkdownStructure},
 };
 
-/// ≥2 heading lines + list/table/link/fence/quote structure or body prose.
-/// Gated so comment-only shell scripts cannot trigger it: a doc needs
-/// structure OR non-heading body lines - a file of bare `# comment` lines has
-/// neither.
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
-	let md_heads = inp.non_empty.iter().filter(|l| is_md_heading(l)).count();
-	let md_structure = inp.non_empty.iter().filter(|l| is_md_structure(l)).count();
-	let md_body = inp
-		.non_empty
+/// True when the content looks like a markdown document.
+///
+/// Two or more heading lines, plus either list/table/link/fence/quote structure
+/// or non-heading body lines. The gate exists so comment-only shell scripts
+/// cannot trigger it: a file of bare `# comment` lines has neither. It is not a
+/// document classifier - front matter and inline markup are ignored.
+pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
+	let MdHeads = Inp.NonEmpty.iter().filter(|l| MarkdownHeading::Fn(l)).count();
+	let MdStructure = Inp.NonEmpty.iter().filter(|l| MarkdownStructure::Fn(l)).count();
+	let MdBody = Inp
+		.NonEmpty
 		.iter()
-		.filter(|l| !is_md_heading(l) && !is_md_structure(l))
+		.filter(|l| !MarkdownHeading::Fn(l) && !MarkdownStructure::Fn(l))
 		.count();
-	md_heads >= 2 && (md_structure >= 1 || md_body >= 1)
+	MdHeads >= 2 && (MdStructure >= 1 || MdBody >= 1)
 }

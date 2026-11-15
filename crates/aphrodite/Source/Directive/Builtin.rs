@@ -1,20 +1,18 @@
 //! Built-in directives baked into the binary via `include_str!`.
+//!
+//! These ship with every installation and are the fallback when no
+//! `directives/` directory exists on disk - a fresh install gets `focus`,
+//! `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy` and `lazy-eval`
+//! without any filesystem setup. The filenames under `BuiltinDirective/` are
+//! the directive identifiers surfaced to the model, so they stay lowercase.
 
 use std::collections::HashMap;
 
-use super::Model::{Directive, MAX_DIRECTIVE_CHARS};
+use super::Model::{MaximumDirectiveChars, Struct};
 
-/// Built-in directives baked into the binary via `include_str!`.
-/// These ship with every installation and are used as fallbacks when no
-/// `directives/` directory exists on disk - so a fresh install gets
-/// `focus`, `foresight`, `ccr-handling`, `cleanup`, `explore`, `lazy`,
-/// and `lazy-eval` without any filesystem setup.
-///
-/// The on-disk `directives/*.md` files (if any) take precedence: if the
-/// directory exists, its `.md` files replace these defaults entirely.
-/// Users can also `aphrodite_directive("add", "ccr-handling")` to
-/// activate the shipped defaults discovered from the embedded set.
-fn builtin_directives() -> Vec<(&'static str, &'static str)> {
+/// The embedded directive set: identifier and body, in the order they are
+/// advertised.
+fn BuiltinDirectives() -> Vec<(&'static str, &'static str)> {
 	vec![
 		("focus", include_str!("../BuiltinDirective/focus.md")),
 		("foresight", include_str!("../BuiltinDirective/foresight.md")),
@@ -27,18 +25,23 @@ fn builtin_directives() -> Vec<(&'static str, &'static str)> {
 }
 
 /// Load built-in directives from the binary (via `include_str!`), applying the
-/// same `MAX_DIRECTIVE_CHARS` cap as `load_directives` does for disk-loaded
+/// same `MaximumDirectiveChars` cap as `LoadDirectives` does for disk-loaded
 /// directives. Returns a `HashMap` ready for `state.directives`.
-pub fn loaded_builtins() -> HashMap<String, Directive> {
-	let mut directives = HashMap::new();
-	for (name, content) in builtin_directives() {
-		let content = if content.len() > MAX_DIRECTIVE_CHARS {
-			let trunc:String = content.chars().take(MAX_DIRECTIVE_CHARS).collect();
-			format!("{}...", trunc)
+///
+/// The on-disk `directives/*.md` files (if any) take precedence: if the
+/// directory exists, its `.md` files replace these defaults entirely. Users
+/// can also `aphrodite_directive("add", "ccr-handling")` to activate the
+/// shipped defaults discovered from the embedded set.
+pub fn Fn() -> HashMap<String, Struct> {
+	let mut Directives = HashMap::new();
+	for (name, Content) in BuiltinDirectives() {
+		let Content = if Content.len() > MaximumDirectiveChars {
+			let Trunc:String = Content.chars().take(MaximumDirectiveChars).collect();
+			format!("{}...", Trunc)
 		} else {
-			content.to_string()
+			Content.to_string()
 		};
-		directives.insert(name.to_string(), Directive { name:name.to_string(), content });
+		Directives.insert(name.to_string(), Struct { name:name.to_string(), Content });
 	}
-	directives
+	Directives
 }

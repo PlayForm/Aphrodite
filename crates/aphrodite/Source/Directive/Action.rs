@@ -1,56 +1,69 @@
-//! Runtime directive actions (`list`/`swap`/`add`/`remove`/`reset`/`load`)
+//! Runtime directive actions (`list`/`swap`/`add`/`remove`/`reset`/`Load`)
 //! against live state.
+//!
+//! This is the single implementation of the action vocabulary. Both
+//! `AphroditeDirective` (the extern fn) and `AphroditeDispatch`'s
+//! `"directive"` arm delegate here (01-F8) - previously ~40 lines of this
+//! logic were duplicated between the two, with divergent error shapes. The
+//! returned value always embeds an `{"error": ...}` key rather than a separate
+//! top-level error call, so a caller can pass it straight through its own
+//! success serializer.
+//!
+//! Every successful mutation latches `ManualDirectiveTurn` (P6): a manual
+//! choice must switch phase-aware auto-swaps off, and a *failed* action must
+//! not, which is why the latch sits inside each success arm rather than at the
+//! top of the function.
 
-/// Handle a directive action (`list`/`swap`/`add`/`remove`/`reset`/`load`)
-/// against live state. Both `aphrodite_directive` (extern fn) and
-/// `aphrodite_dispatch`'s `"directive"` arm delegate here (01-F8) - previously
+/// Handle a directive action (`list`/`swap`/`add`/`remove`/`reset`/`Load`)
+/// against live state. Both `AphroditeDirective` (extern fn) and
+/// `AphroditeDispatch`'s `"directive"` arm delegate here (01-F8) - previously
 /// ~40 lines of this logic were duplicated between the two, with divergent
 /// error shapes (the extern fn returned an error via a separate top-level
-/// `to_json_error` call, the dispatch arm embedded `{"error": ...}` inside an
+/// `ToJSONError` call, the dispatch arm embedded `{"error": ...}` inside an
 /// otherwise-success value). This always returns the latter shape - callers
 /// pass the result straight through their own success serializer.
-pub fn handle_action(state:&mut crate::State::AphroditeState, action:&str, name:&str) -> serde_json::Value {
-	match action {
+pub fn Fn(State:&mut crate::State::AphroditeState, Action:&str, name:&str) -> serde_json::Value {
+	match Action {
 		"list" => {
 			// P3/T10: surface ephemeral (nudge/TTL) entries with their expiry so
 			// the mechanism is observable.
-			let ephemeral:Vec<serde_json::Value> = state
-				.ephemeral_directives
+			let Ephemeral:Vec<serde_json::Value> = State
+				.EphemeralDirectives
 				.iter()
 				.map(|e| {
 					serde_json::json!({
 						"name": e.name,
 						"inline": e.inline,
-						"expires_after_turn": e.expires_after_turn,
+						"expires_after_turn": e.ExpiresAfterTurn,
 					})
 				})
 				.collect();
-			let mut available:Vec<&String> = state.directives.keys().collect();
+			let mut Available:Vec<&String> = State.Directives.keys().collect();
 			// Sort for a stable, deterministic ordering - `HashMap` iteration
 			// order is nondeterministic, which made the `list` result flake
 			// between `["focus","lazy"]` and `["lazy","focus"]` across runs.
-			available.sort();
+			Available.sort();
 			serde_json::json!({
-				"available": available,
-				"active": &state.active_directives,
-				"ephemeral": ephemeral,
+				"available": Available,
+				"active": &State.ActiveDirectives,
+				"ephemeral": Ephemeral,
 			})
 		},
 		"swap" => {
-			if state.directives.contains_key(name) {
-				state.active_directives = vec![name.to_string()];
-				state.manual_directive_turn = Some(state.turn_counter);
-				serde_json::json!({"swapped": name, "active": &state.active_directives})
+			if State.Directives.contains_key(name) {
+				State.ActiveDirectives = vec![name.to_string()];
+				State.ManualDirectiveTurn = Some(State.TurnCounter);
+				serde_json::json!({"swapped": name, "active": &State.ActiveDirectives})
 			} else {
 				serde_json::json!({"error": format!("unknown directive: {}", name)})
 			}
 		},
 		"add" => {
-			if state.directives.contains_key(name) && !state.active_directives.iter().any(|d| d == name) {
-				state.active_directives.push(name.to_string());
+			if State.Directives.contains_key(name) && !State.ActiveDirectives.iter().any(|d| d == name) {
+				State.ActiveDirectives.push(name.to_string());
 			}
-			state.manual_directive_turn = Some(state.turn_counter);
-			serde_json::json!({"active": &state.active_directives})
+			State.ManualDirectiveTurn = Some(State.TurnCounter);
+			serde_json::json!({"active": &State.ActiveDirectives})
 		},
 		// ── "load" (lazy directive activation, 06-T?) - activate a directive
 		// from the *available* set on demand, returning a distinct shape so
@@ -59,28 +72,28 @@ pub fn handle_action(state:&mut crate::State::AphroditeState, action:&str, name:
 		// lazy load is an explicit, intentional activation and a typo should
 		// surface rather than be swallowed. Idempotent if already active.
 		"load" => {
-			if !state.directives.contains_key(name) {
+			if !State.Directives.contains_key(name) {
 				return serde_json::json!({"error": format!("unknown directive: {}", name)});
 			}
-			if !state.active_directives.iter().any(|d| d == name) {
-				state.active_directives.push(name.to_string());
+			if !State.ActiveDirectives.iter().any(|d| d == name) {
+				State.ActiveDirectives.push(name.to_string());
 			}
-			state.manual_directive_turn = Some(state.turn_counter);
-			serde_json::json!({"loaded": name, "active": &state.active_directives})
+			State.ManualDirectiveTurn = Some(State.TurnCounter);
+			serde_json::json!({"loaded": name, "active": &State.ActiveDirectives})
 		},
 		"remove" => {
-			state.active_directives.retain(|d| d != name);
-			state.manual_directive_turn = Some(state.turn_counter);
-			serde_json::json!({"active": &state.active_directives})
+			State.ActiveDirectives.retain(|d| d != name);
+			State.ManualDirectiveTurn = Some(State.TurnCounter);
+			serde_json::json!({"active": &State.ActiveDirectives})
 		},
 		"reset" => {
 			// `reset` clears named actives AND ephemeral nudges AND the manual
 			// latch (P3/P6: explicit return to auto mode - see T10/T20).
-			state.active_directives.clear();
-			state.ephemeral_directives.clear();
-			state.manual_directive_turn = None;
-			serde_json::json!({"active": &state.active_directives})
+			State.ActiveDirectives.clear();
+			State.EphemeralDirectives.clear();
+			State.ManualDirectiveTurn = None;
+			serde_json::json!({"active": &State.ActiveDirectives})
 		},
-		_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|load|remove|reset)", action)}),
+		_ => serde_json::json!({"error": format!("unknown action: {} (use list|swap|add|load|remove|reset)", Action)}),
 	}
 }

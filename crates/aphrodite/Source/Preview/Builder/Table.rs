@@ -1,33 +1,39 @@
 //! Markdown table preview arm.
+//!
+//! A table is described by its width, its height and its header cells. This arm
+//! renders those. It is not a grid reader: cell contents beyond the header are
+//! not shown, so a table's data previews as its shape.
 
-use crate::Preview::Input::Input;
+use crate::Preview::Input::Struct::Struct as Input;
 
-/// Markdown table preview: column count, row count, header cells.
-/// `[table:3 cols 4 rows | Name, Age, City]`. Rows = non-empty lines minus
-/// separator rows (header + data rows).
-pub(crate) fn build_table_preview(inp:&Input<'_>) -> String {
-	let is_sep = |l:&str| {
-		let cells = l.trim().trim_matches('|');
-		!cells.is_empty()
-			&& cells.split('|').all(|c| {
+/// Build a preview of a markdown table.
+///
+/// Promises the column count, the row count and up to five header cells. It is
+/// not a data sample: rows are counted as non-empty lines minus separator rows,
+/// so a table with wrapped cells reports more rows than it has.
+pub(crate) fn Fn(Inp:&Input<'_>) -> String {
+	let IsSep = |l:&str| {
+		let Cells = l.trim().trim_matches('|');
+		!Cells.is_empty()
+			&& Cells.split('|').all(|c| {
 				let t = c.trim();
-				!t.is_empty() && t.chars().all(|ch| matches!(ch, '-' | ':' | ' '))
+				!t.is_empty() && t.chars().all(|Character| matches!(Character, '-' | ':' | ' '))
 			})
 	};
-	let rows:Vec<&str> = inp
+	let Rows:Vec<&str> = Inp
 		.raw
 		.lines()
 		.map(|l| l.trim())
-		.filter(|l| !l.is_empty() && !is_sep(l))
+		.filter(|l| !l.is_empty() && !IsSep(l))
 		.collect();
-	let header = rows.first().unwrap_or(&"").trim_matches('|');
-	let cells:Vec<&str> = header.split('|').map(|c| c.trim()).filter(|c| !c.is_empty()).collect();
-	let cols = cells.len();
-	let shown:Vec<&str> = cells.iter().take(5).copied().collect();
-	let more = if cols > shown.len() {
-		format!(" +{} more", cols - shown.len())
+	let Header = Rows.first().unwrap_or(&"").trim_matches('|');
+	let Cells:Vec<&str> = Header.split('|').map(|c| c.trim()).filter(|c| !c.is_empty()).collect();
+	let Cols = Cells.len();
+	let Shown:Vec<&str> = Cells.iter().take(5).copied().collect();
+	let More = if Cols > Shown.len() {
+		format!(" +{} more", Cols - Shown.len())
 	} else {
 		String::new()
 	};
-	format!("[table:{} cols {} rows | {}{}]", cols, rows.len(), shown.join(", "), more)
+	format!("[table:{} cols {} rows | {}{}]", Cols, Rows.len(), Shown.join(", "), More)
 }

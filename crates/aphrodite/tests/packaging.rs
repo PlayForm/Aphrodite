@@ -3,109 +3,107 @@
 //! `cargo publish` never checks that the files referenced by `include_str!`
 //! actually ship in the uploaded tarball - it only validates the manifest
 //! (that a lib/bin target exists). The v1.3.8 release was un-installable
-//! because `exclude = ["*.md"]` stripped `src/builtin_directives/*.md`, which
-//! `src/directives/builtin.rs` embeds via `include_str!`. Local `cargo
-//! build`/`cargo test` passed because the files exist in the checkout; only a
-//! build of the *packaged tarball* (what `cargo install` consumes) reveals
-//! the break.
+//! because `exclude = ["*.md"]` stripped the builtin directive `.md` files,
+//! which `Source/Directive/Builtin.rs` embeds via `include_str!`. Local
+//! `cargo build`/`cargo test` passed because the files exist in the checkout;
+//! only a build of the *packaged tarball* (what `cargo install` consumes)
+//! reveals the break.
 //!
 //! This test shells out to `cargo package --list` (the real tarball contents)
-//! and asserts every `include_str!("src/...")` target in
-//! `src/directives/builtin.rs` is present. It runs in `cargo test`, so CI's
-//! `Test` job catches regressions before any publish. A `build.rs` cannot do
-//! this reliably: it runs against the checkout (files present) and is skipped
-//! under `cargo publish --no-verify`.
+//! and asserts every `include_str!` target in `Source/Directive/Builtin.rs` is
+//! present. It runs in `cargo test`, so CI's `Test` job catches regressions
+//! before any publish. A `build.rs` cannot do this reliably: it runs against
+//! the checkout (files present) and is skipped under `cargo publish --no-verify`.
 
-use std::{Path::Path, process::Command};
+use std::{path::Path, process::Command};
 
 /// Extract the path argument from `include_str!("...")` occurrences wherever
 /// they appear on a line (they sit inside a tuple, e.g.
-/// `("focus", include_str!("../builtin_directives/focus.md"))`). The crate
-/// embeds files relative to `src/`, so in the tarball they appear as
-/// `src/builtin_directives/focus.md`. We normalize the `src/...`,
-/// `builtin_directives/...`, and (post-atomization, paths are relative to
-/// `src/directives/`) `../builtin_directives/...` forms to the tarball path.
-fn collect_include_str_paths(source:&str) -> Vec<String> {
-	let mut out = Vec::new();
-	for line in source.lines() {
-		let line = line.trim();
-		let mut rest = line;
+/// `("focus", include_str!("../BuiltinDirective/focus.md"))`). The path is
+/// relative to the embedding file (`Source/Directive/`), so in the tarball the
+/// target appears as `Source/BuiltinDirective/focus.md`. We normalize the
+/// `../` and `Source/` forms to that tarball path.
+fn CollectIncludeStrPaths(Source:&str) -> Vec<String> {
+	let mut Out = Vec::new();
+	for Line in Source.lines() {
+		let Line = Line.trim();
+		let mut Rest = Line;
 		// find every `include_str!("...")` on the line
-		while let Some(pos) = rest.find("include_str!") {
-			let after_kw = &rest[pos + "include_str!".len()..];
-			if let Some(open) = after_kw.find('"') {
-				let inner = &after_kw[open + 1..];
-				if let Some(close) = inner.find('"') {
-					let path = &inner[..close];
-					let normalized = path.strip_prefix("src/").unwrap_or(path);
-					let normalized = normalized.strip_prefix("../").unwrap_or(normalized);
-					if normalized.starts_with("builtin_directives/") {
-						out.push(format!("src/{}", normalized));
+		while let Some(Pos) = Rest.find("include_str!") {
+			let AfterKw = &Rest[Pos + "include_str!".len()..];
+			if let Some(Open) = AfterKw.find('"') {
+				let Inner = &AfterKw[Open + 1..];
+				if let Some(Close) = Inner.find('"') {
+					let path = &Inner[..Close];
+					let Normalized = path.strip_prefix("../").unwrap_or(path);
+					let Normalized = Normalized.strip_prefix("Source/").unwrap_or(Normalized);
+					if Normalized.starts_with("BuiltinDirective/") {
+						Out.push(format!("Source/{}", Normalized));
 					}
-					rest = &inner[close + 1..];
+					Rest = &Inner[Close + 1..];
 					continue;
 				}
 			}
 			break;
 		}
 	}
-	out
+	Out
 }
 
 #[test]
-fn packaged_tarball_contains_all_builtin_directives() {
-	let crate_dir = env!("CARGO_MANIFEST_DIR");
+fn PackagedTarballContainsAllBuiltinDirectives() {
+	let CrateDirectory = env!("CARGO_MANIFEST_DIR");
 
-	// 1. Read builtin.rs (where the include_str! targets live) and find them.
-	let directives_path = Path::new(crate_dir).join("src/directives/builtin.rs");
-	let source =
-		std::fs::read_to_string(&directives_path).expect("src/directives/builtin.rs must be readable in the checkout");
-	let targets = collect_include_str_paths(&source);
+	// 1. Read Builtin.rs (where the include_str! targets live) and find them.
+	let DirectivesPath = Path::new(CrateDirectory).join("Source/Directive/Builtin.rs");
+	let Source =
+		std::fs::read_to_string(&DirectivesPath).expect("Source/Directive/Builtin.rs must be readable in the checkout");
+	let Targets = CollectIncludeStrPaths(&Source);
 	assert!(
-		!targets.is_empty(),
-		"expected at least one include_str! target in src/directives/builtin.rs"
+		!Targets.is_empty(),
+		"expected at least one include_str! target in Source/Directive/Builtin.rs"
 	);
 
 	// 2. List the real packaged tarball contents.
-	let output = Command::new("cargo")
+	let Output = Command::new("cargo")
 		.args(["package", "--list", "--allow-dirty"])
-		.current_dir(crate_dir)
+		.current_dir(CrateDirectory)
 		.output()
 		.expect("failed to spawn `cargo package --list`");
 	assert!(
-		output.status.success(),
+		Output.status.success(),
 		"cargo package --list failed: {}",
-		String::from_utf8_lossy(&output.stderr)
+		String::from_utf8_lossy(&Output.stderr)
 	);
-	let listed = String::from_utf8_lossy(&output.stdout);
+	let Listed = String::from_utf8_lossy(&Output.stdout);
 
 	// 3. Every include_str! target must appear in the tarball listing.
-	for target in &targets {
+	for Target in &Targets {
 		assert!(
-			listed.lines().any(|l| l.trim_end() == target.as_str()),
-			"packaged tarball is missing `{}` (referenced by include_str! in src/directives/builtin.rs).
+			Listed.lines().any(|l| l.trim_end() == Target.as_str()),
+			"packaged tarball is missing `{}` (referenced by include_str! in Source/BuiltinDirective/).
 Fix: ensure it is not excluded by `exclude` in Cargo.toml.",
-			target
+			Target
 		);
 	}
 }
 
 #[test]
-fn packaged_tarball_has_lib_and_bin_targets() {
-	let crate_dir = env!("CARGO_MANIFEST_DIR");
-	let output = Command::new("cargo")
+fn PackagedTarballHasLibAndBinTargets() {
+	let CrateDirectory = env!("CARGO_MANIFEST_DIR");
+	let Output = Command::new("cargo")
 		.args(["package", "--list", "--allow-dirty"])
-		.current_dir(crate_dir)
+		.current_dir(CrateDirectory)
 		.output()
 		.expect("failed to spawn `cargo package --list`");
-	assert!(output.status.success());
-	let listed = String::from_utf8_lossy(&output.stdout);
+	assert!(Output.status.success());
+	let Listed = String::from_utf8_lossy(&Output.stdout);
 	assert!(
-		listed.lines().any(|l| l.trim_end() == "src/lib.rs"),
-		"packaged tarball missing src/lib.rs - no [lib] target would ship"
+		Listed.lines().any(|l| l.trim_end() == "Source/Library.rs"),
+		"packaged tarball missing Source/Library.rs - no [lib] target would ship"
 	);
 	assert!(
-		listed.lines().any(|l| l.trim_end() == "src/main.rs"),
-		"packaged tarball missing src/main.rs - no [[bin]] target would ship"
+		Listed.lines().any(|l| l.trim_end() == "Source/Main.rs"),
+		"packaged tarball missing Source/Main.rs - no [[bin]] target would ship"
 	);
 }

@@ -139,13 +139,13 @@ and skills live dev-side.
 
 ## Call sites
 
-| Concern                                                                       | Module                                 |
-| ----------------------------------------------------------------------------- | -------------------------------------- |
-| `_load_dylib` (probe + load-once), `_call_json`, `_hook_dispatch`, `register` | `plugins/aphrodite/__init__.py`        |
-| FFI setup: `_configure_ffi` / `_manual_ffi_setup` / `_REQUIRED_VOID_P`        | `plugins/aphrodite/__init__.py`        |
-| `_probe_dylib` (subprocess smoke test) / `_read_str` (NULL guard)             | `plugins/aphrodite/__init__.py`        |
-| `aphrodite_hermes_call_hook` (bridge hooks) / `replacement_from`              | `crates/aphrodite-hermes/src/lib.rs`   |
-| `tools::unwrap_hermes_result` / `tools::dispatch`                             | `crates/aphrodite-hermes/src/tools.rs` |
-| `hooks::transform_tool_result_inner` / `pre_llm_call` / `post_llm_call`       | `crates/aphrodite/src/hooks.rs`        |
-| `flow::build_turn_context` (assembler)                                        | `crates/aphrodite/src/flow.rs`         |
-| Core C ABI `guarded` / `aphrodite_dispatch`                                   | `crates/aphrodite/src/lib.rs`          |
+| Concern                                                                       | Module                                      |
+| ----------------------------------------------------------------------------- | ------------------------------------------- |
+| `_load_dylib` (probe + load-once), `_call_json`, `_hook_dispatch`, `register` | `plugins/aphrodite/__init__.py`             |
+| FFI setup: `_configure_ffi` / `_manual_ffi_setup` / `_REQUIRED_VOID_P`        | `plugins/aphrodite/__init__.py`             |
+| `_probe_dylib` (subprocess smoke test) / `_read_str` (NULL guard)             | `plugins/aphrodite/__init__.py`             |
+| `aphrodite_hermes_call_hook` (bridge hooks) / `replacement_from`              | `crates/aphrodite-hermes/Source/Library.rs` |
+| `tools::unwrap_hermes_result` / `tools::dispatch`                             | `crates/aphrodite-hermes/Source/Tool/`      |
+| `hooks::transform_tool_result_inner` / `pre_llm_call` / `post_llm_call`       | `crates/aphrodite/Source/Hook/`             |
+| `flow::build_turn_context` (assembler)                                        | `crates/aphrodite/Source/Flow/`             |
+| Core C ABI `guarded` / `aphrodite_dispatch`                                   | `crates/aphrodite/Source/Library.rs`        |

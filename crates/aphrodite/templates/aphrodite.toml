@@ -150,7 +150,7 @@ ccr_marker_hint = false       # WIRED: prompt knob - marker hint shown to the LL
 catalog_intent_hints = false  # WIRED: prompt knob - per-intent catalog hints
 # First-turn session orientation injected by pre_llm_call on turn 0 (dylib
 # path only). Ships a default when this key is absent (see
-# crates/aphrodite/src/flow.rs). Set to "" to disable entirely.
+# crates/aphrodite/Source/Flow/). Set to "" to disable entirely.
 session_inject = """
 [APHRODITE] CCR active. Tool output > threshold → <<<CCR:hash|type|size>>>.
 Markers ARE the content, compressed. A marker's `size` is its retrieval cost:
@@ -180,7 +180,7 @@ OPERATING RULES (token-efficiency):
 # templates, and the reverse key map. Absent = hardcoded builders/defaults.
 # Resolution order per preview: family[ctype] -> reverse[ctype] ->
 # family[_default] -> hardcoded builder. Source of truth:
-# crates/aphrodite/src/templates.rs.
+# crates/aphrodite/Source/Template/.
 # Preview variables (brace-wrapped in format strings): {type} {ln} {size}
 # {first} {err} {warn} {msg} {exit} {cmd} {files} {fn} {plus} {minus} {keys}
 # {items} {commit} {hash} {subject} {pid} {uptime} {fns} {structs} {impls}

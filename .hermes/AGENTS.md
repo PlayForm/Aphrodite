@@ -10,6 +10,13 @@ of the token cost. Read this file first - it is the map.
 - **Binary 1.5.0** - `crates/aphrodite` (plus `crates/aphrodite-hermes`,
   `package.json`, `plugins/aphrodite/BINARY_VERSION`). Live values:
   `aphrodite --version` / `aphrodite_stats` (hardcoded doc numbers drift).
+- **Layout (house style, phases 1-3 done)** - both crates use
+  `Source/Library.rs` as the crate root and `Source/Main.rs` for the binary.
+  A module is a PascalCase directory whose `mod.rs` facade only declares, and
+  every leaf file owns **one export**, named by kind (`Struct`, `Fn`, `Enum`,
+  `Const`), so a consumer names the leaf path
+  (`Preview::Builder::Entry::Fn`). The 25 `aphrodite_*` exports live one per
+  file under `crates/aphrodite/Source/ABI/`. No compatibility aliases remain.
 - **Plugin 2.2.0** - `plugins/aphrodite` is a git submodule
   (PlayForm/Aphrodite-Hermes, remote `Source`). It is a **pure loader**: all
   compression/engine logic lives in the Rust dylib
@@ -43,8 +50,9 @@ of the token cost. Read this file first - it is the map.
 
 | What            | Where                                                                             |
 | --------------- | --------------------------------------------------------------------------------- |
-| Core engine     | `crates/aphrodite/` (Rust)                                                        |
-| Agent bridge    | `crates/aphrodite-hermes/` (dylib exports)                                        |
+| Core engine     | `crates/aphrodite/Source/` (root `Library.rs`, one export per file)               |
+| C ABI exports   | `crates/aphrodite/Source/ABI/` (one file per `aphrodite_*` export)                |
+| Agent bridge    | `crates/aphrodite-hermes/Source/` (root `Library.rs`, `ABI/` exports)             |
 | Plugin (loader) | `plugins/aphrodite/` (`plugin.yaml`, `BINARY_VERSION`)                            |
 | Forked deps     | `vendor/headroom/` (submodule; `aphrodite-headroom-core`)                         |
 | Config          | `aphrodite.toml.example` (tracked); `aphrodite.toml` (local, gitignored)          |

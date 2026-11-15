@@ -89,7 +89,7 @@ limited to):**
 Each class above maps to code you can open. Naming that code makes a report
 easier to route to the right maintainer.
 
-**[`crates/aphrodite/src/prefetch.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/prefetch.rs)**
+**[`crates/aphrodite/Source/Prefetch/`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/Source/Prefetch/)**
 
 ```rs
 fn refuse_reason(path:&Path) -> Option<String> {
@@ -109,7 +109,7 @@ fn refuse_reason(path:&Path) -> Option<String> {
 > a local file disclosure finding, so include the exact path and whether it
 > was reached through prefetch or retrieval.
 
-**[`crates/aphrodite/src/main.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/main.rs)**
+**[`crates/aphrodite/Source/Main.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/Source/Main.rs)**
 
 ```rs
 fn check_loopback_request(addr:SocketAddr, host_header:&str) -> Result<(), &'static str> {
@@ -125,7 +125,7 @@ fn check_loopback_request(addr:SocketAddr, host_header:&str) -> Result<(), &'sta
 > The second layer is the DNS-rebinding defense. `/health` is the one route
 > exempt from the peer check.
 
-**[`crates/aphrodite/src/main.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/main.rs)**
+**[`crates/aphrodite/Source/Main.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/Source/Main.rs)**
 
 ```rs
 fn check_bearer_token(configured:Option<&str>, auth_header:&str) -> Result<(), &'static str> {
@@ -144,7 +144,7 @@ fn check_bearer_token(configured:Option<&str>, auth_header:&str) -> Result<(), &
 > loopback caller, and startup logs a warning. `/metrics` is exempt from this
 > token but not from the loopback check.
 
-**[`crates/aphrodite-hermes/src/lib.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite-hermes/src/lib.rs)**
+**[`crates/aphrodite-hermes/Source/Library.rs`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite-hermes/Source/Library.rs)**
 
 ```rs
 fn lock_bounded(state:&Arc<Mutex<AphroditeState>>) -> Option<std::sync::MutexGuard<'_, AphroditeState>> {
@@ -376,7 +376,7 @@ still triaged as an availability bug rather than closed as a feature request.
 `fill_pct`, the value behind `X-Aphrodite-Fill-Pct` and the `fill_pct` metric,
 is derived from the compression-ratio moving average:
 `100 - ratio_ema / 20`, clamped to `[1, 99]`
-([`compute_fill_pct`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/src/proxy.rs)).
+([`compute_fill_pct`](https://github.com/PlayForm/Aphrodite/blob/Development/crates/aphrodite/Source/Proxy/)).
 A fresh process reports `90.0` because the seed ratio is `2.0x`, so a high
 `fill_pct` means the engine sees little headroom, not that the disk is 90%
 full. When you report store growth, measure the `ccr.db` file and its WAL

@@ -2,9 +2,9 @@
 """Static FFI-contract checker for the Aphrodite Rust<->ctypes boundary.
 
 Verifies that every pointer-returning ``#[no_mangle]`` /
-``#[unsafe(no_mangle)]`` ``pub extern "C"`` export
-in ``crates/aphrodite-hermes/src/lib.rs`` that the Python shim binds or calls
-is configured with ``restype = c_void_p``. A missing restype is the historical
+``#[unsafe(no_mangle)]`` ``pub extern "C"`` export in the
+``crates/aphrodite-hermes/Source`` tree that the Python shim binds or calls is
+configured with ``restype = c_void_p``. A missing restype is the historical
 SIGSEGV root cause: ctypes' default restype (``c_int``) reads the 64-bit
 ``*mut c_char`` return truncated and sign-extended, and ``_read_str`` then
 strlen()s a bogus low address.
@@ -37,7 +37,11 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_LIBRS = REPO_ROOT / "crates" / "aphrodite-hermes" / "src" / "lib.rs"
+# The export surface is the crate's whole ``Source`` tree, not one file: the
+# house style puts one exported symbol per file under ``ABI/``, so a
+# single-file default would see zero exports and report every bound symbol as
+# "required-not-exported".
+DEFAULT_LIBRS = REPO_ROOT / "crates" / "aphrodite-hermes" / "Source"
 DEFAULT_PLUGIN = REPO_ROOT / "plugins" / "aphrodite" / "__init__.py"
 DEFAULT_BINDINGS = REPO_ROOT / "plugins" / "aphrodite" / "_bindings.py"
 
@@ -46,13 +50,27 @@ VOID_P_SUFFIX = "c_void_p"
 
 # Matches `#[no_mangle]` (pre-2024) or `#[unsafe(no_mangle)]` (edition
 # 2024) followed by `pub [unsafe] extern "C" fn NAME(args)
-# [-> RET] {`. Single-line signatures like the ones in lib.rs; tolerant of
+# [-> RET] {`. Single-line signatures like the ones in Source/; tolerant of
 # whitespace/newlines between the signature and the body brace. Group 2 is
 # the argument list (counted by parse_export_arg_counts); group 3 the return.
 EXPORT_RE = re.compile(
     r'#\[(?:unsafe\(no_mangle\)|no_mangle)\]\s+pub\s+(?:unsafe\s+)?extern\s+"C"\s+fn\s+(\w+)\s*\(([^)]*)\)\s*(?:->\s*([^{]+))?\s*\{',
     re.MULTILINE,
 )
+
+
+def read_librs_source(path):
+    """Source text to scan for exports: one file, or every ``.rs`` under a tree.
+
+    A directory is read as the concatenation of its whole ``.rs`` tree because
+    the exports live one-per-file under ``ABI/``. The concatenation order is
+    sorted purely so the reading is deterministic - every regex here is
+    order-independent, and a symbol may not be declared twice.
+    """
+    path = Path(path)
+    if path.is_dir():
+        return "\n".join(child.read_text() for child in sorted(path.rglob("*.rs")))
+    return path.read_text()
 
 
 def classify_return(ret):
@@ -68,7 +86,7 @@ def classify_return(ret):
 
 
 def parse_exports(librs_source):
-    """{symbol: return-kind} for every #[no_mangle] / #[unsafe(no_mangle)] extern "C" fn in lib.rs."""
+    """{symbol: return-kind} for every #[no_mangle] / #[unsafe(no_mangle)] extern "C" fn in Source/."""
     exports = {}
     for match in EXPORT_RE.finditer(librs_source):
         exports[match.group(1)] = classify_return(match.group(3))
@@ -76,10 +94,10 @@ def parse_exports(librs_source):
 
 
 def parse_export_arg_counts(librs_source):
-    """{symbol: parameter count} for every #[no_mangle] extern "C" fn in lib.rs.
+    """{symbol: parameter count} for every #[no_mangle] extern "C" fn in Source/.
 
     The parameter list group is `([^)]*)`, so nested parens (e.g. function
-    pointers) are not counted - lib.rs exports are plain pointer/scalar args.
+    pointers) are not counted - these exports are plain pointer/scalar args.
     """
     counts = {}
     for match in EXPORT_RE.finditer(librs_source):
@@ -236,17 +254,17 @@ def check(librs_source, plugin_source, bindings_source=None):
             if symbol in required:
                 violations.append(
                     f"[required-not-exported] {symbol}: listed in _REQUIRED_VOID_P "
-                    "but not a #[no_mangle] export in lib.rs"
+                    "but not a #[no_mangle] export in Source/"
                 )
             if symbol in called:
                 violations.append(
                     f"[called-not-exported] {symbol}: called via _call_json but not "
-                    "a #[no_mangle] export in lib.rs"
+                    "a #[no_mangle] export in Source/"
                 )
             if symbol in direct:
                 violations.append(
                     f"[direct-call-not-exported] {symbol}: invoked as "
-                    f"dylib.{symbol}(...) but not a #[no_mangle] export in lib.rs"
+                    f"dylib.{symbol}(...) but not a #[no_mangle] export in Source/"
                 )
             continue
         if symbol in argtypes:
@@ -255,7 +273,7 @@ def check(librs_source, plugin_source, bindings_source=None):
             if expected is not None and actual != expected:
                 violations.append(
                     f"[wrong-argcount] {symbol}: argtypes declares {actual} "
-                    f"parameter(s) but lib.rs declares {expected} - ctypes "
+                    f"parameter(s) but Source/ declares {expected} - ctypes "
                     "marshals arguments positionally and never verifies the "
                     "count, so a mismatch misaligns the ABI frame"
                 )
@@ -283,21 +301,21 @@ def check(librs_source, plugin_source, bindings_source=None):
         elif symbol in required:
             violations.append(
                 f"[required-non-pointer] {symbol}: listed in _REQUIRED_VOID_P but "
-                f"lib.rs declares a non-pointer return ({kind})"
+                f"Source/ declares a non-pointer return ({kind})"
             )
 
     for symbol in sorted(restypes):
         if symbol not in exports:
             violations.append(
                 f"[unknown-export-configured] {symbol}: restype configured but symbol "
-                "is not a #[no_mangle] export in lib.rs"
+                "is not a #[no_mangle] export in Source/"
             )
 
     for symbol in sorted(argtypes):
         if symbol not in exports:
             violations.append(
                 f"[unknown-export-argtypes] {symbol}: argtypes configured but symbol "
-                "is not a #[no_mangle] export in lib.rs"
+                "is not a #[no_mangle] export in Source/"
             )
 
     for symbol in sorted(exports):
@@ -319,7 +337,8 @@ def main(argv=None):
     parser.add_argument(
         "--librs",
         default=str(DEFAULT_LIBRS),
-        help="path to crates/aphrodite-hermes/src/lib.rs",
+        help="path to the Rust export source: the crate's Source directory "
+        "(every .rs under it is read) or a single file",
     )
     parser.add_argument(
         "--plugin",
@@ -336,8 +355,8 @@ def main(argv=None):
 
     librs_path = Path(args.librs)
     plugin_path = Path(args.plugin)
-    if not librs_path.is_file():
-        print(f"ERROR: lib.rs not found: {librs_path}", file=sys.stderr)
+    if not (librs_path.is_file() or librs_path.is_dir()):
+        print(f"ERROR: export source not found: {librs_path}", file=sys.stderr)
         return 2
     if not plugin_path.is_file():
         print(f"ERROR: plugin not found: {plugin_path}", file=sys.stderr)
@@ -352,7 +371,7 @@ def main(argv=None):
     elif DEFAULT_BINDINGS.is_file():
         bindings_path = DEFAULT_BINDINGS
 
-    librs_source = librs_path.read_text()
+    librs_source = read_librs_source(librs_path)
     plugin_source = plugin_path.read_text()
     bindings_source = bindings_path.read_text() if bindings_path else None
 

@@ -219,7 +219,7 @@ to `aphrodite_retrieve` verbatim.
 ## Enriched Preview Catalog
 
 Every marker carries a compact, human-readable preview built
-by `build_preview` (`crates/aphrodite/src/preview.rs`).
+by `build_preview` (`crates/aphrodite/Source/Preview/`).
 
 These enriched previews are **automatic and default** - no flag - and are emitted identically
 on both the proxy path and the Hermes hook/FFI path (both funnel

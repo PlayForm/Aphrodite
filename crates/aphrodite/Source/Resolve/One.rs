@@ -1,19 +1,37 @@
+//! One hash, one store lookup.
+//!
+//! This is the primitive the recursive resolver is built from: it answers "what is
+//! stored under this hash" and deliberately does not look inside the answer.
+//! Unpacking nested markers is `Recursive/`'s job, and keeping the two apart is
+//! what makes the depth limit and the cycle guard expressible at all.
+//!
+//! It is not a validating parse: it tolerates a whole marker body because the
+//! model is not reliable about stripping one, but it does not check that the hash
+//! is well formed, and it never invents content for a hash the store does not
+//! hold.
+
 use crate::State::AphroditeState;
 
 /// Resolve a single CCR hash from the inline store.
-/// Does NOT unpack nested markers. Returns None if not found.
 ///
-/// Tolerates a caller passing the full `hash|type|size` marker body instead
-/// of the bare hash (an LLM copying a marker sometimes includes the
-/// pipe-delimited suffix instead of stripping it) - `parse_marker_hash`
-/// already splits on `|` for markers found in text, so callers that hand us
-/// a raw arg (e.g. `aphrodite_retrieve(hash=...)`) need the same tolerance.
-pub fn resolve_one(state:&mut AphroditeState, hash_val:&str) -> Option<String> {
-	let hash_val = crate::Marker::normalize_hash(hash_val);
+/// Does NOT unpack nested markers. Returns `None` if the hash is not stored.
+///
+/// Tolerates a caller passing the full `hash|type|size` marker body instead of
+/// the bare hash (an LLM copying a marker sometimes includes the pipe-delimited
+/// suffix instead of stripping it) - the marker parser already splits on `|` for
+/// markers found in text, so callers that hand us a raw argument (e.g.
+/// `aphrodite_retrieve(hash=...)`) need the same tolerance.
+///
+/// A successful resolve of a chain-split segment hash is the tier-1 teaching
+/// loop's consequence signal: it is attributed to the split event that produced
+/// the hash, counted once per hash, so the threshold can adapt. Losing that
+/// attribution does not corrupt content - it only blinds the loop.
+pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
+	let HashValue = crate::Marker::NormalizeHash(HashValue);
 
 	// i: prefix - inline-only hashes
-	if hash_val.starts_with("i:") {
-		return state.inline_store_get(hash_val);
+	if HashValue.starts_with("i:") {
+		return State.InlineStoreGet(HashValue);
 	}
 
 	// NOTE (F6): this used to check a `{hash}#stage2` key first, "for
@@ -23,16 +41,16 @@ pub fn resolve_one(state:&mut AphroditeState, hash_val:&str) -> Option<String> {
 	// `{hash}#stage2`, this check-before-standard-lookup ordering would have
 	// made every plain resolution of `hash` silently and permanently return
 	// the lossy reduced version instead of the original, with no way for a
-	// caller to opt out. Wiring stage-2 up properly (a real `depth`
+	// caller to opt out. Wiring stage-2 up properly (a real `Depth`
 	// parameter on retrieve, only consulting `#stage2` at `depth >= 2`) is a
 	// deliberate feature decision, not a bug fix - see
 	// `.plans/05-compression-pipeline.md` §5. Deleted here rather than wired.
-	let found = state.inline_store_get(hash_val);
+	let Found = State.InlineStoreGet(HashValue);
 	// Tier 1 teaching loop: a successful resolve of a chain-split segment
 	// hash is the consequence signal - attribute it to the split event that
 	// produced it (counts once per hash) and let the threshold adapt.
-	if found.is_some() {
-		state.note_split_retrieval(hash_val);
+	if Found.is_some() {
+		State.NoteSplitRetrieval(HashValue);
 	}
-	found
+	Found
 }

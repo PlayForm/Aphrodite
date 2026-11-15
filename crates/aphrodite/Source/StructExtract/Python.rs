@@ -1,60 +1,76 @@
-//! Python extractor: `def` / `class` signatures.
+//! Python extractor: `def` and `class` signatures.
+//!
+//! Records `def name(params)` for every function or method and `class name` for every
+//! class, subtracting each line from the shared preview budget as it goes. It is not a
+//! Python parser: it never looks at indentation, so a nested method is recorded exactly
+//! like a module-level function and a `def` inside a string is recorded as real. The
+//! case-insensitive prefix test is deliberate - `Def` and `Async Def` are still
+//! declarations to this reader - and losing it would silently drop every
+//! capitalised-`Def` file from the preview.
 
 use std::collections::HashMap;
 
-use super::{MAX_SIG_LEN, floor_boundary, sig, trunc_params};
+use crate::StructExtract::{
+	Format::{Floor::Fn as Floor, Parameters::Fn as Parameters, Signature::Fn as Signature},
+	MaximumSignatureLength::Const as MaximumSigLength,
+};
 
-// ── Python extractor ───────────────────────────────────
-
-pub(super) fn extract_python(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mut isize) {
-	let mut fns:Vec<String> = Vec::new();
-	for line in content.lines() {
-		if *budget <= 0 {
+/// Append this Python source's `Fns` and `Classes` lines to `Result`, spending `Budget`.
+///
+/// Each signature subtracts its own length plus one separator from the budget, and the
+/// scan stops the moment it is spent, so the `Classes` pass only runs when the `Fns`
+/// pass left room. A category is inserted only when it produced a line, and the function
+/// returns early once the budget is gone. It is not a formatter: the lines stored here
+/// are already cut to the signature cap.
+pub(super) fn Fn(Content:&str, Result:&mut HashMap<String, Vec<String>>, Budget:&mut isize) {
+	let mut Fns:Vec<String> = Vec::new();
+	for Line in Content.lines() {
+		if *Budget <= 0 {
 			break;
 		}
-		let trimmed = line.trim();
-		let lower = trimmed.to_lowercase();
-		let is_def = (lower.starts_with("def ") || lower.starts_with("async def ")) && trimmed.contains('(');
-		if is_def {
-			let after = trimmed.trim_start_matches("async ").trim_start_matches("def ");
-			if let Some(paren) = after.find('(') {
-				let name = &after[..paren];
-				let params_end = after[paren..].find(')').unwrap_or(0);
-				let params = if params_end > 1 { &after[paren + 1..paren + params_end] } else { "" };
-				let s = format!("def {}({})", name, trunc_params(params));
-				let s_trunc = if s.len() > MAX_SIG_LEN {
-					floor_boundary(&s, MAX_SIG_LEN - 3).to_string() + "..."
+		let Trimmed = Line.trim();
+		let Lower = Trimmed.to_lowercase();
+		let IsDef = (Lower.starts_with("def ") || Lower.starts_with("async def ")) && Trimmed.contains('(');
+		if IsDef {
+			let After = Trimmed.trim_start_matches("async ").trim_start_matches("def ");
+			if let Some(Paren) = After.find('(') {
+				let name = &After[..Paren];
+				let ParamsEnd = After[Paren..].find(')').unwrap_or(0);
+				let Params = if ParamsEnd > 1 { &After[Paren + 1..Paren + ParamsEnd] } else { "" };
+				let s = format!("def {}({})", name, Parameters(Params));
+				let STrunc = if s.len() > MaximumSigLength {
+					Floor(&s, MaximumSigLength - 3).to_string() + "..."
 				} else {
 					s
 				};
-				let slen = s_trunc.len();
-				fns.push(s_trunc);
-				*budget -= slen as isize + 1;
+				let Slen = STrunc.len();
+				Fns.push(STrunc);
+				*Budget -= Slen as isize + 1;
 			}
 		}
 	}
-	if !fns.is_empty() {
-		result.insert("fns".into(), fns);
+	if !Fns.is_empty() {
+		Result.insert("fns".into(), Fns);
 	}
-	if *budget <= 0 {
+	if *Budget <= 0 {
 		return;
 	}
 
-	let mut classes:Vec<String> = Vec::new();
-	for line in content.lines() {
-		if *budget <= 0 {
+	let mut Classes:Vec<String> = Vec::new();
+	for Line in Content.lines() {
+		if *Budget <= 0 {
 			break;
 		}
-		let trimmed = line.trim();
-		if let Some(rest) = trimmed.strip_prefix("class ") {
-			let name = rest.split(['(', ':']).next().unwrap_or("?");
-			let s = sig("class", name);
-			let slen = s.len();
-			classes.push(s);
-			*budget -= slen as isize + 1;
+		let Trimmed = Line.trim();
+		if let Some(Rest) = Trimmed.strip_prefix("class ") {
+			let name = Rest.split(['(', ':']).next().unwrap_or("?");
+			let s = Signature("class", name);
+			let Slen = s.len();
+			Classes.push(s);
+			*Budget -= Slen as isize + 1;
 		}
 	}
-	if !classes.is_empty() {
-		result.insert("classes".into(), classes);
+	if !Classes.is_empty() {
+		Result.insert("classes".into(), Classes);
 	}
 }

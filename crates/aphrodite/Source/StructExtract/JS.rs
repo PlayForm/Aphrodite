@@ -1,33 +1,47 @@
-//! JS/TS extractor: `function` / arrow / `class` signatures.
+//! JS/TS extractor: `function`, arrow and `class` signatures.
+//!
+//! Records `function name` for declarations, `=> name` for bindings whose value is
+//! an arrow function, and `class name`, subtracting each line from the shared preview
+//! budget as it goes. It is not a JS parser: it reads one line at a time and never
+//! tracks a value across lines, so a function expression assigned on one line and
+//! arrowed on the next is missed. What must not drift is the arrow guard - a `=>`
+//! that only appears in a trailing comment must not turn a plain constant into a
+//! function, because the model would then be told the file exports something it does
+//! not.
 
 use std::collections::HashMap;
 
-use super::sig;
+use super::Format::Signature::Fn as Signature;
 
-// ── JS/TS extractor ────────────────────────────────────
-
-pub(super) fn extract_js(content:&str, result:&mut HashMap<String, Vec<String>>, budget:&mut isize) {
-	let mut fns:Vec<String> = Vec::new();
-	for line in content.lines() {
-		if *budget <= 0 {
+/// Append this JS/TS source's `Fns` and `Classes` lines to `Result`, spending `Budget`.
+///
+/// Each signature subtracts its own length plus one separator from the budget, and
+/// the scan stops the moment it is spent, so the `Classes` pass only runs when the
+/// `Fns` pass left room. A category is inserted only when it produced a line, and the
+/// function returns early once the budget is gone. It is not a formatter: the lines
+/// stored here are already cut to the signature cap.
+pub(super) fn Fn(Content:&str, Result:&mut HashMap<String, Vec<String>>, Budget:&mut isize) {
+	let mut Fns:Vec<String> = Vec::new();
+	for Line in Content.lines() {
+		if *Budget <= 0 {
 			break;
 		}
-		let trimmed = line.trim();
+		let Trimmed = Line.trim();
 		// function name(...) or export function name(...) or async function name(...)
-		if trimmed.starts_with("function ")
-			|| trimmed.starts_with("export function ")
-			|| trimmed.starts_with("async function ")
-			|| trimmed.starts_with("export async function ")
+		if Trimmed.starts_with("function ")
+			|| Trimmed.starts_with("export function ")
+			|| Trimmed.starts_with("async function ")
+			|| Trimmed.starts_with("export async function ")
 		{
-			let after = trimmed
+			let After = Trimmed
 				.trim_start_matches("export ")
 				.trim_start_matches("async ")
 				.trim_start_matches("function ");
-			let name = after.split('(').next().unwrap_or("?").trim();
-			let s = sig("function", name);
-			let slen = s.len();
-			fns.push(s);
-			*budget -= slen as isize + 1;
+			let name = After.split('(').next().unwrap_or("?").trim();
+			let s = Signature("function", name);
+			let Slen = s.len();
+			Fns.push(s);
+			*Budget -= Slen as isize + 1;
 		}
 		// Arrow functions: const name = (...) => { ... }
 		//
@@ -41,50 +55,50 @@ pub(super) fn extract_js(content:&str, result:&mut HashMap<String, Vec<String>>,
 		// fix that only special-cased a `//`-PREFIXED line (as opposed to a
 		// trailing `// ...` after real code) would still miss this exact
 		// case, since the line as a whole does not start with `//`.
-		let code_part = trimmed.split("//").next().unwrap_or(trimmed);
-		if !code_part.trim().is_empty()
-			&& let Some((before_eq, after_eq)) = code_part.split_once('=')
+		let CodePart = Trimmed.split("//").next().unwrap_or(Trimmed);
+		if !CodePart.trim().is_empty()
+			&& let Some((BeforeEq, AfterEq)) = CodePart.split_once('=')
 		{
-			let before_eq = before_eq.trim();
-			if after_eq.contains("=>")
-				&& (before_eq.starts_with("const ") || before_eq.starts_with("let ") || before_eq.starts_with("var "))
+			let BeforeEq = BeforeEq.trim();
+			if AfterEq.contains("=>")
+				&& (BeforeEq.starts_with("const ") || BeforeEq.starts_with("let ") || BeforeEq.starts_with("var "))
 			{
-				let name = before_eq
+				let name = BeforeEq
 					.trim_start_matches("const ")
 					.trim_start_matches("let ")
 					.trim_start_matches("var ")
 					.trim();
 				if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-					let s = sig("=>", name);
-					let slen = s.len();
-					fns.push(s);
-					*budget -= slen as isize + 1;
+					let s = Signature("=>", name);
+					let Slen = s.len();
+					Fns.push(s);
+					*Budget -= Slen as isize + 1;
 				}
 			}
 		}
 	}
-	if !fns.is_empty() {
-		result.insert("fns".into(), fns);
+	if !Fns.is_empty() {
+		Result.insert("fns".into(), Fns);
 	}
-	if *budget <= 0 {
+	if *Budget <= 0 {
 		return;
 	}
 
-	let mut classes:Vec<String> = Vec::new();
-	for line in content.lines() {
-		if *budget <= 0 {
+	let mut Classes:Vec<String> = Vec::new();
+	for Line in Content.lines() {
+		if *Budget <= 0 {
 			break;
 		}
-		let trimmed = line.trim();
-		if let Some(rest) = trimmed.strip_prefix("class ") {
-			let name = rest.split(['{', ' ', ':']).next().unwrap_or("?");
-			let s = sig("class", name);
-			let slen = s.len();
-			classes.push(s);
-			*budget -= slen as isize + 1;
+		let Trimmed = Line.trim();
+		if let Some(Rest) = Trimmed.strip_prefix("class ") {
+			let name = Rest.split(['{', ' ', ':']).next().unwrap_or("?");
+			let s = Signature("class", name);
+			let Slen = s.len();
+			Classes.push(s);
+			*Budget -= Slen as isize + 1;
 		}
 	}
-	if !classes.is_empty() {
-		result.insert("classes".into(), classes);
+	if !Classes.is_empty() {
+		Result.insert("classes".into(), Classes);
 	}
 }

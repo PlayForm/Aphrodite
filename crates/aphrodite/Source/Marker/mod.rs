@@ -2,10 +2,23 @@
 //!
 //! Generates <<<CCR:hash|type|size>>> markers with TOML-driven templates.
 //!
-//! 1.5.0: atomized into a per-item tree: `parse.rs` (hash/size parsing and
-//! extraction), `format.rs` (ccr_marker rendering), `tests.rs` (battery).
-//! This facade re-exports the exact public names the rest of the crate
-//! (and `aphrodite-hermes` via `lib.rs`) depends on.
+//! The marker line is a wire format: the LLM reads it and the resolver parses
+//! it, so the grammar (`<<<CCR:{hash}|{type}|{size}>>>`) and the preview line
+//! under it are a contract, not a rendering choice. Anything that changes a
+//! byte of that output changes what every already-emitted marker means.
+//!
+//! The tree separates the two halves - producing a marker and reading one back
+//! - because they fail in opposite directions:
+//!
+//! - `Format/` - rendering: the entry point, the template dispatch, the fixed
+//!   fallback grammar, the "already bracketed?" test, `{var}` substitution, and
+//!   the process-global template registration.
+//! - `Parse/` - reading: hash normalization, hash validity, preview extraction,
+//!   and the multi-family hash extractor.
+//! - `Test/` - the battery, split by area.
+//!
+//! This facade re-exports the exact public names the rest of the crate (and
+//! `aphrodite-hermes` via `Library.rs`) depends on.
 
 mod Format;
 mod Parse;
@@ -13,8 +26,8 @@ mod Parse;
 #[cfg(test)]
 mod Test;
 
-pub use Format::{ccr_marker, set_marker_templates};
-pub use Parse::{extract_hashes, is_valid_ccr_hash, normalize_hash, parse_preview};
-pub(crate) use Format::substitute_vars;
+pub use Format::{Const::SetMarkerTemplates, Entry::CCRMarker};
+pub use Parse::{Extract::ExtractHashes, Normalize::NormalizeHash, Preview::ParsePreview, Valid::IsValidCCRHash};
+pub(crate) use Format::Vars::SubstituteVars;
 #[cfg(test)]
-pub(crate) use Format::{marker_hint_enabled, marker_templates_test_guard, registered_marker_format};
+pub(crate) use Format::Const::{MarkerHintEnabled, MarkerTemplatesTestGuard, RegisteredMarkerFormat};

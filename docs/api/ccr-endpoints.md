@@ -102,7 +102,7 @@ on a later `/retrieve`.
 
 ```rust
 // Request
-pub struct CcrCreateRequest {
+pub struct CCRCreateRequest {
     pub content: String,
     pub key: Option<String>,         // custom hash override
     pub ttl_seconds: Option<u64>,
@@ -110,7 +110,7 @@ pub struct CcrCreateRequest {
 }
 
 // Response
-pub struct CcrCreateResponse {
+pub struct CCRCreateResponse {
     pub hash: String,
     pub token_savings_ratio: f64,
     pub original_size: usize,
@@ -119,7 +119,7 @@ pub struct CcrCreateResponse {
 }
 
 // Notification
-pub struct CcrNotification {
+pub struct CCRNotification {
     pub event: String,               // "ccr_created"
     pub hash: String,
     pub created_at: u64,             // unix seconds

@@ -66,11 +66,11 @@ Byte accounting: only `response_body_bytes` accumulates during the stream
 
 ## Call sites
 
-| Concern                                                           | Module                          |
-| ----------------------------------------------------------------- | ------------------------------- |
-| `body_wants_stream` (request-side detection)                      | `crates/aphrodite/src/proxy.rs` |
-| `stream_client` construction (no total timeout)                   | `crates/aphrodite/src/proxy.rs` |
-| Client selection in handler                                       | `crates/aphrodite/src/proxy.rs` |
-| `is_sse` (response-side detection)                                | `crates/aphrodite/src/proxy.rs` |
-| SSE stream branch (`bytes_stream().inspect`, byte/error counting) | `crates/aphrodite/src/proxy.rs` |
-| `sse_stream_errors` in `/metrics`                                 | `crates/aphrodite/src/main.rs`  |
+| Concern                                                           | Module                            |
+| ----------------------------------------------------------------- | --------------------------------- |
+| `body_wants_stream` (request-side detection)                      | `crates/aphrodite/Source/Proxy/`  |
+| `stream_client` construction (no total timeout)                   | `crates/aphrodite/Source/Proxy/`  |
+| Client selection in handler                                       | `crates/aphrodite/Source/Proxy/`  |
+| `is_sse` (response-side detection)                                | `crates/aphrodite/Source/Proxy/`  |
+| SSE stream branch (`bytes_stream().inspect`, byte/error counting) | `crates/aphrodite/Source/Proxy/`  |
+| `sse_stream_errors` in `/metrics`                                 | `crates/aphrodite/Source/Main.rs` |

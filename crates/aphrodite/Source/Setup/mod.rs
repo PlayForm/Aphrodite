@@ -1,46 +1,31 @@
-//! Bootstrap setup: `aphrodite setup` - one-shot install after
+//! Bootstrap install path: `aphrodite setup`, the one-shot after
 //! `cargo install aphrodite`.
 //!
-//! Creates ~/.hermes/aphrodite/ with binaries, config, and plugin manifest,
-//! then optionally launches the proxy. Maximum security: self-verification,
-//! permission hardening, no secrets in args.
+//! Setup resolves the Hermes home and the runtime home, installs the binary and
+//! both dylibs, writes `aphrodite.toml`, the `plugin.yaml` manifest, the
+//! `__init__.py` loader and the `BINARY_VERSION` pin, then registers the plugin
+//! with Hermes. It is the only writer of an installed layout, so a silent failure
+//! here does not fail setup - it leaves a Hermes runtime that starts, registers,
+//! and then cannot load its dylib or its loader, and the symptom appears in the
+//! gateway on a later run.
 //!
-//! Templates live in `templates/` and are embedded at compile time via
-//! `include_str!` - no runtime file dependency for cargo-installed binaries.
+//! The work is grouped by what it touches. `Run/` orchestrates and owns the error
+//! type and the resolved context; `Verify/` checks prerequisites and hashes the
+//! artifact; `Dylib/` locates, downloads and checksums the shared libraries;
+//! `Write/` writes every installed file, the two `include_str!` templates
+//! included; `MacOS.rs` applies the Gatekeeper-safe treatment to each artifact copy
+//! on macOS.
 //!
-//! 1.5.0: atomized into a domain tree: `run.rs` (orchestration + error
-//! type + context), `verify.rs` (prereq checks), `dylib.rs` (copy/
-//! download/checksum/triple), `macos.rs` (Gatekeeper-safe artifact install),
-//! `write.rs` (config/shim/manifest writers + embedded templates), `tests.rs`
-//! (battery). This facade re-exports the exact public names the rest of the
-//! crate depends on (`Setup::run`, `Setup::SetupError`).
+//! This facade declares the leaves and carries no logic. `Run::Entry::Fn` and
+//! `Run::Error::Enum` are the only items anything outside `Setup/` names, and
+//! `Run` is `pub` because the binary - a separate crate target - calls it.
 
 mod Dylib;
 #[cfg(target_os = "macos")]
-mod Macos;
-mod Run;
+mod MacOS;
+pub mod Run;
 mod Verify;
 mod Write;
 
 #[cfg(test)]
 mod Test;
-
-pub use Run::{SetupError, run};
-pub(crate) use Run::SetupCtx;
-pub(crate) use Dylib::copy_dylibs;
-#[cfg(test)]
-pub(crate) use Dylib::verify_download_checksum;
-pub(crate) use Verify::{self_hash, verify_hermes};
-pub(crate) use Write::{
-	CONFIG_TEMPLATE,
-	binary_name,
-	register_plugin,
-	secure_perms,
-	write_binary_version,
-	write_init_py,
-	write_plugin_yaml,
-};
-#[cfg(test)]
-pub(crate) use Write::HERMES_PLUGIN_SHIM;
-#[cfg(target_os = "macos")]
-pub(crate) use Macos::install_macos_artifact;

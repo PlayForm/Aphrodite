@@ -1,15 +1,23 @@
-//! code shape detector.
+//! Code shape detector.
+//!
+//! Code is recognised in two grades: a strong signature line proves it on its
+//! own, while statement lines only vote. This detector applies both grades. It
+//! is not a language detector - the language is a separate question.
 
 use crate::Preview::{
-	Input::Input,
-	Line::Code::{is_code_strong_line, is_code_vote_line},
+	Input::Struct::Struct as Input,
+	Line::Code::{StrongLine, VoteLine},
 };
 
-/// A strong signature marker (`fn main(`, `def x(`, `struct X`, `#include`,
-/// shebang) or >=2 statement-line votes (`use x::y;`, `let x =`, `import x`,
-/// `return x`, ...).
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
-	let code_strong = inp.non_empty.iter().any(|l| is_code_strong_line(l.trim_start()));
-	let code_votes = inp.non_empty.iter().filter(|l| is_code_vote_line(l.trim_start())).count();
-	code_strong || code_votes >= 2
+/// True when the content looks like source code.
+///
+/// One strong marker (`fn main(`, `def x(`, `struct X`, `#include`, a shebang) or
+/// two statement votes (`use x::y;`, `let x =`, `import x`, `return x`) are
+/// enough. It is not a syntax check: content that merely quotes code in prose can
+/// accumulate two votes, which is why the majority gate exists rather than a
+/// single-line test.
+pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
+	let CodeStrong = Inp.NonEmpty.iter().any(|l| StrongLine::Fn(l.trim_start()));
+	let CodeVotes = Inp.NonEmpty.iter().filter(|l| VoteLine::Fn(l.trim_start())).count();
+	CodeStrong || CodeVotes >= 2
 }

@@ -1,8 +1,12 @@
-//! Per-line predicate primitives, one file per predicate family
-//! (1.5.0 reverse-taxonomy split of the old monolithic `preview.rs`).
+//! Per-line predicates shared by the preview detectors and builders.
 //!
-//! Shared by detectors (shape votes) and builders (preview arms) - each
-//! predicate lives here exactly once.
+//! A preview arm and the detector that routes to it must agree about what a
+//! line is; if they do not, content is classified as one shape and rendered as
+//! another. Each predicate therefore lives here exactly once and both sides
+//! call it. The families are grouped by what they read - code, errors,
+//! failures, git status, grep hits, lint issues, markdown, paths, test output,
+//! warnings, YAML keys - and a family holding more than one predicate is a
+//! directory of one-predicate leaves.
 
 pub mod Code;
 pub mod Error;

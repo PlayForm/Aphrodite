@@ -61,20 +61,21 @@ The Aphrodite crate produces BOTH a proxy binary and a cdylib from one build:
 
 ```
 crates/aphrodite/
-  ├── src/main.rs          # Proxy binary - spawns :9797 + :9798
-  ├── src/lib.rs           # 25 C ABI functions - cdylib for Python loading
-  ├── src/proxy.rs         # Handler, compression, tool relay
-  ├── src/resolve.rs       # CCR marker resolution (nested, recursive)
-  ├── src/stage2.rs        # Semantic reduction (JSON, build, diff, code)
-  ├── src/struct_extract.rs # Code structure extraction
-  ├── src/hooks.rs         # transform_tool_result, transform_terminal_output
-  ├── src/state.rs         # Session state, inline store, LRU
-  ├── src/retrieve.rs      # /retrieve endpoint
-  └── src/config.rs        # MultiConfig from aphrodite.toml
+  ├── Source/Main.rs        # Proxy binary - spawns :9797 + :9798
+  ├── Source/Library.rs     # Crate root: module list; the 25 C ABI exports live in Source/ABI/
+  ├── Source/ABI/           # One file per aphrodite_* export - cdylib for Python loading
+  ├── Source/Proxy/         # Handler, compression, tool relay
+  ├── Source/Resolve/       # CCR marker resolution (nested, recursive)
+  ├── Source/Stage2/        # Semantic reduction (JSON, build, diff, code)
+  ├── Source/StructExtract/ # Code structure extraction
+  ├── Source/Hook/          # transform_tool_result, transform_terminal_output
+  ├── Source/State/         # Session state, inline store, LRU
+  ├── Source/Retrieve/      # /retrieve endpoint
+  └── Source/ConfigurationLoader/ # MultiConfig from aphrodite.toml
 
 crates/aphrodite-hermes/   # Hermes-specific integration (cdylib)
-  ├── tools.rs             # 13 tool dispatch handlers
-  ├── schemas.rs           # JSON Schema definitions
+  ├── Source/Tool/         # 13 tool dispatch handlers
+  ├── Source/Schema/       # JSON Schema definitions
 
 vendor/headroom/
   └── crates/headroom-core/  # Compression engine (PlayForm fork)

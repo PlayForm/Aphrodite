@@ -1,8 +1,9 @@
-//! Shape detectors, one file per SHAPE (1.5.0 REFACTOR-PLAN §3a).
+//! Shape detectors, one file per content shape.
 //!
-//! Every detector takes the shared [`Input`](crate::Preview::Input::Input)
-//! and returns `bool` (the xml detector returns `Option<&'static str>`).
-//! Priority = chain position in `detect.rs` - the `or_else` order.
+//! A detector answers one question - does this content have this shape - and the
+//! order of the chain in `Detect::SemanticType` is the priority contract. Keeping
+//! each shape in its own file is what lets that order be read as a list. A
+//! detector is not a builder: it never renders, and it never sees the preview.
 
 pub mod Build;
 pub mod Code;

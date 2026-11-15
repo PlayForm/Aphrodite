@@ -1,11 +1,23 @@
-//! Hermes wrapper-envelope JSON object predicate.
+//! Hermes wrapper-envelope predicate.
+//!
+//! The JSON arm has to choose between two honest answers: the key list of the
+//! payload, or the payload itself when the payload is wrapped. This module
+//! decides which of the two a parsed object is. It is not a JSON parser and it
+//! does not validate structure - it only answers "is this object a Hermes
+//! envelope?", and getting it wrong makes a wrapped result preview as a list of
+//! envelope keys instead of the result.
 
-use serde_json::Value as JsonValue;
+use serde_json::Value as JSONValue;
 
-/// True when a JSON object is a Hermes wrapper envelope whose raw-JSON preview
-/// is intentional (the payload is inside the wrapper, not the key list).
-pub(crate) fn is_envelope_json_object(obj:&serde_json::Map<String, JsonValue>) -> bool {
-	const GUARD:&[&str] = &[
+/// True when a JSON object is a Hermes wrapper envelope.
+///
+/// A wrapper envelope carries the real payload under one of a fixed set of
+/// field names (`Output`, `Content`, `Matches`, ...), so previewing its key
+/// list is intentional and correct: the key list names the payload. This is
+/// not a heuristic about JSON shape - a plain object with none of the guard
+/// keys is a payload in its own right and must preview as one.
+pub(crate) fn Fn(Obj:&serde_json::Map<String, JSONValue>) -> bool {
+	const Guard:&[&str] = &[
 		"output",
 		"exit_code",
 		"diff",
@@ -23,5 +35,5 @@ pub(crate) fn is_envelope_json_object(obj:&serde_json::Map<String, JsonValue>) -
 		"name",
 		"description",
 	];
-	obj.keys().any(|k| GUARD.contains(&k.as_str()))
+	Obj.keys().any(|k| Guard.contains(&k.as_str()))
 }

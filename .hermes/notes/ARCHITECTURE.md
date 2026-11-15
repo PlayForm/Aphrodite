@@ -62,7 +62,7 @@ cbindgen 0.29 -> aphrodite_hermes.h
 - `plugins/aphrodite/layout_check.py` + `layout_schema.json` self-heal the
   layout at startup: create missing dirs, repair symlinks, relocate displaced
   files (byte-verified, never overwrites user data), idempotent, never raises.
-- Directives are embedded in the binary (`crates/aphrodite/src/builtin_directives/`,
+- Directives are embedded in the binary (`crates/aphrodite/Source/BuiltinDirective/`,
   7 files incl. lazy-eval.md), materialized by
   `aphrodite_hermes_materialize_directives` into `~/.hermes/aphrodite/directives/`
   at registration - idempotent, never overwrites user-modified files.
@@ -72,18 +72,19 @@ cbindgen 0.29 -> aphrodite_hermes.h
 
 ## 5. Preview system (post-Issue #11 WS1/2/4)
 
-- `build_preview` (`crates/aphrodite/src/preview/mod.rs` - atomized dir module
-  per REFACTOR-PLAN-1.5.0 §4: `detectors/`, `builders/`, `line/`, `text/`) is
+- `build_preview` (`crates/aphrodite/Source/Preview/` - one item per file, the
+  entry point is `Preview::Builder::Entry::Fn`) is
   the shared builder
   for every hook/FFI/C-ABI/bridge path; `proxy_build_preview` is the proxy's
   parallel builder (WS3 parity deferred).
 - WS4 wired `[previews] preview_max_chars` end-to-end: env
   `APHRODITE_PREVIEW_MAX_CHARS` > TOML > default 120, enforced at the single
   choke point (end of `build_preview`), char-boundary-safe truncation that
-  preserves the closing `]` + `...`; applied at startup (`main.rs`), on
-  `/reload` (`proxy.rs`), in dylib init (`crates/aphrodite-hermes/src/lib.rs`),
-  and by `config_loader::apply_previews`.
-- `tools::unwrap_hermes_result` (`crates/aphrodite-hermes/src/tools.rs`): the
+  preserves the closing `]` + `...`; applied at startup (`Source/Main.rs`), on
+  `/reload` (`Source/Proxy/`), in dylib init
+  (`crates/aphrodite-hermes/Source/Library.rs`),
+  and by `ConfigurationLoader::Proxy::Previews::Struct::Struct`.
+- `Tool::Unwrap::Fn` (`crates/aphrodite-hermes/Source/Tool/Unwrap/Fn.rs`): the
   Hermes-envelope heuristic; WS1 removed the `ok` collapse, guarded the
   success-string + priority-key arms (single-key only), and made the caller
   hint win over the unwrap on the explicit compress path (full-content preview

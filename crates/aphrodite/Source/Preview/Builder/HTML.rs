@@ -1,49 +1,58 @@
 //! HTML preview arm.
+//!
+//! A page's title, heading count and link count say what it is about without
+//! shipping the markup. This arm renders those. It is not an HTML parser and it
+//! does not execute anything - the tags are read as text, so a `<title>` inside
+//! a script string would be found too.
 
-use crate::Preview::Input::Input;
+use crate::Preview::Input::Struct::Struct as Input;
 
-/// HTML preview: title, heading count, link count, body size estimate.
-pub(crate) fn build_html_preview(inp:&Input<'_>) -> String {
+/// Build a preview of HTML content.
+///
+/// Promises the `<title>` text, a heading count, a link count and a body-size
+/// estimate. It is not a DOM: nothing is normalised, so malformed markup yields
+/// whatever counts the text happens to produce.
+pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	// Extract <title>...</title> text (anywhere on a line, case-insensitive).
-	let title = inp.raw.lines().find_map(|l| {
-		let lower = l.to_lowercase();
-		let start = lower.find("<title>")? + 7;
-		let end = lower[start..].find("</title>")?;
-		Some(l[start..start + end].trim().chars().take(60).collect::<String>())
+	let Title = Inp.raw.lines().find_map(|l| {
+		let Lower = l.to_lowercase();
+		let Start = Lower.find("<title>")? + 7;
+		let End = Lower[Start..].find("</title>")?;
+		Some(l[Start..Start + End].trim().chars().take(60).collect::<String>())
 	});
 	// Count common structural elements.
-	let headings = inp.raw.matches("<h1").count()
-		+ inp.raw.matches("<h2").count()
-		+ inp.raw.matches("<h3").count()
-		+ inp.raw.matches("<H1").count()
-		+ inp.raw.matches("<H2").count()
-		+ inp.raw.matches("<H3").count();
-	let links = inp.raw.matches("<a ").count() + inp.raw.matches("<A ").count();
-	let imgs = inp.raw.matches("<img ").count() + inp.raw.matches("<IMG ").count();
-	let scripts = inp.raw.matches("<script").count() + inp.raw.matches("<SCRIPT").count();
+	let Headings = Inp.raw.matches("<h1").count()
+		+ Inp.raw.matches("<h2").count()
+		+ Inp.raw.matches("<h3").count()
+		+ Inp.raw.matches("<H1").count()
+		+ Inp.raw.matches("<H2").count()
+		+ Inp.raw.matches("<H3").count();
+	let Links = Inp.raw.matches("<a ").count() + Inp.raw.matches("<A ").count();
+	let Imgs = Inp.raw.matches("<img ").count() + Inp.raw.matches("<IMG ").count();
+	let Scripts = Inp.raw.matches("<script").count() + Inp.raw.matches("<SCRIPT").count();
 
-	let mut parts:Vec<String> = Vec::new();
-	if let Some(t) = title {
-		parts.push(t);
+	let mut Parts:Vec<String> = Vec::new();
+	if let Some(t) = Title {
+		Parts.push(t);
 	}
-	let mut stats:Vec<String> = Vec::new();
-	if headings > 0 {
-		stats.push(format!("{}h", headings));
+	let mut Stats:Vec<String> = Vec::new();
+	if Headings > 0 {
+		Stats.push(format!("{}h", Headings));
 	}
-	if links > 0 {
-		stats.push(format!("{}a", links));
+	if Links > 0 {
+		Stats.push(format!("{}a", Links));
 	}
-	if imgs > 0 {
-		stats.push(format!("{}img", imgs));
+	if Imgs > 0 {
+		Stats.push(format!("{}img", Imgs));
 	}
-	if scripts > 0 {
-		stats.push(format!("{}script", scripts));
+	if Scripts > 0 {
+		Stats.push(format!("{}script", Scripts));
 	}
-	stats.push(format!("{}L", inp.total));
-	let stats_str = stats.join(" ");
-	if parts.is_empty() {
-		format!("[html:{}]", stats_str)
+	Stats.push(format!("{}L", Inp.Total));
+	let StatsStr = Stats.join(" ");
+	if Parts.is_empty() {
+		format!("[html:{}]", StatsStr)
 	} else {
-		format!("[html:{} | {}]", stats_str, parts.join(" | "))
+		format!("[html:{} | {}]", StatsStr, Parts.join(" | "))
 	}
 }

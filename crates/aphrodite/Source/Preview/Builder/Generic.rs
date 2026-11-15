@@ -1,26 +1,29 @@
-//! generic preview arm (the honest fallback).
+//! Generic preview arm - the honest fallback.
+//!
+//! When nothing classified the payload, the preview still has to say something
+//! true about it. This arm shows a content hint. It is not a classifier: it
+//! never claims to know the shape, it only finds the first line that carries
+//! content and samples it fairly.
 
 use crate::Preview::{
-	Input::Input,
-	Text::{FirstMeaningful::first_meaningful_line, SampleLong::sample_long_line},
+	Input::Struct::Struct as Input,
+	Text::{FirstMeaningful, SampleLong},
 };
 
-/// Plain-text / unrecognized fallback: even when we can't classify the shape,
-/// do better than a bare L/B count - show a content hint so the agent has
-/// SOME signal about what the blob is.
+/// Build a preview for content of unknown shape.
 ///
-/// ISSUE-11 residuals #1/#4 (RC-D): the hint used to be the FIRST non-empty
-/// line raw - a pretty-printed JSON blob previewed as a lone `{` (MISLEADING,
-/// the top battery offender) and a 10 KB single-line payload as a bare 60-char
-/// head (SHALLOW). Now: skip structural noise lines (lone braces/brackets) to
-/// the first MEANINGFUL line (the first key / statement), and sample
-/// head+tail for very long lines.
-pub(crate) fn build_generic_preview(type_str:&str, inp:&Input<'_>) -> String {
-	let hint = first_meaningful_line(inp.raw)
-		.map(|l| sample_long_line(&l))
+/// Promises a content hint rather than a bare length/byte count, so the model
+/// has some signal about what the blob is. It is not a first-line reader: the
+/// hint skips structural noise (a lone `{` from pretty-printed JSON) to the
+/// first MEANINGFUL line, and samples head+tail for a very long line. Showing
+/// the raw first line made a pretty-printed JSON blob preview as `{` - the
+/// single most misleading preview the battery ever measured.
+pub(crate) fn Fn(TypeStr:&str, Inp:&Input<'_>) -> String {
+	let Hint = FirstMeaningful::Fn(Inp.raw)
+		.map(|l| SampleLong::Fn(&l))
 		.filter(|s| !s.is_empty());
-	match hint {
-		Some(h) => format!("[{}:{}L {}B | {}]", type_str, inp.total, inp.bytes, h),
-		None => format!("[{}:{}L {}B]", type_str, inp.total, inp.bytes),
+	match Hint {
+		Some(h) => format!("[{}:{}L {}B | {}]", TypeStr, Inp.Total, Inp.bytes, h),
+		None => format!("[{}:{}L {}B]", TypeStr, Inp.Total, Inp.bytes),
 	}
 }

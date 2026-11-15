@@ -1,0 +1,69 @@
+//! The store-and-marker step itself.
+
+use aphrodite::State::{AphroditeState, MarkerEntry};
+
+use crate::Tool::Unwrap;
+
+/// Store content in the session's inline store and record a catalog marker.
+/// `center` is an optional caller-supplied string that travels with the
+/// marker (schema param `_ccr_center`) - previously documented but silently
+/// dropped (F11); now threaded through to both the recorded catalog entry
+/// and the rendered marker.
+/// Returns `{hash, type, size, preview, marker}`.
+///
+/// It does not check for duplicates: compressing the same bytes twice records two
+/// catalogue rows over one inline-store key, which is what makes the catalogue a
+/// history of what the session did rather than a set of distinct blobs.
+pub(crate) fn Fn(state:&mut AphroditeState, content:&str, hint:&str, center:Option<&str>) -> serde_json::Value {
+	// Hermes wraps tool results in JSON. Unwrap to find real content for
+	// classification/preview (terminal output, diffs, etc.) instead of a
+	// meaningless "[json:1items 1L]" - but always hash and store the
+	// ORIGINAL `content`, never the extracted piece: retrieval must return
+	// exactly what was passed in, including wrapper metadata like
+	// `exit_code`/`error`, and legitimate caller JSON that merely matches a
+	// wrapper shape (e.g. `{"content":"hi","id":42}`) must round-trip intact.
+	let (classify_content, eff_type) = if let Some((c, t)) = Unwrap::Fn(content) {
+		// ISSUE-11 WS1 (caller-hint-wins): the caller's explicit `type`
+		// hint is intent, the unwrap is a guess - when a non-default hint
+		// is present it must win. For JSON payloads the preview is built
+		// from the FULL content: an unwrap fragment ("ok") produces a
+		// wrong `[text:1L 2B | ok]` that counts the fragment, not the
+		// stored payload, and drops the shape signal entirely.
+		if !hint.is_empty() && hint != "text" {
+			if content.trim_start().starts_with('{') {
+				(content.to_string(), hint.to_string())
+			} else {
+				(c, hint.to_string())
+			}
+		} else {
+			(c, t)
+		}
+	} else {
+		let detected = aphrodite::detect_type(content);
+		let ccr_type = if hint.is_empty() || hint == "text" { detected } else { hint.to_string() };
+		(content.to_string(), ccr_type)
+	};
+
+	let hash = aphrodite::Hook::Hash::Fn::Fn(content);
+	let preview = aphrodite::build_preview(&eff_type, &classify_content);
+	let marker = aphrodite::Marker::ccr_marker(&hash, &eff_type, content.len(), &preview, None, None, center);
+
+	state.inline_store_put(hash.clone(), content.to_string());
+	state.record_marker(MarkerEntry {
+		hash:hash.clone(),
+		ccr_type:eff_type.clone(),
+		size:content.len(),
+		preview:preview.clone(),
+		turn:state.turn_counter,
+		center:center.map(|c| c.to_string()),
+		meta:None,
+	});
+
+	serde_json::json!({
+		"hash": hash,
+		"type": eff_type,
+		"size": content.len(),
+		"preview": preview,
+		"marker": marker,
+	})
+}

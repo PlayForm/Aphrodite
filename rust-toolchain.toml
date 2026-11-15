@@ -21,7 +21,7 @@
 # Consequence to respect: the lint set moves with the compiler. A nightly can
 # gain a lint that rejects code which passed yesterday - that is how
 # `clippy::new_instead_of_clear` surfaced in
-# crates/aphrodite/src/chain_split.rs. The answer is to fix the code, never to
+# crates/aphrodite/Source/ChainSplit/. The answer is to fix the code, never to
 # freeze the compiler.
 #
 # Maintain/CheckParity.py asserts that this channel and components list match

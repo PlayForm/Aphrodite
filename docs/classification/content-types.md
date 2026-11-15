@@ -19,9 +19,9 @@ Preview Catalog](../proxy/compression.md#enriched-preview-catalog).
 | Stage               | Where                                  | Role                                                                                                                                                                    |
 | ------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Base classifier     | `headroom-core` content detector       | Coarse type: JSON array, source code, search results, build output, diff, HTML, plain text. Confidence-gated, first match wins                                          |
-| Semantic refinement | `crates/aphrodite/src/preview.rs`      | Refines common shapes (test output, git status/log, ls, grep, tables, markdown, YAML, XML, CSV) that the base classifier flattens to `text`                             |
-| Proxy heuristics    | `crates/aphrodite/src/proxy.rs`        | The standalone proxy path's own ladder: JSON envelopes, per-language code, errors, build, linter, diff, git, log                                                        |
-| Envelope unwrap     | `crates/aphrodite-hermes/src/tools.rs` | The Hermes plugin path: unwraps `{output, exit_code}`, `{diff}`, `{error}`, `{total_count, matches}`, `{content, total_lines}` envelopes before classifying the payload |
+| Semantic refinement | `crates/aphrodite/Source/Preview/`     | Refines common shapes (test output, git status/log, ls, grep, tables, markdown, YAML, XML, CSV) that the base classifier flattens to `text`                             |
+| Proxy heuristics    | `crates/aphrodite/Source/Proxy/`       | The standalone proxy path's own ladder: JSON envelopes, per-language code, errors, build, linter, diff, git, log                                                        |
+| Envelope unwrap     | `crates/aphrodite-hermes/Source/Tool/` | The Hermes plugin path: unwraps `{output, exit_code}`, `{diff}`, `{error}`, `{total_count, matches}`, `{content, total_lines}` envelopes before classifying the payload |
 
 The proxy path classifies raw pushed content; the Hermes plugin path unwraps envelopes first,
 then runs the same base classifier and semantic detector on the extracted payload.

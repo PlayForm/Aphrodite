@@ -1,33 +1,42 @@
-//! test-output preview arm.
+//! Test-output preview arm.
+//!
+//! A test run is summarised by three numbers - passed, failed, ignored - and by
+//! the name of the first failure. This arm renders those. It is not a test
+//! runner: it reads the text the runner printed, so a runner with an unfamiliar
+//! summary shape previews with zeroes rather than with a guess.
 
-use crate::Preview::{Input::Input, Text::NumberBefore::num_before};
+use crate::Preview::{Input::Struct::Struct as Input, Text::NumberBefore::Exact};
 
-/// test-output preview: pass/fail/ignored tallies + first failing test.
-/// `[test:220 pass 0 fail 1 ignored | 0.31s]` / names the first failure.
-pub(crate) fn build_test_preview(inp:&Input<'_>) -> String {
+/// Build a preview of test output.
+///
+/// Promises pass/fail/ignored tallies plus the first failing test's name and the
+/// run duration. It is not a verdict: a run whose summary line is missing reports
+/// no tally, and the failing-test name is shown so that a run which failed
+/// without a summary can never look clean.
+pub(crate) fn Fn(Inp:&Input<'_>) -> String {
 	// cargo: `test result: ok. 220 passed; 0 failed; 1 ignored; ... 0.31s`
-	let mut pass = 0usize;
-	let mut fail = 0usize;
-	let mut ignored = 0usize;
-	let mut found = false;
-	for line in inp.raw.lines() {
-		if let Some(rest) = line.split("test result:").nth(1) {
-			found = true;
-			pass += num_before(rest, "passed");
-			fail += num_before(rest, "failed");
-			ignored += num_before(rest, "ignored");
+	let mut Pass = 0usize;
+	let mut Fail = 0usize;
+	let mut Ignored = 0usize;
+	let mut Found = false;
+	for Line in Inp.raw.lines() {
+		if let Some(Rest) = Line.split("test result:").nth(1) {
+			Found = true;
+			Pass += Exact::Fn(Rest, "passed");
+			Fail += Exact::Fn(Rest, "failed");
+			Ignored += Exact::Fn(Rest, "ignored");
 		}
 	}
 	// pytest: `=== 3 failed, 220 passed in 0.31s ===` / `220 passed`
-	if !found {
-		for line in inp.raw.lines() {
-			if line.contains("passed") || line.contains("failed") {
-				let p = num_before(line, "passed");
-				let f = num_before(line, "failed");
+	if !Found {
+		for Line in Inp.raw.lines() {
+			if Line.contains("passed") || Line.contains("failed") {
+				let p = Exact::Fn(Line, "passed");
+				let f = Exact::Fn(Line, "failed");
 				if p > 0 || f > 0 {
-					found = true;
-					pass += p;
-					fail += f;
+					Found = true;
+					Pass += p;
+					Fail += f;
 				}
 			}
 		}
@@ -35,31 +44,31 @@ pub(crate) fn build_test_preview(inp:&Input<'_>) -> String {
 	// Bare test log without a summary line (residual #4, `term_plain`):
 	// `test foo ... ok` / `... FAILED` / `... ignored` lines still give an
 	// honest pass/fail tally instead of `[test:3L]`.
-	if !found {
-		for line in inp.raw.lines() {
-			let t = line.trim();
-			if let Some(rest) = t.strip_prefix("test ") {
-				if rest.contains("... ok") {
-					pass += 1;
-					found = true;
-				} else if rest.contains("... FAILED") {
-					fail += 1;
-					found = true;
-				} else if rest.contains("... ignored") {
-					ignored += 1;
-					found = true;
+	if !Found {
+		for Line in Inp.raw.lines() {
+			let t = Line.trim();
+			if let Some(Rest) = t.strip_prefix("test ") {
+				if Rest.contains("... ok") {
+					Pass += 1;
+					Found = true;
+				} else if Rest.contains("... FAILED") {
+					Fail += 1;
+					Found = true;
+				} else if Rest.contains("... ignored") {
+					Ignored += 1;
+					Found = true;
 				}
 			}
 		}
 	}
 	// First failing test name (cargo `test NAME ... FAILED` / go `--- FAIL: NAME`).
-	let first_fail = inp
+	let FirstFail = Inp
 		.raw
 		.lines()
 		.find_map(|l| {
 			let t = l.trim();
-			if let Some(rest) = t.strip_prefix("--- FAIL: ") {
-				Some(rest.split_whitespace().next().unwrap_or("").to_string())
+			if let Some(Rest) = t.strip_prefix("--- FAIL: ") {
+				Some(Rest.split_whitespace().next().unwrap_or("").to_string())
 			} else if t.starts_with("test ") && t.ends_with("FAILED") {
 				t.strip_prefix("test ")
 					.and_then(|r| r.split_whitespace().next())
@@ -73,15 +82,15 @@ pub(crate) fn build_test_preview(inp:&Input<'_>) -> String {
 		})
 		.filter(|s| !s.is_empty());
 	// Duration if present (Phase 4: token scan replacing the old DUR_RE).
-	let dur = first_duration(inp.raw);
+	let Dur = FirstDuration(Inp.raw);
 
-	if !found && first_fail.is_none() {
-		return format!("[test:{}L]", inp.total);
+	if !Found && FirstFail.is_none() {
+		return format!("[test:{}L]", Inp.Total);
 	}
-	let mut s = format!("[test:{} pass {} fail {} ignored", pass, fail, ignored);
-	if let Some(f) = first_fail {
+	let mut s = format!("[test:{} pass {} fail {} ignored", Pass, Fail, Ignored);
+	if let Some(f) = FirstFail {
 		s.push_str(&format!(" | FAIL {}", f.chars().take(40).collect::<String>()));
-	} else if let Some(d) = dur {
+	} else if let Some(d) = Dur {
 		s.push_str(&format!(" | {}", d));
 	}
 	s.push(']');
@@ -90,16 +99,16 @@ pub(crate) fn build_test_preview(inp:&Input<'_>) -> String {
 
 /// First duration token on a line (`0.31s` / `150ms`), first match wins -
 /// the same order as the old `DUR_RE` captures. A whitespace token ending
-/// `s` with a `digits '.' digits` prefix, or ending `ms` with an all-digit
+/// `s` with a `digits '.' digits` prefix, or ending `Ms` with an all-digit
 /// prefix.
-fn first_duration(content:&str) -> Option<String> {
-	for line in content.lines() {
-		for tok in line.split_whitespace() {
-			if let Some(ms) = tok.strip_suffix("ms") {
-				if !ms.is_empty() && ms.chars().all(|c| c.is_ascii_digit()) {
-					return Some(format!("{ms}ms"));
+fn FirstDuration(Content:&str) -> Option<String> {
+	for Line in Content.lines() {
+		for Tok in Line.split_whitespace() {
+			if let Some(Ms) = Tok.strip_suffix("ms") {
+				if !Ms.is_empty() && Ms.chars().all(|c| c.is_ascii_digit()) {
+					return Some(format!("{Ms}ms"));
 				}
-			} else if let Some(s) = tok.strip_suffix('s')
+			} else if let Some(s) = Tok.strip_suffix('s')
 				&& let Some((a, b)) = s.split_once('.')
 				&& !a.is_empty()
 				&& !b.is_empty()

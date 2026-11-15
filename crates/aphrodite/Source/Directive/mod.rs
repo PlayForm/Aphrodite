@@ -1,7 +1,7 @@
 //! Conversational Directives - lightweight behavioral context for the LLM.
 //!
 //! Directives are short `.md` files that inject behavioral instructions into
-//! the LLM's context via `pre_llm_call`. Unlike file content (which gets
+//! the LLM's context via `PreLLMCall`. Unlike file content (which gets
 //! compressed into CCR markers), directives are **always inline** - they're
 //! compact enough to never need compression, and the engine injects them
 //! directly into the LLM's context without any file-system round-trip or
@@ -10,11 +10,16 @@
 //! Per profile, per user: `directives/*.md` files are swappable at runtime
 //! via `aphrodite_directive("swap", "name")`.
 //!
-//! Atomized into a reverse-taxonomy tree: `builtin.rs` (baked-in include_str!
-//! defaults), `model.rs` (Directive + size caps), `load.rs` (disk loading),
-//! `build.rs` (context injection), `action.rs` (runtime actions),
-//! `tests.rs` (battery). This facade re-exports the exact public names the
-//! rest of the crate (and `aphrodite-hermes` via `lib.rs`) depends on.
+//! Atomized into a reverse-taxonomy tree: `Builtin.rs` (baked-in include_str!
+//! defaults), `Model.rs` (the directive struct + size caps), `Load.rs` (disk
+//! loading), `Build.rs` (context injection), `Action.rs` (runtime actions),
+//! `Test/` (the battery, split by area). Each leaf owns exactly one item and
+//! names it by kind, so the file says what the item is and the directory says
+//! what it is for.
+//!
+//! This facade declares the tree and nothing else. A consumer names the leaf
+//! (`Directive::Model::Struct::Struct`), so the file that defines an item is
+//! the only place it is defined and there is exactly one way to spell it.
 
 pub mod Action;
 pub mod Build;
@@ -24,9 +29,3 @@ pub mod Model;
 
 #[cfg(test)]
 mod Test;
-
-pub use Action::handle_action;
-pub use Build::build_directive_context;
-pub use Builtin::loaded_builtins;
-pub use Load::load_directives;
-pub use Model::{Directive, MAX_COMBINED_CHARS, MAX_DIRECTIVE_CHARS};

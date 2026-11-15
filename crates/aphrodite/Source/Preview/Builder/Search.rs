@@ -1,37 +1,44 @@
-//! search preview arm.
+//! Search preview arm.
+//!
+//! A search result differs from a grep result only in what counts as a hit, so
+//! this arm reports the same three facts: hits, distinct files, first location.
+//! It is not a ranking and it does not read match text.
 
 use std::collections::BTreeSet;
 
-use crate::Preview::{Input::Input, Line::Grep::is_search_line};
+use crate::Preview::{Input::Struct::Struct as Input, Line::Grep};
 
-/// Search preview: grep/ripgrep hit count, distinct files, first match location.
-/// Matches the same `file:line:` shape as `content_detector::SEARCH_RESULT_PATTERN`
-/// (Phase 4: structural `is_search_line`, no regex).
-pub(crate) fn build_search_preview(inp:&Input<'_>) -> String {
-	let mut hits = 0usize;
-	let mut files:BTreeSet<String> = BTreeSet::new();
-	let mut first:Option<String> = None;
-	for line in inp.raw.lines() {
-		if line.trim().is_empty() {
+/// Build a preview of search results.
+///
+/// Promises the hit count, the number of distinct files and the first match
+/// location. It is not the grep arm: the path here need not look file-ish, so a
+/// result whose path has no extension still counts - which is the whole
+/// difference between the two shapes.
+pub(crate) fn Fn(Inp:&Input<'_>) -> String {
+	let mut Hits = 0usize;
+	let mut Files:BTreeSet<String> = BTreeSet::new();
+	let mut First:Option<String> = None;
+	for Line in Inp.raw.lines() {
+		if Line.trim().is_empty() {
 			continue;
 		}
-		if !is_search_line(line) {
+		if !Grep::Search::Fn(Line) {
 			continue;
 		}
-		hits += 1;
-		if let Some((path, rest)) = line.split_once(':') {
-			files.insert(path.to_string());
-			if first.is_none() {
-				let lno = rest.split(':').next().unwrap_or("");
-				first = Some(format!("{}:{}", path, lno).chars().take(48).collect());
+		Hits += 1;
+		if let Some((path, Rest)) = Line.split_once(':') {
+			Files.insert(path.to_string());
+			if First.is_none() {
+				let Lno = Rest.split(':').next().unwrap_or("");
+				First = Some(format!("{}:{}", path, Lno).chars().take(48).collect());
 			}
 		}
 	}
-	if hits == 0 {
-		return format!("[search:{}L]", inp.total);
+	if Hits == 0 {
+		return format!("[search:{}L]", Inp.Total);
 	}
-	match first {
-		Some(loc) => format!("[search:{} hits in {} files | {} ...]", hits, files.len(), loc),
-		None => format!("[search:{} hits in {} files]", hits, files.len()),
+	match First {
+		Some(Loc) => format!("[search:{} hits in {} files | {} ...]", Hits, Files.len(), Loc),
+		None => format!("[search:{} hits in {} files]", Hits, Files.len()),
 	}
 }

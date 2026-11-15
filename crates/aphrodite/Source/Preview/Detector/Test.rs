@@ -1,24 +1,31 @@
-//! test-output shape detector.
+//! Test-output shape detector.
+//!
+//! A `test result:` line is unambiguous, but a bare test log has no summary - it
+//! has a `running N tests` header and per-test result lines. Both shapes are
+//! recognised here, so a run without a summary still previews as a test run. It
+//! is not a verdict: nothing is executed and no result is inferred.
 
 use crate::Preview::{
-	Input::Input,
-	Line::Test::{has_number_after, has_number_before, is_running_tests_line, is_test_result_line},
+	Input::Struct::Struct as Input,
+	Line::Test::{NumberAfter, NumberBefore, Result, Running},
 };
 
-/// cargo/pytest/jest/go: a `test result:` / `N passed` / `=== RUN` / pytest
-/// summary line is a strong, unambiguous signal even amid other noise.
-/// Extended for the SHALLOW tail (residual #4): `running N tests` +
-/// `test X ... ok` lines (a bare test log without a summary line) also count.
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
-	inp.raw.contains("test result:")
-		|| inp.raw.contains("=== RUN ")
-		|| inp.raw.contains("--- FAIL:")
-		|| inp.raw.contains("--- PASS:")
-		|| inp
+/// True when the content looks like test output.
+///
+/// A `test result:` / `N passed` / `=== RUN` / pytest summary line is a strong
+/// signal even amid other noise. A bare log also counts when it carries both a
+/// `running N tests` header and `test X ... ok` result lines. It is not a
+/// pass/fail check - the arm that renders the tally decides that.
+pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
+	Inp.raw.contains("test result:")
+		|| Inp.raw.contains("=== RUN ")
+		|| Inp.raw.contains("--- FAIL:")
+		|| Inp.raw.contains("--- PASS:")
+		|| Inp
 			.raw
 			.lines()
-			.any(|l| has_number_before(l, "passed") || has_number_before(l, "failed"))
-		|| inp.raw.lines().any(|l| has_number_after(l, "Tests:"))
-		|| inp.raw.lines().any(|l| is_running_tests_line(l.trim_start()))
-		|| inp.raw.lines().any(|l| is_test_result_line(l.trim_start()))
+			.any(|l| NumberBefore::Fn(l, "passed") || NumberBefore::Fn(l, "failed"))
+		|| Inp.raw.lines().any(|l| NumberAfter::Fn(l, "Tests:"))
+		|| Inp.raw.lines().any(|l| Running::Fn(l.trim_start()))
+		|| Inp.raw.lines().any(|l| Result::Fn(l.trim_start()))
 }

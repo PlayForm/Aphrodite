@@ -1,21 +1,23 @@
-//! terminal shape detector (Phase 6: exit-code / shell-trace rules).
+//! Terminal shape detector.
 //!
-//! Conservative on purpose: the terminal arm must NOT become a universal
-//! detector (every `Error:` line would classify terminal). Only explicit
-//! shell-trace signals count - an `exit code:` line or `$ `-prompt / `exit
-//! code` majority.
+//! The terminal arm must not become a universal detector - every `Error:` line
+//! would classify as terminal - so only explicit shell-trace signals count here.
+//! It is not a fallback: content that matches nothing else lands on the generic
+//! arm, not on this one.
 
-use crate::Preview::Input::Input;
+use crate::Preview::Input::Struct::Struct as Input;
 
-/// Shell/exit-code trace signals: an explicit `exit code:` line, a majority
-/// of `$ `-prompt lines, or a `command not found` / `zsh:` / `bash:` error
-/// trace.
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
-	let has_exit_code = inp.raw.lines().any(|l| l.contains("exit code:"));
-	let prompt_majority = inp.majority(|l| l.trim_start().starts_with("$ "), 1);
-	let shell_err = inp.raw.lines().any(|l| {
+/// True when the content looks like a shell/terminal trace.
+///
+/// An explicit `exit code:` line, a majority of `$ `-prompt lines, or a
+/// `command not found` / `zsh:` / `bash:` error trace. It is not an
+/// error-message detector: a lone `error: ...` line deliberately does not count.
+pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
+	let HasExitCode = Inp.raw.lines().any(|l| l.contains("exit code:"));
+	let PromptMajority = Inp.Majority(|l| l.trim_start().starts_with("$ "), 1);
+	let ShellError = Inp.raw.lines().any(|l| {
 		let t = l.trim();
 		t.starts_with("zsh:") || t.starts_with("bash:") || t.contains("command not found")
 	});
-	has_exit_code || prompt_majority || shell_err
+	HasExitCode || PromptMajority || ShellError
 }

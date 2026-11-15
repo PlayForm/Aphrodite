@@ -116,11 +116,11 @@ flowchart TD
 
 | Concern                                                           | Module                                                |
 | ----------------------------------------------------------------- | ----------------------------------------------------- |
-| `proxy_handler` request/response orchestration                    | `crates/aphrodite/src/proxy.rs`                       |
-| `compress_chat_completion`                                        | `crates/aphrodite/src/proxy.rs`                       |
-| `proxy_detect_content_type` (classify)                            | `crates/aphrodite/src/proxy.rs`                       |
-| `proxy_build_preview` / `proxy_format_ccr_output`                 | `crates/aphrodite/src/proxy.rs`                       |
-| `threshold_for` / `update_compression_ratio` / `compute_fill_pct` | `crates/aphrodite/src/proxy.rs`                       |
+| `proxy_handler` request/response orchestration                    | `crates/aphrodite/Source/Proxy/`                      |
+| `compress_chat_completion`                                        | `crates/aphrodite/Source/Proxy/`                      |
+| `proxy_detect_content_type` (classify)                            | `crates/aphrodite/Source/Proxy/`                      |
+| `proxy_build_preview` / `proxy_format_ccr_output`                 | `crates/aphrodite/Source/Proxy/`                      |
+| `threshold_for` / `update_compression_ratio` / `compute_fill_pct` | `crates/aphrodite/Source/Proxy/`                      |
 | `compute_key` (BLAKE3, 40-hex)                                    | `vendor/headroom/crates/headroom-core/src/ccr/mod.rs` |
-| `smart_marker` / `cache_marker`                                   | `crates/aphrodite/src/proxy.rs`                       |
-| tool_calls pass-through rationale + test                          | `crates/aphrodite/src/proxy.rs`                       |
+| `smart_marker` / `cache_marker`                                   | `crates/aphrodite/Source/Proxy/`                      |
+| tool_calls pass-through rationale + test                          | `crates/aphrodite/Source/Proxy/`                      |

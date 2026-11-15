@@ -1,9 +1,14 @@
-//! search shape detector (Phase 6: `path:line:` majority, mirroring the old
-//! proxy `SEARCH_RESULT_PATTERN` shape).
+//! Search shape detector.
+//!
+//! A search result is a majority of `path:line:` lines, mirroring the shape the
+//! old proxy pattern accepted. It is the grep detector minus the file-ish path
+//! requirement, and that difference is the only thing separating the two arms.
 
-use crate::Preview::{Input::Input, Line::Grep::is_search_line};
+use crate::Preview::{Input::Struct::Struct as Input, Line::Grep::Search};
 
-/// `path:line:` majority - the same structural rule the search preview uses
-/// (`is_search_line`: `splitn(3, ':')`, path non-empty no-space, middle all
-/// digits, third segment exists).
-pub(crate) fn detect(inp:&Input<'_>) -> bool { inp.majority(is_search_line, 2) }
+/// True when the content looks like search results.
+///
+/// Two or more `path:line:` lines making up at least half the non-empty lines.
+/// It is not the grep detector: a timestamped line is explicitly not a search
+/// path, so log output cannot be claimed here.
+pub(crate) fn Fn(Inp:&Input<'_>) -> bool { Inp.Majority(Search::Fn, 2) }

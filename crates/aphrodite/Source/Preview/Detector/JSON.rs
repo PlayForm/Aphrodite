@@ -1,26 +1,31 @@
-//! JSON shape detector - runs FIRST in the chain (strict parse is the
-//! strongest shape signal; a JSON payload can never be hijacked by a marker
-//! substring inside one of its string values).
+//! JSON shape detector.
+//!
+//! A strict parse is the strongest shape signal available, so this detector runs
+//! FIRST in the chain: a JSON payload can never be hijacked by a marker-shaped
+//! substring inside one of its string values. It is not a schema check - any
+//! parseable object or array is JSON.
 
-use serde_json::Value as JsonValue;
+use serde_json::Value as JSONValue;
 
-use crate::Preview::{Input::Input, Text::EnvelopeJSON::is_envelope_json_object};
+use crate::Preview::{Input::Struct::Struct as Input, Text::EnvelopeJSON};
 
-/// Strict parse of an object/array. Hermes wrapper envelopes
-/// (`output`/`exit_code`, `diff`, `error`, `success`, `total_count`/`matches`,
-/// `content`/`total_lines`, `result`/`message`/`found`/`preview`,
-/// skill_view `name`/`description`) are EXCLUDED: their raw-JSON previews are
-/// deliberately the caller-visible payload (WS1 full-content preview), and
-/// hiding e.g. an error message behind a key listing would be a regression.
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
-	if let Ok(v) = serde_json::from_str::<JsonValue>(inp.raw) {
+/// True when the content parses as a JSON object or array.
+///
+/// Hermes wrapper envelopes (`Output`/`ExitCode`, `Diff`, `error`, `Success`,
+/// `TotalCount`/`Matches`, `Content`/`total_lines`, `Result`/`Message`/`Found`/
+/// `Preview`, `name`/`description`) are EXCLUDED: their raw-JSON previews are
+/// deliberately the caller-visible payload, and hiding an error message behind a
+/// key listing would be a regression. It is not a validator of the payload's
+/// meaning, only of its syntax.
+pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
+	if let Ok(v) = serde_json::from_str::<JSONValue>(Inp.raw) {
 		match v {
-			JsonValue::Object(obj) => {
-				if !is_envelope_json_object(&obj) {
+			JSONValue::Object(Obj) => {
+				if !EnvelopeJSON::Fn(&Obj) {
 					return true;
 				}
 			},
-			JsonValue::Array(_) => return true,
+			JSONValue::Array(_) => return true,
 			_ => {},
 		}
 	}

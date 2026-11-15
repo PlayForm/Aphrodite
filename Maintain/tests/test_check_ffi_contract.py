@@ -21,7 +21,7 @@ _ASSERTS = 0
 # Mirror of the real export surface (10 exports, all *mut c_char except
 # free_string which returns void). Multi-line signature included on purpose.
 FIXTURE_LIBRS = """\
-//! Minimal fixture mirroring crates/aphrodite-hermes/src/lib.rs.
+//! Minimal fixture mirroring crates/aphrodite-hermes/Source/.
 
 #[no_mangle]
 pub extern "C" fn aphrodite_hermes_dispatch_tool(
@@ -445,11 +445,11 @@ def test_unsafe_no_mangle_form():
 
 # ── Real repo + CLI end-to-end ───────────────────────────────────────────────
 def test_real_repo_clean():
-    librs = REPO_ROOT / "crates" / "aphrodite-hermes" / "src" / "lib.rs"
+    librs = REPO_ROOT / "crates" / "aphrodite-hermes" / "Source"
     plugin = REPO_ROOT / "plugins" / "aphrodite" / "__init__.py"
-    ok(librs.is_file(), f"lib.rs missing: {librs}")
+    ok(librs.is_dir(), f"export source tree missing: {librs}")
     ok(plugin.is_file(), f"plugin missing: {plugin}")
-    violations, warnings, source = ffi.check(librs.read_text(), plugin.read_text())
+    violations, warnings, source = ffi.check(ffi.read_librs_source(librs), plugin.read_text())
     ok(violations == [], f"real repo violations: {violations}")
     ok(source == "inline setup block", f"unexpected restype source: {source}")
     ok(any("list_tools" in w for w in warnings), "expected list_tools unconfigured warning")

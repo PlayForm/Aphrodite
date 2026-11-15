@@ -1,12 +1,19 @@
 //! git-log shape detector.
+//!
+//! A log is a run of `commit <hash>` blocks. One block could be a quoted line of
+//! prose, so the detector needs corroboration. It is not a history reader: the
+//! commits are never resolved.
 
-use crate::Preview::Input::Input;
+use crate::Preview::Input::Struct::Struct as Input;
 
-/// `commit <hash>` blocks: ≥1 block, and either ≥2 blocks or an `Author:`
-/// line (a lone `commit ` line in prose is not a log).
-pub(crate) fn detect(inp:&Input<'_>) -> bool {
-	let commit_lines = inp
-		.non_empty
+/// True when the content looks like `git log` output.
+///
+/// At least one `commit <hash>` block, and either two blocks or an `Author:`
+/// line. A lone `commit ` line in prose is not a log. It is not a range check:
+/// no parent links or branches are examined.
+pub(crate) fn Fn(Inp:&Input<'_>) -> bool {
+	let CommitLines = Inp
+		.NonEmpty
 		.iter()
 		.filter(|l| {
 			l.strip_prefix("commit ")
@@ -14,5 +21,5 @@ pub(crate) fn detect(inp:&Input<'_>) -> bool {
 				.unwrap_or(false)
 		})
 		.count();
-	commit_lines >= 1 && (commit_lines >= 2 || inp.raw.contains("Author:"))
+	CommitLines >= 1 && (CommitLines >= 2 || Inp.raw.contains("Author:"))
 }

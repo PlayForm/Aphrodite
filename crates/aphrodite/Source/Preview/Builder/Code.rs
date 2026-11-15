@@ -1,14 +1,24 @@
-//! code preview arm (structure map + first signature).
+//! Code preview arm.
+//!
+//! Source code compressed to a marker still has to tell the model what the code
+//! contains, and a byte count does not. This arm renders the structure map -
+//! function, struct, trait, impl and class counts plus the first signature - so
+//! the dylib/hook path matches the proxy's preview quality. It is not a syntax
+//! tree: the map comes from regex extraction, so an unusual dialect can
+//! under-count.
 
-use crate::Preview::Input::Input;
+use crate::Preview::Input::Struct::Struct as Input;
 
-/// Enrich with the structure map (fns/structs/traits/impls/classes/types +
-/// first signature) so the dylib/hook path matches the proxy's preview
-/// quality, instead of a bare substring count.
-pub(crate) fn build_code_preview(inp:&Input<'_>) -> String {
-	let st = crate::StructExtract::extract_code_structure(inp.raw, "");
-	let mut parts:Vec<String> = Vec::new();
-	for (key, label) in [
+/// Build a preview of source code.
+///
+/// Promises a structure map (function, struct, trait, impl, class and type
+/// counts) plus the first signature, instead of a bare substring count. It is
+/// not a parse: the counts describe what the extractor recognised, so they are
+/// a floor, not a census.
+pub(crate) fn Fn(Inp:&Input<'_>) -> String {
+	let St = crate::StructExtract::Extract::Fn(Inp.raw, "");
+	let mut Parts:Vec<String> = Vec::new();
+	for (Key, Label) in [
 		("fns", "fns"),
 		("structs", "structs"),
 		("traits", "traits"),
@@ -16,21 +26,21 @@ pub(crate) fn build_code_preview(inp:&Input<'_>) -> String {
 		("classes", "classes"),
 		("types", "types"),
 	] {
-		if let Some(v) = st.get(key)
+		if let Some(v) = St.get(Key)
 			&& !v.is_empty()
 		{
-			parts.push(format!("{}{}", v.len(), label));
+			Parts.push(format!("{}{}", v.len(), Label));
 		}
 	}
-	let summary = if parts.is_empty() {
-		format!("{}fns", inp.raw.matches("fn ").count() + inp.raw.matches("def ").count())
+	let Summary = if Parts.is_empty() {
+		format!("{}fns", Inp.raw.matches("fn ").count() + Inp.raw.matches("def ").count())
 	} else {
-		parts.join("|")
+		Parts.join("|")
 	};
-	let sig = st
+	let Sig = St
 		.get("fns")
 		.and_then(|v| v.first())
 		.map(|s| format!(" {}", s.chars().take(48).collect::<String>().trim()))
 		.unwrap_or_default();
-	format!("[code:{}{} {}L]", summary, sig, inp.total)
+	format!("[code:{}{} {}L]", Summary, Sig, Inp.Total)
 }

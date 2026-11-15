@@ -11,10 +11,10 @@
 
 use std::path::PathBuf;
 
-fn wide_document() -> String {
+fn WideDocument() -> String {
 	let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../bench/corpus/wide_5k_keys.json");
-	if let Ok(content) = std::fs::read_to_string(&p) {
-		return content;
+	if let Ok(Content) = std::fs::read_to_string(&p) {
+		return Content;
 	}
 	// Inline fallback: a >10,000-line document with the same shape.
 	(0..20_002)
@@ -24,54 +24,54 @@ fn wide_document() -> String {
 }
 
 #[test]
-fn limit_zero_returns_full_document_over_10000_lines_byte_identical() {
-	let content = wide_document();
+fn LimitZeroReturnsFullDocumentOver10000LinesByteIdentical() {
+	let Content = WideDocument();
 	assert!(
-		content.lines().count() > 10_000,
+		Content.lines().count() > 10_000,
 		"regression needs a document over the 10,000-line cap"
 	);
 
-	let (got, truncated) = aphrodite::Retrieve::paginate(&content, 0, 0).expect("paginate ok");
-	assert_eq!(got, content, "limit:0 must return the exact original bytes");
-	assert!(!truncated, "limit:0 never truncates");
+	let (Got, Truncated) = aphrodite::Retrieve::Page::Fn::Fn(&Content, 0, 0).expect("paginate ok");
+	assert_eq!(Got, Content, "limit:0 must return the exact original bytes");
+	assert!(!Truncated, "limit:0 never truncates");
 }
 
 #[test]
-fn full_document_retrieval_preserves_content_addressing_hash() {
+fn FullDocumentRetrievalPreservesContentAddressingHash() {
 	// Round-trip contract: the returned body hashes to the marker's own hash.
-	let content = wide_document();
-	let (got, _) = aphrodite::Retrieve::paginate(&content, 0, 0).expect("paginate ok");
+	let Content = WideDocument();
+	let (Got, _) = aphrodite::Retrieve::Page::Fn::Fn(&Content, 0, 0).expect("paginate ok");
 
-	let original_hash = headroom_core::ccr::compute_key(content.as_bytes());
-	let retrieved_hash = headroom_core::ccr::compute_key(got.as_bytes());
+	let OriginalHash = headroom_core::ccr::compute_key(Content.as_bytes());
+	let RetrievedHash = headroom_core::ccr::compute_key(Got.as_bytes());
 	assert_eq!(
-		original_hash, retrieved_hash,
+		OriginalHash, RetrievedHash,
 		"retrieved content must hash to the same key as the stored content"
 	);
 }
 
 #[test]
-fn large_document_round_trips_through_store_and_expand() {
+fn LargeDocumentRoundTripsThroughStoreAndExpand() {
 	// End-to-end: store the wide document under its content hash and expand
 	// it back - byte-identical, hence the hash contract holds.
-	let content = wide_document();
-	let hash = headroom_core::ccr::compute_key(content.as_bytes());
+	let Content = WideDocument();
+	let hash = headroom_core::ccr::compute_key(Content.as_bytes());
 
-	let mut state = aphrodite::State::AphroditeState::default();
-	state.inline_store_put(hash.clone(), content.clone());
+	let mut State = aphrodite::State::AphroditeState::default();
+	State.InlineStorePut(hash.clone(), Content.clone());
 
-	let expanded = aphrodite::Resolve::expand(&mut state, &hash).expect("entry found");
-	assert_eq!(expanded, content, "expand must return the exact original bytes");
-	assert_eq!(headroom_core::ccr::compute_key(expanded.as_bytes()), hash);
+	let Expanded = aphrodite::Resolve::Expand::Fn(&mut State, &hash).expect("entry found");
+	assert_eq!(Expanded, Content, "expand must return the exact original bytes");
+	assert_eq!(headroom_core::ccr::compute_key(Expanded.as_bytes()), hash);
 }
 
 #[test]
-fn explicit_limit_over_cap_still_truncates() {
+fn ExplicitLimitOverCapStillTruncates() {
 	// The 02-F5 safety cap still applies to explicit limits - only limit:0
 	// means the full document.
-	let content = wide_document();
-	let (got, truncated) = aphrodite::Retrieve::paginate(&content, 0, 999_999).expect("paginate ok");
-	assert!(truncated);
-	assert!(got.starts_with("[lines 1-10000/"), "explicit limit must still window");
-	assert!(got.len() < content.len());
+	let Content = WideDocument();
+	let (Got, Truncated) = aphrodite::Retrieve::Page::Fn::Fn(&Content, 0, 999_999).expect("paginate ok");
+	assert!(Truncated);
+	assert!(Got.starts_with("[lines 1-10000/"), "explicit limit must still window");
+	assert!(Got.len() < Content.len());
 }

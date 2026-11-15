@@ -1,15 +1,17 @@
-//! Preview builder: content-type detection and human-readable preview strings
-//! for compressed CCR content.
+//! Preview: content-type detection and the honest preview string for compressed
+//! CCR content.
 //!
-//! Used by both the proxy binary and the `aphrodite-hermes` bridge crate
-//! (via `crate::preview` re-export).
+//! Used by both the proxy binary and the `aphrodite-hermes` bridge crate. The tree
+//! is a reverse taxonomy: `Builder/` holds one arm per content type, `Detector/` one
+//! shape vote per type, `Line/` the per-line predicates both sides share, `Text/` the
+//! `&str` utilities, and the entry points (`Detect/`, `Type/`, `State/`, `Input/`,
+//! `Language/`) sit beside them. This facade declares the modules and re-exports the
+//! exact public names the rest of the crate depends on.
 //!
-//! 1.5.0: atomized into a reverse-taxonomy tree (REFACTOR-PLAN-1.5.0):
-//! `detect.rs` (entry points), `builders/` (one file per preview arm),
-//! `detectors/` (one file per shape), `line/` (per-line predicates),
-//! `text/` (&str utilities), `state.rs` (preview cap), `tests.rs` (battery).
-//! This facade re-exports the exact public names the rest of the crate
-//! (and `aphrodite-hermes` via `lib.rs`) depends on.
+//! The preview the model sees must be the FINAL, honest representation of the stored
+//! payload. That rule is why the tree is split this finely: a detector and the arm
+//! that renders its verdict have to agree, and they can only be kept in agreement if
+//! the predicates they share have one definition each.
 
 pub mod Builder;
 pub mod Detect;
@@ -18,21 +20,30 @@ pub mod Input;
 #[cfg(feature = "proxy")]
 pub mod Language;
 pub mod Line;
-pub mod Type;
 pub mod State;
 pub mod Text;
+pub mod Type;
 
 #[cfg(test)]
 mod Test;
 
-pub use Builder::build_preview;
-pub use Detect::{detect_semantic_type, detect_type};
-pub use State::{preview_max_chars, set_preview_max_chars};
+pub use crate::{
+	Preview::{
+		Builder::Entry::Fn as BuildPreview,
+		Detect::{SemanticType::Fn as DetectSemanticType, Type::Fn as DetectType},
+		State::{Get::Fn as PreviewMaximumChars, Set::Fn as SetPreviewMaximumChars},
+	},
+	Template::{
+		Family::Set::Fn::Fn as SetPreviewFamily,
+		Get::Fn::Fn as GetTemplates,
+		Render::Fn::Fn as RenderPreview,
+		Set::Fn::Fn as SetTemplates,
+	},
+};
 #[cfg(test)]
-pub(crate) use State::preview_cap_test_guard;
-
-// TOML-driven preview template rendering (pre-Rust port): re-exported here
-// so engine/proxy/hermes call sites keep one `aphrodite::Preview::` prefix
-// for every preview knob (the `[templates.preview]` registry is consumed by
-// `build_preview` above).
-pub use crate::Template::{get_preview_family, get_templates, render_preview, set_preview_family, set_templates};
+pub(crate) use crate::Preview::State::Guard::Fn as PreviewCapTestGuard;
+// TOML-driven preview template rendering (pre-Rust port): re-exported here so
+// engine/proxy/hermes call sites keep one `aphrodite::Preview::` prefix for every
+// preview knob (the `[templates.preview]` registry is consumed by `BuildPreview`
+// above).
+pub use crate::Template::Family::Get::Fn::Fn as GetPreviewFamily;

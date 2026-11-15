@@ -1,0 +1,5 @@
+//! `Build` - Build the proxy's `AppState` from CLI configuration.
+//!
+//! The item lives in `Fn.rs`; this facade only declares it.
+
+pub mod Fn;

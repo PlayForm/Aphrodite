@@ -1,66 +1,27 @@
-//! Code structure extractor - regex-based pattern matching per language.
-//! Port of plugins/aphrodite/_core/struct.py
+//! Code structure extraction - the signature preview the model reads.
 //!
-//! Extracts function/struct/class signatures from source code with
-//! a 300-char preview budget. Used by the preview engine to show
-//! code structure in CCR markers like [code_rust:3fns 2structs].
+//! A stored code blob is previewed as `[code_rust:3fns 2structs]`, and that line
+//! is produced here. It is a product surface: the categories it reports are the
+//! only structural information the model gets about the file, so a signature that
+//! overruns the budget silently drops the categories behind it and the model then
+//! reasons about a file it was never shown.
 //!
-//! 1.5.0: atomized into a reverse-taxonomy tree (REFACTOR-PLAN-1.5.0):
-//! `detect.rs` (language auto-detection), `format.rs` (byte-safe
-//! truncation + signature formatting), `rust.rs`/`python.rs`/`go.rs`/
-//! `js.rs` (one extractor per language), `tests.rs` (battery). This
-//! facade re-exports the exact public names the rest of the crate
-//! (and `bench/compression` via `lib.rs`) depends on.
+//! One leaf per language (`Rust`, `Python`, `Go`, `JS`), one for detection
+//! (`Detect`), one for the byte-safe truncation they share (`Format`), and one for
+//! the entry point that owns the budget and the dispatch table (`Extract`). This
+//! facade only declares the tree and keeps the pre-kind names alive for callers
+//! outside this module.
 
-use std::collections::HashMap;
-
+pub mod Budget;
 pub mod Detect;
+pub mod Extract;
 pub mod Format;
 pub mod Go;
 pub mod JS;
+pub mod MaximumParametersLength;
+pub mod MaximumSignatureLength;
 pub mod Python;
 pub mod Rust;
 
 #[cfg(test)]
 mod Test;
-
-use Go::extract_go;
-use JS::extract_js;
-use Python::extract_python;
-use Rust::extract_rust;
-
-/// Maximum total output in characters (preview budget).
-pub(crate) const BUDGET:usize = 300;
-
-/// Maximum length of a single signature line.
-pub(crate) const MAX_SIG_LEN:usize = 60;
-
-/// Maximum param string length before truncation.
-pub(crate) const MAX_PARAMS_LEN:usize = 35;
-
-pub(crate) use Detect::auto_detect;
-pub(crate) use Format::{floor_boundary, sig, trunc_params};
-
-/// Extract code structure from source content.
-/// Auto-detects language from content prefixes.
-/// Returns a map of category → list of short signature strings.
-pub fn extract_code_structure(content:&str, language:&str) -> HashMap<String, Vec<String>> {
-	let lang = if language.is_empty() { auto_detect(content) } else { language.to_string() };
-
-	if lang.is_empty() {
-		return HashMap::new();
-	}
-
-	let mut result:HashMap<String, Vec<String>> = HashMap::new();
-	let mut budget = BUDGET as isize;
-
-	match lang.as_str() {
-		"rust" => extract_rust(content, &mut result, &mut budget),
-		"python" => extract_python(content, &mut result, &mut budget),
-		"go" => extract_go(content, &mut result, &mut budget),
-		"js" | "ts" => extract_js(content, &mut result, &mut budget),
-		_ => {},
-	}
-
-	result
-}

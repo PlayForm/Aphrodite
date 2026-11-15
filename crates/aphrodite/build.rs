@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// re-parsing Cargo.toml.
 	println!(
 		"cargo:rustc-env=APHRODITE_VERSION={}",
-		Environment::var("CARGO_PKG_VERSION").unwrap_or_default()
+		env::var("CARGO_PKG_VERSION").unwrap_or_default()
 	);
 
 	// Git commit hash (short form)
@@ -44,16 +44,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// Build timestamp (UTC ISO 8601), honoring SOURCE_DATE_EPOCH for
 	// reproducible builds. Uses SystemTime instead of shelling out to `date`,
 	// which isn't available on Windows runners.
-	let epoch_secs = Environment::var("SOURCE_DATE_EPOCH")
+	let epoch_secs = env::var("SOURCE_DATE_EPOCH")
 		.ok()
-		.and_then(|s| s.Parse::<u64>().ok())
+		.and_then(|s| s.parse::<u64>().ok())
 		.or_else(|| SystemTime::now().duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs()));
 	if let Some(secs) = epoch_secs {
 		println!("cargo:rustc-env=APHRODITE_BUILD_DATE={}", format_iso8601(secs));
 	}
 
 	// Target triple
-	println!("cargo:rustc-env=APHRODITE_TARGET={}", Environment::var("TARGET").unwrap_or_default());
+	println!("cargo:rustc-env=APHRODITE_TARGET={}", env::var("TARGET").unwrap_or_default());
 
 	// Rustc version
 	if let Ok(output) = Command::new("rustc").arg("--version").output()
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	}
 
 	// Build profile (debug / release)
-	println!("cargo:rustc-env=APHRODITE_PROFILE={}", Environment::var("PROFILE").unwrap_or_default());
+	println!("cargo:rustc-env=APHRODITE_PROFILE={}", env::var("PROFILE").unwrap_or_default());
 
 	Ok(())
 }

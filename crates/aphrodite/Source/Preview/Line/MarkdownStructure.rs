@@ -1,10 +1,18 @@
-//! Markdown structural-line predicate (list item, link, fence, blockquote,
-//! horizontal rule).
+//! Markdown structural-line predicate.
+//!
+//! A markdown document is recognised by its non-prose lines - list items,
+//! links, fences, blockquotes, rules. This predicate votes on those lines; the
+//! heading predicate votes separately because a document can be all headings.
 
-/// True for a non-heading markdown structural line (list item, link, fence,
-/// blockquote, horizontal rule).
-pub(crate) fn is_md_structure(line:&str) -> bool {
-	let t = line.trim_start();
+/// True for a non-heading markdown structural line.
+///
+/// Matches list items (`-`, `*`, `+`), blockquotes, fenced code (` ``` `,
+/// `~~~`), table rows (`|`), inline links (`[...](...)`), and horizontal rules
+/// of three or more `-`/`=` characters. It is not a prose detector: an
+/// ordinary sentence returns false, which is what keeps shell output with a
+/// leading `-` from being claimed as markdown.
+pub(crate) fn Fn(Line:&str) -> bool {
+	let t = Line.trim_start();
 	t.starts_with("- ")
 		|| t.starts_with("* ")
 		|| t.starts_with("+ ")

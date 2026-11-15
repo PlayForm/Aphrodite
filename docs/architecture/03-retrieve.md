@@ -98,10 +98,10 @@ via a `LazyLock` regex whose hash class is anchored to `[0-9a-fA-F:i]{6,64}`
 
 ## Call sites
 
-| Concern                                                 | Module                             |
-| ------------------------------------------------------- | ---------------------------------- |
-| `handle_retrieve`                                       | `crates/aphrodite/src/retrieve.rs` |
-| `filter_content` / `paginate`                           | `crates/aphrodite/src/retrieve.rs` |
-| `resolve::expand` / `resolve_recursive` / `resolve_one` | `crates/aphrodite/src/resolve/`    |
-| `find_markers` / `parse_marker_hash`                    | `crates/aphrodite/src/resolve/`    |
-| `normalize_hash` / `extract_hashes` (HASH_RE)           | `crates/aphrodite/src/marker/`     |
+| Concern                                                 | Module                              |
+| ------------------------------------------------------- | ----------------------------------- |
+| `handle_retrieve`                                       | `crates/aphrodite/Source/Retrieve/` |
+| `filter_content` / `paginate`                           | `crates/aphrodite/Source/Retrieve/` |
+| `resolve::expand` / `resolve_recursive` / `resolve_one` | `crates/aphrodite/Source/Resolve/`  |
+| `find_markers` / `parse_marker_hash`                    | `crates/aphrodite/Source/Resolve/`  |
+| `normalize_hash` / `extract_hashes` (HASH_RE)           | `crates/aphrodite/Source/Marker/`   |

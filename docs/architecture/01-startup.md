@@ -159,14 +159,14 @@ or the FFI assertion fails, `register()` logs "plugin disabled" and returns.
 
 | Concern                                                               | Module                                                                        |
 | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Runtime + subcommand dispatch                                         | `crates/aphrodite/src/main.rs`                                                |
-| Config path resolution + bind-before-spawn                            | `crates/aphrodite/src/main.rs`                                                |
-| Config reload watcher                                                 | `crates/aphrodite/src/main.rs`                                                |
-| Per-listener router + serve                                           | `crates/aphrodite/src/main.rs`                                                |
-| `MultiConfig::resolve` / `apply_port_override`                        | `crates/aphrodite/src/config/`                                                |
-| `proxy::build_state` (CCR backend selection)                          | `crates/aphrodite/src/proxy.rs`                                               |
-| `resolve_thresholds`                                                  | `crates/aphrodite/src/proxy.rs`                                               |
+| Runtime + subcommand dispatch                                         | `crates/aphrodite/Source/Main.rs`                                             |
+| Config path resolution + bind-before-spawn                            | `crates/aphrodite/Source/Main.rs`                                             |
+| Config reload watcher                                                 | `crates/aphrodite/Source/Main.rs`                                             |
+| Per-listener router + serve                                           | `crates/aphrodite/Source/Main.rs`                                             |
+| `MultiConfig::resolve` / `apply_port_override`                        | `crates/aphrodite/Source/Configuration/`                                      |
+| `proxy::build_state` (CCR backend selection)                          | `crates/aphrodite/Source/Proxy/`                                              |
+| `resolve_thresholds`                                                  | `crates/aphrodite/Source/Proxy/`                                              |
 | `SqliteCcrStore` / `InMemoryCcrStore`                                 | `vendor/headroom/crates/headroom-core/src/ccr/backends/{sqlite,in_memory}.rs` |
 | Plugin `register()` / `_load_dylib` / `_probe_dylib` / `_start_proxy` | `plugins/aphrodite/__init__.py`                                               |
 | Layout check (report-only)                                            | `plugins/aphrodite/layout_check.py` (+ `layout_schema.json`)                  |
-| Directives materialize FFI                                            | `crates/aphrodite-hermes/src/lib.rs`                                          |
+| Directives materialize FFI                                            | `crates/aphrodite-hermes/Source/Library.rs`                                   |

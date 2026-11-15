@@ -213,7 +213,7 @@ hash, not a rendered marker.
 
 ### Notification
 
-If `notify_url` is configured, fires an async POST with a `CcrNotification`:
+If `notify_url` is configured, fires an async POST with a `CCRNotification`:
 
 ```json
 {

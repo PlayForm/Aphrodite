@@ -8,19 +8,19 @@ use std::{
 };
 
 pub struct Store {
-	data:Mutex<HashMap<String, String>>,
-	cap:usize,
-	order:Mutex<Vec<String>>,
+	Data:Mutex<HashMap<String, String>>,
+	Cap:usize,
+	Order:Mutex<Vec<String>>,
 }
 
 impl Store {
-	pub fn new(cap:usize) -> Arc<Self> {
-		Arc::new(Self { data:Mutex::new(HashMap::new()), cap, order:Mutex::new(Vec::new()) })
+	pub fn new(Cap:usize) -> Arc<Self> {
+		Arc::new(Self { Data:Mutex::new(HashMap::new()), Cap, Order:Mutex::new(Vec::new()) })
 	}
 	pub fn get(&self, k:&str) -> Option<String> {
-		let d = self.data.lock().unwrap();
+		let d = self.Data.lock().unwrap();
 		if let Some(v) = d.get(k) {
-			let mut o = self.order.lock().unwrap();
+			let mut o = self.Order.lock().unwrap();
 			o.retain(|x| x != k);
 			o.push(k.to_string());
 			Some(v.clone())
@@ -28,33 +28,33 @@ impl Store {
 			None
 		}
 	}
-	pub fn put(&self, k:&str, v:&str) {
-		let mut d = self.data.lock().unwrap();
-		let mut o = self.order.lock().unwrap();
+	pub fn Put(&self, k:&str, v:&str) {
+		let mut d = self.Data.lock().unwrap();
+		let mut o = self.Order.lock().unwrap();
 		if d.contains_key(k) {
 			o.retain(|x| x != k);
-		} else if d.len() >= self.cap {
-			if let Some(evict) = o.first().cloned() {
+		} else if d.len() >= self.Cap {
+			if let Some(Evict) = o.first().cloned() {
 				o.remove(0);
-				d.remove(&evict);
+				d.remove(&Evict);
 			}
 		}
 		d.insert(k.to_string(), v.to_string());
 		o.push(k.to_string());
 	}
-	pub fn del(&self, k:&str) -> bool {
-		let mut d = self.data.lock().unwrap();
-		let mut o = self.order.lock().unwrap();
+	pub fn Del(&self, k:&str) -> bool {
+		let mut d = self.Data.lock().unwrap();
+		let mut o = self.Order.lock().unwrap();
 		o.retain(|x| x != k);
 		d.remove(k).is_some()
 	}
-	pub fn len(&self) -> usize { self.data.lock().unwrap().len() }
+	pub fn len(&self) -> usize { self.Data.lock().unwrap().len() }
 	pub fn is_empty(&self) -> bool { self.len() == 0 }
 }
 
-pub fn fnv1a(data:&[u8]) -> u64 {
+pub fn Fnv1a(Data:&[u8]) -> u64 {
 	let mut h:u64 = 14695981039346656037;
-	for b in data {
+	for b in Data {
 		h ^= *b as u64;
 		h = h.wrapping_mul(1099511628211);
 	}
@@ -62,28 +62,28 @@ pub fn fnv1a(data:&[u8]) -> u64 {
 }
 
 pub struct BatchProcessor {
-	store:Arc<Store>,
-	workers:usize,
+	Store:Arc<Store>,
+	Workers:usize,
 }
 impl BatchProcessor {
-	pub fn new(store:Arc<Store>, workers:usize) -> Self { Self { store, workers } }
-	pub fn process_batch(&self, items:&[(String, String)]) -> usize {
-		let chunk = (items.len() + self.workers - 1) / self.workers;
-		let done = Arc::new(Mutex::new(0usize));
+	pub fn new(Store:Arc<Store>, Workers:usize) -> Self { Self { Store, Workers } }
+	pub fn ProcessBatch(&self, Items:&[(String, String)]) -> usize {
+		let Chunk = (Items.len() + self.Workers - 1) / self.Workers;
+		let Done = Arc::new(Mutex::new(0usize));
 		std::thread::scope(|s| {
-			for slice in items.chunks(chunk) {
-				let st = self.store.clone();
-				let dn = done.clone();
-				let sl = slice.to_vec();
+			for Slice in Items.Chunks(Chunk) {
+				let St = self.Store.clone();
+				let Dn = Done.clone();
+				let Sl = Slice.to_vec();
 				s.spawn(move || {
-					for (k, v) in &sl {
-						st.put(k, v);
-						*dn.lock().unwrap() += 1;
+					for (k, v) in &Sl {
+						St.Put(k, v);
+						*Dn.lock().unwrap() += 1;
 					}
 				});
 			}
 		});
-		*done.lock().unwrap()
+		*Done.lock().unwrap()
 	}
 }
 
@@ -91,22 +91,22 @@ impl BatchProcessor {
 mod tests {
 	use super::*;
 	#[test]
-	fn put_get() {
+	fn PutGet() {
 		let s = Store::new(4);
-		s.put("a", "1");
+		s.Put("a", "1");
 		assert_eq!(s.get("a"), Some("1".into()));
 	}
 	#[test]
-	fn eviction() {
+	fn Eviction() {
 		let s = Store::new(2);
-		s.put("a", "1");
-		s.put("b", "2");
-		s.put("c", "3");
+		s.Put("a", "1");
+		s.Put("b", "2");
+		s.Put("c", "3");
 		assert_eq!(s.get("a"), None);
 		assert_eq!(s.get("b"), Some("2".into()));
 	}
 	#[test]
-	fn fnv_known() {
-		assert_eq!(fnv1a(b"hello"), 0xA430D84680AABD0B);
+	fn FnvKnown() {
+		assert_eq!(Fnv1a(b"hello"), 0xA430D84680AABD0B);
 	}
 }

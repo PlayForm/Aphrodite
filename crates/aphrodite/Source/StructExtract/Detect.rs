@@ -1,46 +1,64 @@
-//! Language auto-detection for the code structure extractor.
+//! Source-language detection from content alone.
+//!
+//! The caller does not always know what a stored blob is, so it passes an empty
+//! language and this module decides. It is a keyword heuristic over a sample of
+//! non-comment lines - not a tokenizer, not a file-extension lookup, and not an
+//! authoritative answer: content that matches no family is reported as unknown, and
+//! the preview then carries no structure rather than guessing one.
 
-use super::floor_boundary;
+use crate::StructExtract::Format::Floor::Fn as FloorBoundary;
 
-/// Number of non-comment lines `auto_detect` scans before giving up.
-const AUTO_DETECT_SCAN_LINES:usize = 60;
+/// Number of non-comment lines `Fn` scans before giving up.
+const AutoDetectScanLines:usize = 60;
 
-/// Is this line a comment/doc-comment line, for the purposes of skipping
-/// leading file-header comment blocks in `auto_detect`?
-fn is_comment_line(trimmed:&str) -> bool {
-	trimmed.is_empty()
-		|| trimmed.starts_with("//") // Rust/Go/JS/TS line comments (incl. `///`, `//!`)
-		|| trimmed.starts_with('#') // Python/shell comments (and shebangs)
-		|| trimmed.starts_with('*') // continuation line of a `/* ... */` block
-		|| trimmed.starts_with("/*")
+/// Is this line a comment/doc-comment line, for the purposes of skipping leading
+/// file-header comment blocks in `Fn`?
+///
+/// Covers the four comment styles the supported languages open files with: `//`
+/// (Rust, Go, JS/TS, including `///` and `//!`), `#` (Python, shell, including
+/// shebangs), and both the first and continuation lines of a `/* ... */` block. It
+/// is a prefix test, not a parser, so a `#` that opens a string literal is skipped
+/// as a comment.
+fn IsCommentLine(Trimmed:&str) -> bool {
+	Trimmed.is_empty()
+		|| Trimmed.starts_with("//") // Rust/Go/JS/TS line comments (incl. `///`, `//!`)
+		|| Trimmed.starts_with('#') // Python/shell comments (and shebangs)
+		|| Trimmed.starts_with('*') // continuation line of a `/* ... */` block
+		|| Trimmed.starts_with("/*")
 }
 
-/// Auto-detect the source language from content, by scanning up to
-/// [`AUTO_DETECT_SCAN_LINES`] non-comment lines rather than a fixed 500-BYTE
-/// prefix of the raw content (T10/F8): a file that opens with a long `//!`
-/// module doc comment (extremely common in this very codebase) could push
-/// every real `fn`/`struct`/etc. keyword past that byte window, so the
-/// detector saw only comment prose and returned "unknown" for a file that is
-/// unambiguously Rust. Skipping comment lines while scanning fixes that
-/// without needing a real tokenizer.
-pub(crate) fn auto_detect(content:&str) -> String {
-	let sample:String = content
+/// The detected language tag, or the empty string when nothing matched.
+///
+/// Returns `"rust"`, `"python"`, `"go"`, `"js"`, `"sh"` or `""`. The sample is the
+/// first [`AutoDetectScanLines`] non-comment lines rather than a fixed 500-byte
+/// prefix of the raw content: a file that opens with a long `//!` module doc
+/// comment - extremely common in this very codebase - pushes every real
+/// `fn`/`struct` keyword past a byte window, so a prefix scan saw only comment
+/// prose and reported "unknown" for a file that is unambiguously Rust. Skipping
+/// comment lines fixes that without a real tokenizer.
+///
+/// It is not a confidence score: the first family whose keywords appear wins, so a
+/// Rust file that merely mentions `function ` in a doc comment it could not skip is
+/// reported as JS. `sh` is only claimed on a shebang or an `echo ` in the head, and
+/// an empty return means the caller must fall back rather than render structure.
+pub(crate) fn Fn(Content:&str) -> String {
+	let Sample:String = Content
 		.lines()
-		.filter(|l| !is_comment_line(l.trim()))
-		.take(AUTO_DETECT_SCAN_LINES)
+		.filter(|l| !IsCommentLine(l.trim()))
+		.take(AutoDetectScanLines)
 		.collect::<Vec<_>>()
 		.join("\n");
-	let head = sample.as_str();
-	if head.contains("fn ") && head.contains("->") {
+	let Head = Sample.as_str();
+	if Head.contains("fn ") && Head.contains("->") {
 		"rust".into()
-	} else if head.contains("def ") && head.contains(":") {
+	} else if Head.contains("def ") && Head.contains(":") {
 		"python".into()
-	} else if head.contains("func ") && head.contains("{") {
+	} else if Head.contains("func ") && Head.contains("{") {
 		"go".into()
-	} else if head.contains("function ") || head.contains("=>") || head.contains("interface ") {
+	} else if Head.contains("function ") || Head.contains("=>") || Head.contains("interface ") {
 		"js".into()
-	} else if content.trim_start().starts_with("#!/")
-		|| (head.len() > 200 && floor_boundary(head, 200).contains("echo "))
+	} else if Content.trim_start().starts_with("#!/")
+		|| (Head.len() > 200 && FloorBoundary(Head, 200).contains("echo "))
 	{
 		"sh".into()
 	} else {

@@ -1,0 +1,26 @@
+//! The opt-in `auto_expand_guidance` line.
+//!
+//! Injected only while `state.auto_expand` is set: tool outputs arrive
+//! expanded inline, so a CCR marker appearing anyway is worth resolving. It
+//! renders through the prompt renderer, so a configured template wins over the
+//! compiled-in fallback; disabled means no bytes at all.
+
+use crate::{Flow::Prompt::Render::Fn::RenderPrompt, State::AphroditeState};
+
+/// Auto-expand guidance section (prompt template `auto_expand_guidance`,
+/// pre-Rust port): while `state.auto_expand` is enabled, inject the rendered
+/// guidance so the model knows tool outputs arrive expanded inline (and that
+/// a CCR marker appearing anyway is worth retrieving). Rendered through
+/// [`RenderPrompt`] - a configured `[templates.prompts] auto_expand_guidance`
+/// wins, the compiled-in fallback otherwise. Disabled (default) = no
+/// guidance, current behavior; an unknown/empty template renders nothing.
+pub(crate) fn AutoExpandGuidanceBlock(State:&AphroditeState) -> String {
+	if !State.AutoExpand {
+		return String::new();
+	}
+	let Text = RenderPrompt(State, "auto_expand_guidance", &[]);
+	if Text.is_empty() {
+		return String::new();
+	}
+	format!("[auto-expand: {}]", Text)
+}

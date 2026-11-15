@@ -1,33 +1,41 @@
 //! grep/ripgrep preview arm.
+//!
+//! A search result is described by three numbers and one location: how many
+//! hits, how many distinct files, and where the first one is. This arm renders
+//! them. It is not a match extractor - the first hit is shown verbatim and no
+//! match text is parsed.
 
 use std::collections::BTreeSet;
 
-use crate::Preview::{Input::Input, Line::Grep::is_grep_line};
+use crate::Preview::{Input::Struct::Struct as Input, Line::Grep};
 
-/// grep/ripgrep preview: hit count, distinct files, first location.
-/// `[grep:38 hits in 9 files | src/x.rs:12 ...]`.
-pub(crate) fn build_grep_preview(inp:&Input<'_>) -> String {
-	let mut hits = 0usize;
-	let mut files:BTreeSet<String> = BTreeSet::new();
-	let mut first:Option<String> = None;
-	for line in inp.raw.lines() {
-		if !is_grep_line(line) {
+/// Build a preview of grep/ripgrep output.
+///
+/// Promises the hit count, the number of distinct files and the first location.
+/// It is not a relevance ranking: hits are counted as printed, so a file
+/// mentioned twice counts once in the file total and twice in the hit total.
+pub(crate) fn Fn(Inp:&Input<'_>) -> String {
+	let mut Hits = 0usize;
+	let mut Files:BTreeSet<String> = BTreeSet::new();
+	let mut First:Option<String> = None;
+	for Line in Inp.raw.lines() {
+		if !Grep::Hit::Fn(Line) {
 			continue;
 		}
-		hits += 1;
-		let mut it = line.splitn(3, ':');
-		let path = it.next().unwrap_or("");
-		let lno = it.next().unwrap_or("");
-		files.insert(path.to_string());
-		if first.is_none() {
-			first = Some(format!("{}:{}", path, lno).chars().take(48).collect());
+		Hits += 1;
+		let mut It = Line.splitn(3, ':');
+		let path = It.next().unwrap_or("");
+		let Lno = It.next().unwrap_or("");
+		Files.insert(path.to_string());
+		if First.is_none() {
+			First = Some(format!("{}:{}", path, Lno).chars().take(48).collect());
 		}
 	}
-	if hits == 0 {
-		return format!("[grep:{}L]", inp.total);
+	if Hits == 0 {
+		return format!("[grep:{}L]", Inp.Total);
 	}
-	match first {
-		Some(loc) => format!("[grep:{} hits in {} files | {} ...]", hits, files.len(), loc),
-		None => format!("[grep:{} hits in {} files]", hits, files.len()),
+	match First {
+		Some(Loc) => format!("[grep:{} hits in {} files | {} ...]", Hits, Files.len(), Loc),
+		None => format!("[grep:{} hits in {} files]", Hits, Files.len()),
 	}
 }
