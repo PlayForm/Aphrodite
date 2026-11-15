@@ -8,7 +8,7 @@ use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 // preview builder (the key was declared-but-unread dead config). ──
 #[test]
 fn TestApplyPreviewsWiresPreviewMaximumChars() {
-	let _G = crate::Preview::State::Guard::Fn();
+	let _G = crate::Preview::PreviewCapTestGuard();
 	// Hermetic: a stray APHRODITE_PREVIEW_MAX_CHARS in the session env
 	// (e.g. left by a manual cap probe) would win the precedence chain
 	// and break every assert - and the leaked cap would poison every
@@ -22,17 +22,17 @@ fn TestApplyPreviewsWiresPreviewMaximumChars() {
 		ParseFailure:None,
 	};
 	cfg.ApplyPreviews();
-	assert_eq!(crate::Preview::State::Get::Fn(), 77);
+	assert_eq!(crate::Preview::PreviewMaximumChars(), 77);
 
 	// Env override wins over TOML.
 	let mut Cfg2 = Configuration::default();
 	Cfg2.SetOverride("APHRODITE_PREVIEW_MAX_CHARS", "123");
 	Cfg2.ApplyPreviews();
-	assert_eq!(crate::Preview::State::Get::Fn(), 123);
+	assert_eq!(crate::Preview::PreviewMaximumChars(), 123);
 
 	// Absent/0 -> unlimited (legacy behavior), and restore the global.
 	Configuration::default().ApplyPreviews();
-	assert_eq!(crate::Preview::State::Get::Fn(), 0);
+	assert_eq!(crate::Preview::PreviewMaximumChars(), 0);
 	if let Some(v) = EnvironmentBackup {
 		unsafe { std::env::set_var("APHRODITE_PREVIEW_MAX_CHARS", v) }
 	}

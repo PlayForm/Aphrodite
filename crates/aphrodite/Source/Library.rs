@@ -82,4 +82,4 @@ pub mod Scripting;
 // Moved to `crate::Preview` (report 01-T11); re-exported here so
 // `aphrodite-hermes`'s `use aphrodite::{build_preview, detect_type}` stays
 // source-compatible.
-
+pub use Preview::{BuildPreview, DetectType};

@@ -13,5 +13,5 @@
 pub fn CreatePollMarker(TaskID:&str, CommandSummary:&str, Turn:usize) -> String {
 	let Preview = format!("[poll:running {} | turn {}]", CommandSummary, Turn);
 	let hash = TaskID;
-	crate::Marker::Format::Entry::CCRMarker(hash, "poll", 0, &Preview, None, None, None)
+	crate::Marker::CCRMarker(hash, "poll", 0, &Preview, None, None, None)
 }

@@ -1,7 +1,6 @@
 //! `GetTemplates`: the currently registered `[templates]` section.
 
-use crate::State::Template::Struct::TemplatesConfiguration;
-use crate::Template::State::Fn::Fn as State;
+use crate::{State::TemplatesConfiguration, Template::State::Fn::Fn as State};
 
 /// Currently registered `[templates]` config (None = hardcoded builders).
 ///

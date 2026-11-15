@@ -12,31 +12,30 @@
 
 use std::collections::HashMap;
 
-use crate::Stage2::Reduce::Build;
-use crate::Stage2::Reduce::Code;
-use crate::Stage2::Reduce::Diff;
-use crate::Stage2::Reduce::JSON;
-use crate::Stage2::Reducer::Type::Reducer;
+use crate::Stage2::{
+	Reduce::{Build, Code, Diff, JSON},
+	Reducer::Reducer,
+};
 
 /// Registry mapping CCR types to their reducer functions.
 pub fn ReducerRegistry() -> HashMap<&'static str, Reducer> {
 	let mut m:HashMap<&'static str, Reducer> = HashMap::new();
-	m.insert("json", JSON::Fn::ReduceJSON);
-	m.insert("json_list", JSON::Fn::ReduceJSON);
-	m.insert("json_array", JSON::Fn::ReduceJSON);
-	m.insert("diff", Diff::Fn::ReduceDiff);
-	m.insert("git", Diff::Fn::ReduceDiff);
-	m.insert("build_output", Build::Fn::ReduceBuild);
-	m.insert("build_error", Build::Fn::ReduceBuild);
-	m.insert("build", Build::Fn::ReduceBuild);
-	m.insert("log", Build::Fn::ReduceBuild);
-	m.insert("code_rust", Code::Fn::ReduceCode);
-	m.insert("code_python", Code::Fn::ReduceCode);
-	m.insert("code_go", Code::Fn::ReduceCode);
-	m.insert("code_js", Code::Fn::ReduceCode);
-	m.insert("code_ts", Code::Fn::ReduceCode);
-	m.insert("code_sh", Code::Fn::ReduceCode);
-	m.insert("code", Code::Fn::ReduceCode);
-	m.insert("source_code", Code::Fn::ReduceCode);
+	m.insert("json", JSON::ReduceJSON);
+	m.insert("json_list", JSON::ReduceJSON);
+	m.insert("json_array", JSON::ReduceJSON);
+	m.insert("diff", Diff::ReduceDiff);
+	m.insert("git", Diff::ReduceDiff);
+	m.insert("build_output", Build::ReduceBuild);
+	m.insert("build_error", Build::ReduceBuild);
+	m.insert("build", Build::ReduceBuild);
+	m.insert("log", Build::ReduceBuild);
+	m.insert("code_rust", Code::ReduceCode);
+	m.insert("code_python", Code::ReduceCode);
+	m.insert("code_go", Code::ReduceCode);
+	m.insert("code_js", Code::ReduceCode);
+	m.insert("code_ts", Code::ReduceCode);
+	m.insert("code_sh", Code::ReduceCode);
+	m.insert("code", Code::ReduceCode);
+	m.insert("source_code", Code::ReduceCode);
 	m
 }

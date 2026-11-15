@@ -5,7 +5,7 @@
 //! about markers is vocabulary for using them, not an explanation of how they
 //! are produced.
 
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// Build the one-shot first-turn injection from the configured `SessionInject`
 /// template. Returns empty string if `state.session_inject` is empty or the

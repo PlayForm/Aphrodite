@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 use super::Recursive::Recursive;
 
 /// Expand a hash through every nesting level.

@@ -11,7 +11,7 @@ use crate::Proxy::{
 		Stream::Fn::Fn as BodyWantsStream,
 		Truncate::Fn::Fn as TruncateCharSafe,
 	},
-	Test::Support::State::Fn::{TestState, TestStateWithMaximumBody},
+	Test::Support::{TestState, TestStateWithMaximumBody},
 	Threshold::Const::ChatCompletionsPath,
 };
 

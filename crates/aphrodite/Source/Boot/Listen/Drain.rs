@@ -1,7 +1,8 @@
 //! Draining the listeners after the first shutdown signal.
 
 use tokio::{sync::watch::Sender, task::JoinHandle};
-use Boot::Listen::Shutdown::Signal;
+
+use crate::Boot::Listen::Signal;
 
 /// Wait for a shutdown signal, then drain every listener.
 ///

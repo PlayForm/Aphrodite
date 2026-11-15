@@ -2,7 +2,7 @@
 //! recall catalog is annotated.
 
 use super::super::super::Struct::Struct;
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// Write the two prompt knobs that steer per-turn teaching.
 ///

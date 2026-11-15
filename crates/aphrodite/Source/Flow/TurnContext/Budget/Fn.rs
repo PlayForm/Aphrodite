@@ -6,7 +6,7 @@
 //! it fit. The loop re-joins on every iteration because the length of the
 //! joined string is not a linear function of the section count.
 
-use crate::Flow::Section::Label::Fn::JoinSections;
+use crate::Flow::JoinSections;
 
 /// Drop trailing sections until the joined context fits `Budget`, never
 /// crossing the always-survive floor.

@@ -1,9 +1,10 @@
 //! The Tier 1 teaching loop: attribution counted once, the ring bound, and
 //! every adaptation branch (raise, hold, clamp at both ends, minimum events).
 
-use crate::State::Struct::AphroditeState;
-use crate::State::Const::SplitAdaptMinimumEvents;
-use crate::State::Const::SplitEventCap;
+use crate::State::{
+	AphroditeState,
+	Const::{SplitAdaptMinimumEvents, SplitEventCap},
+};
 
 #[test]
 fn TestRecordChainSplitRegistersHashesAndCountsRetrievalOnce() {

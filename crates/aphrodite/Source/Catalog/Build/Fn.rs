@@ -2,9 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use crate::Catalog::Size::Fn::Fn as FmtSize;
-use crate::State::Struct::AphroditeState;
-use crate::StructExtract::Format::Floor::Fn as FloorBoundary;
+use crate::{
+	Catalog::Size::Fn::Fn as FmtSize,
+	State::AphroditeState,
+	StructExtract::Format::Floor::Fn as FloorBoundary,
+};
 
 /// Full catalog result with items, by_type grouping, stats.
 pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
@@ -90,7 +92,7 @@ pub fn Fn(State:&AphroditeState, Mode:&str) -> serde_json::Value {
 		Result["recommendations"] = serde_json::json!(Recommendations);
 		// `[templates.prompts] search_hint` (pre-Rust port); falls back to
 		// the compiled-in string when the key is absent.
-		Result["hint"] = serde_json::json!(crate::Flow::Prompt::Render::Fn::RenderPrompt(State, "search_hint", &[]));
+		Result["hint"] = serde_json::json!(crate::Flow::RenderPrompt(State, "search_hint", &[]));
 	}
 
 	Result

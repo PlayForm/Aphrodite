@@ -10,7 +10,7 @@ impl Struct {
 	/// deserialised whole. A `[templates]` section that fails to deserialise
 	/// therefore also yields `None` - the hardcoded builders stay in force,
 	/// which is the same outcome as an absent section.
-	pub fn GetTemplates(&self) -> Option<crate::State::Template::Struct::TemplatesConfiguration> {
+	pub fn GetTemplates(&self) -> Option<crate::State::TemplatesConfiguration> {
 		self.Section("templates").and_then(|t| t.clone().try_into().ok())
 	}
 }

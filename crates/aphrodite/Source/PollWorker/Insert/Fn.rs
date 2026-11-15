@@ -7,10 +7,10 @@
 //! the oldest still-running task. Evicting a running task is the last resort
 //! because it silently orphans work the agent still expects to poll.
 
-use crate::PollWorker::Task::Const::MaximumBgTasks;
-use crate::PollWorker::Task::Status::Enum::BgStatus;
-use crate::PollWorker::Task::Struct::BgTask;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	PollWorker::Task::{Const::MaximumBgTasks, Status::Enum::BgStatus, Struct::BgTask},
+	State::AphroditeState,
+};
 
 /// Insert a new background task into the state, evicting the oldest
 /// completed/stale task if at capacity.

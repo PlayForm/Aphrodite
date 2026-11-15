@@ -33,7 +33,7 @@ fn TestDirectivesLoadedEvenWhenActiveEmpty() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::Struct::AphroditeState::default();
+	let mut State = crate::State::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 
 	std::env::set_current_dir(&Original).unwrap();
@@ -75,7 +75,7 @@ fn TestDirectivesEnvironmentOverrideWinsOverCwd() {
 	std::env::set_current_dir(&CwdDirectory).unwrap();
 	unsafe { std::env::set_var("APHRODITE_DIRECTIVES_DIR", &EnvironmentDirectory) };
 
-	let mut State = crate::State::Struct::AphroditeState::default();
+	let mut State = crate::State::AphroditeState::default();
 	GuardedApplyCompression(&Configuration::default(), &mut State);
 
 	unsafe { std::env::remove_var("APHRODITE_DIRECTIVES_DIR") };

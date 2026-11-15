@@ -3,7 +3,7 @@
 
 use crate::Proxy::{
 	Cache::{Get::Fn::Fn as ResponseCacheGet, Hash::Fn::Fn as Fnv1a64, Key::Fn::Fn as CacheKeyFromBody},
-	Test::Support::State::Fn::TestState,
+	Test::Support::TestState,
 };
 
 // ── T3: cache_key_from_body / fnv1a_64 ────────────────────────

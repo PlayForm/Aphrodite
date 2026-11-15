@@ -3,11 +3,10 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::Guard::Cstr;
-use crate::ABI::Guard::MaximumContent;
-use crate::ABI::Guard::ToJSONError;
-use crate::ABI::Guard::ToJSONOk;
-use crate::ABI::Handle::Lookup::WithState;
+use super::{
+	Guard::{Cstr, MaximumContent, ToJSONError, ToJSONOk},
+	Handle::WithState,
+};
 
 /// Universal hook dispatcher. Python calls this for every hook handler.
 /// Returns JSON-wrapped result or raw string if content-only.
@@ -65,8 +64,8 @@ pub extern "C" fn AphroditeDispatch(
 	match WithState(Hid, |s| {
 		match name.as_ref() {
 			"on_session_start" | "session_start" => crate::Hook::Session::Fn::Fn(s),
-			"transform_tool_result" => crate::Hook::ToolResult::Entry::Fn::TransformToolResult(s, Content, Tool),
-			"transform_terminal_output" => crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput(s, Content),
+			"transform_tool_result" => crate::Hook::TransformToolResult(s, Content, Tool),
+			"transform_terminal_output" => crate::Hook::TransformTerminalOutput(s, Content),
 			"pre_llm_call" => crate::Hook::LLM::Pre::Fn::Fn(s),
 			"post_llm_call" => crate::Hook::LLM::Post::Fn::Fn(s),
 			"catalog" => {

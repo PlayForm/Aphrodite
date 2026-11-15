@@ -39,5 +39,5 @@ pub struct Struct {
 	pub Prompts:Option<PromptsConfiguration>,
 	/// `[templates]` - preview format strings and prompt text.
 	#[serde(rename = "templates")]
-	pub Templates:Option<crate::State::Template::Struct::TemplatesConfiguration>,
+	pub Templates:Option<crate::State::TemplatesConfiguration>,
 }

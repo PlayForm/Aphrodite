@@ -2,3 +2,4 @@
 
 pub mod Struct;
 
+pub use Struct::TemplatesConfiguration;

@@ -52,7 +52,7 @@ fn TestParseFailureRecordedOnConfigurationAndState() {
 	);
 
 	// `AphroditeStats` self-diagnosis surface.
-	let mut State = crate::State::Struct::AphroditeState::default();
+	let mut State = crate::State::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	let Ce = State
 		.ConfigurationError
@@ -87,7 +87,7 @@ fn TestLoadFromMultibyteCommentParses() {
 		"a multibyte comment must not fail the parse: {:?}",
 		cfg.ParseFailure
 	);
-	let mut State = crate::State::Struct::AphroditeState::default();
+	let mut State = crate::State::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert_eq!(State.TerminalThreshold, 16384);
 	assert!(State.ConfigurationError.is_none());

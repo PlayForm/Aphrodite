@@ -13,8 +13,7 @@
 //!
 //! Returns `Some(reduced_string)` only when all three gates pass.
 
-use crate::Stage2::Const::MinimumStage2Size;
-use crate::Stage2::Registry::Fn::ReducerRegistry;
+use crate::Stage2::{Const::MinimumStage2Size, Registry::ReducerRegistry};
 
 /// Produce a semantically reduced version of content.
 ///

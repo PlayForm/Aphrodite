@@ -21,3 +21,4 @@ pub mod Record;
 pub mod Retrieve;
 pub mod Struct;
 
+pub use Struct::SplitEvent;

@@ -2,7 +2,7 @@
 //! runs, as opposed to how much it compresses.
 
 use super::super::super::Struct::Struct;
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// Write the poll-worker, auto-expand, live-container, recursion, body-size
 /// and auto-reload switches.

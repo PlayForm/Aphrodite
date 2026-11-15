@@ -4,7 +4,7 @@ use super::{
 	super::Struct::Struct,
 	Section::{ChainSplit, Debug, Directive, Engine, Flow, Prompt, Runtime, Template},
 };
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 impl Struct {
 	/// Load compression settings into an AphroditeState.

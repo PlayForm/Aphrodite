@@ -11,13 +11,14 @@
 
 use crate::{
 	Flow::{
-		Engine::Offload::Fn::EngineOffloadBlock,
-		FirstTurn::Fn::BuildFirstTurnInjection,
-		Nudge::Render::Fn::RenderNudges,
-		Retrieval::{AutoExpand::Fn::AutoExpandGuidanceBlock, Guidance::Fn::RetrievalGuidanceBlock},
-		Section::Label::Fn::NudgesPresent,
+		AutoExpandGuidanceBlock,
+		BuildFirstTurnInjection,
+		EngineOffloadBlock,
+		NudgesPresent,
+		RenderNudges,
+		RetrievalGuidanceBlock,
 	},
-	State::Struct::AphroditeState,
+	State::AphroditeState,
 };
 
 /// Every candidate section for this turn, in survival order, plus the number
@@ -50,7 +51,7 @@ pub(crate) fn CollectSections(State:&mut AphroditeState) -> (Vec<String>, usize)
 	let AutoExpand = AutoExpandGuidanceBlock(State);
 
 	// ── Droppable section: recall catalog, delta-only (04-F1) ──
-	let Recall = crate::Session::Catalog::Fn::CatalogSummary(State);
+	let Recall = crate::Session::CatalogSummary(State);
 
 	// ── Poll-worker status (above recall, dropped after recall) ──
 	let BgStatus = if State.PollWorkerEnabled {

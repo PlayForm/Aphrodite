@@ -4,7 +4,7 @@
 //! `Request`/`Next`), so these tests need no env-var serialisation the way
 //! `mgmt_token()` itself would.
 
-use Guard::Bearer::Fn::CheckBearerToken;
+use crate::Guard::CheckBearerToken;
 
 #[test]
 fn TestCheckBearerTokenPassesWhenUnconfigured() {

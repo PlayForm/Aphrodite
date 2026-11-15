@@ -4,7 +4,7 @@
 use crate::Proxy::{
 	Relay::{Execute::Fn::Fn as ExecuteToolRelay, Response::Struct::Struct as ToolRelayResponse},
 	State::CCR::Get::Fn::Fn as CCRGet,
-	Test::Support::State::Fn::TestStateWithCCR,
+	Test::Support::TestStateWithCCR,
 };
 
 #[test]

@@ -15,7 +15,7 @@ use crate::{
 	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
 	Proxy::{
 		State::Struct::Struct as AppState,
-		Test::Support::Store::Struct::Struct as FailingCCRStore,
+		Test::Support::FailingCCRStore,
 		Threshold::Const::{
 			AutoExpandLimitDefault,
 			CacheCompressThreshold,

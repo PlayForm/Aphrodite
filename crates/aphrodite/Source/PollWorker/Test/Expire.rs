@@ -1,10 +1,10 @@
 //! Staleness marking: the turn gap that marks a task abandoned, and the
 //! polls that must not trip it.
 
-use crate::PollWorker::Expire::Fn::ExpireStaleTasks;
-use crate::PollWorker::Insert::Fn::InsertBgTask;
-use crate::PollWorker::Task::Status::Enum::BgStatus;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	PollWorker::{Expire::Fn::ExpireStaleTasks, Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus},
+	State::AphroditeState,
+};
 
 #[test]
 fn TestExpireStaleTasks() {

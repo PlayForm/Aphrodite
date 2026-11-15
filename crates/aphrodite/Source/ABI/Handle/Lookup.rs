@@ -8,7 +8,7 @@
 use std::sync::{Arc, Mutex};
 
 use super::Table::Handles;
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// Look up a session's handle and clone its `Arc` out from under the map
 /// lock, which is dropped before returning - callers lock the per-session

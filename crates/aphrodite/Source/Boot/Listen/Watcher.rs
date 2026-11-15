@@ -13,7 +13,8 @@ use aphrodite::{
 	Proxy,
 	Proxy::State::Struct::Struct as AppState,
 };
-use Boot::State::Listener::Bound;
+
+use crate::Boot::State::Bound;
 
 /// Watch `ConfigurationPath`'s directory and apply threshold changes to every listener.
 ///

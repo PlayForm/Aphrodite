@@ -3,7 +3,7 @@
 
 use crate::{
 	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
-	Proxy::Test::Support::State::Fn::{TestState, TestStateWithCCR},
+	Proxy::Test::Support::{TestState, TestStateWithCCR},
 };
 
 #[test]

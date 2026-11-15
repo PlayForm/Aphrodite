@@ -1,10 +1,10 @@
 //! The turn-context renderer: empty state, mixed state, and the
 //! live-container line's on/off contract.
 
-use crate::PollWorker::Insert::Fn::InsertBgTask;
-use crate::PollWorker::Status::Fn::RenderBgTaskStatus;
-use crate::PollWorker::Task::Status::Enum::BgStatus;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	PollWorker::{Insert::Fn::InsertBgTask, Status::Fn::RenderBgTaskStatus, Task::Status::Enum::BgStatus},
+	State::AphroditeState,
+};
 
 #[test]
 fn TestRenderBgTaskStatusEmpty() {

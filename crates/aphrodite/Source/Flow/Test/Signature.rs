@@ -1,6 +1,6 @@
 //! Argument signatures: the same logical call must hash the same twice.
 
-use crate::Flow::Signature::Normalize::Fn::NormalizeArgsSig;
+use crate::Flow::NormalizeArgsSig;
 
 #[test]
 fn TestNormalizeArgsSigStableAcrossVolatileKeys() {

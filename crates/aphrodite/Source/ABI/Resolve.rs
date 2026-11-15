@@ -2,10 +2,10 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::Guard::Cstr;
-use crate::ABI::Guard::ToJSONError;
-use crate::ABI::Guard::ToJSONOk;
-use crate::ABI::Handle::Lookup::WithState;
+use super::{
+	Guard::{Cstr, ToJSONError, ToJSONOk},
+	Handle::WithState,
+};
 
 /// Resolve hash with full recursive expansion - port of _resolve.py
 ///

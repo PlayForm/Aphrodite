@@ -5,9 +5,10 @@
 //! result must never land in the store over the original, and expansion must be
 //! repeatable with the same answer.
 
-use crate::Resolve::Expand::Fn as Expand;
-use crate::Resolve::One::Fn as ResolveOne;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Resolve::{Expand::Fn as Expand, One::Fn as ResolveOne},
+	State::AphroditeState,
+};
 
 #[test]
 fn TestExpandSimple() {

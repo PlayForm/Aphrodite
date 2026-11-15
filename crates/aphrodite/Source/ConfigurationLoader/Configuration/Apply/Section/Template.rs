@@ -1,7 +1,7 @@
 //! `[templates]` plus the marker grammar and first-turn session injection.
 
 use super::super::super::Struct::Struct;
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// Write the loaded template model into state and register the marker grammar
 /// process-globally.
@@ -33,7 +33,7 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 	// canonical fallback grammar so a hot-reload that removes the templates
 	// never leaves a stale format in force.
 	let CCRMarkerHint = Configuration.GetBool("APHRODITE_CCR_MARKER_HINT", "prompts", "ccr_marker_hint", false);
-	crate::Marker::Format::Const::SetMarkerTemplates(
+	crate::Marker::SetMarkerTemplates(
 		Templates.as_ref().and_then(|t| t.Marker.get("format")).map(String::as_str),
 		Templates.as_ref().and_then(|t| t.Marker.get("hint")).map(String::as_str),
 		CCRMarkerHint,
@@ -56,7 +56,7 @@ pub(crate) fn Apply(Configuration:&Struct, State:&mut AphroditeState) {
 			"APHRODITE_SESSION_INJECT",
 			"prompts",
 			"session_inject",
-			crate::Flow::Prompt::Const::ShippedSessionInject,
+			crate::Flow::ShippedSessionInject,
 		)
 	};
 }

@@ -7,7 +7,7 @@
 //! measuring any other concatenation would let a turn exceed its budget while
 //! the check said it fit.
 
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// DEV-ONLY: short label for an injected section, derived from its first
 /// line (the section order is fixed by [`BuildTurnContext`]).

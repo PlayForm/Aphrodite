@@ -2,3 +2,4 @@
 
 pub mod Fn;
 
+pub use Fn::ReduceDiff;

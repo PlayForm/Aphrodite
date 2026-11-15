@@ -35,4 +35,6 @@ pub mod Segment;
 pub mod Split;
 
 #[cfg(test)]
-pub mod Test;
+mod Test;
+
+pub use Const::SegMarker;

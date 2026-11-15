@@ -2,11 +2,10 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::Guard::Cstr;
-use crate::ABI::Guard::Guarded;
-use crate::ABI::Guard::ToJSONError;
-use crate::ABI::Guard::ToJSONOk;
-use crate::ABI::Handle::Lookup::GetHandle;
+use super::{
+	Guard::{Cstr, Guarded, ToJSONError, ToJSONOk},
+	Handle::GetHandle,
+};
 
 /// Answer with the session's catalogue in the requested `Mode`.
 ///

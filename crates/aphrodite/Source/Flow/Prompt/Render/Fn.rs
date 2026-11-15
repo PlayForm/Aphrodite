@@ -5,11 +5,7 @@
 //! renders as "" instead of panicking, because a typo in a prompt knob must
 //! degrade the injected context, never take the turn down.
 
-use crate::{
-	Flow::Prompt::Const::FallbackPrompts,
-	Marker::Format::Vars::SubstituteVars,
-	State::Struct::AphroditeState,
-};
+use crate::{Flow::Prompt::Const::FallbackPrompts, Marker::SubstituteVars, State::AphroditeState};
 
 /// Render a `[templates.prompts]` template (pre-Rust port of
 /// `_core/template.py` `_render_prompt_tmpl`).

@@ -8,3 +8,8 @@
 
 pub mod Const;
 pub mod Render;
+
+pub use self::{
+	Const::{FallbackPrompts, ShippedSessionInject},
+	Render::Fn::RenderPrompt,
+};

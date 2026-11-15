@@ -5,7 +5,7 @@
 //! renders through the prompt renderer, so a configured template wins over the
 //! compiled-in fallback; disabled means no bytes at all.
 
-use crate::{Flow::Prompt::Render::Fn::RenderPrompt, State::Struct::AphroditeState};
+use crate::{Flow::Prompt::Render::Fn::RenderPrompt, State::AphroditeState};
 
 /// Auto-expand guidance section (prompt template `auto_expand_guidance`,
 /// pre-Rust port): while `state.auto_expand` is enabled, inject the rendered

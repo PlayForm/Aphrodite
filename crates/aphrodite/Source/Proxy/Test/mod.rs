@@ -6,22 +6,22 @@
 //! misleading preview is a bug, so no test here may be weakened to fit a
 //! refactor.
 
-pub mod Body;
-pub mod CCR;
-pub mod Cache;
-pub mod Compress;
-pub mod Detect;
-pub mod Metadata;
-pub mod Preview;
-pub mod Property;
-pub mod Regression;
-pub mod Relay;
-pub mod Stats;
-pub mod Stream;
-pub mod Threshold;
-pub mod Support;
+mod Body;
+mod CCR;
+mod Cache;
+mod Compress;
+mod Detect;
+mod Metadata;
+mod Preview;
+mod Property;
+mod Regression;
+mod Relay;
+mod Stats;
+mod Stream;
+mod Threshold;
+mod Support;
 
 // `pub(crate)` (not private) so other in-crate test modules - e.g.
 // `Retrieve::tests` - can reach `test_state_with_ccr()` without duplicating
 // `AppState`'s ~47-field literal (report 05 T5 verification).
-
+pub(crate) use Support::TestStateWithCCR;

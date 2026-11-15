@@ -11,8 +11,14 @@
 //! `Assemble` is the last step and the only one that can fail on operator error:
 //! a standalone proxy with no API key.
 
-pub mod Compression;
-pub mod Load;
-pub mod Path;
-pub mod Proxies;
-pub mod Tracing;
+mod Compression;
+mod Load;
+mod Path;
+mod Proxies;
+mod Tracing;
+
+pub use Compression::Compression;
+pub use Load::Load;
+pub use Path::Resolve;
+pub use Proxies::Assemble;
+pub use Tracing::Subscribe;

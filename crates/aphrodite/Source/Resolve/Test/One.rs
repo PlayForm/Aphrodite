@@ -5,8 +5,7 @@
 //! it honours the `i:` inline prefix, and it can never be shadowed by a
 //! `{hash}#stage2` key.
 
-use crate::Resolve::One::Fn as ResolveOne;
-use crate::State::Struct::AphroditeState;
+use crate::{Resolve::One::Fn as ResolveOne, State::AphroditeState};
 
 #[test]
 fn TestResolveOneInline() {

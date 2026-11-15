@@ -18,7 +18,7 @@ pub extern "C" fn AphroditeStage2(Content:*const c_char, CCRType:*const c_char) 
 	};
 	let t = unsafe { Cstr(CCRType) }.unwrap_or_default();
 	Guarded(std::panic::AssertUnwindSafe(move || {
-		match crate::Stage2::Compress::Fn::CompressStage2(&c, &t) {
+		match crate::Stage2::CompressStage2(&c, &t) {
 			Some(Reduced) => CString::new(Reduced.replace('\0', "")).unwrap().into_raw(),
 			None => ToJSONError("no reduction possible"),
 		}

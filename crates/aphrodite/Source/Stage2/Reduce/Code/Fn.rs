@@ -37,7 +37,7 @@ pub fn ReduceCode(Content:&str) -> Option<String> {
 		// every one of the 9 patterns → 9 allocs/line). Bug 18-P12.
 		let Lower = Trimmed.to_lowercase();
 		for Sp in &Patterns {
-			if let Some(_Caps) = crate::Stage2::Regex::Fn::RegexMatch(Trimmed, &Lower, Sp.Pattern) {
+			if let Some(_Caps) = crate::Stage2::Regex::RegexMatch(Trimmed, &Lower, Sp.Pattern) {
 				let SigLine:String = Trimmed.chars().take(120).collect();
 				Sigs.push(format!("  [{}] {}", Sp.Kind, SigLine));
 			}

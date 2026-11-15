@@ -1,9 +1,12 @@
 //! Admission, deduplication and eviction of tracked tasks.
 
-use crate::PollWorker::Insert::Fn::InsertBgTask;
-use crate::PollWorker::Task::Const::MaximumBgTasks;
-use crate::PollWorker::Task::Status::Enum::BgStatus;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	PollWorker::{
+		Insert::Fn::InsertBgTask,
+		Task::{Const::MaximumBgTasks, Status::Enum::BgStatus},
+	},
+	State::AphroditeState,
+};
 
 #[test]
 fn TestInsertBgTaskDedup() {

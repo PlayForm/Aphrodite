@@ -1,6 +1,6 @@
 //! The referenced-files list: de-duplication and tool-name refresh.
 
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 #[test]
 fn TestRecordFileDedup() {

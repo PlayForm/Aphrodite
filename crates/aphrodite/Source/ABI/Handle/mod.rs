@@ -10,3 +10,6 @@ pub mod Allocate;
 pub mod Lookup;
 pub mod Table;
 
+pub(crate) use Allocate::AllocHandle;
+pub(crate) use Lookup::{GetHandle, WithState};
+pub(crate) use Table::Handles;

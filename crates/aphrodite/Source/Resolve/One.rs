@@ -10,7 +10,7 @@
 //! is well formed, and it never invents content for a hash the store does not
 //! hold.
 
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// Resolve a single CCR hash from the inline store.
 ///
@@ -27,7 +27,7 @@ use crate::State::Struct::AphroditeState;
 /// the hash, counted once per hash, so the threshold can adapt. Losing that
 /// attribution does not corrupt content - it only blinds the loop.
 pub fn Fn(State:&mut AphroditeState, HashValue:&str) -> Option<String> {
-	let HashValue = crate::Marker::Parse::Normalize::NormalizeHash(HashValue);
+	let HashValue = crate::Marker::NormalizeHash(HashValue);
 
 	// i: prefix - inline-only hashes
 	if HashValue.starts_with("i:") {

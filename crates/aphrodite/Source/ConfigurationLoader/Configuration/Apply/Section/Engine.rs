@@ -1,7 +1,7 @@
 //! `[compression]` engine thresholds, plus the `[defaults]` upstream values.
 
 use super::super::super::Struct::Struct;
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 /// Write the context-engine thresholds and the upstream model/URL defaults.
 ///

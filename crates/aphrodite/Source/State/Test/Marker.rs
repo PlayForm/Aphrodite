@@ -1,8 +1,6 @@
 //! The recent-marker catalog cap and its front-eviction arithmetic.
 
-use crate::State::Struct::AphroditeState;
-use crate::State::Const::RecentMarkersCap;
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::State::{AphroditeState, Const::RecentMarkersCap, MarkerEntry};
 
 #[test]
 fn TestRecordMarkerEviction() {

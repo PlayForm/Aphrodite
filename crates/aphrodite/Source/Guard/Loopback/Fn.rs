@@ -6,7 +6,7 @@
 
 use std::net::SocketAddr;
 
-use Guard::Host::Fn::HostHeaderToHostname;
+use crate::Guard::HostHeaderToHostname;
 
 /// Hostnames a legitimate loopback caller can present in its `Host` header.
 /// report 12 F1: a peer-IP check alone is not DNS-rebinding-safe - a

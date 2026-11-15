@@ -7,9 +7,10 @@
 //! exit code is read from the JSON wrapper when present and from an
 //! `exit code: N` line otherwise, because not every poll result is wrapped.
 
-use crate::PollWorker::Task::Status::Enum::BgStatus;
-use crate::State::Struct::AphroditeState;
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::{
+	PollWorker::Task::Status::Enum::BgStatus,
+	State::{AphroditeState, MarkerEntry},
+};
 
 /// Update a background task's status based on a `process(action='poll')`
 /// result flowing through `TransformToolResult`. Called BEFORE the
@@ -93,7 +94,7 @@ pub fn UpdateFromPoll(State:&mut AphroditeState, ToolName:&str, Content:&str) ->
 
 	for (i, ExitCodeValue, AccOutput) in Completions {
 		let hash = headroom_core::ccr::compute_key(AccOutput.as_bytes());
-		let Preview = crate::Preview::Builder::Entry::Fn("terminal", &AccOutput);
+		let Preview = crate::BuildPreview("terminal", &AccOutput);
 		State.InlineStorePut(hash.clone(), AccOutput);
 
 		// Collect task metadata BEFORE mutably borrowing bg_tasks[i],

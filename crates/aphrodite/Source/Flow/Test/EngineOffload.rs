@@ -9,10 +9,10 @@
 
 use crate::{
 	Flow::{
+		BuildTurnContext,
 		Engine::Offload::Fn::{EngineArchivePrompt, EngineOffloadSectionFrom},
-		TurnContext::Fn::BuildTurnContext,
 	},
-	State::Struct::AphroditeState,
+	State::AphroditeState,
 };
 
 #[test]

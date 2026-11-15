@@ -7,9 +7,10 @@
 //! the two into one threshold either kills a live build or forgets a
 //! completion the agent was told about.
 
-use crate::PollWorker::Task::Const::StaleTurnAge;
-use crate::PollWorker::Task::Status::Enum::BgStatus;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	PollWorker::Task::{Const::StaleTurnAge, Status::Enum::BgStatus},
+	State::AphroditeState,
+};
 
 /// Expire background tasks that the agent has stopped polling.
 /// Called from `PostLLMCall` after turn advancement.

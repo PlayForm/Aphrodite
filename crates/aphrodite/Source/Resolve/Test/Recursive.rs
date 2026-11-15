@@ -7,9 +7,10 @@
 //! they pin behaviour, not implementation.
 
 use super::*;
-use crate::Resolve::Expand::Fn as Expand;
-use crate::Resolve::Recursive::Inline::Fn as ResolveInline;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Resolve::{Expand::Fn as Expand, Recursive::Inline::Fn as ResolveInline},
+	State::AphroditeState,
+};
 
 #[test]
 fn TestExpandDeepNestingRespectsLimit() {

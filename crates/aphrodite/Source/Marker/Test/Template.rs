@@ -5,10 +5,7 @@
 //! string, and resets the registration - the templates are process-global, so
 //! a test that leaves one registered changes what every later test sees.
 
-use crate::Marker::Format::Entry::CCRMarker;
-use crate::Marker::Format::Const::MarkerTemplatesTestGuard;
-use crate::Marker::Format::Const::SetMarkerTemplates;
-use crate::Marker::Format::Vars::SubstituteVars;
+use crate::Marker::{CCRMarker, MarkerTemplatesTestGuard, SetMarkerTemplates, SubstituteVars};
 
 #[test]
 fn TestMarkerFormatConfiguredRendersTomlTemplate() {

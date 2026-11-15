@@ -6,10 +6,7 @@
 //! value > compiled-in default, the same order the listen-port override uses.
 
 use crate::{
-	Configuration::{
-		Environment::Warn::Fn::EnvironmentParseWarn,
-		Proxy::Compression::Struct::Struct as CompressionConfiguration,
-	},
+	Configuration::{EnvironmentParseWarn, Proxy::Compression::Struct::Struct as CompressionConfiguration},
 	Proxy::Threshold::{
 		Const::{AutoExpandLimitDefault, CacheCompressThreshold, InlineCCRThreshold, TokenCompressThreshold},
 		Struct::Struct as ResolvedThresholds,

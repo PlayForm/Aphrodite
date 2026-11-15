@@ -2,7 +2,7 @@
 //! rendered through the prompt renderer so a configured template wins.
 
 use super::Support::StateWithPrompt;
-use crate::{Flow::TurnContext::Fn::BuildTurnContext, State::Struct::AphroditeState};
+use crate::{Flow::BuildTurnContext, State::AphroditeState};
 
 #[test]
 fn TestAutoExpandGuidanceInjectedWhenEnabled() {

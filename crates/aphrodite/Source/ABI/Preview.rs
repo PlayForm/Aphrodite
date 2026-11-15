@@ -17,7 +17,7 @@ pub extern "C" fn AphroditePreview(Content:*const c_char, CCRType:*const c_char)
 	};
 	let t = unsafe { Cstr(CCRType) }.unwrap_or_default();
 	Guarded(std::panic::AssertUnwindSafe(move || {
-		let Preview = crate::Preview::Builder::Entry::Fn(&t, &c);
+		let Preview = crate::BuildPreview(&t, &c);
 		CString::new(Preview.replace('\0', "")).unwrap().into_raw()
 	}))
 }

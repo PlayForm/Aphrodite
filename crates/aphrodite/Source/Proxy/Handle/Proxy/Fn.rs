@@ -73,14 +73,14 @@ pub async fn Fn(
 		None
 	};
 	if let Some(Ck) = CacheKey
-		&& let Some(Cached) = Lookup::Fn::Fn(&state, Some(Ck), RequestIDShort, &Method, path.path(), T0)
+		&& let Some(Cached) = Lookup::Fn(&state, Some(Ck), RequestIDShort, &Method, path.path(), T0)
 	{
 		return Cached;
 	}
 	// 02-F2: a `"stream": true` request goes out on `StreamClient` (no total
 	// timeout), not the bounded `Client` - see `Forward`'s doc comment.
-	let (UpstreamResult, FinalErrorWasTimeout) = Forward::Fn::Fn(&state, &Method, &url, &Headers, BodyVec).await;
-	Respond::Fn::Fn(
+	let (UpstreamResult, FinalErrorWasTimeout) = Forward::Fn(&state, &Method, &url, &Headers, BodyVec).await;
+	Respond::Fn(
 		&state,
 		&Method,
 		path.path(),

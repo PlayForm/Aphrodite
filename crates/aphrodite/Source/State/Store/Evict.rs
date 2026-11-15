@@ -1,7 +1,6 @@
 //! The one eviction pass both inline-store bounds share.
 
-use crate::State::Struct::AphroditeState;
-use crate::State::Const::InlineMaximum;
+use super::super::{AphroditeState, Const::InlineMaximum};
 
 impl AphroditeState {
 	/// Evict the least-recently-used entry until both the entry-count cap

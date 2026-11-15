@@ -5,7 +5,7 @@
 //! source of truth: unlike the marker preview, which sanitizes for safe
 //! rendering, whatever goes in here must come out byte-for-byte identical.
 
-use crate::State::Struct::AphroditeState;
+use crate::State::AphroditeState;
 
 #[test]
 fn TestInlineStorePutGet() {

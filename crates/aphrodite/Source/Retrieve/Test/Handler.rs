@@ -18,7 +18,7 @@ use crate::Retrieve::{Handle::Fn::Fn as HandleRetrieve, Request::Struct::Struct 
 // duplicating its ~47-field literal.
 #[test]
 fn TestHandleRetrieveNormalizesPipeSuffixedAndWhitespaceHash() {
-	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
+	let state = crate::Proxy::Test::TestStateWithCCR();
 	{
 		let mut Map = state.InlineCCR.lock().unwrap();
 		Map.put("abc123".to_string(), "<the real content>".to_string());
@@ -50,7 +50,7 @@ fn TestHandleRetrieveNormalizesPipeSuffixedAndWhitespaceHash() {
 // miss (which turned every request into a confusing 404). ──
 #[test]
 fn TestHandleRetrievePoisonedInlineCCRLockReturns500() {
-	let state = crate::Proxy::Test::Support::State::Fn::TestStateWithCCR();
+	let state = crate::Proxy::Test::TestStateWithCCR();
 	// Poison the mutex: panic while holding the guard (contained via
 	// catch_unwind so it stays inside this test).
 	let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

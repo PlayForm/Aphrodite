@@ -2,10 +2,10 @@
 
 use std::os::raw::c_char;
 
-use crate::ABI::Guard::Cstr;
-use crate::ABI::Guard::ToJSONError;
-use crate::ABI::Guard::ToJSONOk;
-use crate::ABI::Handle::Lookup::WithState;
+use super::{
+	Guard::{Cstr, ToJSONError, ToJSONOk},
+	Handle::WithState,
+};
 
 /// Re-read `[compression] context_engine` from `path` and apply it.
 ///
@@ -48,7 +48,7 @@ pub extern "C" fn AphroditeReload(Handle:*const c_char, path:*const c_char) -> *
 						// subscriber exists) and record the failure on the
 						// state + response so `AphroditeStats` can
 						// self-diagnose.
-						crate::ConfigurationLoader::Warn::Fn::WarnParseFailure(
+						crate::ConfigurationLoader::WarnParseFailure(
 							std::path::Path::new(p.as_str()),
 							&Error,
 							"keeping previous value",

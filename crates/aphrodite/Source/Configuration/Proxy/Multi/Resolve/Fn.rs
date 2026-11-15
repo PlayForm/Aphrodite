@@ -1,11 +1,7 @@
 //! Resolving one `[[proxies]]` entry into the CLI-shaped configuration the
 //! proxy consumes.
 
-use crate::Configuration::{
-	CLI::Struct::Struct as CLI,
-	Environment::Warn::Fn::EnvironmentParseWarn,
-	Proxy::Mode::Enum::Enum as ProxyMode,
-};
+use crate::Configuration::{CLI::Struct::Struct as CLI, EnvironmentParseWarn, Proxy::Mode::Enum::Enum as ProxyMode};
 use super::super::Struct::Struct;
 
 impl Struct {

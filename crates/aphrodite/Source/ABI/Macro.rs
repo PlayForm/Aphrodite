@@ -33,7 +33,7 @@ macro_rules! stateful {
 				Err(_) => return $crate::ABI::Guard::ToJSONError("invalid handle"),
 			};
 			$(let $arg = unsafe { $crate::ABI::Guard::Cstr($arg) }.unwrap_or_default();)*
-			match $crate::ABI::Handle::Lookup::WithState(Hid, |$s| $body) {
+			match $crate::ABI::Handle::WithState(Hid, |$s| $body) {
 				Ok(v) => $crate::ABI::Guard::ToJSONOk(&v),
 				Err(e) => $crate::ABI::Guard::ToJSONError(&e),
 			}

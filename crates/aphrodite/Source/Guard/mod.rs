@@ -13,10 +13,15 @@
 //! middleware that ever grows logic of its own is a defect, not a convenience.
 //! Weakening any check here reopens a documented hole - see `SECURITY.md`.
 
-pub mod Bearer;
-pub mod Host;
-pub mod Loopback;
-pub mod Token;
+mod Bearer;
+mod Host;
+mod Loopback;
+mod Token;
 
 #[cfg(test)]
-pub mod Test;
+mod Test;
+
+pub use Bearer::{CheckBearerToken, RequireMgmtToken};
+pub use Host::HostHeaderToHostname;
+pub use Loopback::{CheckLoopbackRequest, LoopbackOnly};
+pub use Token::MgmtToken;

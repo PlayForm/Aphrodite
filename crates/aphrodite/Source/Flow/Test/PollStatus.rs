@@ -1,6 +1,6 @@
 //! Poll-worker status is injected only while the worker is enabled.
 
-use crate::{Flow::TurnContext::Fn::BuildTurnContext, State::Struct::AphroditeState};
+use crate::{Flow::BuildTurnContext, State::AphroditeState};
 
 #[test]
 fn TestBuildTurnContextOmitsPollStatusWhenDisabled() {
