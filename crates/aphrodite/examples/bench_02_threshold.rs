@@ -77,11 +77,11 @@ fn Spawn(Mode:&str, Port:u16) -> Proxy {
 			Mode,
 			"--listen",
 			&Listen,
-			"--api-url",
+			"--apiurl",
 			"http://127.0.0.1:1",
 			"--api-key",
 			"bench",
-			"--ccr-db-path",
+			"--ccr-database-path",
 		])
 		.arg(&DatabasePath)
 		// See bin_path()'s doc comment: a repo-root aphrodite.toml would

@@ -63,11 +63,11 @@ fn SpawnProxy() -> Proxy {
 			"token",
 			"--listen",
 			&Listen,
-			"--api-url",
+			"--apiurl",
 			"http://127.0.0.1:1",
 			"--api-key",
 			"bench",
-			"--ccr-db-path",
+			"--ccr-database-path",
 		])
 		.arg(&DatabasePath)
 		// A repo-root aphrodite.toml would override --mode/--listen/etc.
