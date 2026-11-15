@@ -6,7 +6,8 @@ use aphrodite::Configuration::{
 	Proxy::Compression::Struct::Struct as CompressionConfiguration,
 };
 
-use crate::Boot::State::{self, Bound};
+use Boot::State::self;
+use Boot::State::Listener::Bound;
 
 /// Bind every listener and build its `AppState`, returning them ready to serve.
 ///

@@ -3,6 +3,5 @@
 //! The family is named for the tool (`aphrodite_test`); the module's own unit
 //! tests live one level up in `Tool/Test/`, so the two never collide.
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

@@ -6,7 +6,7 @@
 //! command is a signal even when the output is too small to compress.
 
 use super::super::Inner::Fn::Fn as TransformTerminalOutputInner;
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Transform terminal output - exit code aware.
 pub fn TransformTerminalOutput(State:&mut AphroditeState, Content:&str) -> serde_json::Value {

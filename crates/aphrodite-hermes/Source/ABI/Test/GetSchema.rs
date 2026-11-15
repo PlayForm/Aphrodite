@@ -2,7 +2,8 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{aphrodite_hermes_free_string, aphrodite_hermes_get_schema};
+use ABI::FreeString::aphrodite_hermes_free_string;
+use ABI::GetSchema::aphrodite_hermes_get_schema;
 
 #[test]
 fn test_get_schema_known_tool() {

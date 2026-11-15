@@ -13,13 +13,11 @@
 //! text - it silently removes the directives the session is supposed to be
 //! following.
 
-use crate::{
-	Flow::{
-		JoinSections,
-		TurnContext::{Budget::DropToBudget, Collect::CollectSections, Log::LogPreTurn},
-	},
-	State::AphroditeState,
-};
+use crate::Flow::Section::Label::Fn::JoinSections;
+use crate::Flow::TurnContext::Budget::Fn::DropToBudget;
+use crate::Flow::TurnContext::Collect::Fn::CollectSections;
+use crate::Flow::TurnContext::Log::Fn::LogPreTurn;
+use crate::State::Struct::AphroditeState;
 
 /// Assemble the complete per-turn injected context, in fixed order, hard-capped
 /// at `state.flow_budget_chars`.

@@ -10,7 +10,10 @@ use serde::Deserialize;
 /// execute against this proxy's CCR state (e.g. `AphroditeRetrieve`).
 #[derive(Debug, Deserialize)]
 pub struct Struct {
+	#[serde(rename = "tool")]
 	pub Tool:String,
+	#[serde(rename = "params")]
 	pub Params:serde_json::Value,
+	#[serde(rename = "callback_url")]
 	pub CallbackURL:Option<String>,
 }

@@ -2,7 +2,9 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{Session::Registry::Struct::session_state, aphrodite_hermes_call_hook, aphrodite_hermes_free_string};
+use Session::Registry::Struct::session_state;
+use ABI::CallHook::aphrodite_hermes_call_hook;
+use ABI::FreeString::aphrodite_hermes_free_string;
 
 // ── Wedged-lock degrade probe (gateway shared-plugin fix): simulate an
 // abandoned worker by HOLDING a session's state mutex, then call the
@@ -11,7 +13,7 @@ use crate::{Session::Registry::Struct::session_state, aphrodite_hermes_call_hook
 // timeout (the pre-fix behavior that hung the gateway). ──
 #[test]
 fn probe_wedged_session_lock_degrades_fail_open() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	// Simulate the abandoned worker: hold this session's lock.
 	let state = session_state("probe-wedged");
 	let _wedged_guard = state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);

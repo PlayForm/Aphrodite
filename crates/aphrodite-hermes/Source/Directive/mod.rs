@@ -3,7 +3,7 @@
 //!
 //! The shipped directive set is EMBEDDED in the core `aphrodite` crate
 //! (`crates/aphrodite/Source/BuiltinDirective/*.md`, compiled in via
-//! `include_str!` and exposed through `aphrodite::Directive::Builtin::Fn()`).
+//! `include_str!` and exposed through `aphrodite::Directive::Builtin::Fn::Fn()`).
 //! This module provisions those builtins into the user-data home
 //! (`~/.hermes/aphrodite/directives/` by default) so the plugin directory
 //! never has to hold runtime state: the core crate is the provider (the

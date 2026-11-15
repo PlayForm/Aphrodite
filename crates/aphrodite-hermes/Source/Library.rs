@@ -41,44 +41,29 @@
 // renamed away at every declaration.
 #![allow(non_snake_case)]
 
-mod ABI;
-mod Configuration;
-mod Debug;
-mod Directive;
-mod Guard;
-mod Health;
-mod Hook;
-mod Schema;
-mod Session;
-mod Tool;
+pub mod ABI;
+pub mod Configuration;
+pub mod Debug;
+pub mod Directive;
+pub mod Guard;
+pub mod Health;
+pub mod Hook;
+pub mod Schema;
+pub mod Session;
+pub mod Tool;
 
 // Re-export core aphrodite types for convenience
-pub use aphrodite::State::AphroditeState;
+
 // The C ABI surface: every `aphrodite_hermes_*` symbol Hermes binds, one per
 // file under `ABI/`. Re-exported at the crate root so the exported symbol set
 // stays greppable from one place; the symbol NAMES are the contract asserted by
 // cbindgen -> `plugins/aphrodite/_bindings.py` and
 // `Maintain/check_ffi_contract.py`, and none of them may change.
-pub use ABI::{
-	CallHook::aphrodite_hermes_call_hook,
-	DispatchTool::aphrodite_hermes_dispatch_tool,
-	FreeString::aphrodite_hermes_free_string,
-	GetHooks::aphrodite_hermes_get_hooks,
-	GetSchema::aphrodite_hermes_get_schema,
-	GetSchemas::aphrodite_hermes_get_schemas,
-	ListTools::aphrodite_hermes_list_tools,
-	MaterializeDirectives::aphrodite_hermes_materialize_directives,
-	ProxyHealth::aphrodite_hermes_proxy_health,
-	Version::aphrodite_hermes_version,
-};
+
 // Crate-internal names that peer modules (`Tool/`, `Directive/`, `Schema/`)
 // reach through the crate root.
-pub(crate) use Health::Proxy::Fn::proxy_health;
-pub(crate) use Session::With::Fn::with_shared;
+
 // Only the session-isolation probe reaches the crate root for `with_session`:
 // production code paths go straight to `Session::With::Fn`, so the alias is
 // gated to keep the lib build warning-free.
-#[cfg(test)]
-pub(crate) use Session::With::Fn::with_session;
-#[cfg(test)]
-pub(crate) use Session::Guard::Fn::test_guard;
+

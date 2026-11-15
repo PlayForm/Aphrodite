@@ -12,7 +12,7 @@
 //! `crate::Debug` remains live in both profiles (it only activates on a flag
 //! file).
 
-use crate::Tool::Dispatch::ToolHandler;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_debug` handler.
 ///
@@ -21,7 +21,7 @@ use crate::Tool::Dispatch::ToolHandler;
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_debug", |args| {
 		let on = args.get("on").and_then(|v| v.as_bool()).unwrap_or(true);
-		match crate::Debug::Session::Set::Fn(on) {
+		match crate::Debug::Session::Set::Fn::Fn(on) {
 			Ok((session, flag)) => {
 				serde_json::json!({
 					"status": "ok",

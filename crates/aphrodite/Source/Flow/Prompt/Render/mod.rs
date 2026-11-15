@@ -2,4 +2,3 @@
 
 pub mod Fn;
 
-pub use self::Fn::RenderPrompt;

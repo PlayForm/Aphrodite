@@ -1,10 +1,10 @@
 //! Store terminal output and emit its marker payload.
 
-use crate::{
-	Hook::{AutoExpand::Content, ToolResult::Classify},
-	Marker::CCRMarker,
-	State::{AphroditeState, MarkerEntry},
-};
+use crate::Hook::AutoExpand::Content;
+use crate::Hook::ToolResult::Classify;
+use crate::Marker::Format::Entry::CCRMarker;
+use crate::State::Struct::AphroditeState;
+use crate::State::Marker::Struct::MarkerEntry;
 
 /// Store `Content`, record the marker, and build the payload the bridge hands
 /// to the model - replacing the marker with the resolved content when
@@ -25,7 +25,7 @@ pub(crate) fn Fn(
 	let hash = headroom_core::ccr::compute_key(Content.as_bytes());
 	State.InlineStorePut(hash.clone(), Content.to_string());
 
-	let Preview = crate::BuildPreview(&TypeStr, ClassifyContent);
+	let Preview = crate::Preview::Builder::Entry::Fn(&TypeStr, ClassifyContent);
 	let Marker = CCRMarker(&hash, &TypeStr, Content.len(), &Preview, None, None, None);
 
 	State.RecordMarker(MarkerEntry {

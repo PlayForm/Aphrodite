@@ -15,11 +15,8 @@
 //! This file declares and re-exports only.
 
 pub mod Configuration;
-mod Warn;
+pub mod Warn;
 
 #[cfg(test)]
-mod Test;
+pub mod Test;
 
-/// The parse-failure warning, re-exported for `ABI::Reload`, which reports a
-/// broken config on the hot-reload path.
-pub(crate) use Warn::Fn::WarnParseFailure;

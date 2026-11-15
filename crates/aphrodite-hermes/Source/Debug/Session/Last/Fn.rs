@@ -36,7 +36,7 @@ pub(crate) fn Fn() -> String {
 		}
 	}
 	// Reload fallback: read the persisted session id from the runtime home.
-	std::fs::read_to_string(Runtime::Fn().join("session.current"))
+	std::fs::read_to_string(Runtime::Fn::Fn().join("session.current"))
 		.ok()
 		.map(|s| s.trim().to_string())
 		.unwrap_or_default()

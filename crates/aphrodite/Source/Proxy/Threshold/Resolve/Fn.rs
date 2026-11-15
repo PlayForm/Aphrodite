@@ -5,13 +5,13 @@
 //! proxy on the old numbers. Precedence is env var > `[compression]` TOML
 //! value > compiled-in default, the same order the listen-port override uses.
 
-use crate::{
-	Configuration::{EnvironmentParseWarn, Proxy::Compression::Struct::Struct as CompressionConfiguration},
-	Proxy::Threshold::{
-		Const::{AutoExpandLimitDefault, CacheCompressThreshold, InlineCCRThreshold, TokenCompressThreshold},
-		Struct::Struct as ResolvedThresholds,
-	},
-};
+use crate::Configuration::Environment::Warn::Fn::EnvironmentParseWarn;
+use crate::Configuration::Proxy::Compression::Struct::Struct as CompressionConfiguration;
+use crate::Proxy::Threshold::Const::AutoExpandLimitDefault;
+use crate::Proxy::Threshold::Const::CacheCompressThreshold;
+use crate::Proxy::Threshold::Const::InlineCCRThreshold;
+use crate::Proxy::Threshold::Const::TokenCompressThreshold;
+use crate::Proxy::Threshold::Struct::Struct as ResolvedThresholds;
 
 /// Resolve the compression thresholds and auto-expand knobs from env vars,
 /// the TOML `[compression]` table (if any), and the compiled-in defaults,

@@ -17,6 +17,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			as a record of what has already been looked at. Takes no arguments. \
 			Returns {total, files: [{path, tool}]} where `tool` is the tool that first \
 			referenced the path.",
-		"parameters": NoParams::Fn()
+		"parameters": NoParams::Fn::Fn()
 	})
 }

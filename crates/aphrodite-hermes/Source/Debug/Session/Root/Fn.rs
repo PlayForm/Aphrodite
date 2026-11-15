@@ -24,5 +24,5 @@ pub(crate) fn Fn() -> String {
 	if last.is_empty() {
 		return String::new();
 	}
-	Chain::Fn(&last).last().cloned().unwrap_or_else(|| last.clone())
+	Chain::Fn::Fn(&last).last().cloned().unwrap_or_else(|| last.clone())
 }

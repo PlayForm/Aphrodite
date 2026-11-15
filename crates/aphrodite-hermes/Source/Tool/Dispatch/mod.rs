@@ -4,6 +4,5 @@
 //! the type here rather than in `Registry/` means a family can be written - and
 //! type-checked - without the table that assembles it existing yet.
 
-mod Fn;
+pub mod Fn;
 
-pub use Fn::{Fn, ToolHandler};

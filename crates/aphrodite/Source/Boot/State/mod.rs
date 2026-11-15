@@ -7,8 +7,6 @@
 //! and apply new compression thresholds to all of them, not just re-parse and
 //! log.
 
-mod Build;
-mod Listener;
+pub mod Build;
+pub mod Listener;
 
-pub use Build::Build;
-pub use Listener::Bound;

@@ -2,7 +2,8 @@
 
 use std::ffi::CStr;
 
-use crate::{aphrodite_hermes_free_string, aphrodite_hermes_list_tools};
+use ABI::FreeString::aphrodite_hermes_free_string;
+use ABI::ListTools::aphrodite_hermes_list_tools;
 
 #[test]
 fn test_list_tools_returns_array() {

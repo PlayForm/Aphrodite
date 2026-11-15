@@ -11,10 +11,14 @@ use serde::Serialize;
 /// polling.
 #[derive(Debug, Serialize)]
 pub struct Struct {
+	#[serde(rename = "event")]
 	pub Event:String,
 	pub hash:String,
+	#[serde(rename = "created_at")]
 	pub CreatedAt:u64,
+	#[serde(rename = "ttl")]
 	pub Ttl:u64,
+	#[serde(rename = "tags")]
 	pub Tags:Vec<String>,
 }
 

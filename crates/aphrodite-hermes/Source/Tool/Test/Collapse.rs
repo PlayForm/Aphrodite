@@ -5,7 +5,7 @@
 //! `type` hint must win over the envelope heuristic; and search results must show
 //! the REAL match count instead of a capped or invented one.
 
-use crate::Tool::Dispatch::Fn as dispatch;
+use Tool::Dispatch::Fn::Fn as dispatch;
 
 // ── FIXDESIGN 3.1: the issue's exact repro shape, explicit path.
 // {"success":true,"data":{...}} with type:"tool_result" must keep the
@@ -13,7 +13,7 @@ use crate::Tool::Dispatch::Fn as dispatch;
 // "[text:1L 2B | ok]". ──
 #[test]
 fn test_compress_json_payload_with_hint_keeps_type_and_full_preview() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let content = serde_json::json!({"success": true, "data": {"web": [{"title": "x"}]}}).to_string();
 	let compressed = dispatch(
 		"aphrodite_compress",
@@ -56,7 +56,7 @@ fn test_compress_json_payload_with_hint_keeps_type_and_full_preview() {
 // not a json type, which the classifier cannot produce here.) ──
 #[test]
 fn test_compress_bare_success_object_preview_is_honest() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let content = serde_json::json!({"success": true}).to_string();
 	let compressed = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
 	let preview = compressed["preview"].as_str().unwrap();
@@ -77,7 +77,7 @@ fn test_compress_bare_success_object_preview_is_honest() {
 // the REAL matches, not collapse to "[search:1L]". ──
 #[test]
 fn test_compress_search_result_shows_real_match_count() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let content = serde_json::json!({
 		"total_count": 19,
 		"matches_format": "path-grouped",
@@ -101,7 +101,7 @@ fn test_compress_search_result_shows_real_match_count() {
 // 20 must not preview as "[search:20 hits ...]". ──
 #[test]
 fn test_compress_search_matches_array_counts_all_matches() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let matches:Vec<serde_json::Value> = (0..25)
 		.map(|i| serde_json::json!({"path": format!("f{i}.rs"), "line": i, "content": "x"}))
 		.collect();
@@ -118,7 +118,7 @@ fn test_compress_search_matches_array_counts_all_matches() {
 // total ("0 total") instead of an unreadable "[search:1L]". ──
 #[test]
 fn test_compress_search_zero_or_count_only_surfaces_total() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let content = serde_json::json!({"total_count": 0, "matches": []}).to_string();
 	let compressed = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
 	let preview = compressed["preview"].as_str().unwrap();
@@ -137,7 +137,7 @@ fn test_compress_search_zero_or_count_only_surfaces_total() {
 // envelope - it must preview as itself, not as a fake search. ──
 #[test]
 fn test_compress_data_object_with_total_count_key_is_not_search() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let content = serde_json::json!({"total_count": 42, "items": [1, 2, 3]}).to_string();
 	let compressed = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
 	assert_ne!(

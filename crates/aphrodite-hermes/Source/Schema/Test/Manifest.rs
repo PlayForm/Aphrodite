@@ -14,7 +14,7 @@ use crate::Schema::All;
 /// undeclared tool (teknium review, PR 118488).
 #[test]
 fn test_catalog_tool_count_matches_manifest() {
-	let names:Vec<String> = All::Fn()
+	let names:Vec<String> = All::Fn::Fn()
 		.into_iter()
 		.map(|s| s["name"].as_str().expect("name must be a string").to_string())
 		.collect();

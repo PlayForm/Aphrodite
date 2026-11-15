@@ -7,7 +7,7 @@
 //! `ctx.register_context_engine`, which is why it has no schema and is excluded by
 //! name from the schema/registry consistency test.
 
-use crate::Tool::Dispatch::ToolHandler;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `context_engine_pre_llm` handler.
 ///
@@ -15,7 +15,7 @@ use crate::Tool::Dispatch::ToolHandler;
 /// empty context block.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("context_engine_pre_llm", |_args| {
-		crate::with_shared(|state| {
+		crate::Session::With::Fn::with_shared(|state| {
 			let context = aphrodite::Flow::BuildTurnContext(state, None);
 			if context.is_empty() {
 				serde_json::Value::Null

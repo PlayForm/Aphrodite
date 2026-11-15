@@ -2,7 +2,8 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{aphrodite_hermes_call_hook, aphrodite_hermes_free_string};
+use ABI::CallHook::aphrodite_hermes_call_hook;
+use ABI::FreeString::aphrodite_hermes_free_string;
 
 // ── T13 (F11): the production hook-dispatch path Python actually calls
 // (`aphrodite_hermes_call_hook("post_llm_call", ...)`) must archive the
@@ -13,14 +14,14 @@ use crate::{aphrodite_hermes_call_hook, aphrodite_hermes_free_string};
 // returned zero turns in real Hermes usage even after that fix. ──
 #[test]
 fn test_call_hook_post_llm_call_archives_turn_for_aphrodite_diff() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
 	);
 
 	let compress_args = CString::new(serde_json::json!({"content": "x".repeat(5000)}).to_string()).unwrap();
-	let compress_ptr = crate::aphrodite_hermes_dispatch_tool(
+	let compress_ptr = crate::ABI::DispatchTool::aphrodite_hermes_dispatch_tool(
 		CString::new("aphrodite_compress").unwrap().as_ptr(),
 		compress_args.as_ptr(),
 	);
@@ -33,7 +34,7 @@ fn test_call_hook_post_llm_call_archives_turn_for_aphrodite_diff() {
 	);
 	aphrodite_hermes_free_string(hook_ptr);
 
-	let diff_ptr = crate::aphrodite_hermes_dispatch_tool(
+	let diff_ptr = crate::ABI::DispatchTool::aphrodite_hermes_dispatch_tool(
 		CString::new("aphrodite_diff").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
 	);

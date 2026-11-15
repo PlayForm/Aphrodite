@@ -1,6 +1,6 @@
 //! The inline store's byte budget and running total.
 
-use super::super::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 impl AphroditeState {
 	/// Current byte budget for the inline store (report 05 F11).

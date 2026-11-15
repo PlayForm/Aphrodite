@@ -15,17 +15,17 @@ use super::{Expected, Temp};
 
 #[test]
 fn ffi_materialize_directives_roundtrip() {
-	let home = Temp::Fn("ffi");
+	let home = Temp::Fn::Fn("ffi");
 	let home_c = CString::new(home.to_str().unwrap()).unwrap();
-	let ptr = crate::aphrodite_hermes_materialize_directives(home_c.as_ptr());
+	let ptr = crate::ABI::MaterializeDirectives::aphrodite_hermes_materialize_directives(home_c.as_ptr());
 	assert!(!ptr.is_null());
 	let json = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
-	crate::aphrodite_hermes_free_string(ptr);
+	crate::ABI::FreeString::aphrodite_hermes_free_string(ptr);
 	let v:serde_json::Value = serde_json::from_str(&json).unwrap();
 	assert_eq!(v["status"], "ok");
 	assert_eq!(
 		v["written"].as_array().unwrap().len(),
-		Expected::Fn().len(),
+		Expected::Fn::Fn().len(),
 		"all embedded files must be written: {v}"
 	);
 	assert!(

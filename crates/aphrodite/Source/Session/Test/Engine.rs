@@ -5,7 +5,8 @@
 //! runs inside `PreLLMCall`, where a partial mutation would show the model a
 //! history that no archive explains.
 
-use crate::{Session::EngineMaybeArchive, State::AphroditeState};
+use crate::Session::Engine::Fn::EngineMaybeArchive;
+use crate::State::Struct::AphroditeState;
 
 // ── Context-engine archiving (pre-Rust port of _engine.py) ──
 
@@ -168,7 +169,7 @@ fn TestEngineArchivePayloadRoundTripsInline() {
 	s.EngineProtectLast = 5;
 	let Prompt = EngineMaybeArchive(&mut s).expect("must archive");
 	// Extract the hash from the marker line and resolve it back.
-	let hash = crate::Marker::ExtractHashes(&Prompt)
+	let hash = crate::Marker::Parse::Extract::ExtractHashes(&Prompt)
 		.into_iter()
 		.next()
 		.expect("marker hash must be extractable");

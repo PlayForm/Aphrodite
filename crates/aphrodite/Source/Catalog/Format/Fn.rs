@@ -1,10 +1,8 @@
 //! Render the human-readable catalog table.
 
-use crate::{
-	Catalog::Size::Fn::Fn as FmtSize,
-	State::AphroditeState,
-	StructExtract::Format::Floor::Fn as FloorBoundary,
-};
+use crate::Catalog::Size::Fn::Fn as FmtSize;
+use crate::State::Struct::AphroditeState;
+use crate::StructExtract::Format::Floor::Fn as FloorBoundary;
 
 /// Format catalog as markdown table (for LLM consumption).
 pub fn Fn(State:&AphroditeState) -> String {
@@ -31,7 +29,7 @@ pub fn Fn(State:&AphroditeState) -> String {
 	// marker recorded out of order (e.g. a re-scan with an older turn)
 	// can't displace genuinely newer entries from the visible window.
 	// Stable sort keeps equal-turn markers in insertion order.
-	let mut Newest:Vec<&crate::State::MarkerEntry> = Items.iter().collect();
+	let mut Newest:Vec<&crate::State::Marker::Struct::MarkerEntry> = Items.iter().collect();
 	Newest.sort_by_key(|m| std::cmp::Reverse(m.Turn));
 
 	for m in Newest.iter().take(20) {

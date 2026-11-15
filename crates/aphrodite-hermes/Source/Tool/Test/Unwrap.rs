@@ -113,7 +113,7 @@ fn test_unwrap_hermes_result_table() {
 
 	for (label, input, expected) in cases {
 		let content = input.to_string();
-		let got = Unwrap::Fn(&content);
+		let got = Unwrap::Fn::Fn(&content);
 		match expected {
 			Some((c, t)) => {
 				let (gc, gt) = got.unwrap_or_else(|| panic!("{label}: expected Some, got None"));

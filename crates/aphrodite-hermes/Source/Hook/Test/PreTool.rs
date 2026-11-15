@@ -2,13 +2,15 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{aphrodite_hermes_call_hook, aphrodite_hermes_free_string, with_shared};
+use ABI::CallHook::aphrodite_hermes_call_hook;
+use ABI::FreeString::aphrodite_hermes_free_string;
+use Session::With::Fn::with_shared;
 
 // ── Poll-worker: pre_tool_call auto-backgrounding tests ──
 
 #[test]
 fn test_pre_tool_call_auto_backgrounds_terminal() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
@@ -35,7 +37,7 @@ fn test_pre_tool_call_auto_backgrounds_terminal() {
 
 #[test]
 fn test_pre_tool_call_does_not_background_poll_action() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
@@ -59,7 +61,7 @@ fn test_pre_tool_call_does_not_background_poll_action() {
 
 #[test]
 fn test_pre_tool_call_disabled_passes_through() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
@@ -86,7 +88,7 @@ fn test_pre_tool_call_disabled_passes_through() {
 // untouched (no markers), chains at/above it get rewritten. ──
 #[test]
 fn test_pre_tool_call_chain_split_respects_adaptive_threshold() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),

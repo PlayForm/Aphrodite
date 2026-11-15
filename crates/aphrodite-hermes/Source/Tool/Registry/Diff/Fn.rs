@@ -1,6 +1,6 @@
 //! `aphrodite_diff` - the archived per-turn compression history.
 
-use crate::Tool::Dispatch::ToolHandler;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_diff` handler.
 ///
@@ -9,7 +9,7 @@ use crate::Tool::Dispatch::ToolHandler;
 /// though `aphrodite_retrieve` can still resolve it.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_diff", |_args| {
-		crate::with_shared(|state| {
+		crate::Session::With::Fn::with_shared(|state| {
 			let turns = aphrodite::Session::GetConvIndex(state);
 			serde_json::json!({"total": turns.len(), "turns": turns})
 		})

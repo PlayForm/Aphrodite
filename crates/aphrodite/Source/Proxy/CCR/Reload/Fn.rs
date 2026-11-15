@@ -32,11 +32,11 @@ pub async fn Fn(State(state):State<Arc<AppState>>) -> impl IntoResponse {
 		Ok(Configuration) => {
 			// Issue #11 WS4: keep the preview cap in sync on hot-reload
 			// (`[previews] preview_max_chars`).
-			crate::Preview::SetPreviewMaximumChars(Configuration.Previews.as_ref().and_then(|p| p.PreviewMaximumChars));
+			crate::Preview::State::Set::Fn(Configuration.Previews.as_ref().and_then(|p| p.PreviewMaximumChars));
 			// ── TOML-driven marker block templates (pre-Rust port): keep the
 			// process-global marker format/hint + `CCRMarkerHint` knob in
 			// sync on hot-reload, same as the preview cap above.
-			crate::Marker::SetMarkerTemplates(
+			crate::Marker::Format::Const::SetMarkerTemplates(
 				Configuration
 					.Templates
 					.as_ref()

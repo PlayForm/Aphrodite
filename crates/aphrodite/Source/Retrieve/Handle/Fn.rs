@@ -29,7 +29,7 @@ pub async fn Fn(State(state):State<Arc<AppState>>, Json(Request):Json<RetrieveRe
 		// (report 05 F3) - an LLM sometimes echoes the full marker body back
 		// as the hash argument instead of the bare hash, and this endpoint's
 		// lookups (inline_ccr, CCR backend) are exact-match only.
-		Some(h) => crate::Marker::NormalizeHash(h).to_string(),
+		Some(h) => crate::Marker::Parse::Normalize::NormalizeHash(h).to_string(),
 		None => {
 			return (
 				StatusCode::BAD_REQUEST,

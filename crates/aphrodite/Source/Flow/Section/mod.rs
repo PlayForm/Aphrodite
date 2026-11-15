@@ -2,4 +2,3 @@
 
 pub mod Label;
 
-pub(crate) use self::Label::{JoinSections, NudgesPresent, SectionLabel};

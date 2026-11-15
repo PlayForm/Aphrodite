@@ -2,13 +2,15 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{aphrodite_hermes_call_hook, aphrodite_hermes_free_string, with_shared};
+use ABI::CallHook::aphrodite_hermes_call_hook;
+use ABI::FreeString::aphrodite_hermes_free_string;
+use Session::With::Fn::with_shared;
 
 // ── 05-T8 (P2): the bridge must parse the status/error kwargs Hermes ships
 // on a tool result and record a failing telemetry event. ──
 #[test]
 fn test_call_hook_tool_result_records_error_event() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
@@ -42,7 +44,7 @@ fn test_call_hook_tool_result_records_error_event() {
 // result regresses to a useless "[json:1items 1L]" preview.
 #[test]
 fn test_call_hook_transform_tool_result_unwraps_hermes_wrapper() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
@@ -72,7 +74,7 @@ fn test_call_hook_transform_tool_result_unwraps_hermes_wrapper() {
 		"recorded preview must reflect the unwrapped payload: {preview}"
 	);
 
-	let retrieved = crate::Tool::Dispatch::Fn("aphrodite_retrieve", &serde_json::json!({"hash": hash}).to_string());
+	let retrieved = crate::Tool::Dispatch::Fn::Fn("aphrodite_retrieve", &serde_json::json!({"hash": hash}).to_string());
 	assert_eq!(retrieved["found"], true);
 	assert_eq!(
 		retrieved["content"].as_str().unwrap(),

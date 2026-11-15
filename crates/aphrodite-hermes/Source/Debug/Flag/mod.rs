@@ -14,8 +14,6 @@ pub(crate) mod Read;
 pub(crate) mod Resolve;
 pub(crate) mod Scoped;
 
-mod Cache;
-mod Const;
+pub mod Cache;
+pub mod Const;
 
-pub(crate) use Cache::FLAG_CACHE;
-pub(crate) use Const::FLAG_PREFIX;

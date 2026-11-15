@@ -16,7 +16,7 @@ pub extern "C" fn aphrodite_hermes_dispatch_tool(tool_name:*const c_char, args_j
 	let args = unsafe { cstr_to_string(args_json) };
 
 	guarded(std::panic::AssertUnwindSafe(move || {
-		let result = Tool::Dispatch::Fn(&name, &args);
+		let result = Tool::Dispatch::Fn::Fn(&name, &args);
 		match serde_json::to_string(&result) {
 			Ok(json) => to_c_string(&json),
 			Err(e) => to_json_error(&format!("serialize error: {}", e)),

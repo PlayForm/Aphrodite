@@ -52,5 +52,5 @@ pub(crate) fn post_tool_log(
 			.unwrap_or_else(|| "true".to_string());
 		kv.push(("auto_expanded_bytes", bytes));
 	}
-	crate::Debug::Log::Bridge::Fn(state, session, "post_tool", &kv);
+	crate::Debug::Log::Bridge::Fn::Fn(state, session, "post_tool", &kv);
 }

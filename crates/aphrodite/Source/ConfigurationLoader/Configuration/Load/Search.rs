@@ -3,7 +3,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use super::super::Struct::Struct;
-use crate::ConfigurationLoader::WarnParseFailure;
+use crate::ConfigurationLoader::Warn::Fn::WarnParseFailure;
 
 impl Struct {
 	/// Load from TOML file. Returns defaults on any failure.

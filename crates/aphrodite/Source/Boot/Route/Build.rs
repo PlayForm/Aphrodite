@@ -6,10 +6,14 @@ use std::sync::Arc;
 use aphrodite::Proxy::State::Struct::Struct as AppState;
 use axum::{Router, extract::DefaultBodyLimit, middleware};
 
-use crate::{
-	Boot::Route::{CCR, Chat, Health, Management, Relay, Retrieve},
-	Guard::{LoopbackOnly, RequireMgmtToken},
-};
+use Boot::Route::CCR;
+use Boot::Route::Chat;
+use Boot::Route::Health;
+use Boot::Route::Management;
+use Boot::Route::Relay;
+use Boot::Route::Retrieve;
+use Guard::Loopback::Middleware::LoopbackOnly;
+use Guard::Bearer::Middleware::RequireMgmtToken;
 
 /// Build one listener's complete router.
 ///

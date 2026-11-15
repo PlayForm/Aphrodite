@@ -4,6 +4,5 @@
 //! Re-exported under its kind name so the joining module can call it as
 //! `Resolve::Fn()`.
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

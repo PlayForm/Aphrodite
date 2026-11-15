@@ -3,7 +3,8 @@
 
 use std::ffi::CStr;
 
-use crate::{Guard::Fn::guarded, aphrodite_hermes_free_string};
+use Guard::Fn::guarded;
+use ABI::FreeString::aphrodite_hermes_free_string;
 
 // ── T2 (F1): a panic anywhere inside a `guarded()` body must surface as
 // an error JSON, not unwind across the extern "C" boundary. ──

@@ -2,15 +2,11 @@
 //! the instant-marker contract (task hash up front, output hash only at
 //! completion, and the two are never the same value).
 
-use crate::{
-	PollWorker::{
-		Insert::Fn::InsertBgTask,
-		Marker::Fn::CreatePollMarker,
-		Task::Status::Enum::BgStatus,
-		Update::Fn::UpdateFromPoll,
-	},
-	State::AphroditeState,
-};
+use crate::PollWorker::Insert::Fn::InsertBgTask;
+use crate::PollWorker::Marker::Fn::CreatePollMarker;
+use crate::PollWorker::Task::Status::Enum::BgStatus;
+use crate::PollWorker::Update::Fn::UpdateFromPoll;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestPollLiveProgressBytesSoFarAndEta() {

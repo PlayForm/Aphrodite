@@ -2,5 +2,3 @@
 
 pub mod Fn;
 
-pub(crate) use self::Fn::ConvIndexCap;
-pub use self::Fn::NextTurn;

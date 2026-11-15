@@ -4,10 +4,10 @@
 use axum::{extract::State, response::IntoResponse};
 use bytes::Bytes;
 
-use crate::Proxy::{
-	CCR::Create::{Handle::Fn::Fn as HandleCCRCreate, Response::Struct::Struct as CCRCreateResponse},
-	Test::Support::{TestState, TestStateWithFailingCCR},
-};
+use crate::Proxy::CCR::Create::Handle::Fn::Fn as HandleCCRCreate;
+use crate::Proxy::CCR::Create::Response::Struct::Struct as CCRCreateResponse;
+use crate::Proxy::Test::Support::State::Fn::TestState;
+use crate::Proxy::Test::Support::State::Fn::TestStateWithFailingCCR;
 
 #[test]
 fn TestCCRCreateResponseSerdeShape() {

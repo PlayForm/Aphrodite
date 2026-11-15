@@ -8,11 +8,10 @@
 
 use std::{collections::HashMap, sync::Mutex};
 
-use crate::Debug::{
-	Chain::{self, SESSION_PARENTS},
-	Runtime,
-	Session::State::LAST_SESSION,
-};
+use Debug::Chain::self;
+use Debug::Chain::State::SESSION_PARENTS;
+use Debug::Runtime;
+use Debug::Session::State::LAST_SESSION;
 
 /// Record session -> parent from a `pre_llm_call` invocation. Empty or
 /// self-referential pairs are ignored (a root session has no parent).
@@ -37,7 +36,7 @@ pub(crate) fn Fn(session:&str, parent:&str) {
 	// is mirrored to a tiny file that `last_session()` reads back.
 	// Best-effort - a failed
 	// write degrades to "no persistence", never an error.
-	let _ = std::fs::write(Runtime::Fn().join("session.current"), session);
+	let _ = std::fs::write(Runtime::Fn::Fn().join("session.current"), session);
 	if parent.is_empty() || session == parent {
 		// Root session (no parent): publish it directly so the env-gated
 		// logger targets `debug.<root>` (crate::debug).

@@ -20,6 +20,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			terminal_threshold, proxies: {token: {port, alive}, cache: {port, alive}}}. \
 			`alive: false` means nothing answered on that port within 400ms - the plugin \
 			still works, it just is not proxying.",
-		"parameters": NoParams::Fn()
+		"parameters": NoParams::Fn::Fn()
 	})
 }

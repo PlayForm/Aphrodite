@@ -10,10 +10,13 @@ use crate::Retrieve::Progress::Struct::Struct as LiveProgress;
 pub struct Struct {
 	/// `true` when `Content` carries a payload (a full document or a window of
 	/// one); `false` on every error shape.
+	#[serde(rename = "found")]
 	pub Found:bool,
 	/// The resolved payload, or `None` when the lookup failed.
+	#[serde(rename = "content")]
 	pub Content:Option<String>,
 	/// Which backend served it (`InlineCCR`, `ccr`, `none`).
+	#[serde(rename = "source")]
 	pub Source:String,
 	/// Human-readable failure reason; `None` on success.
 	pub error:Option<String>,
@@ -24,10 +27,12 @@ pub struct Struct {
 	/// bytes so the body hashes to its own marker hash). A `[lines a-b/total]`
 	/// header is also prepended to `Content` in that case; this field lets a
 	/// caller detect truncation without parsing it.
+	#[serde(rename = "truncated")]
 	pub Truncated:bool,
 	/// Live-container progress; present only when the resolved entry is a
 	/// live container. Skipped when absent so non-container responses stay
 	/// byte-identical to the pre-live shape.
 	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(rename = "live")]
 	pub Live:Option<LiveProgress>,
 }

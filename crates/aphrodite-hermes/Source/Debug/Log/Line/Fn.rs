@@ -5,7 +5,7 @@
 //! therefore deliberately a single line of scalar fields - never the payload,
 //! never a multi-line block that would compete with the marker.
 
-use crate::Debug::Flag::Resolve::Fn as enabled_for;
+use Debug::Flag::Resolve::Fn::Fn as enabled_for;
 
 /// Build a `[aphrodite-debug ...]` prefix line from a compression result
 /// when the flag is on for `session`; `None` when off (no allocation on the

@@ -5,7 +5,7 @@
 //! make every error unique - line numbers and paths change - and the
 //! distinct-error count would stop meaning anything.
 
-use crate::Flow::Hash::Fnv1a;
+use crate::Flow::Hash::Fn::Fnv1a;
 
 /// FNV-1a signature of an error: `ErrorType` + first line of `ErrorMessage`
 /// (P2/P7). Distinct compiler errors differ on line 1, so this stays

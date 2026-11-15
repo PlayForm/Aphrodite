@@ -1,12 +1,13 @@
 //! Session start: every per-session field returns to its configured default.
 
-use crate::{Session::OnSessionStart, State::AphroditeState};
+use crate::Session::Start::Fn::OnSessionStart;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestSessionStartResets() {
 	let mut s = AphroditeState::default();
 	s.TurnCounter = 42;
-	s.RecordMarker(crate::State::MarkerEntry {
+	s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,

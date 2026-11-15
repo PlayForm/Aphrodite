@@ -5,10 +5,9 @@
 //! Everything a test needs to observe is therefore set explicitly at the call
 //! site, and no fixture hides a default that a later change could move.
 
-use crate::{
-	Directive::Model::Struct as Directive,
-	State::{AphroditeState, MarkerEntry},
-};
+use crate::Directive::Model::Struct as Directive;
+use crate::State::Struct::AphroditeState;
+use crate::State::Marker::Struct::MarkerEntry;
 
 /// A state carrying one directive, active and ready to render.
 pub(super) fn StateWithDirective(name:&str, body:&str) -> AphroditeState {

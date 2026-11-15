@@ -6,10 +6,9 @@
 //! verbatim instead of being swallowed.
 
 use super::Support::StateWithPrompt;
-use crate::{
-	Flow::{RenderPrompt, ShippedSessionInject},
-	State::AphroditeState,
-};
+use crate::Flow::Prompt::Render::Fn::RenderPrompt;
+use crate::Flow::Prompt::Const::ShippedSessionInject;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestRenderPromptFromTemplatesMap() {

@@ -25,25 +25,10 @@ pub mod Text;
 pub mod Type;
 
 #[cfg(test)]
-mod Test;
+pub mod Test;
 
-pub use crate::{
-	Preview::{
-		Builder::Entry::Fn as BuildPreview,
-		Detect::{SemanticType::Fn as DetectSemanticType, Type::Fn as DetectType},
-		State::{Get::Fn as PreviewMaximumChars, Set::Fn as SetPreviewMaximumChars},
-	},
-	Template::{
-		Family::Set::Fn::Fn as SetPreviewFamily,
-		Get::Fn::Fn as GetTemplates,
-		Render::Fn::Fn as RenderPreview,
-		Set::Fn::Fn as SetTemplates,
-	},
-};
-#[cfg(test)]
-pub(crate) use crate::Preview::State::Guard::Fn as PreviewCapTestGuard;
 // TOML-driven preview template rendering (pre-Rust port): re-exported here so
 // engine/proxy/hermes call sites keep one `aphrodite::Preview::` prefix for every
 // preview knob (the `[templates.preview]` registry is consumed by `BuildPreview`
 // above).
-pub use crate::Template::Family::Get::Fn::Fn as GetPreviewFamily;
+

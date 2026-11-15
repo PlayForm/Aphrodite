@@ -25,7 +25,7 @@ pub type ToolHandler = fn(args:&serde_json::Value) -> Value;
 /// each handler does its own required-field checks, which is what keeps the error
 /// text specific to the tool.
 pub fn Fn(name:&str, args_json:&str) -> Value {
-	let registry = Registry::Fn();
+	let registry = Registry::Fn::Fn();
 	match registry.get(name) {
 		Some(handler) => {
 			let args:Value = match serde_json::from_str(args_json) {

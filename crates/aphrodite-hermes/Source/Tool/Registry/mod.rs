@@ -22,6 +22,5 @@ pub(crate) mod Test;
 #[cfg(debug_assertions)]
 pub(crate) mod Debug;
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

@@ -18,7 +18,7 @@ impl Struct {
 	/// `GetString`: there is no env-var spelling of a preview family, and
 	/// inventing one would make the family configurable in two places with
 	/// different precedence.
-	pub fn ApplyTemplates(&self, State:&crate::State::AphroditeState) {
+	pub fn ApplyTemplates(&self, State:&crate::State::Struct::AphroditeState) {
 		let Family = self
 			.Section("previews")
 			.and_then(|s| s.get("model_family"))

@@ -9,17 +9,13 @@
 //! touch, but keeping one evaluation point avoids two answers to one
 //! question).
 
-use crate::{
-	Flow::{
-		AutoExpandGuidanceBlock,
-		BuildFirstTurnInjection,
-		EngineOffloadBlock,
-		NudgesPresent,
-		RenderNudges,
-		RetrievalGuidanceBlock,
-	},
-	State::AphroditeState,
-};
+use crate::Flow::Retrieval::AutoExpand::Fn::AutoExpandGuidanceBlock;
+use crate::Flow::FirstTurn::Fn::BuildFirstTurnInjection;
+use crate::Flow::Engine::Offload::Fn::EngineOffloadBlock;
+use crate::Flow::Section::Label::Fn::NudgesPresent;
+use crate::Flow::Nudge::Render::Fn::RenderNudges;
+use crate::Flow::Retrieval::Guidance::Fn::RetrievalGuidanceBlock;
+use crate::State::Struct::AphroditeState;
 
 /// Every candidate section for this turn, in survival order, plus the number
 /// of leading entries the budget may never drop.
@@ -51,7 +47,7 @@ pub(crate) fn CollectSections(State:&mut AphroditeState) -> (Vec<String>, usize)
 	let AutoExpand = AutoExpandGuidanceBlock(State);
 
 	// ── Droppable section: recall catalog, delta-only (04-F1) ──
-	let Recall = crate::Session::CatalogSummary(State);
+	let Recall = crate::Session::Catalog::Fn::CatalogSummary(State);
 
 	// ── Poll-worker status (above recall, dropped after recall) ──
 	let BgStatus = if State.PollWorkerEnabled {

@@ -12,7 +12,7 @@ use crate::{
 ///
 /// The shipped directive set is embedded in the core `aphrodite` crate
 /// (`builtin_directives/*.md` via `include_str!`, exposed through
-/// `aphrodite::Directive::Builtin::Fn()`); this fn provisions it into
+/// `aphrodite::Directive::Builtin::Fn::Fn()`); this fn provisions it into
 /// the user-data home so the plugin directory never holds runtime state.
 ///
 /// `home_dir` is the runtime home (the user-data folder, e.g.
@@ -26,7 +26,7 @@ use crate::{
 pub extern "C" fn aphrodite_hermes_materialize_directives(home_dir:*const c_char) -> *mut c_char {
 	let home = unsafe { cstr_to_string(home_dir) };
 	guarded(std::panic::AssertUnwindSafe(move || {
-		let result = Directive::Into::Fn(&home);
+		let result = Directive::Into::Fn::Fn(&home);
 		to_c_string(&serde_json::to_string(&result).unwrap_or_default())
 	}))
 }

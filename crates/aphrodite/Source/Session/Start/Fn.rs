@@ -6,7 +6,7 @@
 //! change" on a session that has never emitted, and an adapted chain-split
 //! threshold carries one conversation's shape into another.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Handle session start - reset all per-session state.
 pub fn OnSessionStart(State:&mut AphroditeState) -> serde_json::Value {

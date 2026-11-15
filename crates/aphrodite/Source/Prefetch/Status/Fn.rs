@@ -8,7 +8,7 @@
 //! parsed defensively - a malformed or legacy entry degrades to zeroes rather
 //! than failing the whole schedule.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Live prefetch schedule - the extended status struct behind the
 /// `aphrodite_prefetch_status` tool (pre-Rust `_hooks/prefetch.py`

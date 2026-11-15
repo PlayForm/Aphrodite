@@ -1,14 +1,12 @@
 //! Store content as a live container and emit the instant marker.
 
 use super::super::Marker;
-use crate::{
-	Hook::Live::{
-		Chunk::Fn::Fn as ChunkOnCharBoundaries,
-		Const::LiveChunkSize,
-		Key::Fn::{LiveChunkKey, LiveMetaKey},
-	},
-	State::{AphroditeState, MarkerEntry},
-};
+use crate::Hook::Live::Chunk::Fn::Fn as ChunkOnCharBoundaries;
+use crate::Hook::Live::Const::LiveChunkSize;
+use crate::Hook::Live::Key::Fn::LiveChunkKey;
+use crate::Hook::Live::Key::Fn::LiveMetaKey;
+use crate::State::Struct::AphroditeState;
+use crate::State::Marker::Struct::MarkerEntry;
 
 /// Live-container transform (pre-Rust port of `_wrap_as_live_container`):
 /// store the content chunked with a metadata envelope, record a `Live`
@@ -45,7 +43,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> serde
 	});
 	State.InlineStorePut(LiveMetaKey(&hash), meta.to_string());
 
-	let Preview = crate::BuildPreview(TypeStr, Content);
+	let Preview = crate::Preview::Builder::Entry::Fn(TypeStr, Content);
 	let Marker = Marker::Fn::Fn(&hash, Total, n, &Preview);
 
 	State.RecordMarker(MarkerEntry {

@@ -16,7 +16,7 @@ pub(crate) fn transform_terminal_output(state:&mut AphroditeState, input:&HookIn
 	let term_content = input.term_content();
 	let parsed = &input.parsed;
 
-	let classify = crate::Tool::Unwrap::Fn(term_content);
+	let classify = crate::Tool::Unwrap::Fn::Fn(term_content);
 	// 05-P2/T8: thread the terminal `command`/`returncode` into
 	// the telemetry ring so terminal failures feed error-loop
 	// detection.
@@ -33,10 +33,10 @@ pub(crate) fn transform_terminal_output(state:&mut AphroditeState, input:&HookIn
 	// fall back to the current turn's session so terminal output keeps the
 	// same session scope as tool results.
 	let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
-	let sid = if sid.is_empty() { crate::Debug::Session::Last::Fn() } else { sid.to_string() };
+	let sid = if sid.is_empty() { crate::Debug::Session::Last::Fn::Fn() } else { sid.to_string() };
 	// DEV-ONLY debug logger (crate::Debug): post-tool outcome +
 	// elapsed microseconds for the terminal path.
-	let t0 = crate::Debug::Log::Any::Fn(state, &sid).then(std::time::Instant::now);
+	let t0 = crate::Debug::Log::Any::Fn::Fn(state, &sid).then(std::time::Instant::now);
 	if let Some(t0) = t0 {
 		let us = t0.elapsed().as_micros() as u64;
 		aphrodite::Debug::Timing::Add::Fn::Fn(aphrodite::Debug::Timing::Enum::Enum::ToolTransform, us);

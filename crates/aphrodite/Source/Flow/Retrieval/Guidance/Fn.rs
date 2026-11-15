@@ -5,7 +5,7 @@
 //! compression pipeline stays invisible to the model: a line that explained
 //! the splitter would teach it to reason about the tool instead of its task.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Retrieval-guidance text for `retrieve_guidance = "standard"`.
 const RetrievalGuidanceStandard:&str = "CCR markers compress large tool output. Use aphrodite_retrieve(hash) when the \

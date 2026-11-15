@@ -55,7 +55,7 @@ pub(crate) fn replacement_from(r:&serde_json::Value, session:&str) -> serde_json
 		// so the session sees what the engine did without retrieving. Quiet
 		// path (flag off) costs one stat() and returns the marker unchanged.
 		let mut out = String::with_capacity(marker.len() + 128);
-		if let Some(line) = Debug::Log::Line::Fn(r, session) {
+		if let Some(line) = Debug::Log::Line::Fn::Fn(r, session) {
 			out.push_str(&line);
 			out.push('\n');
 		}

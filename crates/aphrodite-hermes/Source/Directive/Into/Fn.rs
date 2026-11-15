@@ -17,11 +17,11 @@ use crate::Directive::{Materialize, Resolve};
 /// whole resolution, which is what makes a second call idempotent rather than
 /// additive.
 pub(crate) fn Fn(home_param:&str) -> serde_json::Value {
-	let (dir, warnings) = Resolve::Fn(home_param);
+	let (dir, warnings) = Resolve::Fn::Fn(home_param);
 	for w in &warnings {
 		eprintln!("aphrodite-hermes: {w}");
 	}
-	let mut result = Materialize::Fn(&dir);
+	let mut result = Materialize::Fn::Fn(&dir);
 	if let Some(arr) = result.get_mut("warnings").and_then(|v| v.as_array_mut()) {
 		for w in warnings {
 			arr.push(serde_json::Value::String(w));

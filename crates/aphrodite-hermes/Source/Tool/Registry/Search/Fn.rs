@@ -1,6 +1,7 @@
 //! `aphrodite_search` - filter recorded markers by keyword and/or type.
 
-use crate::Tool::{Arg, Dispatch::ToolHandler};
+use Tool::Arg;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_search` handler.
 ///
@@ -9,9 +10,9 @@ use crate::Tool::{Arg, Dispatch::ToolHandler};
 /// reads a miss as "the content is gone" will not fall back to the catalogue.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_search", |args| {
-		let query = Arg::Fn(args, "query").to_lowercase();
+		let query = Arg::Fn::Fn(args, "query").to_lowercase();
 		let type_filter = args.get("type").and_then(|v| v.as_str());
-		crate::with_shared(|state| {
+		crate::Session::With::Fn::with_shared(|state| {
 			let results:Vec<serde_json::Value> = state
 				.RecentMarkers
 				.iter()

@@ -2,7 +2,8 @@
 
 use tokio::{sync::watch::Receiver, task::JoinHandle};
 
-use crate::Boot::{Listen::Serve, State::Bound};
+use Boot::Listen::Serve::Serve;
+use Boot::State::Listener::Bound;
 
 /// Spawn a serving task per listener and return their join handles.
 ///

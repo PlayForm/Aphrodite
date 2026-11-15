@@ -29,7 +29,7 @@ pub(crate) fn Fn(Content:&str) -> &'static str {
 		}
 		return "json";
 	}
-	match crate::Preview::DetectSemanticType(Content) {
+	match crate::Preview::Detect::SemanticType::Fn(Content) {
 		// Language refinement: shape "code" → code_rust/python/go/js.
 		Some("code") => crate::Preview::Language::Fn::Fn(Content).unwrap_or("code"),
 		Some(t) => t,

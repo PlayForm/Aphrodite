@@ -5,7 +5,7 @@
 //! counts once. A `get`-then-increment would let a single popular marker
 //! dominate the ratio and pin the threshold at its floor.
 
-use super::super::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 impl AphroditeState {
 	/// Attribute a successful resolve to a split event (consequence signal).

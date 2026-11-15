@@ -16,11 +16,15 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct TemplatesConfiguration {
 	#[serde(default)]
+	#[serde(rename = "preview")]
 	pub Preview:HashMap<String, HashMap<String, String>>,
 	#[serde(default)]
+	#[serde(rename = "marker")]
 	pub Marker:HashMap<String, String>,
 	#[serde(default)]
+	#[serde(rename = "prompts")]
 	pub Prompts:HashMap<String, String>,
 	#[serde(default)]
+	#[serde(rename = "reverse")]
 	pub Reverse:HashMap<String, String>,
 }

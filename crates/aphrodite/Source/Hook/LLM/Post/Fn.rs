@@ -1,6 +1,6 @@
 //! The post-LLM-call hook.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Post-LLM call hook - archive turn.
 ///
@@ -21,13 +21,13 @@ pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 		.max_by_key(|m| m.Size)
 	{
 		let (hash, Summary, Size) = (Largest.hash.clone(), Largest.Preview.clone(), Largest.Size);
-		crate::Session::ArchiveTurn(State, &hash, &Summary, Size);
+		crate::Session::Archive::Fn::ArchiveTurn(State, &hash, &Summary, Size);
 	}
-	crate::Session::NextTurn(State);
+	crate::Session::Turn::Fn::NextTurn(State);
 	// P3/T9: purge expired ephemeral nudges AFTER advancing the turn, so a
 	// one-shot pushed during turn N renders in turn N+1's context exactly once
 	// and is gone by turn N+2.
-	crate::Flow::PurgeExpiredNudges(State);
+	crate::Flow::Nudge::Purge::Fn::PurgeExpiredNudges(State);
 	// Poll-worker: expire stale tasks (not polled in >STALE_TURN_AGE turns)
 	// and drop completed/failed tasks older than 16 turns.
 	crate::PollWorker::Expire::Fn::ExpireStaleTasks(State);

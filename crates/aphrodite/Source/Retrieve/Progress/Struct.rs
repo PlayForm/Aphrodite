@@ -12,13 +12,18 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct Struct {
 	/// Number of chunks the container was stored in.
+	#[serde(rename = "chunks")]
 	pub Chunks:usize,
 	/// Target byte size of one chunk.
+	#[serde(rename = "chunk_size")]
 	pub ChunkSize:usize,
 	/// Total bytes the container holds.
+	#[serde(rename = "bytes_total")]
 	pub BytesTotal:usize,
 	/// Bytes served so far across every retrieve of this container.
+	#[serde(rename = "bytes_arrived")]
 	pub BytesArrived:usize,
 	/// `true` once the full content has been delivered.
+	#[serde(rename = "complete")]
 	pub Complete:bool,
 }

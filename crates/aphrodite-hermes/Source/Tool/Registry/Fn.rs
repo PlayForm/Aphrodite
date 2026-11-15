@@ -22,7 +22,7 @@ use super::{
 	Stats,
 	Test,
 };
-use crate::Tool::Dispatch::ToolHandler;
+use Tool::Dispatch::Fn::ToolHandler;
 #[cfg(debug_assertions)]
 use super::Debug;
 
@@ -39,26 +39,26 @@ use super::Debug;
 pub(crate) fn Fn() -> HashMap<&'static str, ToolHandler> {
 	let mut m:HashMap<&'static str, ToolHandler> = HashMap::new();
 	for (name, handler) in [
-		Compress::Fn(),
-		Retrieve::Fn(),
-		Stats::Fn(),
-		Catalog::Fn(),
-		Search::Fn(),
-		Diff::Fn(),
-		Directive::Fn(),
-		File::Fn(),
-		Prefetch::Fn(),
-		PrefetchStatus::Fn(),
-		Reclassify::Fn(),
-		Test::Fn(),
-		Rebuild::Fn(),
-		ContextEngine::Fn(),
+		Compress::Fn::Fn(),
+		Retrieve::Fn::Fn(),
+		Stats::Fn::Fn(),
+		Catalog::Fn::Fn(),
+		Search::Fn::Fn(),
+		Diff::Fn::Fn(),
+		Directive::Fn::Fn(),
+		File::Fn::Fn(),
+		Prefetch::Fn::Fn(),
+		PrefetchStatus::Fn::Fn(),
+		Reclassify::Fn::Fn(),
+		Test::Fn::Fn(),
+		Rebuild::Fn::Fn(),
+		ContextEngine::Fn::Fn(),
 	] {
 		m.insert(name, handler);
 	}
 	#[cfg(debug_assertions)]
 	{
-		let (name, handler) = Debug::Fn();
+		let (name, handler) = Debug::Fn::Fn();
 		m.insert(name, handler);
 	}
 	m

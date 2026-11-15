@@ -5,7 +5,6 @@
 //! required to sit under the current workspace, and capped. Moving this code must
 //! not weaken any of the three.
 
-mod Const;
-mod Fn;
+pub mod Const;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

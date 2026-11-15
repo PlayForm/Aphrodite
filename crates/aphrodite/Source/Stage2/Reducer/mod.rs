@@ -5,4 +5,3 @@
 
 pub mod Type;
 
-pub use Type::Reducer;

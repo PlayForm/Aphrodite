@@ -3,10 +3,9 @@
 
 use std::ffi::CStr;
 
-use crate::{
-	Guard::Fn::{to_c_string, to_json_error},
-	aphrodite_hermes_free_string,
-};
+use Guard::Fn::to_c_string;
+use Guard::Fn::to_json_error;
+use ABI::FreeString::aphrodite_hermes_free_string;
 
 // ── F4 hardening: the FFI allocate/free pairing must be symmetric and
 // allocator-safe. Every string returned across the C ABI is allocated

@@ -3,7 +3,8 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{aphrodite_hermes_dispatch_tool, aphrodite_hermes_free_string};
+use ABI::DispatchTool::aphrodite_hermes_dispatch_tool;
+use ABI::FreeString::aphrodite_hermes_free_string;
 
 #[test]
 fn test_dispatch_unknown_tool() {

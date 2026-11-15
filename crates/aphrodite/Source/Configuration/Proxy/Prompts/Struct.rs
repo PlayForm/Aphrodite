@@ -9,9 +9,12 @@
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Struct {
 	/// Retrieval guidance level (`minimal`/`standard`/`verbose`).
+	#[serde(rename = "retrieve_guidance")]
 	pub RetrieveGuidance:Option<String>,
 	/// Show the marker hint line alongside compressed output.
+	#[serde(rename = "ccr_marker_hint")]
 	pub CCRMarkerHint:Option<bool>,
 	/// Annotate recall-catalog rows with `intent=read`.
+	#[serde(rename = "catalog_intent_hints")]
 	pub CatalogIntentHints:Option<bool>,
 }

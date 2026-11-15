@@ -22,16 +22,22 @@ use crate::Configuration::Proxy::{
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Struct {
 	/// Shared fallbacks for every `[[proxies]]` entry.
+	#[serde(rename = "defaults")]
 	pub Defaults:Option<Defaults>,
 	/// Proxy definitions; absent table = no proxies, not an error.
 	#[serde(default)]
+	#[serde(rename = "proxies")]
 	pub Proxies:Vec<ProxyConfiguration>,
 	/// `[compression]` knobs (thresholds, caps, engine window).
+	#[serde(rename = "compression")]
 	pub Compression:Option<CompressionConfiguration>,
 	/// `[previews]` knobs (templates, structure maps, preview cap).
+	#[serde(rename = "previews")]
 	pub Previews:Option<PreviewsConfiguration>,
 	/// `[prompts]` knobs (retrieval guidance, marker hints).
+	#[serde(rename = "prompts")]
 	pub Prompts:Option<PromptsConfiguration>,
 	/// `[templates]` - preview format strings and prompt text.
-	pub Templates:Option<crate::State::TemplatesConfiguration>,
+	#[serde(rename = "templates")]
+	pub Templates:Option<crate::State::Template::Struct::TemplatesConfiguration>,
 }

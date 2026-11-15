@@ -2,10 +2,11 @@
 
 use std::os::raw::c_char;
 
-use super::{
-	Guard::{Cstr, Guarded, ToJSONError, ToJSONOk},
-	Handle::GetHandle,
-};
+use crate::ABI::Guard::Cstr;
+use crate::ABI::Guard::Guarded;
+use crate::ABI::Guard::ToJSONError;
+use crate::ABI::Guard::ToJSONOk;
+use crate::ABI::Handle::Lookup::GetHandle;
 
 /// Apply a directive `Action` named by `name` and answer with the action's JSON
 /// result.

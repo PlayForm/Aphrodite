@@ -9,11 +9,15 @@
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Struct {
 	/// Preview family to render with (`code_first`, ...); absent = default.
+	#[serde(rename = "model_family")]
 	pub ModelFamily:Option<String>,
 	/// Render a code-structure map instead of raw lines for source files.
+	#[serde(rename = "code_structure_map")]
 	pub CodeStructureMap:Option<bool>,
 	/// Cap on the rendered preview in characters; 0 = unlimited.
+	#[serde(rename = "preview_max_chars")]
 	pub PreviewMaximumChars:Option<u32>,
 	/// Line count for Rust previews.
+	#[serde(rename = "rust_preview_lines")]
 	pub RustPreviewLines:Option<u32>,
 }

@@ -2,7 +2,8 @@
 //! rendered through the prompt renderer so a configured template wins.
 
 use super::Support::StateWithPrompt;
-use crate::{Flow::BuildTurnContext, State::AphroditeState};
+use crate::Flow::TurnContext::Fn::BuildTurnContext;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestAutoExpandGuidanceInjectedWhenEnabled() {
@@ -37,7 +38,7 @@ fn TestAutoExpandGuidanceUsesConfiguredTemplate() {
 	s.FlowBudgetChars = 4000;
 	let Context = BuildTurnContext(&mut s, None);
 	assert!(
-		Context.contains("[auto-expand: inline {Limit} limit]"),
+		Context.contains("[auto-expand: inline {limit} limit]"),
 		"configured template must win over the fallback: {Context}"
 	);
 }

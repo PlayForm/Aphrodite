@@ -37,5 +37,5 @@ pub(crate) fn log_session_init(state:&AphroditeState, session:&str) {
 		kv.push(("code_multiplier", cm));
 	}
 	kv.push(("proxy", proxy_health().to_string()));
-	crate::Debug::Log::Bridge::Fn(state, session, "init", &kv);
+	crate::Debug::Log::Bridge::Fn::Fn(state, session, "init", &kv);
 }

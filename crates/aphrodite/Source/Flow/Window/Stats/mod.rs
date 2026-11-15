@@ -2,4 +2,3 @@
 
 pub mod Struct;
 
-pub use self::Struct::WindowStats;

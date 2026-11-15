@@ -102,7 +102,7 @@ pub(crate) fn Fn(content:&str) -> Option<(String, String)> {
 
 	// ── Search: {"total_count":N,"matches":[...] or "matches_text", "truncated":bool} ──
 	if obj.get("total_count").and_then(|c| c.as_u64()).is_some()
-		&& let Some((body, ct)) = Search::Fn(obj)
+		&& let Some((body, ct)) = Search::Fn::Fn(obj)
 	{
 		return Some((body, ct.to_string()));
 	}

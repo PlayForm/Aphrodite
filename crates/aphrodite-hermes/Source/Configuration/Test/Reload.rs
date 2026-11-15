@@ -12,7 +12,7 @@ use crate::Configuration::Reload::Fn::apply_config_reload;
 // and telemetry are untouched by `apply_compression` itself. ──
 #[test]
 fn test_config_reload_preserves_directives_and_applies_thresholds() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 
 	let stamp = std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)

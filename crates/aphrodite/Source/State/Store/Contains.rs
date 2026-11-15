@@ -1,6 +1,6 @@
 //! Non-promoting membership test for the inline store.
 
-use super::super::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 impl AphroditeState {
 	/// Non-promoting membership test for the inline store (P4/T12): unlike

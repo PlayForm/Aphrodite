@@ -1,17 +1,12 @@
 //! Live containers: chunk arithmetic, store layout, instant marker.
 
-use crate::{
-	Hook::{
-		Live::{
-			Chunk::Fn::Fn as ChunkOnCharBoundaries,
-			Const::LiveChunkSize,
-			Key::Fn::{LiveChunkKey, LiveMetaKey},
-		},
-		TransformTerminalOutput,
-		TransformToolResult,
-	},
-	State::AphroditeState,
-};
+use crate::Hook::Live::Chunk::Fn::Fn as ChunkOnCharBoundaries;
+use crate::Hook::Live::Const::LiveChunkSize;
+use crate::Hook::Live::Key::Fn::LiveChunkKey;
+use crate::Hook::Live::Key::Fn::LiveMetaKey;
+use crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput;
+use crate::Hook::ToolResult::Entry::Fn::TransformToolResult;
+use crate::State::Struct::AphroditeState;
 
 // Contract 1: `LiveContainer` off (the default) must keep the payload
 // byte-identical to the pre-live shape - same field set, same marker

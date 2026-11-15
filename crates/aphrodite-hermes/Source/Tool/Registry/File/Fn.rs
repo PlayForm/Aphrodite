@@ -1,6 +1,6 @@
 //! `aphrodite_files` - file paths referenced this session.
 
-use crate::Tool::Dispatch::ToolHandler;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_files` handler.
 ///
@@ -9,7 +9,7 @@ use crate::Tool::Dispatch::ToolHandler;
 /// original `tool`.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_files", |_args| {
-		crate::with_shared(|state| {
+		crate::Session::With::Fn::with_shared(|state| {
 			let files:Vec<serde_json::Value> = state
 				.ReferencedFiles
 				.iter()

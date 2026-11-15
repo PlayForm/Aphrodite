@@ -4,14 +4,14 @@
 //! to be `>= 1` because other tests left markers behind, which would let a
 //! double-recording bug pass unnoticed.
 
-use crate::Tool::Dispatch::Fn as dispatch;
+use Tool::Dispatch::Fn::Fn as dispatch;
 
 #[test]
 fn test_catalog_and_search_see_compressions() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	// Reset shared state so `total` reflects only this test's compression,
 	// making the previously-loosened `>= 1` assertions exact.
-	crate::with_shared(aphrodite::Session::OnSessionStart);
+	crate::Session::With::Fn::with_shared(aphrodite::Session::OnSessionStart);
 	dispatch(
 		"aphrodite_compress",
 		&serde_json::json!({"content": "needle_xyz in a haystack\n".repeat(5), "type": "log"}).to_string(),

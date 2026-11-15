@@ -29,7 +29,7 @@ pub(crate) fn transform_tool_result(state:&mut AphroditeState, input:&HookInput)
 	// etc.) - unwrap it to classify/preview the real payload,
 	// but hand core the ORIGINAL content so it's what gets
 	// hashed and stored (retrieval must stay lossless).
-	let classify = crate::Tool::Unwrap::Fn(tool_content);
+	let classify = crate::Tool::Unwrap::Fn::Fn(tool_content);
 	// 05-P2/T8: parse the error/args/timing signals Hermes ships
 	// on every call (previously dropped on the floor) and route
 	// them into the telemetry ring via `_with_meta`.
@@ -44,7 +44,7 @@ pub(crate) fn transform_tool_result(state:&mut AphroditeState, input:&HookInput)
 	// DEV-ONLY debug logger (crate::Debug): post-tool outcome +
 	// elapsed microseconds. Timing is captured only when a debug
 	// channel is on for this session (quiet path: one load).
-	let t0 = crate::Debug::Log::Any::Fn(state, sid).then(std::time::Instant::now);
+	let t0 = crate::Debug::Log::Any::Fn::Fn(state, sid).then(std::time::Instant::now);
 	let r = aphrodite::Hook::TransformToolResultWithMeta(
 		state,
 		tool_content,

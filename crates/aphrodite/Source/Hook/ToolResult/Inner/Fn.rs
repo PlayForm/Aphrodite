@@ -1,17 +1,15 @@
 //! The tool-result gate sequence.
 
 use super::super::{Classify, Record};
-use crate::{
-	Hook::{
-		AutoExpand::{Applies, Content},
-		Live::Container,
-		Meta::Struct::Struct as ToolCallMeta,
-		Path::Fn::Fn as ExtractFilePath,
-		Tool::Const::EssentialTools,
-	},
-	Marker::CCRMarker,
-	State::{AphroditeState, MarkerEntry},
-};
+use crate::Hook::AutoExpand::Applies;
+use crate::Hook::AutoExpand::Content;
+use crate::Hook::Live::Container;
+use crate::Hook::Meta::Struct::Struct as ToolCallMeta;
+use crate::Hook::Path::Fn::Fn as ExtractFilePath;
+use crate::Hook::Tool::Const::EssentialTools;
+use crate::Marker::Format::Entry::CCRMarker;
+use crate::State::Struct::AphroditeState;
+use crate::State::Marker::Struct::MarkerEntry;
 
 /// The tool-result pipeline: telemetry, file tracking, bypass gates, the live
 /// container, then store + marker + the auto-expand override.
@@ -92,7 +90,7 @@ pub(crate) fn Fn(
 
 	State.InlineStorePut(hash.clone(), Content.to_string());
 
-	let Preview = crate::BuildPreview(&TypeStr, ClassifyContent);
+	let Preview = crate::Preview::Builder::Entry::Fn(&TypeStr, ClassifyContent);
 	let Marker = CCRMarker(&hash, &TypeStr, Content.len(), &Preview, None, None, None);
 
 	State.RecordMarker(MarkerEntry {

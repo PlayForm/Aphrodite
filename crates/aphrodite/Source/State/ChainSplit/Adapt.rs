@@ -7,7 +7,8 @@
 //! `SplitAdaptMinimumEvents` floor keeps a one-off split from being read as a
 //! trend at all.
 
-use super::super::{AphroditeState, Const::SplitAdaptMinimumEvents};
+use crate::State::Struct::AphroditeState;
+use crate::State::Const::SplitAdaptMinimumEvents;
 
 impl AphroditeState {
 	/// Consequence-driven threshold adaptation (Tier 1, invisible): with at

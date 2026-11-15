@@ -2,7 +2,8 @@
 
 use std::os::raw::c_char;
 
-use super::{Guard::Cstr, Handle::Handles};
+use crate::ABI::Guard::Cstr;
+use crate::ABI::Handle::Table::Handles;
 
 /// Drop the session named by `Handle` from the handle table.
 ///

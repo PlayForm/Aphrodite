@@ -10,7 +10,6 @@
 //! hash and store the ORIGINAL content, and only borrow the classification from
 //! here.
 
-mod Fn;
-mod Search;
+pub mod Fn;
+pub mod Search;
 
-pub(crate) use Fn::Fn;

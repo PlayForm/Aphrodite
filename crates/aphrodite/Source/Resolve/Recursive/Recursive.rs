@@ -10,10 +10,9 @@
 
 use std::collections::HashMap;
 
-use crate::{
-	Resolve::{One, Parse::Find},
-	State::AphroditeState,
-};
+use crate::Resolve::One;
+use crate::Resolve::Parse::Find;
+use crate::State::Struct::AphroditeState;
 
 // Depth limit is `AphroditeState::recursive_depth` - config-driven via
 // `APHRODITE_RECURSIVE_DEPTH`, default 5 in `AphroditeState::default()` and

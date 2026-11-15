@@ -6,7 +6,8 @@
 //! directory has removed the guard `Maintain/SECURITY.md` names, and one of
 //! these must fail.
 
-use crate::{Prefetch::Files::Fn::PrefetchFiles, State::AphroditeState};
+use crate::Prefetch::Files::Fn::PrefetchFiles;
+use crate::State::Struct::AphroditeState;
 
 // ── Teknium1 review ask 1: prefetch applies the same guard as
 // `AphroditeRetrieve` (`read_path_guarded` semantics, implemented here

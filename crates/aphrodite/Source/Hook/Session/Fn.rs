@@ -1,6 +1,6 @@
 //! Session start - full reset.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Session start hook - full reset.
 ///
@@ -9,4 +9,4 @@ use crate::State::AphroditeState;
 /// C ABI dispatch in `Library.rs` and the Hermes bridge both call it by this
 /// name), and two reset implementations would drift the moment one gained a
 /// field the other did not.
-pub fn Fn(State:&mut AphroditeState) -> serde_json::Value { crate::Session::OnSessionStart(State) }
+pub fn Fn(State:&mut AphroditeState) -> serde_json::Value { crate::Session::Start::Fn::OnSessionStart(State) }

@@ -1,6 +1,6 @@
 //! `aphrodite_prefetch` - read and store files now, returning one marker each.
 
-use crate::Tool::Dispatch::ToolHandler;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_prefetch` handler.
 ///
@@ -23,6 +23,6 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 			return serde_json::json!({"error": "paths is required"});
 		}
 		let outcomes = aphrodite::Prefetch::Read::Entry::Fn::ReadPaths(&paths);
-		crate::with_shared(|state| aphrodite::Prefetch::Insert::Fn::InsertOutcomes(state, outcomes))
+		crate::Session::With::Fn::with_shared(|state| aphrodite::Prefetch::Insert::Fn::InsertOutcomes(state, outcomes))
 	})
 }

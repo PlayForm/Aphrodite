@@ -1,9 +1,8 @@
 //! Record a terminal call's telemetry event.
 
-use crate::{
-	Flow,
-	State::{AphroditeState, ToolEvent},
-};
+use crate::Flow;
+use crate::State::Struct::AphroditeState;
+use crate::State::Event::Struct::ToolEvent;
 
 /// Record the telemetry event for one terminal call (P2/T6).
 ///
@@ -14,7 +13,7 @@ use crate::{
 pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, command:Option<&str>, Returncode:Option<i64>) {
 	let Okay = Returncode.map(|Rc| Rc == 0).unwrap_or(true);
 	let Args = command.map(|c| serde_json::json!({"command": c}));
-	let Sig = Flow::NormalizeArgsSig("terminal", Args.as_ref());
+	let Sig = Flow::Signature::Normalize::Fn::NormalizeArgsSig("terminal", Args.as_ref());
 	let ErrorSig = if Okay {
 		None
 	} else {
@@ -24,7 +23,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, command:Option<&str>, 
 			.lines()
 			.find(|l| l.contains("error") || l.contains("Error") || l.contains("FAILED") || l.contains("panicked"))
 			.or_else(|| Content.lines().next());
-		Some(Flow::ErrorSig(command, FirstError))
+		Some(Flow::Signature::Error::Fn::ErrorSig(command, FirstError))
 	};
 	State.RecordToolEvent(ToolEvent {
 		Turn:State.TurnCounter,

@@ -1,9 +1,8 @@
 //! The rolling turn window and its aggregate.
 
-use crate::{
-	Flow::TurnWindow,
-	State::{AphroditeState, ToolEvent},
-};
+use crate::Flow::Window::Turn::Fn::TurnWindow;
+use crate::State::Struct::AphroditeState;
+use crate::State::Event::Struct::ToolEvent;
 
 #[test]
 fn TestTurnWindowCountsReadsWritesErrors() {

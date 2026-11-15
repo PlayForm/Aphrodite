@@ -4,16 +4,16 @@
 //! `aphrodite_stats`: the tracing warn is a no-op in the Hermes dylib, so this
 //! field is the only guaranteed-visible signal that defaults are in effect.
 
-use crate::Tool::Dispatch::Fn as dispatch;
+use Tool::Dispatch::Fn::Fn as dispatch;
 
 #[test]
 fn test_stats_surfaces_config_error() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let broken_path = "/tmp/aphrodite-cfg-broken-test.toml";
 
 	// Simulate a found-but-broken aphrodite.toml (what
 	// `Config::load().apply_compression()` records on the state).
-	crate::with_shared(|s| s.ConfigurationError = Some(format!("{broken_path}: TOML parse error")));
+	crate::Session::With::Fn::with_shared(|s| s.ConfigurationError = Some(format!("{broken_path}: TOML parse error")));
 
 	let r = dispatch("aphrodite_stats", "{}");
 	assert_eq!(r["config_error"].as_str().unwrap(), format!("{broken_path}: TOML parse error"));
@@ -24,7 +24,7 @@ fn test_stats_surfaces_config_error() {
 	);
 
 	// Restore the shared state so later tests are hermetic.
-	crate::with_shared(|s| s.ConfigurationError = None);
+	crate::Session::With::Fn::with_shared(|s| s.ConfigurationError = None);
 	let r2 = dispatch("aphrodite_stats", "{}");
 	assert!(
 		r2["config_error"].is_null(),

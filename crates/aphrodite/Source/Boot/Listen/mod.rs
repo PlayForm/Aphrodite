@@ -5,16 +5,10 @@
 //! logged an error and left that one listener silently dead while the other kept
 //! answering - the process exited 0 and looked healthy.
 
-mod Bind;
-mod Drain;
-mod Serve;
-mod Shutdown;
-mod Spawn;
-mod Watcher;
+pub mod Bind;
+pub mod Drain;
+pub mod Serve;
+pub mod Shutdown;
+pub mod Spawn;
+pub mod Watcher;
 
-pub use Bind::Bind;
-pub use Drain::Drain;
-pub use Serve::Serve;
-pub use Shutdown::Signal;
-pub use Spawn::Spawn;
-pub use Watcher::watch;

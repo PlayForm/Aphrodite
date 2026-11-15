@@ -9,8 +9,12 @@ use serde::Deserialize;
 /// optional caller-supplied `Key` (defaults to the content hash).
 #[derive(Debug, Deserialize)]
 pub struct Struct {
+	#[serde(rename = "content")]
 	pub Content:String,
+	#[serde(rename = "key")]
 	pub Key:Option<String>,
+	#[serde(rename = "ttl_seconds")]
 	pub TtlSeconds:Option<u64>,
+	#[serde(rename = "tags")]
 	pub Tags:Option<Vec<String>>,
 }

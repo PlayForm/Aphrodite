@@ -1,6 +1,7 @@
 //! `aphrodite_catalog` - full or table-of-contents view of recorded markers.
 
-use crate::Tool::{Arg, Dispatch::ToolHandler};
+use Tool::Arg;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_catalog` handler.
 ///
@@ -10,10 +11,10 @@ use crate::Tool::{Arg, Dispatch::ToolHandler};
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_catalog", |args| {
 		let mode = {
-			let m = Arg::Fn(args, "mode");
+			let m = Arg::Fn::Fn(args, "mode");
 			if m.is_empty() { "full" } else { m }
 		};
-		crate::with_shared(|state| {
+		crate::Session::With::Fn::with_shared(|state| {
 			let items:Vec<serde_json::Value> = state
 				.RecentMarkers
 				.iter()

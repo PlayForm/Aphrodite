@@ -31,7 +31,7 @@ pub fn ReduceJSON(Content:&str) -> Option<String> {
 			}
 			s
 		},
-		_ => format!("[json:{}]", crate::Stage2::Name::TypeName(&Data)),
+		_ => format!("[json:{}]", crate::Stage2::Name::Fn::TypeName(&Data)),
 	};
 	// Minify
 	let Minified = serde_json::to_string(&Data).unwrap_or_default();

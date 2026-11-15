@@ -2,7 +2,8 @@
 
 use std::ffi::CStr;
 
-use crate::{aphrodite_hermes_free_string, aphrodite_hermes_version};
+use ABI::FreeString::aphrodite_hermes_free_string;
+use ABI::Version::aphrodite_hermes_version;
 
 #[test]
 fn test_version_is_semver() {

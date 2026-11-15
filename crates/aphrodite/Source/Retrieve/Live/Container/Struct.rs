@@ -14,17 +14,22 @@ pub(crate) struct Struct {
 	/// `true` only for a container envelope; the default keeps a malformed
 	/// entry on the plain path.
 	#[serde(default)]
+	#[serde(rename = "live")]
 	pub(crate) Live:bool,
 	/// Total bytes the container holds.
 	#[serde(default)]
+	#[serde(rename = "size")]
 	pub(crate) Size:usize,
 	/// Number of stored chunks.
 	#[serde(default)]
+	#[serde(rename = "chunks")]
 	pub(crate) Chunks:usize,
 	/// Target byte size of one chunk.
 	#[serde(default)]
+	#[serde(rename = "chunk_size")]
 	pub(crate) ChunkSize:usize,
 	/// Bytes already served; advanced and written back on every retrieve.
 	#[serde(default)]
+	#[serde(rename = "bytes_arrived")]
 	pub(crate) BytesArrived:usize,
 }

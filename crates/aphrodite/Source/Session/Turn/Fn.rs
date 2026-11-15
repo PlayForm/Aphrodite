@@ -4,7 +4,7 @@
 //! per-turn cursor into the conversation, so leaving it set would make the next
 //! turn start reading from the middle of the history.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Increment turn counter and return new value.
 pub fn NextTurn(State:&mut AphroditeState) -> usize {

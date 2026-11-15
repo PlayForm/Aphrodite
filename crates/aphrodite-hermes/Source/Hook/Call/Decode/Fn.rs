@@ -19,7 +19,7 @@ pub(crate) fn decode(args:&str) -> Result<HookInput, serde_json::Error> {
 		.filter(|s| !s.is_empty())
 		.map(str::to_string)
 		.unwrap_or_else(|| {
-			let last = crate::Debug::Session::Last::Fn();
+			let last = crate::Debug::Session::Last::Fn::Fn();
 			if last.is_empty() { DEFAULT_SESSION.to_string() } else { last }
 		});
 	Ok(HookInput { parsed, session_id, args_len:args.len() })

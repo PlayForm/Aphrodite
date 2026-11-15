@@ -2,7 +2,7 @@
 //! active.
 
 use super::super::super::Struct::Struct;
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Discover a directives directory, load it, and seed the active set.
 ///

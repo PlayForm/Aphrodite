@@ -13,4 +13,4 @@ use crate::Debug::{Flag, Runtime};
 ///
 /// It does not check existence - callers stat the result, so a missing file and
 /// an unreadable one both degrade to "off".
-pub(crate) fn Fn() -> PathBuf { Runtime::Fn().join(Flag::FLAG_PREFIX) }
+pub(crate) fn Fn() -> PathBuf { Runtime::Fn::Fn().join(Flag::Const::FLAG_PREFIX) }

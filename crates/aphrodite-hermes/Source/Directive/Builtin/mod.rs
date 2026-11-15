@@ -5,6 +5,5 @@
 //! as `Builtin::Fn()` - the module path carries the domain, the item carries
 //! the kind.
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

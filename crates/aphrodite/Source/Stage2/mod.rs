@@ -49,6 +49,5 @@ pub mod Regex;
 pub mod Registry;
 
 #[cfg(test)]
-mod Test;
+pub mod Test;
 
-pub use Compress::CompressStage2;

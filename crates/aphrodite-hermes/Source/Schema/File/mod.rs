@@ -3,6 +3,5 @@
 //! Singular `File/` per the house rule (a directory names a thing, not a
 //! collection); the tool's own name keeps the plural.
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

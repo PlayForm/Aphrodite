@@ -3,13 +3,12 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{
-	Session::Registry::Struct::{DEFAULT_SESSION, session_state},
-	aphrodite_hermes_call_hook,
-	aphrodite_hermes_free_string,
-	with_session,
-	with_shared,
-};
+use Session::Registry::Struct::DEFAULT_SESSION;
+use Session::Registry::Struct::session_state;
+use ABI::CallHook::aphrodite_hermes_call_hook;
+use ABI::FreeString::aphrodite_hermes_free_string;
+use Session::With::Fn::with_session;
+use Session::With::Fn::with_shared;
 
 // ── Per-session state registry probe (gateway shared-plugin fix): two
 // different session_ids must resolve to DIFFERENT AphroditeState
@@ -19,7 +18,7 @@ use crate::{
 // state made every session see everything. ──
 #[test]
 fn probe_per_session_state_isolation() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	// Reset the default (tool) session so its catalog count is
 	// deterministic (other tests leave markers behind).
 	with_shared(aphrodite::Session::OnSessionStart);
@@ -71,6 +70,6 @@ fn probe_per_session_state_isolation() {
 		cat_def["total"],
 		0,
 		"default session must NOT see session A's compression: last_session={:?}",
-		crate::Debug::Session::Last::Fn()
+		crate::Debug::Session::Last::Fn::Fn()
 	);
 }

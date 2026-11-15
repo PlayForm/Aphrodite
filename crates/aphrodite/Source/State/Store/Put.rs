@@ -1,6 +1,6 @@
 //! Inserting into the inline store.
 
-use super::super::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 impl AphroditeState {
 	/// Insert into inline store with LRU + byte-budget eviction (report 05

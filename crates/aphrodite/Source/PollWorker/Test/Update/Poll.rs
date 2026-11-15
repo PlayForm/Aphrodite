@@ -1,10 +1,10 @@
 //! Exit-code detection (JSON wrapper and text fallback), output accumulation
 //! across polls, and the 256KB accumulation cap.
 
-use crate::{
-	PollWorker::{Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus, Update::Fn::UpdateFromPoll},
-	State::AphroditeState,
-};
+use crate::PollWorker::Insert::Fn::InsertBgTask;
+use crate::PollWorker::Task::Status::Enum::BgStatus;
+use crate::PollWorker::Update::Fn::UpdateFromPoll;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestUpdateFromPollExitCodeZero() {

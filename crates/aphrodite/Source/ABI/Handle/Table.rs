@@ -10,7 +10,7 @@ use std::{
 	sync::{Arc, Mutex},
 };
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Process-global handle table. `None` until the first handle is allocated,
 /// so `Mutex::new` can stay `const` without requiring a heap alloc at

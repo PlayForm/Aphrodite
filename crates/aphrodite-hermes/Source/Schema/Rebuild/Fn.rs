@@ -17,6 +17,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			replace itself mid-session - it reports the state an operator needs plus the \
 			command to run outside the session. Takes no arguments. \
 			Returns {status: \"ok\", version, proxies, hint}.",
-		"parameters": NoParams::Fn()
+		"parameters": NoParams::Fn::Fn()
 	})
 }

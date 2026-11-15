@@ -11,7 +11,7 @@ use crate::{
 #[unsafe(no_mangle)]
 pub extern "C" fn aphrodite_hermes_list_tools() -> *mut c_char {
 	guarded(|| {
-		let schemas = Schema::All::Fn();
+		let schemas = Schema::All::Fn::Fn();
 		to_c_string(&serde_json::to_string(&schemas).unwrap_or_default())
 	})
 }

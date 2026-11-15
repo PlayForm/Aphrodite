@@ -11,7 +11,8 @@ mod Session;
 mod Terminal;
 mod ToolResult;
 
-use crate::{Hook::Hash::Fn::Fn as ComputeHash, State::AphroditeState};
+use crate::Hook::Hash::Fn::Fn as ComputeHash;
+use crate::State::Struct::AphroditeState;
 
 /// Store `Text` under its own CCR hash and return the hash.
 ///

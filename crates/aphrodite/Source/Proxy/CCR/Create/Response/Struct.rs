@@ -10,8 +10,12 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct Struct {
 	pub hash:String,
+	#[serde(rename = "token_savings_ratio")]
 	pub TokenSavingsRatio:f64,
+	#[serde(rename = "original_size")]
 	pub OriginalSize:usize,
+	#[serde(rename = "compressed_size")]
 	pub CompressedSize:usize,
+	#[serde(rename = "marker_size")]
 	pub MarkerSize:usize,
 }

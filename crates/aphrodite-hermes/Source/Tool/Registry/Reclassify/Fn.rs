@@ -1,6 +1,6 @@
 //! `aphrodite_reclassify` - re-detect type and preview for stored markers.
 
-use crate::Tool::Dispatch::ToolHandler;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_reclassify` handler.
 ///
@@ -11,7 +11,7 @@ use crate::Tool::Dispatch::ToolHandler;
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_reclassify", |args| {
 		let only_hash = args.get("hash").and_then(|v| v.as_str());
-		crate::with_shared(|state| {
+		crate::Session::With::Fn::with_shared(|state| {
 			// Collect (hash, fresh content) for markers we will touch, then
 			// recompute type + preview from the stored content.
 			let targets:Vec<String> = state

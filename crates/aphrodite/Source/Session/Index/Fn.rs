@@ -4,7 +4,7 @@
 //! says nothing about turn order, and a caller that rendered it unsorted would
 //! present the archive out of sequence.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Get the conversation index as a JSON-serializable value, sorted oldest first.
 pub fn GetConvIndex(State:&AphroditeState) -> Vec<serde_json::Value> {

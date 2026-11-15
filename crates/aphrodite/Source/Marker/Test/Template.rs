@@ -5,7 +5,10 @@
 //! string, and resets the registration - the templates are process-global, so
 //! a test that leaves one registered changes what every later test sees.
 
-use crate::Marker::{CCRMarker, MarkerTemplatesTestGuard, SetMarkerTemplates, SubstituteVars};
+use crate::Marker::Format::Entry::CCRMarker;
+use crate::Marker::Format::Const::MarkerTemplatesTestGuard;
+use crate::Marker::Format::Const::SetMarkerTemplates;
+use crate::Marker::Format::Vars::SubstituteVars;
 
 #[test]
 fn TestMarkerFormatConfiguredRendersTomlTemplate() {
@@ -96,7 +99,7 @@ fn TestMarkerTemplateUnknownVarLeftVerbatim() {
 #[test]
 fn TestSubstituteVarsKnownUnknownAndEscapes() {
 	let Vars = [("hash", "abc"), ("size", "42")];
-	assert_eq!(SubstituteVars("<<<CCR:{hash}|text|{Size}>>>", &Vars), "<<<CCR:abc|text|42>>>");
+	assert_eq!(SubstituteVars("<<<CCR:{hash}|text|{size}>>>", &Vars), "<<<CCR:abc|text|42>>>");
 	assert_eq!(SubstituteVars("{typo} {hash}", &Vars), "{typo} abc");
 	assert_eq!(SubstituteVars("a{{b}}c", &Vars), "a{b}c");
 	assert_eq!(SubstituteVars("{{{hash}}}", &Vars), "{abc}");

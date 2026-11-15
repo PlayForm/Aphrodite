@@ -7,10 +7,9 @@
 //! already been conditioned on. Only running tasks are listed: a finished
 //! task is the nudge's job, not the status block's.
 
-use crate::{
-	PollWorker::Task::{Status::Enum::BgStatus, Struct::BgTask},
-	State::AphroditeState,
-};
+use crate::PollWorker::Task::Status::Enum::BgStatus;
+use crate::PollWorker::Task::Struct::BgTask;
+use crate::State::Struct::AphroditeState;
 
 /// Render bg task status lines for injection into `BuildTurnContext`.
 /// Returns empty string if no active tasks.

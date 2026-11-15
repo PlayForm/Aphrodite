@@ -22,7 +22,7 @@ pub(crate) fn Fn(state:&mut AphroditeState, content:&str, hint:&str, center:Opti
 	// exactly what was passed in, including wrapper metadata like
 	// `exit_code`/`error`, and legitimate caller JSON that merely matches a
 	// wrapper shape (e.g. `{"content":"hi","id":42}`) must round-trip intact.
-	let (classify_content, eff_type) = if let Some((c, t)) = Unwrap::Fn(content) {
+	let (classify_content, eff_type) = if let Some((c, t)) = Unwrap::Fn::Fn(content) {
 		// ISSUE-11 WS1 (caller-hint-wins): the caller's explicit `type`
 		// hint is intent, the unwrap is a guess - when a non-default hint
 		// is present it must win. For JSON payloads the preview is built

@@ -1,10 +1,9 @@
 //! The one-shot first-turn orientation: rendered on turn 0 only, and only
 //! when `SessionInject` is non-empty.
 
-use crate::{
-	Flow::{BuildTurnContext, ShippedSessionInject},
-	State::AphroditeState,
-};
+use crate::Flow::TurnContext::Fn::BuildTurnContext;
+use crate::Flow::Prompt::Const::ShippedSessionInject;
+use crate::State::Struct::AphroditeState;
 
 // ── First-turn session injection: rendered only on turn 0, dropped after ──
 #[test]

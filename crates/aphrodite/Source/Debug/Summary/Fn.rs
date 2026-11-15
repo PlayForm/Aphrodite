@@ -1,6 +1,6 @@
 //! `config_summary`: the effective configuration as kv pairs.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// DEV-ONLY: config-summary kv pairs for the session-init line.
 ///

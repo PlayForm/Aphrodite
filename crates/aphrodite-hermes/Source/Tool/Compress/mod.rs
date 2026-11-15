@@ -6,6 +6,5 @@
 //! Retrieval must return exactly what was passed in - wrapper metadata like
 //! `exit_code` included - or the tool is lossy in the one way that matters.
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

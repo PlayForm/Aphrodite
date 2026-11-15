@@ -1,6 +1,6 @@
 //! The entry-point gates: size floor, unknown type, and "reduction must save".
 
-use crate::Stage2::CompressStage2;
+use crate::Stage2::Compress::Fn::CompressStage2;
 
 #[test]
 fn TestSmallContentReturnsNone() {

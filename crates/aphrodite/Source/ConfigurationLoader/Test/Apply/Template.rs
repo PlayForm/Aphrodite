@@ -39,7 +39,7 @@ fn TestApplyTemplatesRegistersTemplatesAndFamily() {
 
 #[test]
 fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
-	let _G = crate::Marker::MarkerTemplatesTestGuard();
+	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
 	// [templates.prompts] session_inject (canonical pre-Rust location) wins
 	// over the legacy [prompts] session_inject.
 	let cfg = Configuration {
@@ -67,12 +67,12 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 	// Neither => shipped constant.
 	let mut State3 = crate::State::AphroditeState::default();
 	Configuration::default().ApplyCompression(&mut State3);
-	assert_eq!(State3.SessionInject, crate::Flow::ShippedSessionInject);
+	assert_eq!(State3.SessionInject, crate::Flow::Prompt::Const::ShippedSessionInject);
 }
 
 #[test]
 fn TestSessionInjectEnvironmentOverrideBeatsTemplatesPrompts() {
-	let _G = crate::Marker::MarkerTemplatesTestGuard();
+	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
 	let mut cfg = Configuration::default();
 	cfg.SetOverride("APHRODITE_SESSION_INJECT", "env wins");
 	let mut State = crate::State::AphroditeState::default();

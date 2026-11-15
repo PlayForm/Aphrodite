@@ -14,7 +14,7 @@ use crate::Debug::Log::Level;
 /// does not filter or truncate - a caller that logs a 40 KB value gets a 40 KB
 /// line, so callers pass sizes and hashes rather than payloads.
 pub(crate) fn Fn(state:&aphrodite::State::AphroditeState, session:&str, event:&str, kv:&[(&str, String)]) {
-	let lvl = Level::Fn(state, session);
+	let lvl = Level::Fn::Fn(state, session);
 	if lvl > 0 {
 		aphrodite::Debug::Log::At::Fn::Fn(lvl, event, kv);
 	}

@@ -17,6 +17,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			produced a compression. Takes no arguments. \
 			Returns {total, turns: [{turn, hash, summary, size}]}; each `hash` is \
 			resolvable through aphrodite_retrieve.",
-		"parameters": NoParams::Fn()
+		"parameters": NoParams::Fn::Fn()
 	})
 }

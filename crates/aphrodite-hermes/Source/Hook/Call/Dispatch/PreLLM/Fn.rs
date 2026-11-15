@@ -37,14 +37,14 @@ pub(crate) fn pre_llm_call(state:&mut AphroditeState, input:&HookInput) -> serde
 		parsed.get("session_id").and_then(|v| v.as_str()),
 		parsed.get("parent_session_id").and_then(|v| v.as_str()),
 	) {
-		Debug::Session::Record::Fn(sid, pid);
+		Debug::Session::Record::Fn::Fn(sid, pid);
 	}
 	// DEV-ONLY debug logger (crate::Debug): pre-turn bridge line
 	// (turn/session/request-size); the per-section sizes and the cumulative
 	// metrics are logged inside build_turn_context.
 	let sid = parsed.get("session_id").and_then(|v| v.as_str()).unwrap_or("");
 	if !sid.is_empty() {
-		crate::Debug::Log::Bridge::Fn(
+		crate::Debug::Log::Bridge::Fn::Fn(
 			state,
 			sid,
 			"pre_turn",

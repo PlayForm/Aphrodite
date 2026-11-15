@@ -10,7 +10,7 @@
 /// Ordered by name, matching the sort in `Builtin::Fn`, so a test can compare
 /// arrays positionally when it needs to.
 pub(crate) fn Fn() -> Vec<(String, String)> {
-	crate::Directive::Builtin::Fn()
+	crate::Directive::Builtin::Fn::Fn()
 		.into_iter()
 		.map(|(name, content)| (format!("{name}.md"), content))
 		.collect()

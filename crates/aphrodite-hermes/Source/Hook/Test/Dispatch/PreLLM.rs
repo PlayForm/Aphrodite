@@ -2,7 +2,9 @@
 
 use std::ffi::{CStr, CString};
 
-use crate::{aphrodite_hermes_call_hook, aphrodite_hermes_free_string, with_shared};
+use ABI::CallHook::aphrodite_hermes_call_hook;
+use ABI::FreeString::aphrodite_hermes_free_string;
+use Session::With::Fn::with_shared;
 
 // ── 01-F3: the bridge's `pre_llm_call` arm - the only one Hermes calls
 // in production - must actually inject active directive text, not just
@@ -13,7 +15,7 @@ use crate::{aphrodite_hermes_call_hook, aphrodite_hermes_free_string, with_share
 // path) already building that context correctly. ──
 #[test]
 fn test_call_hook_pre_llm_call_injects_active_directive_context() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),
@@ -55,7 +57,7 @@ fn test_call_hook_pre_llm_call_injects_active_directive_context() {
 // path) unrepresentable. ──
 #[test]
 fn test_call_hook_pre_llm_includes_directives() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	aphrodite_hermes_call_hook(
 		CString::new("session_start").unwrap().as_ptr(),
 		CString::new("{}").unwrap().as_ptr(),

@@ -1,12 +1,13 @@
 //! The delta catalog: new markers, new files, and the opt-in intent hints.
 
-use crate::{Session::CatalogSummary, State::AphroditeState};
+use crate::Session::Catalog::Fn::CatalogSummary;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestCatalogSummaryDeltaOnNewMarkers() {
 	let mut s = AphroditeState::default();
 	assert!(CatalogSummary(&mut s).is_empty());
-	s.RecordMarker(crate::State::MarkerEntry {
+	s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 		hash:"abc".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -41,7 +42,7 @@ fn TestCatalogSummaryDeltaOnNewFiles() {
 #[test]
 fn TestCatalogSummaryIntentHintsOffByDefault() {
 	let mut s = AphroditeState::default();
-	s.RecordMarker(crate::State::MarkerEntry {
+	s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 		hash:"aaaaaaaaaaaa111111111111".into(),
 		CCRType:"text".into(),
 		Size:100,
@@ -64,7 +65,7 @@ fn TestCatalogSummaryIntentHintsOnListsRecentHashes() {
 		"cccccccccccc333333333333",
 		"dddddddddddd444444444444",
 	] {
-		s.RecordMarker(crate::State::MarkerEntry {
+		s.RecordMarker(crate::State::Marker::Struct::MarkerEntry {
 			hash:h.into(),
 			CCRType:"text".into(),
 			Size:100,

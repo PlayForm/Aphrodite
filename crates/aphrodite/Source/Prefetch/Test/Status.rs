@@ -2,10 +2,9 @@
 //! `LiveContainer` is off, and the arrival/ETA fields added alongside the
 //! base fields when it is on.
 
-use crate::{
-	Prefetch::{Files::Fn::PrefetchFiles, Status::Fn::PrefetchStatus},
-	State::AphroditeState,
-};
+use crate::Prefetch::Files::Fn::PrefetchFiles;
+use crate::Prefetch::Status::Fn::PrefetchStatus;
+use crate::State::Struct::AphroditeState;
 
 // ── Live containers (pre-Rust `_hooks/live.py` port): prefetch status
 // surfaces container semantics (arrival timestamp, byte progress, ETA)

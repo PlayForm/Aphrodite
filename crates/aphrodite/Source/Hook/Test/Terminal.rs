@@ -1,7 +1,8 @@
 //! Terminal path: exit-code typing, chain splitting, auto-expand.
 
 use super::StoreNested;
-use crate::{Hook::TransformTerminalOutput, State::AphroditeState};
+use crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestTerminalExitCode() {
@@ -78,8 +79,8 @@ fn TestAutoExpandBypassesChainSplitAndThreshold() {
 	s.TerminalThreshold = 100000; // content below the threshold
 	let Content = format!(
 		"seg a output\n{}\nseg b output\n{}\nseg c output\n",
-		crate::ChainSplit::SegMarker,
-		crate::ChainSplit::SegMarker
+		crate::ChainSplit::Const::SegMarker,
+		crate::ChainSplit::Const::SegMarker
 	);
 	let r = TransformTerminalOutput(&mut s, &Content);
 	assert_eq!(
@@ -100,8 +101,8 @@ fn TestChainSplitUnaffectedWhenAutoExpandOff() {
 	s.TerminalThreshold = 0;
 	let Content = format!(
 		"seg a output\n{}\nseg b output\n{}\nseg c output\n",
-		crate::ChainSplit::SegMarker,
-		crate::ChainSplit::SegMarker
+		crate::ChainSplit::Const::SegMarker,
+		crate::ChainSplit::Const::SegMarker
 	);
 	let r = TransformTerminalOutput(&mut s, &Content);
 	assert_eq!(r["chain_split"], true, "chain-split must keep working when auto-expand is off");

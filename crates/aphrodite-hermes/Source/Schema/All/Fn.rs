@@ -31,20 +31,20 @@ use crate::Schema::Debug;
 /// is exactly the kind of state that goes stale.
 pub fn Fn() -> Vec<serde_json::Value> {
 	vec![
-		Compress::Fn(),
-		Retrieve::Fn(),
-		Stats::Fn(),
-		File::Fn(),
-		Diff::Fn(),
-		Search::Fn(),
-		Directive::Fn(),
-		Smoke::Fn(),
-		Catalog::Fn(),
-		Reclassify::Fn(),
-		Prefetch::Fn(),
-		PrefetchStatus::Fn(),
-		Rebuild::Fn(),
+		Compress::Fn::Fn(),
+		Retrieve::Fn::Fn(),
+		Stats::Fn::Fn(),
+		File::Fn::Fn(),
+		Diff::Fn::Fn(),
+		Search::Fn::Fn(),
+		Directive::Fn::Fn(),
+		Smoke::Fn::Fn(),
+		Catalog::Fn::Fn(),
+		Reclassify::Fn::Fn(),
+		Prefetch::Fn::Fn(),
+		PrefetchStatus::Fn::Fn(),
+		Rebuild::Fn::Fn(),
 		#[cfg(debug_assertions)]
-		Debug::Fn(),
+		Debug::Fn::Fn(),
 	]
 }

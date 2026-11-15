@@ -2,7 +2,7 @@
 //! ceiling.
 
 use super::super::super::Struct::Struct;
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Write the chain-split switch and the adaptive threshold bounds.
 ///

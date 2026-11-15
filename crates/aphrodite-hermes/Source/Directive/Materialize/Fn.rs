@@ -41,7 +41,7 @@ pub(crate) fn Fn(dir:&Path) -> serde_json::Value {
 		});
 	}
 
-	for (name, content) in Builtin::Fn() {
+	for (name, content) in Builtin::Fn::Fn() {
 		let file_name = format!("{name}.md");
 		let dest = dir.join(&file_name);
 		match fs::read(&dest) {

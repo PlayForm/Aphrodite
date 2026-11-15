@@ -1,9 +1,9 @@
 //! `aphrodite_test` - the in-process compress/retrieve smoke test.
 
-use crate::{
-	Tool::{Arg, Compress, Dispatch::ToolHandler},
-	proxy_health,
-};
+use Tool::Arg;
+use Tool::Compress;
+use Tool::Dispatch::Fn::ToolHandler;
+use Health::Proxy::Fn::proxy_health;
 
 /// The `aphrodite_test` handler.
 ///
@@ -17,7 +17,7 @@ use crate::{
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_test", |args| {
 		let mode = {
-			let m = Arg::Fn(args, "mode");
+			let m = Arg::Fn::Fn(args, "mode");
 			if m.is_empty() { "quick" } else { m }
 		};
 		let samples:&[(&str, &str)] = match mode {
@@ -32,9 +32,9 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 		};
 		let mut checks = Vec::new();
 		let mut passed = 0usize;
-		crate::with_shared(|state| {
+		crate::Session::With::Fn::with_shared(|state| {
 			for (content, hint) in samples {
-				let info = Compress::Fn(state, content, hint, None);
+				let info = Compress::Fn::Fn(state, content, hint, None);
 				let hash = info["hash"].as_str().unwrap_or("");
 				let round = aphrodite::Resolve::Expand::Fn(state, hash);
 				let ok = round.as_deref() == Some(*content);

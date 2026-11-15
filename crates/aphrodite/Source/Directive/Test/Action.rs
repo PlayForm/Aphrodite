@@ -66,19 +66,19 @@ fn TestHandleActionAllActionsAndUnknown() {
 fn TestOneShotNudgeRendersOnceThenPurged() {
 	let mut s = crate::State::AphroditeState::default();
 	s.TurnCounter = 5;
-	crate::Flow::PushNudge(&mut s, "step back and restate the goal", 1);
+	crate::Flow::Nudge::Push::Fn::PushNudge(&mut s, "step back and restate the goal", 1);
 
 	// Simulate the turn advancing (post_llm_call runs next_turn then purge):
 	// during turn 5 the nudge is live; render at turn 6 must include it.
 	s.TurnCounter = 6;
-	let Ctx6 = crate::Flow::BuildTurnContext(&mut s, None);
+	let Ctx6 = crate::Flow::TurnContext::Fn::BuildTurnContext(&mut s, None);
 	assert!(Ctx6.contains("[nudge:"), "one-shot nudge must render at turn 6: {Ctx6}");
 	assert!(Ctx6.contains("step back and restate the goal"));
 
 	// post_llm_call advances to turn 7 and purges expired nudges.
 	crate::Hook::LLM::Post::Fn::Fn(&mut s);
 	assert_eq!(s.TurnCounter, 7);
-	let Ctx7 = crate::Flow::BuildTurnContext(&mut s, None);
+	let Ctx7 = crate::Flow::TurnContext::Fn::BuildTurnContext(&mut s, None);
 	assert!(!Ctx7.contains("[nudge:"), "expired nudge must be gone at turn 7: {Ctx7}");
 }
 
@@ -88,7 +88,7 @@ fn TestOneShotNudgeRendersOnceThenPurged() {
 fn TestNudgeCapDropsOldest() {
 	let mut s = crate::State::AphroditeState::default();
 	for i in 0..5 {
-		crate::Flow::PushNudge(&mut s, &format!("nudge number {i}"), 10);
+		crate::Flow::Nudge::Push::Fn::PushNudge(&mut s, &format!("nudge number {i}"), 10);
 	}
 	assert_eq!(s.EphemeralDirectives.len(), 4, "cap must hold at 4 stored entries");
 	assert!(
@@ -111,7 +111,7 @@ fn TestNudgeCapDropsOldest() {
 fn TestListShowsEphemeralAndResetClearsThem() {
 	let mut s = crate::State::AphroditeState::default();
 	s.TurnCounter = 3;
-	crate::Flow::PushNudge(&mut s, "watch out", 2);
+	crate::Flow::Nudge::Push::Fn::PushNudge(&mut s, "watch out", 2);
 	s.ManualDirectiveTurn = Some(3);
 
 	let Listed = HandleAction(&mut s, "list", "");

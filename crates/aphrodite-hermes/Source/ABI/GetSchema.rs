@@ -12,7 +12,7 @@ use crate::{
 pub extern "C" fn aphrodite_hermes_get_schema(tool_name:*const c_char) -> *mut c_char {
 	let name = unsafe { cstr_to_string(tool_name) };
 	guarded(std::panic::AssertUnwindSafe(move || {
-		match Schema::Get::Fn(&name) {
+		match Schema::Get::Fn::Fn(&name) {
 			Some(s) => to_c_string(&serde_json::to_string(&s).unwrap_or_default()),
 			None => to_json_error(&format!("unknown tool: {}", name)),
 		}

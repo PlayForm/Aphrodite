@@ -3,11 +3,10 @@
 
 use std::{ffi::CString, os::raw::c_char};
 
-use super::{
-	Guard::{Cstr, Guarded},
-	Handle::AllocHandle,
-};
-use crate::State::AphroditeState;
+use crate::ABI::Guard::Cstr;
+use crate::ABI::Guard::Guarded;
+use crate::ABI::Handle::Allocate::AllocHandle;
+use crate::State::Struct::AphroditeState;
 
 /// Allocate a session and return its handle as a decimal C string.
 ///

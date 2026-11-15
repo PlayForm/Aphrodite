@@ -30,7 +30,7 @@ pub(crate) fn with_session<T>(sid:&str, f:impl FnOnce(&mut AphroditeState) -> T)
 /// Run `f` against the session state under a bounded lock.
 ///
 /// Compatibility shim for tools and tests that lack a `session_id`: resolves
-/// `crate::Debug::Session::Last::Fn()` (fallback to the [`DEFAULT_SESSION`] key
+/// `crate::Debug::Session::Last::Fn::Fn()` (fallback to the [`DEFAULT_SESSION`] key
 /// when empty) and locks ONLY that session with the bounded lock. On `None`
 /// (wedged lock) it runs `f` against a THROWAWAY clone of the config
 /// template so the call still returns quickly - fail-open, never block; the
@@ -47,7 +47,7 @@ pub(crate) fn with_session<T>(sid:&str, f:impl FnOnce(&mut AphroditeState) -> T)
 /// so an interruption degrades to "entry missing" rather than "duplicate
 /// entry".
 pub(crate) fn with_shared<T>(f:impl FnOnce(&mut AphroditeState) -> T) -> T {
-	let sid = crate::Debug::Session::Last::Fn();
+	let sid = crate::Debug::Session::Last::Fn::Fn();
 	let sid = if sid.is_empty() { DEFAULT_SESSION.to_string() } else { sid };
 	let state = session_state(&sid);
 	if let Some(mut guard) = lock_bounded(&state) {

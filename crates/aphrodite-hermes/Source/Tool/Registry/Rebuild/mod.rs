@@ -1,5 +1,4 @@
 //! `aphrodite_rebuild` - the operational state report.
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;

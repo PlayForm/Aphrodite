@@ -25,16 +25,16 @@ pub(crate) fn Fn(session:&str) -> bool {
 	if session.is_empty() {
 		// No session context: the plain `debug` flag applies (non-Hermes
 		// hosts, standalone tool paths, tests without a session).
-		return Flag::Read::Fn(&Flag::Global::Fn());
+		return Flag::Read::Fn::Fn(&Flag::Global::Fn::Fn());
 	}
-	let chain = Chain::Fn(session);
+	let chain = Chain::Fn::Fn(session);
 	// Root-most first: the top-level session's scoped flag governs the
 	// whole tree. Walk root -> leaf and take the first scoped flag that
 	// EXISTS (its value decides; absence falls through to OFF).
 	for sid in chain.iter().rev() {
-		let p = Flag::Scoped::Fn(sid);
+		let p = Flag::Scoped::Fn::Fn(sid);
 		if p.exists() {
-			return Flag::Read::Fn(&p);
+			return Flag::Read::Fn::Fn(&p);
 		}
 	}
 	false

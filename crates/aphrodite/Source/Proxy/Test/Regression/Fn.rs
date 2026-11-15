@@ -2,11 +2,10 @@
 
 use std::sync::atomic::Ordering;
 
-use crate::Proxy::{
-	Compress::Chat::Fn::Fn as CompressChatCompletion,
-	Format::Fn::Fn as ProxyFormatCCROutput,
-	Test::Support::{ChatCompletionBody, TestStateWithCCR},
-};
+use crate::Proxy::Compress::Chat::Fn::Fn as CompressChatCompletion;
+use crate::Proxy::Format::Fn::Fn as ProxyFormatCCROutput;
+use crate::Proxy::Test::Support::Chat::Fn::ChatCompletionBody;
+use crate::Proxy::Test::Support::State::Fn::TestStateWithCCR;
 
 /// Corpus 07_tokens_saved.py: the AtomicU64 must actually be incremented
 /// on the real compression path, not just exist unused in /stats.

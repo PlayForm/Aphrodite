@@ -2,4 +2,3 @@
 
 pub mod Fn;
 
-pub(crate) use self::Fn::{JoinSections, NudgesPresent, SectionLabel};

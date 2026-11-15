@@ -1,6 +1,7 @@
 //! The turn counter advances and the scan cursor resets.
 
-use crate::{Session::NextTurn, State::AphroditeState};
+use crate::Session::Turn::Fn::NextTurn;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestNextTurn() {

@@ -6,7 +6,7 @@
 //! actually read; calling it twice in one turn therefore reports "no change"
 //! for both.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Per-turn catalog summary - delta-only emission for markers AND files (04-F1/F4).
 ///

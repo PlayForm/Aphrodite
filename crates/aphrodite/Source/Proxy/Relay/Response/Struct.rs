@@ -13,9 +13,12 @@ use serde::Serialize;
 /// the callback URL later.
 #[derive(Debug, Serialize)]
 pub struct Struct {
+	#[serde(rename = "success")]
 	pub Success:bool,
+	#[serde(rename = "result")]
 	pub Result:Option<serde_json::Value>,
 	pub error:Option<String>,
+	#[serde(rename = "async_call")]
 	pub AsyncCall:bool,
 }
 

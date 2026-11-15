@@ -25,9 +25,9 @@ pub(crate) fn pre_tool_call(state:&mut AphroditeState, input:&HookInput) -> serd
 	let call_tool = input.parsed.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 	let args_bytes = input.parsed.get("args").map(|a| a.to_string().len()).unwrap_or(0);
 	let expected = expected_path(state, call_tool, &input.parsed);
-	crate::Debug::Log::Bridge::Fn(
+	crate::Debug::Log::Bridge::Fn::Fn(
 		state,
-		&crate::Debug::Session::Last::Fn(),
+		&crate::Debug::Session::Last::Fn::Fn(),
 		"pre_tool",
 		&[
 			("tool", call_tool.to_string()),

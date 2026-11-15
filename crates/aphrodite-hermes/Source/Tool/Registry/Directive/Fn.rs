@@ -5,7 +5,8 @@
 //! bridge exposes the identical action set and error shape - one implementation,
 //! two transports.
 
-use crate::Tool::{Arg, Dispatch::ToolHandler};
+use Tool::Arg;
+use Tool::Dispatch::Fn::ToolHandler;
 
 /// The `aphrodite_directive` handler.
 ///
@@ -13,9 +14,9 @@ use crate::Tool::{Arg, Dispatch::ToolHandler};
 /// other action mutates the active set.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_directive", |args| {
-		let action = Arg::Fn(args, "action");
+		let action = Arg::Fn::Fn(args, "action");
 		let action = if action.is_empty() { "list" } else { action };
-		let name = Arg::Fn(args, "name");
-		crate::with_shared(|state| aphrodite::Directive::Action::Fn(state, action, name))
+		let name = Arg::Fn::Fn(args, "name");
+		crate::Session::With::Fn::with_shared(|state| aphrodite::Directive::Action::Fn(state, action, name))
 	})
 }

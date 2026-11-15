@@ -37,7 +37,7 @@ fn GoSourceWithErrorReturns() -> String {
 #[test]
 fn GoSourceWithErrorReturnsIsSourceCodeNotBuild() {
 	let Content = GoSourceWithErrorReturns();
-	let ty = aphrodite::DetectType(&Content);
+	let ty = aphrodite::Preview::Detect::Type::Fn(&Content);
 	assert_eq!(
 		ty, "source_code",
 		"idiomatic Go with `(string, error)` returns must not be classified as build (found: {ty})"
@@ -55,7 +55,7 @@ warning: unused variable: `pending`
    Compiling bar v0.1.0
 error: could not compile `foo`
 ";
-	assert_eq!(aphrodite::DetectType(Content), "build");
+	assert_eq!(aphrodite::Preview::Detect::Type::Fn(Content), "build");
 }
 
 #[test]
@@ -68,7 +68,7 @@ ERROR compilation failed
 FAILED test_x
 PASSED test_y
 ";
-	assert_eq!(aphrodite::DetectType(Content), "build");
+	assert_eq!(aphrodite::Preview::Detect::Type::Fn(Content), "build");
 }
 
 #[test]
@@ -84,13 +84,13 @@ function handle(data) {
     return null;
 }
 ";
-	assert_ne!(aphrodite::DetectType(Content), "build");
+	assert_ne!(aphrodite::Preview::Detect::Type::Fn(Content), "build");
 }
 
 #[test]
 fn RealBuildLogFixtureStillDetectsAsBuild() {
 	// The corpus control fixture must keep its label after the gating change.
 	if let Some(Content) = CorpusFixture("build_log.txt") {
-		assert_eq!(aphrodite::DetectType(&Content), "build");
+		assert_eq!(aphrodite::Preview::Detect::Type::Fn(&Content), "build");
 	}
 }

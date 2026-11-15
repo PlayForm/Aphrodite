@@ -1,6 +1,8 @@
 //! `aphrodite_retrieve` - resolve a CCR hash (recursively) or read a path.
 
-use crate::Tool::{Arg, Dispatch::ToolHandler, Read};
+use Tool::Arg;
+use Tool::Dispatch::Fn::ToolHandler;
+use Tool::Read;
 
 /// The `aphrodite_retrieve` handler.
 ///
@@ -12,11 +14,11 @@ use crate::Tool::{Arg, Dispatch::ToolHandler, Read};
 /// context without changing what is stored.
 pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 	("aphrodite_retrieve", |args| {
-		let path = Arg::Fn(args, "path");
+		let path = Arg::Fn::Fn(args, "path");
 		if !path.is_empty() {
-			return match Read::Fn(path) {
+			return match Read::Fn::Fn(path) {
 				Ok(content) => {
-					let query = Arg::Fn(args, "query");
+					let query = Arg::Fn::Fn(args, "query");
 					let body = if query.is_empty() {
 						content
 					} else {
@@ -28,12 +30,12 @@ pub(crate) fn Fn() -> (&'static str, ToolHandler) {
 			};
 		}
 
-		let hash = Arg::Fn(args, "hash");
+		let hash = Arg::Fn::Fn(args, "hash");
 		if hash.is_empty() {
 			return serde_json::json!({"error": "hash or path is required"});
 		}
-		let query = Arg::Fn(args, "query").to_string();
-		crate::with_shared(|state| {
+		let query = Arg::Fn::Fn(args, "query").to_string();
+		crate::Session::With::Fn::with_shared(|state| {
 			match aphrodite::Resolve::Expand::Fn(state, hash) {
 				Some(content) => {
 					let body = if query.is_empty() {

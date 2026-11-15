@@ -4,12 +4,12 @@
 //! delegate to the same `Directive::handle_action` as everything else -
 //! list/swap round-trip through the shared session state.
 
-use crate::Tool::Dispatch::Fn as dispatch;
+use Tool::Dispatch::Fn::Fn as dispatch;
 
 #[test]
 fn test_aphrodite_directive_tool_list_and_swap() {
-	let _g = crate::test_guard();
-	crate::with_shared(|state| {
+	let _g = crate::Session::Guard::Fn::test_guard();
+	crate::Session::With::Fn::with_shared(|state| {
 		// `active_directives` is process-global and NOT reset between
 		// tests (deliberately - directives persist across a session
 		// reset just like the inline store); start from a known-empty

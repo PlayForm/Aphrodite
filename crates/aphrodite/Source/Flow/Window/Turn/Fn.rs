@@ -6,7 +6,8 @@
 //! re-reading files") rather than as diagnostics, so the boundary has to be
 //! exactly what the caller means.
 
-use crate::{Flow::Window::Stats::Struct::WindowStats, State::AphroditeState};
+use crate::Flow::Window::Stats::Struct::WindowStats;
+use crate::State::Struct::AphroditeState;
 
 /// Compute `WindowStats` over the last `n` turns (P2/T7).
 pub fn TurnWindow(State:&AphroditeState, n:usize) -> WindowStats {

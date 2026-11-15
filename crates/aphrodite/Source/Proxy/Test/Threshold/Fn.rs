@@ -11,26 +11,20 @@ use axum::{extract::State, response::IntoResponse};
 use reqwest::Client as HttpClient;
 use tokio_util::task::TaskTracker;
 
-use crate::{
-	Configuration::Proxy::{Compression::Struct::Struct as CompressionConfiguration, Mode::Enum::Enum as ProxyMode},
-	Proxy::{
-		CCR::Reload::Fn::Fn as HandleCCRReload,
-		Cache::Hash::Fn::Fn as Fnv1a64,
-		State::Struct::Struct as AppState,
-		Test::Support::{ReloadTestLock, TestState},
-		Threshold::{
-			Const::{
-				AutoExpandLimitDefault,
-				CacheCompressThreshold,
-				InitialFillPct,
-				InitialRatioEma,
-				InlineCCRThreshold,
-				TokenCompressThreshold,
-			},
-			Resolve::Fn::Fn as ResolveThresholds,
-		},
-	},
-};
+use crate::Configuration::Proxy::Compression::Struct::Struct as CompressionConfiguration;
+use crate::Configuration::Proxy::Mode::Enum::Enum as ProxyMode;
+use crate::Proxy::CCR::Reload::Fn::Fn as HandleCCRReload;
+use crate::Proxy::Cache::Hash::Fn::Fn as Fnv1a64;
+use crate::Proxy::State::Struct::Struct as AppState;
+use crate::Proxy::Test::Support::Lock::Const::ReloadTestLock;
+use crate::Proxy::Test::Support::State::Fn::TestState;
+use crate::Proxy::Threshold::Const::AutoExpandLimitDefault;
+use crate::Proxy::Threshold::Const::CacheCompressThreshold;
+use crate::Proxy::Threshold::Const::InitialFillPct;
+use crate::Proxy::Threshold::Const::InitialRatioEma;
+use crate::Proxy::Threshold::Const::InlineCCRThreshold;
+use crate::Proxy::Threshold::Const::TokenCompressThreshold;
+use crate::Proxy::Threshold::Resolve::Fn::Fn as ResolveThresholds;
 
 #[test]
 fn TestCompressThresholdCache() {

@@ -1,10 +1,10 @@
 //! The terminal-output gate sequence.
 
 use super::super::{ChainSplit, Emit, Record};
-use crate::{
-	Hook::{AutoExpand::Applies, Live::Container, ToolResult::Classify},
-	State::AphroditeState,
-};
+use crate::Hook::AutoExpand::Applies;
+use crate::Hook::Live::Container;
+use crate::Hook::ToolResult::Classify;
+use crate::State::Struct::AphroditeState;
 
 /// The terminal-output pipeline: telemetry, the auto-expand gate, chain
 /// splitting, the threshold gate, the live container, then store + marker.

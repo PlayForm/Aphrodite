@@ -3,7 +3,7 @@
 //!
 //! The dylib owns no directive text of its own - the `.md` sources are
 //! compiled into the core `aphrodite` crate - so this module is a thin,
-//! deterministic projection of `aphrodite::Directive::Builtin::Fn()`.
+//! deterministic projection of `aphrodite::Directive::Builtin::Fn::Fn()`.
 //! Sorting here (rather than at the write site) is what makes the report's
 //! `written`/`skipped` arrays stable across runs.
 
@@ -18,7 +18,7 @@
 /// the runtime home never appears here (that difference is exactly what
 /// `Materialize` reports as `skipped`).
 pub(crate) fn Fn() -> Vec<(String, String)> {
-	let mut set:Vec<(String, String)> = aphrodite::Directive::Builtin::Fn()
+	let mut set:Vec<(String, String)> = aphrodite::Directive::Builtin::Fn::Fn()
 		.into_iter()
 		.map(|(name, d)| (name, d.Content))
 		.collect();

@@ -2,7 +2,7 @@
 //!
 //! `tool_describe` and `aphrodite_hermes_get_schema` both need exactly this, and
 //! both need it to agree with the catalogue the model was shown - so it searches
-//! `All::Fn` rather than keeping an index that could drift.
+//! `All::Fn::Fn` rather than keeping an index that could drift.
 
 use crate::Schema::All;
 
@@ -11,4 +11,4 @@ use crate::Schema::All;
 /// Returns `None` for an unknown name, which the FFI layer turns into
 /// `{"error": "unknown tool: <name>"}`. It is a linear scan on purpose: the
 /// catalogue is small and a duplicate-name bug would be masked by a map.
-pub fn Fn(name:&str) -> Option<serde_json::Value> { All::Fn().into_iter().find(|s| s["name"] == name) }
+pub fn Fn(name:&str) -> Option<serde_json::Value> { All::Fn::Fn().into_iter().find(|s| s["name"] == name) }

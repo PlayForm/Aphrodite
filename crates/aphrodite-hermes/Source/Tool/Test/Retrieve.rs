@@ -5,7 +5,7 @@
 //! both directions, because a guard that refuses everything passes the first test
 //! on its own.
 
-use crate::Tool::Dispatch::Fn as dispatch;
+use Tool::Dispatch::Fn::Fn as dispatch;
 
 // ── T5 (F3): the "aphrodite_retrieve" tool delegates to
 // `aphrodite::Resolve::Expand::Fn` -> `resolve_one`, which already strips a
@@ -13,7 +13,7 @@ use crate::Tool::Dispatch::Fn as dispatch;
 // pins that the delegation actually carries the tolerance through.
 #[test]
 fn test_retrieve_normalizes_pipe_suffixed_and_whitespace_hash() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let content = "fn answer() -> i32 { 42 }\n".repeat(10);
 	let compressed = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
 	let hash = compressed["hash"].as_str().expect("hash present").to_string();
@@ -27,7 +27,7 @@ fn test_retrieve_normalizes_pipe_suffixed_and_whitespace_hash() {
 
 #[test]
 fn test_retrieve_with_query_filters_lines() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let content = "alpha line\nbeta error here\ngamma line\n";
 	let c = dispatch("aphrodite_compress", &serde_json::json!({"content": content}).to_string());
 	let hash = c["hash"].as_str().unwrap().to_string();
@@ -43,7 +43,7 @@ fn test_retrieve_with_query_filters_lines() {
 #[test]
 fn test_retrieve_path_outside_workspace_is_denied() {
 	// /etc/hosts exists and is outside any repo cwd → must be refused.
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let r = dispatch("aphrodite_retrieve", &serde_json::json!({"path": "/etc/hosts"}).to_string());
 	assert_eq!(r["found"], false, "reads outside the workspace must be denied: {r:?}");
 	assert!(r["error"].as_str().unwrap().contains("outside the workspace"));
@@ -52,7 +52,7 @@ fn test_retrieve_path_outside_workspace_is_denied() {
 #[test]
 fn test_retrieve_path_within_workspace_ok() {
 	// This source file is inside the crate (workspace) → allowed.
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let r = dispatch(
 		"aphrodite_retrieve",
 		&serde_json::json!({"path": concat!(env!("CARGO_MANIFEST_DIR"), "/Source/Tool/Read/Fn.rs")}).to_string(),
@@ -63,7 +63,7 @@ fn test_retrieve_path_within_workspace_ok() {
 
 #[test]
 fn test_retrieve_missing_hash() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let r = dispatch(
 		"aphrodite_retrieve",
 		&serde_json::json!({"hash": "deadbeefdeadbeefdeadbeef"}).to_string(),

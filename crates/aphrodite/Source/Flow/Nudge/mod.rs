@@ -10,4 +10,3 @@ pub mod Purge;
 pub mod Push;
 pub mod Render;
 
-pub use self::{Purge::Fn::PurgeExpiredNudges, Push::Fn::PushNudge, Render::Fn::RenderNudges};

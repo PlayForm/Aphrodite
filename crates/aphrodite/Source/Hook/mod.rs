@@ -38,14 +38,8 @@ pub mod Tool;
 pub mod ToolResult;
 
 #[cfg(test)]
-mod Test;
+pub mod Test;
 
 // ── Public surface (called from `Library.rs`, `Proxy/`, `Retrieve/` and the
 // `aphrodite-hermes` bridge) ───────────────────────────────────────────────
 
-pub use Terminal::Entry::Fn::{
-	TransformTerminalOutput,
-	TransformTerminalOutputClassified,
-	TransformTerminalOutputWithMeta,
-};
-pub use ToolResult::Entry::Fn::{TransformToolResult, TransformToolResultClassified, TransformToolResultWithMeta};

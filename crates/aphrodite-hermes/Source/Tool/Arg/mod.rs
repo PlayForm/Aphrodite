@@ -5,6 +5,5 @@
 //! would need its own missing-field error, and the error text would drift per
 //! tool.
 
-mod Fn;
+pub mod Fn;
 
-pub use Fn::Fn;

@@ -9,4 +9,3 @@
 
 pub mod Struct;
 
-pub use Struct::ActiveDirective;

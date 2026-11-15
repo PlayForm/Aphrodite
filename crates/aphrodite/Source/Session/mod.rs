@@ -20,12 +20,5 @@ pub mod Start;
 pub mod Turn;
 
 #[cfg(test)]
-mod Test;
+pub mod Test;
 
-pub use Archive::Fn::ArchiveTurn;
-pub use Catalog::Fn::CatalogSummary;
-pub use Engine::Fn::EngineMaybeArchive;
-pub use Index::Fn::GetConvIndex;
-pub use Start::Fn::OnSessionStart;
-pub use Turn::Fn::NextTurn;
-pub(crate) use Turn::ConvIndexCap;

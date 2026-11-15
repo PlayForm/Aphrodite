@@ -1,5 +1,4 @@
 //! Lookup of one schema by tool name.
 
-mod Fn;
+pub mod Fn;
 
-pub use Fn::Fn;

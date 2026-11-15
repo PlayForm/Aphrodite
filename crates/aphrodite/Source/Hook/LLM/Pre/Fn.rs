@@ -1,6 +1,6 @@
 //! The pre-LLM-call hook.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Pre-LLM call hook - inject catalog + active directives into context.
 ///
@@ -19,7 +19,7 @@ pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 	let Directives = crate::Directive::Build::Fn(&State.Directives, &State.ActiveDirectives);
 	// catalog_summary is now called inside build_turn_context - don't call
 	// it separately (04-F3: double call skipped delta tracking every other turn).
-	let Context = crate::Flow::BuildTurnContext(State, None);
+	let Context = crate::Flow::TurnContext::Fn::BuildTurnContext(State, None);
 	serde_json::json!({
 		"status": "ok",
 		"compressed_count": State.RecentMarkers.len(),

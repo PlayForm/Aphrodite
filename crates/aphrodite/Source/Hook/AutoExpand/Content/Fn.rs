@@ -1,6 +1,6 @@
 //! Resolve a freshly stored hash inline for auto-expand.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Resolve a freshly stored hash through the crate's recursive resolution
 /// entry point (port of the pre-Rust `_resolve_recursive` auto-expand path).

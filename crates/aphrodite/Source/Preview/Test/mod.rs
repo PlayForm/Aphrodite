@@ -11,7 +11,7 @@ use super::*;
 
 /// Serializes tests that mutate the process-global preview cap (cargo runs this
 /// module's tests concurrently; the cap is process-wide).
-fn CapGuard() -> std::sync::MutexGuard<'static, ()> { crate::Preview::PreviewCapTestGuard() }
+fn CapGuard() -> std::sync::MutexGuard<'static, ()> { crate::Preview::State::Guard::Fn() }
 
 const GitStatus:&str = " M crates/aphrodite/src/preview.rs\n M crates/aphrodite/src/hooks.rs\nA  src/new_a.rs\nA  \
                         src/new_b.rs\nD  src/old.rs\n?? tmp/scratch\n?? tmp/other\n?? build/log";

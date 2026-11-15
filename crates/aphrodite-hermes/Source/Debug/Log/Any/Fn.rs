@@ -12,4 +12,4 @@ use crate::Debug::Log::Level;
 /// It is not a substitute for `effective_level`: a caller that needs to know
 /// WHICH level to log at must ask the level, since this collapses 1 and 2 into
 /// the same answer.
-pub(crate) fn Fn(state:&aphrodite::State::AphroditeState, session:&str) -> bool { Level::Fn(state, session) != 0 }
+pub(crate) fn Fn(state:&aphrodite::State::AphroditeState, session:&str) -> bool { Level::Fn::Fn(state, session) != 0 }

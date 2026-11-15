@@ -7,7 +7,8 @@
 //! fork on what the pipeline does with it.
 
 use super::super::Inner::Fn::Fn as TransformToolResultInner;
-use crate::{Hook::Meta::Struct::Struct as ToolCallMeta, State::AphroditeState};
+use crate::Hook::Meta::Struct::Struct as ToolCallMeta;
+use crate::State::Struct::AphroditeState;
 
 /// Transform tool output - full compression pipeline.
 pub fn TransformToolResult(State:&mut AphroditeState, Content:&str, ToolName:&str) -> serde_json::Value {

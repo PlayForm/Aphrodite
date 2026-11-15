@@ -1,10 +1,11 @@
 //! Split marked terminal output into per-segment markers.
 
-use crate::{
-	ChainSplit::{ErrorHint::Fn::Fn as SegmentErrorHint, Marked::Output::Fn::Fn as SplitMarkedOutput, SegMarker},
-	Marker::CCRMarker,
-	State::{AphroditeState, MarkerEntry},
-};
+use crate::ChainSplit::ErrorHint::Fn::Fn as SegmentErrorHint;
+use crate::ChainSplit::Marked::Output::Fn::Fn as SplitMarkedOutput;
+use crate::ChainSplit::Const::SegMarker;
+use crate::Marker::Format::Entry::CCRMarker;
+use crate::State::Struct::AphroditeState;
+use crate::State::Marker::Struct::MarkerEntry;
 
 /// Split marked output into one stored, previewed, retrievable marker per
 /// segment. Returns `None` when the feature is off, when auto-expand owns the
@@ -38,7 +39,7 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, DoAutoExpand:bool) -> 
 		let SegHash = headroom_core::ccr::compute_key(SegText.as_bytes());
 		State.InlineStorePut(SegHash.clone(), SegText.to_string());
 		SegHashes.push(SegHash.clone());
-		let mut Preview = crate::BuildPreview(&TypeStr, SegText);
+		let mut Preview = crate::Preview::Builder::Entry::Fn(&TypeStr, SegText);
 		// Tier 3: per-segment error hint - content-level only. When
 		// this segment's own output carries an error signal, surface
 		// it in the preview so the LLM sees which segment failed and

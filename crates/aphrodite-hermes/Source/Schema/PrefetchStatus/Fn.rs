@@ -18,6 +18,6 @@ pub(crate) fn Fn() -> serde_json::Value {
 			markers, not a progress bar. Takes no arguments. \
 			Returns {loading: [], ready: [{path, hash, type, size}], errors: [], \
 			total_ready}.",
-		"parameters": NoParams::Fn()
+		"parameters": NoParams::Fn::Fn()
 	})
 }

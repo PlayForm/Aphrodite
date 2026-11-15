@@ -1,6 +1,7 @@
 //! `aphrodite_rebuild` - the operational state report.
 
-use crate::{Tool::Dispatch::ToolHandler, proxy_health};
+use Tool::Dispatch::Fn::ToolHandler;
+use Health::Proxy::Fn::proxy_health;
 
 /// The `aphrodite_rebuild` handler.
 ///

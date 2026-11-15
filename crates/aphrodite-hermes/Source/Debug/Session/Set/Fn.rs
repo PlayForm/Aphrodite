@@ -4,10 +4,10 @@
 //! cache by hand: a write within the same filesystem timestamp granularity would
 //! otherwise leave the reader returning the previous value.
 
-use crate::Debug::{
-	Flag::{self, FLAG_CACHE},
-	Session::{Last, Root},
-};
+use Debug::Flag::self;
+use Debug::Flag::Cache::FLAG_CACHE;
+use Debug::Session::Last;
+use Debug::Session::Root;
 
 /// Set (or clear) the debug flag for the CURRENT session tree - the tool
 /// entry point for `aphrodite_debug`. Returns the resolved root session id
@@ -25,8 +25,8 @@ use crate::Debug::{
 /// It does not create the runtime home - a missing home surfaces as the write
 /// error, which is the honest answer to "the toggle did not stick".
 pub(crate) fn Fn(on:bool) -> Result<(String, String), String> {
-	let root = Root::Fn();
-	let root = if root.is_empty() { Last::Fn() } else { root };
+	let root = Root::Fn::Fn();
+	let root = if root.is_empty() { Last::Fn::Fn() } else { root };
 	if root.is_empty() {
 		return Err("no session context yet - hooks have not fired in this process".to_string());
 	}

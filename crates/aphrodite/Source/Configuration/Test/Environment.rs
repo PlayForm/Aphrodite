@@ -1,6 +1,7 @@
 //! `EnvironmentBool` - one truthiness rule for boolean env vars everywhere.
 
-use super::{super::EnvironmentBool, Guard::EnvironmentGuard};
+use crate::Configuration::Environment::Bool::Fn::EnvironmentBool;
+use crate::Configuration::Test::Guard::EnvironmentGuard;
 
 // ── T10 (F12): one truthiness rule for boolean env vars everywhere. ──
 #[test]

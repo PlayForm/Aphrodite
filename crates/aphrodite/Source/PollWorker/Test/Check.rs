@@ -1,10 +1,10 @@
 //! The nudge pass: which states speak, and the two-nudge ceiling that keeps
 //! poll workers from eating the directive budget.
 
-use crate::{
-	PollWorker::{Check::Fn::CheckBgTasks, Insert::Fn::InsertBgTask, Task::Status::Enum::BgStatus},
-	State::AphroditeState,
-};
+use crate::PollWorker::Check::Fn::CheckBgTasks;
+use crate::PollWorker::Insert::Fn::InsertBgTask;
+use crate::PollWorker::Task::Status::Enum::BgStatus;
+use crate::State::Struct::AphroditeState;
 
 #[test]
 fn TestCheckBgTasksPushesNudgeForRunning() {

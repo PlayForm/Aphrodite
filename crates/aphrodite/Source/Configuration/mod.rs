@@ -20,8 +20,5 @@ pub mod Environment;
 pub mod Proxy;
 
 #[cfg(test)]
-mod Test;
+pub mod Test;
 
-pub use Environment::{Bool::Fn::EnvironmentBool, Warn::Fn::EnvironmentParseWarn};
-
-pub use crate::State::TemplatesConfiguration;

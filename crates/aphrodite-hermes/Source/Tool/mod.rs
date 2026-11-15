@@ -2,8 +2,8 @@
 //!
 //! Each Hermes tool (`aphrodite_compress`, `aphrodite_retrieve`, ...) has a
 //! handler here that parses args, operates on the current session's state
-//! (see [`crate::with_shared`]), and returns a JSON result. Tools carry no
-//! `session_id` in their args, so [`crate::with_shared`] resolves the
+//! (see [`crate::Session::With::Fn::with_shared`]), and returns a JSON result. Tools carry no
+//! `session_id` in their args, so [`crate::Session::With::Fn::with_shared`] resolves the
 //! session from `Debug::Session::Last::Fn()` (the current turn's session, set by
 //! `pre_llm_call`) and locks ONLY that session's state with a bounded lock -
 //! content compressed by a hook or `aphrodite_compress` stays resolvable by

@@ -1,9 +1,9 @@
 //! Session lifecycle: turn archiving and the poll-worker checkpoints.
 
-use crate::{
-	Hook::LLM::{Post::Fn::Fn as PostLLMCall, Pre::Fn::Fn as PreLLMCall},
-	State::{AphroditeState, MarkerEntry},
-};
+use crate::Hook::LLM::Post::Fn::Fn as PostLLMCall;
+use crate::Hook::LLM::Pre::Fn::Fn as PreLLMCall;
+use crate::State::Struct::AphroditeState;
+use crate::State::Marker::Struct::MarkerEntry;
 
 // ── T13 (F11): post_llm_call must archive the turn's last marker into
 // conv_index so aphrodite_diff returns non-zero results.

@@ -1,10 +1,9 @@
 //! Record a per-call telemetry event.
 
 use super::super::Path::Fn::Fn as WrotePathFrom;
-use crate::{
-	Hook::Meta::Struct::Struct as ToolCallMeta,
-	State::{AphroditeState, ToolEvent},
-};
+use crate::Hook::Meta::Struct::Struct as ToolCallMeta;
+use crate::State::Struct::AphroditeState;
+use crate::State::Event::Struct::ToolEvent;
 
 /// Record a per-call telemetry event from the supplied metadata (P2/T6).
 /// `Okay` is fail-open: a missing `Status` means success. `WrotePath` is
@@ -22,10 +21,10 @@ pub(crate) fn Fn(State:&mut AphroditeState, ToolName:&str, Content:&str, meta:&T
 	let ErrorSig = if Okay {
 		None
 	} else {
-		Some(crate::Flow::ErrorSig(meta.ErrorType, meta.ErrorMessage))
+		Some(crate::Flow::Signature::Error::Fn::ErrorSig(meta.ErrorType, meta.ErrorMessage))
 	};
 	let WrotePath = WrotePathFrom(ToolName, meta.ArgsJSON, Content);
-	let Sig = crate::Flow::NormalizeArgsSig(ToolName, meta.ArgsJSON);
+	let Sig = crate::Flow::Signature::Normalize::Fn::NormalizeArgsSig(ToolName, meta.ArgsJSON);
 	State.RecordToolEvent(ToolEvent {
 		Turn:State.TurnCounter,
 		Tool:ToolName.to_string(),

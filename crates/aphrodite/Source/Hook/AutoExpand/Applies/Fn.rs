@@ -1,6 +1,6 @@
 //! The auto-expand gate.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Auto-expand gate (dylib-side consumer of `[compression] auto_expand`):
 /// when enabled AND the content fits `AutoExpandLimit` bytes, the

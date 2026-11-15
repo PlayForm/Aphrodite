@@ -5,7 +5,7 @@
 //! one-shots that correct the model's current behaviour, not a second
 //! directive channel, and an uncapped list would grow into one.
 
-use crate::State::AphroditeState;
+use crate::State::Struct::AphroditeState;
 
 /// Render at most 2 active inline nudges as `[nudge: <text>]` lines, newest
 /// wins (P3/T9). An entry renders while it has not expired

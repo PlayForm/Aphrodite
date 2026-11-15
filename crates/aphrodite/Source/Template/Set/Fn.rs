@@ -1,6 +1,7 @@
 //! `SetTemplates`: register the parsed `[templates]` section.
 
-use crate::{State::TemplatesConfiguration, Template::State::Fn::Fn as State};
+use crate::State::Template::Struct::TemplatesConfiguration;
+use crate::Template::State::Fn::Fn as State;
 
 /// Register the `[templates]` config (None = hardcoded builders remain the
 /// default). Returns the previous value so callers (tests, hot-reload) can

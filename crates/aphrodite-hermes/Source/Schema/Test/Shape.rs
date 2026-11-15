@@ -12,7 +12,7 @@ use crate::Schema::All;
 /// rather than per tool.
 #[test]
 fn test_all_schemas_are_well_formed() {
-	for s in All::Fn() {
+	for s in All::Fn::Fn() {
 		let name = s["name"].as_str().expect("name must be a string");
 		assert!(name.starts_with("aphrodite_"), "{name}: unexpected tool name prefix");
 
@@ -78,7 +78,7 @@ fn test_all_schemas_are_well_formed() {
 /// truncated with an ellipsis, so the lead sentence has to stand alone.
 #[test]
 fn test_first_sentence_fits_catalog_listing() {
-	for s in All::Fn() {
+	for s in All::Fn::Fn() {
 		let name = s["name"].as_str().unwrap_or_default();
 		let desc = s["description"].as_str().unwrap_or_default();
 		let first = desc.split(['.', '!', '?', '\n']).next().unwrap_or_default();

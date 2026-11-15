@@ -4,7 +4,8 @@
 //! schema added without a handler (an advertised tool that always errors) or a
 //! handler added without a schema (a tool the model can never discover).
 
-use crate::Tool::{Dispatch::Fn as dispatch, Registry};
+use Tool::Dispatch::Fn::Fn as dispatch;
+use Tool::Registry;
 
 #[test]
 fn test_unknown_tool() {
@@ -20,12 +21,12 @@ fn schema_registry_names_match_tool_registry_keys() {
 	// which is an internal hook handler registered via
 	// `ctx.register_context_engine` - never exposed as a callable tool
 	// to Hermes, so it has no schema by design).
-	let registry_names:std::collections::HashSet<&str> = Registry::Fn()
+	let registry_names:std::collections::HashSet<&str> = Registry::Fn::Fn()
 		.keys()
 		.copied()
 		.filter(|n| *n != "context_engine_pre_llm")
 		.collect();
-	let schema_names:std::collections::HashSet<String> = crate::Schema::All::Fn()
+	let schema_names:std::collections::HashSet<String> = crate::Schema::All::Fn::Fn()
 		.iter()
 		.map(|s| s["name"].as_str().unwrap().to_string())
 		.collect();
@@ -46,7 +47,7 @@ fn schema_registry_names_match_tool_registry_keys() {
 
 #[test]
 fn test_test_tool_roundtrips() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let r = dispatch("aphrodite_test", &serde_json::json!({"mode": "full"}).to_string());
 	assert_eq!(r["status"], "ok", "smoke test should pass: {:?}", r);
 	assert_eq!(r["passed"], r["total"]);
@@ -54,7 +55,7 @@ fn test_test_tool_roundtrips() {
 
 #[test]
 fn test_prefetch_real_file() {
-	let _g = crate::test_guard();
+	let _g = crate::Session::Guard::Fn::test_guard();
 	let src = concat!(env!("CARGO_MANIFEST_DIR"), "/Source/Tool/mod.rs");
 	let r = dispatch("aphrodite_prefetch", &serde_json::json!({"paths": [src]}).to_string());
 	assert_eq!(r["loaded"], 1, "prefetch should load this source file: {:?}", r);

@@ -2,6 +2,5 @@
 //!
 //! Dev-only: the sole caller is the `aphrodite_debug` tool.
 
-mod Fn;
+pub mod Fn;
 
-pub(crate) use Fn::Fn;
