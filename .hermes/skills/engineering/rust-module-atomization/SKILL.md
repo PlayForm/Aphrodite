@@ -249,6 +249,34 @@ produced a broken build or a silently wrong rewrite:
 Worked mechanics (the parse, the rewrite, the three failure signatures) live in
 `references/alias-sweep.md`.
 
+## No-build sweeps (structural self-check)
+
+A sweep card that forbids `cargo check`/`clippy`/`fmt` (the build belongs to a
+later verification card) still has to be verifiably structural. These checks
+catch the error classes a build catches first, without compiling:
+
+- Every `mod X;` in a facade resolves to `X.rs` or `X/`, every non-`mod.rs`
+  `.rs` file is declared by its parent facade, and no directory lacks a
+  `mod.rs`. A missing declaration drops a whole module silently - it is not a
+  warning. Probe: a script that walks the area, regexes
+  `^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;` per facade and `stat`s the
+  target.
+- No duplicate `mod X;` in one facade (same script, count per name).
+- Zero remaining references to every item you renamed or deleted:
+  `grep -rn '<OldPath>' --include=*.rs .`. A consumer in a directory the card
+  does not own still breaks the build, so its one-line update is part of the
+  change - not scope creep. Record it in the handoff.
+- Brace/paren/bracket balance per file, with a tokenizer that skips strings and
+  comments: `write_file` reports `lint: skipped (untrusted workspace)` for `.rs`
+  outside a trusted rustfmt workspace, so it proves nothing about syntax.
+  `rustc -Zparse-only` is NOT an option - removed as of nightly 1.102
+  (`error: unknown unstable option: 'parse-only'`).
+
+What this cannot prove - types, trait bounds, borrows, `dead_code` - stays for
+the verification card. Keep new items' accessors and variants each reachable
+from a real call site in the same change, or `-D warnings` fails on dead code
+before anything else does.
+
 ## Pitfalls
 
 - **A rename pass that rewrites module identifiers also hits four things that
