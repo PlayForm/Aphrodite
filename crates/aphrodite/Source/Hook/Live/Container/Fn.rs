@@ -21,6 +21,13 @@ use crate::{
 /// path something to serve progressively. Dropping either one breaks a
 /// different consumer.
 pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> serde_json::Value {
+	let Span = tracing::info_span!(
+		"hook.live_container",
+		ccr_type = %TypeStr,
+		content_bytes = Content.len(),
+		chunks = tracing::field::Empty,
+	);
+	let _Entered = Span.enter();
 	let hash = headroom_core::ccr::compute_key(Content.as_bytes());
 	let Total = Content.len();
 	let Chunks = ChunkOnCharBoundaries(Content, LiveChunkSize);
@@ -60,7 +67,8 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> serde
 
 	// DEV-ONLY debug metrics (crate::debug): count the live-container wrap.
 	crate::Debug::Count::Bump::Fn::Fn(crate::Debug::Count::Enum::Enum::LiveContainers);
-	serde_json::json!({
+	Span.record("chunks", n);
+	let Payload = serde_json::json!({
 		"status": "ok",
 		"compressed": true,
 		"live": true,
@@ -71,5 +79,6 @@ pub(crate) fn Fn(State:&mut AphroditeState, Content:&str, TypeStr:&str) -> serde
 		"bytes_arrived": 0,
 		"preview": Preview,
 		"marker": Marker,
-	})
+	});
+	Payload
 }

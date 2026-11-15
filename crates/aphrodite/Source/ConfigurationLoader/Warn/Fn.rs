@@ -38,7 +38,7 @@ pub(crate) fn WarnParseFailure(path:&std::path::Path, error:&toml::de::Error, Ac
 	// holding one saw the warning routed to stderr and never reached its own
 	// subscriber.
 	match !tracing::dispatcher::has_been_set() {
-		true => eprintln!("[aphrodite] {}", Message),
+		true => crate::Logging::Stderr::Fn::Fn(&format!("[aphrodite] {Message}")),
 		false => (),
 	}
 }

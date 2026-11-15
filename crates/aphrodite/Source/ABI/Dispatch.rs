@@ -46,6 +46,19 @@ pub extern "C" fn AphroditeDispatch(
 
 	let Tool = Args.get("tool_name").and_then(|v| v.as_str()).unwrap_or("unknown");
 
+	// One span per host call. The hook name is the routing key and the handle is
+	// the session, so a trace line answers "which session asked for what"; the
+	// content is measured, never logged, and `ok` is filled in at the end.
+	let Span = tracing::info_span!(
+		"abi.dispatch",
+		hook = %name,
+		tool = %Tool,
+		handle = Hid,
+		content_bytes = Content.len(),
+		ok = tracing::field::Empty,
+	);
+	let _Entered = Span.enter();
+
 	// F9: read prefetch files from disk BEFORE taking the HANDLES lock, not
 	// inside `WithState`'s closure - up to 10MB per file was previously
 	// read while holding the *global* handle-map mutex, serializing every
@@ -64,7 +77,7 @@ pub extern "C" fn AphroditeDispatch(
 		false => None,
 	});
 
-	match WithState(Hid, |s| {
+	let (Result, Succeeded) = match WithState(Hid, |s| {
 		match name.as_ref() {
 			"on_session_start" | "session_start" => crate::Hook::Session::Fn::Fn(s),
 			"transform_tool_result" => crate::Hook::ToolResult::Entry::Fn::TransformToolResult(s, Content, Tool),
@@ -142,7 +155,9 @@ pub extern "C" fn AphroditeDispatch(
 			_ => serde_json::json!({"error": format!("unknown hook: {}", name)}),
 		}
 	}) {
-		Ok(v) => ToJSONOk(&v),
-		Err(e) => ToJSONError(&format!("{e:#}")),
-	}
+		Ok(v) => (ToJSONOk(&v), true),
+		Err(e) => (ToJSONError(&format!("{e:#}")), false),
+	};
+	Span.record("ok", Succeeded);
+	Result
 }

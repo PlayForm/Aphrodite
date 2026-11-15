@@ -19,7 +19,15 @@ pub async fn Run() -> anyhow::Result<()> {
 	let (ConfigurationPath, UseMultiConfiguration) = Configuration::Path::Resolve();
 	let (MultiConfiguration, CLIFallback, LogCompact) =
 		Configuration::Load::Load(&ConfigurationPath, UseMultiConfiguration)?;
-	Configuration::Tracing::Subscribe(LogCompact)?;
+	// The configured level: `--dev` is the one knob that names a verbosity
+	// ("verbose request/response logging"), so it is the configured `debug`.
+	// Everything else defers to `APHRODITE_LOG`, then `RUST_LOG`, then `info` -
+	// see `Logging::Level`.
+	let ConfiguredLevel = match CLIFallback.as_ref().map(|CLI| CLI.Dev) {
+		Some(true) => Some(tracing::Level::DEBUG),
+		_ => None,
+	};
+	aphrodite::Logging::Fn::Fn(LogCompact, ConfiguredLevel)?;
 	let Compression = Configuration::Compression::Compression(MultiConfiguration.as_ref());
 	let Proxies = Configuration::Proxies::Assemble(MultiConfiguration, CLIFallback)?;
 	Announce(Proxies.len());

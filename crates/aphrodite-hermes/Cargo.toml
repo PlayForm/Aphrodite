@@ -20,6 +20,13 @@ aphrodite = { path = "../aphrodite", version = "1.8.1", default-features = false
 anyhow = { workspace = true }
 serde_json = { workspace = true }
 notify = "8.2.1"
+# Logging: `tracing` is the only emission API in this crate, and
+# `tracing-subscriber` is what installs the one process-wide `EnvFilter`
+# subscriber (see `Source/Debug/Init/`). `env-filter` is the RUST_LOG /
+# APHRODITE_LOG support §4.5 requires; `fmt` is the stderr layer. No `json`
+# feature: this dylib writes into a host process's stderr, not a log shipper.
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 
 # Build-time FFI codegen (cbindgen -> aphrodite_hermes.h -> ctypesgen ->
 # plugins/aphrodite/_bindings.py). These crates are consumed by build.rs and

@@ -32,7 +32,7 @@ pub(crate) fn Fn(dir:&Path) -> serde_json::Value {
 		Err(e) => {
 			let msg = format!("could not create directives dir {}: {}; nothing materialized", dir.display(), e);
 			warnings.push(msg.clone());
-			eprintln!("aphrodite-hermes: {msg}");
+			crate::Debug::Warn::Fn::Fn(&msg);
 
 			return json!({
 				"status": "ok",
@@ -63,7 +63,7 @@ pub(crate) fn Fn(dir:&Path) -> serde_json::Value {
 					Ok(()) => written.push(file_name),
 					Err(we) => {
 						warnings.push(format!("could not write directives/{file_name}: {we}"));
-						eprintln!("aphrodite-hermes: directives/{file_name} write failed: {we}");
+						crate::Debug::Warn::Fn::Fn(&format!("directives/{file_name} write failed: {we}"));
 					},
 				}
 			},

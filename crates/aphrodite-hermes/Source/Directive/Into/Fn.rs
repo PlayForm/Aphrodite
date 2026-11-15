@@ -17,8 +17,12 @@ use crate::Directive::{Materialize, Resolve};
 /// whole resolution, which is what makes a second call idempotent rather than
 /// additive.
 pub(crate) fn Fn(home_param:&str) -> serde_json::Value {
+	// `materialize_directives` is the earliest thing the Python loader calls,
+	// so it is where a cold process gets its subscriber (`Debug::Init`).
+	crate::Debug::Init::Fn::Fn();
+
 	let (dir, warnings) = Resolve::Fn::Fn(home_param);
-	warnings.iter().for_each(|w| eprintln!("aphrodite-hermes: {w}"));
+	warnings.iter().for_each(|w| crate::Debug::Warn::Fn::Fn(w));
 
 	let mut result = Materialize::Fn::Fn(&dir);
 

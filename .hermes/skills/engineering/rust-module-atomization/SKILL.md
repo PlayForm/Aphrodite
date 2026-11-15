@@ -85,6 +85,20 @@ to save a build.
 
 ## Multi-file orchestration (parallel agents)
 
+**Gate a card to the parent whose OUTPUT it consumes, not to the card that happens
+to precede it in your head.** A sibling gate means "these two may run together":
+when the anyhow card and the `if`/`match` card were both children of the
+`pub use` removal card, completing that card spawned all three at once - one
+rewriting return types crate-wide while the other rewrote bodies crate-wide, on
+the same files. Two rules that prevent it: cards that change a *signature* must
+be parents of cards that change a *body*, and the only cards that may be
+siblings are ones owning disjoint trees (one per crate, one per module group).
+A mis-gate is recoverable but expensive: `complete` refuses a `scheduled` or
+`running` card, `reclaim` releases the claim without stopping the process, and
+`--force` closes the run record while the worker keeps draining - so the
+orphans keep writing for a while and can revert a file the live worker just
+finished.
+
 To atomize a whole crate, dispatch one agent per file with DISJOINT file
 ownership. The migration is parallel-safe because `pub mod X;` in lib.rs
 needs NO change when `X.rs` becomes `X/mod.rs` - a directory module

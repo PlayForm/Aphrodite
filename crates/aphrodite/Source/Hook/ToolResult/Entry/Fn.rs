@@ -5,13 +5,24 @@
 //! metadata. They exist as separate functions because the FFI, the proxy and
 //! the bridge each know a different amount about the call; they must never
 //! fork on what the pipeline does with it.
+//!
+//! Every form opens the same `hook.tool_result` span (`Span/`) and records the
+//! pipeline's decision on it (`Hook::Outcome::Record`), so one trace line says
+//! which gate answered - `below_threshold`, `essential_tool` or `compressed`.
 
-use super::super::Inner::Fn::Fn as TransformToolResultInner;
-use crate::{Hook::Meta::Struct::Struct as ToolCallMeta, State::Struct::AphroditeState};
+use super::{super::Inner::Fn::Fn as TransformToolResultInner, Span::Fn::Fn as ToolSpan};
+use crate::{
+	Hook::{Meta::Struct::Struct as ToolCallMeta, Outcome::Record::Fn::Fn as RecordOutcome},
+	State::Struct::AphroditeState,
+};
 
 /// Transform tool output - full compression pipeline.
 pub fn TransformToolResult(State:&mut AphroditeState, Content:&str, ToolName:&str) -> serde_json::Value {
-	TransformToolResultInner(State, Content, ToolName, None, &ToolCallMeta::default())
+	let Span = ToolSpan(ToolName, Content.len());
+	let _Entered = Span.enter();
+	let Payload = TransformToolResultInner(State, Content, ToolName, None, &ToolCallMeta::default());
+	RecordOutcome(&Span, &Payload);
+	Payload
 }
 
 /// Same as [`TransformToolResult`], but a caller that has already found the
@@ -27,7 +38,11 @@ pub fn TransformToolResultClassified(
 	ToolName:&str,
 	Classify:Option<(&str, &str)>,
 ) -> serde_json::Value {
-	TransformToolResultInner(State, Content, ToolName, Classify, &ToolCallMeta::default())
+	let Span = ToolSpan(ToolName, Content.len());
+	let _Entered = Span.enter();
+	let Payload = TransformToolResultInner(State, Content, ToolName, Classify, &ToolCallMeta::default());
+	RecordOutcome(&Span, &Payload);
+	Payload
 }
 
 /// Same as [`TransformToolResultClassified`], plus the Hermes-supplied call
@@ -41,5 +56,9 @@ pub fn TransformToolResultWithMeta(
 	Classify:Option<(&str, &str)>,
 	meta:&ToolCallMeta,
 ) -> serde_json::Value {
-	TransformToolResultInner(State, Content, ToolName, Classify, meta)
+	let Span = ToolSpan(ToolName, Content.len());
+	let _Entered = Span.enter();
+	let Payload = TransformToolResultInner(State, Content, ToolName, Classify, meta);
+	RecordOutcome(&Span, &Payload);
+	Payload
 }

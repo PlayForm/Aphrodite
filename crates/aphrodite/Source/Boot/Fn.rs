@@ -62,7 +62,11 @@ pub fn Fn() -> anyhow::Result<()> {
 							println!("setup complete, starting proxy...");
 						},
 						Err(e) => {
-							eprintln!("setup failed: {e:#}");
+							// The subscriber cannot exist on this path yet: `setup`
+							// runs before the configuration is parsed, so this is
+							// the pre-subscriber sink rather than a `tracing`
+							// event that would be dropped.
+							aphrodite::Logging::Stderr::Fn::Fn(&format!("setup failed: {e:#}"));
 							std::process::exit(1);
 						},
 					}
@@ -76,15 +80,18 @@ pub fn Fn() -> anyhow::Result<()> {
 
 	// Worker thread count - I/O-bound proxy needs more than CPU cores.
 	// Default: 4× CPU or 32 minimum. Override: APHRODITE_WORKER_THREADS.
-	// F15: warn (via eprintln, not tracing - the subscriber isn't initialized
-	// this early, see `run()`'s matching comment) on a malformed value
-	// instead of silently falling back, mirroring `ApplyPortOverride`.
+	// F15: warn on a malformed value instead of silently falling back,
+	// mirroring `ApplyPortOverride`. The pre-subscriber sink, not `tracing`:
+	// the worker pool is built before `Boot::Run` parses the configuration, so
+	// no subscriber exists yet and a `tracing::warn!` would be dropped.
 	let WorkerThreads = match std::env::var("APHRODITE_WORKER_THREADS") {
 		Ok(v) => {
 			match v.parse::<usize>() {
 				Ok(n) => n,
 				Err(_) => {
-					eprintln!("APHRODITE_WORKER_THREADS={v:?} is not a valid number; using the computed default");
+					aphrodite::Logging::Stderr::Fn::Fn(&format!(
+						"APHRODITE_WORKER_THREADS={v:?} is not a valid number; using the computed default"
+					));
 					let Cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
 					(Cpus * 4).max(32)
 				},

@@ -5,12 +5,16 @@
 //! call. `Returncode` is what makes the error-loop breaker work: a failing
 //! command is a signal even when the output is too small to compress.
 
-use super::super::Inner::Fn::Fn as TransformTerminalOutputInner;
-use crate::State::Struct::AphroditeState;
+use super::{super::Inner::Fn::Fn as TransformTerminalOutputInner, Span::Fn::Fn as TerminalSpan};
+use crate::{Hook::Outcome::Record::Fn::Fn as RecordOutcome, State::Struct::AphroditeState};
 
 /// Transform terminal output - exit code aware.
 pub fn TransformTerminalOutput(State:&mut AphroditeState, Content:&str) -> serde_json::Value {
-	TransformTerminalOutputClassified(State, Content, None)
+	let Span = TerminalSpan(Content.len(), None, None);
+	let _Entered = Span.enter();
+	let Payload = TransformTerminalOutputInner(State, Content, None, None, None);
+	RecordOutcome(&Span, &Payload);
+	Payload
 }
 
 /// Same as [`TransformTerminalOutput`], with the same `Classify` contract
@@ -20,7 +24,11 @@ pub fn TransformTerminalOutputClassified(
 	Content:&str,
 	Classify:Option<(&str, &str)>,
 ) -> serde_json::Value {
-	TransformTerminalOutputInner(State, Content, Classify, None, None)
+	let Span = TerminalSpan(Content.len(), None, None);
+	let _Entered = Span.enter();
+	let Payload = TransformTerminalOutputInner(State, Content, Classify, None, None);
+	RecordOutcome(&Span, &Payload);
+	Payload
 }
 
 /// Same as [`TransformTerminalOutputClassified`], plus the Hermes-supplied
@@ -33,5 +41,9 @@ pub fn TransformTerminalOutputWithMeta(
 	command:Option<&str>,
 	Returncode:Option<i64>,
 ) -> serde_json::Value {
-	TransformTerminalOutputInner(State, Content, Classify, command, Returncode)
+	let Span = TerminalSpan(Content.len(), command, Returncode);
+	let _Entered = Span.enter();
+	let Payload = TransformTerminalOutputInner(State, Content, Classify, command, Returncode);
+	RecordOutcome(&Span, &Payload);
+	Payload
 }

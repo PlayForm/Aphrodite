@@ -49,7 +49,8 @@ pub(crate) fn spawn_config_watcher() {
 			}) {
 				Ok(w) => w,
 				Err(e) => {
-					eprintln!("[aphrodite] config auto-reload watcher failed to start: {e}");
+					crate::Debug::Warn::Fn::Fn(&format!("config auto-reload watcher failed to start: {e}"));
+
 					return;
 				},
 			};
@@ -57,7 +58,9 @@ pub(crate) fn spawn_config_watcher() {
 			watch_dirs.iter().for_each(|dir| {
 				match watcher.watch(dir, notify::RecursiveMode::NonRecursive) {
 					Ok(()) => {},
-					Err(e) => eprintln!("[aphrodite] config auto-reload: cannot watch {}: {e}", dir.display()),
+					Err(e) => {
+						crate::Debug::Warn::Fn::Fn(&format!("config auto-reload: cannot watch {}: {e}", dir.display()))
+					},
 				}
 			});
 

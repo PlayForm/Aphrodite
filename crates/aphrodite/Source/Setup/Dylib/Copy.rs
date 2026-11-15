@@ -150,10 +150,10 @@ pub(crate) fn Fn(Context:&SetupContext) -> anyhow::Result<()> {
 								// Optional core dylib: degrade gracefully (F9) - the
 								// Hermes plugin runtime never loads it, so setup can
 								// complete without it.
-								eprintln!(
+								crate::Logging::Stderr::Fn::Fn(&format!(
 									"WARNING: optional dylib '{name}' could not be located or downloaded ({e}); \
 									 continuing without it - the Hermes plugin loads only the *_hermes dylib"
-								);
+								));
 								return Ok(());
 							},
 						}

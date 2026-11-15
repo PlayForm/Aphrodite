@@ -23,20 +23,20 @@ pub(crate) fn configured_ports() -> (u16, u16) {
 	// left an operator with no way to tell "my override didn't apply" from "I
 	// didn't set an override" (the exact bug class `apply_port_override`'s
 	// comment in `aphrodite::config` documents).
-	// This crate has no logging/tracing subscriber of its own (it's a dylib
-	// loaded into the host Python process, not a standalone binary) - use
-	// `eprintln!` directly so the warning actually reaches the host's
-	// captured stderr instead of a silently-unsubscribed `tracing` call.
+	// This crate installs its own `tracing` subscriber (`Debug::Init`) but may
+	// lose the global-dispatcher race to the host, so route the warning through
+	// `Debug::Warn`: it logs via tracing AND falls back to stderr in exactly the
+	// unsubscribed case. A typo'd port must never be invisible.
 	let port_from_env = |var:&str, default:u16| {
 		match std::env::var(var) {
 			Ok(v) => {
 				match v.parse::<u16>() {
 					Ok(port) => port,
 					Err(_) => {
-						eprintln!(
-							"aphrodite-hermes: {}={:?} is not a valid port (1-65535); using default {}",
+						crate::Debug::Warn::Fn::Fn(&format!(
+							"{}={:?} is not a valid port (1-65535); using default {}",
 							var, v, default
-						);
+						));
 						default
 					},
 				}

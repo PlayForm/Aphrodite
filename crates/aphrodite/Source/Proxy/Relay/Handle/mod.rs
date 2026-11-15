@@ -1,5 +1,7 @@
 //! `Handle` - The `/tool_relay` handler: validate, dispatch, answer.
 //!
-//! The item lives in `Fn.rs`; this facade only declares it.
+//! `Fn` opens the relay span and `Route` is its body; this facade only declares
+//! them.
 
 pub mod Fn;
+pub mod Route;

@@ -31,6 +31,7 @@ pub mod Hash;
 pub mod LLM;
 pub mod Live;
 pub mod Meta;
+pub mod Outcome;
 pub mod Path;
 pub mod Session;
 pub mod Terminal;

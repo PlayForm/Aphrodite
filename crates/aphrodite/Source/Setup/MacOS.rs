@@ -11,7 +11,7 @@ use std::{fs, path::Path, process::Command};
 
 use anyhow::Context;
 
-use crate::Setup::Write::Permissions::Fn as SecurePerms;
+use crate::{Logging::Stderr::Fn::Fn as StderrLine, Setup::Write::Permissions::Fn as SecurePerms};
 
 /// Copy `Src` to `Dest` with the full macOS treatment, then harden permissions.
 ///
@@ -43,10 +43,10 @@ pub(crate) fn Fn(Src:&Path, Dest:&Path, DylibIDName:Option<&str>, Mode:u32) -> a
 			match Command::new("xattr").args(["-c", Dest.to_str().unwrap_or("")]).output() {
 				Ok(Out) if Out.status.success() => {},
 				_ => {
-					eprintln!(
+					StderrLine(&format!(
 						"warning: xattr -c failed or unavailable for {} - Gatekeeper may still kill this artifact",
 						Dest.display()
-					)
+					))
 				},
 			}
 		},
@@ -61,11 +61,11 @@ pub(crate) fn Fn(Src:&Path, Dest:&Path, DylibIDName:Option<&str>, Mode:u32) -> a
 			{
 				Ok(Out) if Out.status.success() => {},
 				_ => {
-					eprintln!(
+					StderrLine(&format!(
 						"warning: install_name_tool failed or unavailable for {} - Gatekeeper may kill Hermes when \
 						 loading this dylib; install Xcode Command Line Tools and re-run setup",
 						Dest.display()
-					)
+					))
 				},
 			}
 			// Ad-hoc re-sign: install_name_tool invalidates the dylib's embedded
@@ -76,10 +76,10 @@ pub(crate) fn Fn(Src:&Path, Dest:&Path, DylibIDName:Option<&str>, Mode:u32) -> a
 			{
 				Ok(Out) if Out.status.success() => {},
 				_ => {
-					eprintln!(
+					StderrLine(&format!(
 						"warning: codesign failed or unavailable for {} - Gatekeeper may still kill this dylib",
 						Dest.display()
-					)
+					))
 				},
 			}
 		},

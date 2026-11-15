@@ -30,7 +30,7 @@ pub(crate) fn Fn(_Context:&SetupContext) -> anyhow::Result<()> {
 	match !Status.status.success() {
 		true => {
 			let Stderr = String::from_utf8_lossy(&Status.stderr);
-			eprintln!("warning: hermes plugins enable aphrodite: {Stderr}");
+			crate::Logging::Stderr::Fn::Fn(&format!("warning: hermes plugins enable aphrodite: {Stderr}"));
 		},
 		false => {
 			println!("plugin registered with hermes");

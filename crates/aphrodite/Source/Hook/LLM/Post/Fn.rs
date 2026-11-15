@@ -10,16 +10,28 @@ use crate::State::Struct::AphroditeState;
 /// `aphrodite_diff` always returned zero turns despite compressions
 /// happening every turn.
 pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
+	let Span = tracing::info_span!(
+		"hook.post_llm",
+		turn = State.TurnCounter,
+		archived = tracing::field::Empty,
+		archived_size = tracing::field::Empty,
+	);
+	let _Entered = Span.enter();
 	// Archive the LARGEST marker recorded this turn (T13/F13): the last
 	// recorded marker is usually the least informative (e.g. a tiny confirm
 	// echo), while the largest carries the most content for the conversation
 	// index. Ties keep the later-recorded entry.
-	match State
+	let Largest = State
 		.RecentMarkers
 		.iter()
 		.filter(|m| m.Turn == State.TurnCounter)
-		.max_by_key(|m| m.Size)
-	{
+		.max_by_key(|m| m.Size);
+	// Outcome first, while the borrow is still live: whether this turn had
+	// anything worth indexing, and how big it was. The hash identifies the
+	// entry without putting a payload near a log line.
+	Span.record("archived", Largest.is_some());
+	Span.record("archived_size", Largest.map(|m| m.Size).unwrap_or(0));
+	match Largest {
 		Some(Largest) => {
 			let (hash, Summary, Size) = (Largest.hash.clone(), Largest.Preview.clone(), Largest.Size);
 			crate::Session::Archive::Fn::ArchiveTurn(State, &hash, &Summary, Size);

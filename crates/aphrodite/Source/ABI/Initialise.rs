@@ -23,6 +23,12 @@ use crate::{
 /// session until the process exits.
 #[unsafe(no_mangle)]
 pub extern "C" fn AphroditeInit(ConfigurationPath:*const c_char) -> *mut c_char {
+	// Install the process-wide tracing subscriber before anything can log: the
+	// dylib is the plugin's only chance to own the stack, and a host that
+	// already installed one is handled inside `Logging::Fn` (it answers `Ok`
+	// and keeps the host's). A failure here must not fail the session - a
+	// process without a subscriber still compresses; it just says less.
+	let _ = crate::Logging::Fn::Fn(false, None);
 	let path = unsafe { Cstr(ConfigurationPath) }.unwrap_or_default();
 	Guarded(std::panic::AssertUnwindSafe(move || {
 		let mut State = AphroditeState::default();

@@ -27,6 +27,15 @@
 //! degrades to silence - a debug-logging failure must never break a
 //! compression or turn.
 //!
+//! Every record ALSO enters the process-wide `tracing` stack
+//! (`Debug::Log::Emit`, target `aphrodite::debug`, level `DEBUG`), so one
+//! stream carries both the proxy's spans and the engine's per-turn decisions.
+//! The file append stays direct instead of becoming a `tracing` layer, and that
+//! is deliberate: the file's bytes are a documented contract that has to
+//! survive a process where no subscriber is installed at all - the Hermes dylib
+//! before `AphroditeInit`, or a host that installed its own dispatcher first -
+//! and a layer would only write when a subscriber it does not own exists.
+//!
 //! The tree is grouped by WHAT a record describes: `Level/` is the gate,
 //! `Log/` is the append itself (record shape, kv sanitiser, verbose variant),
 //! `Count/` and `Timing/` are the accumulators, `Root/` is the session id the

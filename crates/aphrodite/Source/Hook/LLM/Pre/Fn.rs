@@ -11,6 +11,13 @@ use crate::State::Struct::AphroditeState;
 /// `context_engine_pre_llm` return only `{"context": ...}`; core keeps the
 /// richer shape for back-compat.
 pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
+	let Span = tracing::info_span!(
+		"hook.pre_llm",
+		turn = State.TurnCounter,
+		markers = tracing::field::Empty,
+		context_bytes = tracing::field::Empty,
+	);
+	let _Entered = Span.enter();
 	// Poll-worker checkpoint: push nudges for running/completed/failed tasks
 	// (only when the master flag is enabled).
 	match State.PollWorkerEnabled {
@@ -31,10 +38,19 @@ pub fn Fn(State:&mut AphroditeState) -> serde_json::Value {
 		true => None,
 		false => Some(Context),
 	};
-	serde_json::json!({
+	let Payload = serde_json::json!({
 		"status": "ok",
 		"compressed_count": State.RecentMarkers.len(),
 		"directives": DirectivesField,
 		"context": ContextField,
-	})
+	});
+	// Outcome: what this turn's context actually carried. Byte counts, never
+	// the context itself - it is prompt text and may quote anything the tools
+	// returned.
+	Span.record("markers", State.RecentMarkers.len());
+	Span.record(
+		"context_bytes",
+		Payload.get("context").and_then(|v| v.as_str()).map(str::len).unwrap_or(0),
+	);
+	Payload
 }

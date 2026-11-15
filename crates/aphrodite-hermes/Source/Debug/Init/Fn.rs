@@ -1,0 +1,93 @@
+//! The one subscriber this dylib installs - and the case where it installs none.
+//!
+//! `libaphrodite_hermes` is not a process. It is a cdylib `dlopen`ed into the
+//! Hermes gateway (a Python process) and, in dev, into a Rust host that may
+//! already own the global dispatcher. `tracing::subscriber::set_global_default`
+//! would therefore be a hostile act: it either wins and silences the host's
+//! logging, or loses and takes the whole plugin down with it. `try_init` is the
+//! only correct install - it answers "already set" as an `Err`, which this
+//! module discards without a word.
+//!
+//! Two consequences follow, and both are deliberate:
+//!
+//!   - A second init is a no-op twice over: `Once` keeps the second call from
+//!     reaching `try_init` at all, and `try_init` itself would refuse anyway.
+//!     Nothing panics, and nothing is logged ABOUT the logging setup - a dylib
+//!     that announces its own subscriber in every gateway log is noise.
+//!   - The per-session debug FILE is not a subscriber layer. It is written by
+//!     `Debug::Log::Bridge` through the core sink, because it has to keep
+//!     working when this install loses to a host subscriber. A layer-based file
+//!     sink would silently stop producing `debug.<root>` in exactly that case,
+//!     which would break the `aphrodite_debug` toggle's contract.
+//!
+//! Filter precedence is the one §4.5 fixes: `RUST_LOG`, then `APHRODITE_LOG`,
+//! then the level the engine captured at config load (0 -> warn, 1 -> debug,
+//! 2 -> trace). The fmt layer is target-restricted to this crate so it can
+//! never duplicate a host's own diagnostics into the same stderr.
+
+use std::sync::Once;
+
+use tracing_subscriber::{
+	EnvFilter,
+	Layer as _,
+	filter::{LevelFilter, Targets},
+	layer::SubscriberExt,
+	util::SubscriberInitExt,
+};
+
+use crate::Debug::Init::Const::TARGET;
+
+/// Install guard. `call_once` is what makes the second call cheap: it cannot
+/// reach `try_init`, so the "already installed" path is one atomic load.
+static INSTALL:Once = Once::new();
+
+/// Install the process-wide subscriber, once per process.
+///
+/// Idempotent by design and silent on every failure path: a host that already
+/// installed a subscriber, a filter string that fails to parse, and a second
+/// call from another thread all end in the same place - this crate logs through
+/// whatever dispatcher is in force, and the per-session debug file keeps being
+/// written regardless.
+pub(crate) fn Fn() {
+	INSTALL.call_once(|| {
+		let Filter = std::env::var("RUST_LOG")
+			.ok()
+			.or_else(|| std::env::var("APHRODITE_LOG").ok())
+			.filter(|Spec| !Spec.trim().is_empty())
+			.and_then(|Spec| EnvFilter::try_new(&Spec).ok())
+			.unwrap_or_else(|| EnvFilter::new(LevelName()));
+
+		// OFF by default, TRACE for this crate's targets only: a host dispatcher
+		// may route other crates' events to its own log, and re-printing them
+		// here would double-report the host's diagnostics.
+		let Only = Targets::new()
+			.with_default(LevelFilter::OFF)
+			.with_target(TARGET, LevelFilter::TRACE);
+
+		// `try_init` reports "already set" as an error instead of panicking -
+		// that error IS the host-subscriber case, and it is not a defect.
+		let _ = tracing_subscriber::registry()
+			.with(Filter)
+			.with(
+				tracing_subscriber::fmt::layer()
+					.with_target(false)
+					.with_writer(std::io::stderr)
+					.with_filter(Only),
+			)
+			.try_init();
+	});
+}
+
+/// The filter default when neither env var is set.
+///
+/// Reads the level the engine captured at config load rather than the
+/// environment again: a second read could disagree with the level the debug
+/// file and the flag toggle are gated on, and a log whose filter disagrees with
+/// the feature it logs is worse than no log.
+fn LevelName() -> &'static str {
+	match aphrodite::Debug::Level::Get::Fn::Fn() {
+		0 => "warn",
+		1 => "debug",
+		_ => "trace",
+	}
+}

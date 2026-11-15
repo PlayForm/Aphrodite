@@ -76,7 +76,7 @@ tracing-subscriber = { version = "0.3.23", features = [
 	"json",
 	"env-filter",
 	"fmt",
-], optional = true }
+] }
 anyhow = { workspace = true }
 bytes = { workspace = true, optional = true }
 futures = { version = "0.3.34", optional = true }
@@ -102,7 +102,6 @@ proxy = [
 	"tokio",
 	"reqwest",
 	"clap",
-	"tracing-subscriber",
 	"bytes",
 	"futures",
 	"rand",

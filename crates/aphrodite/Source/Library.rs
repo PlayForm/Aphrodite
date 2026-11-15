@@ -54,6 +54,8 @@ pub mod Directive;
 pub mod Home;
 pub mod Flow;
 pub mod Hook;
+/// The one `tracing` subscriber, installed once per process.
+pub mod Logging;
 pub mod Marker;
 pub mod PollWorker;
 pub mod Prefetch;
