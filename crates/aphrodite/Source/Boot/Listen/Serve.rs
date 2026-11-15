@@ -3,9 +3,7 @@
 use std::net::SocketAddr;
 
 use aphrodite::Configuration::Proxy::Mode::Enum::Enum as ProxyMode;
-
-use Boot::Route;
-use Boot::State::Listener::Bound;
+use Boot::{Route, State::Listener::Bound};
 use Guard::Token::Fn::MgmtToken;
 
 /// Serve one bound listener until its shutdown receiver fires.

@@ -15,7 +15,7 @@ use crate::ConfigurationLoader::Configuration::Struct::Struct as Configuration;
 fn TestApplyCompressionReadsToolThresholdTokenKey() {
 	let mut cfg = Configuration::default();
 	cfg.SetOverride("APHRODITE_TOOL_THRESHOLD_TOKEN", "777");
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert_eq!(State.ToolThreshold, 777);
 }
@@ -27,7 +27,7 @@ fn TestApplyCompressionFromTomlTable() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert_eq!(State.ToolThreshold, 321);
 }
@@ -41,19 +41,19 @@ fn TestFlowBudgetFromToml() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert_eq!(State.FlowBudgetChars, 1234);
 
 	// Env override wins over TOML.
 	let mut Cfg2 = Configuration::default();
 	Cfg2.SetOverride("APHRODITE_FLOW_BUDGET_CHARS", "555");
-	let mut State2 = crate::State::AphroditeState::default();
+	let mut State2 = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&Cfg2, &mut State2);
 	assert_eq!(State2.FlowBudgetChars, 555);
 
 	// Absent everywhere => default 4000.
-	let mut State3 = crate::State::AphroditeState::default();
+	let mut State3 = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&Configuration::default(), &mut State3);
 	assert_eq!(State3.FlowBudgetChars, 4000);
 }
@@ -63,7 +63,7 @@ fn TestFlowBudgetFromToml() {
 #[test]
 fn TestPollWorkerEnabledDefaultTrue() {
 	let cfg = Configuration::default();
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert!(State.PollWorkerEnabled, "poll_worker must default to true");
 }
@@ -72,7 +72,7 @@ fn TestPollWorkerEnabledDefaultTrue() {
 fn TestPollWorkerDisabledViaEnvironmentOverride() {
 	let mut cfg = Configuration::default();
 	cfg.SetOverride("APHRODITE_POLL_WORKER", "false");
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert!(!State.PollWorkerEnabled);
 }
@@ -84,7 +84,7 @@ fn TestPollWorkerDisabledViaToml() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert!(!State.PollWorkerEnabled);
 }
@@ -100,14 +100,14 @@ fn TestAphroditeDebugEnvironmentSetsStateLevel() {
 	unsafe { std::env::remove_var(Key) };
 
 	// Absent => 0 (off - byte-identical behavior when unset).
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&Configuration::default(), &mut State);
 	assert_eq!(State.DebugLevel, 0, "absent APHRODITE_DEBUG must leave debug off");
 	assert!(!crate::Debug::Level::Enabled::Fn::Fn(), "process-global level must mirror 0");
 
 	for (Value, Expected) in [("1", 1u8), ("2", 2u8), ("3", 2u8)] {
 		unsafe { std::env::set_var(Key, Value) };
-		let mut State = crate::State::AphroditeState::default();
+		let mut State = crate::State::Struct::AphroditeState::default();
 		GuardedApplyCompression(&Configuration::default(), &mut State);
 		assert_eq!(State.DebugLevel, Expected, "APHRODITE_DEBUG={Value:?}");
 	}
@@ -131,19 +131,19 @@ fn TestAutoReloadResolution() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	assert!(State.AutoReload, "auto_reload must resolve from TOML");
 
 	// Default off.
-	let mut State2 = crate::State::AphroditeState::default();
+	let mut State2 = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&Configuration::default(), &mut State2);
 	assert!(!State2.AutoReload, "auto_reload must default to off");
 
 	// ── Env override wins.
 	let mut Cfg3 = Configuration::default();
 	Cfg3.SetOverride("APHRODITE_AUTO_RELOAD", "1");
-	let mut State3 = crate::State::AphroditeState::default();
+	let mut State3 = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&Cfg3, &mut State3);
 	assert!(State3.AutoReload, "env override must enable auto_reload");
 }

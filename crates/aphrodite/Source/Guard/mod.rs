@@ -20,4 +20,3 @@ pub mod Token;
 
 #[cfg(test)]
 pub mod Test;
-

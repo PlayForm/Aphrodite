@@ -5,9 +5,7 @@
 //! the configured length cap to whatever comes back. It is not a builder - it
 //! renders nothing itself, and every path through it ends in the same cap.
 
-use crate::Preview::Input;
-use crate::Preview::State::Maximum::PreviewMaximumChars;
-use crate::Preview::Type;
+use crate::Preview::{Input, State::Maximum::PreviewMaximumChars, Type};
 use super::{Cap, Dispatch};
 
 /// Build a compact, human-readable preview of compressed content.

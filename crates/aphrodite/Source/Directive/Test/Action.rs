@@ -14,7 +14,7 @@ use crate::Directive::{Action::Fn as HandleAction, Model::Struct as Directive};
 // delegate to - cover all six actions plus an unknown one directly. ──
 #[test]
 fn TestHandleActionAllActionsAndUnknown() {
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	State
 		.Directives
 		.insert("focus".into(), Directive { name:"focus".into(), Content:"stay focused".into() });
@@ -64,7 +64,7 @@ fn TestHandleActionAllActionsAndUnknown() {
 // shows again. ──
 #[test]
 fn TestOneShotNudgeRendersOnceThenPurged() {
-	let mut s = crate::State::AphroditeState::default();
+	let mut s = crate::State::Struct::AphroditeState::default();
 	s.TurnCounter = 5;
 	crate::Flow::Nudge::Push::Fn::PushNudge(&mut s, "step back and restate the goal", 1);
 
@@ -86,7 +86,7 @@ fn TestOneShotNudgeRendersOnceThenPurged() {
 // oldest. ──
 #[test]
 fn TestNudgeCapDropsOldest() {
-	let mut s = crate::State::AphroditeState::default();
+	let mut s = crate::State::Struct::AphroditeState::default();
 	for i in 0..5 {
 		crate::Flow::Nudge::Push::Fn::PushNudge(&mut s, &format!("nudge number {i}"), 10);
 	}
@@ -109,7 +109,7 @@ fn TestNudgeCapDropsOldest() {
 // manual latch. ──
 #[test]
 fn TestListShowsEphemeralAndResetClearsThem() {
-	let mut s = crate::State::AphroditeState::default();
+	let mut s = crate::State::Struct::AphroditeState::default();
 	s.TurnCounter = 3;
 	crate::Flow::Nudge::Push::Fn::PushNudge(&mut s, "watch out", 2);
 	s.ManualDirectiveTurn = Some(3);
@@ -129,7 +129,7 @@ fn TestListShowsEphemeralAndResetClearsThem() {
 // current turn (P6 override latch). ──
 #[test]
 fn TestManualMutationSetsManualDirectiveTurn() {
-	let mut s = crate::State::AphroditeState::default();
+	let mut s = crate::State::Struct::AphroditeState::default();
 	s.TurnCounter = 12;
 	s.Directives
 		.insert("focus".into(), Directive { name:"focus".into(), Content:"stay focused".into() });

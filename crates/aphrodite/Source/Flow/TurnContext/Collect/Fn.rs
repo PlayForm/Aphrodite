@@ -9,13 +9,16 @@
 //! touch, but keeping one evaluation point avoids two answers to one
 //! question).
 
-use crate::Flow::Retrieval::AutoExpand::Fn::AutoExpandGuidanceBlock;
-use crate::Flow::FirstTurn::Fn::BuildFirstTurnInjection;
-use crate::Flow::Engine::Offload::Fn::EngineOffloadBlock;
-use crate::Flow::Section::Label::Fn::NudgesPresent;
-use crate::Flow::Nudge::Render::Fn::RenderNudges;
-use crate::Flow::Retrieval::Guidance::Fn::RetrievalGuidanceBlock;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Flow::{
+		Engine::Offload::Fn::EngineOffloadBlock,
+		FirstTurn::Fn::BuildFirstTurnInjection,
+		Nudge::Render::Fn::RenderNudges,
+		Retrieval::{AutoExpand::Fn::AutoExpandGuidanceBlock, Guidance::Fn::RetrievalGuidanceBlock},
+		Section::Label::Fn::NudgesPresent,
+	},
+	State::Struct::AphroditeState,
+};
 
 /// Every candidate section for this turn, in survival order, plus the number
 /// of leading entries the budget may never drop.

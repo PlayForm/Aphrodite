@@ -17,7 +17,7 @@ fn TestPromptKnobsResolveFromTomlAndDefault() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.ApplyCompression(&mut State);
 	assert_eq!(State.RetrieveGuidance, "verbose");
 	assert!(State.CatalogIntentHints);
@@ -26,7 +26,7 @@ fn TestPromptKnobsResolveFromTomlAndDefault() {
 	assert_eq!(crate::Marker::Format::Const::RegisteredMarkerFormat().as_deref(), Some("{preview}"));
 
 	// Absent everywhere => defaults (minimal / off / off / fallback grammar).
-	let mut State2 = crate::State::AphroditeState::default();
+	let mut State2 = crate::State::Struct::AphroditeState::default();
 	Configuration::default().ApplyCompression(&mut State2);
 	assert_eq!(State2.RetrieveGuidance, "minimal");
 	assert!(!State2.CatalogIntentHints);
@@ -40,7 +40,7 @@ fn TestPromptKnobsResolveFromEnvironmentOverride() {
 	let mut cfg = Configuration::default();
 	cfg.SetOverride("APHRODITE_RETRIEVE_GUIDANCE", "standard");
 	cfg.SetOverride("APHRODITE_CATALOG_INTENT_HINTS", "1");
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.ApplyCompression(&mut State);
 	assert_eq!(State.RetrieveGuidance, "standard");
 	assert!(State.CatalogIntentHints);

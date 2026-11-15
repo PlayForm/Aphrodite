@@ -1,8 +1,9 @@
 //! Record a terminal call's telemetry event.
 
-use crate::Flow;
-use crate::State::Struct::AphroditeState;
-use crate::State::Event::Struct::ToolEvent;
+use crate::{
+	Flow,
+	State::{Event::Struct::ToolEvent, Struct::AphroditeState},
+};
 
 /// Record the telemetry event for one terminal call (P2/T6).
 ///

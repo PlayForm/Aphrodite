@@ -67,7 +67,7 @@ fn TestTocMode() {
 #[test]
 fn TestTocHintUsesConfiguredSearchHintTemplate() {
 	let mut s = AphroditeState::default();
-	s.Templates = Some(crate::State::TemplatesConfiguration::default());
+	s.Templates = Some(crate::State::Template::Struct::TemplatesConfiguration::default());
 	s.Templates
 		.as_mut()
 		.unwrap()

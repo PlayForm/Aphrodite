@@ -5,9 +5,10 @@
 //! keep I/O out of the lock - that caller composes `ReadPaths` and
 //! `InsertOutcomes` itself, which is exactly why the split exists.
 
-use crate::Prefetch::Insert::Fn::InsertOutcomes;
-use crate::Prefetch::Read::Entry::Fn::ReadPaths;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Prefetch::{Insert::Fn::InsertOutcomes, Read::Entry::Fn::ReadPaths},
+	State::Struct::AphroditeState,
+};
 
 /// Prefetch a list of file paths into the inline store.
 /// Returns JSON with status per file: loaded, skipped (too large), missing.

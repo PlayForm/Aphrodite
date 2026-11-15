@@ -19,7 +19,7 @@ fn TestApplyTemplatesRegistersTemplatesAndFamily() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	GuardedApplyCompression(&cfg, &mut State);
 	cfg.ApplyTemplates(&State);
 	assert_eq!(
@@ -50,7 +50,7 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.ApplyCompression(&mut State);
 	assert_eq!(State.SessionInject, "templates text");
 
@@ -60,12 +60,12 @@ fn TestSessionInjectPrefersTemplatesPromptsOverPrompts() {
 		Overrides:HashMap::new(),
 		ParseFailure:None,
 	};
-	let mut State2 = crate::State::AphroditeState::default();
+	let mut State2 = crate::State::Struct::AphroditeState::default();
 	Cfg2.ApplyCompression(&mut State2);
 	assert_eq!(State2.SessionInject, "legacy text");
 
 	// Neither => shipped constant.
-	let mut State3 = crate::State::AphroditeState::default();
+	let mut State3 = crate::State::Struct::AphroditeState::default();
 	Configuration::default().ApplyCompression(&mut State3);
 	assert_eq!(State3.SessionInject, crate::Flow::Prompt::Const::ShippedSessionInject);
 }
@@ -75,7 +75,7 @@ fn TestSessionInjectEnvironmentOverrideBeatsTemplatesPrompts() {
 	let _G = crate::Marker::Format::Const::MarkerTemplatesTestGuard();
 	let mut cfg = Configuration::default();
 	cfg.SetOverride("APHRODITE_SESSION_INJECT", "env wins");
-	let mut State = crate::State::AphroditeState::default();
+	let mut State = crate::State::Struct::AphroditeState::default();
 	cfg.ApplyCompression(&mut State);
 	assert_eq!(State.SessionInject, "env wins");
 }

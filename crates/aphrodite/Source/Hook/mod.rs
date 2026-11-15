@@ -42,4 +42,3 @@ pub mod Test;
 
 // ── Public surface (called from `Library.rs`, `Proxy/`, `Retrieve/` and the
 // `aphrodite-hermes` bridge) ───────────────────────────────────────────────
-

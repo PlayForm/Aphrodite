@@ -1,11 +1,12 @@
 //! The chain-split battery: separator handling, the marker round trip, and the
 //! per-segment error hints.
 
-use crate::ChainSplit::ErrorHint::Fn::Fn as SegmentErrorHint;
-use crate::ChainSplit::Marked::Command::Fn::Fn as BuildMarkedCommand;
-use crate::ChainSplit::Marked::Output::Fn::Fn as SplitMarkedOutput;
-use crate::ChainSplit::Const::SegMarker;
-use crate::ChainSplit::Split::Fn::Fn as SplitChain;
+use crate::ChainSplit::{
+	Const::SegMarker,
+	ErrorHint::Fn::Fn as SegmentErrorHint,
+	Marked::{Command::Fn::Fn as BuildMarkedCommand, Output::Fn::Fn as SplitMarkedOutput},
+	Split::Fn::Fn as SplitChain,
+};
 
 #[test]
 fn SplitsOnAndAndSemicolon() {

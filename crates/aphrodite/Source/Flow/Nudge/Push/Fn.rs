@@ -5,8 +5,7 @@
 //! The store holds at most four entries and evicts the oldest, so a caller
 //! that pushes every turn cannot accumulate unbounded text into the budget.
 
-use crate::State::Directive::Struct::ActiveDirective;
-use crate::State::Struct::AphroditeState;
+use crate::State::{Directive::Struct::ActiveDirective, Struct::AphroditeState};
 
 /// Push an inline nudge that renders on the next `PreLLMCall` and self-purges
 /// after `TtlTurns` (P3/T9). `ttl_turns = 1` is a one-shot: rendered on the

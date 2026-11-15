@@ -7,10 +7,13 @@
 //! exercised on `EngineOffloadSectionFrom`, which is the piece that turns
 //! the engine's answer into text.
 
-use crate::Flow::TurnContext::Fn::BuildTurnContext;
-use crate::Flow::Engine::Offload::Fn::EngineArchivePrompt;
-use crate::Flow::Engine::Offload::Fn::EngineOffloadSectionFrom;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Flow::{
+		Engine::Offload::Fn::{EngineArchivePrompt, EngineOffloadSectionFrom},
+		TurnContext::Fn::BuildTurnContext,
+	},
+	State::Struct::AphroditeState,
+};
 
 #[test]
 fn TestEngineOffloadDisabledNoCallNoInjection() {

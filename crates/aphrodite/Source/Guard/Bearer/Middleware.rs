@@ -6,9 +6,7 @@ use axum::{
 	middleware::Next,
 	response::{IntoResponse, Json},
 };
-
-use Guard::Bearer::Fn::CheckBearerToken;
-use Guard::Token::Fn::MgmtToken;
+use Guard::{Bearer::Fn::CheckBearerToken, Token::Fn::MgmtToken};
 
 /// Bearer gate for the management routes.
 ///

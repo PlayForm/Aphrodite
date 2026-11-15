@@ -1,10 +1,10 @@
 //! Store terminal output and emit its marker payload.
 
-use crate::Hook::AutoExpand::Content;
-use crate::Hook::ToolResult::Classify;
-use crate::Marker::Format::Entry::CCRMarker;
-use crate::State::Struct::AphroditeState;
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::{
+	Hook::{AutoExpand::Content, ToolResult::Classify},
+	Marker::Format::Entry::CCRMarker,
+	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+};
 
 /// Store `Content`, record the marker, and build the payload the bridge hands
 /// to the model - replacing the marker with the resolved content when

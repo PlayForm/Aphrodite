@@ -6,9 +6,10 @@
 //! reference available. Every gate runs before any mutation, so a refusal is a
 //! true no-op - byte-identical behaviour to an engine that does not exist.
 
-use crate::Session::Archive::Fn::ArchiveTurn;
-use crate::Session::Turn::Fn::ConvIndexCap;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Session::{Archive::Fn::ArchiveTurn, Turn::Fn::ConvIndexCap},
+	State::Struct::AphroditeState,
+};
 
 /// Context-engine archiving entry (pre-Rust port of `_engine.py`
 /// `AphroditeContextEngine`).
@@ -93,7 +94,11 @@ pub fn EngineMaybeArchive(State:&mut AphroditeState) -> Option<String> {
 	State.InlineStorePut(hash.clone(), Packed.clone());
 	let Preview = Packed.chars().take(120).collect::<String>();
 	let Marker = crate::Marker::Format::Entry::CCRMarker(&hash, "context", Packed.len(), &Preview, None, None, None);
-	let Rendered = crate::Flow::Prompt::Render::Fn::RenderPrompt(State, "engine_offload", &[("hash", &hash), ("tail", &TailN.to_string())]);
+	let Rendered = crate::Flow::Prompt::Render::Fn::RenderPrompt(
+		State,
+		"engine_offload",
+		&[("hash", &hash), ("tail", &TailN.to_string())],
+	);
 	let Prompt = format!("{Marker}\n{Rendered}");
 
 	// Replace the archived middle with the marker entry: drop the middle

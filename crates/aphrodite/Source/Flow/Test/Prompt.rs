@@ -6,9 +6,10 @@
 //! verbatim instead of being swallowed.
 
 use super::Support::StateWithPrompt;
-use crate::Flow::Prompt::Render::Fn::RenderPrompt;
-use crate::Flow::Prompt::Const::ShippedSessionInject;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Flow::Prompt::{Const::ShippedSessionInject, Render::Fn::RenderPrompt},
+	State::Struct::AphroditeState,
+};
 
 #[test]
 fn TestRenderPromptFromTemplatesMap() {
@@ -22,7 +23,7 @@ fn TestRenderPromptFromTemplatesMap() {
 #[test]
 fn TestRenderPromptConfiguredTemplateWinsOverFallback() {
 	let mut s = AphroditeState::default();
-	s.Templates = Some(crate::State::TemplatesConfiguration::default());
+	s.Templates = Some(crate::State::Template::Struct::TemplatesConfiguration::default());
 	s.Templates
 		.as_mut()
 		.unwrap()

@@ -5,8 +5,7 @@
 //! runs inside `PreLLMCall`, where a partial mutation would show the model a
 //! history that no archive explains.
 
-use crate::Session::Engine::Fn::EngineMaybeArchive;
-use crate::State::Struct::AphroditeState;
+use crate::{Session::Engine::Fn::EngineMaybeArchive, State::Struct::AphroditeState};
 
 // ── Context-engine archiving (pre-Rust port of _engine.py) ──
 

@@ -5,15 +5,16 @@ use std::sync::Arc;
 
 use axum::response::IntoResponse;
 
-use crate::Proxy::Cache::Get::Fn::Fn as ResponseCacheGet;
-use crate::Proxy::Cache::Key::Fn::Fn as CacheKeyFromBody;
-use crate::Proxy::Handle::Proxy::Fn::Fn as ProxyHandler;
-use crate::Proxy::Stream::Fn::Fn as IsSSE;
-use crate::Proxy::Test::Support::Upstream::Fn::HeaderValue;
-use crate::Proxy::Test::Support::Upstream::Fn::SpawnMockUpstream;
-use crate::Proxy::Test::Support::Upstream::Fn::TestRequest;
-use crate::Proxy::Test::Support::State::Fn::TestState;
-use crate::Proxy::Threshold::Const::ChatCompletionsPath;
+use crate::Proxy::{
+	Cache::{Get::Fn::Fn as ResponseCacheGet, Key::Fn::Fn as CacheKeyFromBody},
+	Handle::Proxy::Fn::Fn as ProxyHandler,
+	Stream::Fn::Fn as IsSSE,
+	Test::Support::{
+		State::Fn::TestState,
+		Upstream::Fn::{HeaderValue, SpawnMockUpstream, TestRequest},
+	},
+	Threshold::Const::ChatCompletionsPath,
+};
 
 #[test]
 fn TestIsSSEExactMatch() {

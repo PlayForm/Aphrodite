@@ -1,7 +1,6 @@
 //! `engine_skip`: why the engine archived nothing this turn.
 
-use crate::Debug::Log::At::Fn::Fn as LogAt;
-use crate::State::Struct::AphroditeState;
+use crate::{Debug::Log::At::Fn::Fn as LogAt, State::Struct::AphroditeState};
 
 /// DEV-ONLY: engine skip line - the context-engine decision when nothing
 /// was archived this turn.

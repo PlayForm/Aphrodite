@@ -1,9 +1,10 @@
 //! The `/stats` payload: every counter group, and the store values that are
 //! read live rather than counted.
 
-use crate::Configuration::Proxy::Mode::Enum::Enum as ProxyMode;
-use crate::Proxy::Test::Support::State::Fn::TestState;
-use crate::Proxy::Test::Support::State::Fn::TestStateWithCCR;
+use crate::{
+	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
+	Proxy::Test::Support::State::Fn::{TestState, TestStateWithCCR},
+};
 
 #[test]
 fn TestStatsJSONModes() {

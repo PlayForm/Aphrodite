@@ -9,11 +9,10 @@
 //! (including ones from the same batch), and a caller that cannot see the
 //! budget discovers that only when a later retrieve unexpectedly misses.
 
-use crate::Prefetch::Arrival::Struct::LiveArrival;
-use crate::Prefetch::Outcome::Enum::ReadOutcome;
-use crate::Prefetch::Read::Const::MaximumPrefetchSize;
-use crate::State::Struct::AphroditeState;
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::{
+	Prefetch::{Arrival::Struct::LiveArrival, Outcome::Enum::ReadOutcome, Read::Const::MaximumPrefetchSize},
+	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+};
 
 /// Classify and store already-read file contents into `State`. Pure state
 /// mutation + JSON assembly - no I/O, so this is the only part that needs

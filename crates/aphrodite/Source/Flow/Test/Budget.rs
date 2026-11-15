@@ -6,10 +6,10 @@
 //! directives is a correctness failure, not a size optimisation.
 
 use super::Support::{AddMarker, StateWithDirective};
-use crate::Flow::TurnContext::Fn::BuildTurnContext;
-use crate::Flow::Nudge::Push::Fn::PushNudge;
-use crate::Flow::Prompt::Const::ShippedSessionInject;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Flow::{Nudge::Push::Fn::PushNudge, Prompt::Const::ShippedSessionInject, TurnContext::Fn::BuildTurnContext},
+	State::Struct::AphroditeState,
+};
 
 // ── T1: the assembler drops the recall catalog before directives when the
 // budget is too small - directives are never dropped. ──

@@ -1,9 +1,7 @@
 //! Spawning one serving task per bound listener.
 
 use tokio::{sync::watch::Receiver, task::JoinHandle};
-
-use Boot::Listen::Serve::Serve;
-use Boot::State::Listener::Bound;
+use Boot::{Listen::Serve::Serve, State::Listener::Bound};
 
 /// Spawn a serving task per listener and return their join handles.
 ///

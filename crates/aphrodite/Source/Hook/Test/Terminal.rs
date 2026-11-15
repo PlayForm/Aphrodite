@@ -1,8 +1,7 @@
 //! Terminal path: exit-code typing, chain splitting, auto-expand.
 
 use super::StoreNested;
-use crate::Hook::Terminal::Entry::Fn::TransformTerminalOutput;
-use crate::State::Struct::AphroditeState;
+use crate::{Hook::Terminal::Entry::Fn::TransformTerminalOutput, State::Struct::AphroditeState};
 
 #[test]
 fn TestTerminalExitCode() {

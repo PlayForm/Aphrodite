@@ -1,10 +1,11 @@
 //! Tool relay: the wire shapes of request and response, and
 //! `ExecuteToolRelay`'s closed verb set.
 
-use crate::Proxy::Relay::Execute::Fn::Fn as ExecuteToolRelay;
-use crate::Proxy::Relay::Response::Struct::Struct as ToolRelayResponse;
-use crate::Proxy::State::CCR::Get::Fn::Fn as CCRGet;
-use crate::Proxy::Test::Support::State::Fn::TestStateWithCCR;
+use crate::Proxy::{
+	Relay::{Execute::Fn::Fn as ExecuteToolRelay, Response::Struct::Struct as ToolRelayResponse},
+	State::CCR::Get::Fn::Fn as CCRGet,
+	Test::Support::State::Fn::TestStateWithCCR,
+};
 
 #[test]
 fn TestToolRelayResponseSyncSerdeShape() {

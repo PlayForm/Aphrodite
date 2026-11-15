@@ -1,11 +1,14 @@
 //! Split marked terminal output into per-segment markers.
 
-use crate::ChainSplit::ErrorHint::Fn::Fn as SegmentErrorHint;
-use crate::ChainSplit::Marked::Output::Fn::Fn as SplitMarkedOutput;
-use crate::ChainSplit::Const::SegMarker;
-use crate::Marker::Format::Entry::CCRMarker;
-use crate::State::Struct::AphroditeState;
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::{
+	ChainSplit::{
+		Const::SegMarker,
+		ErrorHint::Fn::Fn as SegmentErrorHint,
+		Marked::Output::Fn::Fn as SplitMarkedOutput,
+	},
+	Marker::Format::Entry::CCRMarker,
+	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+};
 
 /// Split marked output into one stored, previewed, retrievable marker per
 /// segment. Returns `None` when the feature is off, when auto-expand owns the

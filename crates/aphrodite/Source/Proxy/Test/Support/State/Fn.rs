@@ -11,15 +11,21 @@ use reqwest::Client as HttpClient;
 use headroom_core::ccr::backends::in_memory::InMemoryCcrStore;
 use tokio_util::task::TaskTracker;
 
-use crate::Configuration::Proxy::Mode::Enum::Enum as ProxyMode;
-use crate::Proxy::State::Struct::Struct as AppState;
-use crate::Proxy::Test::Support::Store::Struct::Struct as FailingCCRStore;
-use crate::Proxy::Threshold::Const::AutoExpandLimitDefault;
-use crate::Proxy::Threshold::Const::CacheCompressThreshold;
-use crate::Proxy::Threshold::Const::InitialFillPct;
-use crate::Proxy::Threshold::Const::InitialRatioEma;
-use crate::Proxy::Threshold::Const::InlineCCRThreshold;
-use crate::Proxy::Threshold::Const::TokenCompressThreshold;
+use crate::{
+	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
+	Proxy::{
+		State::Struct::Struct as AppState,
+		Test::Support::Store::Struct::Struct as FailingCCRStore,
+		Threshold::Const::{
+			AutoExpandLimitDefault,
+			CacheCompressThreshold,
+			InitialFillPct,
+			InitialRatioEma,
+			InlineCCRThreshold,
+			TokenCompressThreshold,
+		},
+	},
+};
 
 pub(crate) fn TestState() -> AppState {
 	use std::{collections::HashMap, sync::Mutex};

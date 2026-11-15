@@ -1,9 +1,10 @@
 //! The prefetch call surface: missing files, real files, the size cap and the
 //! inline-store budget the response reports.
 
-use crate::Prefetch::Files::Fn::PrefetchFiles;
-use crate::Prefetch::Read::Const::MaximumPrefetchSize;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Prefetch::{Files::Fn::PrefetchFiles, Read::Const::MaximumPrefetchSize},
+	State::Struct::AphroditeState,
+};
 
 #[test]
 fn TestPrefetchMissing() {

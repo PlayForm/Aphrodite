@@ -1,7 +1,6 @@
 //! The delta catalog: new markers, new files, and the opt-in intent hints.
 
-use crate::Session::Catalog::Fn::CatalogSummary;
-use crate::State::Struct::AphroditeState;
+use crate::{Session::Catalog::Fn::CatalogSummary, State::Struct::AphroditeState};
 
 #[test]
 fn TestCatalogSummaryDeltaOnNewMarkers() {

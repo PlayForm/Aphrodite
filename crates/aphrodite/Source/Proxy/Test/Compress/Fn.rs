@@ -6,12 +6,17 @@ use std::sync::atomic::Ordering;
 
 use headroom_core::ccr::compute_key;
 
-use crate::Configuration::Proxy::Mode::Enum::Enum as ProxyMode;
-use crate::Proxy::Compress::Chat::Fn::Fn as CompressChatCompletion;
-use crate::Proxy::State::CCR::Get::Fn::Fn as CCRGet;
-use crate::Proxy::Test::Support::Chat::Fn::ChatCompletionBody;
-use crate::Proxy::Test::Support::State::Fn::TestStateWithCCR;
-use crate::Proxy::Test::Support::State::Fn::TestStateWithFailingCCR;
+use crate::{
+	Configuration::Proxy::Mode::Enum::Enum as ProxyMode,
+	Proxy::{
+		Compress::Chat::Fn::Fn as CompressChatCompletion,
+		State::CCR::Get::Fn::Fn as CCRGet,
+		Test::Support::{
+			Chat::Fn::ChatCompletionBody,
+			State::Fn::{TestStateWithCCR, TestStateWithFailingCCR},
+		},
+	},
+};
 
 // ── T4 (F4): a failed ccr_put must leave content uncompressed, not
 // silently swapped for an unresolvable marker. ──

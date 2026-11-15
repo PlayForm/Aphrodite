@@ -1,10 +1,10 @@
 //! The response cache: key stability, credential scoping, TTL expiry, and the
 //! FNV vectors.
 
-use crate::Proxy::Cache::Get::Fn::Fn as ResponseCacheGet;
-use crate::Proxy::Cache::Hash::Fn::Fn as Fnv1a64;
-use crate::Proxy::Cache::Key::Fn::Fn as CacheKeyFromBody;
-use crate::Proxy::Test::Support::State::Fn::TestState;
+use crate::Proxy::{
+	Cache::{Get::Fn::Fn as ResponseCacheGet, Hash::Fn::Fn as Fnv1a64, Key::Fn::Fn as CacheKeyFromBody},
+	Test::Support::State::Fn::TestState,
+};
 
 // ── T3: cache_key_from_body / fnv1a_64 ────────────────────────
 #[test]

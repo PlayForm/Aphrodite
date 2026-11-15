@@ -1,8 +1,9 @@
 //! The conversation index: eviction at the cap, and read order.
 
-use crate::Session::Archive::Fn::ArchiveTurn;
-use crate::Session::Index::Fn::GetConvIndex;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Session::{Archive::Fn::ArchiveTurn, Index::Fn::GetConvIndex},
+	State::Struct::AphroditeState,
+};
 
 #[test]
 fn TestArchiveEviction() {

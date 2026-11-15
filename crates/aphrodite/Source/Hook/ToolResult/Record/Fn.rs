@@ -1,9 +1,10 @@
 //! Record a per-call telemetry event.
 
 use super::super::Path::Fn::Fn as WrotePathFrom;
-use crate::Hook::Meta::Struct::Struct as ToolCallMeta;
-use crate::State::Struct::AphroditeState;
-use crate::State::Event::Struct::ToolEvent;
+use crate::{
+	Hook::Meta::Struct::Struct as ToolCallMeta,
+	State::{Event::Struct::ToolEvent, Struct::AphroditeState},
+};
 
 /// Record a per-call telemetry event from the supplied metadata (P2/T6).
 /// `Okay` is fail-open: a missing `Status` means success. `WrotePath` is

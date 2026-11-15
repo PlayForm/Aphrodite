@@ -6,9 +6,7 @@
 //! instead - the value of this file is that the whole startup sequence reads in
 //! one screen.
 
-use Boot::Banner::Announce;
-use Boot::Configuration;
-use Boot::Listen;
+use Boot::{Banner::Announce, Configuration, Listen};
 
 /// Start every configured proxy and block until the process is asked to stop.
 ///
@@ -19,7 +17,8 @@ use Boot::Listen;
 /// here but a serve failure is not.
 pub async fn Run() -> anyhow::Result<()> {
 	let (ConfigurationPath, UseMultiConfiguration) = Configuration::Path::Resolve();
-	let (MultiConfiguration, CLIFallback, LogCompact) = Configuration::Load::Load(&ConfigurationPath, UseMultiConfiguration)?;
+	let (MultiConfiguration, CLIFallback, LogCompact) =
+		Configuration::Load::Load(&ConfigurationPath, UseMultiConfiguration)?;
 	Configuration::Tracing::Subscribe(LogCompact)?;
 	let Compression = Configuration::Compression::Compression(MultiConfiguration.as_ref());
 	let Proxies = Configuration::Proxies::Assemble(MultiConfiguration, CLIFallback)?;

@@ -5,8 +5,7 @@
 //! key). A signature that drifts makes the same command look new every turn,
 //! which inflates the split decision until it misfires.
 
-use crate::Flow::Hash::Fn::Fnv1a;
-use crate::Flow::Signature::Const::VolatileKeys;
+use crate::Flow::{Hash::Fn::Fnv1a, Signature::Const::VolatileKeys};
 
 /// FNV-1a signature of `Tool` + normalized args (P2/P8 similarity key).
 ///

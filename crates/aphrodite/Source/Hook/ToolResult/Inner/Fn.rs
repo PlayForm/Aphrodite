@@ -1,15 +1,17 @@
 //! The tool-result gate sequence.
 
 use super::super::{Classify, Record};
-use crate::Hook::AutoExpand::Applies;
-use crate::Hook::AutoExpand::Content;
-use crate::Hook::Live::Container;
-use crate::Hook::Meta::Struct::Struct as ToolCallMeta;
-use crate::Hook::Path::Fn::Fn as ExtractFilePath;
-use crate::Hook::Tool::Const::EssentialTools;
-use crate::Marker::Format::Entry::CCRMarker;
-use crate::State::Struct::AphroditeState;
-use crate::State::Marker::Struct::MarkerEntry;
+use crate::{
+	Hook::{
+		AutoExpand::{Applies, Content},
+		Live::Container,
+		Meta::Struct::Struct as ToolCallMeta,
+		Path::Fn::Fn as ExtractFilePath,
+		Tool::Const::EssentialTools,
+	},
+	Marker::Format::Entry::CCRMarker,
+	State::{Marker::Struct::MarkerEntry, Struct::AphroditeState},
+};
 
 /// The tool-result pipeline: telemetry, file tracking, bypass gates, the live
 /// container, then store + marker + the auto-expand override.

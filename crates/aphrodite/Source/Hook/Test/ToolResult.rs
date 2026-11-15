@@ -1,9 +1,10 @@
 //! Tool-result path: bypass gates, the payload shape, auto-expand.
 
 use super::StoreNested;
-use crate::Hook::Hash::Fn::Fn as ComputeHash;
-use crate::Hook::ToolResult::Entry::Fn::TransformToolResult;
-use crate::State::Struct::AphroditeState;
+use crate::{
+	Hook::{Hash::Fn::Fn as ComputeHash, ToolResult::Entry::Fn::TransformToolResult},
+	State::Struct::AphroditeState,
+};
 
 #[test]
 fn TestEssentialToolSkip() {

@@ -5,8 +5,7 @@
 //! history is the recent end. Evicting the newest would make every archive
 //! immediately unreachable.
 
-use crate::Session::Turn::Fn::ConvIndexCap;
-use crate::State::Struct::AphroditeState;
+use crate::{Session::Turn::Fn::ConvIndexCap, State::Struct::AphroditeState};
 
 /// Archive a compression at end of turn into the conversation index.
 pub fn ArchiveTurn(State:&mut AphroditeState, hash:&str, Summary:&str, Size:usize) {

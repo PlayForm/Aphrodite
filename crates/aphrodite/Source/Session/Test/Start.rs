@@ -1,7 +1,6 @@
 //! Session start: every per-session field returns to its configured default.
 
-use crate::Session::Start::Fn::OnSessionStart;
-use crate::State::Struct::AphroditeState;
+use crate::{Session::Start::Fn::OnSessionStart, State::Struct::AphroditeState};
 
 #[test]
 fn TestSessionStartResets() {

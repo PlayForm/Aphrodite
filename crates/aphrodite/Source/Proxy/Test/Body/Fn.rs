@@ -5,12 +5,15 @@ use std::sync::Arc;
 
 use axum::{body::Body, extract::FromRequest, http::StatusCode, response::IntoResponse};
 
-use crate::Proxy::Body::Capped::Struct::Struct as CappedBody;
-use crate::Proxy::Body::Stream::Fn::Fn as BodyWantsStream;
-use crate::Proxy::Body::Truncate::Fn::Fn as TruncateCharSafe;
-use crate::Proxy::Test::Support::State::Fn::TestState;
-use crate::Proxy::Test::Support::State::Fn::TestStateWithMaximumBody;
-use crate::Proxy::Threshold::Const::ChatCompletionsPath;
+use crate::Proxy::{
+	Body::{
+		Capped::Struct::Struct as CappedBody,
+		Stream::Fn::Fn as BodyWantsStream,
+		Truncate::Fn::Fn as TruncateCharSafe,
+	},
+	Test::Support::State::Fn::{TestState, TestStateWithMaximumBody},
+	Threshold::Const::ChatCompletionsPath,
+};
 
 // ── 02-F2: `BodyWantsStream` decides which client (bounded vs
 // no-total-timeout) a request goes out on - must match on the exact
