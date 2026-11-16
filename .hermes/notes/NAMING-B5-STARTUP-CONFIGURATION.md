@@ -324,15 +324,28 @@ trip the 3+ probe from inside my paths:
 
 ## Verification
 
+The claims below are executable, not prose: `hermes-verify-b5-naming.py` in the OS temp directory
+(`/private/var/folders/.../T/hermes-verify-b5-naming.py`) runs all seven checks and exits 0 only if
+every one passes. It is left in place rather than cleaned up, so the evidence survives this turn.
+
 | Claim | Probe | Result |
 | --- | --- | --- |
-| 3+ token compounds gone from the partition | `grep -rnoE '\b[A-Z][a-z0-9]+([A-Z][a-z0-9]+){2,}\b' Boot Configuration ConfigurationLoader Setup Home Main.rs --include=*.rs` minus comment lines | 229 → 106, and every survivor is a dependency name (`TryStreamExt`, `DefaultBodyLimit`), an external contract (`UseBasicParsing`), a test name, a doc paragraph about a deleted item, or an item owned by another row (listed above) |
-| serde keys unchanged | extract `#[serde(rename)]` + field pairs from the six tables | 48 pins; 36 sit on a renamed field and were already there, 11 on fields this card did not rename, and exactly 1 was added (`name`) |
-| CLI flags and value names unchanged | extract `long`/`value_name` from `CLI/Struct.rs` + `CLI/Command/Enum.rs`, compare to `target/release/aphrodite --help` and `setup --help` captured **before** the edits (`.hermes/tmp/help-*-before.txt`) | 18 root + 7 setup flags equal, and every value-bearing option's `<VALUE>` equal |
-| Emitted TOML template untouched | `git status --porcelain crates/aphrodite/templates/ plugins/` | clean |
-| Every changed file still parses | `rustfmt --edition 2024 --emit stdout <file>` over every changed `.rs` | 0 parse errors (691 files) |
-| Every declared module exists | `pub mod X;` in each `mod.rs` vs `X.rs` / `X/mod.rs` | 0 missing |
-| ABI symbols unchanged | `grep -c 'pub extern "C" fn aphrodite_' crates/aphrodite/Source/ABI` | not touched by this card; no `ABI/` export was edited |
+| serde keys unchanged | extract `#[serde(rename)]` + field pairs from the six tables; assert every field is pinned and the key list equals the pre-rename list | 48 pins; 36 on a renamed field and already there, 11 on fields this card did not rename, exactly 1 added (`name`) |
+| CLI flags and value names unchanged | extract `long`/`value_name` per `#[arg]` (multi-line tolerant) and compare to `target/release/aphrodite --help` / `setup --help` captured **before** the edits (`.hermes/tmp/help-*-before.txt`) | 18 root + 7 setup options equal, flag and `<VALUE>` both |
+| one word per item | 3+ token probe over the partition, each non-comment hit classified as dependency / external contract / test label / another card's item | 229 → 106, 0 unclassified |
+| no renamed symbol survives | grep each old name across `crates/` | 0 hits |
+| module tree intact | `pub mod X;` vs `X.rs` / `X/mod.rs` | 0 missing |
+| every changed file parses | `rustfmt --edition 2024 --emit stdout` over every changed `.rs` | 0 parse errors (715 files) |
+| emitted artifacts untouched | `git status --porcelain crates/aphrodite/templates/ plugins/` | clean |
+
+Two findings the probe produced that the by-hand sweep had missed, both fixed: a stale module doc in
+`Home/Database/Fn.rs` and a stale `MaximumContext` reference in `Boot/Route/Chat.rs`.
+
+One environment note: this tree is shared with the other eight cards and a sibling ran `cargo fmt`
+over it mid-pass, so `#[arg(...)]` attributes here are now one-argument-per-line rather than the
+single lines this card wrote. Formatting only - no attribute was added, dropped or reordered - and
+the CLI probe reads attribute blocks rather than lines so it is insensitive to it.
 
 Not verified here, and owed to the verification card: the compile, the test count, and a real
 `--help` diff. The `value_name` pins make the last one a one-line check.
+
